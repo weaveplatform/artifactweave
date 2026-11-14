@@ -293,16 +293,17 @@ func (s CranAPI) cranIndexRead(
 		switch {
 		case result.Stream != nil:
 			defer func() { _ = result.Stream.Body.Close() }()
-			body, err = io.ReadAll(io.LimitReader(result.Stream.Body, 32<<20+1))
+			// The stream is the server's copy, cached or spooled, so a
+			// failed read of it is a storage fault, 500, not the
+			// upstream's 502 (#1488).
+			body, err = pkgroute.ReadServed(ctx, result.Stream.Body, 32<<20,
+				pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous))
 		case result.Item != nil:
 			body, err = s.readCranBlob(ctx, result.Item.Actual.SHA256)
 		default:
 			return view, source.ErrInvalidResult
 		}
 		if err != nil {
-			if result.Stream != nil {
-				err = pkgroute.SourceError(source.ErrInvalidResult, p.Anonymous)
-			}
 			return view, fmt.Errorf("cran: remote index body: %w", err)
 		}
 	} else {

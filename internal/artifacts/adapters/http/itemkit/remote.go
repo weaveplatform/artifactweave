@@ -423,6 +423,11 @@ func (s *Kit) ServeRemoteStream(
 	// If-Unmodified-Since as its cached copy does: 7.x answers a remote
 	// download through the same isNotModified.
 	r = withoutUnevaluatedPreconditions(r)
+	// Whatever the stream holds, a file the upstream sent or a document
+	// the cache keeps without an item, the item route serves it as the
+	// file at the path asked for, as 7.x's download serves any resource
+	// it finds there (RemoteRepoResource, FileResource).
+	result.Stream.Path = req.Path
 	sw := &StatusWriter{ResponseWriter: w}
 	if err := pkgroute.ServeStream(sw, r, result.Stream); err != nil {
 		httpkit.NoteCause(ctx, err)

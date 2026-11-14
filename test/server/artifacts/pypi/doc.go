@@ -26,6 +26,9 @@
 //   - TestAccPypiRemoteFileMIMERefusal fails while an upstream file whose
 //     label the remote's block list refuses answers other than 7.x's 409,
 //     remembered, without asking the upstream again (issue 1392).
+//   - TestAccPypiRemoteFileETagIsItsSHA1 fails while a remote wheel answers
+//     with its upstream's ETag instead of its SHA-1, or matches it (issue
+//     1484).
 //
 // # References
 //

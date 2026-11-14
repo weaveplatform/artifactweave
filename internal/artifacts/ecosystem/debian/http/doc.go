@@ -99,16 +99,19 @@
 //   - A Packages or Sources index, stored, cached, in a snapshot or passed
 //     through a virtual repository, and its by-hash copy, reach only a
 //     caller with Read permission on every package it lists, which the
-//     generic item route cannot check. A remote repository caches its
-//     upstream's index as fetched (RTFACT-27303, #1356); one that does not
-//     decode lists no package the server can read, so it is read with the
-//     permission on its own path [I]. A Debian installer's Packages index,
-//     which a remote repository relays as metadata, is read so too, as a
-//     translation or a Contents index is [I]. The download
-//     policy does not filter or refuse an index for the packages it lists:
-//     a package whose file the include and exclude patterns reject stays
-//     listed and only its download is refused, as in Artifactory's indexes
-//     (RTFACT-30830, RTFACT-30656).
+//     generic item route cannot check. A HEAD of a remote repository's
+//     index is answered from the index's info, without that check, as 7.x
+//     reads a remote index by its own path's permission; it sends the
+//     index's length and no package list (#1478). A remote repository
+//     caches its upstream's index as fetched (RTFACT-27303, #1356); one
+//     that does not decode lists no package the server can read, so it is
+//     read with the permission on its own path [I]. A Debian installer's
+//     Packages index, which a remote repository relays as metadata, is
+//     read so too, as a translation or a Contents index is [I]. The
+//     download policy does not filter or refuse an index for the packages
+//     it lists: a package whose file the include and exclude patterns
+//     reject stays listed and only its download is refused, as in
+//     Artifactory's indexes (RTFACT-30830, RTFACT-30656).
 //   - An index, a virtual repository's metadata and a virtual package are
 //     read under the download policy at their own path, after the Read
 //     permission check (DV-057): a blacked-out repository, or patterns that
@@ -284,10 +287,14 @@
 //     declares; the snapshot answers 403, or 401 to an anonymous caller, at
 //     once and through the work queue, also where patterns reject the
 //     index, and the target gets no snapshot.
+//   - served_copy_fault_test.go: a remote index, and a virtual's index read
+//     from a remote member, whose served copy fails to read answers 500
+//     (#1488).
 //
-// debian_index_test.go, debian_index_query_test.go, debian_virtual_test.go
-// and debian_virtual_files_test.go serve their item GETs through the kit
-// with TryDebianItem as the only overlay (overlay_fixture_test.go).
+// debian_index_test.go, debian_index_query_test.go, debian_virtual_test.go,
+// debian_virtual_files_test.go and served_copy_fault_test.go serve their
+// item GETs through the kit with TryDebianItem as the only overlay
+// (overlay_fixture_test.go).
 //
 // The route suite test/server/artifacts/debian checks the snapshot reads'
 // guards and a remote's relay of upstream files through the router, and

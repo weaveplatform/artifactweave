@@ -104,7 +104,9 @@
 //     metadata_response_test.go, module_location_test.go,
 //     cold_head_test.go, a HEAD that fills the cache, and
 //     storage_fault_test.go, a failed read, write or publication of the
-//     cache's own copy, a Hex tarball's Deployed hook among them; and
+//     cache's own copy, a Hex tarball's Deployed hook among them,
+//     state_fault_test.go, a failed read or write of the availability
+//     state the circuit keeps; and
 //     discovery_test.go, discovery_contract_test.go, listing_test.go and
 //     listing_smart_test.go cover discovery and listings. helpers_test.go
 //     holds their small helpers, and export_test.go opens the policy's

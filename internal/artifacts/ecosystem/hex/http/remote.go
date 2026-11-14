@@ -96,8 +96,12 @@ func (h handler) remoteMetadata(
 		return source.Result{}, nil, upstreamFailure()
 	}
 	defer body.Close()
-	data, err := io.ReadAll(io.LimitReader(body, 16<<20+1))
-	if err != nil || len(data) > 16<<20 {
+	// The server's copy, as the tarball's is (validateRemoteTarball).
+	data, err := pkgroute.ReadServed(r.Context(), body, 16<<20, upstreamFailure())
+	if err != nil {
+		return source.Result{}, nil, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
+	}
+	if len(data) > 16<<20 {
 		return source.Result{}, nil, upstreamFailure()
 	}
 	return result, data, nil
@@ -401,9 +405,16 @@ func (h handler) validateRemoteTarball(
 	default:
 		return hexfmt.Package{}, upstreamFailure()
 	}
-	data, err := io.ReadAll(io.LimitReader(body, hexfmt.MaxTarballBytes+1))
+	// Either copy is the server's, the cached tarball or the spool file
+	// of a repository that keeps none, so a failed read of it is a
+	// storage fault, 500; a tarball that reads but fails its checks keeps
+	// the 502 (#1488).
+	data, err := pkgroute.ReadServed(r.Context(), body, hexfmt.MaxTarballBytes, upstreamFailure())
 	_ = body.Close()
-	if err != nil || len(data) == 0 || len(data) > hexfmt.MaxTarballBytes {
+	if err != nil {
+		return hexfmt.Package{}, err //nolint:wrapcheck // ReadServed's answer: the route's or a storage fault
+	}
+	if len(data) == 0 || len(data) > hexfmt.MaxTarballBytes {
 		return hexfmt.Package{}, upstreamFailure()
 	}
 	pkg, err := hexfmt.InspectTarball(bytes.NewReader(data))

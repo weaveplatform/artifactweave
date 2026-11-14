@@ -115,6 +115,12 @@ A cache/flight identity includes incarnation, source generation, normalized logi
 path, representation/media variant and upstream query identity. Sensitive query values
 use an opaque keyed fingerprint; do not place them in observable keys. HTTP and JSON
 PyPI indexes, NuGet resource versions and OCI manifest Accept variants cannot collide.
+Those Accept values are the adapter's own. A client's `Accept` never reaches the
+upstream or the cache identity, so one cached file serves every client whatever it
+accepts: 7.161.26's `HttpRepo.whiteListHeaders` sends upstream only the headers an
+internal request delegates, never a client's, and `RemoteRepoBase.internalGetInfo`
+looks a cached file up by its path ([#1390](https://github.com/weaveplatform/artifactweave/issues/1390)).
+The client's `Accept` is read only as the requested types of the MIME check.
 Configured credentials, TLS/proxy authority, custom headers/cookies and source endpoints
 belong to the generation, not a global client pool. Caller Authorization is never part
 of an upstream request. Stateful upstream responses that vary by unmodeled headers or
@@ -182,7 +188,7 @@ or authentication challenges as artifactweave credentials.
 | DNS/connect failure, broken body, invalid TLS, redirect violation | Transport error; only connectivity/timeouts trip assumed-offline, never security validation failures | 502; no security/integrity fallback |
 | Network/metadata deadline | Cancel request; discard incomplete candidate | 504; stale fallback only under R11 |
 | Unexpected 2xx, unsafe redirect or unsolicited 206 on full fetch | Not a full cacheable artifact; typed protocol error | 502 |
-| GET 200 or 304 whose stored or spooled copy fails to open or read while the format's check (`Validate`, `ValidateMetadata`, its inspection, a 304's re-admission, or a publication hook such as Hex's `Deployed`) reads it, or while a format route reads the copy the source service served it (LuaRocks, Bower, Composer, Ansible, Bazel modules, CocoaPods, Conda and Hugging Face metadata, [#1462](https://github.com/weaveplatform/artifactweave/issues/1462)); or whose copy the blob store fails to write or commit, whose spool file cannot be written, or whose publication meets a failed store call (the fence, the item or entry write, the transaction's begin or commit), or a statement the store failed to run under a format's hook (`kernel.ErrStore`, which the SQL store's `Wrap` marks; [#1470](https://github.com/weaveplatform/artifactweave/issues/1470)) | The server's storage fault, not the upstream's: publish nothing, keep the prior entry, never trip assumed-offline; a failed read of the upstream's body stays the upstream's ([#1269](https://github.com/weaveplatform/artifactweave/issues/1269)) | 500 "internal error" [I] where the error on its own would answer a 502 with no fallback; a read or write that times out or ends short keeps its 504 or 502 and R11 fallback; the store's verdicts (not found, conflict, invalid) map as before |
+| GET 200 or 304 whose stored or spooled copy fails to open or read while the format's check (`Validate`, `ValidateMetadata`, its inspection, a 304's re-admission, or a publication hook such as Hex's `Deployed`) reads it, or while a format route reads the copy the source service served it (LuaRocks, Bower, Composer, Ansible, Bazel modules, CocoaPods, Conda and Hugging Face metadata, [#1462](https://github.com/weaveplatform/artifactweave/issues/1462); npm package documents, Hex tarballs and registry resources, Debian and CRAN indexes and P2 site archives, [#1488](https://github.com/weaveplatform/artifactweave/issues/1488)); or whose copy the blob store fails to write or commit, whose spool file cannot be written, or whose publication meets a failed store call (the fence, the item or entry write, the transaction's begin or commit), or a statement the store failed to run under a format's hook (`kernel.ErrStore`, which the SQL store's `Wrap` marks; [#1470](https://github.com/weaveplatform/artifactweave/issues/1470)) or as the authority fence re-reads the repository or its options, or as the repository's availability state (the assumed-offline circuit) is read before the upstream exchange or the upstream's answer is recorded in it after ([#1489](https://github.com/weaveplatform/artifactweave/issues/1489); 7.x keeps that state in memory [I]) | The server's storage fault, not the upstream's: publish nothing, keep the prior entry, never trip assumed-offline; a failed read of the upstream's body stays the upstream's ([#1269](https://github.com/weaveplatform/artifactweave/issues/1269)) | 500 "internal error" [I] where the error on its own would answer a 502 with no fallback; a read or write that times out or ends short keeps its 504 or 502 and R11 fallback; the store's verdicts (not found, conflict, invalid) map as before |
 
 A downstream HEAD on a remote that stores artifacts locally fills the cache as a GET
 does, in the GET's own flight (the upstream's HEAD, then its GET, unless
@@ -215,12 +221,39 @@ token, or 404 "Checksum not found for <file>" when the upstream has none, as
 every GET sent upstream, it follows a HEAD unless `bypassHeadRequests`. Never publish
 an item from an upstream HEAD alone: a HEAD that downloads nothing (R13, a checksum request, a checksum-only or
 transient resource, or an answer the cache may not keep) sends the upstream one HEAD,
-and the caller closes the response without publishing anything from it.
+and the caller closes the response without publishing anything from it. A route that
+reads what it serves, as the Debian index route does, answers a HEAD with the length the
+source reports for it, the length its GET's body has, without reading it, as 7.161.26's
+`RequestResponseHelper.sendHeadResponse` sends the resource's size
+([#1478](https://github.com/weaveplatform/artifactweave/issues/1478)).
 `bypassHeadRequests` suppresses only the preflight of a GET. [#621](https://github.com/weaveplatform/artifactweave/issues/621) may perform a full, validated GET when its download path needs
 computed hashes; that is an explicit fill, not proof that a HEAD cached bytes. A cold
 Range request with storage enabled fetches a complete 200 into the ordinary ingestion
 path, then serves the requested range; an upstream 206 is never labeled complete. A
 no-store range may relay a validated 206 without durable caching ([#621](https://github.com/weaveplatform/artifactweave/issues/621)).
+
+A remote file served from a stream, the upstream's on a remote that stores nothing
+(R13) or a document the cache keeps without an item, such as a `maven-metadata.xml`,
+answers a GET and a HEAD with the type of its path, as its kept copy does, never the
+upstream's label: 7.161.26 serves a remote that stores nothing from the
+`RemoteRepoResource`, whose `getMimeType` is `NamingUtils.getMimeType` of its path, and a
+cached file from the `FileResource`, typed by its path when it carries no content-type
+property, and `RequestResponseHelper` sends that type. The upstream's `Content-Type`
+serves only the MIME check and an adapter's own negotiation, such as Docker's; a format
+route that builds its document per request keeps the type it sets
+([#1477](https://github.com/weaveplatform/artifactweave/issues/1477)).
+
+Such a file answers with its SHA-1, bare, as its ETag, beside `X-Checksum-Sha1`,
+whether the upstream's answer or the cached copy serves it, and `If-None-Match` is
+matched against that SHA-1 alone: the upstream's `ETag` stays in the cache entry for the
+remote's own conditional request and never reaches a client, as 7.161.26's
+`RequestResponseHelper.setBasicHeaders` sets every downloaded resource's ETag to its
+SHA-1 ([#1484](https://github.com/weaveplatform/artifactweave/issues/1484)). A file an
+upstream's HEAD answers without a SHA-1 sends no ETag; `If-None-Match` then matches
+nothing, `*` and a list included, and only `If-Modified-Since` finds it unchanged, as
+`DownloadServiceImpl.isNotModified` reads them, whether or not the upstream sent a
+length ([#1487](https://github.com/weaveplatform/artifactweave/issues/1487)). A route
+that chooses its own validator, as the registry does for a manifest, keeps it.
 
 `storeArtifactsLocally=false` is a repository setting, and treated as nonpersistent. An
 upstream `Cache-Control: no-store` is not: the remote keeps that answer like any other,
@@ -281,6 +314,15 @@ authorization. A caller retries as a new authorized operation. During a singlefl
 CacheOnly callers never join a MayFetch operation, and a network-forbidden project
 caller cannot join an external-fill flight. Multi-node deduplication/leases are
 P35; atomic generation checks are required in all stores now.
+
+The application's authority fence (`Policy.CheckCurrent`) re-reads the repository and
+the options built from it (its proxy and client certificate). Options that read but
+changed supersede the read, 503, and so does a read that fails, unless the store failed
+to run its statement (`kernel.ErrStore`): that is the server's storage fault, 500
+"internal error", logged once [I]
+([#1489](https://github.com/weaveplatform/artifactweave/issues/1489)). As a read starts,
+before any upstream exchange, a failed options read keeps its 502 and a failed
+repository read its 503.
 
 **Cleanup clock [I], RC-5.** [#622](https://github.com/weaveplatform/artifactweave/issues/622) uses last successful content use, initialized on first
 cache commit, as the inactivity clock. Successful GET/range delivery and successful

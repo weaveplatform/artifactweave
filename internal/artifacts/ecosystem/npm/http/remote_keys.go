@@ -60,9 +60,9 @@ func (h handler) remoteKeys(w http.ResponseWriter, r *http.Request) {
 	}
 	if result.Stream != nil {
 		// The bytes are the upstream's, which validateKeysDocument read as
-		// JSON, so they keep its validators; only the label is the local
-		// document's and registry.npmjs.org's, whatever the upstream sent [I]
-		// (#216).
+		// JSON, served with their own SHA-1 as ETag as any cached file is
+		// (#1484); only the label is the local document's and
+		// registry.npmjs.org's, whatever the upstream sent [I] (#216).
 		result.Stream.MediaType = jsonType
 	}
 	h.k.ServeResult(w, r, result)

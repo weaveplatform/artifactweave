@@ -26,6 +26,19 @@
 //   - TestAccNPMRemoteTarballMIMERefusal fails while an upstream tarball
 //     whose label the remote's block list refuses answers other than 7.x's
 //     409, remembered, without asking the upstream again (issue 1392).
+//   - TestAccNPMRemoteTarballTypedByPath fails while a tarball of a remote
+//     that stores nothing answers its upstream's label instead of the type
+//     its kept copy answers (issue 1477).
+//   - TestAccNPMRemoteTarballETagIsItsSHA1 and TestAccNPMRemoteKeysETagIsItsSHA1
+//     fail while a remote tarball or keys document answers with its
+//     upstream's ETag instead of its SHA-1, or matches it (issue 1484);
+//     TestAccNPMRemoteTarballHeadWithoutChecksumIsMatchedByDate while a
+//     tarball HEAD answered from the upstream's HEAD without a checksum is
+//     matched by Go's rules against the upstream's ETag (issue 1487).
+//   - TestAccNPMRemoteFailedAvailabilityWriteIsAServerFault fails while a
+//     remote tarball whose record of the upstream's 200 or 404 in the
+//     availability state meets a statement the database fails to run
+//     answers other than 500 "internal error", logged once (issue 1489).
 //
 // # References
 //

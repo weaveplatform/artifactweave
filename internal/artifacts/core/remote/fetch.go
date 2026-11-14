@@ -36,7 +36,7 @@ func (p *Policy) fill(
 	}
 	state, err := p.State(ctx, q, opts.Revision)
 	if err != nil {
-		return fillResult{key: key}, err
+		return fillResult{key: key}, stateFault(ctx, err)
 	}
 	if failure := p.Cooldown(state); failure != nil {
 		return p.fallback(q, key, e, failure)
@@ -61,7 +61,7 @@ func (p *Policy) fill(
 		}
 		latest, stateErr := p.State(ctx, q, opts.Revision)
 		if stateErr != nil {
-			return fillResult{key: key}, stateErr
+			return fillResult{key: key}, stateFault(ctx, stateErr)
 		}
 		if failure := p.Cooldown(latest); failure != nil {
 			return p.fallback(q, key, e, failure)
@@ -188,7 +188,7 @@ func (p *Policy) direct(
 	}
 	state, err := p.State(ctx, q, opts.Revision)
 	if err != nil {
-		return source.Result{}, err
+		return source.Result{}, stateFault(ctx, err)
 	}
 	fallback := func(failure error) (source.Result, error) {
 		filled, e := p.fallback(q, key, old, failure)
@@ -227,7 +227,7 @@ func (p *Policy) direct(
 		}
 		latest, stateErr := p.State(ctx, q, opts.Revision)
 		if stateErr != nil {
-			return source.Result{}, stateErr
+			return source.Result{}, stateFault(ctx, stateErr)
 		}
 		if failure := p.Cooldown(latest); failure != nil {
 			return fallback(failure)
@@ -333,7 +333,6 @@ func (p *Policy) directOnce(
 					Checksums: claimed,
 					Size:      res.ContentLength,
 					MediaType: res.Header.Get("Content-Type"),
-					ETag:      res.Header.Get("ETag"),
 					Modified:  modified,
 				},
 			},
@@ -365,7 +364,6 @@ func (p *Policy) directOnce(
 				OriginalChecksums: transient.Declared,
 				Size:              transient.Info.Size,
 				MediaType:         u.ContentType,
-				ETag:              u.ETag,
 				Modified:          modified,
 				Checksums: kernel.Checksums{
 					SHA256: transient.Info.Digests.SHA256,

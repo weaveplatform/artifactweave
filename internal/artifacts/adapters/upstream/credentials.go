@@ -25,6 +25,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/kernel/wire"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
@@ -208,11 +209,42 @@ func (r *Resolver) Options(ctx context.Context, c repo.Config) (remote.Options, 
 	return opts, nil
 }
 
+// configurationError is err, a failed read of what a remote's options are
+// built from, as Resolver answers it: an ended context as a request error,
+// anything else as remote.ErrConfiguration. A statement the store failed to
+// run (kernel.ErrStore) keeps its error behind that answer, which StoreFault
+// returns.
 func configurationError(err error) error {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return safeError(err)
 	}
+	if errors.Is(err, kernel.ErrStore) {
+		return &storeFault{cause: err}
+	}
 	return remote.ErrConfiguration
+}
+
+// storeFault is remote.ErrConfiguration for options the store failed to
+// read, with the store's error. It reads as that error and is it, and does
+// not unwrap to the store's: a caller that maps the failure, such as
+// remote.PolicyError at the start of a read, answers it as before, and
+// only one that asks StoreFault answers it as the server's fault
+// (https://github.com/weaveplatform/artifactweave/issues/1489).
+type storeFault struct{ cause error }
+
+func (e *storeFault) Error() string { return remote.ErrConfiguration.Error() }
+
+func (e *storeFault) Is(target error) bool { return target == remote.ErrConfiguration }
+
+// StoreFault is the store's error behind err, an error of Resolver.Options,
+// when the options failed because a statement the store ran failed
+// (kernel.ErrStore), and nil otherwise.
+func StoreFault(err error) error {
+	var fault *storeFault
+	if errors.As(err, &fault) {
+		return fault.cause
+	}
+	return nil
 }
 
 func (r *Resolver) certificate(ctx context.Context, alias string) (accessapi.Certificate, error) {

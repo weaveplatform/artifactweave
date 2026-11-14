@@ -53,6 +53,11 @@
 //     its upstream and served by a virtual over it (#1375), and a cached
 //     Release, InRelease, installer index or component file served by its
 //     -cache alias without asking the upstream (#1382).
+//   - debian_remote_head_test.go: a HEAD of a remote repository's Packages
+//     index, cold and warm, on a remote that stores it and one that does
+//     not, answers its GET's length, type and cache headers (#1478); a
+//     caller who may read the index by its path but not a package it lists
+//     gets the HEAD's 200 and length, and the GET's 403.
 //   - debian_repository_config_test.go: ddebSupported taken by a Debian
 //     remote, and ddebSupported and debianTrivialLayout read as false by a
 //     Debian local, federated or remote repository that never set them

@@ -172,13 +172,16 @@ func TestUnitCRANRemoteIndexFaults(t *testing.T) {
 		Key: "cran-fault-remote", Class: repo.Remote,
 		PackageType: repo.Cran, URL: "https://up.example",
 	})
+	// A failed read of the stream the source service served is a failed
+	// read of the server's own copy, cached or spooled: its storage fault,
+	// 500 "internal error", not the upstream's 502 (#1488).
 	for _, tc := range []struct {
 		name     string
 		expected int
 	}{
 		{"unavailable", http.StatusBadGateway},
 		{"empty result", http.StatusBadGateway},
-		{"read failure", http.StatusBadGateway},
+		{"read failure", http.StatusInternalServerError},
 		{"oversized index", http.StatusBadGateway},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -186,6 +189,10 @@ func TestUnitCRANRemoteIndexFaults(t *testing.T) {
 			got := w.do(http.MethodGet,
 				"/artifactory/cran-fault-remote/src/contrib/PACKAGES", "admin", "")
 			wantStatus(t, got, tc.expected)
+			if tc.expected == http.StatusInternalServerError && got.Body.String() !=
+				`{"errors":[{"message":"internal error","status":500}]}`+"\n" {
+				t.Fatalf("read failure answered %q", got.Body)
+			}
 			if strings.Contains(got.Body.String(), "assertthat") {
 				t.Fatalf("faulty upstream index advertised a package: %s", got.Body)
 			}

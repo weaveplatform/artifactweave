@@ -14,6 +14,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -136,6 +137,11 @@ func (k *Kit) read(
 		if err != nil {
 			return source.Result{}, fmt.Errorf("read source: %w", err)
 		}
+		if result.Stream != nil && resource.Kind == source.ResourceKindArtifact {
+			// An artifact's stream is the remote file itself, which
+			// ServeStream answers as the copy kept of it would be.
+			result.Stream.Path = resource.Path
+		}
 		return result, nil
 	}
 	if resource.Kind != source.ResourceKindArtifact {
@@ -156,6 +162,11 @@ func (k *Kit) read(
 // Resource builds an artifact request with an explicit escaped upstream path.
 // Conditions belong to the downstream representation: a policy backend must
 // not use these as upstream validators without a matching stored representation.
+// The client's Accept is left out: 7.161.26's HttpRepo.whiteListHeaders
+// sends upstream only the headers an internal request delegates, never a
+// client's, and the cache keeps one file per path whatever the next
+// client accepts (https://github.com/weaveplatform/artifactweave/issues/1390).
+// An adapter whose upstream negotiates by Accept sets its own value.
 func Resource(r *http.Request, path, escaped string) source.Resource {
 	return source.Resource{
 		Kind:        source.ResourceKindArtifact,
@@ -163,7 +174,6 @@ func Resource(r *http.Request, path, escaped string) source.Resource {
 		EscapedPath: escaped,
 		Method:      r.Method,
 		Query:       r.URL.RawQuery,
-		Accept:      r.Header.Get("Accept"),
 		Range:       r.Header.Get("Range"),
 		IfRange:     r.Header.Get("If-Range"),
 		IfNoneMatch: r.Header.Get(
@@ -265,7 +275,16 @@ func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error
 		r = WithoutRange(r)
 	}
 	h := w.Header()
-	if s.MediaType != "" {
+	switch {
+	case s.Path != "":
+		// A remote file is typed by its path, the upstream's label
+		// whatever it says, as a kept copy is (ServeFile): 7.161.26's
+		// RemoteRepoResource.getMimeType is NamingUtils.getMimeType of the
+		// path, and RequestResponseHelper sends it on a GET and a HEAD. The
+		// label serves only the MIME check
+		// (https://github.com/weaveplatform/artifactweave/issues/1477).
+		h.Set("Content-Type", item.MimeType(s.Path))
+	case s.MediaType != "":
 		h.Set("Content-Type", s.MediaType)
 	}
 	if s.ETag != "" {
@@ -281,16 +300,38 @@ func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error
 		h.Set("Content-Length", strconv.FormatInt(s.Size, 10))
 	}
 	SetChecksums(h, s.Checksums)
-	if s.Status == http.StatusOK && s.Checksums.SHA1 != "" {
-		// A stream with a SHA-1 is a file: the upstream's file, or a cached
-		// copy of it, which 7.x answers through its download as it answers
-		// a local file, so its conditional answer and its 416 are that
-		// download's (FileNotModified, RangeRefusalWriter). The ETag this
-		// response sends matches too: a client sends back the one it was
-		// given. A document a protocol builds per request carries no SHA-1
-		// and keeps http.ServeContent's answers, which no 7.x source shows
-		// for those routes [I].
-		tags := []string{s.Checksums.SHA1, ETagValue(s.ETag)}
+	if s.Status == http.StatusOK && (s.Path != "" || s.Checksums.SHA1 != "") {
+		// A stream that names its path or has a SHA-1 is a file: the
+		// upstream's file, or a cached copy of it, which 7.x answers
+		// through its download as it answers a local file, so its
+		// conditional answer and its 416 are that download's
+		// (FileNotModified, RangeRefusalWriter). A document a protocol
+		// builds per request has neither and keeps http.ServeContent's
+		// answers, which no 7.x source shows for those routes [I].
+		var tags []string
+		switch {
+		case s.ETag != "":
+			// A route that chose its own validator, as the registry
+			// chooses a manifest's digest, keeps it, and a client that
+			// sends it back is matched.
+			tags = []string{s.Checksums.SHA1, ETagValue(s.ETag)}
+		case s.Checksums.SHA1 != "":
+			// The file's ETag is its bare SHA-1, never the upstream's,
+			// which the policy keeps for its own conditional request:
+			// 7.161.26's RequestResponseHelper.setBasicHeaders sets every
+			// downloaded resource's ETag to its SHA-1, a remote one's
+			// included, so the first download and the cached copy send
+			// the same validator, matched alone
+			// (https://github.com/weaveplatform/artifactweave/issues/1484).
+			w, r = bareETag(w, r, s.Checksums.SHA1)
+			tags = []string{s.Checksums.SHA1}
+		default:
+			// A file without a SHA-1, such as a HEAD answered from an
+			// upstream's HEAD that declares none, sends no ETag, as
+			// setEtag sets none for a null SHA-1, and only
+			// If-Modified-Since can find it unchanged, whatever its length
+			// (https://github.com/weaveplatform/artifactweave/issues/1487).
+		}
 		if FileNotModified(r, tags, s.Checksums.MD5, s.Modified) {
 			WriteNotModified(w)
 			return nil

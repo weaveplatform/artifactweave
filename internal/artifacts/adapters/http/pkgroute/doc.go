@@ -119,14 +119,31 @@
 //     period, never the upstream's 502. A read with a format hint keeps the
 //     adapter's stricter check and its 502
 //     (https://github.com/weaveplatform/artifactweave/issues/1392).
+//   - Resource never carries the client's Accept: no header of a client's
+//     request reaches the upstream or the cache identity, as 7.x's
+//     HttpRepo.whiteListHeaders sends none, and an adapter whose upstream
+//     negotiates sets its own
+//     (https://github.com/weaveplatform/artifactweave/issues/1390).
+//   - ServeStream answers a stream that names its repository path, the
+//     remote file an artifact read returns or the item route serves, with
+//     the type of that path, as the file's kept copy answers, and never the
+//     upstream's label, as 7.161.26's RemoteRepoResource.getMimeType does; a
+//     stream without one, a document a protocol builds or raw metadata it
+//     serves under its own type, keeps its MediaType
+//     (https://github.com/weaveplatform/artifactweave/issues/1477).
 //   - ServeStream answers If-Match and If-Unmodified-Since never, as 7.x's
-//     download reads neither, on every stream. A stream with a SHA-1, a
-//     file, answers If-None-Match and If-Modified-Since as that download's
-//     isNotModified does (FileNotModified), and a range past its end with
-//     416 and Content-Range alone; a document a protocol builds per request
-//     keeps http.ServeContent's answers to both
+//     download reads neither, on every stream. A stream that names its path
+//     or has a SHA-1, a file, answers If-None-Match and If-Modified-Since as
+//     that download's isNotModified does (FileNotModified), and a range past
+//     its end with 416 and Content-Range alone; a document a protocol builds
+//     per request keeps http.ServeContent's answers to both
 //     (https://github.com/weaveplatform/artifactweave/issues/1468,
-//     https://github.com/weaveplatform/artifactweave/issues/1469).
+//     https://github.com/weaveplatform/artifactweave/issues/1469). A file's
+//     ETag is its bare SHA-1, never the upstream's, unless the route chose
+//     its own; a file without a SHA-1 sends none, and only
+//     If-Modified-Since finds it unchanged
+//     (https://github.com/weaveplatform/artifactweave/issues/1484,
+//     https://github.com/weaveplatform/artifactweave/issues/1487).
 //   - SourceError answers a failure of the server's own storage while it
 //     keeps a remote file (format.ErrStorageFault) as the router's
 //     internal fault, 500
@@ -137,7 +154,8 @@
 //     server's cached file or spool file, marks a failed read the same way
 //     (ReadServed, ServedReadFault), and keeps its own 502 for a copy that
 //     reads but does not parse or is over its limit
-//     (https://github.com/weaveplatform/artifactweave/issues/1462).
+//     (https://github.com/weaveplatform/artifactweave/issues/1462,
+//     https://github.com/weaveplatform/artifactweave/issues/1488).
 //
 // # References
 //
@@ -181,7 +199,7 @@
 // read's policy path and a remote member's refusal against a fake source
 // boundary; source_result_test.go tests ServeResult from inside the
 // package; conditional_test.go covers ServeStream's conditional answers and
-// FileNotModified. Every
+// FileNotModified, and etag_test.go a file stream's SHA-1 ETag. Every
 // native protocol's route suite under test/server/artifacts reaches it
 // through the router.
 package pkgroute

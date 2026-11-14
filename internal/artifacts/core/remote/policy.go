@@ -317,9 +317,11 @@ func (p *Policy) cachedOnly(ctx context.Context, q source.Request) (source.Resul
 // repository key and resource path, revision as SettingsRevision, and as
 // Variant a keyed HMAC-SHA256 (Key) of every term that changes the
 // representation. The terms are the resource's kind, mutability, escaped
-// path, variant and Accept, its query when the repository propagates query
-// parameters, its upstream path, external URL (not for a Git LFS object, which
-// its SHA-256 names), checksums and expected content type when any is set, and
+// path, variant and Accept (the adapter's own, never the client's, so a
+// file is cached once whatever clients accept, #1390), its query when the
+// repository propagates query parameters, its upstream path, external URL
+// (not for a Git LFS object, which its SHA-256 names), checksums and
+// expected content type when any is set, and
 // each opt-in rule set on it, the NuGet empty feed ("nuget-empty-feed-v1") and
 // the accepted media types among them. The keyed fingerprint keeps sensitive
 // query values out of an observable key. Cached entries are stored under the
@@ -459,7 +461,6 @@ func (p *Policy) resultFor(
 				Representation: source.Representation{
 					Size:              e.Blob.Size,
 					MediaType:         e.ContentType,
-					ETag:              e.ETag,
 					Modified:          modified,
 					Checksums:         e.Blob.Checksums,
 					OriginalChecksums: e.OriginalChecksums,
@@ -494,7 +495,6 @@ func (p *Policy) result(ctx context.Context, e model.RemoteCacheEntry) (source.R
 		Stream: &source.Stream{Body: body, Status: 200, Representation: source.Representation{
 			Size:              info.Size,
 			MediaType:         e.ContentType,
-			ETag:              e.ETag,
 			Modified:          modified,
 			Checksums:         e.Blob.Checksums,
 			OriginalChecksums: e.OriginalChecksums,
@@ -518,7 +518,7 @@ func (p *Policy) used(token model.RemoteCacheToken) func(context.Context) error 
 
 // TransportRequest is the upstream request for q: the resource's escaped
 // path, or the path mapped to the upstream's layout, or its external URL,
-// with its query, Accept header and body. Given e, the cached complete
+// with its query, the adapter's Accept header and body. Given e, the cached complete
 // representation of the same resource, it adds e's validator
 // (If-None-Match, else If-Modified-Since) so that the upstream can answer
 // 304; the caller's own validators never reach the upstream. Format rules

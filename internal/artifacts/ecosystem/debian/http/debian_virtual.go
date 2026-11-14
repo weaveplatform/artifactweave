@@ -419,7 +419,7 @@ func (s DebianAPI) serveVirtualDebianSources(
 		httpkit.WriteErr(w, r, err)
 		return true
 	}
-	writeDebianIndex(w, r, req.Path, body, nil)
+	writeDebianIndex(w, r, req.Path, bytes.NewReader(body), nil)
 	return true
 }
 
@@ -563,7 +563,10 @@ func (s DebianAPI) debianMemberRead(
 			defer func() { _ = result.Stream.Body.Close() }()
 			body, err := io.ReadAll(io.LimitReader(result.Stream.Body, debianIndexLimit+1))
 			if err != nil {
-				return nil, nil, fmt.Errorf("debian member stream: %w", err)
+				// The member's copy is the server's: a storage fault
+				// (#1488).
+				return nil, nil, fmt.Errorf("debian member stream: %w",
+					pkgroute.ServedReadFault(ctx, err))
 			}
 			return body, result.CheckPermission, nil
 		}

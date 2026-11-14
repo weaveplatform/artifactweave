@@ -56,6 +56,29 @@
 //     still refreshes mutable metadata under a zero retrieval cache
 //     period. The test repoints the remote world's repository at each
 //     package type in turn.
+//   - remote_accept_test.go: a remote read sends the upstream no Accept of
+//     the client's, and one cached file serves clients that accept other
+//     types (#1390).
+//   - remote_path_type_test.go: a remote file served from a stream, the
+//     upstream's on a remote that stores nothing or a Maven metadata
+//     document the cache keeps without an item, answers with the type of
+//     its path, as its kept copy does, never the upstream's label (#1477).
+//   - remote_etag_test.go: a remote file, on a remote that stores it and
+//     one that does not, and a Maven metadata document, answer with their
+//     SHA-1 as ETag, matched alone, never the upstream's (#1484); a HEAD
+//     answered from an upstream's HEAD without a checksum sends no ETag
+//     and is matched by its date alone (#1487).
+//   - remote_fence_fault_test.go: a generic and a Maven remote read whose
+//     authority fence meets a statement the database fails to run,
+//     reading the repository or its proxy configuration, answers 500
+//     "internal error", logged once; options that changed still answer
+//     503, and failed options as a read starts their 502 (#1489).
+//   - remote_circuit_fault_test.go: a generic remote read, on a remote
+//     that stores artifacts and one that does not, whose record of the
+//     upstream's 200 or 404 in the availability state meets a statement
+//     the database fails to run, answers 500 "internal error", logged once,
+//     with the circuit untouched; a source replaced meanwhile still
+//     answers 503 (#1489).
 //
 // # References
 //

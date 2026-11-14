@@ -156,9 +156,14 @@ type Resource struct {
 	PostBody []byte
 	// Transient forbids persistent caching of a Git LFS batch response, whose
 	// upstream transfer actions may carry expiring URLs or credentials.
-	Transient       bool
-	Query           string
-	Variant         string
+	Transient bool
+	Query     string
+	Variant   string
+	// Accept is the adapter's own Accept for the upstream request, such as
+	// the registry's manifest types or npm's abbreviated packument, and part
+	// of the cache identity. It is never the client's header: 7.161.26's
+	// HttpRepo.whiteListHeaders sends upstream no header of a client's
+	// request, and keeps one cached file per path (#1390).
 	Accept          string
 	Range           string
 	IfRange         string
@@ -251,12 +256,31 @@ type Representation struct {
 	// OriginalChecksums retain upstream declarations for Maven pass-through;
 	// Checksums always describe the computed bytes.
 	OriginalChecksums kernel.Checksums
-	MediaType         string
-	Size              int64
-	ETag              string
-	Modified          time.Time
-	Checksums         kernel.Checksums
-	ContentRange      string
+	// MediaType is the upstream's label on a stream the remote policy
+	// returns, which the MIME check and the registry's manifest
+	// negotiation read; a route serving a remote file answers the type of
+	// Path instead (pkgroute.ServeStream).
+	MediaType string
+	Size      int64
+	// ETag is a validator the route chose for what it serves, such as the
+	// registry's manifest digest or a document it builds per request. The
+	// remote policy leaves it empty and keeps the upstream's ETag in its
+	// entry for its own conditional request, so a remote file answers with
+	// its SHA-1, as 7.161.26's RequestResponseHelper.setBasicHeaders sets
+	// every downloaded resource's ETag (pkgroute.ServeStream, #1484).
+	ETag         string
+	Modified     time.Time
+	Checksums    kernel.Checksums
+	ContentRange string
+	// Path, when set, is the repository path of the remote file these bytes
+	// are, the upstream's or its cached copy: the item route sets it on
+	// every stream it serves, and the package route kit on an artifact read
+	// (pkgroute.Kit.Read). The stream is then answered with the type of its
+	// path, as 7.161.26's RemoteRepoResource.getMimeType types a remote file
+	// and a kept copy is typed (#1477). Empty for a document a protocol
+	// builds per request and for raw metadata a protocol serves under its
+	// own type.
+	Path string
 }
 
 // Stream is an unpersisted representation (including storeArtifactsLocally=false).

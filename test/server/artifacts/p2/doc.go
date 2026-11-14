@@ -52,6 +52,9 @@
 //     PUT, DELETE and a method the item routes do not serve, and for a
 //     request without credentials while anonymous access is off; the
 //     answers it leaves to a signed-in caller and when it is off (#1435).
+//   - served_copy_fault_test.go: an archive-backed remote whose served site
+//     archive, a stream or a cached item, fails to read answers 500, logged
+//     once (#1488).
 //
 // # References
 //
