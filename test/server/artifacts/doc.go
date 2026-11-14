@@ -35,8 +35,8 @@
 //     (reindex_test.go) and remote sources over stub backends
 //     (source_test.go).
 //   - PostgreSQL through internal/app/storetest for the cases that run on
-//     it too (idempotency_sql_test.go, properties_long_test.go); they skip
-//     without Docker.
+//     it too (idempotency_sql_test.go, keyed_operations_test.go,
+//     properties_long_test.go); they skip without Docker.
 //
 // # Outputs
 //
@@ -58,7 +58,9 @@
 //   - builds_test.go, builds_diff_test.go, builds_promote_test.go and
 //     builds_routes_test.go: build-info publish, read, rename, diff,
 //     promotion and retention; idempotency_test.go and
-//     idempotency_sql_test.go: idempotent build appends and their replay.
+//     idempotency_sql_test.go: idempotent build appends and their replay;
+//     keyed_operations_test.go: every operation that declares
+//     Idempotency-Key, replayed once on SQLite and PostgreSQL.
 //   - searches_test.go, searches_builds_test.go, searches_layout_test.go and
 //     searches_versions_test.go: the GET searches; searches_upstream*_test.go:
 //     searches that reach a remote repository's upstream.

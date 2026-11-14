@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -150,4 +151,44 @@ func TestUnitStrictKeyedRefusesAnUnknownService(t *testing.T) {
 		keyedOperations{},
 		"artifactroy",
 	)
+}
+
+// A served operation whose answer carries a secret declares no key
+// (decision 0043, secret-response), so a key on it answers the gate's 400,
+// before authentication and without running it: a replay would have to
+// keep the secret to answer again.
+func TestAccSecretResponseOperationsRefuseAKey(t *testing.T) {
+	served := routerServes(t)
+	w := newItemWorld(t, false)
+	const rule = "Idempotency-Key is supported only once, on an operation whose API description declares it"
+	checked := 0
+	for _, name := range specFiles {
+		doc := loadSpec(t, name)
+		server := doc.Servers[0].URL
+		for path, item := range doc.Paths.Map() {
+			for method, op := range item.Operations() {
+				reason, _ := op.Extensions["x-idempotency-reason"].(string)
+				if reason != "secret-response" || !served(method+" "+server+path, op) {
+					continue
+				}
+				checked++
+				target := server + pathParameter.ReplaceAllString(path, "p")
+				rec := w.do(method, target, "admin", "{}", "Idempotency-Key", `"k"`)
+				if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), rule) {
+					t.Errorf(
+						"%s %s (%s): %d %s",
+						method,
+						target,
+						op.OperationID,
+						rec.Code,
+						rec.Body,
+					)
+				}
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no served secret-response operation checked")
+	}
+	t.Logf("%d served secret-response operations refuse a key", checked)
 }

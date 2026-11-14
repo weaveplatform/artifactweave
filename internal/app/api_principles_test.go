@@ -26,6 +26,8 @@ const (
 	ruleNaturalIdentifier     = "natural-identifier"
 	ruleNoneReason            = "none-reason"
 	ruleKeyParameter          = "key-parameter"
+	ruleKeyServed             = "key-served"
+	ruleKeyStub               = "key-stub"
 	ruleCostAdmission         = "cost-admission"
 	ruleAdmissionResponses    = "admission-responses"
 	ruleAdmissionHeaders      = "admission-headers"
@@ -81,7 +83,13 @@ type principleOp struct {
 	spec, server, method, path string
 	item                       *openapi3.PathItem
 	op                         *openapi3.Operation
+	// served is an operation a handler serves rather than a 501 stub.
+	served bool
 }
+
+// servedFunc reports whether the router serves an operation, given its
+// route as "METHOD server+path".
+type servedFunc func(route string, op *openapi3.Operation) bool
 
 func (o principleOp) name() string {
 	return o.method + " " + o.server + o.path + " (" + o.op.OperationID + ")"
@@ -146,8 +154,9 @@ func admissionClass(method, path string, query url.Values) string {
 }
 
 // checkAPIPrinciples applies every rule to every operation of doc, the
-// bundled spec named spec.
-func checkAPIPrinciples(spec string, doc *openapi3.T) []principleViolation {
+// bundled spec named spec, of which served picks the operations a handler
+// serves.
+func checkAPIPrinciples(spec string, doc *openapi3.T, served servedFunc) []principleViolation {
 	server := doc.Servers[0].URL
 	// The envelope the spec's ErrorResponse describes: the one admission
 	// answers the service's own prefix in.
@@ -167,6 +176,7 @@ func checkAPIPrinciples(spec string, doc *openapi3.T) []principleViolation {
 				spec: spec, server: server, method: method, path: path,
 				item: item, op: item.GetOperation(method),
 			}
+			o.served = served(method+" "+server+path, o.op)
 			report := func(rule, format string, args ...any) {
 				out = append(out, principleViolation{
 					Rule: rule, Spec: spec, Op: o.name(), Detail: fmt.Sprintf(format, args...),
@@ -276,6 +286,17 @@ func checkIdempotency(o principleOp, report reportFunc) {
 		if class != "key" && class != "" {
 			report(ruleKeyParameter, "declares %s but is %s, not key", idempotencyKeyHeader, class)
 		}
+	}
+	// A served key operation honours the key, which it says by declaring
+	// it; a stub answers 501 to any request, so a key it declared would
+	// promise a replay that no handler runs.
+	declares := o.hasParameter(openapi3.ParameterInHeader, idempotencyKeyHeader)
+	switch {
+	case class == "key" && o.served && !declares:
+		report(ruleKeyServed, "is a served key operation that does not declare %s",
+			idempotencyKeyHeader)
+	case !o.served && declares:
+		report(ruleKeyStub, "declares %s, but a 501 stub serves it", idempotencyKeyHeader)
 	}
 }
 
@@ -774,12 +795,25 @@ func principleSummary(violations []principleViolation, examples int) string {
 	return b.String()
 }
 
+// routerServes reports whether the router serves an operation rather than
+// a 501 stub, as the API reliability ledger reads it.
+func routerServes(t *testing.T) servedFunc {
+	t.Helper()
+	stubbed := stubbedHandwritten(t)
+	return func(route string, op *openapi3.Operation) bool {
+		handwritten, _ := op.Extensions["x-handwritten"].(bool)
+		return implemented[route] || handwritten && !stubbed[route]
+	}
+}
+
 // TestAccAPIPrinciples holds every operation of the seven bundled specs to
 // decision 0043's rules: its idempotency, cost and paging classes, the 429
-// and 503 admission answers with their headers, and the key parameter. A
+// and 503 admission answers with their headers, and the key parameter, which
+// every served key operation declares and no stub does. A
 // failure prints one grouped summary: per rule and spec, the count and the
 // first examples.
 func TestAccAPIPrinciples(t *testing.T) {
+	served := routerServes(t)
 	var all []principleViolation
 	operations := 0
 	for _, name := range specFiles {
@@ -787,7 +821,9 @@ func TestAccAPIPrinciples(t *testing.T) {
 		for _, item := range doc.Paths.Map() {
 			operations += len(item.Operations())
 		}
-		all = append(all, checkAPIPrinciples(strings.TrimSuffix(name, ".openapi.yaml"), doc)...)
+		all = append(
+			all,
+			checkAPIPrinciples(strings.TrimSuffix(name, ".openapi.yaml"), doc, served)...)
 	}
 	if operations == 0 {
 		t.Fatal("no operations checked")
