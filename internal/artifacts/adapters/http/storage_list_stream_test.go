@@ -27,8 +27,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/internal/app/adapters/sql/postgres"
-	"github.com/weaveplatform/artifactweave/internal/app/adapters/sql/sqlite"
 	appstoretest "github.com/weaveplatform/artifactweave/internal/app/storetest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -230,14 +228,22 @@ func fileListStore(t *testing.T, backend string) serverStore {
 	case "inmem":
 		db = inmem.New()
 	case "sqlite":
-		s, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "list.db"), sqlite.Options{})
+		s, err := appstoretest.OpenSQLite(
+			ctx,
+			filepath.Join(t.TempDir(), "list.db"),
+			appstoretest.SQLiteOptions{},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = s.Close() })
 		db = s
 	default:
-		s, err := postgres.Open(ctx, platsqltest.PostgresDSN(t), postgres.Options{MaxOpenConns: 8})
+		s, err := appstoretest.OpenPostgres(
+			ctx,
+			platsqltest.PostgresDSN(t),
+			appstoretest.PostgresOptions{MaxOpenConns: 8},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
