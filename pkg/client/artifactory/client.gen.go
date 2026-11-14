@@ -7334,7 +7334,7 @@ type CalculateOpkgRepositoryMetadataParamsWriteProps int
 
 // CalculatePubRepositoryMetadataParams defines parameters for CalculatePubRepositoryMetadata.
 type CalculatePubRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
+	// Async Optional query parameter. When false the response waits for the work to finish; when true or omitted the server queues the work and returns at once.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
 
@@ -9508,7 +9508,7 @@ type ClientInterface interface {
 
 	// CalculateAlpineRepositoryMetadata performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories.
+	// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories. Requires Manage on the repository. Answers "Reindexing of Alpine repository <repoKey> was scheduled to run."
 	CalculateAlpineRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RetrieveBuildArtifactsArchiveWithBody Build artifacts archive
@@ -9750,7 +9750,7 @@ type ClientInterface interface {
 
 	// CalculateBowerIndex performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 	//
-	// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
+	// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories. Requires Manage on the repository. Answers "Bower index for refresh for <repoKey> has been accepted".
 	CalculateBowerIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAllBuilds performs a GET /api/build (the `GetAllBuilds` operationId) request.
@@ -9857,7 +9857,7 @@ type ClientInterface interface {
 
 	// CalculateCargoRepositoryMetadata performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 	//
-	// Queues validation and metadata rebuild for a local or one-node federated Cargo repository.
+	// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. On a remote repository, named by its key or its cache's, expires the cached upstream config.json before it answers, so that the next read fetches it again. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
 	CalculateCargoRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetItemSha256ChecksumWithBody Attach the sha256 property
@@ -10193,7 +10193,7 @@ type ClientInterface interface {
 
 	// CalculateCocoaPodsIndex performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 	//
-	// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives.
+	// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives. Requires an administrator. Answers "Reindexing of CocoaPods repository <repoKey> was scheduled to run."
 	CalculateCocoaPodsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateConanRepositoryMetadata performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
@@ -10203,7 +10203,7 @@ type ClientInterface interface {
 
 	// CalculateCondaRepositoryMetadata performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types and classes are rejected with 400.
+	// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires an administrator; other package types and classes are rejected with 400. Answers "Recalculating index for Conda repository <repoKey> scheduled to run."
 	CalculateCondaRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetChecksumReplication performs a GET /api/config/storage/checksumReplication (the `GetChecksumReplication` operationId) request.
@@ -10225,7 +10225,7 @@ type ClientInterface interface {
 
 	// CalculateCranRepositoryMetadata performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400.
+	// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400. Answers "Recalculating index for CRAN repository <repoKey> scheduled to run."
 	CalculateCranRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// MoveCranArchives performs a GET /api/cran/{repoKey}/move-archives (the `MoveCranArchives` operationId) request.
@@ -10265,7 +10265,7 @@ type ClientInterface interface {
 
 	// CalculateDebianRepositoryMetadata performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 	//
-	// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission.
+	// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission. Answers "Recalculating index for Debian repository <repoKey> scheduled to run."
 	CalculateDebianRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateDebianSnapshotWithBody performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request,
@@ -10569,7 +10569,7 @@ type ClientInterface interface {
 
 	// CalculateRubyGemsIndex performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 	//
-	// Rebuilds the RubyGems package index from valid local or one-node federated gem archives.
+	// Rebuilds the RubyGems package index from valid local or one-node federated gem archives and answers OK once it is done. Requires Manage on the repository.
 	CalculateRubyGemsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetGpgPrivateKeyWithBody Set the GPG private key
@@ -10713,12 +10713,12 @@ type ClientInterface interface {
 
 	// CalculateOpkgRepositoryMetadata performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 	//
-	// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages.
+	// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages. Waits for the work to finish unless async is 1. Requires Manage on the repository. Answers "Recalculating index for Opkg repository <repoKey> scheduled to run."
 	CalculateOpkgRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculatePubRepositoryMetadata performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the local Dart pub package index from stored archives. Runs synchronously unless async is true.
+	// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator. Reindexing a remote repository or its cache is not implemented and answers 501.
 	CalculatePubRepositoryMetadata(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPuppetModules performs a GET /api/puppet/{repoKey}/v3/modules (the `GetPuppetModules` operationId) request.
@@ -11916,7 +11916,7 @@ type ClientInterface interface {
 
 	// CalculateSwiftIndex performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 	//
-	// Schedule a rebuild of local or federated Swift package release metadata from stored source archives.
+	// Schedule a rebuild of local or federated Swift package release metadata from stored source archives. Requires an administrator. Answers "Reindexing of Swift repository <repoKey> was scheduled to run."
 	CalculateSwiftIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSystemInfo System information
@@ -12893,13 +12893,13 @@ type ClientInterface interface {
 
 	// CalculateYumRepositoryMetadata performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 	//
-	// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.
+	// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation. Requires Manage on the repository. A local or federated calculation answers "YUM metadata calculation for repository '<repoKey>' accepted."
 	CalculateYumRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // CalculateAlpineRepositoryMetadata performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 //
-// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories.
+// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories. Requires Manage on the repository. Answers "Reindexing of Alpine repository <repoKey> was scheduled to run."
 func (c *Client) CalculateAlpineRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateAlpineRepositoryMetadataRequest(c.Server, repoKey)
 	if err != nil {
@@ -13441,7 +13441,7 @@ func (c *Client) SetAPIRestriction(ctx context.Context, userName string, body Se
 
 // CalculateBowerIndex performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 //
-// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
+// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories. Requires Manage on the repository. Answers "Bower index for refresh for <repoKey> has been accepted".
 func (c *Client) CalculateBowerIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateBowerIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -13738,7 +13738,7 @@ func (c *Client) GetBuildArtifacts(ctx context.Context, buildName string, buildN
 
 // CalculateCargoRepositoryMetadata performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 //
-// Queues validation and metadata rebuild for a local or one-node federated Cargo repository.
+// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. On a remote repository, named by its key or its cache's, expires the cached upstream config.json before it answers, so that the next read fetches it again. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
 func (c *Client) CalculateCargoRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCargoRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -14494,7 +14494,7 @@ func (c *Client) GetCleanupPoliciesView(ctx context.Context, params *GetCleanupP
 
 // CalculateCocoaPodsIndex performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 //
-// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives.
+// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives. Requires an administrator. Answers "Reindexing of CocoaPods repository <repoKey> was scheduled to run."
 func (c *Client) CalculateCocoaPodsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCocoaPodsIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -14524,7 +14524,7 @@ func (c *Client) CalculateConanRepositoryMetadata(ctx context.Context, repoKey s
 
 // CalculateCondaRepositoryMetadata performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 //
-// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types and classes are rejected with 400.
+// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires an administrator; other package types and classes are rejected with 400. Answers "Recalculating index for Conda repository <repoKey> scheduled to run."
 func (c *Client) CalculateCondaRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCondaRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -14586,7 +14586,7 @@ func (c *Client) ConfigureChecksumReplication(ctx context.Context, body Configur
 
 // CalculateCranRepositoryMetadata performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 //
-// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400.
+// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400. Answers "Recalculating index for CRAN repository <repoKey> scheduled to run."
 func (c *Client) CalculateCranRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCranRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -14686,7 +14686,7 @@ func (c *Client) CalculateCachedRemoteDebianRepositoryCoordinates(ctx context.Co
 
 // CalculateDebianRepositoryMetadata performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 //
-// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission.
+// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission. Answers "Recalculating index for Debian repository <repoKey> scheduled to run."
 func (c *Client) CalculateDebianRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateDebianRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -15384,7 +15384,7 @@ func (c *Client) GetUnavailableMirrors(ctx context.Context, reqEditors ...Reques
 
 // CalculateRubyGemsIndex performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 //
-// Rebuilds the RubyGems package index from valid local or one-node federated gem archives.
+// Rebuilds the RubyGems package index from valid local or one-node federated gem archives and answers OK once it is done. Requires Manage on the repository.
 func (c *Client) CalculateRubyGemsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateRubyGemsIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -15728,7 +15728,7 @@ func (c *Client) CalculateNuGetRepositoryMetadata(ctx context.Context, repoKey s
 
 // CalculateOpkgRepositoryMetadata performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 //
-// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages.
+// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages. Waits for the work to finish unless async is 1. Requires Manage on the repository. Answers "Recalculating index for Opkg repository <repoKey> scheduled to run."
 func (c *Client) CalculateOpkgRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateOpkgRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -15743,7 +15743,7 @@ func (c *Client) CalculateOpkgRepositoryMetadata(ctx context.Context, repoKey st
 
 // CalculatePubRepositoryMetadata performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 //
-// Rebuilds the local Dart pub package index from stored archives. Runs synchronously unless async is true.
+// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator. Reindexing a remote repository or its cache is not implemented and answers 501.
 func (c *Client) CalculatePubRepositoryMetadata(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculatePubRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -18410,7 +18410,7 @@ func (c *Client) RefreshStorageSummaryInfo(ctx context.Context, reqEditors ...Re
 
 // CalculateSwiftIndex performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 //
-// Schedule a rebuild of local or federated Swift package release metadata from stored source archives.
+// Schedule a rebuild of local or federated Swift package release metadata from stored source archives. Requires an administrator. Answers "Reindexing of Swift repository <repoKey> was scheduled to run."
 func (c *Client) CalculateSwiftIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateSwiftIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -20696,7 +20696,7 @@ func (c *Client) GetVcsTags(ctx context.Context, repoKey string, userOrg string,
 
 // CalculateYumRepositoryMetadata performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 //
-// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.
+// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation. Requires Manage on the repository. A local or federated calculation answers "YUM metadata calculation for repository '<repoKey>' accepted."
 func (c *Client) CalculateYumRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateYumRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -36709,7 +36709,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateAlpineRepositoryMetadataWithResponse performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories.
+	// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories. Requires Manage on the repository. Answers "Reindexing of Alpine repository <repoKey> was scheduled to run."
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateAlpineRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateAlpineRepositoryMetadataResponse, error)
@@ -36977,7 +36977,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateBowerIndexWithResponse performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 	//
-	// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
+	// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories. Requires Manage on the repository. Answers "Bower index for refresh for <repoKey> has been accepted".
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateBowerIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateBowerIndexResponse, error)
@@ -37108,7 +37108,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateCargoRepositoryMetadataWithResponse performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 	//
-	// Queues validation and metadata rebuild for a local or one-node federated Cargo repository.
+	// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. On a remote repository, named by its key or its cache's, expires the cached upstream config.json before it answers, so that the next read fetches it again. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCargoRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCargoRepositoryMetadataResponse, error)
@@ -37484,7 +37484,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateCocoaPodsIndexWithResponse performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 	//
-	// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives.
+	// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives. Requires an administrator. Answers "Reindexing of CocoaPods repository <repoKey> was scheduled to run."
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCocoaPodsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateCocoaPodsIndexResponse, error)
@@ -37498,7 +37498,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateCondaRepositoryMetadataWithResponse performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types and classes are rejected with 400.
+	// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires an administrator; other package types and classes are rejected with 400. Answers "Recalculating index for Conda repository <repoKey> scheduled to run."
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCondaRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCondaRepositoryMetadataResponse, error)
@@ -37526,7 +37526,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateCranRepositoryMetadataWithResponse performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400.
+	// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400. Answers "Recalculating index for CRAN repository <repoKey> scheduled to run."
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCranRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCranRepositoryMetadataResponse, error)
@@ -37574,7 +37574,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateDebianRepositoryMetadataWithResponse performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 	//
-	// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission.
+	// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission. Answers "Recalculating index for Debian repository <repoKey> scheduled to run."
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateDebianRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateDebianRepositoryMetadataResponse, error)
@@ -37928,7 +37928,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateRubyGemsIndexWithResponse performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 	//
-	// Rebuilds the RubyGems package index from valid local or one-node federated gem archives.
+	// Rebuilds the RubyGems package index from valid local or one-node federated gem archives and answers OK once it is done. Requires Manage on the repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateRubyGemsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateRubyGemsIndexResponse, error)
@@ -38094,14 +38094,14 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateOpkgRepositoryMetadataWithResponse performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 	//
-	// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages.
+	// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages. Waits for the work to finish unless async is 1. Requires Manage on the repository. Answers "Recalculating index for Opkg repository <repoKey> scheduled to run."
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateOpkgRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateOpkgRepositoryMetadataResponse, error)
 
 	// CalculatePubRepositoryMetadataWithResponse performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the local Dart pub package index from stored archives. Runs synchronously unless async is true.
+	// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator. Reindexing a remote repository or its cache is not implemented and answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculatePubRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculatePubRepositoryMetadataResponse, error)
@@ -39467,7 +39467,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateSwiftIndexWithResponse performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 	//
-	// Schedule a rebuild of local or federated Swift package release metadata from stored source archives.
+	// Schedule a rebuild of local or federated Swift package release metadata from stored source archives. Requires an administrator. Answers "Reindexing of Swift repository <repoKey> was scheduled to run."
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateSwiftIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateSwiftIndexResponse, error)
@@ -40600,7 +40600,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateYumRepositoryMetadataWithResponse performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 	//
-	// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.
+	// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation. Requires Manage on the repository. A local or federated calculation answers "YUM metadata calculation for repository '<repoKey>' accepted."
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateYumRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateYumRepositoryMetadataResponse, error)
@@ -52850,6 +52850,8 @@ type CalculatePubRepositoryMetadataResponse struct {
 	JSON429 *TooManyRequests
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+	// JSON501 the response for an HTTP 501 `application/json` response
+	JSON501 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
 	// Headers429 the parsed response headers for an HTTP 429 response
@@ -52876,6 +52878,11 @@ func (r CalculatePubRepositoryMetadataResponse) GetJSON429() *TooManyRequests {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r CalculatePubRepositoryMetadataResponse) GetJSON500() *ErrorResponse {
 	return r.JSON500
+}
+
+// GetJSON501 returns the response for an HTTP 501 `application/json` response
+func (r CalculatePubRepositoryMetadataResponse) GetJSON501() *ErrorResponse {
+	return r.JSON501
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
@@ -73199,7 +73206,7 @@ func (r CalculateYumRepositoryMetadataResponse) ContentType() string {
 
 // CalculateAlpineRepositoryMetadataWithResponse performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 //
-// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories.
+// Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories. Requires Manage on the repository. Answers "Reindexing of Alpine repository <repoKey> was scheduled to run."
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateAlpineRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateAlpineRepositoryMetadataResponse, error) {
@@ -73647,7 +73654,7 @@ func (c *ClientWithResponses) SetAPIRestrictionWithResponse(ctx context.Context,
 
 // CalculateBowerIndexWithResponse performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 //
-// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
+// Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories. Requires Manage on the repository. Answers "Bower index for refresh for <repoKey> has been accepted".
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateBowerIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateBowerIndexResponse, error) {
@@ -73892,7 +73899,7 @@ func (c *ClientWithResponses) GetBuildArtifactsWithResponse(ctx context.Context,
 
 // CalculateCargoRepositoryMetadataWithResponse performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 //
-// Queues validation and metadata rebuild for a local or one-node federated Cargo repository.
+// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. On a remote repository, named by its key or its cache's, expires the cached upstream config.json before it answers, so that the next read fetches it again. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCargoRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCargoRepositoryMetadataResponse, error) {
@@ -74520,7 +74527,7 @@ func (c *ClientWithResponses) GetCleanupPoliciesViewWithResponse(ctx context.Con
 
 // CalculateCocoaPodsIndexWithResponse performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 //
-// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives.
+// Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives. Requires an administrator. Answers "Reindexing of CocoaPods repository <repoKey> was scheduled to run."
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCocoaPodsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateCocoaPodsIndexResponse, error) {
@@ -74546,7 +74553,7 @@ func (c *ClientWithResponses) CalculateConanRepositoryMetadataWithResponse(ctx c
 
 // CalculateCondaRepositoryMetadataWithResponse performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 //
-// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types and classes are rejected with 400.
+// Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires an administrator; other package types and classes are rejected with 400. Answers "Recalculating index for Conda repository <repoKey> scheduled to run."
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCondaRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCondaRepositoryMetadataResponse, error) {
@@ -74598,7 +74605,7 @@ func (c *ClientWithResponses) ConfigureChecksumReplicationWithResponse(ctx conte
 
 // CalculateCranRepositoryMetadataWithResponse performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 //
-// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400.
+// Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400. Answers "Recalculating index for CRAN repository <repoKey> scheduled to run."
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCranRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCranRepositoryMetadataResponse, error) {
@@ -74682,7 +74689,7 @@ func (c *ClientWithResponses) CalculateCachedRemoteDebianRepositoryCoordinatesWi
 
 // CalculateDebianRepositoryMetadataWithResponse performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 //
-// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission.
+// Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission. Answers "Recalculating index for Debian repository <repoKey> scheduled to run."
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateDebianRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateDebianRepositoryMetadataResponse, error) {
@@ -75275,7 +75282,7 @@ func (c *ClientWithResponses) GetUnavailableMirrorsWithResponse(ctx context.Cont
 
 // CalculateRubyGemsIndexWithResponse performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 //
-// Rebuilds the RubyGems package index from valid local or one-node federated gem archives.
+// Rebuilds the RubyGems package index from valid local or one-node federated gem archives and answers OK once it is done. Requires Manage on the repository.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateRubyGemsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateRubyGemsIndexResponse, error) {
@@ -75561,7 +75568,7 @@ func (c *ClientWithResponses) CalculateNuGetRepositoryMetadataWithResponse(ctx c
 
 // CalculateOpkgRepositoryMetadataWithResponse performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 //
-// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages.
+// Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages. Waits for the work to finish unless async is 1. Requires Manage on the repository. Answers "Recalculating index for Opkg repository <repoKey> scheduled to run."
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateOpkgRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateOpkgRepositoryMetadataResponse, error) {
@@ -75574,7 +75581,7 @@ func (c *ClientWithResponses) CalculateOpkgRepositoryMetadataWithResponse(ctx co
 
 // CalculatePubRepositoryMetadataWithResponse performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 //
-// Rebuilds the local Dart pub package index from stored archives. Runs synchronously unless async is true.
+// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator. Reindexing a remote repository or its cache is not implemented and answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculatePubRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculatePubRepositoryMetadataResponse, error) {
@@ -77834,7 +77841,7 @@ func (c *ClientWithResponses) RefreshStorageSummaryInfoWithResponse(ctx context.
 
 // CalculateSwiftIndexWithResponse performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 //
-// Schedule a rebuild of local or federated Swift package release metadata from stored source archives.
+// Schedule a rebuild of local or federated Swift package release metadata from stored source archives. Requires an administrator. Answers "Reindexing of Swift repository <repoKey> was scheduled to run."
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateSwiftIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateSwiftIndexResponse, error) {
@@ -79753,7 +79760,7 @@ func (c *ClientWithResponses) GetVcsTagsWithResponse(ctx context.Context, repoKe
 
 // CalculateYumRepositoryMetadataWithResponse performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 //
-// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.
+// Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation. Requires Manage on the repository. A local or federated calculation answers "YUM metadata calculation for repository '<repoKey>' accepted."
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateYumRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateYumRepositoryMetadataResponse, error) {
@@ -94091,6 +94098,13 @@ func ParseCalculatePubRepositoryMetadataResponse(rsp *http.Response) (*Calculate
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON501 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
 		var dest ServiceUnavailable

@@ -322,7 +322,7 @@ the request's base URL (decision [0002](0002-spec-first-flat-crud-handwritten-it
     challenge, as wrong credentials do (RTDEV-37982). JFrog does not support a key alone
     (RTFACT-20340, R29 9). The client then retries with its stored credentials, if any.
   - The key is never logged. The access log records the user it named.
-- **A NuGet client's refused password** answers 403 "Bad credentials" with the Basic
+- **A NuGet client's refused password** answers 403 "Bad Credentials" with the Basic
   challenge, not 401 (#1465). 7.161.26's entry point answers 403 when the failure is a wrong
   password (`BadCredentialsException`), the `User-Agent` contains `nuget` in any case, and
   `Authorization` or `X-NuGet-ApiKey` is not blank: "Return 403 to nuget client if bad

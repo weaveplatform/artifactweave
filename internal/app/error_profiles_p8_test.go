@@ -84,7 +84,9 @@ func TestAccProtocolErrorProfiles(t *testing.T) {
 // Packages paths answer in the protocol's envelope with its content type, and
 // pub's 401 and 403 with the Bearer realm="pub" challenge carrying the
 // error's message, which the pub repository specification requires and dart
-// pub prints (#1249, #1279).
+// pub prints (#1249, #1279). The others' 403 for a locked account carries
+// the Basic challenge, as 7.x's entry point sends it with every refusal
+// (#1485).
 // Their reindex operations keep Artifactory's envelope and Basic challenge,
 // and so do the binder's 400 for a reindex with an empty key and the
 // router's 404 for a bare prefix, which no middleware writes. Under /v2 a
@@ -100,7 +102,7 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 		pub     = "/artifactory/api/pub/libs-local/api/packages/widget"
 		swift   = "/artifactory/api/swift/libs-local/acme/widget"
 		apm     = "/artifactory/api/agentpackages/libs-local/v1/search"
-		locked  = `User is Locked.\nContact System Administrator to Unlock The Account.`
+		locked  = "Login has failed. Due to Incorrect username/password or locked user."
 		problem = "application/problem+json; charset=utf-8"
 		pubType = "application/vnd.pub.v2+json"
 	)
@@ -116,21 +118,18 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 			`{"error":{"code":"UNAUTHORIZED","message":"Authentication is required"}}`,
 		},
 		{
-			http.MethodGet, pub, basic("admin", "wrong"), 401, pubType, pubRealm("Bad credentials"),
-			`{"error":{"code":"UNAUTHORIZED","message":"Bad credentials"}}`,
+			http.MethodGet, pub, basic("admin", "wrong"), 401, pubType, pubRealm("Bad Credentials"),
+			`{"error":{"code":"UNAUTHORIZED","message":"Bad Credentials"}}`,
 		},
 		{
 			http.MethodGet, pub,
 			map[string]string{"Authorization": "Bearer not-a-token"},
 			401,
-			pubType, pubRealm("Bad credentials"),
-			`{"error":{"code":"UNAUTHORIZED","message":"Bad credentials"}}`,
+			pubType, pubRealm("Bad Credentials"),
+			`{"error":{"code":"UNAUTHORIZED","message":"Bad Credentials"}}`,
 		},
-		// The message's newline is a space in the challenge, a quoted-string
-		// of printable ASCII.
 		{
-			http.MethodGet, pub, basic("locked", "pw"), 403, pubType,
-			pubRealm("User is Locked. Contact System Administrator to Unlock The Account."),
+			http.MethodGet, pub, basic("locked", "pw"), 403, pubType, pubRealm(locked),
 			`{"error":{"code":"FORBIDDEN","message":"` + locked + `"}}`,
 		},
 		{
@@ -139,10 +138,10 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 		},
 		{
 			http.MethodGet, swift, basic("reader", "wrong"), 401, problem, apierror.BasicChallenge,
-			`{"detail":"Bad credentials","status":401,"title":"Unauthorized"}`,
+			`{"detail":"Bad Credentials","status":401,"title":"Unauthorized"}`,
 		},
 		{
-			http.MethodGet, swift, basic("locked", "pw"), 403, problem, "",
+			http.MethodGet, swift, basic("locked", "pw"), 403, problem, apierror.BasicChallenge,
 			`{"detail":"` + locked + `","status":403,"title":"Forbidden"}`,
 		},
 		{
@@ -151,10 +150,10 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 		},
 		{
 			http.MethodGet, apm, basic("deployer", "wrong"), 401, problem, apierror.BasicChallenge,
-			`{"detail":"Bad credentials","status":401,"title":"Unauthorized"}`,
+			`{"detail":"Bad Credentials","status":401,"title":"Unauthorized"}`,
 		},
 		{
-			http.MethodGet, apm, basic("locked", "pw"), 403, problem, "",
+			http.MethodGet, apm, basic("locked", "pw"), 403, problem, apierror.BasicChallenge,
 			`{"detail":"` + locked + `","status":403,"title":"Forbidden"}`,
 		},
 		{
@@ -178,7 +177,7 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 			`{"errors":[{"message":"not found: GET /artifactory/api/swift/","status":404}]}`,
 		},
 		{
-			http.MethodGet, "/v2/", basic("locked", "pw"), 403, "application/json", "",
+			http.MethodGet, "/v2/", basic("locked", "pw"), 403, "application/json", apierror.BasicChallenge,
 			`{"errors":[{"code":"DENIED","message":"` + locked + `"}]}`,
 		},
 	} {

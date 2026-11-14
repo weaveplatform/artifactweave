@@ -16,7 +16,7 @@ tags:
 paths:
   /api/alpine/{repoKey}/reindex:
     post:
-      description: Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories.
+      description: Rebuilds APKINDEX.tar.gz from the repository's stored Alpine packages. The work is queued and runs asynchronously. Supported for local and one-node federated repositories. Requires Manage on the repository. Answers "Reindexing of Alpine repository <repoKey> was scheduled to run."
       operationId: calculateAlpineRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -991,7 +991,7 @@ paths:
       x-cost: recovery
   /api/bower/{repoKey}/reindex:
     post:
-      description: Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories.
+      description: Rebuilds the Bower package and version index from stored bower.json manifests. The work is queued asynchronously for local and one-node federated repositories. Requires Manage on the repository. Answers "Bower index for refresh for <repoKey> has been accepted".
       operationId: calculateBowerIndex
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -1901,7 +1901,7 @@ paths:
       x-cost: ordinary
   /api/cargo/{repoKey}/reindex:
     post:
-      description: Queues validation and metadata rebuild for a local or one-node federated Cargo repository.
+      description: Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. On a remote repository, named by its key or its cache's, expires the cached upstream config.json before it answers, so that the next read fetches it again. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
       operationId: calculateCargoRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -1922,9 +1922,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text acknowledgement of the queued Cargo reindex.
+                description: Plain-text acknowledgement of the reindex.
                 type: string
-          description: The Cargo reindex was scheduled.
+          description: The Cargo reindex ran, or was scheduled when async is true; on a remote repository the cached upstream config.json was expired.
         '401':
           content:
             application/json:
@@ -1936,7 +1936,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: The caller is not an administrator; the body carries the error envelope.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -3888,7 +3888,7 @@ paths:
       x-pagination-next: none
   /api/cocoapods/{repoKey}/reindex:
     post:
-      description: Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives.
+      description: Schedule a rebuild of the CocoaPods CDN package index from local or federated tar.gz archives. Requires an administrator. Answers "Reindexing of CocoaPods repository <repoKey> was scheduled to run."
       operationId: calculateCocoaPodsIndex
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -3917,7 +3917,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: The caller is not an administrator; the body carries the error envelope.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -4134,7 +4134,7 @@ paths:
       x-tier: implemented
   /api/conda/{repoKey}/reindex:
     post:
-      description: Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types and classes are rejected with 400.
+      description: Rebuilds the channel indexes of a local or federated Conda repository from its stored package archives. Waits for the work to finish unless async is true. Requires an administrator; other package types and classes are rejected with 400. Answers "Recalculating index for Conda repository <repoKey> scheduled to run."
       operationId: calculateCondaRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -4169,7 +4169,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: The caller is not an administrator; the body carries the error envelope.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -4367,7 +4367,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/copyitem.md
   /api/cran/reindex/{repoKey}:
     post:
-      description: Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400.
+      description: Rebuilds the PACKAGES indexes of a local CRAN repository from its stored package archives. Waits for the work to finish unless async is true. Requires Manage on the repository; other package types, and federated, remote and virtual repositories, are rejected with 400. Answers "Recalculating index for CRAN repository <repoKey> scheduled to run."
       operationId: calculateCranRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -4604,7 +4604,7 @@ paths:
       x-tier: stub
   /api/deb/reindex/{repoKey}:
     post:
-      description: Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission.
+      description: Recalculates Debian Packages, Sources and Release metadata for a local repository. Defaults to synchronous work; async=true queues it. Requires Manage permission. Answers "Recalculating index for Debian repository <repoKey> scheduled to run."
       operationId: calculateDebianRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -6965,7 +6965,7 @@ paths:
       x-pagination-next: none
   /api/gems/{repoKey}/reindex:
     post:
-      description: Rebuilds the RubyGems package index from valid local or one-node federated gem archives.
+      description: Rebuilds the RubyGems package index from valid local or one-node federated gem archives and answers OK once it is done. Requires Manage on the repository.
       operationId: calculateRubyGemsIndex
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -8307,7 +8307,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatenugetrepositorymetadata.md
   /api/opkg/reindex/{repoKey}:
     post:
-      description: Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages.
+      description: Rebuild the Packages and Release metadata in each Opkg feed from stored IPK packages. Waits for the work to finish unless async is 1. Requires Manage on the repository. Answers "Recalculating index for Opkg repository <repoKey> scheduled to run."
       operationId: calculateOpkgRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -8346,7 +8346,7 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text body. Not returned.
+                description: Plain-text acknowledgement of the reindex.
                 type: string
           description: The reindex was scheduled or completed.
         '401':
@@ -8381,7 +8381,7 @@ paths:
       x-tier: native
   /api/pub/{repoKey}/reindex:
     post:
-      description: Rebuilds the local Dart pub package index from stored archives. Runs synchronously unless async is true.
+      description: Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator. Reindexing a remote repository or its cache is not implemented and answers 501.
       operationId: calculatePubRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -8391,11 +8391,11 @@ paths:
           schema:
             description: Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
             type: string
-        - description: Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
+        - description: Optional query parameter. When false the response waits for the work to finish; when true or omitted the server queues the work and returns at once.
           in: query
           name: async
           schema:
-            description: When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
+            description: When false the response waits for the work to finish; when true or omitted the server queues the work and returns at once.
             type: boolean
       responses:
         '200':
@@ -8416,7 +8416,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: The caller is not an administrator; the body carries the error envelope.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -8425,6 +8425,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The server failed while processing the request; the body carries the error envelope.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Reindexing a remote repository or its cache is not implemented.
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       tags:
@@ -14542,7 +14548,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/refreshstoragesummaryinfo.md
   /api/swift/{repoKey}/reindex:
     post:
-      description: Schedule a rebuild of local or federated Swift package release metadata from stored source archives.
+      description: Schedule a rebuild of local or federated Swift package release metadata from stored source archives. Requires an administrator. Answers "Reindexing of Swift repository <repoKey> was scheduled to run."
       operationId: calculateSwiftIndex
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -14571,7 +14577,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs; the body carries the error envelope.
+          description: The caller is not an administrator; the body carries the error envelope.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -20465,7 +20471,7 @@ paths:
       x-cost: ordinary
   /api/yum/{repoKey}:
     post:
-      description: Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation.
+      description: Recalculates RPM repodata for local and federated repositories, or validates the on-demand metadata view of a virtual repository. The default waits for completion; async=true queues hosted calculation. Requires Manage on the repository. A local or federated calculation answers "YUM metadata calculation for repository '<repoKey>' accepted."
       operationId: calculateYumRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.

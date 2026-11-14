@@ -39,6 +39,11 @@ var Indexes = []string{
 	"https://docs.jfrog.com/artifactory/reference/retention-release-bundle-v1-api/llms.txt",
 	"https://docs.jfrog.com/artifactory/reference/jfrog-distribution-api/llms.txt",
 	"https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt",
+	// JFrog moved Replace or Create a Group (PUT /access/api/v2/groups/{name},
+	// 7.177.2 SaaS) out of the index above into a family of its own on
+	// 2026-11-13; the page URL stayed. Without this index a fetch loses the
+	// operation, and the parity check stops comparing replaceGroup (#1434).
+	"https://docs.jfrog.com/administration/reference/jfrog-platform-groups-api/llms.txt",
 	"https://docs.jfrog.com/administration/reference/storage-and-archive/llms.txt",
 	"https://docs.jfrog.com/administration/reference/jfrog-artifactory-security-api/llms.txt",
 	"https://docs.jfrog.com/administration/reference/jfrog-artifactory-loggers-api/llms.txt",

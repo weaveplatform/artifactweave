@@ -8,8 +8,9 @@ import (
 
 // reindexMatrixPart is the reindex operations' share of the matrix:
 // Manage on the repository, which only the administrators hold on
-// reindexRepos here, and an administrator for Terraform's and Conan's. The
-// status table's reindexer holds Manage alone.
+// reindexRepos here, and an administrator for Terraform's and
+// formatReindexes' admin ones. The status table's reindexer holds Manage
+// alone.
 var reindexMatrixPart = matrixPart{
 	rows: func() []matrixRow {
 		const (

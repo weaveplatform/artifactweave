@@ -73,8 +73,11 @@ func TestUnitRemoteErrorEnvelopes(t *testing.T) {
 			body: `{"errors":[{"message":"Gateway Timeout","status":504}]}`,
 		},
 		{
+			// A repeat reads under the configuration that superseded the
+			// read, so the 503 hints a retry (decision 0043, #1415).
 			name: "superseded", err: source.ErrSuperseded, status: 503,
-			body: `{"errors":[{"message":"Service Unavailable","status":503}]}`,
+			body:       `{"errors":[{"message":"Service Unavailable","status":503}]}`,
+			retryAfter: "1",
 		},
 		{
 			name: "caller denied", err: source.ErrDenied, status: 403,

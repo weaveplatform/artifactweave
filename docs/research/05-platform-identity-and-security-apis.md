@@ -178,7 +178,9 @@ and camelCase keys inside one object: this is why wire models live in packages t
 
 ## Access identity (`/access/api/...`)
 
-Source index: https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt.
+Source indexes: https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt,
+and, for Replace or Create a Group only,
+https://docs.jfrog.com/administration/reference/jfrog-platform-groups-api/llms.txt.
 All endpoints take Bearer auth; unless noted they require a platform admin.
 
 ### Users v2
@@ -263,6 +265,7 @@ for an unknown member.
 | GET | `/access/api/v2/groups` | 200 | query `limit`, `cursor`, `descendingOrder`, `groupName`, `role`, `resourceType`, `resourceName`, `projectKey`; response `{"groups":[{group_name,uri}],"cursor":"..."}` |
 | POST | `/access/api/v2/groups` | **201** | `members` and `import_from_ldap_group_setting` are mutually exclusive; 409 on conflict; `platform_group` requires 201 |
 | GET | `/access/api/v2/groups/{name}` | 200 | |
+| PUT | `/access/api/v2/groups/{name}` | **201** or 200 | creates the group (201) or replaces it (200); a body `name` that differs from the path answers 400; a replacement resets every field it leaves out and replaces `members`, keeping `realm` and `realm_attributes` ([replacegroup](https://docs.jfrog.com/administration/reference/replacegroup)) |
 | PATCH | `/access/api/v2/groups/{name}` | 200 | `realm`, `realm_attributes` and `members` are not updatable here |
 | DELETE | `/access/api/v2/groups/{name}` | **204** | `platform_group` requires 204 |
 | PATCH | `/access/api/v2/groups/{name}/members` | 200 | `{"add":[...],"remove":[...]}` returns `{"members":[...]}` |
@@ -270,6 +273,24 @@ for an unknown member.
 Create body: `{name,description,auto_join,admin_privileges,external_id,import_from_ldap_group_setting,members[],reports_manager,watch_manager,policy_manager,policy_viewer,manage_resources,manage_webhook}`;
 details add `realm` and `realm_attributes`. The `roles` field needs Artifactory ≥7.128.0;
 there is no other version gate on groups.
+
+**Replace or Create a Group moved; JFrog did not withdraw it**
+([#1434](https://github.com/weaveplatform/artifactweave/issues/1434)). On 2026-11-13 the
+page answered 404 and left the JFrog Platform REST APIs index. It came back the same day at
+the same URL (`updatedAt` 2026-11-13T10:29:17Z), now titled Replace or Create a Group
+rather than Create or Replace a Group, as the only page of a new family,
+[JFrog Platform - Groups API](https://docs.jfrog.com/administration/reference/jfrog-platform-groups-api/llms.txt).
+Its text, status codes and schemas are the same as on 2026-11-10. The
+[SaaS release notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)
+announce it under 7.177.2 (9 November 2026) as a new REST API. The self-managed notes, up
+to 7.173.18, do not mention it yet, and no deprecation notice names an Access v2 group
+route. The [deprecated APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis)
+page, last edited on 2026-11-09, still says the new API is create-only and points at
+`PATCH`; it was written before this route was published. No JFrog client sends the route
+yet: `platform_group` creates with `POST` and updates with `PATCH`, while
+`artifactory_group` and jfrog-client-go send the legacy `PUT /api/security/groups/{groupName}`.
+artifactweave keeps serving it, and the spec oracle now fetches the new family, so an
+oracle refresh keeps the route under the parity check.
 
 **Group names keep their case and are compared exactly**
 ([#1309](https://github.com/weaveplatform/artifactweave/issues/1309)), unlike usernames,
@@ -493,7 +514,9 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    indefinitely on 401 responses"
    (`ArtifactoryBasicAuthenticationEntryPoint.isAlreadyAuthedApiKeyRequest`), with the Basic
    challenge the entry point adds to every answer that is not for the UI. Its message is the
-   provider's, which is not open source; artifactweave answers "Bad credentials" **[I]**, and
+   provider's: Access's providers answer "Bad Credentials" when Access refuses it
+   (`AccessAuthProviderUtils`), but which provider reads a key is not open source, so
+   artifactweave's "Bad Credentials" is **[I]**, and
    an `X-Api-Key` sent empty, read as a key but not one that turns the refusal into 403,
    401 **[I]** ([#1464](https://github.com/weaveplatform/artifactweave/issues/1464)). The
    same entry point answers 403 "if bad credentials error" to a client whose `User-Agent`
@@ -547,11 +570,22 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    refused whatever password it sends: 7.x checks the lock before the password, logging
    "Checking if user is not locked" and then "User is locked, denying login." with no failed
    attempt registered (**[J]** [RTFACT-29453](https://jfrog.atlassian.net/browse/RTFACT-29453),
-   7.31.10 to 7.55.6). artifactweave answers it 403 "User is Locked.\nContact System
-   Administrator to Unlock The Account." before the suspension and the password, and counts
+   7.31.10 to 7.55.6). artifactweave answers it 403 "Login has failed. Due to Incorrect
+   username/password or locked user." before the suspension and the password, and counts
    nothing ([#475](https://github.com/weaveplatform/artifactweave/issues/475)). The status and
-   message are OSS 6.20's: `ArtifactoryBasicAuthenticationEntryPoint` answers a
-   `LockedException` 403 with the `UserLockedException` message **[I]**.
+   message are 7.161.26's: `AccessFilter`'s `SecurityUtils.ensureLoginAttemptAllowed` throws
+   `UserLockedException.userLocked()` with that message before any authentication filter runs,
+   and `ArtifactoryBasicAuthenticationEntryPoint` answers the `LockedException` 403. The
+   message names a wrong password as well, by design, "to avoid any clue for the hacker to
+   identify valid user accounts" (**[J]**
+   [RTFACT-24156](https://jfrog.atlassian.net/browse/RTFACT-24156), 7.11); OSS 6.20's "User is
+   Locked.\nContact System Administrator to Unlock The Account." is not 7.x's.
+   The entry point's `sendErrorResponse` adds `WWW-Authenticate: Basic realm="Artifactory
+   Realm"` to the 403 of a locked account, an expired password and a suspended login, as to
+   every answer it gives but its UI's (`UiRequestUtils.isUiRestRequest`: a path under
+   `/artifactory/ui/` or `Request-Agent: artifactoryUI`), and artifactweave sends it with each
+   on every route, the authenticated user's 403 and the API restriction's excepted
+   ([#1485](https://github.com/weaveplatform/artifactweave/issues/1485)).
 6. The Docker token flow is described in [04-package-protocols.md](04-package-protocols.md);
    `/artifactory/api/docker/<repo>/v1|v2/auth` returns `{"auth":"<base64 user:pass>","email":"..."}`.
 7. Basic credentials create tokens through `POST /access/api/v1/tokens` only once an
@@ -647,6 +681,7 @@ access needed to prove a hosted integration is a recorded phase dependency, neve
 successful local imitation of a vendor-owned operation.
 
 Primary URLs: https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt,
+https://docs.jfrog.com/administration/reference/jfrog-platform-groups-api/llms.txt,
 https://docs.jfrog.com/administration/reference/jfrog-artifactory-security-api/llms.txt,
 https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis,
 https://docs.jfrog.com/administration/docs/access-tokens,
@@ -706,6 +741,40 @@ in N seconds", the REST body 7.61.1 and 7.27.6 answer (**[J]** RTFACT-29934 and 
 item 5 of [Authentication](#authentication-accepted-on-every-endpoint)), where it gave the KB's
 log line before.
 
+**Settled by [#1485](https://github.com/weaveplatform/artifactweave/issues/1485).** A locked
+account, an expired password and a suspended login answer 403 with the entry point's Basic
+challenge, which no answer to a request of the UI's carries, and a locked account's message is
+7.161.26's "Login has failed. Due to Incorrect username/password or locked user." rather than
+OSS 6.20's (item 5 of [Authentication](#authentication-accepted-on-every-endpoint)).
+
+**Settled by [#1486](https://github.com/weaveplatform/artifactweave/issues/1486).** Credentials
+that do not verify answer 401 "Bad Credentials", with a capital C, where artifactweave answered
+"Bad credentials". With the internal realm enabled in Access, a wrong password reaches
+`AccessInternalAuthenticationProvider`, the last provider in `security.xml` since 7.55, and
+Access's refusal ends in `AccessAuthProviderUtils.handleAccessClientHttpException`, which
+throws `BadCredentialsException("Bad Credentials")` from 7.117.5 on ("Bad credentials" in
+7.55.2 to 7.111.22). `DbAuthenticationProvider` and Spring's `DaoAuthenticationProvider`
+still say "Bad credentials", but 7.x tries them only while Access does not handle the internal
+realm. Access 7.191.16, shipped with 7.161.26, lists `internal` first in
+`security.authentication.enabled-realms` in its shipped `example.config.internal.yml`, so the
+realm is on unless an administrator turns it off. Captures agree: `GET /v2/_catalog` with a
+wrong password answered `{"errors":[{"status":401,"message":"Bad Credentials"}]}` on 7.117.12
+(**[J]** [RTFACT-31253](https://jfrog.atlassian.net/browse/RTFACT-31253)), JFrog's own
+package-reroute README says Docker Hub credentials sent to the token endpoint "produce
+`Bad Credentials`", and a default `jfrog/artifactory-jcr` install (7.146.17) answers invalid
+credentials 401 "Bad Credentials" (stackrox/stackrox PR 21328). Every lower-case capture comes
+from before 7.117 (RTFACT-26849 on 7.31.10, jfrog-cli issue 1616 on 7.41.6, RTFACT-29440 on
+SaaS 7.53) or names no version. The same text answers a token or API key that does not verify,
+which 7.x answers through Access's providers as well; what 7.x says for each is **[I]**:
+`AccessTokenAuthenticationProvider` answers "Token failed verification: " and Access's reason,
+a reason no source maps to the fault (a valid access token under another user name gave
+"signature" on SaaS 7.53.1, RTFACT-29440), and an API key header answers the provider's message.
+The Access routes answer the same text, which is **[I]** as well: Access words its own
+refusals, and the one capture, with no version, shows Basic credentials from `~/.netrc` on an
+OIDC identity mappings route answered 401
+`{"errors":[{"code":"UNAUTHORIZED","message":"HTTP 401 Unauthorized","detail":"Request has failed. Due to incorrect username/password or locked user."}]}`
+(**[KB]** [Access OIDC 401 errors caused by .netrc overrides](https://jfrog.com/help/r/artifactory-how-to-fix-access-oidc-401-unauthorized-errors-caused-by-netrc-overrides)).
+
 **Where artifactweave differs.** Decision 0005's
 [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check) lists the token,
 account policy, seeding and OIDC differences, and decision 0006's
@@ -749,14 +818,13 @@ records.
   says.
 - Whether token details carry `audience` and `project_key` (Access tokens v1).
 - Whether `unexpirePassword/{userName}` still exists (the legacy table).
-- The answer to a correct password that has expired. **[I]** 403 with "Password has expired",
-  on every route but the user's own password change, on the Access APIs as on Artifactory's.
-  OSS 6.20 `ArtifactoryBasicAuthenticationEntryPoint` answers a `CredentialsExpiredException`
-  403, as it does a locked account, and its `AccessUserPassAuthenticationProvider` raises one
-  with that message when Access reports `PASSWORD_EXPIRED` (**[J]**
-  [RTFACT-17846](https://jfrog.atlassian.net/browse/RTFACT-17846) logs it); for a blocked
-  user, the 403 still holds in 7.x (**[KB]**
-  [000005331](https://jfrog.com/help/r/artifactory-intermittent-403-errors-while-working-with-artifactory/artifactory-intermittent-403-errors-while-working-with-artifactory)).
+- The answer of the Access APIs to a correct password that has expired, and to a locked
+  account. **[I]** The same 403 and message as Artifactory's routes, with its Basic challenge.
+  On Artifactory's routes 7.161.26 settles both: `AccessAuthProviderUtils` raises
+  `CredentialsExpiredException("Password has expired")` when Access reports
+  `PASSWORD_EXPIRED` (**[J]** [RTFACT-17846](https://jfrog.atlassian.net/browse/RTFACT-17846)
+  logs it), and `ArtifactoryBasicAuthenticationEntryPoint` answers it 403 with the challenge,
+  as it does a locked account; Access answers its own APIs and is not open source.
 - Whether a user may authenticate the legacy `changePassword` with its expired password.
   **[I]** It may: the call is how an expired password is replaced, and OSS 6.20's
   `canUserLogin` accepts an expired old password for it.
@@ -808,16 +876,13 @@ records.
   [RTFACT-2807](https://jfrog.atlassian.net/browse/RTFACT-2807)) points the same way.
 - The file name of a repository's public key. **[I]** `<alias>.rsa.pub`, or `<alias>.gpg.pub`
   for a GPG pair, sent as `Content-Disposition: attachment; filename=...`.
-- The status and message for a locked account. **[I]** 403 "User is Locked.\nContact System
-  Administrator to Unlock The Account.", from OSS 6.20's entry point and
-  `UserLockedException`; no 7.x capture of the response is published.
 - Whether the commercial filters read `Basic Og==`, a blank `Basic`, a Basic scheme spelled
   other than `Basic `, a blank `Bearer`, another scheme or a bare value. **[I]** None does:
   the open source chain serves them as anonymous (item 8 of
   [Authentication](#authentication-accepted-on-every-endpoint)), on the Docker, OCI, NuGet
   and Vagrant paths too, and `X-NuGet-ApiKey` is read beside them.
 - What Access answers Basic credentials naming `anonymous` while anonymous access is on,
-  which the Basic filter reads and passes to Access. **[I]** 401 "Bad credentials", counted
+  which the Basic filter reads and passes to Access. **[I]** 401 "Bad Credentials", counted
   as a failed login: the anonymous user has no password.
 - The legacy delete of the built-in `admin` or `anonymous` user. **[I]** 400 with
   `the built-in user "admin" cannot be deleted`, the message of Access v2's 403. Access, which refuses

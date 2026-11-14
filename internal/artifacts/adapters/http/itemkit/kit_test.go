@@ -221,6 +221,12 @@ func TestUnitItemErrorStatuses(t *testing.T) {
 			got.Status != tc.status || got.Message != tc.message {
 			t.Errorf("%s: %v; want %d %q", tc.name, err, tc.status, tc.message)
 		}
+		// Only a deploy whose content was collected beside it reports a
+		// transient condition, which a retry clears (#1415).
+		if retry := tc.err == item.ErrCollected; retry != (got.RetryAfterSeconds == 1) ||
+			!retry && got.RetryAfterSeconds != 0 {
+			t.Errorf("%s: RetryAfterSeconds %d", tc.name, got.RetryAfterSeconds)
+		}
 	}
 }
 

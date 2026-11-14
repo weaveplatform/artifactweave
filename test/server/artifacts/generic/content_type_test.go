@@ -79,8 +79,10 @@ func TestAccGenericChecksumContentType(t *testing.T) {
 	}
 
 	// A SHA-256 the remote retrieves for a file it has not cached is typed
-	// the same way.
+	// the same way. The upstream holds the file, which the remote asks
+	// about first (#1495).
 	cold := strings.Repeat("a", 64)
+	upstream(remote, "/cold/a.jar", javaArchive, body)
 	upstream(remote, "/cold/a.jar.sha256", "text/plain", cold)
 	on := true
 	remote.c.RetrieveSha256FromServer = &on

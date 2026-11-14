@@ -15,7 +15,7 @@ Feature: Authentication
   Scenario: Wrong credentials are refused even on a probe
     When I GET "/artifactory/api/system/ping" as "admin" with password "wrong"
     Then the response status is 401
-    And the JSON field "errors.0.message" equals "Bad credentials"
+    And the JSON field "errors.0.message" equals "Bad Credentials"
 
   Scenario: The seeded admin is accepted
     When I GET "/artifactory/api/repositories" as admin

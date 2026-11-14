@@ -356,3 +356,26 @@ func TestAccRemoteDeliveryRefusesRevocationAfterRead(t *testing.T) {
 		)
 	}
 }
+
+// TestAccSupersededRemoteFetchHintsARetry (#1415): a remote read that a change of
+// the remote's configuration superseded answers 503 "Service Unavailable"
+// with Retry-After: 1, since a repeat reads under the new configuration.
+func TestAccSupersededRemoteFetchHintsARetry(t *testing.T) {
+	svc := &source.Service{
+		Resolve: sourceIdentity,
+		HTTP: sourceBackend(
+			func(context.Context, source.Request, source.Permit) (source.Result, error) {
+				return source.Result{}, source.ErrSuperseded
+			},
+		),
+	}
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = svc })
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		res := w.do(method, "/artifactory/up/a.bin", "reader", "")
+		want := `{"errors":[{"message":"Service Unavailable","status":503}]}` + "\n"
+		if res.Code != http.StatusServiceUnavailable || res.Header().Get("Retry-After") != "1" ||
+			method == http.MethodGet && res.Body.String() != want {
+			t.Fatal(method, res.Code, res.Header(), res.Body)
+		}
+	}
+}

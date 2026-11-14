@@ -288,7 +288,7 @@ func TestAccSwiftPMPrintsProblemDetails(t *testing.T) {
 	// The bad password is reader's, not admin's: a failed login blocks the
 	// user's next one for a moment, and admin publishes next.
 	for _, c := range []struct{ user, password, printed string }{
-		{"reader", "wrong", "server error 401: Bad credentials"},
+		{"reader", "wrong", "server error 401: Bad Credentials"},
 		{"deployer", "pw", "server error 403: Forbidden"},
 	} {
 		out, err := publish(c.user, c.password)

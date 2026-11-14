@@ -283,20 +283,26 @@ func TestAccRemoteChecksumFileAnswersConditionalsAsTheDownload(t *testing.T) {
 }
 
 // TestAccColdRemoteChecksumAnswersConditionalsAsTheDownload: a SHA-256 a
-// remote retrieves from its upstream without the file
+// remote retrieves from its upstream for a file it does not hold
 // (retrieveSha256FromServer) ignores If-Match and If-Unmodified-Since and
-// answers If-Modified-Since against the upstream checksum's time, GET and
-// HEAD alike. Its file's checksums are unknown, so no If-None-Match
-// matches, as 7.x's isNoneMatch treats a blank SHA-1, and a HEAD sends
-// none of them (#1436).
+// answers If-Modified-Since against the time of the file, which the
+// upstream's HEAD reported, not of the checksum file, GET and HEAD alike:
+// 7.161.26's respond reads the file's info before respondForChecksumRequest
+// (#1495). The file's checksums are unknown, so no If-None-Match matches,
+// as 7.x's isNoneMatch treats a blank SHA-1, and a HEAD sends none of them
+// (#1436).
 func TestAccColdRemoteChecksumAnswersConditionalsAsTheDownload(t *testing.T) {
 	w := harness.NewRemoteWorld(t)
 	w.Repo.RetrieveSha256FromServer = new(true)
 	w.Update()
 	digest := strings.Repeat("c", 64)
 	modified := time.Unix(1700000000, 0).UTC()
-	w.Upstream.Set("/cold.bin.sha256",
-		fakeupstream.Resource{Body: []byte(digest + "  cold.bin\n"), Modified: modified})
+	w.Upstream.Set("/cold.bin",
+		fakeupstream.Resource{Body: []byte("cold bytes"), Modified: modified})
+	w.Upstream.Set("/cold.bin.sha256", fakeupstream.Resource{
+		Body:     []byte(digest + "  cold.bin\n"),
+		Modified: modified.Add(48 * time.Hour),
+	})
 	before := modified.Add(-time.Hour).Format(http.TimeFormat)
 	after := modified.Add(time.Hour).Format(http.TimeFormat)
 	whole := condAnswer{http.StatusOK, digest, ""}

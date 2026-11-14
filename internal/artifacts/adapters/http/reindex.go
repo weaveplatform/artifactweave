@@ -19,13 +19,15 @@ import (
 // on the persistent work queue, as format.KindReindex keyed by the
 // repository, or as format.KindReindexPath for Helm's partial reindex, and
 // answers 7.x's text once it is queued, since 7.x schedules them ("an
-// asynchronous reindexing of a local repository", KB 000005641). Conan's,
-// Conda's, CRAN's, opkg's and PyPI's, whose references call the calculation
-// synchronous by default, and Pub's run before they answer unless async is
-// true, and RubyGems' always does. Until the format of an operation's
-// package type is a format.Reindexer the operation answers 501, as the stub
-// did, before anything else is checked. The reindex operations of the other
-// package types, which no format here serves, keep the generated stub.
+// asynchronous reindexing of a local repository", KB 000005641). Cargo's,
+// Conan's, Conda's, CRAN's, opkg's and PyPI's, whose references call the
+// calculation synchronous by default, run before they answer unless async
+// is true; Pub's, which its reference calls asynchronous, runs first only
+// when async is false; and RubyGems' always does. Until the format of an
+// operation's package type is a format.Reindexer the operation answers 501,
+// as the stub did, before anything else is checked. The reindex operations
+// of the other package types, which no format here serves, keep the
+// generated stub.
 
 // CalculateBowerIndex rebuilds the native Bower version index from manifests.
 func (s ArtifactoryAPI) CalculateBowerIndex(
@@ -74,17 +76,26 @@ func (s ArtifactoryAPI) CalculateAlpineRepositoryMetadata(
 	return artgen.CalculateAlpineRepositoryMetadata200TextResponse(msg), err
 }
 
-// CalculateCargoRepositoryMetadata validates and rebuilds the hosted crate view.
+// CalculateCargoRepositoryMetadata validates and rebuilds the hosted crate
+// view, before it answers unless async is true: "The calculation can be
+// synchronous (the default) or asynchronous"
+// (calculatecargorepositorymetadata). On a remote repository it expires the
+// cached upstream config.json instead (itemkit.ReindexOps).
 func (s ArtifactoryAPI) CalculateCargoRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateCargoRepositoryMetadataRequestObject,
 ) (artgen.CalculateCargoRepositoryMetadataResponseObject, error) {
-	msg, err := s.Reindex(ctx, repo.Cargo, req.RepoKey, "", false)
-	return artgen.CalculateCargoRepositoryMetadata200TextResponse(msg), err
+	async := req.Params.Async != nil && *req.Params.Async
+	msg, err := s.Reindex(ctx, repo.Cargo, req.RepoKey, "", !async)
+	if err != nil {
+		return nil, err
+	}
+	return artgen.CalculateCargoRepositoryMetadata200TextResponse(msg), nil
 }
 
 // CalculateRubyGemsIndex rebuilds a RubyGems repository's specs indexes
-// from its stored gems before it answers.
+// from its stored gems before it answers. No 7.x reference states the
+// timing, and the archived sample's OK fits a finished run [I].
 func (s ArtifactoryAPI) CalculateRubyGemsIndex(
 	ctx context.Context, req artgen.CalculateRubyGemsIndexRequestObject,
 ) (artgen.CalculateRubyGemsIndexResponseObject, error) {
@@ -159,14 +170,17 @@ func helmPartialReindexPath(r *http.Request) (string, string, bool) {
 
 // The generated reindex operations of the package types with a format.
 
-// CalculatePubRepositoryMetadata rebuilds a Pub repository's package index,
-// before it answers unless async is true.
+// CalculatePubRepositoryMetadata queues the rebuild of a Pub repository's
+// package index and answers once it is queued: "The calculation is
+// asynchronous" (calculatepubrepositorymetadata). The same page declares
+// async without saying what false does; it runs the rebuild before the
+// answer, as before [I].
 func (s ArtifactoryAPI) CalculatePubRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculatePubRepositoryMetadataRequestObject,
 ) (artgen.CalculatePubRepositoryMetadataResponseObject, error) {
-	async := req.Params.Async != nil && *req.Params.Async
-	msg, err := s.Reindex(ctx, repo.Pub, req.RepoKey, "", !async)
+	wait := req.Params.Async != nil && !*req.Params.Async
+	msg, err := s.Reindex(ctx, repo.Pub, req.RepoKey, "", wait)
 	if err != nil {
 		return nil, err
 	}

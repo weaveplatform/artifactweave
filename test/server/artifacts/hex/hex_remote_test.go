@@ -446,8 +446,9 @@ func TestUnitHexRemoteSignedMetadataFiltersDeniedVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	badKey := w.do(http.MethodGet, base+"versions", "partial", "")
-	if badKey.Code != http.StatusServiceUnavailable {
-		t.Fatalf("invalid upstream signing key accepted: %d %s", badKey.Code, badKey.Body)
+	if badKey.Code != http.StatusServiceUnavailable || badKey.Header().Get("Retry-After") != "" {
+		t.Fatalf("invalid upstream signing key accepted: %d %v %s", badKey.Code, badKey.Header(),
+			badKey.Body)
 	}
 }
 

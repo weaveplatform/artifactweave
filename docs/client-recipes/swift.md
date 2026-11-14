@@ -66,7 +66,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 - The native auth regression test rejects invalid credentials with HTTP 401 before publication and verifies the release was not created, then publishes/resolves with valid credentials. The real password verifier and route permission evaluator are used; access-token-as-Basic-password behavior is separately covered by the shared authenticator tests.
 - The pinned Linux CI lane exercises these registry auth/config flags. Local verification of the new authenticated flow used Swift 6.4.2. Xcode GUI/IDE setup is outside this CLI recipe.
 - Authentication format reference: https://docs.swift.org/latest/documentation/packagemanagerdocs/packageregistrylogin/ . Direct configuration avoids depending on an unimplemented login API.
-- Registry errors carry Content-Version: 1, so SwiftPM prints the server's detail, for example 'failed publishing: server error 401: Bad credentials' or 'server error 409: Swift release 1.0.0 already exists with different content'. The native test runs this recipe's configuration against the production router for a 401, a 403 and a 409.
+- Registry errors carry Content-Version: 1, so SwiftPM prints the server's detail, for example 'failed publishing: server error 401: Bad Credentials' or 'server error 409: Swift release 1.0.0 already exists with different content'. The native test runs this recipe's configuration against the production router for a 401, a 403 and a 409.
 
 ## Verification sources
 

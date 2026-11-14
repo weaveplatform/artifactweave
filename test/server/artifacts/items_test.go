@@ -22,9 +22,11 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
 func sha1Hex(s string) string {
@@ -1167,4 +1169,46 @@ func TestAccServeFilePreservesProtocolDisposition(t *testing.T) {
 	if got := ordinary.Header().Get("Content-Disposition"); got != blob.Disposition(it.Name) {
 		t.Fatalf("default disposition %q, want %q", got, blob.Disposition(it.Name))
 	}
+}
+
+// TestAccCollectedDeployHintsARetry (#1415): a deploy whose content garbage
+// collection is removing answers 503 with its message and Retry-After: 1,
+// and the repeat it asks for stores the file. The collector here marked the
+// blob and stopped, which leaves it deleting, as a collection running beside
+// the deploy does.
+func TestAccCollectedDeployHintsARetry(t *testing.T) {
+	w := newItemWorld(t, false)
+	ctx := t.Context()
+	if err := w.db.Settings().Put(ctx, settings.SettingTrashcan,
+		artmodel.TrashcanSettings{Enabled: false, RetentionDays: 1}); err != nil {
+		t.Fatal(err)
+	}
+	const body = "content a collection removes while it is deployed"
+	sum := sha256.Sum256([]byte(body))
+	wantStatus(t, w.do(http.MethodPut, "/artifactory/libs-local/a.txt", "admin", body), 201)
+	wantStatus(t, w.do(http.MethodDelete, "/artifactory/libs-local/a.txt", "admin", ""), 204)
+	if _, err := w.db.Blobs().MarkDeleting(ctx, blob.Blob{
+		Checksums: kernel.Checksums{SHA256: hex.EncodeToString(sum[:])},
+		Size:      int64(len(body)),
+	}, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	res := w.do(http.MethodPut, "/artifactory/libs-local/b.txt", "admin", body)
+	// The message is the error's, as before #1415: ErrCollected, then the
+	// store's reason.
+	var got struct {
+		Errors []struct {
+			Message string `json:"message"`
+			Status  int    `json:"status"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &got); err != nil || len(got.Errors) != 1 ||
+		got.Errors[0].Status != http.StatusServiceUnavailable ||
+		!strings.HasPrefix(got.Errors[0].Message, item.ErrCollected.Error()) {
+		t.Fatal(res.Body, err)
+	}
+	if res.Code != http.StatusServiceUnavailable || res.Header().Get("Retry-After") != "1" {
+		t.Fatal(res.Code, res.Header(), res.Body)
+	}
+	wantStatus(t, w.do(http.MethodPut, "/artifactory/libs-local/b.txt", "admin", body), 201)
 }
