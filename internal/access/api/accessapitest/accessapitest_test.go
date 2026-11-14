@@ -145,7 +145,12 @@ func TestUnitDeciderAllowsAll(t *testing.T) {
 	if !all(scripted, accessapi.ActionWrite) || all(scripted, 0) {
 		t.Error("AllowsAllFunc does not answer")
 	}
-	if want := []string{fmt.Sprintf("all artifact libs-local a %d", accessapi.ActionWrite)}; !reflect.DeepEqual(asked, want) {
+	if want := []string{
+		fmt.Sprintf("all artifact libs-local a %d", accessapi.ActionWrite),
+	}; !reflect.DeepEqual(
+		asked,
+		want,
+	) {
 		t.Errorf("questions asked = %q, want %q", asked, want)
 	}
 }

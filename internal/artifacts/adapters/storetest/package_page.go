@@ -71,7 +71,11 @@ func listOrderKeys(t *testing.T, newStore Factory) {
 		storekit.Same(t, what+"the last page", c.newestFirst[len(c.newestFirst)-1:],
 			names(s.VersionNamesAt(ctx, pkg.ID, true, len(c.newestFirst)-1, 5)))
 		for _, empty := range [][2]int{{len(c.newestFirst), 5}, {0, 0}, {1 << 40, 1}} {
-			if got := names(s.VersionNamesAt(ctx, pkg.ID, true, empty[0], empty[1])); len(got) != 0 {
+			if got := names(
+				s.VersionNamesAt(ctx, pkg.ID, true, empty[0], empty[1]),
+			); len(
+				got,
+			) != 0 {
 				t.Errorf("%soffset %d limit %d: %q", what, empty[0], empty[1], got)
 			}
 		}
@@ -200,8 +204,10 @@ func nuGetShown(t *testing.T, newStore Factory) {
 		{port.NuGetShown{}, []string{"nulls", "release", "two"}},
 		{port.NuGetShown{Prerelease: true}, []string{"mixed", "nulls", "prerelease", "release", "two"}},
 		{port.NuGetShown{SemVer2: true}, []string{"mixed", "nulls", "release", "semver2", "two"}},
-		{port.NuGetShown{Prerelease: true, SemVer2: true},
-			[]string{"mixed", "nulls", "prerelease", "release", "semver2", "two"}},
+		{
+			port.NuGetShown{Prerelease: true, SemVer2: true},
+			[]string{"mixed", "nulls", "prerelease", "release", "semver2", "two"},
+		},
 	} {
 		r := port.PackageRange{RepoKey: "nuget", Shown: &c.shown}
 		storekit.Same(t, "count shown", len(c.want), count(s.CountPackages(ctx, r)))

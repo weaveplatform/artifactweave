@@ -455,7 +455,12 @@ func (p failingPackages) PackagesAt(
 	if p.failing == "list" {
 		return nil, errBroken
 	}
-	return p.PackageStore.PackagesAt(ctx, r, offset, limit) //nolint:wrapcheck // a test's pass-through
+	return p.PackageStore.PackagesAt(
+		ctx,
+		r,
+		offset,
+		limit,
+	) //nolint:wrapcheck // a test's pass-through
 }
 
 func (p failingPackages) Candidates(

@@ -141,7 +141,16 @@ func TestUnitListOrderKeys(t *testing.T) {
 			}
 		}
 		names = set(admitted)
-		if got, want := stored(t, repo.Ansible, names), galaxyList(names); !slices.Equal(got, want) {
+		if got, want := stored(
+			t,
+			repo.Ansible,
+			names,
+		), galaxyList(
+			names,
+		); !slices.Equal(
+			got,
+			want,
+		) {
 			t.Fatalf("round %d, ansible: %q, want %q", round, got, want)
 		}
 	}

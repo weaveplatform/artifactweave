@@ -55,7 +55,13 @@ func seedVersions(
 	for _, p := range pkg {
 		// Newest first, so the rows' own order is not the index's.
 		for i := n - 1; i >= 0; i-- {
-			if _, err := insert.ExecContext(ctx, p.ID, version(i), i+1, metadata(p, i)); err != nil {
+			if _, err := insert.ExecContext(
+				ctx,
+				p.ID,
+				version(i),
+				i+1,
+				metadata(p, i),
+			); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -68,7 +74,13 @@ func seedVersions(
 	}
 }
 
-func ensureAll(t *testing.T, s *artsql.Store, key string, pt repo.PackageType, names []string) []model.Package {
+func ensureAll(
+	t *testing.T,
+	s *artsql.Store,
+	key string,
+	pt repo.PackageType,
+	names []string,
+) []model.Package {
 	t.Helper()
 	out := make([]model.Package, 0, len(names))
 	err := s.Tx(t.Context(), func(ctx context.Context) error {
@@ -123,7 +135,8 @@ func packagePagesAtScale(t *testing.T, s *artsql.Store) {
 	if s.Dialect().Dollar {
 		// As autovacuum would after a load this size: statistics, and the
 		// visibility map an index-only scan relies on.
-		if _, err := s.DB().ExecContext(ctx, "VACUUM ANALYZE packages, package_versions"); err != nil {
+		if _, err := s.DB().
+			ExecContext(ctx, "VACUUM ANALYZE packages, package_versions"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -207,13 +220,15 @@ func packagePagesAtScale(t *testing.T, s *artsql.Store) {
 		releases, err = st.ReleasesAt(ctx, "forge", 4980, 20)
 		return err
 	})
-	if len(releases) != 20 || releases[0].Package != "acme-m0996" || releases[0].Version != "1.0.4" ||
+	if len(releases) != 20 || releases[0].Package != "acme-m0996" ||
+		releases[0].Version != "1.0.4" ||
 		releases[19].Version != "1.0.0" {
 		t.Fatalf("late releases %+v", releases)
 	}
 	plan := explain(t, s, artsql.ReleasesAtQuery(s), "forge", 20, 4980)
 	t.Logf("%s: late page of releases:\n%s", engine, plan)
-	if !strings.Contains(plan, "packages_name") || !strings.Contains(plan, "package_versions_order") {
+	if !strings.Contains(plan, "packages_name") ||
+		!strings.Contains(plan, "package_versions_order") {
 		t.Error("the releases are not read through packages_name and package_versions_order")
 	}
 	if s.Dialect().Dollar {

@@ -22,6 +22,7 @@ func (stub) Allows(api.ResourceType, api.Repo, string, api.Actions) bool { retur
 func (stub) AllowsFolder(api.ResourceType, api.Repo, string, api.Actions) bool {
 	return false
 }
+
 func (stub) AllowsAll(api.ResourceType, api.Repo, string, api.Actions) bool {
 	return false
 }

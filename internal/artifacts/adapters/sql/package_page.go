@@ -109,7 +109,10 @@ func rangeWhere(d dialect.Dialect, r port.PackageRange) (string, []any, bool) {
 
 // rangeQueries are the count of r's packages and the page of them, by
 // name with LIMIT and OFFSET after args, with false when r selects none.
-func rangeQueries(d dialect.Dialect, r port.PackageRange) (count, page string, args []any, ok bool) {
+func rangeQueries(
+	d dialect.Dialect,
+	r port.PackageRange,
+) (count, page string, args []any, ok bool) {
 	where, args, ok := rangeWhere(d, r)
 	return "SELECT COUNT(*) FROM packages p WHERE " + where,
 		"SELECT p.id, p.repo_key, p.package_type, p.name, p.created_at FROM packages p WHERE " +
@@ -160,7 +163,11 @@ func (p packages) Candidates(
 	for i, pkg := range packages {
 		ids[i], at[pkg.ID], page[i] = pkg.ID, i, port.SearchCandidate{Package: pkg}
 	}
-	versions, err := p.versions(ctx, "read package candidates", searchVersionsQuery(len(ids)), ids...)
+	versions, err := p.versions(
+		ctx,
+		"read package candidates",
+		searchVersionsQuery(len(ids)),
+		ids...)
 	if err != nil {
 		return nil, err
 	}

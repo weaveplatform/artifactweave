@@ -174,7 +174,10 @@ func (p packages) ReleasesAt(
 			vs := p.sorted(pkg.ID)
 			slices.Reverse(vs)
 			for _, v := range vs {
-				all = append(all, port.ReleaseName{PackageID: pkg.ID, Package: pkg.Name, Version: v.Version})
+				all = append(
+					all,
+					port.ReleaseName{PackageID: pkg.ID, Package: pkg.Name, Version: v.Version},
+				)
 			}
 		}
 		out = slices.Clone(window(all, offset, limit))

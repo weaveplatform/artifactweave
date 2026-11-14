@@ -245,8 +245,18 @@ func TestUnitWholeListsReadOnlyTheirPage(t *testing.T) {
 		{"lister", pageStore{version: 2, names: 2}, pageStore{versions: 1, names: 2}},
 	} {
 		*s = pageStore{Store: s.Store}
-		wantBody(t, f.do("GET", base+"/v3/releases?limit=2&offset=10", c.user),
-			listJSON("/v3/releases", 2, 10, 14, releaseJSON(rels["1.2.0"]), releaseJSON(rels["1.1.0"])))
+		wantBody(
+			t,
+			f.do("GET", base+"/v3/releases?limit=2&offset=10", c.user),
+			listJSON(
+				"/v3/releases",
+				2,
+				10,
+				14,
+				releaseJSON(rels["1.2.0"]),
+				releaseJSON(rels["1.1.0"]),
+			),
+		)
 		if c.releases.Store = s.Store; *s != c.releases {
 			t.Fatalf("%s's release list read %+v", c.user, *s)
 		}

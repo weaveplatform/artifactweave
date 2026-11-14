@@ -166,7 +166,11 @@ func TestUnitAllowsAllImpliesAllows(t *testing.T) {
 				Name: "p" + string(rune('a'+i)),
 				Resources: map[accessapi.ResourceType]model.Resource{
 					accessapi.ResourceArtifact: {
-						Actions: model.Grants{Groups: map[string]accessapi.Actions{"g": r | accessapi.Actions(rnd.IntN(2))*w}},
+						Actions: model.Grants{
+							Groups: map[string]accessapi.Actions{
+								"g": r | accessapi.Actions(rnd.IntN(2))*w,
+							},
+						},
 						Targets: map[string]model.Target{"libs-local": tg},
 					},
 				},
