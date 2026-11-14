@@ -20,9 +20,11 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/alpine"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cran"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -134,7 +136,14 @@ func (s *Kit) ItemError(ctx context.Context, op string, err error) error {
 	case errors.Is(err, item.ErrConflict):
 		return apierror.New(http.StatusConflict, err.Error())
 	case errors.Is(err, item.ErrCollected):
-		return apierror.New(http.StatusServiceUnavailable, err.Error())
+		// The deploy lost its content to a collection that ran beside it,
+		// and the message asks for the deploy again, so the 503 reports a
+		// transient condition and hints a retry, as decision 0043's "Rate
+		// headers and Retry-After" asks (#1415). No 7.x source documents
+		// this answer [I].
+		e := apierror.New(http.StatusServiceUnavailable, err.Error())
+		e.RetryAfterSeconds = 1
+		return e
 	case errors.Is(err, item.ErrBadArchive):
 		return apierror.New(http.StatusBadRequest, err.Error())
 	case errors.Is(err, kernel.ErrInvalidItemPath):
@@ -452,7 +461,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "cached document", err))
 		return
 	}
-	if (remoteDownloadType(c, cached) || alias) &&
+	if (remoteDownloadType(c, cached) || alias || fileChecksumRoute(c, cached, req.Path)) &&
 		req.Path != "" &&
 		!req.IsFolder &&
 		s.RemoteSources != nil {
@@ -859,6 +868,33 @@ func acceptedByAll(patterns []repo.RepoPatterns, p string, folder bool) bool {
 		}
 	}
 	return true
+}
+
+// fileChecksumRoute reports whether the checksum request at p on c, a
+// remote whose files this route does not read from the upstream, names a
+// file the CRAN or opkg item route fetches: a package, or an index that
+// route serves. 7.161.26 answers a checksum request on a remote of any type
+// from the file's info (DownloadServiceImpl.respondForChecksumRequest), so
+// such a request takes getRemoteItem's checksum answer once the cache does
+// not hold the file (#1495).
+func fileChecksumRoute(c repo.Config, cached bool, p string) bool {
+	if c.Class != repo.Remote || cached {
+		return false
+	}
+	file, _, ok := item.Sidecar(p)
+	if !ok {
+		return false
+	}
+	switch {
+	case cran.Serves(c.PackageType):
+		_, _, index := cran.IndexPath(file)
+		return index || cran.IsPackage(file)
+	case opkg.Serves(c.PackageType):
+		name := path.Base(file)
+		return strings.HasSuffix(file, ".ipk") && opkg.ValidPath(file) ||
+			opkg.IsIndex(file) && (name == opkg.PackagesName || name == opkg.PackagesGzipName)
+	}
+	return false
 }
 
 func remoteDownloadType(c repo.Config, cached bool) bool {

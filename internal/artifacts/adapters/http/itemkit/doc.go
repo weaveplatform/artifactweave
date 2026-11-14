@@ -105,16 +105,18 @@
 //     If-Unmodified-Since are never read, a HEAD answers 200 with the
 //     checksum's length and the file's headers, and a GET sends the
 //     checksum alone, dated now, with Range applied whatever If-Range says
-//     and a 416 without a body. On a Maven-family remote that stores
-//     artifacts locally, a checksum file whose file the cache does not hold
+//     and a 416 without a body. On a remote of any type whose files the
+//     item route reads, a checksum file whose file the cache does not hold
 //     is answered from the file's info, the upstream's answer to one HEAD,
-//     through the remote's checksum policy, and nothing is downloaded or
-//     kept: only pass-thru finds a value, the one the upstream declared, and
-//     every other answer is 404 "Checksum not found for <file>". On a
-//     Maven-family remote that stores nothing, a checksum file is answered,
-//     under every policy, with the upstream's own <file>.<alg>, after one
-//     HEAD of the file: its first checksum, or that 404 when the upstream
-//     has none.
+//     and the file is not kept, as 7.x's RemoteRepoBase.getChecksum answers
+//     it. On a remote that stores artifacts locally, the remote's checksum
+//     policy reads the info, so only pass-thru finds a value, the one the
+//     upstream declared. On a Maven-family remote that stores nothing, and
+//     on a generic remote with retrieveSha256FromServer for any algorithm,
+//     the upstream's own <file>.<alg> answers next: its first checksum.
+//     With no value the answer is 404 "Checksum not found for <file>". CRAN
+//     and opkg checksum requests reach this answer only for a file their
+//     routes fetch (fileChecksumRoute), and P2's only for a classified file.
 //     A folder listing and an archive entry keep their own answers.
 //
 // # References
@@ -145,7 +147,9 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1362 (local
 //     checksum files), and
 //     https://github.com/weaveplatform/artifactweave/issues/1476 (a Maven
-//     remote's checksum file for a file the cache does not hold).
+//     remote's checksum file for a file the cache does not hold), and
+//     https://github.com/weaveplatform/artifactweave/issues/1495 (the same
+//     answer on a remote of every type).
 //   - https://github.com/weaveplatform/artifactweave/issues/1435 (Force
 //     Authentication on the item routes); JFrog's virtual repository
 //     settings, https://docs.jfrog.com/artifactory/docs/virtual-repositories,
