@@ -29,7 +29,12 @@ func TestUnitNextLink(t *testing.T) {
 			t.Errorf("NextLink(%q) = %s, want %s", c.query, got, c.want)
 		}
 	}
-	if got := httpkit.NextLink("/a b", "", "cursor", "x y"); got != "</a%20b?cursor=x+y>; rel=\"next\"" {
+	if got := httpkit.NextLink(
+		"/a b",
+		"",
+		"cursor",
+		"x y",
+	); got != "</a%20b?cursor=x+y>; rel=\"next\"" {
 		t.Errorf("escaped path and value: %s", got)
 	}
 }

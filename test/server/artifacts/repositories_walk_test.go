@@ -71,7 +71,12 @@ func TestAccRepositoriesLinkNextWindow(t *testing.T) {
 	if got := linkTarget(t, rec); got != list+"?limit=2&offset=2" {
 		t.Errorf("vendor list Link target %q", got)
 	}
-	if rec := w.do(http.MethodGet, list+"?limit=0", "admin", ""); rec.Code != http.StatusBadRequest ||
+	if rec := w.do(
+		http.MethodGet,
+		list+"?limit=0",
+		"admin",
+		"",
+	); rec.Code != http.StatusBadRequest ||
 		rec.Header().Get("Link") != "" {
 		t.Errorf("refused page: %d Link %q", rec.Code, rec.Header().Get("Link"))
 	}

@@ -93,7 +93,8 @@ func TestUnitPrincipalsOfAndPage(t *testing.T) {
 			t.Fatal(err)
 		}
 		pr, err := svc.PrincipalsOf(ctx, c.users, c.groups, c.inherited)
-		if err != nil || !slices.Equal(pr.Users, wantPr.Users) || !slices.Equal(pr.Groups, wantPr.Groups) {
+		if err != nil || !slices.Equal(pr.Users, wantPr.Users) ||
+			!slices.Equal(pr.Groups, wantPr.Groups) {
 			t.Errorf("principals of %v %v %v = %+v, %v; want %+v", c.users, c.groups, c.inherited,
 				pr, err, wantPr)
 		}

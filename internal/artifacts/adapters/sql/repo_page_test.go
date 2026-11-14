@@ -42,7 +42,11 @@ func repoPagesAtScale(t *testing.T, s *artsql.Store) {
 	ctx := t.Context()
 	err := s.Tx(ctx, func(ctx context.Context) error {
 		for i := range repoScale {
-			c := repo.Config{Key: fmt.Sprintf("repo-%05d", i), Class: repo.Local, PackageType: repo.Generic}
+			c := repo.Config{
+				Key:         fmt.Sprintf("repo-%05d", i),
+				Class:       repo.Local,
+				PackageType: repo.Generic,
+			}
 			if i%2 == 1 {
 				c.Class, c.PackageType = repo.Remote, repo.Maven
 			}

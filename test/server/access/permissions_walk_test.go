@@ -79,7 +79,13 @@ func TestAccAccessPermissionsWalkVisitsEachOnce(t *testing.T) {
 				for range len(whole.Permissions) + 1 {
 					p := get(t, as, fmt.Sprintf("?limit=%d%s%s", limit, filter, cursor))
 					if len(p.Permissions) > limit {
-						t.Fatalf("%s %q: %d permissions at limit %d", who, filter, len(p.Permissions), limit)
+						t.Fatalf(
+							"%s %q: %d permissions at limit %d",
+							who,
+							filter,
+							len(p.Permissions),
+							limit,
+						)
 					}
 					walked = append(walked, p.Permissions...)
 					if p.Cursor == "" {

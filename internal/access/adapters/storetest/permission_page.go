@@ -56,14 +56,17 @@ func testPermissionPages(t *testing.T, s port.Store) {
 		{"users and groups after", port.PermissionQuery{
 			After: "P-B", Limit: 1, Granting: true, Users: []string{"ann", "bob"}, Groups: []string{"devs"},
 		}, "[p-c] true"},
-		{"a group", port.PermissionQuery{Limit: 10, Granting: true, Groups: []string{"ops", "devs"}},
-			"[p-c p-e] false"},
+		{
+			"a group",
+			port.PermissionQuery{Limit: 10, Granting: true, Groups: []string{"ops", "devs"}},
+			"[p-c p-e] false",
+		},
 		{"nobody", port.PermissionQuery{Limit: 10, Granting: true}, "[] false"},
 		{"an unknown user", port.PermissionQuery{Limit: 10, Granting: true, Users: []string{"zed"}}, "[] false"},
 	} {
 		ps, more, err := s.Permissions().Page(ctx, c.q)
 		storekit.Must(t, err)
-		names := []string{}
+		names := make([]string, 0, len(ps))
 		for _, p := range ps {
 			names = append(names, p.Name)
 		}

@@ -54,11 +54,16 @@ func TestUnitVisibleReposDescribesIsRepoVisible(t *testing.T) {
 	ctx := context.Background()
 	src := visibilityWorld(t)
 	repos := []accessapi.Repo{
-		{Key: "libs-local", Class: "local"}, {Key: "ext-local", Class: "local"},
-		{Key: "fed-local", Class: "federated"}, {Key: "jcenter", Class: "remote"},
-		{Key: "other-remote", Class: "remote"}, {Key: "virt", Class: "virtual"},
-		{Key: "all", Class: "virtual"}, {Key: "dist", Class: "distribution"},
-		{Key: "gone-local", Class: "local"}, {Key: "ANY", Class: "local"},
+		{Key: "libs-local", Class: "local"},
+		{Key: "ext-local", Class: "local"},
+		{Key: "fed-local", Class: "federated"},
+		{Key: "jcenter", Class: "remote"},
+		{Key: "other-remote", Class: "remote"},
+		{Key: "virt", Class: "virtual"},
+		{Key: "all", Class: "virtual"},
+		{Key: "dist", Class: "distribution"},
+		{Key: "gone-local", Class: "local"},
+		{Key: "ANY", Class: "local"},
 	}
 	subjects := []accessapi.Subject{
 		{Name: "bob", Groups: []string{"devs"}},

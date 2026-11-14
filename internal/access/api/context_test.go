@@ -13,9 +13,10 @@ import (
 // address, and a stub held by value is a Decider that is not a pointer.
 type stub struct{ id int }
 
-func (stub) IsAdmin() bool                                               { return false }
-func (stub) Groups() []string                                            { return nil }
-func (stub) IsRepoVisible(api.Repo) bool                                 { return false }
+func (stub) IsAdmin() bool               { return false }
+func (stub) Groups() []string            { return nil }
+func (stub) IsRepoVisible(api.Repo) bool { return false }
+
 func (stub) VisibleRepos() api.RepoVisibility                            { return api.RepoVisibility{{}} }
 func (stub) Allows(api.ResourceType, api.Repo, string, api.Actions) bool { return false }
 func (stub) AllowsFolder(api.ResourceType, api.Repo, string, api.Actions) bool {

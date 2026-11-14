@@ -59,14 +59,18 @@ func seedAccessLists(t *testing.T, s *accsql.Store) {
 			p := model.Permission{
 				Name: fmt.Sprintf("perm-%05d", i),
 				Resources: map[api.ResourceType]model.Resource{api.ResourceArtifact: {
-					Actions: model.Grants{Users: users, Groups: map[string]api.Actions{"devs": api.ActionRead}},
+					Actions: model.Grants{
+						Users:  users,
+						Groups: map[string]api.Actions{"devs": api.ActionRead},
+					},
 					Targets: map[string]model.Target{"libs-local": {Include: []string{"**"}}},
 				}},
 			}
 			if err := s.Permissions().Create(ctx, p); err != nil {
 				return fmt.Errorf("seed %s: %w", p.Name, err)
 			}
-			if err := s.Groups().Create(ctx, model.Group{Name: fmt.Sprintf("group-%05d", i)}); err != nil {
+			if err := s.Groups().
+				Create(ctx, model.Group{Name: fmt.Sprintf("group-%05d", i)}); err != nil {
 				return fmt.Errorf("seed group %d: %w", i, err)
 			}
 			user := "bob"
@@ -110,10 +114,17 @@ func permissionPagesAtScale(t *testing.T, s *accsql.Store) {
 		q.After, q.Limit = c.after, 10
 		start := time.Now()
 		ps, more, err := s.Permissions().Page(ctx, q)
-		if err != nil || len(ps) != 10 || !more || ps[0].Name != c.first || ps[9].Name != c.lastKey {
+		if err != nil || len(ps) != 10 || !more || ps[0].Name != c.first ||
+			ps[9].Name != c.lastKey {
 			t.Fatalf("%s after %q = %d, more %v, %v", c.who, c.after, len(ps), more, err)
 		}
-		t.Logf("%s: %s, 10 permissions after %q: %s", s.Dialect().Name, c.who, c.after, time.Since(start))
+		t.Logf(
+			"%s: %s, 10 permissions after %q: %s",
+			s.Dialect().Name,
+			c.who,
+			c.after,
+			time.Since(start),
+		)
 		if c.after == "" {
 			continue
 		}
@@ -139,10 +150,21 @@ func groupPagesAtScale(t *testing.T, s *accsql.Store) {
 		if err != nil || len(names) != 10 || next == "" {
 			t.Fatalf("groups after %q = %v, %q, %v", after, names, next, err)
 		}
-		t.Logf("%s: 10 of %d groups after %q: %s", s.Dialect().Name, listScale, after, time.Since(start))
+		t.Logf(
+			"%s: 10 of %d groups after %q: %s",
+			s.Dialect().Name,
+			listScale,
+			after,
+			time.Since(start),
+		)
 	}
-	plan := explainAccess(t, s,
-		"SELECT i.name FROM user_groups i WHERE i.name > ? ORDER BY i.name ASC LIMIT ?", "group-04988", 11)
+	plan := explainAccess(
+		t,
+		s,
+		"SELECT i.name FROM user_groups i WHERE i.name > ? ORDER BY i.name ASC LIMIT ?",
+		"group-04988",
+		11,
+	)
 	t.Logf("%s: groups late page plan:\n%s", s.Dialect().Name, plan)
 	requireIndex(t, plan)
 }
@@ -169,7 +191,13 @@ func auditPagesAtScale(t *testing.T, s *accsql.Store) {
 			if late && rows[0].Sequence >= after {
 				t.Fatalf("audit of %q after %d starts at %d", user, after, rows[0].Sequence)
 			}
-			t.Logf("%s: 10 of the audit of %q after %d: %s", s.Dialect().Name, user, after, time.Since(start))
+			t.Logf(
+				"%s: 10 of the audit of %q after %d: %s",
+				s.Dialect().Name,
+				user,
+				after,
+				time.Since(start),
+			)
 		}
 	}
 	for _, c := range []struct {
@@ -177,8 +205,10 @@ func auditPagesAtScale(t *testing.T, s *accsql.Store) {
 		query string
 		args  []any
 	}{
-		{"every user's", "SELECT id FROM api_restriction_audit WHERE 1 = 1 AND id < ? ORDER BY id DESC LIMIT ?",
-			[]any{24, 11}},
+		{
+			"every user's", "SELECT id FROM api_restriction_audit WHERE 1 = 1 AND id < ? ORDER BY id DESC LIMIT ?",
+			[]any{24, 11},
+		},
 		{"bob's", "SELECT id FROM api_restriction_audit WHERE 1 = 1 AND user_name = ? AND id < ? " +
 			"ORDER BY id DESC LIMIT ?", []any{"bob", 24, 11}},
 	} {

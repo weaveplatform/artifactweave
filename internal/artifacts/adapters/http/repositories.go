@@ -258,7 +258,12 @@ func (p repoPage) of(
 		list.Headers.XResultOffset, list.Headers.XResultLimit = &p.offset, &p.limit
 	}
 	if got.More {
-		link := httpkit.NextLink(repositoriesPath, p.query, "offset", strconv.Itoa(p.offset+p.limit))
+		link := httpkit.NextLink(
+			repositoriesPath,
+			p.query,
+			"offset",
+			strconv.Itoa(p.offset+p.limit),
+		)
 		list.Headers.Link = &link
 	}
 	// A nil body would be null on the wire; an empty list or page is [].
