@@ -69,6 +69,10 @@
 //     is allowed what no function narrows, functions answer when set, and a
 //     question for no action is refused. VisibleRepos follows Admin without
 //     its function.
+//   - TestUnitDeciderAllowsAll: AllowsAllFunc answers when set; without it,
+//     an administrator is allowed every path only when neither AllowsFunc
+//     nor AllowsFolderFunc narrows a path, so a test that scripts path
+//     answers keeps its lists on the path-by-path filter.
 //   - TestUnitAuthenticator, TestUnitAuthorizer: the defaults, the
 //     functions, and Authorizer's error wraps and nil Decider on error.
 //   - TestUnitTokens: the recorded calls, the numbered tokens and the

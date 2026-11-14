@@ -33,6 +33,14 @@
 //     version names in exactly Versions' order, following later writes and
 //     deletes, and a package's own (#1404). It is a subtest of its own,
 //     VersionNames, run beside Run rather than from it.
+//   - RunPackagePages, the contract of port.PackagePages and of
+//     PackageVersionNames' CountVersions and VersionNamesAt: Puppet's,
+//     Chef's and Ansible's versions read back newest first in their lists'
+//     order whatever the write order, and a repository's packages with a
+//     version counted, paged, tallied and listed by release, NuGet's by
+//     the versions their filters show (#1425, #1426). Its subtests,
+//     ListOrderKeys, PackagePages, NuGetShown and TallyAndReleases, run
+//     beside Run.
 //   - The subtests, one per concern, each on a store of its own: Blobs,
 //     ColdBlobs, BlobDeletion, ColdBlobDeletion, BlobTiersSeparate,
 //     Replicas, ReplicaTiersSeparate, Repos, Items, ItemCreate, ColonPaths,
@@ -105,7 +113,9 @@
 // TestAccContract (PostgreSQL) run it under the same subtest names. The
 // adapters run RunDockerPages in adapters/inmem's
 // TestUnitDockerPagesContract and adapters/sql's TestAccDockerPagesContract,
-// and RunVersionNames in adapters/inmem's TestUnitVersionNamesContract and
-// adapters/sql's TestAccVersionNamesContract (each SQLite in memory and in
-// a file, and PostgreSQL).
+// RunVersionNames in adapters/inmem's TestUnitVersionNamesContract and
+// adapters/sql's TestAccVersionNamesContract, and RunPackagePages in
+// adapters/inmem's TestUnitPackagePagesContract and adapters/sql's
+// TestAccPackagePagesContract (each SQLite in memory and in a file, and
+// PostgreSQL).
 package storetest

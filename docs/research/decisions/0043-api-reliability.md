@@ -418,12 +418,14 @@ not a position either.
   pointer is due, plus a count where the contract needs one.
 - **`native` lists are classified, not rewritten.** Their bytes stay. Where their
   paging has moved into the store behind the same bytes, the research section's
-  [native table](../api-reliability/README.md#native-protocols) says how far: npm
-  and NuGet search still count `from`, `skip` and `totalHits` over every earlier
-  candidate ([#1425](https://github.com/weaveplatform/artifactweave/issues/1425),
-  open), and the Ansible, Chef and Puppet lists still read every version name to
-  count and order a page ([#1426](https://github.com/weaveplatform/artifactweave/issues/1426),
-  open).
+  [native table](../api-reliability/README.md#native-protocols) says how far. For
+  a caller who may read every path of the repository, or of the package's folder,
+  npm and NuGet search and the Ansible, Chef and Puppet lists count and page in the
+  store ([#1425](https://github.com/weaveplatform/artifactweave/issues/1425),
+  [#1426](https://github.com/weaveplatform/artifactweave/issues/1426)). For anyone
+  else they still count over every earlier candidate or version name in Go, as
+  the access module decides read permission path by path, and a store count
+  cannot apply it.
 - **No list is collected and then sliced.** `cursor`, `offset` and `page` lists page
   in the store, and `complete` lists stream from store pages
   ([Streaming complete lists](#streaming-complete-lists)). A served `complete` list

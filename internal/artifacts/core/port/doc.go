@@ -42,7 +42,13 @@
 //     and PackageStore, which embeds PackageVersionNames: a
 //     package's version names alone, in Versions' order, which the Puppet,
 //     Ansible and Chef lists count and order before they read their page's
-//     records (#1404).
+//     records for a caller who may read only some paths (#1404), and their
+//     count and a page of them for one who may read every path
+//     (CountVersions, VersionNamesAt); and PackagePages, with PackageRange,
+//     NuGetShown, VersionTally, ReleaseName and CandidatesAt: a
+//     repository's packages with a version counted and paged by name,
+//     tallied and listed by release, which npm's and NuGet's searches and
+//     the Chef and Puppet lists read for such a caller (#1425, #1426).
 //   - DockerPageStore, the item store's reader of a registry repository's
 //     image layout a page at a time (ItemStore.DockerPages), with
 //     DockerFolderQuery, DockerImageQuery, DockerImageManifest and

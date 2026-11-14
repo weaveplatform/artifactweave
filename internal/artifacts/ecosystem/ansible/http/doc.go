@@ -60,9 +60,14 @@
 //     answers (#1404). So only those are checked against their archives: a
 //     version whose index entry or archive no longer matches fails a page
 //     that holds it and no other, and one deleted, or whose archive went,
-//     after the count leaves the page short. A remote's or virtual
-//     repository's list still collects every version to merge its
-//     upstream's pages or its members' lists.
+//     after the count leaves the page short. For a caller who may read
+//     every path of the collection's folder, the package index counts and
+//     pages the versions in the list's order (model.CompareGalaxy), so no
+//     name past the page is read (#1426); anyone else's list filters every
+//     name by read permission. A remote's or virtual repository's list
+//     still collects every version to merge its upstream's pages or its
+//     members' lists, sorted stably, so versions that differ only in build
+//     metadata keep their members' order.
 //   - A publish needs a local or federated repository (405), the write
 //     grant on the collections folder and on the archive's path, a file of
 //     at most 128 MiB whose SHA-256 the form's sha256 field names (400) and
@@ -158,8 +163,9 @@
 //     version document whose copy fails a read answers 500, logs the fault
 //     once and stays cached.
 //   - store_page_test.go (external): the local version list's pages read
-//     without reading the versions outside them, the checks a page makes,
-//     and its store failures.
+//     without reading the versions outside them, or for a caller who may
+//     read the whole collection any name outside them, the checks a page
+//     makes, and its store failures.
 //
 // The @ansible acceptance scenarios drive ansible-galaxy against local,
 // federated, virtual and remote repositories, offline and with bad

@@ -25,7 +25,9 @@
 //   - Pattern.Match, whether a pattern matches a path, and
 //     Pattern.MatchBelow, whether it could match some path below a folder,
 //     which is how a listing shows the folders that lead to permitted
-//     content.
+//     content, and Pattern.MatchAllBelow, whether it matches every path
+//     below a folder, which is how a list knows it may count in its store
+//     what a caller may read (#1425, #1426).
 //
 // # Invariants
 //
@@ -67,9 +69,13 @@
 //     Artifactory's usual forms.
 //   - TestUnitPatternMatchBelow: the folders that lead to content a pattern
 //     can match.
+//   - TestUnitPatternMatchAllBelow: the folders below which a pattern
+//     matches every path.
 //   - FuzzPatternMatch, with inline seeds and no seed corpus directory:
 //     Match agrees with a direct recursive matcher, and "**" matches every
 //     path. make test runs the seeds (FUZZ_PKGS) and CI runs them in the
 //     three-OS Go test matrix; go test -fuzz=FuzzPatternMatch explores
-//     further.
+//     further. FuzzPatternMatchAllBelow, run the same way: a pattern that
+//     MatchAllBelow says matches every path below a folder matches each
+//     path below it the fuzzer tries.
 package antpath

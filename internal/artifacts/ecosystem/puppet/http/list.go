@@ -146,11 +146,16 @@ func (h handler) listable(w http.ResponseWriter, r *http.Request, remoteMessage 
 		}
 		return false
 	default:
-		// JFrog support says a remote repository serves the lists too
-		// (RTFACT-15072), but no source shows what it lists, its
-		// upstream's whole catalog or only what it has cached, nor how it
-		// pages and filters them, so a remote keeps the answer it gave
-		// before until P19 settles that.
+		// The REST API page ("This endpoint will work only on local and
+		// remote repositories") and JFrog support (RTFACT-15072) say a
+		// remote serves the lists too, and PUP-10211 (6.10.4) shows a page
+		// of v3/releases with releases of about 20 modules, but no source
+		// shows what a remote lists, its upstream's whole catalog (the
+		// Forge's tens of thousands of releases, capped at 100 a page) or
+		// only what it has cached (RTFACT-13711 caches one module's
+		// releases), nor how it pages them or filters them for a caller
+		// with partial read (#1286). So a remote keeps the answer it gave
+		// before until P19 captures it.
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, remoteMessage))
 		return false
 	}
