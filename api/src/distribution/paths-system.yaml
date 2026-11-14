@@ -42,6 +42,9 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributebylastdays.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/maintenance/execute/{actionType}:
     post:
       description: Runs a maintenance action using a token from the token operation, sent as the plain-text body.
@@ -106,6 +109,9 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/executemaintenanceaction.md
+      x-idempotency: none
+      x-idempotency-reason: protocol-reconciliation
+      x-cost: expensive
   /api/v1/maintenance/generate_token/{actionType}:
     get:
       description: Issues a single-use token for one maintenance action. The token expires after 3 minutes and must
@@ -157,6 +163,9 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/generatemaintenanceexecutiontoken.md
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: ordinary
   /api/v1/maintenance/stuck_distributions:
     get:
       description: Lists distributions stuck in a non-final state, for example after an edge disappeared mid-transfer.
@@ -188,6 +197,10 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getstuckdistributions.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/metrics:
     get:
       description: Returns the release bundle and distribution counters in OpenMetrics text, under `jfds_` metric
@@ -216,6 +229,8 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getopenmetricsfordistribution.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/info:
     get:
       description: Returns the version, service id and health of the distribution service. `status` is UNSTABLE,
@@ -238,6 +253,8 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionsysteminfo.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/ping:
     get:
       description: Answers 200 with message OK when the instance's distribution features are usable, meaning the
@@ -267,6 +284,8 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributionping.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/settings:
     get:
       description: Returns the distribution settings. Administrators only.
@@ -295,6 +314,8 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionsystemsettings.md
+      x-idempotency: safe
+      x-cost: ordinary
     post:
       description: Replaces the distribution settings. Administrators only.
       operationId: updateDistributionSystemSettings
@@ -325,6 +346,10 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatedistributionsystemsettings.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/v1/system/support/bundle:
     post:
       description: 'Collects a support bundle under a generated id: logs for a date window, the configuration with
@@ -373,6 +398,9 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/createdistributionsupportbundle.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/system/support/bundle/{bundle_id}:
     delete:
       description: Deletes one support bundle. Administrators only.
@@ -416,6 +444,10 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletedistributionsupportbundle.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:bundle_id
+      x-cost: expensive
     get:
       description: Returns one support bundle's metadata. Administrators only.
       operationId: getSupportBundleInfo
@@ -462,6 +494,8 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/getdistributionsupportbundleinfo.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Collects a support bundle as the create operation does, under the id in the path.
       operationId: createSpecificSupportBundle
@@ -521,6 +555,10 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/createspecificdistributionsupportbundle.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:bundle_id
+      x-cost: expensive
   /api/v1/system/support/bundle/{bundle_id}/archive:
     get:
       description: Downloads one support bundle as a zip archive. Administrators only.
@@ -569,6 +607,8 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/downloaddistributionsupportbundle.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/support/bundles:
     get:
       description: Lists the support bundles on this instance. Administrators only.
@@ -603,3 +643,7 @@ paths:
       tags:
       - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/listdistributionsupportbundles.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
