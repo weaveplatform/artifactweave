@@ -9,8 +9,14 @@ import (
 // The messages JFrog clients print. No public source documents Artifactory's
 // exact wording; jfrog-client-go shows errors[].message as it comes.
 var (
-	// ErrBadCredentials answers credentials that do not verify.
-	ErrBadCredentials = apierror.New(http.StatusUnauthorized, "Bad credentials")
+	// ErrBadCredentials answers credentials that do not verify. The capital
+	// C is 7.x's from 7.117 on: with the internal realm on in Access, as its
+	// shipped config sets it, a refused password ends in
+	// AccessAuthProviderUtils' BadCredentialsException("Bad Credentials")
+	// (7.117.5 to 7.161.26; "Bad credentials" up to 7.111.22, and still in
+	// Spring's DaoAuthenticationProvider, which 7.x skips while Access
+	// handles the realm). RTFACT-31253 captures it on 7.117.12 (#1486).
+	ErrBadCredentials = apierror.New(http.StatusUnauthorized, "Bad Credentials")
 	// ErrUnauthenticated answers a request that needs a user and has none.
 	ErrUnauthenticated = apierror.New(http.StatusUnauthorized, "Authentication is required")
 	// ErrForbidden answers an authenticated user without the right.

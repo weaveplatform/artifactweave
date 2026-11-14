@@ -223,7 +223,7 @@ func TestUnitEntryPoint(t *testing.T) {
 			"api restricted", api, "", kernel.ErrAPIRestricted,
 			want{403, "API access is temporarily restricted", false, false},
 		},
-		{"bad credentials", api, "", kernel.ErrBadCredentials, want{401, "Bad credentials", false, false}},
+		{"bad credentials", api, "", kernel.ErrBadCredentials, want{401, "Bad Credentials", false, false}},
 		{
 			"ui path, locked", ui, "", kernel.ErrAccountLocked,
 			want{403, kernel.ErrAccountLocked.Message, false, true},
@@ -234,11 +234,11 @@ func TestUnitEntryPoint(t *testing.T) {
 		},
 		{
 			"ui agent, bad credentials", api, "artifactoryUI", kernel.ErrBadCredentials,
-			want{401, "Bad credentials", false, true},
+			want{401, "Bad Credentials", false, true},
 		},
 		{
-			"ui agent, refused key", api, "artifactoryUI", challengedForbidden("Bad credentials"),
-			want{403, "Bad credentials", false, true},
+			"ui agent, refused key", api, "artifactoryUI", challengedForbidden("Bad Credentials"),
+			want{403, "Bad Credentials", false, true},
 		},
 		{
 			"ui agent, forbidden", api, "artifactoryUI", kernel.ErrForbidden,
@@ -256,7 +256,7 @@ func TestUnitEntryPoint(t *testing.T) {
 		},
 		{
 			"ui without its slash", "/artifactory/uix", "", kernel.ErrBadCredentials,
-			want{401, "Bad credentials", false, false},
+			want{401, "Bad Credentials", false, false},
 		},
 	} {
 		r := httptest.NewRequest(http.MethodGet, c.path, nil)

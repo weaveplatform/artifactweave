@@ -514,7 +514,9 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    indefinitely on 401 responses"
    (`ArtifactoryBasicAuthenticationEntryPoint.isAlreadyAuthedApiKeyRequest`), with the Basic
    challenge the entry point adds to every answer that is not for the UI. Its message is the
-   provider's, which is not open source; artifactweave answers "Bad credentials" **[I]**, and
+   provider's: Access's providers answer "Bad Credentials" when Access refuses it
+   (`AccessAuthProviderUtils`), but which provider reads a key is not open source, so
+   artifactweave's "Bad Credentials" is **[I]**, and
    an `X-Api-Key` sent empty, read as a key but not one that turns the refusal into 403,
    401 **[I]** ([#1464](https://github.com/weaveplatform/artifactweave/issues/1464)). The
    same entry point answers 403 "if bad credentials error" to a client whose `User-Agent`
@@ -745,6 +747,29 @@ challenge, which no answer to a request of the UI's carries, and a locked accoun
 7.161.26's "Login has failed. Due to Incorrect username/password or locked user." rather than
 OSS 6.20's (item 5 of [Authentication](#authentication-accepted-on-every-endpoint)).
 
+**Settled by [#1486](https://github.com/weaveplatform/artifactweave/issues/1486).** Credentials
+that do not verify answer 401 "Bad Credentials", with a capital C, where artifactweave answered
+"Bad credentials". With the internal realm enabled in Access, a wrong password reaches
+`AccessInternalAuthenticationProvider`, the last provider in `security.xml` since 7.55, and
+Access's refusal ends in `AccessAuthProviderUtils.handleAccessClientHttpException`, which
+throws `BadCredentialsException("Bad Credentials")` from 7.117.5 on ("Bad credentials" in
+7.55.2 to 7.111.22). `DbAuthenticationProvider` and Spring's `DaoAuthenticationProvider`
+still say "Bad credentials", but 7.x tries them only while Access does not handle the internal
+realm. Access 7.191.16, shipped with 7.161.26, lists `internal` first in
+`security.authentication.enabled-realms` in its shipped `example.config.internal.yml`, so the
+realm is on unless an administrator turns it off. Captures agree: `GET /v2/_catalog` with a
+wrong password answered `{"errors":[{"status":401,"message":"Bad Credentials"}]}` on 7.117.12
+(**[J]** [RTFACT-31253](https://jfrog.atlassian.net/browse/RTFACT-31253)), JFrog's own
+package-reroute README says Docker Hub credentials sent to the token endpoint "produce
+`Bad Credentials`", and a default `jfrog/artifactory-jcr` install (7.146.17) answers invalid
+credentials 401 "Bad Credentials" (stackrox/stackrox PR 21328). Every lower-case capture comes
+from before 7.117 (RTFACT-26849 on 7.31.10, jfrog-cli issue 1616 on 7.41.6, RTFACT-29440 on
+SaaS 7.53) or names no version. The same text answers a token or API key that does not verify,
+which 7.x answers through Access's providers as well; what 7.x says for each is **[I]**:
+`AccessTokenAuthenticationProvider` answers "Token failed verification: " and Access's reason,
+a reason no source maps to the fault (a valid access token under another user name gave
+"signature" on SaaS 7.53.1, RTFACT-29440), and an API key header answers the provider's message.
+
 **Where artifactweave differs.** Decision 0005's
 [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check) lists the token,
 account policy, seeding and OIDC differences, and decision 0006's
@@ -852,7 +877,7 @@ records.
   [Authentication](#authentication-accepted-on-every-endpoint)), on the Docker, OCI, NuGet
   and Vagrant paths too, and `X-NuGet-ApiKey` is read beside them.
 - What Access answers Basic credentials naming `anonymous` while anonymous access is on,
-  which the Basic filter reads and passes to Access. **[I]** 401 "Bad credentials", counted
+  which the Basic filter reads and passes to Access. **[I]** 401 "Bad Credentials", counted
   as a failed login: the anonymous user has no password.
 - The legacy delete of the built-in `admin` or `anonymous` user. **[I]** 400 with
   `the built-in user "admin" cannot be deleted`, the message of Access v2's 403. Access, which refuses

@@ -285,8 +285,10 @@ func apiKeyCredentials(
 // either API key header is not blank (accessapi.APIKeySent), "if not the
 // client keeps asking for credentials indefinitely on 401 responses"
 // (ArtifactoryBasicAuthenticationEntryPoint.isAlreadyAuthedApiKeyRequest
-// and sendErrorResponse, 7.161.26). The message stays "Bad credentials":
-// 7.x's is the provider's, which is not open source [I]. Any other error
+// and sendErrorResponse, 7.161.26). The message is the provider's: 7.x's
+// Access providers answer "Bad Credentials" when Access refuses the key
+// (AccessAuthProviderUtils), and which provider reads it is not open
+// source [I]. Any other error
 // keeps its status, as the entry point keeps a 403's.
 func refusedAPIKey(r *http.Request, err error) error {
 	var e *apierror.Error
@@ -298,7 +300,7 @@ func refusedAPIKey(r *http.Request, err error) error {
 }
 
 // refusedNuGetPassword is err, a password's refusal, as 7.x's entry point
-// answers a NuGet client: 403 "Bad credentials" with the Basic challenge,
+// answers a NuGet client: 403 "Bad Credentials" with the Basic challenge,
 // rather than 401, when the client's User-Agent names NuGet in any case
 // and it sent an Authorization or X-NuGet-ApiKey value that is not blank,
 // so that the client stops asking for credentials, which it "keeps asking

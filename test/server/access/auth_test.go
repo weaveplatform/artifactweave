@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
@@ -82,24 +83,24 @@ func TestAccAuthentication(t *testing.T) {
 		},
 		"wrong password on a public route": {
 			"GET", "/artifactory/api/system/ping", basic("admin", "nope"),
-			want{http.StatusUnauthorized, true, "Bad credentials"},
+			want{http.StatusUnauthorized, true, "Bad Credentials"},
 		},
 		"unknown user": {
 			"GET", protected, basic("ghost", "pw"),
-			want{http.StatusUnauthorized, true, "Bad credentials"},
+			want{http.StatusUnauthorized, true, "Bad Credentials"},
 		},
 		"admin": {"GET", protected, basic("admin", "pw"), want{status: http.StatusOK}},
 		"bearer before tokens exist": {
 			"GET", protected,
 			map[string]string{"Authorization": "Bearer abc"},
-			want{http.StatusUnauthorized, true, "Bad credentials"},
+			want{http.StatusUnauthorized, true, "Bad Credentials"},
 		},
 		// A refused API key answers 403 with the challenge, as 7.x's entry
 		// point answers it (isAlreadyAuthedApiKeyRequest, #1464).
 		"api key header": {
 			"GET", protected,
 			map[string]string{"X-JFrog-Art-Api": "cmVmd123"},
-			want{http.StatusForbidden, true, "Bad credentials"},
+			want{http.StatusForbidden, true, "Bad Credentials"},
 		},
 	} {
 		rec := do(t, h, tc.method, tc.path, tc.headers, "")
@@ -163,9 +164,9 @@ func TestAccAuthentication(t *testing.T) {
 func TestAccAPIKeyHeaders(t *testing.T) {
 	const (
 		license   = "/artifactory/api/system/license"
-		refused   = `{"errors":[{"message":"Bad credentials","status":403}]}` + "\n"
+		refused   = `{"errors":[{"message":"Bad Credentials","status":403}]}` + "\n"
 		forbidden = `{"errors":[{"message":"Forbidden","status":403}]}` + "\n"
-		bad       = `{"errors":[{"message":"Bad credentials","status":401}]}` + "\n"
+		bad       = `{"errors":[{"message":"Bad Credentials","status":401}]}` + "\n"
 	)
 	for _, anonymous := range []bool{false, true} {
 		var tokens *token.Service
@@ -528,22 +529,22 @@ func TestAccUIRequestsGetNoChallenge(t *testing.T) {
 		challenge  string
 		body       string
 	}{
-		{"wrong password", api, ui(basic("admin", "wrong")), 401, "", bad(401, "Bad credentials")},
+		{"wrong password", api, ui(basic("admin", "wrong")), 401, "", bad(401, "Bad Credentials")},
 		{
 			"bearer that does not verify", api,
-			ui(map[string]string{"Authorization": "Bearer not-a-token"}), 401, "", bad(401, "Bad credentials"),
+			ui(map[string]string{"Authorization": "Bearer not-a-token"}), 401, "", bad(401, "Bad Credentials"),
 		},
 		{
 			"refused API key", api, ui(map[string]string{"X-JFrog-Art-Api": "cmVmd123"}),
-			403, "", bad(403, "Bad credentials"),
+			403, "", bad(403, "Bad Credentials"),
 		},
-		{"wrong password, UI path", "/artifactory/ui/x", basic("admin", "wrong"), 401, "", bad(401, "Bad credentials")},
+		{"wrong password, UI path", "/artifactory/ui/x", basic("admin", "wrong"), 401, "", bad(401, "Bad Credentials")},
 		{
 			"another Request-Agent", api,
 			map[string]string{
 				"Request-Agent": "ArtifactoryUI", "Authorization": basic("admin", "wrong")["Authorization"],
 			},
-			401, apierror.BasicChallenge, bad(401, "Bad credentials"),
+			401, apierror.BasicChallenge, bad(401, "Bad Credentials"),
 		},
 		{
 			"no credentials", api, ui(nil), 401, apierror.BasicChallenge,
@@ -555,6 +556,60 @@ func TestAccUIRequestsGetNoChallenge(t *testing.T) {
 			rec.Body.String() != c.body {
 			t.Errorf("%s: %d %q %s, want %d %q %s", c.name, rec.Code,
 				rec.Header().Get("WWW-Authenticate"), rec.Body, c.status, c.challenge, c.body)
+		}
+	}
+}
+
+// TestAccBadCredentialsWording pins the text of credentials that do not
+// verify: "Bad Credentials", which 7.117 and later answer for a password
+// Access refuses while it handles the internal realm
+// (AccessAuthProviderUtils; RTFACT-31253 on 7.117.12), where artifactweave
+// answered Spring's and 6.x's "Bad credentials" (#1486). A token or API key
+// that does not verify answers the same text, on the REST API, the item
+// route and a format route alike.
+func TestAccBadCredentialsWording(t *testing.T) {
+	rest := func(status int) string {
+		return fmt.Sprintf(`{"errors":[{"message":"Bad Credentials","status":%d}]}`+"\n", status)
+	}
+	npm := func(int) string { return `{"error":"Bad Credentials"}` + "\n" }
+	for _, route := range []struct {
+		path string
+		body func(status int) string
+	}{
+		{"/artifactory/api/repositories", rest},
+		{"/artifactory/libs-release-local/org/a.txt", rest},
+		{"/artifactory/api/npm/npm-local/left-pad", npm},
+	} {
+		// Each route has a router of its own: a second wrong password on
+		// one router would suspend the name.
+		h, secrets := newStatusFixture(t, false)
+		jwt := []byte(secrets["short-access"])
+		// A byte inside the signature, not its last, whose low bits may be
+		// padding the decoder ignores.
+		i := strings.LastIndexByte(string(jwt), '.') + 10
+		jwt[i] = map[bool]byte{true: 'B', false: 'A'}[jwt[i] == 'A']
+		for _, c := range []struct {
+			name    string
+			headers map[string]string
+			status  int
+		}{
+			{"wrong password", basic("admin", "wrong"), http.StatusUnauthorized},
+			{
+				"badly signed token",
+				map[string]string{"Authorization": "Bearer " + string(jwt)},
+				http.StatusUnauthorized,
+			},
+			{
+				"refused API key",
+				map[string]string{"X-JFrog-Art-Api": "cmVmd123"},
+				http.StatusForbidden,
+			},
+		} {
+			rec := do(t, h, http.MethodGet, route.path, c.headers, "")
+			if want := route.body(c.status); rec.Code != c.status || rec.Body.String() != want {
+				t.Errorf("%s on %s: %d %s, want %d %s", c.name, route.path, rec.Code, rec.Body,
+					c.status, want)
+			}
 		}
 	}
 }

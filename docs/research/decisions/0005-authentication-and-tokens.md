@@ -709,6 +709,14 @@ legacy route, the OIDC exchange and the registry token keep their own one-hour d
   user.", are 7.161.26's entry point and `UserLockedException`
   ([#1485](https://github.com/weaveplatform/artifactweave/issues/1485); **[J]**
   [RTFACT-24156](https://jfrog.atlassian.net/browse/RTFACT-24156)).
+- Credentials that do not verify answer 401 "Bad Credentials", 7.117 and later's
+  `AccessAuthProviderUtils` text for a password Access refuses while it handles the internal
+  realm, as its shipped config has it (**[J]**
+  [RTFACT-31253](https://jfrog.atlassian.net/browse/RTFACT-31253) on 7.117.12;
+  [#1486](https://github.com/weaveplatform/artifactweave/issues/1486)). A token or API key
+  that does not verify answers the same text; 7.x's "Token failed verification: " and Access's
+  reason, and the API key provider's message, are on
+  [#216](https://github.com/weaveplatform/artifactweave/issues/216) (research 05).
 - Since 7.84.3 `anonymous` is in neither the `Anything` nor the `Any Remote` permission
   ([permissions](https://docs.jfrog.com/administration/docs/permissions)), and artifactweave
   seeds both that way. Decision
@@ -799,6 +807,10 @@ source states are inferred and listed on
   `oidc.feature`, where `jf atc` mints with an exchanged token and the new token downloads.
 - A locked account (#475): `TestUnitLockoutThroughBasic`, `TestUnitLockBeforeSuspensionAndPassword`,
   `TestAccLockout`, and the status table's `locked` rows before and after the unlock.
+- The wording of credentials that do not verify (#1486): 401 "Bad Credentials", the exact
+  body of a wrong password, a token that does not verify and a refused API key on the REST API,
+  the item route and npm (`TestAccBadCredentialsWording`), and every status table row that
+  quotes it.
 - The entry point's challenge (#1485): `TestUnitEntryPoint` for each refusal and the UI's
   requests, `TestAccRefusedAccountsCarryTheChallenge` for a locked account, an expired password
   and a suspended login on the item route, the REST API, Docker, npm, NuGet, Access and pub,

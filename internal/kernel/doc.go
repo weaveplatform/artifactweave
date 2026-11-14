@@ -85,7 +85,7 @@
 //     change; TestUnitCredentialReferenceGolden pins the bytes.
 //   - The auth sentinels' messages are what JFrog clients print, and their
 //     401 and 403 split is Artifactory's (decision 0005), so statuses and
-//     texts stay byte-identical: 401 "Bad credentials" and "Authentication
+//     texts stay byte-identical: 401 "Bad Credentials" and "Authentication
 //     is required"; 403 "Forbidden", "API access is temporarily
 //     restricted", "Password has expired" and "Login has failed. Due to
 //     Incorrect username/password or locked user.".

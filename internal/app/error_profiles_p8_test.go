@@ -118,15 +118,15 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 			`{"error":{"code":"UNAUTHORIZED","message":"Authentication is required"}}`,
 		},
 		{
-			http.MethodGet, pub, basic("admin", "wrong"), 401, pubType, pubRealm("Bad credentials"),
-			`{"error":{"code":"UNAUTHORIZED","message":"Bad credentials"}}`,
+			http.MethodGet, pub, basic("admin", "wrong"), 401, pubType, pubRealm("Bad Credentials"),
+			`{"error":{"code":"UNAUTHORIZED","message":"Bad Credentials"}}`,
 		},
 		{
 			http.MethodGet, pub,
 			map[string]string{"Authorization": "Bearer not-a-token"},
 			401,
-			pubType, pubRealm("Bad credentials"),
-			`{"error":{"code":"UNAUTHORIZED","message":"Bad credentials"}}`,
+			pubType, pubRealm("Bad Credentials"),
+			`{"error":{"code":"UNAUTHORIZED","message":"Bad Credentials"}}`,
 		},
 		{
 			http.MethodGet, pub, basic("locked", "pw"), 403, pubType, pubRealm(locked),
@@ -138,7 +138,7 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 		},
 		{
 			http.MethodGet, swift, basic("reader", "wrong"), 401, problem, apierror.BasicChallenge,
-			`{"detail":"Bad credentials","status":401,"title":"Unauthorized"}`,
+			`{"detail":"Bad Credentials","status":401,"title":"Unauthorized"}`,
 		},
 		{
 			http.MethodGet, swift, basic("locked", "pw"), 403, problem, apierror.BasicChallenge,
@@ -150,7 +150,7 @@ func TestAccProtocolMiddlewareEnvelopes(t *testing.T) {
 		},
 		{
 			http.MethodGet, apm, basic("deployer", "wrong"), 401, problem, apierror.BasicChallenge,
-			`{"detail":"Bad credentials","status":401,"title":"Unauthorized"}`,
+			`{"detail":"Bad Credentials","status":401,"title":"Unauthorized"}`,
 		},
 		{
 			http.MethodGet, apm, basic("locked", "pw"), 403, problem, apierror.BasicChallenge,
