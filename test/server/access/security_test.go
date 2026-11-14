@@ -236,7 +236,8 @@ func TestAccLockout(t *testing.T) {
 	// it sends (#475), and the entry point's Basic challenge (#1485).
 	for _, pw := range []string{"pw", "wrong"} {
 		rec := do(t, h, http.MethodGet, secAPIKey, basic("user", pw), "")
-		if rec.Code != http.StatusForbidden || rec.Header().Get("WWW-Authenticate") != apierror.BasicChallenge ||
+		if rec.Code != http.StatusForbidden ||
+			rec.Header().Get("WWW-Authenticate") != apierror.BasicChallenge ||
 			rec.Body.String() != `{"errors":[{"message":"Login has failed. Due to Incorrect `+
 				`username/password or locked user.","status":403}]}`+"\n" {
 			t.Fatalf("a locked user with %q: %d %s", pw, rec.Code, rec.Body)
@@ -355,7 +356,10 @@ func TestAccAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
 	// A locked account answers 403 with its own message, the right password
 	// included (#475).
 	if rec := probe("pw"); rec.Code != http.StatusForbidden ||
-		!strings.Contains(rec.Body.String(), `Login has failed. Due to Incorrect username/password or locked user.`) {
+		!strings.Contains(
+			rec.Body.String(),
+			`Login has failed. Due to Incorrect username/password or locked user.`,
+		) {
 		t.Fatalf("the Access limit did not lock: %d %s", rec.Code, rec.Body)
 	}
 

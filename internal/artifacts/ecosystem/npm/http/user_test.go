@@ -200,7 +200,12 @@ func TestAccLoginCountsFailures(t *testing.T) {
 	for range 2 {
 		wantError(t, f.login("ann", "wrong"), http.StatusUnauthorized, "Bad credentials")
 	}
-	wantError(t, f.login("ann", "pw"), http.StatusForbidden, "Login has failed. Due to Incorrect username/password or locked user.")
+	wantError(
+		t,
+		f.login("ann", "pw"),
+		http.StatusForbidden,
+		"Login has failed. Due to Incorrect username/password or locked user.",
+	)
 	if _, err := f.kit.API().Authenticator.Basic(
 		context.Background(),
 		"ann",

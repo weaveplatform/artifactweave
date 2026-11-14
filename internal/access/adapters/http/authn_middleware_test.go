@@ -202,38 +202,62 @@ func TestUnitEntryPoint(t *testing.T) {
 		err               error
 		want              want
 	}{
-		{"locked", api, "", kernel.ErrAccountLocked,
-			want{403, kernel.ErrAccountLocked.Message, true, false}},
-		{"expired", api, "", kernel.ErrPasswordExpired,
-			want{403, "Password has expired", true, false}},
+		{
+			"locked", api, "", kernel.ErrAccountLocked,
+			want{403, kernel.ErrAccountLocked.Message, true, false},
+		},
+		{
+			"expired", api, "", kernel.ErrPasswordExpired,
+			want{403, "Password has expired", true, false},
+		},
 		{"suspended", api, "", suspended, want{
 			403, "This request is blocked due to recurrent login failures, please try again in 3 seconds",
 			true, false,
 		}},
-		{"wrapped lock", api, "", fmt.Errorf("basic: %w", kernel.ErrAccountLocked),
-			want{403, kernel.ErrAccountLocked.Message, true, false}},
+		{
+			"wrapped lock", api, "", fmt.Errorf("basic: %w", kernel.ErrAccountLocked),
+			want{403, kernel.ErrAccountLocked.Message, true, false},
+		},
 		{"forbidden", api, "", kernel.ErrForbidden, want{403, "Forbidden", false, false}},
-		{"api restricted", api, "", kernel.ErrAPIRestricted,
-			want{403, "API access is temporarily restricted", false, false}},
+		{
+			"api restricted", api, "", kernel.ErrAPIRestricted,
+			want{403, "API access is temporarily restricted", false, false},
+		},
 		{"bad credentials", api, "", kernel.ErrBadCredentials, want{401, "Bad credentials", false, false}},
-		{"ui path, locked", ui, "", kernel.ErrAccountLocked,
-			want{403, kernel.ErrAccountLocked.Message, false, true}},
-		{"ui agent, expired", api, "artifactoryUI", kernel.ErrPasswordExpired,
-			want{403, "Password has expired", false, true}},
-		{"ui agent, bad credentials", api, "artifactoryUI", kernel.ErrBadCredentials,
-			want{401, "Bad credentials", false, true}},
-		{"ui agent, refused key", api, "artifactoryUI", challengedForbidden("Bad credentials"),
-			want{403, "Bad credentials", false, true}},
-		{"ui agent, forbidden", api, "artifactoryUI", kernel.ErrForbidden,
-			want{403, "Forbidden", false, false}},
+		{
+			"ui path, locked", ui, "", kernel.ErrAccountLocked,
+			want{403, kernel.ErrAccountLocked.Message, false, true},
+		},
+		{
+			"ui agent, expired", api, "artifactoryUI", kernel.ErrPasswordExpired,
+			want{403, "Password has expired", false, true},
+		},
+		{
+			"ui agent, bad credentials", api, "artifactoryUI", kernel.ErrBadCredentials,
+			want{401, "Bad credentials", false, true},
+		},
+		{
+			"ui agent, refused key", api, "artifactoryUI", challengedForbidden("Bad credentials"),
+			want{403, "Bad credentials", false, true},
+		},
+		{
+			"ui agent, forbidden", api, "artifactoryUI", kernel.ErrForbidden,
+			want{403, "Forbidden", false, false},
+		},
 		// isUiRestRequest compares the header with equals and the
 		// undecoded request URI with startsWith.
-		{"agent in another case", api, "ArtifactoryUI", kernel.ErrAccountLocked,
-			want{403, kernel.ErrAccountLocked.Message, true, false}},
-		{"escaped ui path", "/artifactory/%75i/x", "", kernel.ErrAccountLocked,
-			want{403, kernel.ErrAccountLocked.Message, true, false}},
-		{"ui without its slash", "/artifactory/uix", "", kernel.ErrBadCredentials,
-			want{401, "Bad credentials", false, false}},
+		{
+			"agent in another case", api, "ArtifactoryUI", kernel.ErrAccountLocked,
+			want{403, kernel.ErrAccountLocked.Message, true, false},
+		},
+		{
+			"escaped ui path", "/artifactory/%75i/x", "", kernel.ErrAccountLocked,
+			want{403, kernel.ErrAccountLocked.Message, true, false},
+		},
+		{
+			"ui without its slash", "/artifactory/uix", "", kernel.ErrBadCredentials,
+			want{401, "Bad credentials", false, false},
+		},
 	} {
 		r := httptest.NewRequest(http.MethodGet, c.path, nil)
 		if c.agent != "" {

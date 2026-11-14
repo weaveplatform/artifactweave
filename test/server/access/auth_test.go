@@ -369,7 +369,14 @@ func TestAccRefusedAccountsCarryTheChallenge(t *testing.T) {
 	admin := jsonHeaders(basic("admin", "pw"))
 	expire := func(h http.Handler) {
 		t.Helper()
-		if rec := do(t, h, http.MethodPost, secExpire, admin, `["user"]`); rec.Code != http.StatusOK {
+		if rec := do(
+			t,
+			h,
+			http.MethodPost,
+			secExpire,
+			admin,
+			`["user"]`,
+		); rec.Code != http.StatusOK {
 			t.Fatalf("expire: %d %s", rec.Code, rec.Body)
 		}
 	}
@@ -392,7 +399,13 @@ func TestAccRefusedAccountsCarryTheChallenge(t *testing.T) {
 		name, path, userAgent, challenge string
 		body                             func(message string) string
 	}{
-		{"item", "/artifactory/libs-local/fixture/get.txt", "", apierror.BasicChallenge, artifactory},
+		{
+			"item",
+			"/artifactory/libs-local/fixture/get.txt",
+			"",
+			apierror.BasicChallenge,
+			artifactory,
+		},
 		{"api", "/artifactory/api/repositories", "", apierror.BasicChallenge, artifactory},
 		{
 			"docker", "/v2/", "", apierror.BasicChallenge,
@@ -403,11 +416,17 @@ func TestAccRefusedAccountsCarryTheChallenge(t *testing.T) {
 			func(m string) string { return `{"error":"` + m + `"}` },
 		},
 		{
-			"nuget", "/artifactory/api/nuget/nuget-local/FindPackagesById()", "NuGet Command Line/6.11.0",
-			apierror.BasicChallenge, artifactory,
+			"nuget",
+			"/artifactory/api/nuget/nuget-local/FindPackagesById()",
+			"NuGet Command Line/6.11.0",
+			apierror.BasicChallenge,
+			artifactory,
 		},
 		{
-			"access", "/access/api/v1/tokens", "", apierror.BasicChallenge,
+			"access",
+			"/access/api/v1/tokens",
+			"",
+			apierror.BasicChallenge,
 			func(m string) string { return `{"errors":[{"code":"FORBIDDEN","message":"` + m + `"}]}` },
 		},
 		{
@@ -462,7 +481,14 @@ func TestAccRefusedAccountsCarryTheChallenge(t *testing.T) {
 		t.Errorf("a user without the right: %d %q %s",
 			rec.Code, rec.Header().Get("WWW-Authenticate"), rec.Body)
 	}
-	if rec := do(t, h, http.MethodPut, apiRestrictionPath+"user", admin, restrictionBody()); rec.Code !=
+	if rec := do(
+		t,
+		h,
+		http.MethodPut,
+		apiRestrictionPath+"user",
+		admin,
+		restrictionBody(),
+	); rec.Code !=
 		http.StatusOK {
 		t.Fatalf("restrict: %d %s", rec.Code, rec.Body)
 	}
@@ -513,7 +539,8 @@ func TestAccUIRequestsGetNoChallenge(t *testing.T) {
 		},
 		{"wrong password, UI path", "/artifactory/ui/x", basic("admin", "wrong"), 401, "", bad(401, "Bad credentials")},
 		{
-			"another Request-Agent", api, map[string]string{
+			"another Request-Agent", api,
+			map[string]string{
 				"Request-Agent": "ArtifactoryUI", "Authorization": basic("admin", "wrong")["Authorization"],
 			},
 			401, apierror.BasicChallenge, bad(401, "Bad credentials"),
