@@ -42,7 +42,8 @@
 //     operation in the cache, as api/oracle-inventory.json and the Markdown
 //     of research 14.
 //   - Scaffold: a draft OpenAPI 3.0.3 fragment for one family, every
-//     description the TODO(author) Placeholder.
+//     description the TODO(author) Placeholder, and every operation's
+//     x-idempotency, x-cost and x-pagination too (decision 0043).
 //
 // # Invariants
 //

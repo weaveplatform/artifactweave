@@ -45,6 +45,10 @@
 //     checks that the two agree.
 //   - A pattern is the spec's server URL, the BaseURL router.go mounts each
 //     generated server under, followed by the spec path.
+//   - A class is the spec's text as written: one of decision 0043's values,
+//     or TODO(author) on an x-draft operation make scaffold wrote, which
+//     TestAccAPIPrinciples allows nowhere else. A reader that meets a value
+//     it does not know treats the operation as unclassified.
 //
 // # References
 //
