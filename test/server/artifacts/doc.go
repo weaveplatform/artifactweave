@@ -36,7 +36,9 @@
 //     (source_test.go).
 //   - PostgreSQL through internal/app/storetest for the cases that run on
 //     it too (idempotency_sql_test.go, keyed_operations_test.go,
-//     properties_long_test.go); they skip without Docker.
+//     properties_long_test.go, streamed_lists_test.go); they skip without
+//     Docker. SQLite in a file for the streamed lists and their memory
+//     (streamed_lists_test.go, streamed_memory_test.go).
 //
 // # Outputs
 //
@@ -68,6 +70,12 @@
 //   - repositories_test.go, repositories_format_class_test.go,
 //     repo_environments_test.go and virtual_members_test.go: the repository
 //     configuration API.
+//   - streamed_lists_test.go: Get Repositories without limit and the
+//     dependency search, written from store pages (#1409), against the
+//     bytes they collected, on the in-memory store, SQLite and PostgreSQL,
+//     and their store faults before and after the first byte;
+//     streamed_memory_test.go: the heap while a deep file list of 50,000
+//     files streams.
 //   - source_test.go, source_listing_test.go, cache_maintenance_test.go and
 //     smart_status_test.go: remote sources, browsing, cache maintenance and
 //     the smart remote diagnostic.
