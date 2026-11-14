@@ -90,12 +90,23 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 		if err != nil {
 			return q, source.ErrInvalidRequest
 		}
-		mapped, err := mavenUpstreamPath(local, upstream, r.Path)
+		// A checksum file is the file it names, mapped, with its extension,
+		// as 7.161.26's HttpRepo.downloadResource translates the path it
+		// downloads (convertRequestPathIfNeeded).
+		file, ext := r.Path, ""
+		if r.ChecksumOnly {
+			subject, ok := source.ChecksumSubject(r.Path)
+			if !ok {
+				return q, source.ErrInvalidRequest
+			}
+			file, ext = subject, strings.TrimPrefix(r.Path, subject)
+		}
+		mapped, err := mavenUpstreamPath(local, upstream, file)
 		if err != nil {
 			return q, source.ErrInvalidRequest
 		}
-		r.UpstreamPath = (&url.URL{Path: mapped}).EscapedPath()
-		if IsPom(mapped) && !IsPom(r.Path) {
+		r.UpstreamPath = (&url.URL{Path: mapped + ext}).EscapedPath()
+		if IsPom(mapped) && !IsPom(r.Path) && !r.ChecksumOnly {
 			// Descriptor projection can change .pom to ivy-*.xml. Preserve
 			// the actual upstream POM's admission rules despite that spelling.
 			validationLayout, validationPath = upstream, mapped
@@ -145,6 +156,14 @@ func (m *MavenBackend) PrepareUpload(
 	opts remote.Options,
 	u *item.CacheUpload,
 ) error {
+	if Serves(q.Repo.PackageType) && q.Resource.ChecksumOnly {
+		// The upstream's checksum file is read as it is: 7.161.26's
+		// getRemoteChecksumFromPath downloads it under no checksum policy
+		// and asks for no checksum of it, so fail's demand that the
+		// upstream declare one does not apply.
+		u.Repo.RemoteRepoChecksumPolicyType = repo.IgnoreAndGenerate
+		return nil
+	}
 	if !Serves(q.Repo.PackageType) || preparedMetadata(q.Resource) ||
 		q.Repo.RemoteRepoChecksumPolicyType == repo.IgnoreAndGenerate ||
 		u.Declared != (kernel.Checksums{}) && q.Repo.RemoteRepoChecksumPolicyType != repo.PassThru {

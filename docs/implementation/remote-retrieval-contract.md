@@ -206,8 +206,14 @@ upstream's `X-Checksum-*` declarations, so only `pass-thru` finds a value and ev
 other answer is 404 "Checksum not found for <file>"
 ([#1476](https://github.com/weaveplatform/artifactweave/issues/1476)). A checksum
 request for a file the cache holds, even one due for a refresh, reads that copy as a
-GET does. Never publish an item from an upstream
-HEAD alone: a HEAD that downloads nothing (R13, a checksum request, a checksum-only or
+GET does; the item route sends every other checksum request upstream as a HEAD of the
+file. On a Maven-family remote that stores nothing, that HEAD is followed by a GET of
+the upstream's own checksum file, `<file>.<alg>`, a checksum-only read under no
+checksum policy that asks for no checksum of it, and the answer is that file's first
+token, or 404 "Checksum not found for <file>" when the upstream has none, as
+`RemoteRepoBase.getRemoteChecksum` downloads it (`getRemoteChecksumFromPath`); like
+every GET sent upstream, it follows a HEAD unless `bypassHeadRequests`. Never publish
+an item from an upstream HEAD alone: a HEAD that downloads nothing (R13, a checksum request, a checksum-only or
 transient resource, or an answer the cache may not keep) sends the upstream one HEAD,
 and the caller closes the response without publishing anything from it.
 `bypassHeadRequests` suppresses only the preflight of a GET. [#621](https://github.com/weaveplatform/artifactweave/issues/621) may perform a full, validated GET when its download path needs

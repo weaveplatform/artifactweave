@@ -110,7 +110,11 @@
 //     is answered from the file's info, the upstream's answer to one HEAD,
 //     through the remote's checksum policy, and nothing is downloaded or
 //     kept: only pass-thru finds a value, the one the upstream declared, and
-//     every other answer is 404 "Checksum not found for <file>".
+//     every other answer is 404 "Checksum not found for <file>". On a
+//     Maven-family remote that stores nothing, a checksum file is answered,
+//     under every policy, with the upstream's own <file>.<alg>, after one
+//     HEAD of the file: its first checksum, or that 404 when the upstream
+//     has none.
 //     A folder listing and an archive entry keep their own answers.
 //
 // # References

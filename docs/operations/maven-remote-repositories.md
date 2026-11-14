@@ -74,7 +74,11 @@ from the file's info, the upstream's answer to one HEAD, as 7.x does: nothing is
 downloaded or kept, and no companion is scheduled. Under `pass-thru` it answers the
 checksum the upstream declared in its `X-Checksum-*` header; under the other three
 policies, and under `pass-thru` when the upstream declared none, it answers 404
-"Checksum not found for <file>". A successfully delivered sidecar marks its owner used;
+"Checksum not found for <file>". On a remote that stores nothing, a checksum request
+answers the upstream's own checksum file, `<file>.<alg>`, under every policy, after one
+HEAD of the file, whose body is never asked for: the first checksum in that file, or 404
+"Checksum not found for <file>" when the upstream has none, as 7.x's
+`getRemoteChecksum` reads it. A successfully delivered sidecar marks its owner used;
 HEAD and failed delivery do not.
 
 `maxUniqueSnapshots` applies to fetched unique builds through the existing persistent

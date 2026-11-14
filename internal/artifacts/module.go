@@ -339,7 +339,11 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 			allows = d.AllowsFolder
 		}
 		if q.Resource.ChecksumOnly {
-			path = path[:len(path)-len(".sha256")]
+			file, ok := source.ChecksumSubject(path)
+			if !ok {
+				return source.ErrInvalidRequest
+			}
+			path = file
 		}
 		if !allows(
 			accessapi.ResourceArtifact,

@@ -600,6 +600,16 @@ func TestAccMavenPassThruChecksumsForTransientAndMetadata(t *testing.T) {
 						"reader",
 						"",
 					)
+					if noStore && alg == item.SHA256 {
+						// A remote that stores nothing answers the upstream's
+						// checksum file, and this upstream has no .sha256: 7.x's
+						// getRemoteChecksum finds none and answers 404.
+						remoteStatus(t, result, 404)
+						if result.Body.String() != checksumNotFound(p) {
+							t.Fatal(result.Body)
+						}
+						continue
+					}
 					remoteStatus(t, result, 200)
 					if alg == item.SHA256 {
 						if len(result.Body.String()) != 64 ||

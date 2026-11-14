@@ -351,3 +351,197 @@ func TestAccMavenColdChecksumStoreFault(t *testing.T) {
 		})
 	}
 }
+
+// noStoreWorld is a Maven remote that stores nothing, under policy, over
+// an upstream holding the jar at p, which declares declaredChecksums.
+func noStoreWorld(t *testing.T, policy repo.RemoteChecksumPolicy, p string) *remoteWorld {
+	t.Helper()
+	w := newMavenRemoteWorld(t)
+	w.c.StoreArtifactsLocally = new(false)
+	w.c.RemoteRepoChecksumPolicyType = policy
+	w.update()
+	header := http.Header{"Content-Type": {"application/java-archive"}}
+	for _, d := range declaredChecksums {
+		header.Set(d.header, d.value)
+	}
+	w.up.Set("/"+p, fakeupstream.Resource{
+		Body:     sourceJAR(t, "no-store"),
+		Header:   header,
+		Modified: time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC),
+	})
+	return w
+}
+
+// TestAccMavenNoStoreChecksumFromUpstreamFile: a Maven remote that stores
+// nothing answers a checksum request, HEAD or GET, under every checksum
+// policy, with the upstream's own checksum file: one HEAD of the file,
+// whose body is never asked for, then one GET of <file>.<alg>, answered
+// with its first token. 7.161.26's RemoteRepoBase.getChecksum calls
+// getRemoteChecksum for a remote that stores nothing, which for the Maven
+// family downloads the checksum path (getRemoteChecksumFromPath) and reads
+// it with ChecksumUtils.checksumStringFromStream; the upstream's 404 is
+// null (handleRemoteRequestException), and respondForChecksumRequest
+// answers 404 "Checksum not found for <file>".
+func TestAccMavenNoStoreChecksumFromUpstreamFile(t *testing.T) {
+	const p = "org/acme/app/1.0/app-1.0.jar"
+	upstreamSums := map[string]string{
+		"md5":    strings.Repeat("1", 32),
+		"sha1":   strings.Repeat("2", 40),
+		"sha256": strings.Repeat("3", 64),
+		"sha512": strings.Repeat("4", 128),
+	}
+	for _, policy := range []repo.RemoteChecksumPolicy{repo.GenerateIfAbsent, repo.Fail, repo.IgnoreAndGenerate, repo.PassThru} {
+		for _, present := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/checksum-file=%v", policy, present), func(t *testing.T) {
+				w := noStoreWorld(t, policy, p)
+				if present {
+					for alg, sum := range upstreamSums {
+						w.up.Set("/"+p+"."+alg, fakeupstream.Resource{
+							Body:   []byte(sum + "  app-1.0.jar\n"),
+							Header: http.Header{"Content-Type": {"text/plain"}},
+						})
+					}
+				}
+				for _, method := range []string{"GET", "HEAD"} {
+					for alg, sum := range upstreamSums {
+						res := w.request(method, "/artifactory/remote/"+p+"."+alg, "reader", "")
+						if !present {
+							remoteStatus(t, res, 404)
+							if method == "GET" && res.Body.String() != checksumNotFound(p) {
+								t.Fatal(method, alg, res.Body)
+							}
+							continue
+						}
+						remoteStatus(t, res, 200)
+						h := res.Header()
+						if h.Get("Content-Length") != strconv.Itoa(len(sum)) ||
+							method == "GET" && res.Body.String() != sum ||
+							method == "HEAD" && (res.Body.Len() != 0 ||
+								h.Get("ETag") != declaredChecksums["sha1"].value) {
+							t.Fatal(method, alg, h, res.Body)
+						}
+					}
+				}
+				if n := w.up.Count("GET", "/"+p); n != 0 {
+					t.Fatal("checksum request asked for the file's body", w.up.Requests())
+				}
+				if n := w.up.Count("HEAD", "/"+p); n != 8 {
+					t.Fatal("want one upstream HEAD of the file a request", n, w.up.Requests())
+				}
+				// The checksum file's GET follows a HEAD of it, as every GET
+				// this server sends upstream does unless bypassHeadRequests,
+				// and no checksum of the checksum file is asked for.
+				gets := 0
+				if present {
+					gets = 2
+				}
+				for alg := range upstreamSums {
+					if n := w.up.Count("GET", "/"+p+"."+alg); n != gets {
+						t.Fatal("want one upstream GET of the checksum file a request", alg, n)
+					}
+				}
+				if n := w.up.Count("GET", ""); n != gets*len(upstreamSums) {
+					t.Fatal("asked the upstream for more than the checksum files", w.up.Requests())
+				}
+			})
+		}
+	}
+}
+
+// TestAccMavenNoStoreChecksumFileForms: the checksum file is read as
+// ChecksumUtils.checksumStringFromStream reads it: blank lines and lines
+// starting with "//" are skipped, an "MD5 (name)= <sum>" line answers
+// <sum>, the first token answers, unchecked against the algorithm, and a
+// file with no such line is not found.
+func TestAccMavenNoStoreChecksumFileForms(t *testing.T) {
+	const p = "org/acme/app/1.0/app-1.0.jar"
+	for _, tc := range []struct{ name, body, want string }{
+		{"bare", "0123abcd", "0123abcd"},
+		{"named", "0123abcd *app-1.0.jar\r\n", "0123abcd"},
+		{"comments", "\n   \n// generated\n  0123abcd  \n", "0123abcd"},
+		{"bsd", "MD5 (app-1.0.jar)= 0123abcd\n", "0123abcd"},
+		{"unchecked", "not-a-checksum trailing", "not-a-checksum"},
+		{"blank", "\n\n// only a comment\n", ""},
+		{"empty", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := noStoreWorld(t, repo.GenerateIfAbsent, p)
+			w.up.Set("/"+p+".md5", fakeupstream.Resource{Body: []byte(tc.body)})
+			res := w.request("GET", "/artifactory/remote/"+p+".md5", "reader", "")
+			if tc.want == "" {
+				remoteStatus(t, res, 404)
+				if res.Body.String() != checksumNotFound(p) {
+					t.Fatal(res.Body)
+				}
+				return
+			}
+			remoteStatus(t, res, 200)
+			if res.Body.String() != tc.want {
+				t.Fatalf("%q, want %q", res.Body, tc.want)
+			}
+		})
+	}
+}
+
+// TestAccMavenNoStoreChecksumNeedsTheFile: a checksum request for a file
+// the upstream does not have answers as the file does and never asks for
+// the checksum file, as 7.x's respond answers a resource it did not find
+// before its checksum branch. An upstream fault on the checksum file is
+// the upstream's fault, not a missing checksum; a refused label is
+// refused, as HttpRepo.downloadResource's blockMismatchingMimeTypes
+// refuses it.
+func TestAccMavenNoStoreChecksumNeedsTheFile(t *testing.T) {
+	const p = "org/acme/app/1.0/app-1.0.jar"
+	w := noStoreWorld(t, repo.GenerateIfAbsent, p)
+	w.up.Set("/org/acme/app/1.0/gone-1.0.jar.sha1", fakeupstream.Resource{Body: []byte("0123abcd")})
+	for _, method := range []string{"GET", "HEAD"} {
+		res := w.request(
+			method,
+			"/artifactory/remote/org/acme/app/1.0/gone-1.0.jar.sha1",
+			"reader",
+			"",
+		)
+		remoteStatus(t, res, 404)
+	}
+	if n := w.up.Count("GET", ""); n != 0 {
+		t.Fatal("checksum file asked for without its file", w.up.Requests())
+	}
+
+	w.up.Set("/"+p+".sha1", fakeupstream.Resource{Status: http.StatusServiceUnavailable})
+	fault := w.request("GET", "/artifactory/remote/"+p+".sha1", "reader", "")
+	file := newMavenRemoteWorld(t)
+	file.c.StoreArtifactsLocally = new(false)
+	file.update()
+	file.up.Set("/"+p, fakeupstream.Resource{Status: http.StatusServiceUnavailable})
+	remoteStatus(t, fault, file.request("GET", "/artifactory/remote/"+p, "reader", "").Code)
+
+	w.up.Set("/"+p+".sha1", fakeupstream.Resource{
+		Body:   []byte("<html>0123abcd</html>"),
+		Header: http.Header{"Content-Type": {"text/html"}},
+	})
+	res := w.request("GET", "/artifactory/remote/"+p+".sha1", "reader", "")
+	if res.Code == http.StatusOK {
+		t.Fatal("refused label answered", res.Body)
+	}
+}
+
+// TestAccMavenNoStoreMappedChecksum: on a remote whose upstream has
+// another layout, the checksum file asked for is the mapped file's, as
+// HttpRepo.downloadResource translates the path it downloads
+// (convertRequestPathIfNeeded), and a POM's checksum is not admitted as a
+// POM.
+func TestAccMavenNoStoreMappedChecksum(t *testing.T) {
+	w := newMavenRemoteWorld(t)
+	w.c.RepoLayoutRef, w.c.RemoteRepoLayoutRef = "gradle-default", "maven-2-default"
+	w.c.StoreArtifactsLocally = new(false)
+	w.update()
+	pom := "org/acme/app/1.0/app-1.0.pom"
+	mavenSource(w, pom, []byte(sourcePOM("app", "1.0")), "application/xml")
+	w.up.Set("/"+pom+".sha1", fakeupstream.Resource{Body: []byte(strings.Repeat("5", 40))})
+	res := w.request("GET", "/artifactory/remote/org.acme/app/ivy-1.0.xml.sha1", "reader", "")
+	remoteStatus(t, res, 200)
+	if res.Body.String() != strings.Repeat("5", 40) || w.up.Count("GET", "/"+pom) != 0 ||
+		w.up.Count("GET", "/"+pom+".sha1") != 1 {
+		t.Fatal(res.Body, w.up.Requests())
+	}
+}

@@ -228,22 +228,30 @@ type remoteStreamServer func(
 )
 
 // remoteStreamAnswer returns how getRemoteItem answers a stream for q:
-// ServeRemoteStream, or serveInfoChecksum for a checksum request that
-// reads only the info of the file it names, which it makes a HEAD. That
-// is a request for a file that a Maven-family remote storing artifacts
-// locally does not hold: 7.161.26's DownloadServiceImpl.respond hands a
-// checksum request, HEAD or GET, to respondForChecksumRequest, which never
-// downloads the file, before the branch that downloads one.
-// DownloadRequestContext.getResourcePath strips the checksum's extension,
-// so RemoteRepoBase.getInfo resolves the file, from the upstream's HEAD
-// when the cache does not hold it. A copy the cache holds, even one due
-// for a refresh, is read as before.
+// ServeRemoteStream, or, for a Maven-family checksum request that reads
+// only the info of the file it names, which it makes a HEAD,
+// serveInfoChecksum or serveUpstreamChecksum. 7.161.26's
+// DownloadServiceImpl.respond hands a checksum request, HEAD or GET, to
+// respondForChecksumRequest, which never downloads the file, before the
+// branch that downloads one. DownloadRequestContext.getResourcePath strips
+// the checksum's extension, so RemoteRepoBase.getInfo resolves the file,
+// from the upstream's HEAD when the cache does not hold it. A copy the
+// cache holds, even one due for a refresh, is read as before.
 func (s *Kit) remoteStreamAnswer(
 	ctx context.Context, c repo.Config, sidecar string, q *source.Request,
 ) (remoteStreamServer, error) {
-	if sidecar == "" || !maven.Serves(c.PackageType) || q.CacheOnly ||
-		c.StoreArtifactsLocally != nil && !*c.StoreArtifactsLocally {
+	if sidecar == "" || !maven.Serves(c.PackageType) || q.CacheOnly {
 		return s.ServeRemoteStream, nil
+	}
+	if c.StoreArtifactsLocally != nil && !*c.StoreArtifactsLocally {
+		sum := upstreamChecksumRequest(*q, sidecar)
+		q.Resource.Method = http.MethodHead
+		return func(
+			w http.ResponseWriter, r *http.Request, result source.Result, _ repo.Config,
+			req ItemRequest, resource source.Resource, _ string, anonymous bool,
+		) {
+			s.serveUpstreamChecksum(w, r, result, sum, req, resource, anonymous)
+		}, nil
 	}
 	held, err := remoteCopyHeld(ctx, s.Store, c, q.Resource.Path)
 	switch {
@@ -783,6 +791,109 @@ func (s *Kit) serveInfoChecksum(
 	// The file's headers carry what the upstream declared, as #1459 settled
 	// for a checksum HEAD that streams nothing.
 	s.serveRemoteChecksum(w, r, req.Path, value, result.Stream.Checksums, result.Stream.Modified)
+}
+
+// upstreamChecksumRequest is the read of the checksum file the upstream
+// keeps beside the file q reads, <file>.<sidecar>, which 7.161.26's
+// RemoteRepoBase.getRemoteChecksum downloads for a Maven-family remote
+// that stores nothing (getRemoteChecksumFromPath). HttpRepo.downloadResource
+// sends it with a NullRequestContext: none of the client's matrix
+// parameters, query or headers.
+func upstreamChecksumRequest(q source.Request, sidecar string) source.Request {
+	q.Matrix, q.MatrixParams = model.Matrix{}, ""
+	q.Resource = source.Resource{
+		Kind:         source.ResourceKindArtifact,
+		Path:         q.Resource.Path + "." + sidecar,
+		EscapedPath:  q.Resource.EscapedPath + "." + sidecar,
+		Method:       http.MethodGet,
+		ChecksumOnly: true,
+		// HttpRepo.downloadResource checks the checksum file's label too
+		// (blockMismatchingMimeTypes), with no client Accept to read.
+		ClientMIME: &source.ClientMIME{},
+	}
+	return q
+}
+
+// serveUpstreamChecksum answers the checksum request at req.Path on a
+// Maven-family remote that stores nothing, once result, the upstream's
+// answer to a HEAD of the file at resource.Path, found it: with the first
+// token of the upstream's checksum file, which sum reads, under every
+// checksum policy, as 7.161.26's RemoteRepoBase.getChecksum answers one
+// (getRemoteChecksum, ChecksumUtils.checksumStringFromStream). The file's
+// body is never asked for. An upstream with no checksum file, or one
+// with no checksum in it, answers 404 "Checksum not found for <file>":
+// getChecksum's handleRemoteRequestException returns null for the
+// upstream's 404, and respondForChecksumRequest answers that 404. The
+// file's headers carry what the upstream declared on its HEAD, as #1459
+// settled for a checksum that streams nothing.
+func (s *Kit) serveUpstreamChecksum(
+	w http.ResponseWriter,
+	r *http.Request,
+	result source.Result,
+	sum source.Request,
+	req ItemRequest,
+	resource source.Resource,
+	anonymous bool,
+) {
+	if !s.RemoteDeliveryAllowed(w, r, result, anonymous) {
+		return
+	}
+	_ = result.Stream.Body.Close()
+	ctx := r.Context()
+	fetched, err := s.RemoteSources.Read(ctx, sum)
+	value := ""
+	switch {
+	case err != nil:
+	case fetched.Stream == nil:
+		err = fmt.Errorf("checksum file %s: %w", sum.Resource.Path, source.ErrInvalidRequest)
+	case !s.RemoteDeliveryAllowed(w, r, fetched, anonymous):
+		return
+	default:
+		value, err = checksumFileValue(fetched.Stream.Body)
+		_ = fetched.Stream.Body.Close()
+	}
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
+		httpkit.WriteErr(
+			w,
+			r,
+			s.ItemError(ctx, "read source", pkgroute.SourceError(err, anonymous)),
+		)
+		return
+	}
+	if value == "" {
+		httpkit.WriteErr(
+			w, r, apierror.New(http.StatusNotFound, "Checksum not found for "+resource.Path),
+		)
+		return
+	}
+	s.serveRemoteChecksum(w, r, req.Path, value, result.Stream.Checksums, result.Stream.Modified)
+}
+
+// checksumFileValue reads a checksum file as 7.161.26's
+// ChecksumUtils.checksumStringFromStream does: the first line that is
+// not blank and does not start with "//", trimmed, less anything up to
+// a ")= " (an "MD5 (name)= <sum>" line), up to its first white space.
+// The value is not checked against the algorithm, as getChecksum does
+// not check it. The remote policy holds the file to 4096 bytes
+// (ChecksumOnly), so the whole of it is read here.
+func checksumFileValue(body io.Reader) (string, error) {
+	data, err := io.ReadAll(body)
+	if err != nil {
+		return "", fmt.Errorf("read checksum file: %w", err)
+	}
+	for line := range strings.Lines(string(data)) {
+		if strings.HasPrefix(line, "//") {
+			continue
+		}
+		line = strings.TrimSpace(line)
+		if _, after, found := strings.Cut(line, ")= "); found {
+			line = after
+		}
+		if fields := strings.Fields(line); len(fields) > 0 {
+			return fields[0], nil
+		}
+	}
+	return "", nil
 }
 
 // Cache alias downloads have no source lookup token. Touch only entries naming

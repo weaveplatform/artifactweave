@@ -130,7 +130,11 @@ type Resource struct {
 	// feed. Only trusted feed/query metadata adapters may opt in; complete
 	// metadata validation, an Atom MIME expectation and a versioned schema remain required.
 	NuGetEmptyFeed bool
-	// ChecksumOnly is the trusted generic cold SHA-256 sidecar route. It must
+	// ChecksumOnly is a checksum file (a .sha256, .sha512, .sha1 or .md5
+	// path, ChecksumSubject) the item route reads from the upstream itself:
+	// a generic remote's cold SHA-256 (retrieveSha256FromServer), and the
+	// checksum request of a Maven-family remote that stores nothing, as
+	// 7.161.26's RemoteRepoBase.getRemoteChecksum downloads it. It must
 	// remain transient and authorize the artifact it describes.
 	ChecksumOnly bool
 	// ChecksumRequest marks a read of the file a checksum request (a
@@ -853,15 +857,25 @@ func permissionPath(r Resource) (string, error) {
 		checkedPath = r.PermissionPath
 	}
 	if r.ChecksumOnly {
-		if r.Kind != ResourceKindArtifact || !strings.HasSuffix(checkedPath, ".sha256") {
+		file, ok := ChecksumSubject(checkedPath)
+		if r.Kind != ResourceKindArtifact || !ok {
 			return "", ErrInvalidRequest
 		}
-		checkedPath = strings.TrimSuffix(checkedPath, ".sha256")
-		if checkedPath == "" {
-			return "", ErrInvalidRequest
-		}
+		checkedPath = file
 	}
 	return checkedPath, nil
+}
+
+// ChecksumSubject returns the file a ChecksumOnly resource's path names,
+// less its .sha256, .sha512, .sha1 or .md5, and false for any other path.
+func ChecksumSubject(path string) (string, bool) {
+	for _, ext := range []string{".sha256", ".sha512", ".sha1", ".md5"} {
+		if file, ok := strings.CutSuffix(path, ext); ok && file != "" &&
+			!strings.HasSuffix(file, "/") {
+			return file, true
+		}
+	}
+	return "", false
 }
 
 func (s *Service) revalidate(ctx context.Context, q Request, p Permit) error {

@@ -197,8 +197,10 @@ func (p *Policy) Read(
 		// checksum request's HEAD sends the upstream a HEAD only: 7.161.26's
 		// DownloadServiceImpl.respond hands a checksum request, HEAD or GET,
 		// to respondForChecksumRequest, which answers from the file's info
-		// and never downloads it. (A checksum request's GET still fills the
-		// cache here, a difference the remote retrieval contract records.)
+		// and never downloads it. The item route sends a checksum request
+		// for a file the cache does not hold as a HEAD (#1476); one for a
+		// copy the cache holds stays a GET, which reads that copy and may
+		// refresh it, as the remote retrieval contract records.
 		return p.direct(ctx, q, permit, opts, key, noStore)
 	}
 	// 7.161.26's DownloadServiceImpl.respond answers a HEAD from the
