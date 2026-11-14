@@ -7,6 +7,8 @@ import (
 	"slices"
 	"testing"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -57,6 +59,51 @@ func TestAccHandlersCalledDirectly(t *testing.T) {
 	if _, err := svc.CreateMultipleRepositories(admin,
 		artgen.CreateMultipleRepositoriesRequestObject{}); err == nil {
 		t.Fatal("a batch without a body was accepted")
+	}
+	repositoriesCalledDirectly(t, db, admin)
+}
+
+// repositoriesCalledDirectly: without the router's saved query, Get
+// Repositories' next link is rebuilt from the decoded parameters, and a
+// principal with no decider is evaluated by the authorizer, whose failure
+// answers 500.
+func repositoriesCalledDirectly(t *testing.T, db *inmem.Store, admin context.Context) {
+	t.Helper()
+	for _, key := range []string{"p-1", "p-2"} {
+		c := repo.Config{Key: key, Class: repo.Local, PackageType: repo.Generic, ProjectKey: "p"}
+		if err := db.Repos().Create(admin, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	local := artgen.GetRepositoriesByTypeAndProjectParamsTypeLocal
+	generic := artgen.GetRepositoriesByTypeAndProjectParamsPackageType("generic")
+	project, limit, offset := "p", 1, 0
+	req := artgen.GetRepositoriesByTypeAndProjectRequestObject{
+		Params: artgen.GetRepositoriesByTypeAndProjectParams{
+			Type: &local, PackageType: &generic, Project: &project, Limit: &limit, Offset: &offset,
+		},
+	}
+	svc := newArtifactoryAPI(withAccess(t, Config{Store: db}))
+	res, err := svc.GetRepositoriesByTypeAndProject(admin, req)
+	list, ok := res.(artgen.GetRepositoriesByTypeAndProject200JSONResponse)
+	const want = "</artifactory/api/repositories?limit=1&offset=1&packageType=generic&project=p&type=local>" +
+		`; rel="next"`
+	if err != nil || !ok || len(list.Body) != 1 || list.Headers.Link == nil ||
+		*list.Headers.Link != want {
+		t.Fatalf("direct page = %+v, %v; want Link %s", res, err, want)
+	}
+	failing := withAccess(t, Config{Store: db})
+	failing.Access.Authorizer = &accessapitest.Authorizer{
+		DecideFunc: func(context.Context, accessapi.Subject, bool) (accessapi.Decider, error) {
+			return nil, errors.New("boom")
+		},
+	}
+	_, err = newArtifactoryAPI(failing).GetRepositoriesByTypeAndProject(admin, req)
+	if e := (*apierror.Error)(
+		nil,
+	); !errors.As(err, &e) ||
+		e.Status != http.StatusInternalServerError {
+		t.Fatalf("a failing authorizer: %v", err)
 	}
 }
 
