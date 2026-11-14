@@ -71,7 +71,7 @@ ledger. The ledger test fails when an operation it records as served carries
 | --- | --- |
 | Ordinary reads | Detail reads have no intended write effect. Downloads can populate remote caches, increment statistics and perform upstream work. Retry with bounded backoff; budgets still apply. |
 | Addressed replacements/deletes | Repeating an item/configuration replacement or deletion can converge on the same state, with different responses. Index hooks, retention, audit and concurrent replacements mean the HTTP verb alone is insufficient proof for every mode. Read/reconcile the addressed resource on ambiguous completion. |
-| Build append | Concatenates modules and writes build-info metadata/blob content. Optional keys now bind the same credential, canonical resource and body bytes to one committed effect for 24 hours. [The service](../../../internal/artifacts/core/build/build.go) and [replay store](../../../internal/platform/store/sql/replay.go) commit the effect and receipt together. |
+| Build append | Concatenates modules and writes build-info metadata/blob content. Optional keys now bind the same credential, canonical resource and body bytes to one committed effect for 24 hours. [The shared replay](../../../internal/platform/idempotency/run.go) runs [the handler](../../../internal/artifacts/adapters/http/builds.go) and [append's reload](../../../internal/artifacts/adapters/http/idempotency.go) in one transaction with the receipt the [replay store](../../../internal/platform/store/sql/replay.go) keeps. |
 | Build publish/delete/promote/rename | Publishing can run retention; deletion can select the latest run; promotion/copy/move act on artifact sets. These are not protected by append's key. Reconcile the selected run and source/destination instead of automatically repeating. See [build service](../../../internal/artifacts/core/build/build.go) and [handlers](../../../internal/artifacts/adapters/http/builds.go). |
 | Tokens, refresh and OIDC | Issue fresh credentials or rotate/delete token records. Responses contain secrets and are never retained in the replay store. Unsupported keys are rejected. Restriction checks also run after self-authentication, before issuing/rotating credentials. An ambiguous refresh requires credential reconciliation, not a new blind grant. |
 | AQL | [The same POST handler](../../../internal/artifacts/adapters/http/aql.go) serves reads and `items.delete`/`properties.update`. Only proven read queries are read-retriable. Do not infer read safety merely from the search path. |
@@ -84,7 +84,8 @@ ledger. The ledger test fails when an operation it records as served carries
 A key is accepted exactly where an operation is declared `x-idempotency: key` and
 declares the shared `IdempotencyKey` parameter, as decision 0043's
 [Idempotency classes](../decisions/0043-api-reliability.md#idempotency-classes)
-set out; today build append is the only such operation. Every other operation is
+set out; today build append is the only such operation. [Adding a keyed
+operation](retrying.md#adding-a-keyed-operation) lists the steps for the next. Every other operation is
 `safe`, `natural` (its request names the target it converges on), or `none` with a
 listed reason, and a key sent to it answers 400 before authentication. Imports,
 replication, webhook tests and other actions that wait on another service are
