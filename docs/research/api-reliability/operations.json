@@ -8834,7 +8834,7 @@
       "200 application/vnd.org.jfrog.artifactory.storage.FileList+json.files[]",
       "200 application/vnd.org.jfrog.artifactory.storage.FolderInfo+json.children[]"
     ],
-    "pagination_execution": "complete: the whole collection in one answer, a repository's file list streamed from store pages as they are read, its trees' full path walks merged; folder information's children and the trash can's file list are collected before they are written; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "pagination_execution": "complete: the whole collection in one answer, every list streamed from store pages as they are read: a repository's file list merges its trees' full path walks, folder information walks each tree's children in name order in turn, the trash can's file list and folder information walk its tree in path order, and a folder's last modified item is folded over the walk of what lies below it; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
       "internal/app/router.go",
       "internal/artifacts/adapters/http/items.go",
