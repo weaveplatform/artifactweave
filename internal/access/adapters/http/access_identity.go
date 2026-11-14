@@ -588,7 +588,7 @@ func (s AccessService) CreateGroup(
 // /access/api/v2/groups/{name}): 201 with the group it created, 200 with the
 // group it replaced. The body is Create a Group's, so a replacement resets
 // every field it leaves out to the create default and replaces the members,
-// as JFrog's Create or Replace a Group page says.
+// as JFrog's Replace or Create a Group page says.
 func (s AccessService) ReplaceGroup(
 	ctx context.Context,
 	req accessgen.ReplaceGroupRequestObject,

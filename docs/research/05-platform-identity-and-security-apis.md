@@ -178,7 +178,9 @@ and camelCase keys inside one object: this is why wire models live in packages t
 
 ## Access identity (`/access/api/...`)
 
-Source index: https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt.
+Source indexes: https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt,
+and, for Replace or Create a Group only,
+https://docs.jfrog.com/administration/reference/jfrog-platform-groups-api/llms.txt.
 All endpoints take Bearer auth; unless noted they require a platform admin.
 
 ### Users v2
@@ -263,6 +265,7 @@ for an unknown member.
 | GET | `/access/api/v2/groups` | 200 | query `limit`, `cursor`, `descendingOrder`, `groupName`, `role`, `resourceType`, `resourceName`, `projectKey`; response `{"groups":[{group_name,uri}],"cursor":"..."}` |
 | POST | `/access/api/v2/groups` | **201** | `members` and `import_from_ldap_group_setting` are mutually exclusive; 409 on conflict; `platform_group` requires 201 |
 | GET | `/access/api/v2/groups/{name}` | 200 | |
+| PUT | `/access/api/v2/groups/{name}` | **201** or 200 | creates the group (201) or replaces it (200); a body `name` that differs from the path answers 400; a replacement resets every field it leaves out and replaces `members`, keeping `realm` and `realm_attributes` ([replacegroup](https://docs.jfrog.com/administration/reference/replacegroup)) |
 | PATCH | `/access/api/v2/groups/{name}` | 200 | `realm`, `realm_attributes` and `members` are not updatable here |
 | DELETE | `/access/api/v2/groups/{name}` | **204** | `platform_group` requires 204 |
 | PATCH | `/access/api/v2/groups/{name}/members` | 200 | `{"add":[...],"remove":[...]}` returns `{"members":[...]}` |
@@ -270,6 +273,24 @@ for an unknown member.
 Create body: `{name,description,auto_join,admin_privileges,external_id,import_from_ldap_group_setting,members[],reports_manager,watch_manager,policy_manager,policy_viewer,manage_resources,manage_webhook}`;
 details add `realm` and `realm_attributes`. The `roles` field needs Artifactory ≥7.128.0;
 there is no other version gate on groups.
+
+**Replace or Create a Group moved; JFrog did not withdraw it**
+([#1434](https://github.com/weaveplatform/artifactweave/issues/1434)). On 2026-11-13 the
+page answered 404 and left the JFrog Platform REST APIs index. It came back the same day at
+the same URL (`updatedAt` 2026-11-13T10:29:17Z), now titled Replace or Create a Group
+rather than Create or Replace a Group, as the only page of a new family,
+[JFrog Platform - Groups API](https://docs.jfrog.com/administration/reference/jfrog-platform-groups-api/llms.txt).
+Its text, status codes and schemas are the same as on 2026-11-10. The
+[SaaS release notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)
+announce it under 7.177.2 (9 November 2026) as a new REST API. The self-managed notes, up
+to 7.173.18, do not mention it yet, and no deprecation notice names an Access v2 group
+route. The [deprecated APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis)
+page, last edited on 2026-11-09, still says the new API is create-only and points at
+`PATCH`; it was written before this route was published. No JFrog client sends the route
+yet: `platform_group` creates with `POST` and updates with `PATCH`, while
+`artifactory_group` and jfrog-client-go send the legacy `PUT /api/security/groups/{groupName}`.
+artifactweave keeps serving it, and the spec oracle now fetches the new family, so an
+oracle refresh keeps the route under the parity check.
 
 **Group names keep their case and are compared exactly**
 ([#1309](https://github.com/weaveplatform/artifactweave/issues/1309)), unlike usernames,
@@ -658,6 +679,7 @@ access needed to prove a hosted integration is a recorded phase dependency, neve
 successful local imitation of a vendor-owned operation.
 
 Primary URLs: https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt,
+https://docs.jfrog.com/administration/reference/jfrog-platform-groups-api/llms.txt,
 https://docs.jfrog.com/administration/reference/jfrog-artifactory-security-api/llms.txt,
 https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis,
 https://docs.jfrog.com/administration/docs/access-tokens,
