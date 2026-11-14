@@ -216,6 +216,7 @@
       "repositories_format_class_test.go",
       "repositories_paging_test.go",
       "repositories_test.go",
+      "repositories_walk_test.go",
       "searches_builds_test.go",
       "searches_layout_test.go",
       "searches_test.go",

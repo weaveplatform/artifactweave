@@ -736,10 +736,12 @@ func (s ArtifactoryAPI) SearchPattern(
 	}), nil
 }
 
-// KeepsSearchQuery reports the searches whose raw query the router's
+// KeepsSearchQuery reports the requests whose raw query the router's
 // request details keep: the property search, whose parameters are property
 // keys, and the GAVC search, whose older callers send remote=0/1
-// (gavcRemote). The generated binding drops both.
+// (gavcRemote), which the generated binding drops; and Get Repositories,
+// whose next link keeps every parameter as the client sent it.
 func KeepsSearchQuery(r *http.Request) bool {
-	return r.URL.Path == propertySearchPath || r.URL.Path == "/artifactory/api/search/gavc"
+	return r.URL.Path == propertySearchPath || r.URL.Path == "/artifactory/api/search/gavc" ||
+		r.URL.Path == repositoriesPath
 }

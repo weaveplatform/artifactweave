@@ -55081,6 +55081,7 @@ func (r SetRepositoryReplicationConfigurationResponse) ContentType() string {
 
 // GetRepositoriesByTypeAndProjectResponse200Headers the declared response headers of an HTTP 200 response for GetRepositoriesByTypeAndProject
 type GetRepositoriesByTypeAndProjectResponse200Headers struct {
+	Link          *string
 	XResultLimit  *int
 	XResultOffset *int
 	XTotalCount   *int
@@ -96701,6 +96702,13 @@ func ParseGetRepositoriesByTypeAndProjectResponse(rsp *http.Response) (*GetRepos
 	switch {
 	case rsp.StatusCode == 200:
 		var headers GetRepositoriesByTypeAndProjectResponse200Headers
+		if values := rsp.Header.Values("Link"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Link", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.Link = &value
+		}
 		if values := rsp.Header.Values("X-Result-Limit"); len(values) > 0 {
 			var value int
 			if err := runtime.BindStyledParameterWithOptions("simple", "X-Result-Limit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
