@@ -157,6 +157,7 @@ index tokens_purpose tokens CREATE UNIQUE INDEX tokens_purpose ON tokens(subject
 index tokens_subject tokens CREATE INDEX tokens_subject ON tokens(subject,issued_at,id)
 index trash_deleted trash CREATE INDEX trash_deleted ON trash(deleted_at,id)
 index trash_original trash CREATE INDEX trash_original ON trash(original_repo_key,original_path,original_name,id)
+index trash_path trash CREATE INDEX trash_path ON trash(original_repo_key || '/' || CASE WHEN original_path = '.' THEN original_name ELSE original_path || '/' || original_name END,id)
 index uploads_updated uploads CREATE INDEX uploads_updated ON uploads(updated_at,id)
 index user_groups_auto_join user_groups CREATE INDEX user_groups_auto_join ON user_groups(auto_join,name)
 index users_search_backfill users CREATE INDEX users_search_backfill ON users(name)WHERE search_name IS NULL

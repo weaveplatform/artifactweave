@@ -250,6 +250,13 @@ type TrashEntry struct {
 	DeletedBy string
 }
 
+// TrashPath is where the entry sits in the trash can's tree: its original
+// repository key, a slash and its original full path. The trash can's views
+// list its tree in this path's byte order.
+func (t TrashEntry) TrashPath() string {
+	return t.Record.Item.RepoKey + "/" + t.Record.Item.FullPath()
+}
+
 // Expired reports whether the entry is older than the retention period.
 func (t TrashEntry) Expired(now time.Time, retention time.Duration) bool {
 	return !now.Before(t.DeletedAt.Add(retention))

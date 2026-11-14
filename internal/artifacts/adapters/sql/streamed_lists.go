@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -14,11 +15,11 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 )
 
-// The pages of two complete lists that are written as they are read
+// The pages of the complete lists that are written as they are read
 // (#1409): a folder's descendants in full path order, which the storage
-// API's file list sorts by, and a checksum's build dependencies in
-// FindDependencies' order. Their queries seek the indexes of migration
-// 0004_streamed_lists.
+// API's file list sorts by, a checksum's build dependencies in
+// FindDependencies' order, and the trash can's tree in path order. Their
+// queries seek the indexes of migration 0004_streamed_lists.
 
 // fullPath is the third column of items_full_path, written as the index
 // writes it: an item's full path, which for a root-level item (path ".")
@@ -204,4 +205,82 @@ func dependencyPageQuery(c kernel.Checksums, p kernel.Page) (string, []any, erro
 		" ORDER BY build_id, module_position, position LIMIT ?) f" +
 		" JOIN build_modules m ON m.build_id = f.build_id AND m.position = f.module_position" +
 		" JOIN builds b ON b.id = f.build_id", append(args, p.Limit+1), nil
+}
+
+// trashPath is the first column of trash_path, written as the index writes
+// it: model.TrashEntry.TrashPath, the original repository key, a slash and
+// the original full path, which for a root-level item (path ".") is its
+// name. PostgreSQL needs the COLLATE written out as the index has it.
+func (t trash) trashPath() string {
+	const expr = "original_repo_key || '/' || CASE WHEN original_path = '.' THEN original_name" +
+		" ELSE original_path || '/' || original_name END"
+	if t.s.Dialect().Dollar {
+		return "(" + expr + `) COLLATE "C"`
+	}
+	return expr
+}
+
+func (t trash) BelowByPath(
+	ctx context.Context,
+	dir string,
+	p kernel.Page,
+) ([]model.TrashEntry, string, error) {
+	op := "list trash below " + dir + " by path"
+	p, err := p.Normalize()
+	if err != nil {
+		return nil, "", fmt.Errorf("%s: %w", op, err)
+	}
+	query, args, err := t.belowByPathQuery(dir, p)
+	if err != nil {
+		return nil, "", fmt.Errorf("%s: %w", op, err)
+	}
+	out, err := t.query(ctx, op, query, args...)
+	if err != nil {
+		return nil, "", err
+	}
+	page, next := kernel.Trim(out, p.Limit, func(e model.TrashEntry) []string {
+		return []string{e.TrashPath(), dialect.Itoa(e.ID)}
+	})
+	return page, next, nil
+}
+
+// belowByPathQuery is BelowByPath's query, which the plan tests explain.
+// The entries below dir are exactly the paths from "<dir>/" up to, not
+// including, "<dir>0", since '0' follows '/'; a range trash_path seeks.
+// The cursor is the last entry's (path, ID): the seek starts at its path,
+// and the few entries at that path up to its ID are passed over. The two
+// lower bounds are folded into one, since SQLite seeks by only one of them
+// and would read every entry before the cursor for each page. p is
+// normalized.
+func (t trash) belowByPathQuery(dir string, p kernel.Page) (string, []any, error) {
+	after, err := p.Key(2)
+	if err != nil {
+		return "", nil, err //nolint:wrapcheck // a kernel sentinel, wrapped by the caller
+	}
+	tp := t.trashPath()
+	where := "1 = 1"
+	var args []any
+	low := ""
+	if dir = strings.Trim(dir, "/"); dir != "" {
+		low = dir + "/"
+		where += " AND " + tp + " < ?"
+		args = append(args, dir+"0")
+	}
+	if after != nil && after[0] > low {
+		low = after[0]
+	}
+	if low != "" {
+		where += " AND " + tp + " >= ?"
+		args = append(args, low)
+	}
+	if after != nil {
+		id, err := strconv.ParseInt(after[1], 10, 64)
+		if err != nil {
+			return "", nil, fmt.Errorf("%w: %q is not an ID", kernel.ErrInvalidCursor, after[1])
+		}
+		where += " AND (" + tp + " > ? OR id > ?)"
+		args = append(args, after[0], id)
+	}
+	return "SELECT " + trashCols + " FROM trash WHERE " + where +
+		" ORDER BY " + tp + ", id LIMIT ?", append(args, p.Limit+1), nil
 }

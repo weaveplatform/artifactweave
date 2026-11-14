@@ -214,6 +214,17 @@ func (f faultyTrash) List(
 	return f.TrashStore.List(ctx, repoKey, prefix, p) //nolint:wrapcheck // test double
 }
 
+func (f faultyTrash) BelowByPath(
+	ctx context.Context,
+	dir string,
+	p kernel.Page,
+) ([]artmodel.TrashEntry, string, error) {
+	if f.fails("below") {
+		return nil, "", errBoom
+	}
+	return f.TrashStore.BelowByPath(ctx, dir, p) //nolint:wrapcheck // test double
+}
+
 func (f faultyTrash) Find(
 	ctx context.Context,
 	repoKey, full string,
@@ -238,11 +249,15 @@ func TestAccTrashStorageReadFailure(t *testing.T) {
 	wantStatus(t, w.do("GET", trashURL+"/libs-local/a/one.txt", "admin", ""),
 		http.StatusInternalServerError)
 	fail["find"] = 0
-	// Finding the folder reads the trash once; a list or lastModified view
-	// reads it again.
-	for view, reads := range map[string]int{"": 1, "?list": 2, "?lastModified": 2} {
+	// Finding the path asks the trash whether anything lies below it, the
+	// root's too; a folder's info, list or lastModified view then walks
+	// the trash below it, and the root's properties read nothing more.
+	for view, reads := range map[string]int{
+		"": 2, "?list": 2, "?lastModified": 2, "?properties": 1,
+		"/libs-local": 2, "/libs-local/a?list": 2, "/libs-local/a?lastModified": 2,
+	} {
 		for n := 1; n <= reads; n++ {
-			fail["list"] = n
+			fail["below"] = n
 			wantStatus(t, w.do("GET", trashURL+view, "admin", ""), http.StatusInternalServerError)
 		}
 	}

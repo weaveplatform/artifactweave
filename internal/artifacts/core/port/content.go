@@ -342,6 +342,16 @@ type TrashStore interface {
 		repoKey, prefix string,
 		p kernel.Page,
 	) ([]model.TrashEntry, string, error)
+	// BelowByPath lists the entries below dir in the trash can's tree:
+	// every entry for "", else those whose TrashPath starts with dir and a
+	// slash. They are ordered by TrashPath byte by byte, then by ID, the
+	// order the storage API's views of the trash can list its tree in, so
+	// those views read it a page at a time (#1409).
+	BelowByPath(
+		ctx context.Context,
+		dir string,
+		p kernel.Page,
+	) ([]model.TrashEntry, string, error)
 	// Delete removes an entry.
 	Delete(ctx context.Context, id int64) error
 	// Expired returns entries deleted before t, oldest first, at most limit

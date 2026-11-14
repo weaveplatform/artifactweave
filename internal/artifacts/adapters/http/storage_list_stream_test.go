@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -29,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/sql/postgres"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/sql/sqlite"
 	appstoretest "github.com/weaveplatform/artifactweave/internal/app/storetest"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -40,25 +42,37 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
-// collectedPrefix is where fileListRouter serves collectedFileList.
+// collectedPrefix is where fileListRouter serves collectedStorage.
 const collectedPrefix = "/collected/"
 
-// collectedFileList is the file list as getStorage answered it before
-// #1409 streamed it: the same checks, then below's items from every tree,
-// rendered and sorted whole by render. The streamed list must answer its
-// bytes.
-func (s ArtifactoryAPI) collectedFileList(w http.ResponseWriter, r *http.Request) {
+// collectedStorage is getStorage as it answered before #1409 streamed its
+// lists: the same checks, then the file list, a folder's info and its last
+// modified item from below's items, collected whole, and the file list
+// sorted by render. The streamed views must answer its bytes.
+func (s ArtifactoryAPI) collectedStorage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	v, p, q, err := s.storageRequest(r, collectedPrefix)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	if !v.acc.Folder(v.repo, v.path, accessapi.ActionRead) || p.Anonymous {
+	mode, err := storageMode(q)
+	if err != nil {
+		httpkit.WriteErr(w, r, err)
+		return
+	}
+	if !v.acc.Folder(v.repo, v.path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
-	if v.repo.Class != repo.Virtual {
+	switch {
+	case mode == "list" && p.Anonymous,
+		mode == "lastModified" && !v.acc.Folder(v.repo, v.path, accessapi.ActionWrite),
+		mode == "permissions" && !p.Admin:
+		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		return
+	}
+	if mode == "list" && v.repo.Class != repo.Virtual {
 		if err := generic.CheckBlackedOut(v.repo, v.path); err != nil {
 			httpkit.WriteErr(w, r, s.ItemError(ctx, "storage list", err))
 			return
@@ -73,29 +87,137 @@ func (s ArtifactoryAPI) collectedFileList(w http.ResponseWriter, r *http.Request
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
-	if !f.Item.Folder {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "storage list", httpkit.BadRequestf(
-			"%s is a file; list needs a folder", f.Item.StoragePath())))
+	var (
+		media string
+		body  any
+	)
+	switch mode {
+	case "":
+		media, body, err = v.collectedInfo(ctx, f)
+	case "list":
+		media, body, err = v.collectedList(ctx, f, q)
+	case "lastModified":
+		media, body, err = v.collectedLastModified(ctx, f)
+	default:
+		err = httpkit.BadRequestf("the collected views are info, list and lastModified")
+	}
+	if err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "storage "+mode, err))
 		return
+	}
+	w.Header().Set("Content-Type", media)
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+func (v storageView) collectedInfo(ctx context.Context, f itemkit.Found) (string, any, error) {
+	body := v.infoBody(ctx, f.Item)
+	if !f.Item.Folder {
+		return mediaFileInfo, body, nil
+	}
+	children, err := v.below(ctx, f.Item.FullPath(), false)
+	if err != nil {
+		return "", nil, err
+	}
+	entries := make([]map[string]any, 0, len(children))
+	for _, c := range children {
+		entries = append(entries, map[string]any{"uri": "/" + c.Name, "folder": c.Folder})
+	}
+	body["children"] = entries
+	return mediaFolderInfo, body, nil
+}
+
+func (v storageView) collectedList(
+	ctx context.Context,
+	f itemkit.Found,
+	q url.Values,
+) (string, any, error) {
+	if !f.Item.Folder {
+		return "", nil, httpkit.BadRequestf(
+			"%s is a file; list needs a folder",
+			f.Item.StoragePath(),
+		)
 	}
 	l, err := parseListing(q)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "storage list", err))
-		return
+		return "", nil, err
 	}
 	folder := f.Item.FullPath()
 	items, err := v.below(ctx, folder, l.isDeep)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "storage list", err))
-		return
+		return "", nil, err
 	}
 	files := make([]listed, 0, len(items))
 	for _, it := range items {
 		files = append(files, listed{path: it.FullPath(), item: it})
 	}
-	w.Header().Set("Content-Type", mediaFileList)
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(l.render(v.uri(ctx, folder), folder, f.Item, files))
+	return mediaFileList, l.render(v.uri(ctx, folder), folder, f.Item, files), nil
+}
+
+func (v storageView) collectedLastModified(
+	ctx context.Context,
+	f itemkit.Found,
+) (string, any, error) {
+	newest := f.Item
+	if f.Item.Folder {
+		items, err := v.below(ctx, f.Item.FullPath(), true)
+		if err != nil {
+			return "", nil, err
+		}
+		for _, it := range items {
+			if it.Modified.After(newest.Modified) {
+				newest = it
+			}
+		}
+		if newest.Modified.IsZero() {
+			return "", nil, itemkit.ItemNotFound()
+		}
+	}
+	return mediaLastModified, map[string]any{
+		"uri":          v.uri(ctx, newest.FullPath()),
+		"lastModified": httpkit.FormatTime(newest.Modified),
+	}, nil
+}
+
+// below is what the views collected before #1409: what lies under folder in
+// every tree the view reads, direct children or (deep) every descendant,
+// tree by tree, in Children's or Descendants' order. A name that several
+// members hold is reported once, from the first member the caller may read
+// it in.
+func (v storageView) below(ctx context.Context, folder string, deep bool) ([]model.Item, error) {
+	trees, err := v.trees(ctx, v.repo, map[string]bool{})
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	var out []model.Item
+	for _, t := range trees {
+		list := v.st.Items().Children
+		if deep {
+			list = v.st.Items().Descendants
+		}
+		page := kernel.Page{Limit: kernel.MaxLimit}
+		for {
+			batch, next, err := list(ctx, t.Repo.Key, t.Item.Cached, folder, page)
+			if err != nil {
+				return nil, fmt.Errorf("list %s/%s: %w", t.Repo.Key, folder, err)
+			}
+			for _, it := range batch {
+				// What the caller may not see is left out; a folder shows
+				// when something below it is readable.
+				if !seen[it.FullPath()] &&
+					v.acc.Item(t.Repo, it.FullPath(), it.Folder, accessapi.ActionRead) {
+					seen[it.FullPath()] = true
+					out = append(out, it)
+				}
+			}
+			if next == "" {
+				break
+			}
+			page.After = next
+		}
+	}
+	return out, nil
 }
 
 // fileListStore opens an empty store of backend, with the built-in
@@ -127,8 +249,9 @@ func fileListStore(t *testing.T, backend string) serverStore {
 	return db
 }
 
-// fileListRouter serves the storage routes over db, and collectedFileList
-// under collectedPrefix, to callers who send Basic credentials.
+// fileListRouter serves the storage and trash routes over db, and
+// collectedStorage and collectedTrash under collectedPrefix and
+// collectedTrashPrefix, to callers who send Basic credentials.
 func fileListRouter(t *testing.T, db serverStore) http.Handler {
 	t.Helper()
 	k := accesstest.Over(t, db)
@@ -143,7 +266,10 @@ func fileListRouter(t *testing.T, db serverStore) http.Handler {
 		return p
 	}))
 	s.RegisterStorageRoutes(mux)
-	mux.Get(collectedPrefix+"*", s.collectedFileList)
+	s.RegisterTrashRoutes(mux)
+	mux.Get(collectedPrefix+"*", s.collectedStorage)
+	mux.Get(collectedTrashPrefix, s.collectedTrash)
+	mux.Get(collectedTrashPrefix+"/*", s.collectedTrash)
 	return mux
 }
 
@@ -160,16 +286,18 @@ const (
 // "-", " " and "!" sort before "/", "B" before "b", "é" after "z".
 var fileListTricky = []string{
 	"a/b/c/x.txt", "a/b/!", "a/b-c/y", "a/b c/z", "a/b.d", "a/B", "a/é/e.txt", "a/z",
-	"a/0", "a/b+c", "a/~", "z.txt", "-.txt", "A.txt", "é.txt",
+	"a/0", "a/b+c", "a/~", "z.txt", "-.txt", "A.txt", "é.txt", "-d/f.txt",
 }
 
 // seedFileLists creates libs-local and libs-other (local), remote (whose
 // cache holds files), libs (virtual over libs-local, remote, libs-other and
 // a missing member) and outer (virtual over libs, libs-local and
 // libs-other, which the walk visits once each). Paths in both locals carry
-// different content, so the entry shows whose item is listed. pr reads
-// a/** and wide/f0* of libs-local, a/b/** and wide/** of libs-other, and
-// every path of remote and of the virtual repositories.
+// different content, so the entry shows whose item is listed. A file was
+// last modified 0 to 3 hours after its folders, by the length of its path,
+// so many files tie for a folder's newest. pr reads and deploys a/** and
+// wide/f0* of libs-local, a/b/** and wide/** of libs-other, and every path
+// of remote and of the virtual repositories.
 func seedFileLists(t *testing.T, db serverStore) {
 	t.Helper()
 	ctx := t.Context()
@@ -185,6 +313,9 @@ func seedFileLists(t *testing.T, db serverStore) {
 			Key: "outer", Class: repo.Virtual,
 			Repositories: []string{"libs", "libs-local", "libs-other"},
 		},
+		{Key: "tie-a", Class: repo.Local},
+		{Key: "tie-b", Class: repo.Local},
+		{Key: "tie", Class: repo.Virtual, Repositories: []string{"tie-a", "tie-b"}},
 	} {
 		if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
@@ -215,7 +346,7 @@ func seedFileLists(t *testing.T, db serverStore) {
 				Name:     name,
 				Cached:   cached,
 				Size:     int64(len(content)),
-				Modified: modified,
+				Modified: modified.Add(time.Duration(len(full)%4) * time.Hour),
 				Actual: kernel.Checksums{
 					SHA1: sha1Hex(content), SHA256: sha256Hex(content), MD5: md5Hex(content),
 				},
@@ -232,7 +363,7 @@ func seedFileLists(t *testing.T, db serverStore) {
 		for _, full := range fileListTricky {
 			writes = append(writes, func() error { return put("libs-local", full, false) })
 		}
-		for _, full := range []string{"a/b-c", "a/b/c/x.txt", "a/b/d.txt", "other/x"} {
+		for _, full := range []string{"a/b-c", "a/b/c/x.txt", "a/b/d.txt", "other/x", "-d/g.txt"} {
 			writes = append(writes, func() error { return put("libs-other", full, false) })
 		}
 		for _, full := range []string{"a/r.txt", "deep/d00/f000", "wide/f0001", "a/B"} {
@@ -261,6 +392,7 @@ func seedFileLists(t *testing.T, db serverStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	seedTies(t, db, modified)
 	if err := db.Users().
 		Create(ctx, accesstest.User{Name: "pr", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
@@ -269,7 +401,9 @@ func seedFileLists(t *testing.T, db serverStore) {
 		Name: "pr-lists", Resources: map[accessapi.ResourceType]accesstest.Resource{
 			accessapi.ResourceArtifact: {
 				Actions: accesstest.Grants{
-					Users: map[string]accessapi.Actions{"pr": accessapi.ActionRead},
+					Users: map[string]accessapi.Actions{
+						"pr": accessapi.ActionRead | accessapi.ActionWrite,
+					},
 				},
 				Targets: map[string]accesstest.Target{
 					"libs-local": {Include: []string{"a/**", "wide/f0*"}},
@@ -277,11 +411,47 @@ func seedFileLists(t *testing.T, db serverStore) {
 					"remote":     {Include: []string{"**"}},
 					"libs":       {Include: []string{"**"}},
 					"outer":      {Include: []string{"**"}},
+					"tie-a":      {Include: []string{"x/**", "y/**"}},
+					"tie-b":      {Include: []string{"**"}},
+					"tie":        {Include: []string{"**"}},
 				},
 			},
 		},
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// seedTies fills tie-a and tie-b, the members of the virtual tie, with
+// files that tie for their folder's newest, where the order the collected
+// last-modified read met them in (tree, then (path, name)) is not their
+// full path order: -d/f before !x at the root, y/b/d before y/b-c/e, and
+// tie-a's x/z.bin before tie-b's x/a.bin.
+func seedTies(t *testing.T, db serverStore, at time.Time) {
+	t.Helper()
+	ctx := t.Context()
+	newest := at.Add(5 * time.Hour)
+	for _, it := range []model.Item{
+		{RepoKey: "tie-a", Path: ".", Name: "-d", Folder: true, Modified: at},
+		{RepoKey: "tie-a", Path: ".", Name: "x", Folder: true, Modified: at},
+		{RepoKey: "tie-a", Path: ".", Name: "y", Folder: true, Modified: at},
+		{RepoKey: "tie-a", Path: "y", Name: "b", Folder: true, Modified: at},
+		{RepoKey: "tie-a", Path: "y", Name: "b-c", Folder: true, Modified: at},
+		{RepoKey: "tie-a", Path: "-d", Name: "f", Modified: newest},
+		{RepoKey: "tie-a", Path: ".", Name: "!x", Modified: newest},
+		{RepoKey: "tie-a", Path: "x", Name: "z.bin", Modified: newest},
+		{RepoKey: "tie-a", Path: "x", Name: "b.bin", Modified: at.Add(time.Hour)},
+		{RepoKey: "tie-a", Path: "y/b", Name: "d", Modified: newest},
+		{RepoKey: "tie-a", Path: "y/b-c", Name: "e", Modified: newest},
+		{RepoKey: "tie-b", Path: ".", Name: "x", Folder: true, Modified: at},
+		{RepoKey: "tie-b", Path: ".", Name: "y", Folder: true, Modified: at},
+		{RepoKey: "tie-b", Path: ".", Name: "q.txt", Modified: newest},
+		{RepoKey: "tie-b", Path: "x", Name: "a.bin", Modified: newest},
+		{RepoKey: "tie-b", Path: "y", Name: "b", Modified: at.Add(2 * time.Hour)},
+	} {
+		if _, err := db.Items().Put(ctx, it); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -399,8 +569,87 @@ func TestAccStorageListAnswersAsBefore(t *testing.T) {
 	}
 }
 
-// fileListFaults fails the item store's walks of a folder, by full path
-// and by (path, name) alike, once skip walks have been let through.
+// TestAccStorageFolderViewsStreamTheCollected: on every backend, a
+// folder's info, whose children are written as they are read, and its last
+// modified item, folded over the merged walk, answer the collected views'
+// bytes for local, remote and virtual repositories, the root, nested and
+// missing folders and files, for the administrator and a partial reader.
+// A virtual repository lists its members' children member by member, not
+// merged by name; and among equally new items the one the collected read
+// met first is reported.
+func TestAccStorageFolderViewsStreamTheCollected(t *testing.T) {
+	for _, backend := range []string{"inmem", "sqlite", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			db := fileListStore(t, backend)
+			seedFileLists(t, db)
+			h := fileListRouter(t, db)
+			children := 0
+			for _, key := range []string{
+				"libs-local", "libs-other", "remote", "remote-cache", "libs", "outer",
+				"tie-a", "tie-b", "tie",
+			} {
+				for _, item := range []string{
+					"", "a", "a/b", "a/b/c", "deep", "deep/d00", "wide", "-d", "other", "none",
+					"z.txt", "a/b-c", "x", "y",
+				} {
+					for _, view := range []string{"", "?lastModified"} {
+						for _, user := range []string{"admin", "pr"} {
+							target := key + "/" + item + view
+							got := do(
+								t,
+								h,
+								http.MethodGet,
+								storagePrefix+target,
+								basic(user, "pw"),
+								"",
+							)
+							want := do(
+								t,
+								h,
+								http.MethodGet,
+								collectedPrefix+target,
+								basic(user, "pw"),
+								"",
+							)
+							if got.Code != want.Code ||
+								got.Header().
+									Get("Content-Type") !=
+									want.Header().
+										Get("Content-Type") ||
+								got.Body.String() != want.Body.String() {
+								t.Fatalf(
+									"%s as %s: %d %s, collected %d %s\n got %.600s\nwant %.600s",
+									target,
+									user,
+									got.Code,
+									got.Header().Get("Content-Type"),
+									want.Code,
+									want.Header().Get("Content-Type"),
+									got.Body,
+									want.Body,
+								)
+							}
+							if view == "" && got.Code == http.StatusOK {
+								children = max(
+									children,
+									strings.Count(got.Body.String(), `"uri":"/`),
+								)
+							}
+						}
+					}
+				}
+			}
+			// The widest folder's children cross several store pages.
+			if children < 2*kernel.MaxLimit {
+				t.Fatalf("the most children listed: %d", children)
+			}
+		})
+	}
+}
+
+// fileListFaults fails the item store's walks of a folder, by full path,
+// by (path, name) and by name alike, once skip walks have been let
+// through.
 type fileListFaults struct {
 	serverStore
 	skip *int
@@ -451,6 +700,78 @@ func (f faultyFileWalks) Descendants(
 		folder,
 		p,
 	) //nolint:wrapcheck // test double
+}
+
+func (f faultyFileWalks) Children(
+	ctx context.Context, repoKey string, cached bool, folder string, p kernel.Page,
+) ([]model.Item, string, error) {
+	if f.fail() {
+		return nil, "", errBoom
+	}
+	return f.ItemStore.Children(ctx, repoKey, cached, folder, p) //nolint:wrapcheck // test double
+}
+
+// cutShort gets target from a real server and requires a 200 whose body
+// begins with prefix and holds more, then breaks off unparsed.
+func cutShort(t *testing.T, h http.Handler, target, prefix string) {
+	t.Helper()
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+target, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.SetBasicAuth("admin", "pw")
+	res, err := srv.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = res.Body.Close() }()
+	body, err := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK || err == nil || !bytes.HasPrefix(body, []byte(prefix)) {
+		t.Fatalf("failure after the first byte of %s: %d, %d bytes %.80q, read error %v",
+			target, res.StatusCode, len(body), body, err)
+	}
+	var v any
+	if json.Unmarshal(body, &v) == nil {
+		t.Fatalf("the cut body of %s parses as JSON", target)
+	}
+}
+
+// TestAccStorageFolderViewsStoreFaults: a store failure before a folder's
+// info has written its first byte, or anywhere in a last-modified walk,
+// answers the collected view's error; one after the first page of children
+// has gone out aborts the info, cut short.
+func TestAccStorageFolderViewsStoreFaults(t *testing.T) {
+	db := fileListStore(t, "inmem")
+	seedFileLists(t, db)
+	skip := 0
+	h := fileListRouter(t, fileListFaults{serverStore: db, skip: &skip})
+	// wide's children and descendants cross a store page: the second read
+	// fails after the first is let through.
+	for _, c := range []struct {
+		target string
+		skip   int
+	}{
+		{"libs-local/wide", 0},
+		{"libs/a", 0},
+		{"libs/a", 1},
+		{"libs-local/wide?lastModified", 0},
+		{"libs-local/wide?lastModified", 1},
+		{"libs/?lastModified", 2},
+	} {
+		skip = c.skip
+		got := do(t, h, http.MethodGet, storagePrefix+c.target, basic("admin", "pw"), "")
+		skip = c.skip
+		was := do(t, h, http.MethodGet, collectedPrefix+c.target, basic("admin", "pw"), "")
+		if got.Code != http.StatusInternalServerError || got.Body.String() != was.Body.String() ||
+			got.Header().Get("Content-Type") != was.Header().Get("Content-Type") {
+			t.Fatalf("%s failing after %d reads: %d %s, collected %d %s",
+				c.target, c.skip, got.Code, got.Body, was.Code, was.Body)
+		}
+	}
+	skip = 1
+	cutShort(t, h, storagePrefix+"libs-local/wide", `{"children":[{`)
 }
 
 // TestAccStorageListStoreFaults: a store failure on the first page answers

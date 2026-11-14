@@ -39,7 +39,8 @@
 //     ItemProperties, RepositoryRoot, ItemStats, ItemSearch, ItemsByFullPath
 //     (a folder's descendants in full path byte order, the storage file
 //     list's, #1409),
-//     LongPropertyValues, LongPropertyKeys, Trash, Packages, GitLFSLocks,
+//     LongPropertyValues, LongPropertyKeys, Trash, TrashByPath (the trash
+//     can's tree in path byte order, #1409), Packages, GitLFSLocks,
 //     BowerRegistrations, RemoteCache, RemoteCacheFences, RemoteCacheAtomic,
 //     RemoteCacheEvict, RemoteCacheConcurrent, RemoteCacheUsage,
 //     RemoteSmartState, ArchivedItems, Builds, BuildRuns, BuildDeletes,

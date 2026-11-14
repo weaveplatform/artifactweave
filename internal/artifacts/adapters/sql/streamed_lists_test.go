@@ -3,6 +3,8 @@ package sql_test
 import (
 	"context"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,10 +19,11 @@ import (
 // tests seed: enough that a sort would show in the plan.
 const streamedScale = 5000
 
-// TestAccStreamedListsAtScale reads a late page of a deep file list and of
-// a dependency search on SQLite and PostgreSQL and keeps each query's plan:
-// a seek on items_full_path or build_dependencies_sha1_order, with no sort
-// of every item or dependency (#1409).
+// TestAccStreamedListsAtScale reads a late page of a deep file list, of a
+// dependency search and of the trash can's tree on SQLite and PostgreSQL
+// and keeps each query's plan: a seek on items_full_path,
+// build_dependencies_sha1_order or trash_path, with no sort of every item,
+// dependency or trash entry (#1409).
 func TestAccStreamedListsAtScale(t *testing.T) {
 	sqltest.RunModule(t, mods, artsql.New,
 		func(t *testing.T, newStore func(*testing.T) *artsql.Store) {
@@ -28,7 +31,7 @@ func TestAccStreamedListsAtScale(t *testing.T) {
 		}, sqltest.WithPostgres())
 }
 
-// TestAccStreamedListsClosedDatabase: both page reads report the driver's
+// TestAccStreamedListsClosedDatabase: the page reads report the driver's
 // error on a closed pool.
 func TestAccStreamedListsClosedDatabase(t *testing.T) {
 	s := open(t)
@@ -38,9 +41,11 @@ func TestAccStreamedListsClosedDatabase(t *testing.T) {
 	ctx := context.Background()
 	_, _, byPath := s.Items().DescendantsByFullPath(ctx, "r", false, "a", kernel.Page{})
 	_, _, deps := s.Builds().DependencyPage(ctx, kernel.Checksums{SHA1: "x"}, kernel.Page{})
+	_, _, trash := s.Trash().BelowByPath(ctx, "r", kernel.Page{})
 	sqltest.Fails(t, map[string]error{
 		"Items.DescendantsByFullPath": byPath,
 		"Builds.DependencyPage":       deps,
+		"Trash.BelowByPath":           trash,
 	})
 }
 
@@ -56,6 +61,11 @@ func streamedListsAtScale(t *testing.T, s *artsql.Store) {
 				if _, err := s.Items().
 					Put(ctx, model.Item{RepoKey: "big", Name: full}); err != nil {
 					return fmt.Errorf("seed %s: %w", full, err)
+				}
+				if _, err := s.Trash().Add(ctx, model.TrashEntry{
+					Record: model.TrashRecord{Item: model.Item{RepoKey: "big", Name: full}},
+				}); err != nil {
+					return fmt.Errorf("seed trash %s: %w", full, err)
 				}
 			}
 		}
@@ -113,6 +123,26 @@ func streamedListsAtScale(t *testing.T, s *artsql.Store) {
 		t.Fatal(err)
 	}
 	streamedPlan(t, s, "dependency search", "build_dependencies_sha1_order", query, args)
+
+	// The cursor's ID is past every entry at big/a/f4988.
+	lateTrash := kernel.Page{
+		After: kernel.Cursor("big/a/f4988", strconv.FormatInt(math.MaxInt64, 10)), Limit: 11,
+	}
+	start = time.Now()
+	entries, next, err := s.Trash().BelowByPath(ctx, "big/a", lateTrash)
+	if err != nil || len(entries) != 11 || entries[0].TrashPath() != "big/a/f4989" ||
+		entries[10].TrashPath() != "big/a/f4999" || next != "" {
+		t.Fatalf("late trash page of big/a = %d entries, next %q, %v", len(entries), next, err)
+	}
+	t.Logf("%s: 11 of %d trash entries below big/a after big/a/f4988: %s", s.Dialect().Name,
+		streamedScale, time.Since(start))
+	for _, dir := range []string{"big/a", ""} {
+		query, args, err := artsql.BelowByPathQuery(s, dir, lateTrash)
+		if err != nil {
+			t.Fatal(err)
+		}
+		streamedPlan(t, s, "trash can tree below "+dir, "trash_path", query, args)
+	}
 }
 
 // streamedPlan explains query and requires it to read index in order, with

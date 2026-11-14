@@ -914,6 +914,11 @@ column trash.deleted_by text NOT NULL DEFAULT ''::text
 constraint trash.trash_pkey PRIMARY KEY (id)
 index trash.trash_deleted CREATE INDEX trash_deleted ON trash USING btree (deleted_at, id)
 index trash.trash_original CREATE INDEX trash_original ON trash USING btree (original_repo_key, original_path, original_name, id)
+index trash.trash_path CREATE INDEX trash_path ON trash USING btree ((((original_repo_key || '/'::text) ||
+CASE
+    WHEN (original_path = '.'::text) THEN original_name
+    ELSE ((original_path || '/'::text) || original_name)
+END)), id)
 index trash.trash_pkey CREATE UNIQUE INDEX trash_pkey ON trash USING btree (id)
 sequence trash.trash_id_seq AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE OWNED BY trash.id
 table trusted_keys

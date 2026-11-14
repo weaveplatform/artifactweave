@@ -3,6 +3,7 @@ package inmem
 import (
 	"cmp"
 	"context"
+	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -68,6 +69,34 @@ func (b buildStore) DependencyPage(
 			out = append(out, x.ref)
 		}
 		next = cursor
+		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+	})
+	return out, next, err
+}
+
+// BelowByPath is the SQL store's over the in-memory table: the entries
+// below dir, ordered and paged by TrashPath and ID, which cmp.Compare
+// orders byte by byte as COLLATE "C" and SQLite's BINARY do.
+func (t trash) BelowByPath(
+	ctx context.Context,
+	dir string,
+	p kernel.Page,
+) ([]model.TrashEntry, string, error) {
+	below := strings.Trim(dir, "/") + "/"
+	var (
+		out  []model.TrashEntry
+		next string
+	)
+	err := t.s.Do(ctx, func() error {
+		rows := t.t().All(func(_ int64, e model.TrashEntry) bool {
+			return below == "/" || strings.HasPrefix(e.TrashPath(), below)
+		}, func(a, b model.TrashEntry) int {
+			return cmp.Or(cmp.Compare(a.TrashPath(), b.TrashPath()), cmp.Compare(a.ID, b.ID))
+		})
+		var err error
+		out, next, err = memtx.Paginate(rows, p, false, func(e model.TrashEntry) []any {
+			return []any{e.TrashPath(), e.ID}
+		})
 		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err

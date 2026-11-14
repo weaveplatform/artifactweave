@@ -28,9 +28,9 @@
 //     (format.SidecarKeeper).
 //   - The trash can settings: whether it is on, and the retention period in
 //     days. Unset, it is on with Artifactory's 14 days.
-//   - The caller's permit (Restore) and filter (Children, Below), which judge
-//     each item at its original path. Nil allows every item, for an
-//     administrator.
+//   - The caller's permit (Restore) and filter (Children, Below, Walk,
+//     Holds), which judge each item at its original path. Nil allows every
+//     item, for an administrator.
 //
 // # Outputs
 //
@@ -47,6 +47,11 @@
 //     blob references their files held released.
 //   - Children and Below: the trash can's tree as Artifactory's
 //     auto-trashcan repository holds it (Child, Node), sorted by path.
+//     Walk yields Below's nodes a store page at a time, from the entries in
+//     path order (port.TrashStore.BelowByPath), for the storage views that
+//     write the tree as they read it (#1409); Holds says whether the caller
+//     sees anything below a folder, reading one entry when the first is
+//     visible.
 //   - Repository ("auto-trashcan"), DefaultRetentionDays and DefaultBatch.
 //
 // # Invariants
@@ -64,6 +69,11 @@
 //     removed it released, so no reference is released twice.
 //   - Nothing expires while the trash can is off, as 7.x's small garbage
 //     collection does not run then.
+//   - Walk yields exactly Below's nodes in Below's order, holding one store
+//     page and the answers for the current path's prefixes: before an
+//     entry's node it asks whether each prefix the path continues with a
+//     byte before "/" is a folder, since such a folder sorts before the
+//     entry though what makes it one sorts after.
 //
 // # References
 //

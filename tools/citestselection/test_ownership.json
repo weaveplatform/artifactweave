@@ -154,7 +154,8 @@
       "storage_list_stream_test.go",
       "storage_test.go",
       "storageinfo_test.go",
-      "trash_handlers_test.go"
+      "trash_handlers_test.go",
+      "trash_stream_test.go"
     ],
     "internal/artifacts/adapters/http/itemkit": [
       "access_test.go",

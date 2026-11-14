@@ -37,7 +37,9 @@
 //     RepoUsage, whose DescendantsByFullPath walks a folder's descendants in
 //     the storage file list's order, so that list is written a page at a
 //     time (#1409); BlobIndex with the sentinel ErrDeleting; ReplicaIndex;
-//     TrashStore; and PackageStore, which embeds PackageVersionNames: a
+//     TrashStore, whose BelowByPath walks the trash can's tree in path
+//     order, so its storage views are written a page at a time (#1409);
+//     and PackageStore, which embeds PackageVersionNames: a
 //     package's version names alone, in Versions' order, which the Puppet,
 //     Ansible and Chef lists count and order before they read their page's
 //     records (#1404).

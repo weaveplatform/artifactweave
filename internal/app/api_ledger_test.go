@@ -566,15 +566,25 @@ func apiReviewStreams(e *apiReviewOperation) bool {
 }
 
 // apiReviewHandwrittenStreams are the handwritten routes that write their
-// complete list with httpkit.StreamList: the function that does, which
+// complete lists with httpkit.StreamList: the functions that do, which
 // apiReviewCheckComplete holds to that call, since the ledger records no
-// calls for a handwritten route, and what of the answer streams.
-var apiReviewHandwrittenStreams = map[string]struct{ source, text string }{
+// calls for a handwritten route, and how the answer streams.
+var apiReviewHandwrittenStreams = map[string]struct {
+	sources []string
+	text    string
+}{
 	"GET /artifactory/api/storage/{repoKey}/{itemPath}": {
-		source: "internal/artifacts/adapters/http/storage.go: storageView.list",
-		text: "a repository's file list streamed from store pages as they are read, its trees' " +
-			"full path walks merged; folder information's children and the trash can's file " +
-			"list are collected before they are written",
+		sources: []string{
+			"internal/artifacts/adapters/http/storage.go: storageView.list",
+			"internal/artifacts/adapters/http/storage.go: storageView.folderInfo",
+			"internal/artifacts/adapters/http/trash.go: trashView.list",
+			"internal/artifacts/adapters/http/trash.go: trashView.folderInfo",
+		},
+		text: "every list streamed from store pages as they are read: a repository's file " +
+			"list merges its trees' full path walks, folder information walks each tree's " +
+			"children in name order in turn, the trash can's file list and folder " +
+			"information walk its tree in path order, and a folder's last modified item " +
+			"is folded over the walk of what lies below it",
 	},
 }
 
@@ -648,8 +658,10 @@ func apiReviewCheckComplete(t *testing.T, ops []apiReviewOperation) {
 		}
 	}
 	for route, h := range apiReviewHandwrittenStreams {
-		if !apiReviewCallsStreamList(t, h.source) {
-			t.Errorf("%s: %s no longer calls httpkit.StreamList", route, h.source)
+		for _, source := range h.sources {
+			if !apiReviewCallsStreamList(t, source) {
+				t.Errorf("%s: %s no longer calls httpkit.StreamList", route, source)
+			}
 		}
 	}
 }
