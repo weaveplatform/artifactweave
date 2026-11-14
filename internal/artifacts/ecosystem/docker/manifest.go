@@ -67,6 +67,11 @@ const (
 	ArchitectureProperty = "docker.architecture"
 )
 
+// ContentTypeProperty is the type a file downloads with on the item route
+// (7.x's CONTENT_TYPE_PROP_KEY), which a pushed image manifest carries
+// (PushProperties).
+const ContentTypeProperty = "artifactory.content-type"
+
 // ErrManifestInvalid is a manifest the registry refuses to store:
 // MANIFEST_INVALID.
 var ErrManifestInvalid = errors.New("docker: invalid manifest")
@@ -298,6 +303,27 @@ func Properties(m Manifest, name, folder string, c Config) model.Properties {
 		if model.ValidatePropertyKey(key) == nil {
 			p.Set(key, v)
 		}
+	}
+	return p
+}
+
+// PushProperties are the Properties of a manifest a client pushes to a
+// local repository, and for an image manifest, stored as manifest.json,
+// ContentTypeProperty set to its media type as well. 7.161.26's
+// AbstractMetadataProviderTest (testDockerpkgIdResolver,
+// testOciPkgIdResolver) gives a docker-local and an oci-local manifest.json
+// the property beside the five of Properties, equal to docker.manifest.type,
+// and a comment on RTFACT-26059 (7.19.4) changed it on a local
+// manifest.json to change what a pull through another registry received.
+// So the item route serves a pushed manifest.json with its media type; the
+// registry answers with the pushed type whatever the property says
+// (getManifest). No source shows the property on an index's
+// list.manifest.json or on a remote repository's cached manifest, so
+// neither carries it [I].
+func PushProperties(m Manifest, name, folder string, c Config) model.Properties {
+	p := Properties(m, name, folder, c)
+	if !m.IsIndex() {
+		p.Set(ContentTypeProperty, m.MediaType)
 	}
 	return p
 }

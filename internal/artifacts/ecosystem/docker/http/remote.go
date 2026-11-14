@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 	"strconv"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
@@ -162,23 +161,18 @@ func (g *Registry) remoteListing(
 	var paths []string
 	header := make(http.Header)
 	if q.Kind == KindTags {
-		var listing struct {
-			Tags []string `json:"tags"`
-		}
-		if err := json.NewDecoder(io.LimitReader(stream.Body, 16<<20)).
-			Decode(&listing); err != nil {
+		tags, ok := g.remoteTagList(stream)
+		if !ok {
 			g.remoteError(w, r, q, source.ErrInvalidResult)
 			return
 		}
-		tags := make([]string, 0, len(listing.Tags))
-		for _, tag := range listing.Tags {
-			if result.CheckRead == nil ||
-				result.CheckRead(r.Context(), q.Name+"/"+tag+"/"+layout.ManifestFile) == nil {
-				tags = append(tags, tag)
-			}
+		page, link := remoteTagsPage(r, tags, func(ctx context.Context, tag string) bool {
+			return result.CheckRead == nil ||
+				result.CheckRead(ctx, q.Name+"/"+tag+"/"+layout.ManifestFile) == nil
+		})
+		if link != "" {
+			header.Set("Link", link)
 		}
-		slices.SortFunc(tags, layout.Compare)
-		page := paginateHeaders(header, r, slices.Compact(tags))
 		for _, tag := range page {
 			paths = append(paths, q.Name+"/"+tag+"/"+layout.ManifestFile)
 		}

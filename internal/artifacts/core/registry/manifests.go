@@ -286,7 +286,7 @@ func (s *Service) putFolder(
 	_, err = items.DeployCommitted(ctx, item.Deploy{
 		Target:     item.Target{Repo: p.Repo, Path: dir + "/" + m.File()},
 		Declared:   kernel.Checksums{SHA256: m.Digest},
-		Properties: layout.Properties(m, p.Name, folder, cfg),
+		Properties: layout.PushProperties(m, p.Name, folder, cfg),
 		By:         p.By,
 		Trusted:    true,
 	}, info)

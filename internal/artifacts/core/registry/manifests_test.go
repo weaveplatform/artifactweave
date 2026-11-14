@@ -127,6 +127,7 @@ func TestAccPushByTag(t *testing.T) {
 			t.Fatal(diff)
 		}
 		wantProps := model.Properties{
+			"artifactory.content-type":      {layout.MediaTypeOCIManifest},
 			"docker.manifest":               {"v1"},
 			"docker.manifest.digest":        {"sha256:" + digest},
 			"docker.manifest.type":          {layout.MediaTypeOCIManifest},

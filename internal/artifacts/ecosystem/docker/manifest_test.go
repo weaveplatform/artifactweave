@@ -157,6 +157,29 @@ func TestUnitProperties(t *testing.T) {
 	}
 }
 
+// A pushed image manifest also carries artifactory.content-type, its media
+// type, as 7.x's docker-local and oci-local manifest.json do; an index's
+// list.manifest.json does not [I].
+func TestUnitPushProperties(t *testing.T) {
+	for _, mediaType := range []string{layout.MediaTypeDockerManifest, layout.MediaTypeOCIManifest} {
+		m := layout.Manifest{MediaType: mediaType, Digest: "abc"}
+		want := layout.Properties(m, "team/app", "v1", layout.Config{OS: "linux"})
+		want.Set(layout.ContentTypeProperty, mediaType)
+		got := layout.PushProperties(m, "team/app", "v1", layout.Config{OS: "linux"})
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatal(diff)
+		}
+	}
+	for _, mediaType := range []string{layout.MediaTypeDockerList, layout.MediaTypeOCIIndex} {
+		m := layout.Manifest{MediaType: mediaType, Digest: "abc"}
+		want := layout.Properties(m, "team/app", "v1", layout.Config{})
+		got := layout.PushProperties(m, "team/app", "v1", layout.Config{})
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Fatal(diff)
+		}
+	}
+}
+
 func TestUnitReadConfig(t *testing.T) {
 	const config = `{"architecture":"arm","os":"linux","variant":"v7",` +
 		`"config":{"Labels":{"a":"1","b":"2"}}}`

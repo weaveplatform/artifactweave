@@ -48,7 +48,9 @@ func (g *Registry) registerManifests() {
 // answered here, since containerd and oras resolve a tag with it and a URL
 // signed for GET refuses a HEAD. Both answer with the whole manifest
 // whatever Range asks for, and ignore If-Match and If-Unmodified-Since, as
-// a blob does (pullRequest).
+// a blob does (pullRequest). If-None-Match and If-Modified-Since are
+// decided as 7.x's download decides them, before the redirect
+// (notModified).
 func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request) {
 	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
 		Write(w, err)
@@ -99,9 +101,15 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 	h.Set("Cache-Control", noStore)
 	// The ETag is the manifest file's bare SHA-1, as any stored file's is:
 	// 7.5.7 answered a local manifest GET with it, equal to X-Checksum-Sha1
-	// (RTFACT-23106), and 7.33.12 a HEAD the same way (RTFACT-27199). A
-	// redirect answers its conditional requests against it too.
-	w, r = itemkit.BareETag(w, pullRequest(r), it.Actual.SHA1)
+	// (RTFACT-23106), and 7.33.12 a HEAD the same way (RTFACT-27199). The
+	// conditional request is decided on the request as it was sent, before
+	// the redirect, and neither the redirect's own check nor ServeContent,
+	// which would read it by Go's rules, sees it (withoutValidators).
+	pull := pullRequest(r)
+	w, r = itemkit.BareETag(w, withoutValidators(pull), it.Actual.SHA1)
+	if notModified(w, pull, it) {
+		return
+	}
 	if g.redirectManifest != nil && g.redirectManifest(w, r, q.Repo, it, mediaType) {
 		return
 	}

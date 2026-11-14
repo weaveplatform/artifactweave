@@ -36,7 +36,8 @@ type listPage struct {
 }
 
 // readPage reads the page of names that the request's n and last select,
-// as paginateHeaders cut it from a collected list: the names after last,
+// as the registry cut it from a collected list before #1402 (the tests'
+// paginateHeaders): the names after last,
 // at most n of them, with a Link while more follow. n of zero gives an
 // empty page without a Link (end-8b); an n that is no count lists the rest.
 // open opens the listing after a name, reading batch names a query. Only

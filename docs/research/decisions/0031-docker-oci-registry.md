@@ -356,6 +356,14 @@ its status alone.
   labels become `docker.label.<label>` properties. A manifest with a `subject` also gets
   `oci.subject` (the subject digest) and `oci.artifactType` (the descriptor's
   `artifactType` as the referrers API reports it).
+- **Content type.** An image manifest pushed to a local repository (`manifest.json`) also
+  gets `artifactory.content-type`, equal to `docker.manifest.type`, as 7.161.26's
+  `AbstractMetadataProviderTest` gives a `docker-local` and an `oci-local` `manifest.json`
+  (R23 5.2.1). The item route serves the file with that type; the registry's answer keeps
+  the pushed media type and `Accept` match, and the storage API's `mimeType` stays the
+  path's. **[I]** An index's `list.manifest.json` and a remote repository's cached manifest
+  get no such property, as no source shows one; a Helm OCI push gets it as an OCI push
+  does (amended 2026-11-14, #1396).
 - **Platform properties.** An image manifest also gets `docker.os` and `docker.architecture`,
   the config's `os` and `architecture`, as 7.x sets them on `manifest.json` from 7.125.4:
   - **Variant.** A platform `variant` (arm's `v7`, arm64's `v8`) goes into neither property:
@@ -389,7 +397,17 @@ its status alone.
   JFrog fixed a remote and a virtual one to do the same
   ([RTFACT-26059](https://jfrog.atlassian.net/browse/RTFACT-26059)), as its file download
   answers; no capture shows a manifest's answer to `If-Match` or `If-Unmodified-Since`
-  **[I]** (amended 2026-11-13, #1437).
+  **[I]** (amended 2026-11-13, #1437). That download decides `If-None-Match` one header
+  line at a time, less a `W/` prefix and every quote, against the file's SHA-1, or its MD5
+  when `X-Artifactory-If-None-Match-MD5` is true, and reads `If-Modified-Since` only
+  without it (`DownloadServiceImpl.isNotModified`, 7.161.26 OSS sources). So `*` and a list
+  of tags on one line answer as the plain request, and a matching second line answers 304,
+  for a local manifest as for every other file; a redirecting repository decides before it
+  signs a URL (amended 2026-11-14, #1483).
+  `Content-Type` stays the pushed media type when the manifest file carries
+  `artifactory.content-type`: 7.x's `DockerManifestResponse` drops the type the download
+  would send and the add-on sets its own; whether that one ever reads the property is
+  **[I]** (R23 5.2.1, #1396).
   `X-Artifactory-Docker-Registry` names the repository that holds the manifest, by its
   stored key, which `jf docker push` and `pull` read (R23 6). A manifest also sends the
   headers of a file download, as 7.33.12 answered a local manifest `HEAD` (RTFACT-27199)
@@ -424,6 +442,12 @@ its status alone.
   ties broken by byte order, limited by `n`, continued after `last`, with a `Link` header
   (`<...>; rel="next"`) when more follow. An image with no tags but stored manifests
   answers `{"name","tags":[]}`; an unknown image answers 404 `NAME_UNKNOWN`.
+  - **Remote pages.** A remote repository's tags list is its upstream's, cached as one
+    document. The registry keeps it decoded, sorted and without repeats, by the document's
+    SHA-256, in memory within a fixed budget, so a later page reads none of the document
+    and checks the caller's Read on the tags from `last` to the one after the page, not on
+    every tag; the answers are byte for byte those of the whole list filtered and cut
+    (amended 2026-11-14, #1423).
 - **Catalogs.** Image names are the folders that hold at least one manifest, sorted the
   same way and paginated the same way. A repository lists every image to a caller with Read
   on any path in it, images outside the caller's paths included: "Any user with read access
