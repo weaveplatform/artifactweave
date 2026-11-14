@@ -425,7 +425,8 @@ func TestAccV2StoreFailures(t *testing.T) {
 				{legacyV2 + "/Packages()", "partial"},
 			} {
 				want := http.StatusInternalServerError
-				if failure == "page" && (c.user != "reader" || strings.Contains(c.path, "$filter")) {
+				if failure == "page" &&
+					(c.user != "reader" || strings.Contains(c.path, "$filter")) {
 					want = http.StatusOK
 				}
 				wantStatus(t, f.do(http.MethodGet, c.path, c.user), want)

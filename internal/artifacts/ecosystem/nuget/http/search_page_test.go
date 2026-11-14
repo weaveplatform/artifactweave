@@ -63,7 +63,10 @@ func (p countingPackages) PackagesAt(
 	return found, err //nolint:wrapcheck // a test's pass-through
 }
 
-func (p countingPackages) CountRangeVersions(ctx context.Context, r port.PackageRange) (int, error) {
+func (p countingPackages) CountRangeVersions(
+	ctx context.Context,
+	r port.PackageRange,
+) (int, error) {
 	p.reads.versionCounts++
 	return p.PackageStore.CountRangeVersions(ctx, r) //nolint:wrapcheck // a test's pass-through
 }
@@ -219,11 +222,13 @@ func TestAccSearchLatePage(t *testing.T) {
 		// names paths, have every package checked.
 		{
 			legacyV2URL("Packages()", url.Values{"$skip": {"4980"}, "$filter": {"(IsLatestVersion)"}}),
-			"reader", lateIDs, searchReads{searches: 10, candidates: count},
+			"reader", lateIDs,
+			searchReads{searches: 10, candidates: count},
 		},
 		{
 			legacyV2URL("Packages()", url.Values{"$skip": {"4980"}}),
-			"partial", nil, searchReads{searches: 10, candidates: count},
+			"partial", nil,
+			searchReads{searches: 10, candidates: count},
 		},
 	} {
 		*reads = searchReads{}
@@ -251,7 +256,15 @@ func TestAccSearchLatePage(t *testing.T) {
 		rec := f.do(http.MethodGet, c.path, c.user)
 		wantStatus(t, rec, http.StatusOK)
 		if got := rec.Body.String(); got != c.want || *reads != c.reads {
-			t.Errorf("%s as %s: %s, read %+v; want %s, %+v", c.path, c.user, got, *reads, c.want, c.reads)
+			t.Errorf(
+				"%s as %s: %s, read %+v; want %s, %+v",
+				c.path,
+				c.user,
+				got,
+				*reads,
+				c.want,
+				c.reads,
+			)
 		}
 	}
 	// A feed of one id's versions reads that package alone.

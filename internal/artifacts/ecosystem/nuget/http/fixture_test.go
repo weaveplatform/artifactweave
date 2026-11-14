@@ -478,7 +478,12 @@ func (p failingPackages) RangeVersionsAt(
 	if p.failing == "list" || p.failing == "page" {
 		return nil, errBroken
 	}
-	return p.PackageStore.RangeVersionsAt(ctx, r, offset, limit) //nolint:wrapcheck // a test's pass-through
+	return p.PackageStore.RangeVersionsAt(
+		ctx,
+		r,
+		offset,
+		limit,
+	) //nolint:wrapcheck // a test's pass-through
 }
 
 func (p failingPackages) Candidates(
