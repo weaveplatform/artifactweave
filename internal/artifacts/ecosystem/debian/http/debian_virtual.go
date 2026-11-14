@@ -419,7 +419,7 @@ func (s DebianAPI) serveVirtualDebianSources(
 		httpkit.WriteErr(w, r, err)
 		return true
 	}
-	writeDebianIndex(w, r, req.Path, body, nil)
+	writeDebianIndex(w, r, req.Path, bytes.NewReader(body), nil)
 	return true
 }
 

@@ -209,7 +209,11 @@ request's GET still fills the cache with the file it names, a known difference f
 7.x, which answers that GET from the info too. Never publish an item from an upstream
 HEAD alone: a HEAD that downloads nothing (R13, a checksum request, a checksum-only or
 transient resource, or an answer the cache may not keep) sends the upstream one HEAD,
-and the caller closes the response without publishing anything from it.
+and the caller closes the response without publishing anything from it. A route that
+reads what it serves, as the Debian index route does, answers a HEAD with the length the
+source reports for it, the length its GET's body has, without reading it, as 7.161.26's
+`RequestResponseHelper.sendHeadResponse` sends the resource's size
+([#1478](https://github.com/weaveplatform/artifactweave/issues/1478)).
 `bypassHeadRequests` suppresses only the preflight of a GET. [#621](https://github.com/weaveplatform/artifactweave/issues/621) may perform a full, validated GET when its download path needs
 computed hashes; that is an explicit fill, not proof that a HEAD cached bytes. A cold
 Range request with storage enabled fetches a complete 200 into the ordinary ingestion

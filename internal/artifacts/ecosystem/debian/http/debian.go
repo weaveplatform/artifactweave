@@ -108,6 +108,7 @@ func (s DebianAPI) serveDebianIndex(
 	var body []byte
 	var used func(context.Context) error
 	var checkPermission func(context.Context, string) error
+	var head *source.Stream
 	var err error
 	switch c.Class {
 	case repo.Local, repo.Federated:
@@ -157,6 +158,15 @@ func (s DebianAPI) serveDebianIndex(
 		}
 		checkPermission, used = result.CheckPermission, result.Used
 		switch {
+		case result.Stream != nil && r.Method == http.MethodHead:
+			// The source answers a HEAD with the index's info and no
+			// body, whether it fetched the index or found it cached, so
+			// the length a GET's body has is the stream's Size, which
+			// 7.161.26's sendHeadResponse sends as Content-Length; read,
+			// the empty body answered 0 (#1478). Nothing is read, so the
+			// files the index lists are checked by a GET alone, as before.
+			_ = result.Stream.Body.Close()
+			head = result.Stream
 		case result.Stream != nil:
 			defer func() { _ = result.Stream.Body.Close() }()
 			body, err = io.ReadAll(io.LimitReader(result.Stream.Body, debianIndexLimit+1))
@@ -189,7 +199,27 @@ func (s DebianAPI) serveDebianIndex(
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	writeDebianIndex(w, r, req.Path, body, used)
+	if head != nil {
+		headDebianIndex(w, r, req.Path, head.Size)
+		return
+	}
+	writeDebianIndex(w, r, req.Path, bytes.NewReader(body), used)
+}
+
+// headDebianIndex answers a HEAD of the remote index at path that the source
+// answered with its info alone, size bytes long, with the headers its GET
+// answers. An upstream that sent a store-nothing remote's HEAD no length
+// gets none passed on, as the resource 7.x builds from that answer has no
+// size to send [I].
+func headDebianIndex(w http.ResponseWriter, r *http.Request, path string, size int64) {
+	if size < 0 {
+		setDebianIndexHeaders(w.Header())
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	// A section of nothing, size bytes long, which ServeContent measures
+	// and, for a HEAD, never reads.
+	writeDebianIndex(w, r, path, io.NewSectionReader(strings.NewReader(""), 0, size), nil)
 }
 
 // debianIndexReadable returns nil when the caller may read each of paths,
@@ -227,16 +257,21 @@ func (s DebianAPI) debianIndexReadable(
 // this caller's permissions, so no cache may keep it for another. used, when
 // it is not nil, records the delivery once the whole index was sent.
 func writeDebianIndex(
-	w http.ResponseWriter, r *http.Request, path string, body []byte,
+	w http.ResponseWriter, r *http.Request, path string, body io.ReadSeeker,
 	used func(context.Context) error,
 ) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Cache-Control", "private, no-store")
+	setDebianIndexHeaders(w.Header())
 	sw := &itemkit.StatusWriter{ResponseWriter: w}
-	itemkit.ServeContent(sw, r, path, time.Time{}, bytes.NewReader(body))
+	itemkit.ServeContent(sw, r, path, time.Time{}, body)
 	if sw.Complete(r) && used != nil {
 		_ = used(r.Context())
 	}
+}
+
+// setDebianIndexHeaders sets the headers every answer with an index sends.
+func setDebianIndexHeaders(h http.Header) {
+	h.Set("Content-Type", "text/plain; charset=utf-8")
+	h.Set("Cache-Control", "private, no-store")
 }
 
 // remoteDebianIndexPaths is debianIndexPaths for the index at path that
