@@ -22,8 +22,10 @@ Feature: JFrog CLI publishes Agent Plugins into the stored marketplace files
       """
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent plugins publish plugin --repo plugins-local --version 1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/plugins-local/hello-plugin/1.0.0/hello-plugin-1.0.0.zip" as admin
     Then the response status is 200
     When I GET "/artifactory/plugins-local/marketplace.json" as admin
@@ -59,8 +61,10 @@ Feature: JFrog CLI publishes Agent Plugins into the stored marketplace files
       """
     When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "agent plugins publish both --repo plugins-both --version 1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/plugins-both/cursor-marketplace.json" as admin
     Then the response status is 200
     And the JSON field "plugins.0.name" equals "both-plugin"

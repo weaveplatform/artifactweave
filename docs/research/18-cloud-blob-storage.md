@@ -247,7 +247,7 @@ A declared digest avoids the copy entirely: stage on the final name and commit w
 ### 2.6 Emulator
 
 - **Image:** Azurite v3.37.0, `mcr.microsoft.com/azure-storage/azurite@sha256:830430c1da1a2d537e08f3e6764dd1f5ae00cf0346bcaf625b968ec3f0971fd5` (amd64 and arm64).
-  - No second source: Docker Hub, mirror.gcr.io and ghcr.io hold no copy (checked 2026-11-13), so a run fails when MCR does not answer (#1448).
+  - Second source: Docker Hub, mirror.gcr.io and ghcr.io held no copy (checked 2026-11-13), so the project keeps its own, `ghcr.io/weaveplatform/artifactweave-emulators/azurite`, copied by digest by `.github/workflows/emulator-copy.yml`; `pkg/containertest` pulls from it when MCR fails (#1448, #1463).
 - **API version check:** its baseline API version is 2026-06-06, older than the SDK's.
   - **[probe]** Every request is refused with `400 InvalidHeaderValue` unless Azurite runs with `--skipApiVersionCheck` (AZT/src/blob/utils/constants.ts:5).
 - **testcontainers module:** `modules/azure/azurite` v0.44.0. It has no default image, `WithEnabledServices(BlobService)`, and `BlobServiceURL` without the account name; it has no connection-string helper.

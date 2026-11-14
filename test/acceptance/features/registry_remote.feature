@@ -22,18 +22,25 @@ Feature: Authenticated remote Docker, OCI artifacts and OCI Helm
     And a layer "layer.tar.gz" holding "hello.txt" with content "registry remote fixture"
     When I run crane "auth login {host} -u admin -p {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "append -f layer.tar.gz -t {host}/registry-upstream/team/image:seed"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "mutate {host}/registry-upstream/team/image:seed --set-platform linux/amd64 -t {host}/registry-upstream/team/image:amd64"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "mutate {host}/registry-upstream/team/image:amd64 --set-platform linux/arm64 -t {host}/registry-upstream/team/image:arm64"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "index append -m {host}/registry-upstream/team/image:amd64 -m {host}/registry-upstream/team/image:arm64 -t {host}/registry-upstream/team/image:multi"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "pull --format oci --platform all {host}/registry-proxy/team/image:multi cold.tar"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "manifest {host}/registry-proxy/team/image:multi"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "arm64"
     And the output contains "amd64"
     When I POST "/artifactory/api/zap/registry-proxy-cache/team/image" as admin with body:
@@ -42,6 +49,7 @@ Feature: Authenticated remote Docker, OCI artifacts and OCI Helm
     Then the response status is 200
     When I run crane "pull --format oci --platform all {host}/registry-proxy/team/image:multi after-zap.tar"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I POST "/artifactory/api/repositories/registry-proxy" as admin with body:
       """
       {"offline":true}
@@ -49,8 +57,10 @@ Feature: Authenticated remote Docker, OCI artifacts and OCI Helm
     Then the response status is 200
     When I run crane "pull --format oci --platform all {host}/registry-proxy/team/image:multi offline.tar"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "copy {host}/registry-upstream/team/image:amd64 {host}/registry-proxy/team/image:denied"
     Then the command fails
+    And the server answered no request with 500 since the last command
 
   Scenario: oras pulls an artifact and its discovered referrer through the remote
     Given oras is available
@@ -96,18 +106,23 @@ Feature: Authenticated remote Docker, OCI artifacts and OCI Helm
     Then the response status is 200
     When I run helm "create acme"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "package acme --version 0.1.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "registry login {host} --plain-http --username admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run helm "push acme-0.1.0.tgz oci://{host}/registry-upstream --plain-http"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given a file "pulled/.keep" with content:
       """
       chart output
       """
     When I run helm "pull oci://{host}/helm-proxy/acme --version 0.1.0 --plain-http --destination pulled"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "acme-0.1.0.tgz" and "pulled/acme-0.1.0.tgz" are identical
     When I GET "/artifactory/api/storage/helm-proxy-cache/acme/0.1.0/manifest.json?properties=docker.manifest.type" as admin
     Then the response status is 200
@@ -118,6 +133,7 @@ Feature: Authenticated remote Docker, OCI artifacts and OCI Helm
     Then the response status is 200
     When I run helm "pull oci://{host}/helm-proxy/acme --version 0.1.0 --plain-http --destination pulled"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "acme-0.1.0.tgz" and "pulled/acme-0.1.0.tgz" are identical
     When I POST "/artifactory/api/repositories/helm-proxy" as admin with body:
       """
@@ -126,3 +142,4 @@ Feature: Authenticated remote Docker, OCI artifacts and OCI Helm
     Then the response status is 200
     When I run helm "pull oci://{host}/helm-proxy/acme --version 0.1.0 --plain-http --destination pulled"
     Then the command succeeds
+    And the server answered no request with 500 since the last command

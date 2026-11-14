@@ -14,10 +14,12 @@ Feature: uv and Poetry use both forms of the Python simple index
     And the Python installation verifier is available
     When I run uv "publish --publish-url {url}/api/pypi/pypi-local/ --username admin --password {password} dist/acme_smoke-1.0.0-py3-none-any.whl"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run python "-m venv --without-pip uv-env"
     Then the command succeeds
     When I run uv "pip install --python uv-env/bin/python --no-deps --no-cache --index-url {authurl}/api/pypi/pypi-local/simple/ acme-smoke==1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run python "check_install.py uv-env dist/acme_smoke-1.0.0-py3-none-any.whl acme_smoke 1.0.0"
     Then the command succeeds
 
@@ -34,8 +36,10 @@ Feature: uv and Poetry use both forms of the Python simple index
       """
     When I run poetry "config repositories.local {url}/api/pypi/pypi-local/"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run poetry "publish --repository local --username admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run pip "download --no-deps --no-cache-dir --index-url {authurl}/api/pypi/pypi-local/simple/ --dest downloaded acme-smoke==1.0.0"
     Then the command succeeds
     And the files "dist/acme_smoke-1.0.0-py3-none-any.whl" and "downloaded/acme_smoke-1.0.0-py3-none-any.whl" are identical
@@ -55,6 +59,7 @@ Feature: uv and Poetry use both forms of the Python simple index
       """
     When I run poetry "add --source local acme-smoke==1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run python "check_install.py .venv dist/acme_smoke-1.0.0-py3-none-any.whl acme_smoke 1.0.0"
     Then the command succeeds
 

@@ -15,8 +15,10 @@ Feature: JVM connection recipes resolve from fresh homes with scoped credentials
     And I keep the JSON field "access_token" of the response as "recipe-token"
     When I resolve the ivy recipe with token "invalid-recipe-token"
     Then the command fails
+    And the server answered no request with 500 since the last command
     When I resolve the ivy recipe with token "{recipe-token}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the JVM recipe retrieved the controlled artifact
     And the server answered 200 to GET "/artifactory/ivy-recipe-<class>/org.acme/widget/1.0.0/jars/widget-1.0.0.jar"
 
@@ -40,8 +42,10 @@ Feature: JVM connection recipes resolve from fresh homes with scoped credentials
     And I keep the JSON field "access_token" of the response as "recipe-token"
     When I resolve the gradle recipe with token "invalid-recipe-token"
     Then the command fails
+    And the server answered no request with 500 since the last command
     When I resolve the gradle recipe with token "{recipe-token}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the JVM recipe retrieved the controlled artifact
     And the server answered 200 to GET "/artifactory/gradle-recipe-<class>/org/acme/widget/1.0.0/widget-1.0.0.jar"
 
@@ -65,10 +69,13 @@ Feature: JVM connection recipes resolve from fresh homes with scoped credentials
     And I keep the JSON field "access_token" of the response as "recipe-token"
     When I publish the Gradle recipe with token "invalid-recipe-token"
     Then the command fails
+    And the server answered no request with 500 since the last command
     When I publish the Gradle recipe with token "{recipe-token}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I resolve the gradle recipe with token "{recipe-token}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the JVM recipe retrieved the controlled artifact
 
     Examples:

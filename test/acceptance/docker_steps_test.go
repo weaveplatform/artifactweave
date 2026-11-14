@@ -295,6 +295,7 @@ func (w *world) keepOutput(name string) error {
 // runClient runs a client, keeping its output and exit code for the
 // command steps.
 func (w *world) runClient(cmd *exec.Cmd) error {
+	w.markCommand()
 	out, err := cmd.CombinedOutput()
 	w.body, w.lastRC = out, 0
 	var exitErr *exec.ExitError

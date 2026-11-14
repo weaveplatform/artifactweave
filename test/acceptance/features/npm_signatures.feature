@@ -46,12 +46,15 @@ Feature: npm audit signatures verifies what an npm local repository signs
       """
     When I run npm "publish ./acme-early"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "install --prefix consumer acme-early"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # With no key pair named, the registry lists no keys and npm has none
     # to audit with, as before signing existed.
     When I run npm "audit signatures --prefix consumer"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "found no dependencies to audit that were installed from a supported registry"
 
     # Naming a pair queues the reindex that signs what was stored before.
@@ -65,10 +68,13 @@ Feature: npm audit signatures verifies what an npm local repository signs
     And the queued reindex of "npm-signed" completes within 30 seconds
     When I run npm "publish ./acme-late"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "install --prefix consumer acme-late"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run npm "audit signatures --prefix consumer"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "2 packages have verified registry signatures"
 
     # A new pair, from gpg's armored export as 7.x's documentation makes
@@ -84,6 +90,7 @@ Feature: npm audit signatures verifies what an npm local repository signs
     And the queued reindex of "npm-signed" completes within 30 seconds
     When I run npm "audit signatures --prefix consumer"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "2 packages have verified registry signatures"
 
     # A tampered signature, made by the listed key over another package's
@@ -91,6 +98,7 @@ Feature: npm audit signatures verifies what an npm local repository signs
     When the npm signature of "acme-early" at "1.0.0" in "npm-signed" is replaced by that of "acme-late"
     And I run npm "audit signatures --prefix consumer"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "1 package has an invalid registry signature"
     And the output contains "acme-early@1.0.0"
 

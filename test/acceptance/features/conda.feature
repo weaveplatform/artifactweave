@@ -19,6 +19,7 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     Given the Conda channel is "<repo>"
     When I run micromamba "create --yes --prefix /work/conda-env --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the file "conda-env/share/artifactweave-conda-fixture/hello.txt" contains "ArtifactWeave Conda fixture"
 
     Examples:
@@ -40,6 +41,7 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     Given the Conda channel is "conda-modern"
     When I run micromamba "create --yes --prefix /work/conda-env --channel {conda_channel} --override-channels ca-certificates=2026.7.22"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: micromamba installs through a virtual channel in member order
     Given the registry is running
@@ -60,6 +62,7 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     Given the Conda channel is "conda-virtual"
     When I run micromamba "create --yes --prefix /work/conda-env --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: micromamba installs through the remote cache after the upstream stops
     Given the registry is running
@@ -74,10 +77,12 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     Given the Conda channel is "conda-remote"
     When I run micromamba "create --yes --prefix /work/conda-env --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given the generic upstream stops
     And I clear the Conda client cache
     When I run micromamba "create --yes --prefix /work/conda-env-offline --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: delete, restore and explicit reindex preserve the native channel
     Given the registry is running
@@ -108,6 +113,7 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     Given the Conda channel is "conda-life"
     When I run micromamba "create --yes --prefix /work/conda-env --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: remote repodata refresh discovers a new modern archive
     Given the registry is running
@@ -121,6 +127,7 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     Given the Conda channel is "conda-refresh"
     When I run micromamba "create --yes --prefix /work/conda-env --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given the Conda upstream adds a modern package
     When I POST "/artifactory/api/zap/conda-refresh-cache/noarch" as admin with body:
       """
@@ -129,6 +136,7 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     When I clear the Conda client cache
     And I run micromamba "create --yes --prefix /work/conda-env-modern --channel {conda_channel} --override-channels ca-certificates=2026.7.22"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: a remote package that disagrees with repodata is refused
     Given the registry is running
@@ -157,6 +165,7 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     Given the Conda channel is "sharded"
     When I run micromamba with shards "create --yes --prefix /work/conda-env --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And micromamba used Conda shards without classic fallback
     And the file "conda-env/share/artifactweave-conda-fixture/hello.txt" contains "ArtifactWeave Conda fixture"
 
@@ -179,6 +188,7 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     Given the Conda channel is "sharded-remote"
     When I run micromamba with shards "create --yes --prefix /work/conda-env --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And micromamba used Conda shards without classic fallback
     When I PUT "/artifactory/api/repositories/sharded-virtual" as admin with body:
       """
@@ -190,5 +200,6 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     And the Conda channel is "sharded-virtual"
     When I run micromamba with shards "create --yes --prefix /work/conda-env-offline --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And micromamba used Conda shards without classic fallback
     And the file "conda-env-offline/share/artifactweave-conda-fixture/hello.txt" contains "ArtifactWeave Conda fixture"

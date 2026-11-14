@@ -37,12 +37,24 @@ const (
 	AzuriteImage = "mcr.microsoft.com/azure-storage/azurite@" + azuriteDigest
 )
 
+// azuriteCopy is the project's own copy of AzuriteImage, tagged with its
+// Azurite release. .github/workflows/emulator-copy.yml makes it with crane
+// copy, which keeps the index digest. The workflow reads these lines,
+// AzuriteImage and azuriteDigest, and runs whenever this file changes, so a
+// bump copies the new digest in the same change. It fails when the tag
+// already serves another digest: move the tag with the digest.
+const (
+	azuriteCopy    = "ghcr.io/weaveplatform/artifactweave-emulators/azurite"
+	azuriteCopyTag = "3.37.0"
+)
+
 // Each emulator's sources, in the order they are tried: its image, then a
 // second registry serving the same digest, so one registry that does not
 // answer does not fail the run (#1321, #1448). A pull by digest is checked
 // against that digest, so every source gives the same bytes. On a bump,
-// check each second source serves the new digest, for example with
-// `docker buildx imagetools inspect <source>`.
+// check that MinIO's and fake-gcs-server's second sources serve the new
+// digest, for example with `docker buildx imagetools inspect <source>`;
+// Azurite's is copied by a workflow (azuriteCopy).
 var (
 	// Chainguard publishes the same image on Docker Hub.
 	minioSources = []string{MinIOImage, "docker.io/chainguard/minio@" + minioDigest}
@@ -51,10 +63,12 @@ var (
 	fakeGCSSources = []string{
 		FakeGCSImage, "mirror.gcr.io/fsouza/fake-gcs-server@" + fakeGCSDigest,
 	}
-	// Azurite has no second source yet: Microsoft publishes it on MCR, and
-	// Docker Hub, mirror.gcr.io and ghcr.io hold no copy (checked
-	// 2026-11-13). It needs a copy under the project's own namespace.
-	azuriteSources = []string{AzuriteImage}
+	// Microsoft publishes Azurite only on MCR, and Docker Hub, mirror.gcr.io
+	// and ghcr.io held no copy (checked 2026-11-13), so the second source is
+	// the project's own copy (#1463).
+	azuriteSources = []string{
+		AzuriteImage, azuriteCopy + ":" + azuriteCopyTag + "@" + azuriteDigest,
+	}
 )
 
 // Each helper starts its own container for the calling test and removes it
@@ -183,7 +197,13 @@ func Azurite(t *testing.T) AzuriteEndpoint {
 // function that removes it, for callers without a *testing.T such as
 // acceptance steps; check CheckLinux first.
 func RunAzurite(ctx context.Context) (AzuriteEndpoint, func(), error) {
-	image, err := requireImage(ctx, azuriteSources...)
+	return runAzurite(ctx, azuriteSources)
+}
+
+// runAzurite is RunAzurite from the given sources, so a test can start
+// Azurite from its second source alone.
+func runAzurite(ctx context.Context, sources []string) (AzuriteEndpoint, func(), error) {
+	image, err := requireImage(ctx, sources...)
 	if err != nil {
 		return AzuriteEndpoint{}, nil, fmt.Errorf("start azurite: %w", err)
 	}

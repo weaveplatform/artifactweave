@@ -26,9 +26,11 @@
 //     is handed out only once it serves S3 requests, not merely HTTP. Each
 //     image is pulled before its module starts, one pull per image at a
 //     time in the process. A pull that fails moves on to the image's second
-//     source, a registry serving the same digest (none yet for Azurite),
-//     and when every source fails the error names each registry's answer
-//     rather than the "No such image" testcontainers' own pull ends in.
+//     source, a registry serving the same digest (for Azurite, the
+//     project's copy on GHCR, which .github/workflows/emulator-copy.yml
+//     makes), and when every source fails the error names each registry's
+//     answer rather than the "No such image" testcontainers' own pull ends
+//     in.
 //
 // # References
 //
@@ -44,10 +46,13 @@
 //     https://github.com/testcontainers/testcontainers-go/issues/3945: a
 //     pull whose failure the engine reports inside its 200 answer, which
 //     testcontainers-go does not decode.
+//   - https://github.com/weaveplatform/artifactweave/issues/1463: Azurite's
+//     copy, its second source.
 //
 // # Status
 //
 // Implemented P2 (the Linux engine gate), P2b (the emulators) and P7 (the
 // answer timeout). MinIO's readiness wait added by issue 1307; the checked
-// image pull and the second sources by issue 1448.
+// image pull and the second sources by issue 1448; Azurite's copy by issue
+// 1463.
 package containertest

@@ -26,14 +26,18 @@ Feature: Identity exit checks
       """
     When I run jf "rt u a.txt team-a-local/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u b.txt team-b-local/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: A user, group and permission target made with jf read through tokens, and a repository-scoped token reads only its repository
     When I run jf "rt group-create exit-team --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt user-create exit-dev Exit-pass-123 exit-dev@example.com --users-groups exit-team --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # The CLI's permission target template: comma-separated strings.
     Given a file "pt.json" with content:
       """
@@ -42,6 +46,7 @@ Feature: Identity exit checks
       """
     When I run jf "rt permission-target-create {dir}/pt.json --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
     # jf atc mints a token for another user only with an admin access token.
     When I POST "/access/api/v1/tokens" as admin with body:
@@ -52,14 +57,18 @@ Feature: Identity exit checks
     And I keep the JSON field "access_token" of the response as "admin-token"
     When I run jf "atc exit-dev --url {platform}/ --access-token {admin-token} --expiry 7200"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And I keep the JSON field "access_token" of the output as "dev-token"
     When I run jf "c add dev --url {platform}/ --access-token {dev-token} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt dl team-a-local/a.txt dev/ --flat --fail-no-op --server-id dev"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "dev/a.txt" and "a.txt" are identical
     When I run jf "rt dl team-b-local/b.txt dev/ --flat --fail-no-op --server-id dev"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "dev/b.txt" and "b.txt" are identical
 
     # The same user's token scoped to team-a-local: the group's read on
@@ -72,11 +81,14 @@ Feature: Identity exit checks
     And I keep the JSON field "access_token" of the response as "scoped-token"
     When I run jf "c add scoped --url {platform}/ --access-token {scoped-token} --interactive=false"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt dl team-a-local/a.txt scoped/ --flat --fail-no-op --server-id scoped"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "scoped/a.txt" and "a.txt" are identical
     When I run jf "rt dl team-b-local/b.txt scoped/ --flat --fail-no-op --server-id scoped"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the file "scoped/b.txt" does not exist
     When I GET "/artifactory/team-b-local/b.txt" with the kept token "scoped-token"
     Then the response status is 403

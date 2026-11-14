@@ -39,6 +39,7 @@ Feature: Terraform installs remote modules through authorized archive downloads
       """
     When I run terraform "init -backend=false -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And Terraform selected module "plain" at version "1.0.0" in "."
     And Terraform selected module "nested" at version "2.0.0" in "."
     And the file ".terraform/modules/plain/main.tf" contains "cold ZIP 1.0.0"
@@ -46,6 +47,7 @@ Feature: Terraform installs remote modules through authorized archive downloads
     And the Terraform upstream received cold module discovery and archive requests
     When I run terraform "apply -auto-approve -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "cold ZIP 1.0.0"
     And the output contains "nested tar 2.0.0"
     Given the generic upstream stops
@@ -57,10 +59,12 @@ Feature: Terraform installs remote modules through authorized archive downloads
     When I forget Terraform's module cache
     And I run terraform "init -backend=false -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And Terraform selected module "plain" at version "1.0.0" in "."
     And Terraform selected module "nested" at version "2.0.0" in "."
     And the file ".terraform/modules/plain/main.tf" contains "cold ZIP 1.0.0"
     When I run terraform "apply -auto-approve -no-color"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "cold ZIP 1.0.0"
     And the output contains "nested tar 2.0.0"

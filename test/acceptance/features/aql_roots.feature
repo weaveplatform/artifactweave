@@ -39,20 +39,25 @@ Feature: Repository roots in AQL
       """
     When I run jf "rt u lib/b.jar roots-local/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt s roots-local/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "Found 1 artifact."
     And the output contains "roots-local/lib/b.jar"
     # With folders the search lists the root as "roots-local/", as it would
     # against 7.x: the client skips "." only when it reduces folders.
     When I run jf "rt s roots-local/ --include-dirs --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "Found 3 artifacts."
     When I run jf "rt dl roots-local/ out/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "lib/b.jar" and "out/lib/b.jar" are identical
     When I run jf "rt del roots-local/ --quiet --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/repositories/roots-local" as admin
     Then the response status is 200
     When I GET "/artifactory/roots-local/lib/b.jar" as admin

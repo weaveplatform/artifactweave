@@ -228,6 +228,7 @@ Feature: GET searches
       """
     And I run jf "skills search my-skill --prop --repo generic-local --format json --url {platform} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "my-skill"
     And the output contains "1.0.0"
     And the output does not contain "app-1.0"

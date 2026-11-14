@@ -25,12 +25,14 @@ Feature: Transitive AQL discovers upstream items without inventing cache entries
     And the JSON field "results" has 0 entries
     When I run jf "rt search smart/*.bin --transitive=true --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "smart/file.bin"
     When I GET "/artifactory/smart-cache/file.bin" as admin
     Then the response status is 404
     Given the JFrog CLI runs with "JFROG_CLI_TRANSITIVE_DOWNLOAD" set to "true"
     When I run jf "rt download smart/*.bin cold/ --flat --fail-no-op --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run curl "--fail --silent --show-error --user admin:{password} {url}/smart-cache/file.bin --output cached.bin"
     Then the command succeeds
     And the files "cold/file.bin" and "cached.bin" are identical
@@ -45,4 +47,5 @@ Feature: Transitive AQL discovers upstream items without inventing cache entries
     And the Smart peer becomes unavailable
     When I run jf "rt download smart/*.bin offline/ --flat --fail-no-op --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "cold/file.bin" and "offline/file.bin" are identical

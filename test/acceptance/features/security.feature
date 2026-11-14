@@ -43,18 +43,23 @@ Feature: Legacy security API
     Given the JFrog CLI is available
     When I run jf "rt group-create jf-group --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt user-create jf-user Jf-pass-123 jf-user@example.com --users-groups jf-group --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/security/groups/jf-group?includeUsers=true" as admin
     Then the response status is 200
     And the response body contains "jf-user"
     When I run jf "rt user-create jf-other Jf-pass-456 jf-other@example.com --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt group-add-users jf-group jf-other --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/security/groups/jf-group?includeUsers=true" as admin
     Then the response body contains "jf-other"
     When I run jf "rt users-delete jf-user,jf-other --quiet --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/security/users/jf-user" as admin
     Then the response status is 404

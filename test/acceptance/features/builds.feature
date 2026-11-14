@@ -65,10 +65,13 @@ Feature: Build-info
       """
     When I run jf "rt bc accept-app 7"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u {dir}/app.bin generic-local/app/ --flat --build-name=accept-app --build-number=7 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp accept-app 7 --detailed-summary --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # The summary's sha256 is the X-Checksum-Sha256 the publish answered,
     # and that is the SHA-256 of the run's document in artifactory-build-info.
     And I keep the JSON field "sha256" of the output as "published"
@@ -86,14 +89,18 @@ Feature: Build-info
     And the JSON field "0.path" equals "app"
     # A second publish of the number is a second run.
     When I run jf "rt u {dir}/app.bin generic-local/app/ --flat --build-name=accept-app --build-number=7 --url {url} --user admin --password {password}"
+    And the server answered no request with 500 since the last command
     And I run jf "rt bp accept-app 7 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/accept-app" as admin
     Then the JSON field "buildsNumbers" has 2 entries
     # --overwrite deletes both runs of 7, then publishes one.
     When I run jf "rt u {dir}/app.bin generic-local/app/ --flat --build-name=accept-app --build-number=7 --url {url} --user admin --password {password}"
+    And the server answered no request with 500 since the last command
     And I run jf "rt bp accept-app 7 --overwrite --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 200 to POST "/artifactory/api/build/delete"
     When I GET "/artifactory/api/build/accept-app" as admin
     Then the JSON field "buildsNumbers" has 1 entries
@@ -111,8 +118,10 @@ Feature: Build-info
       """
     When I run jf "rt u {dir}/spaced.bin generic-local/spaced/ --flat --build-name=my{sp}build --build-number=1 --target-props=team=platform{sp}eng --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp my{sp}build 1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/storage/generic-local/spaced/spaced.bin?properties=team" as admin
     Then the response status is 200
     And the JSON field "properties.team.0" equals "platform eng"
@@ -120,6 +129,7 @@ Feature: Build-info
     # would have broken.
     When I run jf "rt s generic-local/spaced/ --build=my{sp}build/1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "generic-local/spaced/spaced.bin"
 
   # With a pattern, the CLI finds a build's files through AQL on
@@ -138,17 +148,22 @@ Feature: Build-info
       """
     When I run jf "rt u {dir}/app.bin generic-local/app/ --flat --build-name=search-app --build-number=3 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u {dir}/other.bin generic-local/app/ --flat --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp search-app 3 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt s generic-local/ --build=search-app/3 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "generic-local/app/app.bin"
     And the output does not contain "other.bin"
     And the server answered 200 to POST "/artifactory/api/search/aql"
     When I run jf "rt dl generic-local/app/ {dir}/out/ --flat --build=search-app/3 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "app.bin" and "out/app.bin" are identical
     And the file "out/other.bin" does not exist
 
@@ -164,12 +179,16 @@ Feature: Build-info
       """
     When I run jf "rt u {dir}/lib.bin generic-local/lib/ --flat --build-name=lib --build-number=4 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp lib 4 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt ba bundle 1 lib 4 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp bundle 1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/build/bundle/1" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.type" equals "build"
@@ -194,15 +213,19 @@ Feature: Build-info
       """
     When I run jf "rt u {dir}/app.bin generic-local/app/ --flat --build-name=promo-app --build-number=1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bp promo-app 1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     # A dry run changes nothing.
     When I run jf "rt bpr promo-app 1 release-local --dry-run --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/storage/release-local/app/app.bin" as admin
     Then the response status is 404
     When I run jf "rt bpr promo-app 1 release-local --status=released --comment=approved --copy --props=stage=prod --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 200 to POST "/artifactory/api/build/promote/promo-app/1"
     When I GET "/artifactory/api/storage/release-local/app/app.bin?properties" as admin
     Then the response status is 200
@@ -219,21 +242,28 @@ Feature: Build-info
     # A move from the one source repository named.
     When I run jf "rt bpr promo-app 1 archive-local --source-repo=release-local --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/artifactory/api/storage/release-local/app/app.bin" as admin
     Then the response status is 404
     When I GET "/artifactory/api/storage/archive-local/app/app.bin" as admin
     Then the response status is 200
     When I run jf "rt bpr promo-app 9 release-local --url {url} --user admin --password {password}"
     Then the command fails
+    And the server answered no request with 500 since the last command
     # Two more runs, then keep only the newest.
     When I run jf "rt u {dir}/app.bin generic-local/app2/ --flat --build-name=promo-app --build-number=2 --url {url} --user admin --password {password}"
+    And the server answered no request with 500 since the last command
     And I run jf "rt bp promo-app 2 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt u {dir}/app.bin generic-local/app3/ --flat --build-name=promo-app --build-number=3 --url {url} --user admin --password {password}"
+    And the server answered no request with 500 since the last command
     And I run jf "rt bp promo-app 3 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run jf "rt bdi promo-app --max-builds=1 --exclude-builds=1 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 204 to POST "/artifactory/api/build/retention/promo-app"
     When I GET "/artifactory/api/build/promo-app" as admin
     Then the JSON field "buildsNumbers" has 2 entries

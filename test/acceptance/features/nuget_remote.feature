@@ -30,22 +30,27 @@ Feature: Native NuGet restores signed packages through a private v3 remote
       """
     When I run verified dotnet "restore consumer/consumer.csproj --packages /work/cold --no-http-cache"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "signed/Acme.Signed.1.0.0.nupkg" and "cold/acme.signed/1.0.0/acme.signed.1.0.0.nupkg" are identical
     And the files "signed/Acme.Dependency.1.0.0.nupkg" and "cold/acme.dependency/1.0.0/acme.dependency.1.0.0.nupkg" are identical
     And the NuGet lockfile "consumer/packages.lock.json" pins "Acme.Signed" to the package "unsigned/Acme.Signed.1.0.0.nupkg"
     When I run verified dotnet "nuget verify cold/acme.signed/1.0.0/acme.signed.1.0.0.nupkg --all"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given the signed NuGet package "signed/Acme.Signed.1.0.0.nupkg" is tampered into "tampered.nupkg"
     When I run verified dotnet "nuget verify tampered.nupkg --all"
     Then the command fails
+    And the server answered no request with 500 since the last command
     And the output contains "NU3008"
     When the generic upstream stops
     And I run verified dotnet "restore consumer/consumer.csproj --packages /work/warm --no-http-cache --force"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the files "signed/Acme.Signed.1.0.0.nupkg" and "warm/acme.signed/1.0.0/acme.signed.1.0.0.nupkg" are identical
     And the files "signed/Acme.Dependency.1.0.0.nupkg" and "warm/acme.dependency/1.0.0/acme.dependency.1.0.0.nupkg" are identical
     When I run verified dotnet "nuget verify warm/acme.signed/1.0.0/acme.signed.1.0.0.nupkg --all"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
     Examples:
       | dotnet  |

@@ -149,12 +149,14 @@ Feature: Docker and OCI registry
     And the JSON field "layers.0.digest" equals "sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f"
     When I run jf "rt s docker-local/team/app/v1/manifest.json --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "docker-local/team/app/v1/manifest.json"
     And the output contains "docker.manifest.digest"
     And the output contains "application/vnd.oci.image.manifest.v1+json"
     And the output contains "docker.label.org.example.team"
     When I run jf "rt s docker-local/team/app/v1/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "docker-local/team/app/v1/sha256__fb5dd9fcad531a9110d9bc07268019760d607378a0dd81ed14d403719c4180a8"
     And the output contains "docker-local/team/app/v1/sha256__e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f"
 
@@ -200,8 +202,10 @@ Feature: Docker and OCI registry
     Then the response status is 200
     When I run crane "auth login {host} -u admin -p {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I run crane "auth token --push {host}/docker-local/app"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And I keep the JSON field "token" of the output as "crane"
     When I GET "/v2/" with the kept token "crane"
     Then the response status is 200
@@ -401,19 +405,23 @@ Feature: Docker and OCI registry
     Then the response status is 201
     When I run jf "rt docker-promote team/app docker-local docker-prod --source-tag=v1 --copy=true --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/v2/docker-prod/team/app/manifests/v1" as admin
     Then the response status is 200
     When I GET "/v2/docker-local/team/app/manifests/v1" as admin
     Then the response status is 200
     When I run jf "rt docker-promote team/app docker-local docker-prod --source-tag=v1 --target-docker-image=team/web --target-tag=release --copy=true --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/v2/docker-prod/team/web/manifests/release" as admin
     Then the response status is 200
     When I run jf "rt s docker-prod/team/web/release/manifest.json --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the output contains "team/web"
     When I run jf "rt docker-promote team/app docker-local docker-prod --source-tag=v2 --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     When I GET "/v2/docker-prod/team/app/manifests/v2" as admin
     Then the response status is 200
     When I GET "/v2/docker-local/team/app/manifests/v2" as admin

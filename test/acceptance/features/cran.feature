@@ -18,6 +18,7 @@ Feature: Native CRAN package installation
     Then the response body contains "Package: assertthat"
     When I install assertthat from CRAN repository "<repo>" with R
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 200 to GET "/artifactory/<repo>/src/contrib/assertthat_0.2.1.tar.gz"
 
     Examples:
@@ -36,10 +37,12 @@ Feature: Native CRAN package installation
     Then the response status is 200
     When I install assertthat from CRAN repository "cran-remote" with R
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     Given the generic upstream stops
     When I clear the R library
     And I install assertthat from CRAN repository "cran-remote" with R
     Then the command succeeds
+    And the server answered no request with 500 since the last command
 
   Scenario: R installs through the first readable CRAN virtual member
     Given the registry is running
@@ -61,6 +64,7 @@ Feature: Native CRAN package installation
     Then the response body contains "Package: assertthat"
     When I install assertthat from CRAN repository "cran-virtual" with R
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the server answered 200 to GET "/artifactory/cran-virtual/src/contrib/assertthat_0.2.1.tar.gz"
 
   Scenario: R installs an archive fetched through a same-origin CRAN redirect
@@ -75,6 +79,7 @@ Feature: Native CRAN package installation
     Then the response status is 200
     When I install assertthat from CRAN repository "cran-redirect" with R
     Then the command succeeds
+    And the server answered no request with 500 since the last command
     And the generic upstream received 1 GET requests for "/src/contrib/assertthat_0.2.1.tar.gz"
     And the generic upstream received 1 GET requests for "/mirrors/assertthat_0.2.1.tar.gz"
 
