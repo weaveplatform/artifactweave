@@ -75,7 +75,8 @@
 //     bytes they collected, on the in-memory store, SQLite and PostgreSQL,
 //     and their store faults before and after the first byte;
 //     streamed_memory_test.go: the heap while a deep file list of 50,000
-//     files streams.
+//     files, and the folder information of the folder holding them,
+//     stream.
 //   - source_test.go, source_listing_test.go, cache_maintenance_test.go and
 //     smart_status_test.go: remote sources, browsing, cache maintenance and
 //     the smart remote diagnostic.
