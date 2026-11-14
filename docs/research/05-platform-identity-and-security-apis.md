@@ -769,6 +769,11 @@ which 7.x answers through Access's providers as well; what 7.x says for each is 
 `AccessTokenAuthenticationProvider` answers "Token failed verification: " and Access's reason,
 a reason no source maps to the fault (a valid access token under another user name gave
 "signature" on SaaS 7.53.1, RTFACT-29440), and an API key header answers the provider's message.
+The Access routes answer the same text, which is **[I]** as well: Access words its own
+refusals, and the one capture, with no version, shows Basic credentials from `~/.netrc` on an
+OIDC identity mappings route answered 401
+`{"errors":[{"code":"UNAUTHORIZED","message":"HTTP 401 Unauthorized","detail":"Request has failed. Due to incorrect username/password or locked user."}]}`
+(**[KB]** [Access OIDC 401 errors caused by .netrc overrides](https://jfrog.com/help/r/artifactory-how-to-fix-access-oidc-401-unauthorized-errors-caused-by-netrc-overrides)).
 
 **Where artifactweave differs.** Decision 0005's
 [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check) lists the token,
