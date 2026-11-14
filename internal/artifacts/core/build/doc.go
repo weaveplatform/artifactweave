@@ -31,7 +31,10 @@
 //     Append, Promotion and PromotionResult, Delete), and runs discarded
 //     under a retention setting (RetentionSettings, Discard).
 //   - Runs, names and numbers read back, and the items a run's artifacts
-//     are (Artifacts, SearchArtifacts, Find).
+//     are (Artifacts, SearchArtifacts, Find). NamePages and RunPages walk
+//     the names and numbers a page at a time for a list written as it is
+//     read, and NoRuns is the error of a build that showed the caller no
+//     numbers.
 //   - The started-time form JFrog writes (StartedLayout, FormatStarted,
 //     ParseStarted), LATEST (Latest) and a run's project (ProjectKey).
 //   - Errors: ErrInvalid, ErrNoTarget and the store's sentinels.
