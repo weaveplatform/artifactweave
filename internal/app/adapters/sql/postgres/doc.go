@@ -65,7 +65,8 @@
 //     malformed one and a closed port, which need no server.
 //   - schema_test.go: TestAccSchemaGolden compares the migrated schema with
 //     testdata/schema.golden.
-//   - replay_test.go: TestAccReplayProcessCrash, with its child
-//     TestAccReplayCrashHelper, as on SQLite, and
-//     TestAccReplayPruneDoesNotDeleteRenewal.
+//   - replay_test.go: TestAccReplayProcessCrash and
+//     TestAccKeyedReplayProcessCrash, with their children
+//     TestAccReplayCrashHelper and TestAccKeyedReplayCrashHelper, as on
+//     SQLite, and TestAccReplayPruneDoesNotDeleteRenewal.
 package postgres

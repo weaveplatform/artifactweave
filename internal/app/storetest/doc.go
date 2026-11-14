@@ -28,8 +28,9 @@
 //     it is given.
 //   - RemoteLayoutPersistence: an open SQL composite and a function that
 //     opens the same database again.
-//   - ReplayCrash: a store and the environment that makes the backend's
-//     child test, which calls ReplayCrashChild, open the same database.
+//   - ReplayCrash and KeyedReplayCrash: a store and the environment that
+//     makes the backend's child test, which calls ReplayCrashChild or
+//     KeyedReplayCrashChild, open the same database.
 //   - LegacyHistoryRefused: an empty database, its dialect and a function
 //     that opens a store over it with migrations. Reset: a database and its
 //     dialect.
@@ -45,7 +46,8 @@
 //     artifacts module's remote sources together, and the build row lock.
 //   - Opener, Rotation, RepositoryHeaderEnvironmentRename,
 //     RepositoryHeadersOpen, RemoteLayoutPersistence, ReplayCrash,
-//     ReplayCrashChild and LegacyHistoryRefused: failures of the calling
+//     ReplayCrashChild, KeyedReplayCrash, KeyedReplayCrashChild and
+//     LegacyHistoryRefused: failures of the calling
 //     test, each naming the expectation it breaks.
 //   - Reset: the database emptied, by rolling back and applying again every
 //     stream that the composite's module list registers.

@@ -69,7 +69,7 @@
 //     the request ID, panic recovery, the access log, the base URL, the
 //     Smart Remote trace, the Docker API version header and registry
 //     challenge, content type normalisation, collection slashes, plus as
-//     space, the idempotent routes, the API recovery context and the xz
+//     space, the Idempotency-Key gate, the API recovery context and the xz
 //     request holder (xzRequests, so a request's xz readers are one holder
 //     of the dictionary budget); then, each
 //     only when configured, the ingress request limits, the forced
@@ -125,7 +125,9 @@
 // the runtime and serverlog.go the HTTP server's error log. TST-07 exported
 // the runtime and moved the remote suites to test/server/artifacts. WEB-22
 // brought the router here: router.go builds it and limits.go holds the
-// request limits.
+// request limits. IDEM-01 added keyed.go, the shared replay that wraps every
+// generated server's keyed operations, with each module's bindings, and the
+// Idempotency-Key gate over the operation table.
 //
 // # Testing
 //
@@ -145,6 +147,7 @@
 // principal matrices (matrix_test.go), the spec checks (spec_test.go,
 // spec_contract_test.go), the 501 stubs (stub_test.go), the error profiles
 // (error_profiles_p8_test.go), the request limits (limits_test.go), the
+// keyed operations' bindings and key gate (keyed_test.go), the
 // API reliability ledger (api_ledger_test.go, which make api-ledger runs to
 // regenerate docs/research/api-reliability/operations.json) and decision
 // 0043's operation rules (api_principles_test.go, whose rules are checked

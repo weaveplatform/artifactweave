@@ -10,9 +10,10 @@
 // operations.gen.go, the Table, from api/*.openapi.yaml after oapi-codegen
 // has generated the servers. This doc.go and operation.go, the Operation
 // type and the Index, are hand-written, and make generate leaves them alone.
-// Nothing reads the table at run time yet: admission (RATE-01, #1407) will
-// take each request's cost class from it, and the Idempotency-Key gate
-// (IDEM-01, #1406) the operations that accept a key (decision 0043).
+// The Idempotency-Key gate and the shared replay's strict middleware
+// (IDEM-01, #1406) read it at run time for the operations that accept a key,
+// and admission (RATE-01, #1407) takes each request's cost class from it
+// (decision 0043).
 //
 // # Inputs
 //
