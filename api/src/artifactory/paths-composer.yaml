@@ -21,6 +21,10 @@ paths:
       x-handwritten: true
       x-native-protocol: true
       x-tier: implemented
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: native
+      x-pagination-next: none
   /api/composer/{repoKey}/p2/{vendor}/{package}.json:
     get:
       operationId: getComposerPackageMetadata
@@ -52,6 +56,10 @@ paths:
       x-handwritten: true
       x-native-protocol: true
       x-tier: implemented
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: native
+      x-pagination-next: none
   /api/composer/{repoKey}/dist/{vendor}/{package}/{version}.zip:
     get:
       operationId: getComposerDistribution
@@ -88,6 +96,8 @@ paths:
       x-handwritten: true
       x-native-protocol: true
       x-tier: implemented
+      x-idempotency: safe
+      x-cost: ordinary
   /api/composer/{repoKey}/reindex:
     post:
       operationId: reindexComposerRepository
@@ -109,3 +119,7 @@ paths:
       x-handwritten: true
       x-native-protocol: true
       x-tier: implemented
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      x-cost: expensive
