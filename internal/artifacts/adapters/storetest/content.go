@@ -23,6 +23,7 @@ import (
 func runContent(t *testing.T, newStore Factory) {
 	t.Run("Repos", func(t *testing.T) { testRepos(t, newStore(t).Repos()) })
 	t.Run("Items", func(t *testing.T) { testItems(t, newStore(t).Items()) })
+	t.Run("ItemsByFullPath", func(t *testing.T) { testItemsByFullPath(t, newStore(t).Items()) })
 	t.Run("ItemCreate", func(t *testing.T) { testItemCreate(t, newStore(t)) })
 	t.Run("ColonPaths", func(t *testing.T) { testColonPaths(t, newStore(t).Items()) })
 	t.Run("ItemProperties", func(t *testing.T) { testItemProperties(t, newStore(t).Items()) })
@@ -32,6 +33,7 @@ func runContent(t *testing.T, newStore Factory) {
 	t.Run("LongPropertyValues", func(t *testing.T) { testLongPropertyValues(t, newStore(t)) })
 	t.Run("LongPropertyKeys", func(t *testing.T) { testLongPropertyKeys(t, newStore(t)) })
 	t.Run("Trash", func(t *testing.T) { testTrash(t, newStore(t).Trash()) })
+	t.Run("TrashByPath", func(t *testing.T) { testTrashByPath(t, newStore(t).Trash()) })
 	t.Run("Packages", func(t *testing.T) { testPackages(t, newStore(t)) })
 }
 

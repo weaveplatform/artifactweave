@@ -175,6 +175,29 @@ type BuildPromotion struct {
 	Repo string
 }
 
+// BuildReport is what a keyed build action reported, kept with the state
+// the action committed so that a replay answers with it unchanged (decision
+// 0043, "Replay for keyed operations"): the runs a delete removed, or a
+// promotion's messages. A replay cannot rebuild either from the runs, which
+// a delete removed and a promotion's file moves changed. It holds build
+// names, numbers, paths and message text, never a credential, and it is
+// kept a little longer than the replay's receipt, until Expires.
+type BuildReport struct {
+	// ID is assigned by the store; the replay's receipt names it.
+	ID int64
+	// Action is the build action that reported.
+	Action     string
+	ProjectKey string
+	Name       string
+	// BuildID is the run a promotion promoted, which its replay rechecks;
+	// zero for a delete, whose runs are gone.
+	BuildID int64
+	// Report is the action's report as the build service encodes it.
+	Report  []byte
+	Created time.Time
+	Expires time.Time
+}
+
 // BuildRetention is retention settings: which runs of a build name to keep.
 // The store keeps, per build name, the settings of the latest build-info
 // document that carried a buildRetention; that publish applied them, and

@@ -29,6 +29,11 @@ type Decider struct {
 	GroupNames []string
 	// IsRepoVisibleFunc answers IsRepoVisible.
 	IsRepoVisibleFunc func(repo accessapi.Repo) bool
+	// VisibleReposFunc answers VisibleRepos. A test that sets
+	// IsRepoVisibleFunc and lists repositories sets it too, to the same
+	// set: a listing filters in its store by VisibleRepos, never asking
+	// IsRepoVisible about each repository.
+	VisibleReposFunc func() accessapi.RepoVisibility
 	// AllowsFunc answers Allows for a question that asks for some action.
 	AllowsFunc func(
 		rt accessapi.ResourceType,
@@ -61,6 +66,20 @@ func (d *Decider) IsRepoVisible(repo accessapi.Repo) bool {
 		return d.IsRepoVisibleFunc(repo)
 	}
 	return d.Admin
+}
+
+// VisibleRepos answers with VisibleReposFunc, or, when it is nil, with
+// every repository for Admin and none otherwise, as IsRepoVisible answers
+// without its function.
+func (d *Decider) VisibleRepos() accessapi.RepoVisibility {
+	switch {
+	case d.VisibleReposFunc != nil:
+		return d.VisibleReposFunc()
+	case d.Admin:
+		return nil
+	default:
+		return accessapi.RepoVisibility{{}}
+	}
 }
 
 // Allows refuses a question that asks for no action, and answers any other

@@ -21,8 +21,9 @@
 //   - The subtests, one per concern, each on a store of its own:
 //     IdentityPages, Users, UserLockout, Groups, Memberships, Permissions,
 //     Tokens, Keypairs, Certificates, TrustedKeys, SigningKeys, Projects,
-//     Roles, Environments, ProjectMembers, Assignments, APIRestrictions and
-//     APIRestrictionConcurrentAudit.
+//     Roles, Environments, ProjectMembers, Assignments, APIRestrictions,
+//     APIRestrictionConcurrentAudit and PermissionPages (PermissionStore.Page,
+//     the Access v2 permissions list's page, #1408).
 //
 // # Invariants
 //
@@ -56,7 +57,9 @@
 // Implemented P2: the identity, token, key and project cases, in the
 // metadata store's contract (pull request 3). The identity listing and API
 // restriction cases came with retry safety and bounded API execution (pull
-// request 905). Moved here in P9d, which added Factory and Run.
+// request 905). Moved here in P9d, which added Factory and Run. The
+// permission page cases came with store paging of the Access v2 list
+// (#1408).
 //
 // # Testing
 //

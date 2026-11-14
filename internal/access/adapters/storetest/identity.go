@@ -870,6 +870,22 @@ func testUserLockout(t *testing.T, s port.Store) {
 		t.Fatal(err)
 	}
 	storekit.Same(t, "Locked", []string{"ann", "cat"}, storekit.Get[[]string](t)(us.Locked(ctx)))
+	// LockedPage walks the same names in the same order, a page at a time,
+	// which is how the legacy locked users list streams them.
+	for _, size := range []int{1, 2, 3} {
+		storekit.Same(t, fmt.Sprintf("LockedPage by %d", size), []string{"ann", "cat"},
+			storekit.Pages(t, size, func(p kernel.Page) ([]string, string, error) {
+				return us.LockedPage(ctx, p)
+			}))
+	}
+	if _, _, err := us.LockedPage(ctx, kernel.Page{After: "%%"}); !errors.Is(
+		err, kernel.ErrInvalidCursor) {
+		t.Fatalf("LockedPage with a malformed cursor: %v", err)
+	}
+	if _, _, err := us.LockedPage(ctx, kernel.Page{After: kernel.Cursor("a", "b")}); !errors.Is(
+		err, kernel.ErrInvalidCursor) {
+		t.Fatalf("LockedPage with another list's cursor: %v", err)
+	}
 
 	// Unlocking named users ignores unknown names and resets counters.
 	storekit.Must(t, us.Unlock(ctx, "ann", "nobody"))
@@ -893,6 +909,11 @@ func testUserLockout(t *testing.T, s port.Store) {
 		[]string{},
 		storekit.Get[[]string](t)(us.Locked(ctx)),
 	)
+	if got := storekit.Pages(t, 2, func(p kernel.Page) ([]string, string, error) {
+		return us.LockedPage(ctx, p)
+	}); len(got) != 0 {
+		t.Fatalf("LockedPage after unlocking all = %v", got)
+	}
 	if ben := storekit.Get[model.User](t)(us.Get(ctx, "ben")); ben.FailedLogins != 0 {
 		t.Fatalf("ben's failures were not cleared: %d", ben.FailedLogins)
 	}

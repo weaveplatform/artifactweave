@@ -48,6 +48,11 @@ type Decider interface {
 	// IsRepoVisible reports whether the subject may see repo in a listing
 	// and read its configuration.
 	IsRepoVisible(repo Repo) bool
+	// VisibleRepos describes the repositories IsRepoVisible admits, for a
+	// store to apply as a filter: for every stored repository r (a key
+	// without the "-cache" suffix, which repository keys never carry),
+	// VisibleRepos().Has(r) equals IsRepoVisible(r).
+	VisibleRepos() RepoVisibility
 	// Allows reports whether the subject holds every action in want on the
 	// file at path in repo, in the rt section of the permissions. Asking for
 	// no action is refused.

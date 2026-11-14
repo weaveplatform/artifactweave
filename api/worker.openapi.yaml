@@ -28,10 +28,18 @@ paths:
           description: The action names.
         '401':
           $ref: '#/components/responses/WorkerUnauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List action names
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworkeractions.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/execute/{workerKey}:
     post:
       description: 'Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.'
@@ -64,10 +72,17 @@ paths:
           $ref: '#/components/responses/WorkerForbidden'
         '404':
           $ref: '#/components/responses/WorkerNotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Execute a worker
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/executehttptriggeredworker.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/execution_history:
     get:
       description: 'Returns recorded executions, newest first. Successful runs are recorded only for workers with debug true; failures, including runs stopped by a limit, always are, with errorCode set. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.'
@@ -121,10 +136,18 @@ paths:
           $ref: '#/components/responses/WorkerUnauthorized'
         '403':
           $ref: '#/components/responses/WorkerForbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List recorded executions
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworkerexecutionhistory.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/rerun/{workerKey}:
     post:
       description: Runs the worker's current script again with the input of a recorded execution. Any authenticated user allowed to run the worker; others get 403.
@@ -171,10 +194,17 @@ paths:
           $ref: '#/components/responses/WorkerForbidden'
         '404':
           $ref: '#/components/responses/WorkerNotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Rerun a recorded execution
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/rerunworker.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/scaffold/tsconfig:
     get:
       description: Returns the TypeScript configuration worker scripts are compiled with. Platform administrators, or project administrators with projectKey.
@@ -196,10 +226,16 @@ paths:
           $ref: '#/components/responses/WorkerUnauthorized'
         '403':
           $ref: '#/components/responses/WorkerForbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get the TypeScript settings
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworkerscaffoldtsconfig.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/liveness:
     get:
       description: Answers when the Workers service is running. No authentication. The service is part of the single process, so this mirrors the process liveness probe.
@@ -211,10 +247,16 @@ paths:
               schema:
                 type: string
           description: The service is alive; the body is a short status text.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Workers liveness
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/checkworkersliveness.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/system/readiness:
     get:
       description: Answers when the Workers service can run workers. No authentication.
@@ -226,10 +268,16 @@ paths:
               schema:
                 type: string
           description: The service is ready; the body is a short status text.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Workers readiness
       tags:
         - system
       x-oracle-source: https://docs.jfrog.com/administration/reference/checkworkersreadiness.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/test:
     post:
       description: 'Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.'
@@ -261,10 +309,17 @@ paths:
           $ref: '#/components/responses/WorkerUnauthorized'
         '403':
           $ref: '#/components/responses/WorkerForbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Test an unsaved script
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/executeworkertestgeneric.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/test/{workerKey}:
     post:
       description: 'Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators, or project administrators for the worker''s project.'
@@ -304,10 +359,17 @@ paths:
           $ref: '#/components/responses/WorkerForbidden'
         '404':
           $ref: '#/components/responses/WorkerNotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Test a saved worker
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/executeworkertest.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/workers:
     get:
       description: Returns every worker. Platform administrators only.
@@ -325,10 +387,18 @@ paths:
           $ref: '#/components/responses/WorkerUnauthorized'
         '403':
           $ref: '#/components/responses/WorkerForbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List workers
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworkers.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Saves a new worker after transpiling its script. Platform administrators, or project administrators with projectKey for actions that support projects. A duplicate key is rejected with 400.
       operationId: createWorker
@@ -354,10 +424,18 @@ paths:
           $ref: '#/components/responses/WorkerUnauthorized'
         '403':
           $ref: '#/components/responses/WorkerForbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a worker
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/createworker.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/key
+      x-cost: expensive
     put:
       description: Changes an existing worker, identified by key in the body; a new script is transpiled before it is saved. Platform administrators only.
       operationId: updateWorker
@@ -379,10 +457,18 @@ paths:
           $ref: '#/components/responses/WorkerForbidden'
         '404':
           $ref: '#/components/responses/WorkerNotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Update a worker
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateworker.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/key
+      x-cost: expensive
   /api/v1/workers/{workerKey}:
     delete:
       description: Deletes a worker; its recorded executions are removed with it. Platform administrators only.
@@ -403,10 +489,18 @@ paths:
           $ref: '#/components/responses/WorkerForbidden'
         '404':
           $ref: '#/components/responses/WorkerNotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a worker
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteworker.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:workerKey
+      x-cost: expensive
     get:
       description: Returns one worker, including its script. Platform administrators only.
       operationId: getWorker
@@ -430,10 +524,16 @@ paths:
           $ref: '#/components/responses/WorkerForbidden'
         '404':
           $ref: '#/components/responses/WorkerNotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a worker
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworker.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v2/actions:
     get:
       description: 'Returns the metadata of each action this instance can trigger: sample input, TypeScript types, filter rules and sample code. Platform administrators, or project administrators with projectKey.'
@@ -457,12 +557,88 @@ paths:
           $ref: '#/components/responses/WorkerUnauthorized'
         '403':
           $ref: '#/components/responses/WorkerForbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Describe the actions
       tags:
         - workers
       x-oracle-source: https://docs.jfrog.com/administration/reference/getworkeractionsmetadata.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
 components:
+  headers:
+    LinkNext:
+      description: >-
+        The next page, as `<target>; rel="next"` (RFC 8288): the path and query the client sent, every parameter kept and only the position changed. Sent only while more items remain, so its absence marks the last page. Declared only by the operations that send it.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimit:
+      description: >-
+        The caller's remaining allowance under the policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";r=5999;t=42`: the policy, the requests left and the seconds until its window resets. Also sent on every other response after admission, whatever its status, and on every response under the `recovery` policy, though no other response declares it. Not sent on health probes, on a refusal reached before any allowance was evaluated, or on an authentication 401 or a restriction 403.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimitPolicy:
+      description: >-
+        The policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";q=6000;w=60`: the policy name (`api`, `expensive`, `authentication` or `recovery`), its quota and its window in seconds. Sent wherever `RateLimit` is.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RetryAfter:
+      description: >-
+        Seconds to wait before retrying, at least 1: the rest of the blocked window for a rate refusal, otherwise 1. Also sent on an operation's own 503 that reports a transient condition; a 503 that reports configuration or a size bound carries none.
+      required: true
+      x-artifactweave-extension: true
+      schema:
+        type: integer
+        minimum: 1
+  parameters:
+    IdempotencyKey:
+      description: >-
+        Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, a retry with the same key, credential, canonical resource and identical body bytes does not repeat the operation's effect: it answers the original success status, with the body built from the committed result after the current credential and permissions are checked again. Reuse with different bytes, or with a changed parameter that alters the effect, returns 422. A resource deleted since answers 404, one moved out of the request's scope 409. Only a success is kept, so a retry after a failure runs the operation again. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window. An operation that does not declare this parameter answers a key with 400.
+      in: header
+      name: Idempotency-Key
+      x-artifactweave-extension: true
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 130
   responses:
+    ServiceUnavailable:
+      description: >-
+        A dependency of the request is briefly unavailable: admission or restriction storage, or, for a retry with an `Idempotency-Key`, the first request still running when the retry's wait budget ran out. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` are present when the answer follows admission, as a keyed retry's does.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: >-
+        A request limit refused the request: a rate allowance or a concurrency permit. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` report the allowance; they are absent when the process's concurrency permits refused the request before any allowance was evaluated.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     WorkerBadRequest:
       content:
         application/json:

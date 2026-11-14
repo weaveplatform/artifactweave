@@ -562,6 +562,9 @@ Strict Tag Overwrite has no switch (DV-035), referrers come from properties rath
 a `referrers.json` (DV-036), and the "Complete list manifest image overwrite" setting is not
 offered (DV-084). That setting is global, the descriptor's
 `repositoriesGeneralConfig.docker.completeListManifestOverwrite`, not a repository field.
+The register also records where JFrog's pages and the registry disagree: the catalog and
+tags list pages give their errors the Searches pages' shared body, where the registry
+answers its own envelope (DV-153).
 
 **Alternatives considered:**
 - *Accepting schema 1, honouring `blockPushingSchema1`*: Docker has removed schema 1 from

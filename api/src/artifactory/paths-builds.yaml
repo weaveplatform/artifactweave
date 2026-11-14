@@ -601,6 +601,10 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getallbuilds.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
     put:
       description: Stores one run's build-info document. The artifacts in modules[].artifacts are not checked
         against stored files. Promotion and the build artifacts search later find each one as an item holding its
@@ -654,28 +658,20 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/uploadbuild.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - query:project
+      - body:/name
+      - body:/number
+      - body:/started
+      x-cost: expensive
   /api/build/append/{buildName}/{buildNumber}:
     post:
       description: Adds modules to an existing run and stores the extended document. Needs deploy and delete permission
         on the build.
       operationId: appendBuild
       parameters:
-      - description: >-
-          Optional header parameter. A quoted
-          ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for
-          example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, retries
-          with the same credential, canonical resource and identical body bytes
-          return 204 without appending again. Reuse with different bytes returns
-          422. Replays remain bound to the original run and require current
-          permission. Concurrent requests wait up to 30 seconds; 503 with
-          Retry-After means retry the same key within its retention window.
-        in: header
-        name: Idempotency-Key
-        x-artifactweave-extension: true
-        schema:
-          type: string
-          minLength: 3
-          maxLength: 130
+      - $ref: '#/components/parameters/IdempotencyKey'
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
           as %2F and is matched as a single path segment.
         in: path
@@ -742,21 +738,18 @@ paths:
           description: The original protected build run has moved to another resource.
         '422':
           description: This unexpired key was used with different request bytes.
-        '503':
-          description: Protected execution exceeded its wait budget. Retry with the same key.
-          headers:
-            Retry-After:
-              schema:
-                type: integer
-              description: Minimum delay in seconds before retrying.
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/appendbuild.md
+      x-idempotency: key
+      x-cost: expensive
   /api/build/delete:
     post:
       description: Deletes runs of one build, selected by number or all at once, optionally with their artifacts.
         Needs delete permission on the build.
       operationId: deleteBuildsMultiple
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         content:
           application/json:
@@ -779,9 +772,13 @@ paths:
           $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
         '403':
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+        '422':
+          description: This unexpired key was used with different request bytes or parameters.
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/deletebuildsmultiple.md
+      x-idempotency: key
+      x-cost: expensive
   /api/build/promote/{buildName}/{buildNumber}:
     post:
       description: Records a status change for the latest run of a build number and optionally moves or copies
@@ -790,6 +787,7 @@ paths:
         them is reported rather than refused. The body may use the vendor media type or application/json.
       operationId: promoteBuild
       parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
           as %2F and is matched as a single path segment.
         in: path
@@ -846,9 +844,15 @@ paths:
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
         '404':
           $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+        '409':
+          description: The run a key promoted has since moved to another build name or number.
+        '422':
+          description: This unexpired key was used with different request bytes or parameters.
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/promotebuild.md
+      x-idempotency: key
+      x-cost: expensive
   /api/build/rename/{buildName}:
     post:
       description: Renames every run of a build. Needs deploy and delete permission on the build.
@@ -899,6 +903,12 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/renamebuild.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:buildName
+      - query:to
+      - query:project
+      x-cost: expensive
   /api/build/retention/{buildName}:
     post:
       description: Discards the runs of a build that the settings do not keep, with their documents and, when asked,
@@ -954,12 +964,18 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/controlbuildretention.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:buildName
+      - query:project
+      x-cost: expensive
   /api/build/{buildName}:
     delete:
       description: Deletes the listed runs of a build, or every run, optionally with their artifacts. Needs delete
         permission on the build.
       operationId: deleteBuilds
       parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
           as %2F and is matched as a single path segment.
         in: path
@@ -1013,9 +1029,13 @@ paths:
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
         '404':
           $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+        '422':
+          description: This unexpired key was used with different request bytes or parameters.
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/deletebuilds.md
+      x-idempotency: key
+      x-cost: expensive
     get:
       description: Lists the runs of one build. Needs read permission on the build.
       operationId: getBuildRuns
@@ -1053,6 +1073,10 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getbuildruns.md
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/build/{buildName}/{buildNumber}:
     get:
       description: Returns one run's build-info document. Needs read permission on the build.
@@ -1125,6 +1149,8 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getbuildinfo.md
+      x-idempotency: safe
+      x-cost: expensive
   /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}:
     get:
       description: Lists where each artifact of a run is stored. Needs read permission on the build.
@@ -1176,6 +1202,10 @@ paths:
       tags:
       - builds
       x-unverified: true
+      x-idempotency: safe
+      x-cost: expensive
+      x-pagination: complete
+      x-pagination-next: none
   /api/docker/{repo-key}/v2/promote:
     post:
       description: Promotes a Docker or OCI image from a local or federated repository to another local or federated
@@ -1240,3 +1270,12 @@ paths:
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/promotedockerimage.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repo-key
+      - body:/dockerRepository
+      - body:/tag
+      - body:/targetRepo
+      - body:/targetDockerRepository
+      - body:/targetTag
+      x-cost: expensive

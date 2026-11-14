@@ -308,6 +308,8 @@ paths:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getchecksumreplication.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Not implemented; answers 501. It would configure checksum replication on this instance.
       operationId: configureChecksumReplication
@@ -343,6 +345,10 @@ paths:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/configurechecksumreplication.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/replication/execute/{repoPath}:
     post:
       description: 'Not implemented; answers 501. It would start a replication now, independently of any schedule.
@@ -411,6 +417,11 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/executepullpushreplication.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoPath
+      - 'body:'
+      x-cost: expensive
   /api/replication/{repoPath}:
     get:
       description: Not implemented; answers 501. It would report the outcome of the last replication that touched a
@@ -458,6 +469,8 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreplicationstatus.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
   /api/replications/channels/release:
     post:
       description: Not implemented; answers 501. It would close every event-based pull replication channel other
@@ -487,6 +500,10 @@ paths:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/closeeventbasedpullreplicationchannels.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/replications/channels/{repoKey}:
     get:
       description: Not implemented; answers 501. It would list the remote instances subscribed to a local repository
@@ -528,6 +545,10 @@ paths:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getremoterepositoriesregisteredforreplication.md
       x-tier: stub
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/replications/multiple/{repoKey}:
     post:
       description: Not implemented; answers 501. It would update a multi-push replication configuration. Configure
@@ -574,6 +595,10 @@ paths:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatemultipushreplication.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      x-cost: expensive
     put:
       description: Not implemented; answers 501. It would create or replace a multi-push replication configuration.
       operationId: createOrReplaceMultiPushReplication
@@ -618,6 +643,10 @@ paths:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createorreplacemultipushreplication.md
       x-tier: stub
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      x-cost: expensive
   /api/replications/{repoKey}:
     delete:
       description: Removes the replication configuration of a repository. With url only the push target with that
@@ -663,6 +692,11 @@ paths:
       tags:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleterepositoryreplicationconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - query:url
+      x-cost: expensive
     get:
       description: Returns the replication configuration of a local or remote repository. A local repository with
         several push targets returns an array; otherwise a single object. password is returned masked. The caller
@@ -716,6 +750,10 @@ paths:
       tags:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoryreplicationconfiguration.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: 'Updates fields of an existing replication configuration; omitted fields keep their values. Two
         reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable
@@ -775,6 +813,12 @@ paths:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updaterepositoryreplicationconfiguration.md
       x-oracle-source-also: https://docs.jfrog.com/artifactory/reference/enableordisablemultiplereplications.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - body:/include
+      - body:/exclude
+      x-cost: expensive
     put:
       description: Creates or replaces the replication configuration of a local or remote repository. The body is
         one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from
@@ -826,6 +870,10 @@ paths:
       tags:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setrepositoryreplicationconfiguration.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      x-cost: expensive
   /api/system/replications:
     get:
       description: Reports whether push and pull replication are blocked for the whole instance. Administrators
@@ -853,6 +901,8 @@ paths:
       tags:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getglobalsystemreplicationconfiguration.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/system/replications/block:
     post:
       description: Pauses replication for the whole instance. push and pull default to true; passing false for one
@@ -898,6 +948,10 @@ paths:
       tags:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/blocksystemreplication.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/system/replications/unblock:
     post:
       description: Resumes replication for the whole instance. push and pull default to true; passing false for
@@ -943,3 +997,7 @@ paths:
       tags:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/unblocksystemreplication.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive

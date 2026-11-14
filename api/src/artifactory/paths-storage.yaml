@@ -1143,6 +1143,8 @@ paths:
       summary: Build artifacts archive
       tags:
       - storage
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/retrievebuildartifactsarchive.md
   /api/archive/download/{repoKey}/{path}:
     get:
@@ -1238,7 +1240,9 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/retrievefolderorrepositoryarchive.md
   /api/checksum/sha256:
     post:
@@ -1276,6 +1280,11 @@ paths:
       summary: Attach the sha256 property
       tags:
       - storage
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/repoKey
+      - body:/path
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setitemsha256checksum.md
   /api/copy/{srcRepoKey}/{srcFilePath}:
     post:
@@ -1387,7 +1396,13 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:srcRepoKey
+      - path:srcFilePath
+      - query:to
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/copyitem.md
   /api/distribute:
     post:
@@ -1431,6 +1446,9 @@ paths:
       summary: Distribute to Bintray
       tags:
       - storage
+      x-cost: expensive
+      x-idempotency: none
+      x-idempotency-reason: external-effect
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributeartifact.md
   /api/download/{repoKey}/{filePath}:
     get:
@@ -1522,7 +1540,9 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: ordinary
       x-handwritten: true
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/artifactsyncdownload.md
       x-tier: stub
   /api/gems/{repoName}/names:
@@ -1542,6 +1562,8 @@ paths:
             text/plain:
               schema: {type: string}
       tags: [storage, handwritten]
+      x-cost: ordinary
+      x-idempotency: safe
       x-handwritten: true
       x-native-protocol: true
   /api/gems/{repoName}/versions:
@@ -1561,6 +1583,8 @@ paths:
             text/plain:
               schema: {type: string}
       tags: [storage, handwritten]
+      x-cost: ordinary
+      x-idempotency: safe
       x-handwritten: true
       x-native-protocol: true
   /api/gems/{repoName}/info/{gemName}:
@@ -1585,6 +1609,8 @@ paths:
             text/plain:
               schema: {type: string}
       tags: [storage, handwritten]
+      x-cost: ordinary
+      x-idempotency: safe
       x-handwritten: true
       x-native-protocol: true
   /api/gems/{repoName}/gems/{fileName}:
@@ -1609,6 +1635,8 @@ paths:
             application/octet-stream:
               schema: {type: string, format: binary}
       tags: [storage, handwritten]
+      x-cost: ordinary
+      x-idempotency: safe
       x-handwritten: true
       x-native-protocol: true
   /api/gems/{repoName}/api/v1/gems:
@@ -1630,6 +1658,11 @@ paths:
         '200':
           description: The gem was published.
       tags: [storage, handwritten]
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoName
+      - body:archive
       x-handwritten: true
       x-native-protocol: true
   /api/gems/{repoName}/api/v1/versions/{gemName}:
@@ -1683,9 +1716,13 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: ordinary
       x-handwritten: true
+      x-idempotency: safe
       x-native-protocol: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrubygemversionlist.md
+      x-pagination: native
+      x-pagination-next: none
   /api/metadata/{repoKey}/{itemPath}:
     patch:
       description: 'Applies a partial update to an item''s properties from a JSON body: keys set to a string or
@@ -1778,7 +1815,12 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - path:itemPath
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updateitemproperties.md
   /api/move/{srcRepoKey}/{srcFilePath}:
     post:
@@ -1890,7 +1932,13 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:srcRepoKey
+      - path:srcFilePath
+      - query:to
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/moveitem.md
   /api/signed/url:
     post:
@@ -1933,6 +1981,8 @@ paths:
       summary: Create a signed download URL
       tags:
       - storage
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createsignedurl.md
   /api/signed/url/key:
     post:
@@ -1956,6 +2006,8 @@ paths:
       summary: Rotate the signed URL key
       tags:
       - storage
+      x-cost: expensive
+      x-idempotency: key
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/replacesignedurlkey.md
   /api/storage/{repoKey}/{itemPath}:
     delete:
@@ -2036,7 +2088,12 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - path:itemPath
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitemproperties.md
     get:
       description: Reads metadata about a file or folder. Without a mode parameter the response is `FileInfo` for
@@ -2232,8 +2289,14 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: ordinary
+      x-cost-expensive-query:
+      - list
       x-handwritten: true
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getstorageitem.md
+      x-pagination: complete
+      x-pagination-next: none
     put:
       description: Sets properties on an item and, by default, on everything below a folder, replacing existing
         values of the same keys. Needs annotate permission. Works on local repositories and remote caches only;
@@ -2316,7 +2379,12 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - path:itemPath
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setitemproperties.md
   /api/storageinfo:
     get:
@@ -2345,6 +2413,8 @@ paths:
       summary: Storage summary
       tags:
       - storage
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo.md
   /api/storageinfo/calculate:
     post:
@@ -2374,6 +2444,10 @@ paths:
       summary: Recalculate the storage summary
       tags:
       - storage
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/refreshstoragesummaryinfo.md
   /api/system/storage/optimize:
     post:
@@ -2403,6 +2477,10 @@ paths:
       summary: Optimise storage
       tags:
       - storage
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/optimizesystemstorage.md
   /api/system/storage/prune/start:
     post:
@@ -2444,6 +2522,10 @@ paths:
       summary: Start pruning unreferenced blobs
       tags:
       - storage
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/startpudprocess.md
   /api/system/storage/prune/status:
     get:
@@ -2478,6 +2560,8 @@ paths:
       summary: Prune status
       tags:
       - storage
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpudprocessstatus.md
   /api/system/storage/prune/stop:
     post:
@@ -2512,6 +2596,10 @@ paths:
       summary: Stop pruning
       tags:
       - storage
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/stoppudprocess.md
   /api/tasks:
     get:
@@ -2539,7 +2627,11 @@ paths:
       summary: Background tasks
       tags:
       - storage
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getbackgroundtasks.md
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/metrics:
     get:
       description: Exposes server metrics in the OpenMetrics text format. Needs admin or the `system:metrics:r`
@@ -2568,6 +2660,8 @@ paths:
       summary: Prometheus metrics
       tags:
       - storage
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getopenmetricsforartifactory.md
   /api/v1/metrics/application:
     get:
@@ -2588,6 +2682,8 @@ paths:
       summary: Application metrics
       tags:
       - storage
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getartifactoryapplicationmetrics.md
   /api/v1/uploads/config:
     get:
@@ -2610,6 +2706,8 @@ paths:
       summary: Multipart upload configuration
       tags:
       - storage
+      x-cost: ordinary
+      x-idempotency: safe
   /api/v1/uploads/create:
     post:
       description: Starts a multipart upload of one file and returns its upload token. The caller needs deploy rights on the repository, as for a deploy. Once the parts are complete, a checksum deploy of the file creates the item.
@@ -2677,7 +2775,10 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: none
+      x-idempotency-reason: protocol-reconciliation
   /api/v1/uploads/urlPart:
     post:
       description: Returns the URL to PUT one part to. Authenticates with the upload token create returned, as a Bearer token. The URL carries a signature for that upload and part, so the part is sent without credentials.
@@ -2719,7 +2820,9 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: safe
   /api/v1/uploads/part:
     put:
       description: Receives one part, in any order. The URL comes from urlPart and authorises the request; no credentials are sent. A part already appended is accepted again and ignored.
@@ -2779,7 +2882,12 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - query:upload
+      - query:partNumber
   /api/v1/uploads/complete:
     post:
       description: Starts assembling the parts, checked against the file's SHA-1, and returns at once; the caller then polls status. Completing again after a retryable error starts over. Authenticates with the upload token create returned, as a Bearer token.
@@ -2817,7 +2925,11 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - header:Authorization
   /api/v1/uploads/status:
     post:
       description: Reports the assembly as `PROCESSING` with a progress percentage, `FINISHED` with a checksum token for the checksum deploy that follows, `RETRYABLE_ERROR` (complete again to retry), or `NON_RETRYABLE_ERROR`. Authenticates with the upload token create returned, as a Bearer token.
@@ -2839,7 +2951,9 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: safe
   /api/v1/uploads/abort:
     post:
       description: Discards the upload's parts and session. Authenticates with the upload token create returned, as a Bearer token.
@@ -2857,7 +2971,11 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - header:Authorization
   /api/zap/{repoPath}:
     post:
       description: Marks the cached metadata under a path of a remote repository's cache as expired, so the next
@@ -2903,7 +3021,11 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoPath
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/zapcache.md
   /{repoKey}/{archivePath}!/{entryPath}:
     get:
@@ -2980,7 +3102,9 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: ordinary
       x-handwritten: true
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/archiveentrydownload.md
   /{repoKey}/{filePath}:
     delete:
@@ -3040,7 +3164,12 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: ordinary
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - path:filePath
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitem.md
     get:
       description: 'Streams the content of a file. Resolution follows the repository class: local serves stored
@@ -3163,7 +3292,9 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: ordinary
       x-handwritten: true
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/retrieveartifact.md
     put:
       description: 'Stores the request body at the path. Needs deploy permission; the target must be a local repository
@@ -3368,7 +3499,12 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: ordinary
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - path:filePath
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deployartifact.md
       x-oracle-source-also:
       - https://docs.jfrog.com/artifactory/reference/deployartifactsfromarchive.md
@@ -3482,6 +3618,11 @@ paths:
       tags:
       - storage
       - handwritten
+      x-cost: ordinary
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - path:filePath
       x-not-routed: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deployartifactbychecksum.md

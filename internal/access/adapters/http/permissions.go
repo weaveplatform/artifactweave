@@ -200,26 +200,23 @@ func (s SecurityAPI) GetPermissionTargets(
 	if err != nil {
 		return nil, err
 	}
-	ps, err := c.svc.List(ctx)
+	base := baseurl.From(ctx) + permV1Path
+	l, err := httpkit.StreamList(ctx, c.svc.Pages(),
+		func(p model.Permission) (artgen.PermissionTargetListItem, bool, error) {
+			return listItem(base, p), true, nil
+		}, httpkit.ListOptions{})
 	if err != nil {
 		return nil, s.permissionError(ctx, "list permissions", err)
 	}
-	return artgen.GetPermissionTargets200JSONResponse(listItems(ctx, permV1Path, ps)), nil
+	return streamed{l}, nil
 }
 
-func listItems(
-	ctx context.Context,
-	path string,
-	ps []model.Permission,
-) []artgen.PermissionTargetListItem {
-	base := baseurl.From(ctx) + path
-	out := make([]artgen.PermissionTargetListItem, 0, len(ps))
-	for _, p := range ps {
-		out = append(out, artgen.PermissionTargetListItem{
-			Name: strPtr(p.Name), Uri: strPtr(base + nameSegment(p.Name)),
-		})
+// listItem is a permission's entry in a name listing, its detail URL under
+// base.
+func listItem(base string, p model.Permission) artgen.PermissionTargetListItem {
+	return artgen.PermissionTargetListItem{
+		Name: strPtr(p.Name), Uri: strPtr(base + nameSegment(p.Name)),
 	}
-	return out
 }
 
 // GetPermissionTargetDetails returns the v1 view: the repository section
@@ -332,12 +329,15 @@ func (s SecurityAPI) GetPermissionTargetsV2(
 	if err != nil {
 		return nil, err
 	}
-	ps, err := c.svc.List(ctx)
+	base := baseurl.From(ctx) + permV2Path
+	l, err := httpkit.StreamList(ctx, c.svc.Pages(),
+		func(p model.Permission) (artgen.PermissionTargetListItem, bool, error) {
+			return listItem(base, p), c.manages(p), nil
+		}, httpkit.ListOptions{})
 	if err != nil {
 		return nil, s.permissionError(ctx, "list permissions", err)
 	}
-	ps = slices.DeleteFunc(ps, func(p model.Permission) bool { return !c.manages(p) })
-	return artgen.GetPermissionTargetsV2200JSONResponse(listItems(ctx, permV2Path, ps)), nil
+	return streamed{l}, nil
 }
 
 // v2Views renders the permissions the v2 form can express. One whose
@@ -647,8 +647,12 @@ func (s AccessService) errOf(ctx context.Context, op string, err error) error {
 
 // GetPermissions pages through the permissions, optionally only those
 // granting given users or groups, as name and uri pairs or, with expand,
-// documents narrowed to those principals' grants. The cursor is the last
-// name of the previous page.
+// documents narrowed to those principals' grants. getpermissions.json
+// documents the cursor as the name of the previous page's last permission,
+// passed back as the next call's cursor, so a page starts after that name
+// rather than at it, which would repeat it. The store reads only the page
+// and one row past it, which says whether a next cursor is due, so a late
+// page costs what the first does (#1408).
 func (s AccessService) GetPermissions(
 	ctx context.Context,
 	req accessgen.GetPermissionsRequestObject,
@@ -680,25 +684,33 @@ func (s AccessService) GetPermissions(
 	case expand && !filtered:
 		return nil, httpkit.BadRequestf("expand requires a user or group filter")
 	}
-	var (
-		ps []model.Permission
-		pr permission.Principals
-	)
+	var pr *permission.Principals
 	if filtered {
 		inherited := q.IncludeInheritedGroups == nil || *q.IncludeInheritedGroups
 		// User names match without regard to case, group names exactly
 		// (getpermissions).
 		users, err = c.svc.FoldUsers(ctx, users)
+		var got permission.Principals
 		if err == nil {
-			ps, pr, err = c.svc.Granting(ctx, users, groups, inherited)
+			got, err = c.svc.PrincipalsOf(ctx, users, groups, inherited)
 		}
-	} else {
-		ps, err = c.svc.List(ctx)
+		if err != nil {
+			return nil, s.errOf(ctx, "list permissions", err)
+		}
+		pr = &got
 	}
+	after := ""
+	if q.Cursor != nil {
+		after = *q.Cursor
+	}
+	page, more, err := c.svc.Page(ctx, after, limit, pr)
 	if err != nil {
 		return nil, s.errOf(ctx, "list permissions", err)
 	}
-	page, next := pageAfter(ps, q.Cursor, limit)
+	next := ""
+	if more {
+		next = page[len(page)-1].Name
+	}
 	if expand {
 		docs := make([]wire.AccessPermission, 0, len(page))
 		for _, p := range page {
@@ -722,31 +734,6 @@ type accessItem struct {
 type accessPage struct {
 	Permissions any    `json:"permissions"`
 	Cursor      string `json:"cursor,omitempty"`
-}
-
-// pageAfter returns up to limit permissions after the cursor, and the next
-// cursor when more remain. getpermissions.json documents the cursor as the
-// name of the page's last permission, passed back as the next call's
-// cursor, so the next page starts after that name rather than at it, which
-// would repeat it.
-func pageAfter(ps []model.Permission, cursor *string, limit int) ([]model.Permission, string) {
-	start := 0
-	if cursor != nil && *cursor != "" {
-		start = len(ps)
-		if i := slices.IndexFunc(
-			ps,
-			func(p model.Permission) bool { return p.Name > *cursor },
-		); i >= 0 {
-			start = i
-		}
-	}
-	end := min(start+limit, len(ps))
-	page := ps[start:end]
-	next := ""
-	if end < len(ps) && len(page) > 0 {
-		next = page[len(page)-1].Name
-	}
-	return page, next
 }
 
 // readAccess decodes an Access permission document. The create body is read

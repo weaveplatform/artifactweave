@@ -73,6 +73,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/middleware"
+	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
@@ -99,6 +100,8 @@ type RouterStore interface {
 	accesshttp.Store
 	// The system handlers' instance identity.
 	instance.Store
+	// The receipts of the keyed operations' replay (keyed.go).
+	Replays() idempotency.ReplayStore
 }
 
 var _ RouterStore = (*appsql.Store)(nil)
@@ -483,7 +486,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		middleware.NormalizeContentType(keepContentType),
 		middleware.CollectionSlash(slashes),
 		accesshttp.PlusAsSpace,
-		artifactshttp.IdempotencyRoutes,
+		keyGate(),
 		accesshttp.APIRecoveryContext,
 		xzRequests,
 	)
@@ -591,7 +594,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	r.HandleFunc("/mc/*", notFound)
 
 	// Generated strict servers, one per spec, each under its service prefix
-	// with the management body limit.
+	// with the management body limit, and the replay wrapping each keyed
+	// operation.
+	keyed := newKeyedOperations(cfg, artAPI)
 	r.Group(func(g chi.Router) {
 		g.Use(
 			middleware.BodyLimit(middleware.ManagementBodyLimit),
@@ -612,7 +617,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				DebianAPI:      &debianOps,
 				CranAPI:        &cranOps,
 				RPMAPI:         &rpmOps,
-			}, nil, strictOpts),
+			}, keyed.artifactory(), strictOpts),
 			artgen.ChiServerOptions{
 				BaseURL:          "/artifactory",
 				BaseRouter:       g,
@@ -626,7 +631,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		accessgen.HandlerWithOptions(
 			accessgen.NewStrictHandlerWithOptions(
 				accessServer{AccessService: accessHTTP.Access},
-				nil,
+				keyed.access(),
 				accessOpts,
 			),
 			accessgen.ChiServerOptions{
@@ -640,7 +645,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		eventgen.HandlerWithOptions(
-			eventgen.NewStrictHandlerWithOptions(eventService{}, nil, eventOpts),
+			eventgen.NewStrictHandlerWithOptions(eventService{}, keyed.event(), eventOpts),
 			eventgen.ChiServerOptions{
 				BaseURL:          "/event",
 				BaseRouter:       g,
@@ -654,7 +659,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		distributiongen.HandlerWithOptions(
 			distributiongen.NewStrictHandlerWithOptions(
 				distributionService{},
-				nil,
+				keyed.distribution(),
 				distributionOpts,
 			),
 			distributiongen.ChiServerOptions{
@@ -668,7 +673,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		workergen.HandlerWithOptions(
-			workergen.NewStrictHandlerWithOptions(workerService{}, nil, workerOpts),
+			workergen.NewStrictHandlerWithOptions(workerService{}, keyed.worker(), workerOpts),
 			workergen.ChiServerOptions{
 				BaseURL:          "/worker",
 				BaseRouter:       g,
@@ -680,7 +685,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		pfedgen.HandlerWithOptions(
-			pfedgen.NewStrictHandlerWithOptions(pfedService{}, nil, pfedOpts),
+			pfedgen.NewStrictHandlerWithOptions(pfedService{}, keyed.pfed(), pfedOpts),
 			pfedgen.ChiServerOptions{
 				BaseURL:          "/pfed",
 				BaseRouter:       g,
@@ -692,7 +697,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		gridgen.HandlerWithOptions(
-			gridgen.NewStrictHandlerWithOptions(gridService{}, nil, gridOpts),
+			gridgen.NewStrictHandlerWithOptions(gridService{}, keyed.grid(), gridOpts),
 			gridgen.ChiServerOptions{
 				BaseURL:          "/grid",
 				BaseRouter:       g,
@@ -755,13 +760,15 @@ func newAuthnOptions(
 }
 
 // newLimitOptions returns the request-limit middleware's options as the
-// router composes them: the probes (configurationhttp.HealthRequest) and
-// the recovery API (APIRecoveryRequest) pass the shared limits.
+// router composes them: the spec operations' cost classes, and the probes
+// (configurationhttp.HealthRequest) and the recovery API
+// (APIRecoveryRequest) for requests no spec operation addresses.
 func newLimitOptions(limits *apilimit.Service) limitOptions {
 	return limitOptions{
-		Health:   configurationhttp.HealthRequest,
-		Recovery: accesshttp.APIRecoveryRequest,
-		Limits:   limits,
+		Operations: costOperations(),
+		Health:     configurationhttp.HealthRequest,
+		Recovery:   accesshttp.APIRecoveryRequest,
+		Limits:     limits,
 	}
 }
 
@@ -817,7 +824,8 @@ func requestDetails(o detailOptions) func(http.Handler) http.Handler {
 // them, from the contributions beside each handler, access's through
 // DetailRules: the property and GAVC searches' raw queries, the policy body
 // rewrite, and the raw bodies of repository updates, build-info publishes
-// and appends, permission creates and group updates.
+// and appends, permission creates, group updates and keyed requests, whose
+// exact bytes the replay's fingerprint digests.
 func newDetailOptions() detailOptions {
 	access := accesshttp.DetailRules()
 	return detailOptions{
@@ -827,6 +835,7 @@ func newDetailOptions() detailOptions {
 			[]func(*http.Request) bool{
 				artifactshttp.KeepsRepositoryBody,
 				artifactshttp.KeepsBuildBody,
+				idempotency.Keyed,
 			},
 			access.RawBody...,
 		),

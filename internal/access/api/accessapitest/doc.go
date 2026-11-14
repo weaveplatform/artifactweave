@@ -67,7 +67,8 @@
 //
 //   - TestUnitDecider: the zero value refuses everything, an administrator
 //     is allowed what no function narrows, functions answer when set, and a
-//     question for no action is refused.
+//     question for no action is refused. VisibleRepos follows Admin without
+//     its function.
 //   - TestUnitAuthenticator, TestUnitAuthorizer: the defaults, the
 //     functions, and Authorizer's error wraps and nil Decider on error.
 //   - TestUnitTokens: the recorded calls, the numbered tokens and the

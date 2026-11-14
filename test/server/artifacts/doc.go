@@ -35,8 +35,10 @@
 //     (reindex_test.go) and remote sources over stub backends
 //     (source_test.go).
 //   - PostgreSQL through internal/app/storetest for the cases that run on
-//     it too (idempotency_sql_test.go, properties_long_test.go); they skip
-//     without Docker.
+//     it too (idempotency_sql_test.go, keyed_operations_test.go,
+//     properties_long_test.go, streamed_lists_test.go); they skip without
+//     Docker. SQLite in a file for the streamed lists and their memory
+//     (streamed_lists_test.go, streamed_memory_test.go).
 //
 // # Outputs
 //
@@ -58,7 +60,9 @@
 //   - builds_test.go, builds_diff_test.go, builds_promote_test.go and
 //     builds_routes_test.go: build-info publish, read, rename, diff,
 //     promotion and retention; idempotency_test.go and
-//     idempotency_sql_test.go: idempotent build appends and their replay.
+//     idempotency_sql_test.go: idempotent build appends and their replay;
+//     keyed_operations_test.go: every operation that declares
+//     Idempotency-Key, replayed once on SQLite and PostgreSQL.
 //   - searches_test.go, searches_builds_test.go, searches_layout_test.go and
 //     searches_versions_test.go: the GET searches; searches_upstream*_test.go:
 //     searches that reach a remote repository's upstream.
@@ -66,6 +70,13 @@
 //   - repositories_test.go, repositories_format_class_test.go,
 //     repo_environments_test.go and virtual_members_test.go: the repository
 //     configuration API.
+//   - streamed_lists_test.go: Get Repositories without limit and the
+//     dependency search, written from store pages (#1409), against the
+//     bytes they collected, on the in-memory store, SQLite and PostgreSQL,
+//     and their store faults before and after the first byte;
+//     streamed_memory_test.go: the heap while a deep file list of 50,000
+//     files, and the folder information of the folder holding them,
+//     stream.
 //   - source_test.go, source_listing_test.go, cache_maintenance_test.go and
 //     smart_status_test.go: remote sources, browsing, cache maintenance and
 //     the smart remote diagnostic.
@@ -79,6 +90,10 @@
 //   - folder_archive_policy_test.go: the folder archive download's policy
 //     (issue 1253).
 //   - multipart_test.go: the JFrog CLI's multipart upload.
+//   - repositories_paging_test.go and repositories_walk_test.go: Get
+//     Repositories' limit and offset (#1367), and its next link, followed
+//     from the first window to the last as an administrator, a partial
+//     reader and anonymous (#1408).
 //
 // # References
 //

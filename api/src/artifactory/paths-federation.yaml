@@ -60,6 +60,11 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletefailedbinarytasks.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - query:repoKey
+      - query:sha1
+      x-cost: expensive
   /api/federation/binaries/failures/list:
     get:
       description: Lists binary transfer tasks of a federated repository that failed because the content could not
@@ -140,6 +145,13 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getlistoffailedbinarytasks.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: page
+      x-pagination-parameters:
+        position: page
+        size: limit
+      x-pagination-next: link
   /api/federation/binaries/failures/replay:
     put:
       description: Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1,
@@ -200,6 +212,11 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/replayfailedbinarytasks.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - query:repoKey
+      - query:sha1
+      x-cost: expensive
   /api/federation/configSync/{repoKey}:
     post:
       description: Sends this member's shared configuration of a federated repository to every other member, repairing
@@ -250,6 +267,9 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/synchronizefederatedmemberconfiguration.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/federation/convertToLocal:
     post:
       description: Converts federated repositories back to local repositories, keeping their content and metadata.
@@ -330,6 +350,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/convertfederatedrepositorytolocal.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - 'body:'
+      x-cost: expensive
   /api/federation/forceFullSync/{repoKey}:
     post:
       description: Starts a full synchronization of a federated repository, interrupting one already in progress.
@@ -396,6 +420,9 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/federatedrepositoryforcefullsync.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/federation/fullSync/{repoKey}:
     post:
       description: 'Runs a full synchronization: members compare their item sets by path and checksum and each side
@@ -471,6 +498,9 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/federatedrepositoryfullsync.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/federation/inconsistentRepos:
     get:
       description: Lists federated repositories whose shared configuration differs from at least one member's. Repair
@@ -509,6 +539,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getlistofinconsistentfederatedrepositories.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/federation/migrate/{repoKey}:
     post:
       description: Converts a local repository into a federated repository with this instance as its only member,
@@ -559,6 +593,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/convertlocalrepositorytofederated.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      x-cost: expensive
   /api/federation/prioritization/{repoKey}:
     put:
       description: Gives a federated repository's outgoing event queue priority over standard queues when the outbox
@@ -624,6 +662,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/prioritizefederatedrepository.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      x-cost: expensive
   /api/federation/propagateCreatedTime:
     put:
       description: 'Instance-wide switch: when enabled, full sync gives each received item its original creation
@@ -673,6 +715,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/propagatecreationtimemetadataduringfullsync.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/federation/reconnect:
     post:
       description: 'Re-establishes the link between the repository service and the federation sync worker, which
@@ -716,6 +762,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/reconnecttofederationclient.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
+      x-cost: expensive
   /api/federation/recovery:
     post:
       description: Clears the error state of outgoing event queues that exhausted their retries, so delivery to
@@ -776,6 +826,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/federationrecovery.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - query:repoKey
+      x-cost: expensive
   /api/federation/removeMember:
     post:
       description: Removes a member, identified by its base URL, from every federation on this instance. The removed
@@ -825,6 +879,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/removefederationmember.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - 'body:'
+      x-cost: expensive
   /api/federation/state:
     get:
       deprecated: true
@@ -896,6 +954,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederationsyncstate.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/federation/status/connectionStates/{repoKey}:
     get:
       description: Shows, for each member of one federated repository, whether events are flowing and how far behind
@@ -1006,6 +1068,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederationconnectiondetails.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/federation/status/mirrorsLag:
     get:
       deprecated: true
@@ -1077,6 +1143,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederationmirrorlagtime.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/federation/status/repo/{repoKey}:
     get:
       deprecated: true
@@ -1222,6 +1292,8 @@ paths:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederatedrepositorystatus.md
       x-unverified: true
+      x-idempotency: safe
+      x-cost: ordinary
   /api/federation/status/stateList:
     get:
       description: Lists each federation on this instance with the aggregated state of its members, optionally filtered
@@ -1324,6 +1396,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederationstatedetails.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/federation/status/stateSummary:
     get:
       description: Counts federation members by state across every federated repository on this instance.
@@ -1405,6 +1481,8 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederationstatesummaries.md
+      x-idempotency: safe
+      x-cost: ordinary
   /api/federation/status/unavailableMirrors:
     get:
       deprecated: true
@@ -1463,6 +1541,10 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getunavailablemirrors.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v2/federation/status/repo/{repoKey}:
     get:
       deprecated: true
@@ -1607,3 +1689,5 @@ paths:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederatedrepositorystatusv2.md
       x-unverified: true
+      x-idempotency: safe
+      x-cost: ordinary

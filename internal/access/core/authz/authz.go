@@ -158,6 +158,97 @@ func (d *Decider) IsRepoVisible(repo accessapi.Repo) bool {
 		d.System("info", kernel.ScopeRead)
 }
 
+// VisibleRepos describes the repositories IsRepoVisible admits, step by step
+// as it decides, so a listing's store can filter by it: an administrator's
+// and a system:info:r scope's are every repository; repo entries' are the
+// keys they name with read; otherwise the repositories a read rule's target
+// covers at the root, narrowed by a token's artifact entries. Every rule
+// grants the same root folder in every repository it covers, because its
+// include and exclude patterns name paths, not repositories, so each one
+// contributes its whole target.
+func (d *Decider) VisibleRepos() accessapi.RepoVisibility {
+	if d.isAdmin {
+		return nil
+	}
+	if d.scope != nil && slices.ContainsFunc(d.scope.Entries, func(e kernel.ScopeEntry) bool {
+		return e.Kind == kernel.ScopeRepo
+	}) {
+		var s accessapi.RepoSet
+		for _, e := range d.scope.Entries {
+			if e.Kind == kernel.ScopeRepo && e.Actions.Covers(kernel.ScopeRead) {
+				s = withTarget(s, e.Target)
+			}
+		}
+		return accessapi.RepoVisibility{compact(s)}
+	}
+	if d.System("info", kernel.ScopeRead) {
+		return nil
+	}
+	var out accessapi.RepoVisibility
+	if !d.hasEveryAction {
+		var s accessapi.RepoSet
+		for _, r := range d.rules[accessapi.ResourceArtifact] {
+			if !r.actions.Has(accessapi.ActionRead) || !r.allows("", true) {
+				continue
+			}
+			switch r.target {
+			case accessapi.TargetAny:
+				s.Every = true
+			case accessapi.TargetAnyLocal:
+				s.Classes = append(s.Classes, string(artrepo.Local), string(artrepo.Federated))
+			case accessapi.TargetAnyRemote:
+				s.Classes = append(s.Classes, string(artrepo.Remote))
+			case accessapi.TargetAnyDistribution:
+				s.Classes = append(s.Classes, "distribution")
+			default:
+				s.Keys = append(s.Keys, r.target)
+			}
+		}
+		out = append(out, compact(s))
+	}
+	if d.filter != nil {
+		var s accessapi.RepoSet
+		for _, e := range d.filter {
+			if !toActions(e.Actions).Has(accessapi.ActionRead) || !scopePathReaches(e.Path) {
+				continue
+			}
+			s = withTarget(s, e.Target)
+		}
+		out = append(out, compact(s))
+	}
+	return slices.DeleteFunc(out, func(s accessapi.RepoSet) bool { return s.Every })
+}
+
+// withTarget adds a token entry's target to s: "*" names every repository,
+// anything else one key.
+func withTarget(s accessapi.RepoSet, target string) accessapi.RepoSet {
+	if target == "*" {
+		s.Every = true
+	} else {
+		s.Keys = append(s.Keys, target)
+	}
+	return s
+}
+
+// scopePathReaches reports whether a token entry's path pattern admits a
+// repository's root folder, as scopeActions asks it for the root.
+func scopePathReaches(path string) bool {
+	if path == "" {
+		return true
+	}
+	p := antpath.CompilePattern(path)
+	return p.Match("") || p.MatchBelow("")
+}
+
+// compact sorts a set's classes and keys and drops repeats, so a store's
+// filter names each once however many rules name it.
+func compact(s accessapi.RepoSet) accessapi.RepoSet {
+	slices.Sort(s.Classes)
+	slices.Sort(s.Keys)
+	s.Classes, s.Keys = slices.Compact(s.Classes), slices.Compact(s.Keys)
+	return s
+}
+
 // Holds reports whether g grants every action in want to the subject,
 // directly or through a group it acts as. It answers questions about a
 // permission document itself (who may manage it), not about content, which

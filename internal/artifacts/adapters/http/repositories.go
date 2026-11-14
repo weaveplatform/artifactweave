@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
@@ -115,9 +117,11 @@ func (s ArtifactoryAPI) readerFor(
 
 // GetRepositoriesByTypeAndProject lists the repositories the caller may
 // see, narrowed by class, package type and project, and paged by limit and
-// offset. The distribution class lists nothing, because no distribution
-// repository is served here, and the list takes the details-list vendor
-// media type when the client asks for it.
+// offset. The store applies the filters, the caller's visibility and the
+// window, and counts what the caller sees only when the list is paged. The
+// distribution class lists nothing, because no distribution repository is
+// served here, and the list takes the details-list vendor media type when
+// the client asks for it.
 func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 	ctx context.Context,
 	req artgen.GetRepositoriesByTypeAndProjectRequestObject,
@@ -130,49 +134,141 @@ func (s ArtifactoryAPI) GetRepositoriesByTypeAndProject(
 	if err != nil {
 		return nil, err
 	}
-	_, can, err := s.readerFor(ctx, st)
+	visible, err := s.visibleTo(ctx)
 	if err != nil {
 		return nil, err
 	}
 	out := artgen.GetRepositoriesByTypeAndProject200JSONResponse{}
-	var f port.RepoFilter
+	l := port.RepoListing{
+		Visible: visible, Offset: page.offset, Limit: page.limit, Count: page.paged,
+	}
 	if req.Params.Type != nil {
 		if *req.Params.Type == artgen.GetRepositoriesByTypeAndProjectParamsTypeDistribution {
-			return page.of(ctx, out), nil
+			return page.of(ctx, out, port.RepoPage{}), nil
 		}
-		f.Class = repo.Class(strings.ToLower(string(*req.Params.Type)))
+		l.Class = repo.Class(strings.ToLower(string(*req.Params.Type)))
 	}
 	if req.Params.Project != nil {
-		f.ProjectKey = *req.Params.Project
+		l.ProjectKey = *req.Params.Project
 	}
-	all, err := st.Repos().List(ctx, f)
+	// The documented package type enumeration is stale, so any value
+	// filters, compared without case. The listed spelling matches too,
+	// which is how the documented "yum" finds rpm repositories.
+	if f := req.Params.PackageType; f != nil {
+		l.PackageTypes = repo.PackageTypesNamed(string(*f))
+	}
+	base := baseurl.From(ctx)
+	if !page.paged {
+		return s.streamRepositories(ctx, st, l, base)
+	}
+	got, err := st.Repos().Page(ctx, l)
 	if err != nil {
 		return nil, s.InternalError(ctx, "list repositories", err)
 	}
-	base := baseurl.From(ctx)
-	for _, c := range all {
-		// The documented package type enumeration is stale, so any value
-		// filters, compared without case. The listed spelling matches too,
-		// which is how the documented "yum" finds rpm repositories.
-		if f := req.Params.PackageType; f != nil &&
-			!strings.EqualFold(string(c.PackageType), string(*f)) &&
-			!strings.EqualFold(repo.PackageTypeName(string(c.PackageType)), string(*f)) {
-			continue
-		}
-		if !can(c) {
-			continue
-		}
-		body, e := appendZero(out.Body)
-		out.Body = body
-		e.Key, e.Type = c.Key, strings.ToUpper(string(c.Class))
-		e.PackageType = repo.PackageTypeName(string(c.PackageType))
-		e.Url = base + "/artifactory/" + c.Key
-		if c.Description != "" {
-			d := c.Description
-			e.Description = &d
-		}
+	page.query = httpkit.RawSearchQuery(ctx)
+	if page.query == "" {
+		page.query = repositoriesQuery(req.Params)
 	}
-	return page.of(ctx, out), nil
+	for _, c := range got.Repos {
+		out.Body = append(out.Body, repoEntry(base, c))
+	}
+	return page.of(ctx, out, got), nil
+}
+
+// repoListEntry is an entry of Get Repositories' list. The generated body's
+// element is an unnamed struct; this alias spells that type, so the paged
+// list appends to the body and the streamed list encodes the same type,
+// and a change to the generated element stops the build.
+//
+//nolint:revive,tagliatelle // the generated element's field names and JSON keys
+type repoListEntry = struct {
+	Description *string `json:"description,omitempty"`
+	Key         string  `json:"key"`
+	PackageType string  `json:"packageType"`
+	Type        string  `json:"type"`
+	Url         string  `json:"url"`
+}
+
+// repoEntry is the list entry of the repository c summarises.
+func repoEntry(base string, c port.RepoSummary) repoListEntry {
+	e := repoListEntry{
+		Key: c.Key, Type: strings.ToUpper(string(c.Class)),
+		PackageType: repo.PackageTypeName(string(c.PackageType)),
+		Url:         base + "/artifactory/" + c.Key,
+	}
+	if c.Description != "" {
+		d := c.Description
+		e.Description = &d
+	}
+	return e
+}
+
+// streamRepositories answers the list without limit, which is whole, from
+// windows of the store's key order as they are read (decision 0043,
+// "Streaming complete lists"): each window continues after the last key
+// of the one before, so a repository created or removed meanwhile shifts
+// nothing. Without limit the answer has no paging header and no Link.
+func (s ArtifactoryAPI) streamRepositories(
+	ctx context.Context,
+	st Store,
+	l port.RepoListing,
+	base string,
+) (artgen.GetRepositoriesByTypeAndProjectResponseObject, error) {
+	// The cursor kernel.Pages hands back is the last key read, as this walk
+	// alone reads it.
+	pages := kernel.NewPages(
+		func(ctx context.Context, p kernel.Page) ([]port.RepoSummary, string, error) {
+			w := l
+			w.Limit, w.After = p.Limit, p.After
+			got, err := st.Repos().Page(ctx, w)
+			if err != nil {
+				return nil, "", s.InternalError(ctx, "list repositories", err)
+			}
+			if !got.More {
+				return got.Repos, "", nil
+			}
+			return got.Repos, got.Repos[len(got.Repos)-1].Key, nil
+		},
+		maxRepoPage,
+	)
+	media := "application/json"
+	if httpkit.Accepts(ctx, mediaDetails) {
+		media = mediaDetails
+	}
+	list, err := httpkit.StreamList(
+		ctx,
+		pages,
+		func(c port.RepoSummary) (repoListEntry, bool, error) { return repoEntry(base, c), true, nil },
+		httpkit.ListOptions{ContentType: media},
+	)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // InternalError's answer
+	}
+	return streamed{list}, nil
+}
+
+// visibleTo returns the repositories the caller sees in a listing, as the
+// sets a store filters by.
+func (s ArtifactoryAPI) visibleTo(ctx context.Context) ([]port.RepoSet, error) {
+	p, err := httpkit.Principal(ctx)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the caller check's typed error
+	}
+	d, _ := accessapi.DeciderFrom(ctx)
+	acc, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, p, d)
+	if err != nil {
+		return nil, s.InternalError(ctx, "repository read rights", err)
+	}
+	v := acc.Decider.VisibleRepos()
+	sets := make([]port.RepoSet, 0, len(v))
+	for _, vs := range v {
+		set := port.RepoSet{Every: vs.Every, Keys: vs.Keys}
+		for _, c := range vs.Classes {
+			set.Classes = append(set.Classes, repo.Class(c))
+		}
+		sets = append(sets, set)
+	}
+	return sets, nil
 }
 
 // maxRepoPage is the largest limit Get Repositories takes: "limit must be
@@ -181,10 +277,13 @@ const maxRepoPage = 1000
 
 // repoPage is the window of the repository list that limit and offset ask
 // for. paged is false without limit, which keeps the list whole and sends no
-// paging headers, as every Artifactory before 7.173 answered.
+// paging headers, as every Artifactory before 7.173 answered; limit is then
+// 0, which a RepoListing reads as the whole list.
 type repoPage struct {
 	limit, offset int
 	paged         bool
+	// query is the query the client sent, which the next link keeps.
+	query string
 }
 
 // newRepoPage checks limit and offset as JFrog's page lists them: "offset
@@ -205,20 +304,34 @@ func newRepoPage(limit, offset *int) (repoPage, error) {
 	return repoPage{limit: *limit, offset: httpkit.Deref(offset), paged: true}, nil
 }
 
-// of answers the page of list. JFrog's page says the server "still
-// enumerates the full authorized filtered set, then returns a slice", so
-// list holds only what the caller may see and X-Total-Count counts that,
-// not every repository the filters match.
+// repositoriesPath is the path Get Repositories serves, which its next
+// link names: the router rewrites the Terraform provider's trailing slash
+// to it before the handler runs.
+const repositoriesPath = "/artifactory/api/repositories"
+
+// of answers list as the window got of the repository list. JFrog's page
+// says the server "still enumerates the full authorized filtered set, then
+// returns a slice", so X-Total-Count counts the repositories the caller may
+// see, not every repository the filters match. While more follow, a Link
+// names the next window (decision 0043): the client's query with offset
+// moved on by limit, an added header JFrog does not send.
 func (p repoPage) of(
 	ctx context.Context,
 	list artgen.GetRepositoriesByTypeAndProject200JSONResponse,
+	got port.RepoPage,
 ) artgen.GetRepositoriesByTypeAndProjectResponseObject {
 	if p.paged {
-		total := len(list.Body)
-		start := min(p.offset, total)
-		list.Body = list.Body[start:min(start+p.limit, total)]
-		list.Headers.XTotalCount = &total
+		list.Headers.XTotalCount = &got.Total
 		list.Headers.XResultOffset, list.Headers.XResultLimit = &p.offset, &p.limit
+	}
+	if got.More {
+		link := httpkit.NextLink(
+			repositoriesPath,
+			p.query,
+			"offset",
+			strconv.Itoa(p.offset+p.limit),
+		)
+		list.Headers.Link = &link
 	}
 	// A nil body would be null on the wire; an empty list or page is [].
 	list.Body = orEmpty(list.Body)
@@ -228,6 +341,29 @@ func (p repoPage) of(
 		)
 	}
 	return list
+}
+
+// repositoriesQuery is the query a client sent with params: the router
+// keeps the query as sent for this path (KeepsSearchQuery), and a handler
+// called without the router rebuilds it from what was decoded.
+func repositoriesQuery(params artgen.GetRepositoriesByTypeAndProjectParams) string {
+	q := url.Values{}
+	if params.Type != nil {
+		q.Set("type", string(*params.Type))
+	}
+	if params.PackageType != nil {
+		q.Set("packageType", string(*params.PackageType))
+	}
+	if params.Project != nil {
+		q.Set("project", *params.Project)
+	}
+	if params.Limit != nil {
+		q.Set("limit", strconv.Itoa(*params.Limit))
+	}
+	if params.Offset != nil {
+		q.Set("offset", strconv.Itoa(*params.Offset))
+	}
+	return q.Encode()
 }
 
 // GetAllRepositoryConfigurations returns every repository's configuration,
@@ -281,14 +417,6 @@ func (s ArtifactoryAPI) GetAllRepositoryConfigurations(
 		), nil
 	}
 	return out, nil
-}
-
-// appendZero appends a zero element to s and returns s and that element,
-// for the generated list bodies, whose element type has no name.
-func appendZero[E any](s []E) ([]E, *E) {
-	var zero E
-	s = append(s, zero)
-	return s, &s[len(s)-1]
 }
 
 // orEmpty returns s, or an empty slice for nil.

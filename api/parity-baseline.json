@@ -65,6 +65,20 @@
     "PUT /mc/api/v1/system/backup/import"
   ],
   "divergent": {
+    "GET /artifactory/api/docker/{}/v2/_catalog": [
+      "missing response 400 property errors[].status",
+      "missing response 401 property errors[].status",
+      "missing response 403 property errors[].status",
+      "missing response 404 property errors[].status",
+      "missing response 500 property errors[].status"
+    ],
+    "GET /artifactory/api/docker/{}/v2/{}/tags/list": [
+      "missing response 400 property errors[].status",
+      "missing response 401 property errors[].status",
+      "missing response 403 property errors[].status",
+      "missing response 404 property errors[].status",
+      "missing response 500 property errors[].status"
+    ],
     "GET /artifactory/api/puppet/{}/v3/modules": [
       "missing response 200 property current",
       "missing response 200 property limit",

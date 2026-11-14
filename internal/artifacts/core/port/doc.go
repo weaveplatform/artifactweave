@@ -29,9 +29,17 @@
 //
 // # Outputs
 //
-//   - RepoStore with RepoFilter; ItemStore with Download, DeleteResult and
-//     RepoUsage; BlobIndex with the sentinel ErrDeleting; ReplicaIndex;
-//     TrashStore; and PackageStore, which embeds PackageVersionNames: a
+//   - RepoStore with RepoFilter, and its Page with RepoListing, RepoSet,
+//     RepoSummary and RepoPage: one window of the repository list, its
+//     filters and the caller's visibility applied in the store (#1408), or
+//     the window after a key (RepoListing.After) for a caller that streams
+//     the whole list (#1409); ItemStore with Download, DeleteResult and
+//     RepoUsage, whose DescendantsByFullPath walks a folder's descendants in
+//     the storage file list's order, so that list is written a page at a
+//     time (#1409); BlobIndex with the sentinel ErrDeleting; ReplicaIndex;
+//     TrashStore, whose BelowByPath walks the trash can's tree in path
+//     order, so its storage views are written a page at a time (#1409);
+//     and PackageStore, which embeds PackageVersionNames: a
 //     package's version names alone, in Versions' order, which the Puppet,
 //     Ansible and Chef lists count and order before they read their page's
 //     records (#1404).
@@ -39,7 +47,8 @@
 //     image layout a page at a time (ItemStore.DockerPages), with
 //     DockerFolderQuery, DockerImageQuery, DockerImageManifest and
 //     DockerFold.
-//   - BuildStore with NormaliseBuild; BowerRegistrationStore;
+//   - BuildStore with NormaliseBuild, whose DependencyPage is one keyset
+//     page of FindDependencies, which the dependency search streams (#1409); BowerRegistrationStore;
 //     GitLFSLockStore with GitLFSLockFilter; and ArchivedItemStore with
 //     ArchivedFilter.
 //   - CleanProperties, CheckPropertyKeys and CheckBuildPropertyKeys, how
@@ -108,6 +117,7 @@
 // 646), GitLFSLockStore (pull request 849) and BowerRegistrationStore (pull
 // request 912). Moved here in P9d, which added ArchivedItemStore and Store.
 // DockerPageStore pages the registry's tags lists and catalogs (#1402).
+// RepoStore.Page pages Get Repositories in the store (#1408).
 //
 // # Testing
 //

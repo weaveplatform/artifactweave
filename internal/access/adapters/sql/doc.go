@@ -30,7 +30,10 @@
 //
 //   - Store, from New, with Users, Groups, Permissions, Tokens, Keys,
 //     Projects and APIRestrictions, and the dialect store's Tx, AfterCommit
-//     and Close.
+//     and Close. Permissions' Page seeks on the permission name and reads
+//     one row past the page, keeping with a grant filter only the
+//     permissions whose grants on permission_grants' principal index name
+//     the filter's users or groups (#1408).
 //   - Module: the name access, the stream migrations.FS, the six sealed
 //     columns and the AfterMigrate hook.
 //
@@ -80,6 +83,8 @@
 //     #p9d-modular-monolith-migration, epic STO
 //     (https://github.com/weaveplatform/artifactweave/issues/939).
 //   - https://github.com/weaveplatform/artifactweave/issues/1060
+//   - https://github.com/weaveplatform/artifactweave/issues/1408 (lists
+//     paged in the store).
 //
 // # Status
 //
@@ -87,7 +92,8 @@
 // stores, as the metadata store's (pull request 3). The identity listings
 // and the API restriction store came with retry safety and bounded API
 // execution (pull request 905). Moved here in P9d, which added Store, New and
-// Module.
+// Module. Permissions' Page came with store paging of the Access v2
+// permissions list (#1408).
 //
 // # Testing
 //
@@ -103,6 +109,12 @@
 //     pages over 5000 users, and an index seek for the late page, on SQLite
 //     and on PostgreSQL) and TestAccIdentitySearchUpgrade (AfterMigrate
 //     fills missing search names, and a second run changes nothing).
+//   - list_pages_test.go: TestAccAccessListsAtScale (first and late pages
+//     of the v2 permissions, every one and one user's, of the group names
+//     and of the API restriction audit, each over 5000 rows, with their
+//     timings and plans, on SQLite and on PostgreSQL; the unfiltered seeks
+//     must read an index). permission_page_export_test.go hands it the
+//     statement Permissions' Page sends.
 //   - projects_test.go: TestAccProjectsFaults (a fault injected after a
 //     successful statement fails the project call) and
 //     TestAccProjectsUnmigrated (every project call reports the driver's

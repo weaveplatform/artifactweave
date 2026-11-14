@@ -34,10 +34,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin, a project admin for the subscription's project and domain, a holder of the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with the needed action.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: List webhook subscriptions
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getwebhooksubscriptions.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
       operationId: createWebhookSubscription
@@ -73,10 +81,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin, a project admin for the subscription's project and domain, a holder of the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with the needed action.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a webhook subscription
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/createwebhooksubscription.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/key
+      x-cost: expensive
   /api/v1/subscriptions/test:
     post:
       description: Builds a sample event for the body's domain and first event type and delivers it once through the body's handler, without storing anything. Useful to check a URL, secret or template before creating the subscription. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with x.
@@ -109,10 +125,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin, a project admin for the subscription's project and domain, a holder of the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with the needed action.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Send a test delivery
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/testwebhooksubscription.md
+      x-idempotency: none
+      x-idempotency-reason: external-effect
+      x-cost: expensive
   /api/v1/subscriptions/{key}:
     delete:
       description: Deletes the subscription. Deliveries already in flight finish; no new ones start. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
@@ -145,10 +168,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No subscription exists with this key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Delete a webhook subscription
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/deletewebhooksubscription.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:key
+      x-cost: expensive
     get:
       description: Returns one subscription with secrets redacted. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with r.
       operationId: getWebhookSubscription
@@ -184,10 +215,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No subscription exists with this key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Get a webhook subscription
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getwebhooksubscription.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
       operationId: updateWebhookSubscription
@@ -232,10 +269,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No subscription exists with this key.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Replace a webhook subscription
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/updatewebhooksubscription.md
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:key
+      x-cost: expensive
   /api/v1/troubleshooting:
     get:
       description: 'Returns delivery attempt records from a store that keeps the most recent 10,000; older ones are discarded. Three modes, chosen by the parameters: without start the connection stays open and streams each new record as it happens until the client disconnects; with start alone the stored records from that time are sent first and the stream then stays live; with start plus end or count the call returns the matching stored records and ends. start=0 begins at the oldest record held. subscription and target filter every mode. A record is kept for every failed attempt, and for every attempt of a subscription with debug set. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with r.'
@@ -361,11 +406,88 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin, a project admin for the subscription's project and domain, a holder of the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with the needed action.
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       summary: Read the webhook delivery log
       tags:
         - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/streamwebhooktroubleshooting.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
 components:
+  headers:
+    LinkNext:
+      description: >-
+        The next page, as `<target>; rel="next"` (RFC 8288): the path and query the client sent, every parameter kept and only the position changed. Sent only while more items remain, so its absence marks the last page. Declared only by the operations that send it.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimit:
+      description: >-
+        The caller's remaining allowance under the policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";r=5999;t=42`: the policy, the requests left and the seconds until its window resets. Also sent on every other response after admission, whatever its status, and on every response under the `recovery` policy, though no other response declares it. Not sent on health probes, on a refusal reached before any allowance was evaluated, or on an authentication 401 or a restriction 403.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RateLimitPolicy:
+      description: >-
+        The policy admission evaluated, in RateLimit draft-11 syntax, for example `"api";q=6000;w=60`: the policy name (`api`, `expensive`, `authentication` or `recovery`), its quota and its window in seconds. Sent wherever `RateLimit` is.
+      x-artifactweave-extension: true
+      schema:
+        type: string
+    RetryAfter:
+      description: >-
+        Seconds to wait before retrying, at least 1: the rest of the blocked window for a rate refusal, otherwise 1. Also sent on an operation's own 503 that reports a transient condition; a 503 that reports configuration or a size bound carries none.
+      required: true
+      x-artifactweave-extension: true
+      schema:
+        type: integer
+        minimum: 1
+  parameters:
+    IdempotencyKey:
+      description: >-
+        Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, a retry with the same key, credential, canonical resource and identical body bytes does not repeat the operation's effect: it answers the original success status, with the body built from the committed result after the current credential and permissions are checked again. Reuse with different bytes, or with a changed parameter that alters the effect, returns 422. A resource deleted since answers 404, one moved out of the request's scope 409. Only a success is kept, so a retry after a failure runs the operation again. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window. An operation that does not declare this parameter answers a key with 400.
+      in: header
+      name: Idempotency-Key
+      x-artifactweave-extension: true
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 130
+  responses:
+    ServiceUnavailable:
+      description: >-
+        A dependency of the request is briefly unavailable: admission or restriction storage, or, for a retry with an `Idempotency-Key`, the first request still running when the retry's wait budget ran out. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` are present when the answer follows admission, as a keyed retry's does.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: >-
+        A request limit refused the request: a rate allowance or a concurrency permit. Wait for `Retry-After` before retrying. `RateLimit` and `RateLimit-Policy` report the allowance; they are absent when the process's concurrency permits refused the request before any allowance was evaluated.
+      x-artifactweave-extension: true
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        RateLimit:
+          $ref: '#/components/headers/RateLimit'
+        RateLimit-Policy:
+          $ref: '#/components/headers/RateLimitPolicy'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     CustomWebhookHandlerCreate:
       description: 'A custom-webhook handler: the request is built from templates.'

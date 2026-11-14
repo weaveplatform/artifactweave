@@ -775,6 +775,7 @@ decided:
 | (none) | `items.props_modified_at`, from migration 0014 (#389), NULL while the item has no properties | the storage list's `mdTimestamps.properties`; Artifactory 6.20 keeps the time in a `node_meta_infos` row per item, and only the time is read here. The property methods set it when a write changes the properties, and `Put` never writes it ([02](02-artifactory-core-api-inventory.md)) |
 | `build_promotions` | `id, created_at, created_by, status, comment, ci_user, source_repo, repo`; no `dry_run` | the fields of a promotion status in the document (`repository`, `ciUser`, `user`, `timestamp`); a dry run records nothing |
 | (none) | `build_retention (project_key, name, count, minimum_build_date, delete_artifacts, keep_numbers)` | the `buildRetention` a publish carries, kept per build name; deleting or renaming the name takes it along |
+| (none) | `build_reports (action, project_key, name, build_id, report, created_at, expires_at)`, artifacts migration 0003 (#1410) | what a keyed build delete or promotion reported, which its replay answers with ([0043](decisions/0043-api-reliability.md#replay-for-keyed-operations)); no foreign key, since a delete's runs are gone, and pruned by expiry |
 
 Conventions every table follows: times are BIGINT Unix microseconds (NULL for unset), durations BIGINT
 milliseconds, documents TEXT, sealed values a BLOB or BYTEA column of their own, and every text column a list

@@ -25,6 +25,8 @@ paths:
               schema:
                 type: string
                 example: The database is not available
+      x-idempotency: safe
+      x-cost: exempt
   /api/v1/system/readiness:
     get:
       operationId: accessReadiness
@@ -48,6 +50,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+      x-idempotency: safe
+      x-cost: exempt
   /api/v1/system/liveness:
     get:
       operationId: accessLiveness
@@ -64,6 +68,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessProbe"
+      x-idempotency: safe
+      x-cost: exempt
   /api/v1/system/version:
     get:
       operationId: getAccessVersion
@@ -79,6 +85,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccessVersion"
+      x-idempotency: safe
+      x-cost: ordinary
 components:
   schemas:
     AccessProbe:

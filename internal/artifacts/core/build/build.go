@@ -17,7 +17,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
-	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
 )
 
 var (
@@ -46,13 +45,12 @@ type Access interface {
 
 // Store is what the build service reads and writes: the item service's
 // store, through which build-info documents and promotions write items
-// (item.Store), with the build records and the replay records that let a
-// retried request append once (decision 0014). Every call joins the
-// transaction ctx carries. Each composite store in app is a Store.
+// (item.Store), with the build records (decision 0014). Every call joins the
+// transaction ctx carries, a keyed append's replay transaction included.
+// Each composite store in app is a Store.
 type Store interface {
 	item.Store
 	Builds() port.BuildStore
-	Replays() idempotency.ReplayStore
 }
 
 // Service works on the builds of one store.
@@ -219,57 +217,35 @@ func (s *Service) Run(
 	return b, nil
 }
 
-// Runs lists the runs of a build the caller may read, newest first.
-// ErrNotFound when the build has no runs, ErrForbidden when the caller may
-// read none.
+// Runs lists the runs of a build the caller may read, newest first, as
+// RunPages walks and keeps them. ErrNotFound when the build has no runs,
+// ErrForbidden when the caller may read none (NoRuns).
 func (s *Service) Runs(
 	ctx context.Context,
 	projectKey, name string,
 	a Access,
 ) ([]model.BuildRun, error) {
-	projectKey = ProjectKey(projectKey)
-	all, err := s.runs(ctx, projectKey, name)
+	pages, keep := s.RunPages(projectKey, name, a)
+	out, seen, err := kept(ctx, pages, keep)
 	if err != nil {
 		return nil, err
 	}
-	if len(all) == 0 {
-		return nil, fmt.Errorf("build: runs of %s: %w", name, ErrNotFound)
-	}
-	repoKey := model.BuildInfoRepo(projectKey)
-	var out []model.BuildRun
-	for _, r := range all {
-		if a.Build(repoKey, documentPath(r), false, api.ActionRead) {
-			out = append(out, r)
-		}
-	}
 	if len(out) == 0 {
-		return nil, ErrForbidden
+		return nil, NoRuns(name, seen)
 	}
 	return out, nil
 }
 
 // Names lists the build names of a project in which the caller may read a
-// run, ordered by name.
+// run, ordered by name, as NamePages walks and keeps them.
 func (s *Service) Names(
 	ctx context.Context,
 	projectKey string,
 	a Access,
 ) ([]model.BuildName, error) {
-	projectKey = ProjectKey(projectKey)
-	all, err := collect(s.Page, func(p kernel.Page) ([]model.BuildName, string, error) {
-		return s.Store.Builds().Names(ctx, projectKey, p)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("build: names: %w", err)
-	}
-	repoKey := model.BuildInfoRepo(projectKey)
-	var out []model.BuildName
-	for _, n := range all {
-		if a.Build(repoKey, model.EncodeBuildInfoSegment(n.Name), true, api.ActionRead) {
-			out = append(out, n)
-		}
-	}
-	return out, nil
+	pages, keep := s.NamePages(projectKey, a)
+	out, _, err := kept(ctx, pages, keep)
+	return out, err
 }
 
 // Append adds modules to a run.
@@ -425,6 +401,18 @@ type Delete struct {
 // item deletes: to the trash can, and needing delete on each. It returns the
 // deleted runs; ErrNotFound when none was.
 func (s *Service) Delete(ctx context.Context, d Delete, a Access) ([]model.BuildRun, error) {
+	return s.deleteThen(ctx, d, a, nil)
+}
+
+// deleteThen is Delete, which runs then, when it is not nil, with the
+// deleted runs in the delete's own transaction, so that what then stores
+// commits or rolls back with the delete.
+func (s *Service) deleteThen(
+	ctx context.Context,
+	d Delete,
+	a Access,
+	then func(context.Context, []model.BuildRun) error,
+) ([]model.BuildRun, error) {
 	if !d.All && len(d.Numbers) == 0 {
 		return nil, fmt.Errorf("%w: no build numbers to delete", ErrInvalid)
 	}
@@ -475,6 +463,9 @@ func (s *Service) Delete(ctx context.Context, d Delete, a Access) ([]model.Build
 					return err
 				}
 			}
+		}
+		if then != nil {
+			return then(ctx, gone)
 		}
 		return nil
 	})

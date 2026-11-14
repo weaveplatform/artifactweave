@@ -45,7 +45,9 @@
 //     administrator, in the legacy security API and Access; and the key
 //     encryption operations, DONE for an administrator (issue 1385).
 //   - permissions_test.go: one permission in three APIs, MANAGE holders, and
-//     the Terraform provider's flows.
+//     the Terraform provider's flows. permissions_walk_test.go follows the
+//     Access v2 list's cursor from the first page to the last, filtered and
+//     not, as an administrator and a permissions-scoped token (#1408).
 //   - roles_test.go and roles_status_test.go: global roles and environments,
 //     and the global environment limit.
 //   - keypairs_test.go: key pairs and certificates, with the Terraform

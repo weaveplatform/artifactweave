@@ -3,6 +3,7 @@ package storetest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ func runBuilds(t *testing.T, newStore Factory) {
 	t.Run("BuildPromotions", func(t *testing.T) { testBuildPromotions(t, newStore(t)) })
 	t.Run("BuildFiles", func(t *testing.T) { testBuildFiles(t, newStore(t)) })
 	t.Run("BuildRetention", func(t *testing.T) { testBuildRetentionPolicy(t, newStore(t)) })
+	t.Run("BuildReports", func(t *testing.T) { testBuildReports(t, newStore(t)) })
 }
 
 // sum returns checksums unique to n.
@@ -431,9 +433,29 @@ func testBuildFiles(t *testing.T, s port.Store) {
 		t.Fatalf("an artifact checksum matched dependencies %v", got)
 	}
 
+	// DependencyPage walks FindDependencies' rows in its order, a page at a
+	// time, whatever the page size (#1409).
+	for size := 1; size <= 3; size++ {
+		storekit.Same(t, fmt.Sprintf("DependencyPage of %d", size), deps,
+			storekit.Pages(t, size, func(p kernel.Page) ([]model.BuildFileRef, string, error) {
+				return bs.DependencyPage(ctx, kernel.Checksums{SHA256: sum(3).SHA256}, p)
+			}))
+	}
+	if got, next, err := bs.DependencyPage(ctx, sum(1), kernel.Page{}); err != nil ||
+		len(got) != 0 || next != "" {
+		t.Fatalf("an artifact checksum paged dependencies %v %q %v", got, next, err)
+	}
+	for _, after := range []string{"%%%", kernel.Cursor("1", "0"), kernel.Cursor("x", "0", "0")} {
+		_, _, err := bs.DependencyPage(ctx, kernel.Checksums{SHA256: sum(3).SHA256},
+			kernel.Page{After: after})
+		storekit.WantErr(t, err, kernel.ErrInvalidCursor)
+	}
+
 	_, err := bs.FindArtifacts(ctx, kernel.Checksums{})
 	storekit.WantErr(t, err, kernel.ErrInvalid)
 	_, err = bs.FindDependencies(ctx, kernel.Checksums{})
+	storekit.WantErr(t, err, kernel.ErrInvalid)
+	_, _, err = bs.DependencyPage(ctx, kernel.Checksums{}, kernel.Page{})
 	storekit.WantErr(t, err, kernel.ErrInvalid)
 }
 

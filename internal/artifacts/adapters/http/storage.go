@@ -1,6 +1,7 @@
 package artifactshttp
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -223,45 +224,6 @@ func (v storageView) trees(
 	return out, nil
 }
 
-// below lists what lies under folder in every tree the view reads, direct
-// children or (deep) every descendant. A name that several members hold is
-// reported once, from the first member, as a download would resolve it.
-func (v storageView) below(ctx context.Context, folder string, deep bool) ([]model.Item, error) {
-	trees, err := v.trees(ctx, v.repo, map[string]bool{})
-	if err != nil {
-		return nil, err
-	}
-	seen := map[string]bool{}
-	var out []model.Item
-	for _, t := range trees {
-		list := v.st.Items().Children
-		if deep {
-			list = v.st.Items().Descendants
-		}
-		page := kernel.Page{Limit: kernel.MaxLimit}
-		for {
-			batch, next, err := list(ctx, t.Repo.Key, t.Item.Cached, folder, page)
-			if err != nil {
-				return nil, fmt.Errorf("list %s/%s: %w", t.Repo.Key, folder, err)
-			}
-			for _, it := range batch {
-				// What the caller may not see is left out; a folder shows
-				// when something below it is readable.
-				if !seen[it.FullPath()] &&
-					v.acc.Item(t.Repo, it.FullPath(), it.Folder, api.ActionRead) {
-					seen[it.FullPath()] = true
-					out = append(out, it)
-				}
-			}
-			if next == "" {
-				break
-			}
-			page.After = next
-		}
-	}
-	return out, nil
-}
-
 // getStorage answers GET /api/storage/{repo}/{path}: file or folder info,
 // or the view one mode parameter selects.
 func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
@@ -308,6 +270,21 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
+	// The file list and a folder's info are written as they are read.
+	if mode == "list" || mode == "" && f.Item.Folder {
+		var l *httpkit.ListStream
+		if mode == "list" {
+			l, err = v.list(ctx, f, q)
+		} else {
+			l, err = v.folderInfo(ctx, f)
+		}
+		if err != nil {
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "storage "+mode, err))
+			return
+		}
+		_ = l.Write(w)
+		return
+	}
 	var (
 		media string
 		body  any
@@ -315,8 +292,6 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 	switch mode {
 	case "":
 		media, body, err = v.info(ctx, f)
-	case "list":
-		media, body, err = v.list(ctx, f, q)
 	case "properties":
 		media, body, err = v.properties(ctx, f, q.Get("properties"))
 	case "stats":
@@ -376,8 +351,62 @@ func putTime(body map[string]any, key string, t time.Time) {
 	}
 }
 
+// info is the item info view: a file's FileInfo, or a folder's FolderInfo
+// with its children collected. getStorage writes a folder's as folderInfo
+// streams it; a search result's info detail embeds it whole.
 func (v storageView) info(ctx context.Context, f itemkit.Found) (string, any, error) {
-	it := f.Item
+	body := v.infoBody(ctx, f.Item)
+	if !f.Item.Folder {
+		return mediaFileInfo, body, nil
+	}
+	walk, err := v.childWalk(ctx, f.Item.FullPath())
+	if err != nil {
+		return "", nil, err
+	}
+	entries := []map[string]any{}
+	pages := kernel.NewPages(walk.read, kernel.MaxLimit)
+	for {
+		children, ok, err := pages.Next(ctx)
+		if err != nil {
+			return "", nil, err //nolint:wrapcheck // the walk names the tree it was reading
+		}
+		if !ok {
+			break
+		}
+		for _, c := range children {
+			entries = append(entries, childEntry(c))
+		}
+	}
+	body["children"] = entries
+	return mediaFolderInfo, body, nil
+}
+
+// folderInfo is a folder's FolderInfo, its children written a store page
+// per tree at a time (decision 0043, "Streaming complete lists") in the
+// order info collects them.
+func (v storageView) folderInfo(ctx context.Context, f itemkit.Found) (*httpkit.ListStream, error) {
+	walk, err := v.childWalk(ctx, f.Item.FullPath())
+	if err != nil {
+		return nil, err
+	}
+	body := v.infoBody(ctx, f.Item)
+	body["children"] = []map[string]any{}
+	// A document of strings and an empty array, which always splits.
+	env, _ := httpkit.EnvelopeOf(body, "children")
+	//nolint:wrapcheck // a store error the handler maps, as info's is
+	return httpkit.StreamList(ctx, kernel.NewPages(walk.read, kernel.MaxLimit),
+		func(c model.Item) (map[string]any, bool, error) { return childEntry(c), true, nil },
+		httpkit.ListOptions{ContentType: mediaFolderInfo, Envelope: env})
+}
+
+// childEntry is a folder's child as FolderInfo lists it.
+func childEntry(c model.Item) map[string]any {
+	return map[string]any{"uri": "/" + c.Name, "folder": c.Folder}
+}
+
+// infoBody is the item info document without a folder's children: the
+// FileInfo of a file, the rest of a folder's FolderInfo.
+func (v storageView) infoBody(ctx context.Context, it model.Item) map[string]any {
 	body := map[string]any{
 		"uri":  v.uri(ctx, it.FullPath()),
 		"repo": v.key,
@@ -401,42 +430,270 @@ func (v storageView) info(ctx context.Context, f itemkit.Found) (string, any, er
 		if it.RemoteURL != "" {
 			body["remoteUrl"] = it.RemoteURL
 		}
-		return mediaFileInfo, body, nil
 	}
-	children, err := v.below(ctx, it.FullPath(), false)
-	if err != nil {
-		return "", nil, err
-	}
-	entries := make([]map[string]any, 0, len(children))
-	for _, c := range children {
-		entries = append(entries, map[string]any{"uri": "/" + c.Name, "folder": c.Folder})
-	}
-	body["children"] = entries
-	return mediaFolderInfo, body, nil
+	return body
 }
 
-// list renders the FileList view of a folder.
-func (v storageView) list(ctx context.Context, f itemkit.Found, q url.Values) (string, any, error) {
+// childWalk walks a folder's children as FolderInfo lists them: each tree
+// the view reads in turn, its children in name order, and a name only
+// from the first tree that holds an item there the caller may read, as a
+// download would resolve it. The trees are not merged by name: a virtual
+// repository lists its first member's children, then the names only a
+// later member holds.
+type childWalk struct {
+	v      storageView
+	folder string
+	trees  []itemkit.Found
+	// at is the tree being walked, cur its walk, and before a walk of each
+	// earlier tree, kept at or before cur's name, which tells whether an
+	// earlier tree has already listed it.
+	at     int
+	cur    *treeWalk
+	before []*treeWalk
+}
+
+func (v storageView) childWalk(ctx context.Context, folder string) (*childWalk, error) {
+	trees, err := v.trees(ctx, v.repo, map[string]bool{})
+	if err != nil {
+		return nil, err
+	}
+	return &childWalk{v: v, folder: folder, trees: trees}, nil
+}
+
+// children is a tree's walk of the folder's children, in name order.
+func (m *childWalk) children(t itemkit.Found) *treeWalk {
+	return &treeWalk{t: t, pages: kernel.NewPages(
+		func(ctx context.Context, p kernel.Page) ([]model.Item, string, error) {
+			return m.v.st.Items().Children(ctx, t.Repo.Key, t.Item.Cached, m.folder, p)
+		},
+		kernel.MaxLimit,
+	)}
+}
+
+func (m *childWalk) readable(t itemkit.Found, it model.Item) bool {
+	return m.v.acc.Item(t.Repo, it.FullPath(), it.Folder, api.ActionRead)
+}
+
+// read is the walk as a PageFunc: up to limit children, and a cursor while
+// more may follow, which only marks that, as fileListWalk's does.
+func (m *childWalk) read(ctx context.Context, p kernel.Page) ([]model.Item, string, error) {
+	var out []model.Item
+	for len(out) < max(p.Limit, 1) {
+		if m.cur == nil {
+			if m.at == len(m.trees) {
+				return out, "", nil
+			}
+			m.cur, m.before = m.children(m.trees[m.at]), nil
+			for _, t := range m.trees[:m.at] {
+				m.before = append(m.before, m.children(t))
+			}
+		}
+		it, ok, err := m.cur.head(ctx, m.folder)
+		if err != nil {
+			return nil, "", err
+		}
+		if !ok {
+			m.cur = nil
+			m.at++
+			continue
+		}
+		m.cur.rows = m.cur.rows[1:]
+		if !m.readable(m.cur.t, it) {
+			continue
+		}
+		listed, err := m.listedBefore(ctx, it.Name)
+		if err != nil {
+			return nil, "", err
+		}
+		if !listed {
+			out = append(out, it)
+		}
+	}
+	return out, kernel.Cursor("more"), nil
+}
+
+// listedBefore reports whether an earlier tree holds a readable item named
+// name, moving each earlier tree's walk up to it: the names come in order.
+func (m *childWalk) listedBefore(ctx context.Context, name string) (bool, error) {
+	for _, b := range m.before {
+		for {
+			h, ok, err := b.head(ctx, m.folder)
+			if err != nil {
+				return false, err
+			}
+			if !ok || h.Name > name {
+				break
+			}
+			if h.Name == name && m.readable(b.t, h) {
+				return true, nil
+			}
+			b.rows = b.rows[1:]
+		}
+	}
+	return false, nil
+}
+
+// list answers the FileList view of a folder: the items below it in every
+// tree the view reads, sorted by uri, which is their full paths' byte
+// order. It is written a store page per tree at a time (decision 0043,
+// "Streaming complete lists"): the trees' walks in that order are merged,
+// so the answer is the one render would sort, never held whole.
+func (v storageView) list(
+	ctx context.Context,
+	f itemkit.Found,
+	q url.Values,
+) (*httpkit.ListStream, error) {
 	if !f.Item.Folder {
-		return "", nil, httpkit.BadRequestf(
+		return nil, httpkit.BadRequestf(
 			"%s is a file; list needs a folder",
 			f.Item.StoragePath(),
 		)
 	}
 	l, err := parseListing(q)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	folder := f.Item.FullPath()
-	items, err := v.below(ctx, folder, l.isDeep)
+	walk, err := v.mergedWalk(ctx, folder, l.isDeep)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
-	files := make([]listed, 0, len(items))
-	for _, it := range items {
-		files = append(files, listed{path: it.FullPath(), item: it})
+	walk.self, walk.root = f.Item, l.shouldIncludeRootPath
+	// A constant document, which always splits.
+	env, _ := httpkit.EnvelopeOf(map[string]any{
+		"uri": v.uri(ctx, folder), "created": httpkit.FormatTime(time.Now()),
+		"files": []map[string]any{},
+	}, "files")
+	//nolint:wrapcheck // a store error the handler maps, as below's was
+	return httpkit.StreamList(ctx, kernel.NewPages(walk.read, kernel.MaxLimit),
+		func(e fileListEntry) (map[string]any, bool, error) {
+			if e.self {
+				return l.rootEntry(e.item), true, nil
+			}
+			m, ok := l.entry(folder, e.listed)
+			return m, ok, nil
+		},
+		httpkit.ListOptions{ContentType: mediaFileList, Envelope: env})
+}
+
+// mergedWalk starts the merged walk of what lies below folder in every
+// tree the view reads: its children, or (deep) every descendant.
+func (v storageView) mergedWalk(
+	ctx context.Context,
+	folder string,
+	deep bool,
+) (*fileListWalk, error) {
+	trees, err := v.trees(ctx, v.repo, map[string]bool{})
+	if err != nil {
+		return nil, err
 	}
-	return mediaFileList, l.render(v.uri(ctx, folder), folder, f.Item, files), nil
+	walk := &fileListWalk{v: v, folder: folder}
+	for _, t := range trees {
+		list := v.st.Items().Children
+		if deep {
+			list = v.st.Items().DescendantsByFullPath
+		}
+		walk.trees = append(walk.trees, &treeWalk{
+			t: t,
+			pages: kernel.NewPages(
+				func(ctx context.Context, p kernel.Page) ([]model.Item, string, error) {
+					return list(ctx, t.Repo.Key, t.Item.Cached, folder, p)
+				},
+				kernel.MaxLimit,
+			),
+		})
+	}
+	return walk, nil
+}
+
+// fileListEntry is an entry a file list's walk yields: an item below the
+// folder, from the tree at index tree, or (self) the folder itself, which
+// includeRootPath lists first.
+type fileListEntry struct {
+	listed
+	tree int
+	self bool
+}
+
+// fileListWalk merges the walks of a file list's trees in full path order.
+// Where several trees hold an item at one path, the first tree's that the
+// caller may read is listed and the others are skipped, as below keeps the
+// first readable one.
+type fileListWalk struct {
+	v      storageView
+	folder string
+	self   model.Item
+	root   bool
+	trees  []*treeWalk
+}
+
+// treeWalk is one tree's walk: its store pages and the rows of the current
+// page not yet merged.
+type treeWalk struct {
+	t     itemkit.Found
+	pages *kernel.Pages[model.Item]
+	rows  []model.Item
+	done  bool
+}
+
+// head is the tree's next item, reading its next page when the current
+// one is used up; false once the tree has no more.
+func (w *treeWalk) head(ctx context.Context, folder string) (model.Item, bool, error) {
+	for len(w.rows) == 0 && !w.done {
+		rows, ok, err := w.pages.Next(ctx)
+		if err != nil {
+			return model.Item{}, false, fmt.Errorf("list %s/%s: %w", w.t.Repo.Key, folder, err)
+		}
+		w.rows, w.done = rows, !ok
+	}
+	if len(w.rows) == 0 {
+		return model.Item{}, false, nil
+	}
+	return w.rows[0], true, nil
+}
+
+// read is the merged walk as a PageFunc: up to limit entries in uri order,
+// and a cursor while more may follow. The cursor only marks that more
+// follows, so it is a constant that never ends the walk early; the walk
+// keeps its own place.
+func (m *fileListWalk) read(ctx context.Context, p kernel.Page) ([]fileListEntry, string, error) {
+	var out []fileListEntry
+	if m.root {
+		// "/" sorts before every other entry's uri, which all begin with it.
+		out, m.root = append(out, fileListEntry{listed: listed{item: m.self}, self: true}), false
+	}
+	for len(out) < max(p.Limit, 1) {
+		least, found := "", false
+		for _, w := range m.trees {
+			it, ok, err := w.head(ctx, m.folder)
+			if err != nil {
+				return nil, "", err
+			}
+			if ok && (!found || it.FullPath() < least) {
+				least, found = it.FullPath(), true
+			}
+		}
+		if !found {
+			return out, "", nil
+		}
+		picked := false
+		for i, w := range m.trees {
+			if len(w.rows) == 0 || w.rows[0].FullPath() != least {
+				continue
+			}
+			it := w.rows[0]
+			w.rows = w.rows[1:]
+			// What the caller may not see is left out; a folder shows when
+			// something below it is readable.
+			if !picked && m.v.acc.Item(w.t.Repo, least, it.Folder, api.ActionRead) {
+				out, picked = append(
+					out,
+					fileListEntry{listed: listed{path: least, item: it}, tree: i},
+				), true
+			}
+		}
+	}
+	return out, kernel.Cursor("more"), nil
 }
 
 // listing holds the FileList view's parameters.
@@ -481,23 +738,17 @@ type listed struct {
 }
 
 // render is the FileList body of folder, whose own item is self, over the
-// items below it.
+// items below it. The trash can's list answers with it; a repository's is
+// written as list walks it, with the same entries in the same order.
 func (l listing) render(uri, folder string, self model.Item, items []listed) map[string]any {
-	base := segments(folder)
 	files := make([]map[string]any, 0, len(items)+1)
 	if l.shouldIncludeRootPath {
-		// The listed folder itself, at "/" relative to itself. The
-		// Terraform provider's TestAccDataSourceFileList_include_root_path
-		// expects this entry first at a repository root, with size -1.
-		files = append(files, listEntry(self, "/", l.shouldIncludeMDTimestamps))
+		files = append(files, l.rootEntry(self))
 	}
 	for _, it := range items {
-		if it.item.Folder && !l.shouldListFolders ||
-			l.depth > 0 && segments(it.path)-base > l.depth {
-			continue
+		if e, ok := l.entry(folder, it); ok {
+			files = append(files, e)
 		}
-		rel := "/" + strings.TrimPrefix(strings.TrimPrefix(it.path, folder), "/")
-		files = append(files, listEntry(it.item, rel, l.shouldIncludeMDTimestamps))
 	}
 	slices.SortFunc(files, func(a, b map[string]any) int {
 		return strings.Compare(
@@ -506,6 +757,25 @@ func (l listing) render(uri, folder string, self model.Item, items []listed) map
 		) //nolint:forcetypeassert // set above
 	})
 	return map[string]any{"uri": uri, "created": httpkit.FormatTime(time.Now()), "files": files}
+}
+
+// rootEntry is the listed folder itself, at "/" relative to itself. The
+// Terraform provider's TestAccDataSourceFileList_include_root_path expects
+// this entry first at a repository root, with size -1.
+func (l listing) rootEntry(self model.Item) map[string]any {
+	return listEntry(self, "/", l.shouldIncludeMDTimestamps)
+}
+
+// entry is the FileList entry of an item below folder, with its uri
+// relative to folder; false for a folder without listFolders or an item
+// deeper than depth.
+func (l listing) entry(folder string, it listed) (map[string]any, bool) {
+	if it.item.Folder && !l.shouldListFolders ||
+		l.depth > 0 && segments(it.path)-segments(folder) > l.depth {
+		return nil, false
+	}
+	rel := "/" + strings.TrimPrefix(strings.TrimPrefix(it.path, folder), "/")
+	return listEntry(it.item, rel, l.shouldIncludeMDTimestamps), true
 }
 
 // listEntry is one entry of a FileList. size is a JSON number, -1 for a
@@ -593,17 +863,41 @@ func (v storageView) stats(ctx context.Context, f itemkit.Found) (string, any, e
 }
 
 // lastModified renders a file's modification time, or for a folder the
-// newest item below it, which is what the view reports.
+// newest item below it that the caller may read, which is what the view
+// reports.
+//
+// A folder's is folded over the merged walk of its descendants, a store
+// page per tree at a time, rather than asked of the store as an aggregate:
+// what the caller may read is decided per path by permission patterns the
+// store does not hold, a virtual repository counts each path from its
+// first member the caller may read, and the item reported among several
+// equally new ones is the one the collected read met first. That read went
+// tree by tree, each in (path, name) order, with the folder itself before
+// them all, so a tie goes to the folder, then the earlier tree, then the
+// lesser (path, name), whatever order the walk meets them in.
 func (v storageView) lastModified(ctx context.Context, f itemkit.Found) (string, any, error) {
 	newest := f.Item
 	if f.Item.Folder {
-		items, err := v.below(ctx, f.Item.FullPath(), true)
+		walk, err := v.mergedWalk(ctx, f.Item.FullPath(), true)
 		if err != nil {
 			return "", nil, err
 		}
-		for _, it := range items {
-			if it.Modified.After(newest.Modified) {
-				newest = it
+		pages := kernel.NewPages(walk.read, kernel.MaxLimit)
+		var best *fileListEntry
+		for {
+			entries, ok, err := pages.Next(ctx)
+			if err != nil {
+				return "", nil, err //nolint:wrapcheck // the walk names the tree it was reading
+			}
+			if !ok {
+				break
+			}
+			for _, e := range entries {
+				switch it := e.item; {
+				case it.Modified.After(newest.Modified),
+					it.Modified.Equal(newest.Modified) && best != nil && metBefore(e, *best):
+					newest, best = it, &e
+				}
 			}
 		}
 		if newest.Modified.IsZero() {
@@ -614,6 +908,17 @@ func (v storageView) lastModified(ctx context.Context, f itemkit.Found) (string,
 		"uri":          v.uri(ctx, newest.FullPath()),
 		"lastModified": httpkit.FormatTime(newest.Modified),
 	}, nil
+}
+
+// metBefore reports whether the collected read met e before than: by tree,
+// then by the stored (path, name), the order Descendants lists in, in which
+// a root-level item's path is ".".
+func metBefore(e, than fileListEntry) bool {
+	return cmp.Or(
+		cmp.Compare(e.tree, than.tree),
+		strings.Compare(e.item.Path, than.item.Path),
+		strings.Compare(e.item.Name, than.item.Name),
+	) < 0
 }
 
 // permissions renders who holds which actions on the item, in the legacy

@@ -342,6 +342,41 @@ func (us users) Locked(ctx context.Context) ([]string, error) {
 	return out, err
 }
 
+// LockedPage is Locked a keyset page at a time, in the same ORDER BY name.
+func (us users) LockedPage(ctx context.Context, p kernel.Page) ([]string, string, error) {
+	p, err := p.Normalize()
+	if err != nil {
+		return nil, "", err //nolint:wrapcheck // already a store sentinel
+	}
+	cond, args, err := dialect.Keyset(p, nameKeyset, nil, false)
+	if err != nil {
+		return nil, "", err
+	}
+	var out []string
+	err = us.s.Rows(
+		ctx,
+		"list locked users",
+		"SELECT name FROM users WHERE status = ? AND "+cond+dialect.OrderBy(
+			nameKeyset,
+			false,
+		)+" LIMIT ?",
+		append(append([]any{string(model.UserLocked)}, args...), p.Limit+1),
+		func(r *sql.Rows) error {
+			var n string
+			if err := r.Scan(&n); err != nil {
+				return err //nolint:wrapcheck // wrapped by Rows
+			}
+			out = append(out, n)
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, "", err
+	}
+	page, next := kernel.Trim(out, p.Limit, func(n string) []string { return []string{n} })
+	return page, next, nil
+}
+
 // --- Groups ----------------------------------------------------------------
 
 type groups struct{ s *Store }

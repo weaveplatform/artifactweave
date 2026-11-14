@@ -94,7 +94,8 @@ func strPtr(s string) *string { return &s }
 
 // --- Users -----------------------------------------------------------------
 
-// GetUsers lists users with their detail URLs.
+// GetUsers lists users with their detail URLs, written as the store's
+// pages are read.
 func (s SecurityAPI) GetUsers(
 	ctx context.Context,
 	_ artgen.GetUsersRequestObject,
@@ -103,22 +104,21 @@ func (s SecurityAPI) GetUsers(
 	if err != nil {
 		return nil, err
 	}
-	users, err := s.identity(st).Users(ctx)
+	base := baseurl.From(ctx) + securityUsers
+	l, err := httpkit.StreamList(ctx, s.identity(st).UserPages(),
+		func(u model.User) (artgen.UserListItem, bool, error) {
+			return artgen.UserListItem{
+				Name: strPtr(
+					u.Name,
+				),
+				Realm: strPtr(u.Realm),
+				Uri:   strPtr(base + nameSegment(u.Name)),
+			}, true, nil
+		}, httpkit.ListOptions{})
 	if err != nil {
 		return nil, s.internalError(ctx, "list users", err)
 	}
-	base := baseurl.From(ctx) + securityUsers
-	out := artgen.GetUsers200JSONResponse{}
-	for _, u := range users {
-		out = append(out, artgen.UserListItem{
-			Name: strPtr(
-				u.Name,
-			),
-			Realm: strPtr(u.Realm),
-			Uri:   strPtr(base + nameSegment(u.Name)),
-		})
-	}
-	return out, nil
+	return streamed{l}, nil
 }
 
 // GetUserDetails returns the legacy user document, without the password.
@@ -231,7 +231,8 @@ func (s SecurityAPI) DeleteUser(
 
 // --- Groups ----------------------------------------------------------------
 
-// GetGroups lists groups with their detail URLs.
+// GetGroups lists groups with their detail URLs, written as the store's
+// pages are read.
 func (s SecurityAPI) GetGroups(
 	ctx context.Context,
 	_ artgen.GetGroupsRequestObject,
@@ -240,18 +241,17 @@ func (s SecurityAPI) GetGroups(
 	if err != nil {
 		return nil, err
 	}
-	groups, err := s.identity(st).Groups(ctx)
+	base := baseurl.From(ctx) + securityGroups
+	l, err := httpkit.StreamList(ctx, s.identity(st).GroupPages(),
+		func(g model.Group) (artgen.GroupListItem, bool, error) {
+			return artgen.GroupListItem{
+				Name: strPtr(g.Name), Uri: strPtr(base + nameSegment(g.Name)),
+			}, true, nil
+		}, httpkit.ListOptions{})
 	if err != nil {
 		return nil, s.internalError(ctx, "list groups", err)
 	}
-	base := baseurl.From(ctx) + securityGroups
-	out := artgen.GetGroups200JSONResponse{}
-	for _, g := range groups {
-		out = append(out, artgen.GroupListItem{
-			Name: strPtr(g.Name), Uri: strPtr(base + nameSegment(g.Name)),
-		})
-	}
-	return out, nil
+	return streamed{l}, nil
 }
 
 // GetGroupDetails returns the legacy group document; members only with
@@ -366,7 +366,8 @@ func (s SecurityAPI) DeleteGroup(
 
 // --- Locks and passwords ---------------------------------------------------
 
-// GetLockedOutUsers lists the users the lock policy locked.
+// GetLockedOutUsers lists the users the lock policy locked, written as the
+// store's pages are read.
 func (s SecurityAPI) GetLockedOutUsers(
 	ctx context.Context,
 	_ artgen.GetLockedOutUsersRequestObject,
@@ -375,11 +376,12 @@ func (s SecurityAPI) GetLockedOutUsers(
 	if err != nil {
 		return nil, err
 	}
-	names, err := s.identity(st).Locked(ctx)
+	l, err := httpkit.StreamList(ctx, s.identity(st).LockedPages(),
+		func(name string) (string, bool, error) { return name, true, nil }, httpkit.ListOptions{})
 	if err != nil {
 		return nil, s.internalError(ctx, "list locked users", err)
 	}
-	return artgen.GetLockedOutUsers200JSONResponse(names), nil
+	return streamed{l}, nil
 }
 
 // UnlockAllLockedOutUsers clears every lock.

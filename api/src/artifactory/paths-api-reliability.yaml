@@ -72,10 +72,6 @@ paths:
       x-artifactweave-extension: true
       tags: [api-reliability]
       responses:
-        '429':
-          description: The reserved recovery allowance is exhausted; Retry-After indicates when to retry.
-        '503':
-          description: Recovery storage is temporarily unavailable; Retry-After indicates when to retry.
         '200':
           description: Current restriction state, including an inactive state when no restriction has been recorded.
           content:
@@ -88,6 +84,8 @@ paths:
           description: The authenticated caller is not an administrator.
         '404':
           description: The managed user does not exist.
+      x-idempotency: safe
+      x-cost: recovery
     put:
       operationId: SetAPIRestriction
       summary: Temporarily restrict a user's API access
@@ -102,10 +100,6 @@ paths:
             schema:
               $ref: '#/components/schemas/APIRestrictionChange'
       responses:
-        '429':
-          description: The reserved recovery allowance is exhausted; Retry-After indicates when to retry.
-        '503':
-          description: Recovery storage is temporarily unavailable; Retry-After indicates when to retry.
         '200':
           description: Recorded restriction.
           content:
@@ -120,6 +114,10 @@ paths:
           description: The authenticated caller is not an administrator.
         '404':
           description: The managed user does not exist.
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:userName
+      x-cost: recovery
     delete:
       operationId: ClearAPIRestriction
       summary: Clear a user's temporary API restriction
@@ -127,10 +125,6 @@ paths:
       x-artifactweave-extension: true
       tags: [api-reliability]
       responses:
-        '429':
-          description: The reserved recovery allowance is exhausted; Retry-After indicates when to retry.
-        '503':
-          description: Recovery storage is temporarily unavailable; Retry-After indicates when to retry.
         '204':
           description: Restriction cleared and recovery event retained.
         '401':
@@ -139,6 +133,10 @@ paths:
           description: The authenticated caller is not an administrator.
         '404':
           description: The managed user does not exist.
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:userName
+      x-cost: recovery
   /api/artifactweave/api-restriction-audit:
     get:
       operationId: GetAPIRestrictionAudit
@@ -166,10 +164,6 @@ paths:
           schema:
             type: string
       responses:
-        '429':
-          description: The reserved recovery allowance is exhausted; Retry-After indicates when to retry.
-        '503':
-          description: Recovery storage is temporarily unavailable; Retry-After indicates when to retry.
         '200':
           description: Bounded page of audit entries.
           content:
@@ -182,3 +176,10 @@ paths:
           description: Credentials are absent or invalid.
         '403':
           description: The authenticated caller is not an administrator.
+      x-idempotency: safe
+      x-cost: recovery
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: cursor
+        size: limit
+      x-pagination-next: body:/cursor
