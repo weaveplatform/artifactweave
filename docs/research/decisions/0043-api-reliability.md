@@ -146,9 +146,10 @@ authentication, admission and routing, as it does today. That covers `safe`,
 yet, hand-written aliases and native protocol routes, unknown paths, and 501 stubs:
 a stub sent a key answers 400, not 501. Two or more `Idempotency-Key` fields answer
 400 too. The 400 uses the path's error envelope, is not charged to any allowance
-and carries no rate header. Its message names build append today; once other
-operations accept a key it names the rule instead, which changes only answers to
-requests that use the extension. Reasons:
+and carries no rate header. Its message named build append while append was the
+only keyed operation; since delete and promotion accept a key too (#1410) it names
+the rule instead, which changed only answers to requests that use the extension.
+Reasons:
 
 - It is today's answer, so no request changes.
 - The draft says a client cannot assume that a server honors a key it sends
@@ -469,9 +470,9 @@ it is.
 ## Optional protected build append
 
 `POST /artifactory/api/build/append/{buildName}/{buildNumber}` is the first
-operation declared `key` and, today, the only one that declares `IdempotencyKey`;
-the [replay](#replay-for-keyed-operations) for every keyed operation follows its
-design. The key is optional. Unkeyed append retains its append-on-every-call
+operation declared `key` and the first to declare `IdempotencyKey`, before build
+delete and promotion (#1410); the [replay](#replay-for-keyed-operations) for every
+keyed operation follows its design. The key is optional. Unkeyed append retains its append-on-every-call
 behavior. The header value is quoted and contains 1–128 ASCII letters, digits,
 `.`, `_`, `:` or `-`; a quoted UUID is recommended. Multiple header values,
 malformed keys, and keys on operations that do not declare the parameter return 400
