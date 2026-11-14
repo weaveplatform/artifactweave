@@ -1453,7 +1453,12 @@ func TestAccV1ReadIsTheClassReadModel(t *testing.T) {
 			},
 		},
 	} {
-		if rec := w.do("PUT", "/artifactory/api/repositories/"+tc.key, "admin", tc.body); rec.Code != 200 {
+		if rec := w.do(
+			"PUT",
+			"/artifactory/api/repositories/"+tc.key,
+			"admin",
+			tc.body,
+		); rec.Code != 200 {
 			t.Fatalf("create %s: %d %s", tc.key, rec.Code, rec.Body)
 		}
 		rec := w.do("GET", "/artifactory/api/repositories/"+tc.key, "admin", "")
@@ -1486,14 +1491,25 @@ func TestAccDockerRepositoryBlocksSchema1ByDefault(t *testing.T) {
 		"docker-remote": `{"rclass":"remote","packageType":"docker","url":"https://up.example"}`,
 		"docker-off":    `{"rclass":"local","packageType":"docker","blockPushingSchema1":false}`,
 	} {
-		if rec := w.do("PUT", "/artifactory/api/repositories/"+key, "admin", body); rec.Code != 200 {
+		if rec := w.do(
+			"PUT",
+			"/artifactory/api/repositories/"+key,
+			"admin",
+			body,
+		); rec.Code != 200 {
 			t.Fatalf("create %s: %d %s", key, rec.Code, rec.Body)
 		}
 		for _, path := range []string{"/artifactory/api/repositories/", "/artifactory/api/v2/repositories/"} {
 			var got map[string]any
 			jsonBody(t, w.do("GET", path+key, "admin", ""), &got)
 			if want := key != "docker-off"; got["blockPushingSchema1"] != want {
-				t.Errorf("%s%s blockPushingSchema1 %v, want %v", path, key, got["blockPushingSchema1"], want)
+				t.Errorf(
+					"%s%s blockPushingSchema1 %v, want %v",
+					path,
+					key,
+					got["blockPushingSchema1"],
+					want,
+				)
 			}
 		}
 	}
@@ -1516,7 +1532,12 @@ func TestAccV2ReadFollowsTheAnnotations(t *testing.T) {
 		"helm-federated": `{"rclass":"federated","packageType":"helm"}`,
 		"generic-local":  `{"rclass":"local"}`,
 	} {
-		if rec := w.do("PUT", "/artifactory/api/repositories/"+key, "admin", body); rec.Code != 200 {
+		if rec := w.do(
+			"PUT",
+			"/artifactory/api/repositories/"+key,
+			"admin",
+			body,
+		); rec.Code != 200 {
 			t.Fatalf("create %s: %d %s", key, rec.Code, rec.Body)
 		}
 	}

@@ -186,7 +186,9 @@ func TestUnitRelevantKeepsTheAnnotatedFields(t *testing.T) {
 			}),
 		},
 	} {
-		got := slices.Sorted(maps.Keys(fieldsOf(t, repo.Relevant(repo.Full(*repo.Defaults(&tc.c))))))
+		got := slices.Sorted(
+			maps.Keys(fieldsOf(t, repo.Relevant(repo.Full(*repo.Defaults(&tc.c))))),
+		)
 		slices.Sort(tc.want)
 		if diff := cmp.Diff(tc.want, got); diff != "" {
 			t.Errorf("%s v2 fields (-want +got):\n%s", tc.c.Key, diff)
@@ -411,7 +413,14 @@ func TestUnitDockerRepositoriesBlockSchema1ByDefault(t *testing.T) {
 				got, ok := fieldsOf(t, read)["blockPushingSchema1"]
 				if want := name == "v1" || class != repo.Virtual; ok != want ||
 					ok && got != true {
-					t.Errorf("%s %s %s blockPushingSchema1 %v (present %v)", class, pt, name, got, ok)
+					t.Errorf(
+						"%s %s %s blockPushingSchema1 %v (present %v)",
+						class,
+						pt,
+						name,
+						got,
+						ok,
+					)
 				}
 			}
 		}
