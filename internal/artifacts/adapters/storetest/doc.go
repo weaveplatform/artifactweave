@@ -24,6 +24,10 @@
 //   - RunDockerPages, the Docker page reader's contract
 //     (port.DockerPageStore): DockerPages, with ManifestFolders and
 //     ImageManifests.
+//   - RunRepoPages, the contract of RepoStore.Page: the window, its More
+//     and Total, and the class, project, package type and visibility
+//     filters, in key order whatever the insertion order (#1408). It is a
+//     subtest of its own, RepoPages, run beside Run.
 //   - RunVersionNames, the contract of PackageVersionNames: a package's
 //     version names in exactly Versions' order, following later writes and
 //     deletes, and a package's own (#1404). It is a subtest of its own,
@@ -84,7 +88,7 @@
 // request 646), the Git LFS lock cases (pull request 849) and the Bower
 // registration cases (pull request 912). Moved here in P9d, which added
 // Factory and Run. RunDockerPages came with the Docker page reader
-// (#1402).
+// (#1402), and RunRepoPages with the repository window (#1408).
 //
 // # Testing
 //
