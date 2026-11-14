@@ -298,7 +298,13 @@ func TestUnitBundleSharedAndAdmission(t *testing.T) {
 		ref.Value != "#/components/responses/TooManyRequests" {
 		t.Fatalf("429 is not the shared reference: %v", ref)
 	}
-	if desc := lookup(lookup(lookup(lookup(lookup(root, "paths"), "/own"), "get"), "responses"), "429"); lookup(desc, "description").Value != "own envelope" {
+	if desc := lookup(
+		lookup(lookup(lookup(lookup(root, "paths"), "/own"), "get"), "responses"),
+		"429",
+	); lookup(
+		desc,
+		"description",
+	).Value != "own envelope" {
 		t.Fatal("an operation's own 429 was replaced")
 	}
 	comps := lookup(root, "components")
@@ -306,7 +312,8 @@ func TestUnitBundleSharedAndAdmission(t *testing.T) {
 		lookup(lookup(comps, "headers"), "RetryAfter") == nil {
 		t.Fatal("shared components not merged")
 	}
-	if !strings.Contains(string(out), "'429':\n") || !strings.Contains(string(out), "$ref: '#/components/responses/ServiceUnavailable'") {
+	if !strings.Contains(string(out), "'429':\n") ||
+		!strings.Contains(string(out), "$ref: '#/components/responses/ServiceUnavailable'") {
 		t.Fatalf("injected statuses not single-quoted like the fragments:\n%s", out)
 	}
 }
@@ -314,8 +321,13 @@ func TestUnitBundleSharedAndAdmission(t *testing.T) {
 func TestUnitBundleSharedPartial(t *testing.T) {
 	// A shared fragment without ServiceUnavailable adds only the 429: a bundle
 	// never references a component it does not hold.
-	svc := sharedService(t, "components:\n  responses:\n    TooManyRequests:\n      description: limited\n",
-		map[string]string{"paths-a.yaml": "paths:\n  /x:\n    get:\n      operationId: x\n      responses:\n        '200':\n          description: ok\n"})
+	svc := sharedService(
+		t,
+		"components:\n  responses:\n    TooManyRequests:\n      description: limited\n",
+		map[string]string{
+			"paths-a.yaml": "paths:\n  /x:\n    get:\n      operationId: x\n      responses:\n        '200':\n          description: ok\n",
+		},
+	)
 	out, err := Bundle(svc)
 	if err != nil {
 		t.Fatal(err)
@@ -347,11 +359,14 @@ func TestUnitBundleSharedErrors(t *testing.T) {
 		shared string
 		files  map[string]string
 	}{
-		"paths in shared": {"paths: {}\n", nil},
+		"paths in shared":   {"paths: {}\n", nil},
 		"unparsable shared": {"components: [\n", nil},
-		"service redeclares a shared component": {shared, map[string]string{
-			"components-common.yaml": "components:\n  headers:\n    RetryAfter:\n      description: again\n",
-		}},
+		"service redeclares a shared component": {
+			shared,
+			map[string]string{
+				"components-common.yaml": "components:\n  headers:\n    RetryAfter:\n      description: again\n",
+			},
+		},
 		"shared not a mapping": {"- a\n", nil},
 	}
 	for name, c := range cases {

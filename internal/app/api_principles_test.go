@@ -104,7 +104,8 @@ func (o principleOp) hasParameter(in, name string) bool {
 		if p.Value == nil || p.Value.In != in {
 			continue
 		}
-		if p.Value.Name == name || in == openapi3.ParameterInHeader && strings.EqualFold(p.Value.Name, name) {
+		if p.Value.Name == name ||
+			in == openapi3.ParameterInHeader && strings.EqualFold(p.Value.Name, name) {
 			return true
 		}
 	}
@@ -186,7 +187,13 @@ type reportFunc func(rule, format string, args ...any)
 // classValue reads one class extension. It reports a missing class when
 // required, a placeholder left on a finished operation and a value outside
 // allowed, and returns the value only when it is one of them.
-func classValue(o principleOp, ext string, allowed []string, required bool, report reportFunc) string {
+func classValue(
+	o principleOp,
+	ext string,
+	allowed []string,
+	required bool,
+	report reportFunc,
+) string {
 	raw, ok := o.op.Extensions[ext]
 	if !ok {
 		if required {
@@ -198,7 +205,12 @@ func classValue(o principleOp, ext string, allowed []string, required bool, repo
 	switch {
 	case v == classPlaceholder:
 		if !isDraft(o.op.Extensions) {
-			report(ruleClassTodo, "%s is still %s on an operation without x-draft", ext, classPlaceholder)
+			report(
+				ruleClassTodo,
+				"%s is still %s on an operation without x-draft",
+				ext,
+				classPlaceholder,
+			)
 		}
 		return ""
 	case !slices.Contains(allowed, v):
@@ -233,7 +245,11 @@ func checkIdempotency(o principleOp, report reportFunc) {
 	case class == "natural":
 		checkNatural(o, natural, hasNatural, report)
 	case hasNatural && class != "":
-		report(ruleNaturalIdentifier, "x-idempotency-natural belongs only to a natural operation, not %s", class)
+		report(
+			ruleNaturalIdentifier,
+			"x-idempotency-natural belongs only to a natural operation, not %s",
+			class,
+		)
 	}
 	switch {
 	case class == "none":
@@ -242,7 +258,11 @@ func checkIdempotency(o principleOp, report reportFunc) {
 				reason, strings.Join(idempotencyReasons, ", "))
 		}
 	case hasReason && class != "":
-		report(ruleNoneReason, "x-idempotency-reason belongs only to a none operation, not %s", class)
+		report(
+			ruleNoneReason,
+			"x-idempotency-reason belongs only to a none operation, not %s",
+			class,
+		)
 	}
 	for _, p := range o.parameters() {
 		if p.Value == nil || p.Value.In != openapi3.ParameterInHeader ||
@@ -264,13 +284,20 @@ func checkIdempotency(o principleOp, report reportFunc) {
 func checkNatural(o principleOp, raw any, present bool, report reportFunc) {
 	entries, ok := stringList(raw)
 	if !present || !ok || len(entries) == 0 {
-		report(ruleNaturalIdentifier, "a natural operation lists its identifiers in x-idempotency-natural")
+		report(
+			ruleNaturalIdentifier,
+			"a natural operation lists its identifiers in x-idempotency-natural",
+		)
 		return
 	}
 	for _, e := range entries {
 		if e == "route" {
 			if len(entries) != 1 {
-				report(ruleNaturalIdentifier, "route is the only entry when it is used, not one of %v", entries)
+				report(
+					ruleNaturalIdentifier,
+					"route is the only entry when it is used, not one of %v",
+					entries,
+				)
 			}
 			continue
 		}
@@ -283,8 +310,11 @@ func checkNatural(o principleOp, raw any, present bool, report reportFunc) {
 			// or archive, the coordinates an uploaded package declares.
 			hasBody := o.op.RequestBody != nil && o.op.RequestBody.Value != nil
 			if !hasBody || name != "" && name != "archive" && !strings.HasPrefix(name, "/") {
-				report(ruleNaturalIdentifier,
-					"%q names no request body element: a JSON Pointer such as body:/name, or body:archive", e)
+				report(
+					ruleNaturalIdentifier,
+					"%q names no request body element: a JSON Pointer such as body:/name, or body:archive",
+					e,
+				)
 			}
 		case name == "":
 			report(ruleNaturalIdentifier, "%q is not <in>:<name> or route", e)
@@ -326,36 +356,68 @@ func checkCost(o principleOp, report reportFunc) string {
 	}
 	method, path := strings.ToUpper(o.method), o.examplePath()
 	if want := admissionClass(method, path, nil); want != cost {
-		report(ruleCostAdmission, "x-cost is %s, but %s %s is admitted as %s", cost, method, path, want)
+		report(
+			ruleCostAdmission,
+			"x-cost is %s, but %s %s is admitted as %s",
+			cost,
+			method,
+			path,
+			want,
+		)
 		return cost
 	}
 	declared, ok := stringList(raw)
 	switch {
 	case hasQuery && cost != "ordinary":
-		report(ruleCostAdmission, "x-cost-expensive-query belongs only to an ordinary operation, not %s", cost)
+		report(
+			ruleCostAdmission,
+			"x-cost-expensive-query belongs only to an ordinary operation, not %s",
+			cost,
+		)
 		return cost
 	case hasQuery && !ok:
-		report(ruleCostAdmission, "x-cost-expensive-query is a list of query parameter names, not %v", raw)
+		report(
+			ruleCostAdmission,
+			"x-cost-expensive-query is a list of query parameter names, not %v",
+			raw,
+		)
 		return cost
 	}
 	for _, q := range declared {
 		if !o.hasParameter(openapi3.ParameterInQuery, q) {
-			report(ruleCostAdmission, "x-cost-expensive-query names %q, which is no query parameter of the operation", q)
+			report(
+				ruleCostAdmission,
+				"x-cost-expensive-query names %q, which is no query parameter of the operation",
+				q,
+			)
 		} else if admissionClass(method, path, url.Values{q: {""}}) != "expensive" {
-			report(ruleCostAdmission, "x-cost-expensive-query names %q, but %s %s?%s is not admitted as expensive",
-				q, method, path, q)
+			report(
+				ruleCostAdmission,
+				"x-cost-expensive-query names %q, but %s %s?%s is not admitted as expensive",
+				q,
+				method,
+				path,
+				q,
+			)
 		}
 	}
 	if cost != "ordinary" {
 		return cost
 	}
 	for _, p := range o.parameters() {
-		if p.Value == nil || p.Value.In != openapi3.ParameterInQuery || slices.Contains(declared, p.Value.Name) {
+		if p.Value == nil || p.Value.In != openapi3.ParameterInQuery ||
+			slices.Contains(declared, p.Value.Name) {
 			continue
 		}
 		if admissionClass(method, path, url.Values{p.Value.Name: {""}}) == "expensive" {
-			report(ruleCostAdmission, "%s %s?%s is admitted as expensive, but x-cost-expensive-query lacks %s",
-				method, path, p.Value.Name, p.Value.Name)
+			report(
+				ruleCostAdmission,
+				"%s %s?%s is admitted as expensive, but x-cost-expensive-query lacks %s",
+				method,
+				path,
+				p.Value.Name,
+				p.Value.Name,
+			)
 		}
 	}
 	return cost
@@ -381,7 +443,11 @@ func checkAdmissionResponses(o principleOp, cost string, otherEnvelope bool, rep
 		switch {
 		case cost == "exempt":
 			if ref == shared[status] {
-				report(ruleAdmissionResponses, "an exempt operation is never admitted, so it does not reference %s", ref)
+				report(
+					ruleAdmissionResponses,
+					"an exempt operation is never admitted, so it does not reference %s",
+					ref,
+				)
 			}
 			continue
 		case resp == nil:
@@ -389,9 +455,12 @@ func checkAdmissionResponses(o principleOp, cost string, otherEnvelope bool, rep
 			continue
 		case ref == shared[status]:
 			if otherEnvelope {
-				report(ruleAdmissionEnvelope,
+				report(
+					ruleAdmissionEnvelope,
 					"admission answers this path in another envelope than ErrorResponse, so its %s is its own, not %s",
-					status, ref)
+					status,
+					ref,
+				)
 			}
 			continue
 		}
@@ -401,7 +470,13 @@ func checkAdmissionResponses(o principleOp, cost string, otherEnvelope bool, rep
 		for header, component := range sortedHeaders() {
 			h := resp.Value.Headers[header]
 			if h == nil || h.Ref != component {
-				report(ruleAdmissionHeaders, "its own %s declares %s by referencing %s", status, header, component)
+				report(
+					ruleAdmissionHeaders,
+					"its own %s declares %s by referencing %s",
+					status,
+					header,
+					component,
+				)
 			}
 		}
 	}
@@ -420,9 +495,20 @@ func checkAdmissionResponses(o principleOp, cost string, otherEnvelope bool, rep
 			switch {
 			case !rate:
 			case h.Ref != component:
-				report(ruleAdmissionHeaders, "%s %s is declared inline rather than referencing %s", status, name, component)
+				report(
+					ruleAdmissionHeaders,
+					"%s %s is declared inline rather than referencing %s",
+					status,
+					name,
+					component,
+				)
 			case name != "Retry-After" && !slices.Contains(statuses, status):
-				report(ruleAdmissionHeaders, "%s declares %s, which only 429 and 503 declare", status, name)
+				report(
+					ruleAdmissionHeaders,
+					"%s declares %s, which only 429 and 503 declare",
+					status,
+					name,
+				)
 			}
 		}
 	}
@@ -466,7 +552,10 @@ func checkPagination(o principleOp, report reportFunc) {
 	next, hasNext := o.op.Extensions["x-pagination-next"]
 	if !has {
 		if hasParams || hasNext {
-			report(rulePaginationDeclaration, "x-pagination-parameters and x-pagination-next need x-pagination")
+			report(
+				rulePaginationDeclaration,
+				"x-pagination-parameters and x-pagination-next need x-pagination",
+			)
 		}
 		if why := collectionEvidence(o); why != "" {
 			report(ruleCollectionPagination, "x-pagination is missing on a collection: %s", why)
@@ -480,7 +569,11 @@ func checkPagination(o principleOp, report reportFunc) {
 	switch m, ok := params.(map[string]any); {
 	case !hasParams:
 		if paged {
-			report(rulePaginationDeclaration, "a %s operation names its position in x-pagination-parameters", class)
+			report(
+				rulePaginationDeclaration,
+				"a %s operation names its position in x-pagination-parameters",
+				class,
+			)
 		}
 	case !ok:
 		report(rulePaginationDeclaration,
@@ -489,16 +582,28 @@ func checkPagination(o principleOp, report reportFunc) {
 		report(rulePaginationDeclaration, "a complete operation has no x-pagination-parameters")
 	default:
 		if _, ok := m["position"]; paged && !ok {
-			report(rulePaginationDeclaration, "a %s operation names its position in x-pagination-parameters", class)
+			report(
+				rulePaginationDeclaration,
+				"a %s operation names its position in x-pagination-parameters",
+				class,
+			)
 		}
 		for _, k := range sortedKeys(m) {
 			name, _ := m[k].(string)
 			switch {
 			case k != "position" && k != "size":
-				report(rulePaginationDeclaration, "x-pagination-parameters holds only position and size, not %s", k)
+				report(
+					rulePaginationDeclaration,
+					"x-pagination-parameters holds only position and size, not %s",
+					k,
+				)
 			case !o.hasAnyParameter(name):
-				report(rulePaginationDeclaration,
-					"x-pagination-parameters %s names %v, which is no parameter of the operation", k, m[k])
+				report(
+					rulePaginationDeclaration,
+					"x-pagination-parameters %s names %v, which is no parameter of the operation",
+					k,
+					m[k],
+				)
 			}
 		}
 	}
@@ -506,17 +611,36 @@ func checkPagination(o principleOp, report reportFunc) {
 	pointer := n == "link" || strings.HasPrefix(n, "body:/")
 	switch {
 	case class == "cursor" && !pointer:
-		report(ruleCursorNext,
-			"a cursor operation names its next pointer in x-pagination-next (link or body:<JSON Pointer>), not %v", next)
+		report(
+			ruleCursorNext,
+			"a cursor operation names its next pointer in x-pagination-next (link or body:<JSON Pointer>), not %v",
+			next,
+		)
 	case paged && !pointer:
-		report(rulePaginationDeclaration,
-			"an %s operation names its next pointer in x-pagination-next (link or body:<JSON Pointer>), not %v", class, next)
+		report(
+			rulePaginationDeclaration,
+			"an %s operation names its next pointer in x-pagination-next (link or body:<JSON Pointer>), not %v",
+			class,
+			next,
+		)
 	case !hasNext:
-		report(rulePaginationDeclaration, "a %s operation declares x-pagination-next, none when it has no pointer", class)
+		report(
+			rulePaginationDeclaration,
+			"a %s operation declares x-pagination-next, none when it has no pointer",
+			class,
+		)
 	case class == "complete" && n != "none":
-		report(rulePaginationDeclaration, "a complete operation has no next pointer: x-pagination-next is none, not %v", next)
+		report(
+			rulePaginationDeclaration,
+			"a complete operation has no next pointer: x-pagination-next is none, not %v",
+			next,
+		)
 	case !pointer && n != "none":
-		report(rulePaginationDeclaration, "x-pagination-next is link, body:<JSON Pointer> or none, not %v", next)
+		report(
+			rulePaginationDeclaration,
+			"x-pagination-next is link, body:<JSON Pointer> or none, not %v",
+			next,
+		)
 	}
 }
 
@@ -563,7 +687,12 @@ func collectionEvidence(o principleOp) string {
 			if mt.Schema.Value.Type.Is(openapi3.TypeArray) {
 				return status + " " + media + " is an array"
 			}
-			apiReviewCollections(status+" "+media, mt.Schema.Value, map[*openapi3.Schema]bool{}, &arrays)
+			apiReviewCollections(
+				status+" "+media,
+				mt.Schema.Value,
+				map[*openapi3.Schema]bool{},
+				&arrays,
+			)
 		}
 	}
 	if len(arrays) == 0 {

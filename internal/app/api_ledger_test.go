@@ -254,7 +254,10 @@ func pageControl(name string) bool {
 	name = strings.ToLower(name)
 	return strings.Contains(name, "page") || strings.Contains(name, "cursor") ||
 		strings.Contains(name, "offset") ||
-		slices.Contains([]string{"limit", "start_pos", "num_of_rows", "n", "last", "$skip", "$top"}, name)
+		slices.Contains(
+			[]string{"limit", "start_pos", "num_of_rows", "n", "last", "$skip", "$top"},
+			name,
+		)
 }
 
 func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
@@ -464,8 +467,8 @@ func apiReviewPolicy(e *apiReviewOperation) {
 // declare yet, or still holds as TODO(author), is empty.
 type apiReviewClasses struct {
 	idempotency, reason, cost, pagination string
-	natural, expensiveQuery              []string
-	position, size, next                 string
+	natural, expensiveQuery               []string
+	position, size, next                  string
 	// keyAccepted: the operation references the shared IdempotencyKey, so
 	// the server honors a key there; a key elsewhere answers 400.
 	keyAccepted bool
@@ -724,41 +727,82 @@ func TestUnitAPIReviewDerivesFromClasses(t *testing.T) {
 		method, path, state string
 		want                want
 	}{
-		{"GET", "/api/system/ping", "implemented", want{
-			"safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
-			"exempt: health exemption, no admission", "not a collection",
-		}},
-		{"GET", "/api/artifactweave/api-restrictions/{user}", "implemented", want{
-			admission: "recovery: administrator recovery reserve: 2 concurrent and 60/min per process; 5s deadline",
-		}},
-		{"PUT", "/api/repositories/{repoKey}", "implemented", want{
-			retry: "natural on path:repoKey, body:/rclass, header:Content-Type: repeating the identical request converges on one state, " +
-				"though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
-			admission: expensive,
-		}},
-		{"POST", "/api/build/append/{buildName}", "implemented", want{
-			retry: "key: optional quoted Idempotency-Key: same credential/resource/body replays the committed effect under current " +
-				"authorization for 24h; a duplicate in flight waits up to 30s, then 503 Retry-After; without a key every call repeats the effect",
-		}},
-		{"POST", "/api/security/token", "implemented", want{
-			retry: "none (secret-response): no retry protection; the answer carries a credential no replay stores; never blindly " +
-				"repeat; list credentials and revoke any not received",
-		}},
-		{"GET", "/api/storage/{repoKey}", "implemented", want{
-			admission:  ordinary + "; ?list additionally selects expensive policy",
-			pagination: "complete: the whole collection in one answer; content-and-configuration: " + storageFamily,
-		}},
+		{
+			"GET",
+			"/api/system/ping",
+			"implemented",
+			want{
+				"safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+				"exempt: health exemption, no admission",
+				"not a collection",
+			},
+		},
+		{
+			"GET",
+			"/api/artifactweave/api-restrictions/{user}",
+			"implemented",
+			want{
+				admission: "recovery: administrator recovery reserve: 2 concurrent and 60/min per process; 5s deadline",
+			},
+		},
+		{
+			"PUT",
+			"/api/repositories/{repoKey}",
+			"implemented",
+			want{
+				retry: "natural on path:repoKey, body:/rclass, header:Content-Type: repeating the identical request converges on one state, " +
+					"though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
+				admission: expensive,
+			},
+		},
+		{
+			"POST",
+			"/api/build/append/{buildName}",
+			"implemented",
+			want{
+				retry: "key: optional quoted Idempotency-Key: same credential/resource/body replays the committed effect under current " +
+					"authorization for 24h; a duplicate in flight waits up to 30s, then 503 Retry-After; without a key every call repeats the effect",
+			},
+		},
+		{
+			"POST",
+			"/api/security/token",
+			"implemented",
+			want{
+				retry: "none (secret-response): no retry protection; the answer carries a credential no replay stores; never blindly " +
+					"repeat; list credentials and revoke any not received",
+			},
+		},
+		{
+			"GET",
+			"/api/storage/{repoKey}",
+			"implemented",
+			want{
+				admission:  ordinary + "; ?list additionally selects expensive policy",
+				pagination: "complete: the whole collection in one answer; content-and-configuration: " + storageFamily,
+			},
+		},
 		{"GET", "/api/search/cursor", "implemented", want{
 			pagination: "cursor (position cursor, next link); search: " + searchFamily,
 		}},
-		{"GET", "/api/search/offset", "implemented", want{
-			pagination: "offset (position offset, size limit, next body:/next); search: " + searchFamily,
-		}},
-		{"DELETE", "/api/repositories/{repoKey}", "stub: 501", want{
-			retry:      "501 is not transient; do not retry until support changes; intended natural on route",
-			admission:  expensive,
-			pagination: "schema-only; no collection query executes",
-		}},
+		{
+			"GET",
+			"/api/search/offset",
+			"implemented",
+			want{
+				pagination: "offset (position offset, size limit, next body:/next); search: " + searchFamily,
+			},
+		},
+		{
+			"DELETE",
+			"/api/repositories/{repoKey}",
+			"stub: 501",
+			want{
+				retry:      "501 is not transient; do not retry until support changes; intended natural on route",
+				admission:  expensive,
+				pagination: "schema-only; no collection query executes",
+			},
+		},
 		{"GET", "/api/search/cursor", "stub: 501", want{
 			pagination: "schema-only; no collection query executes; declared cursor",
 		}},
@@ -771,13 +815,30 @@ func TestUnitAPIReviewDerivesFromClasses(t *testing.T) {
 			"pagination": {got.Pagination, c.want.pagination},
 		} {
 			if pair[1] != "" && pair[0] != pair[1] {
-				t.Errorf("%s %s (%s) %s:\n got %q\nwant %q", c.method, c.path, c.state, field, pair[0], pair[1])
+				t.Errorf(
+					"%s %s (%s) %s:\n got %q\nwant %q",
+					c.method,
+					c.path,
+					c.state,
+					field,
+					pair[0],
+					pair[1],
+				)
 			}
 		}
 	}
 	// TODO(author) on a draft is no class yet: every heuristic stays.
-	got, was := entry("GET", "/api/scaffolded", "stub: 501"), heuristic("GET", "/api/scaffolded", "stub: 501")
-	if got.Retry != was.Retry || got.Admission != was.Admission || got.Pagination != was.Pagination {
+	got, was := entry(
+		"GET",
+		"/api/scaffolded",
+		"stub: 501",
+	), heuristic(
+		"GET",
+		"/api/scaffolded",
+		"stub: 501",
+	)
+	if got.Retry != was.Retry || got.Admission != was.Admission ||
+		got.Pagination != was.Pagination {
 		t.Errorf("an unclassified operation changed: got %+v, heuristics %+v", got, was)
 	}
 	// A key operation that does not reference the shared parameter accepts

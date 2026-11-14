@@ -744,7 +744,10 @@ components:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if diff := cmp.Diff([]string{"POST /artifactory/api/build/append/{}"}, keys(ours.Ops)); diff != "" {
+	if diff := cmp.Diff(
+		[]string{"POST /artifactory/api/build/append/{}"},
+		keys(ours.Ops),
+	); diff != "" {
 		t.Fatal(diff)
 	}
 	op := ours.Ops["POST /artifactory/api/build/append/{}"]

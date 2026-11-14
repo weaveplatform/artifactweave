@@ -53,35 +53,60 @@ func writeSpec(t *testing.T, dir, name, body string) {
 func TestUnitLoadAndRender(t *testing.T) {
 	dir := t.TempDir()
 	writeSpec(t, dir, "artifactory.openapi.yaml", fixtureSpec)
-	writeSpec(t, dir, "access.openapi.yaml",
-		"servers:\n  - url: /access\npaths:\n  /api/v1/system/ping:\n    get:\n      operationId: accessPing\n      x-cost: exempt\n")
+	writeSpec(
+		t,
+		dir,
+		"access.openapi.yaml",
+		"servers:\n  - url: /access\npaths:\n  /api/v1/system/ping:\n    get:\n      operationId: accessPing\n      x-cost: exempt\n",
+	)
 	writeSpec(t, dir, "ignored.yaml", "not: a spec\n")
 	rows, err := Load(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := []Row{
-		{Service: "access", Method: "GET", Pattern: "/access/api/v1/system/ping", OperationID: "accessPing", Cost: "exempt"},
 		{
-			Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/build/append/{buildName}/{buildNumber}",
-			OperationID: "appendBuild", Cost: "expensive", Idempotency: "key", IdempotencyKey: true,
+			Service:     "access",
+			Method:      "GET",
+			Pattern:     "/access/api/v1/system/ping",
+			OperationID: "accessPing",
+			Cost:        "exempt",
 		},
 		{
-			Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list",
-			OperationID: "listDockerTags", Handwritten: true,
+			Service:        "artifactory",
+			Method:         "POST",
+			Pattern:        "/artifactory/api/build/append/{buildName}/{buildNumber}",
+			OperationID:    "appendBuild",
+			Cost:           "expensive",
+			Idempotency:    "key",
+			IdempotencyKey: true,
+		},
+		{
+			Service:     "artifactory",
+			Method:      "GET",
+			Pattern:     "/artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list",
+			OperationID: "listDockerTags",
+			Handwritten: true,
 		},
 		{
 			Service: "artifactory", Method: "PUT", Pattern: "/artifactory/api/keyed/{id}",
 			OperationID: "keyedByPathItem", IdempotencyKey: true,
 		},
 		{
-			Service: "artifactory", Method: "DELETE", Pattern: "/artifactory/api/storage/{repoKey}/{itemPath}",
+			Service:     "artifactory",
+			Method:      "DELETE",
+			Pattern:     "/artifactory/api/storage/{repoKey}/{itemPath}",
 			OperationID: "deleteItemProperties",
 		},
 		{
-			Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/storage/{repoKey}/{itemPath}",
-			OperationID: "getStorageItem", Cost: "ordinary", ExpensiveQuery: []string{"list"},
-			Idempotency: "safe", Pagination: "complete",
+			Service:        "artifactory",
+			Method:         "GET",
+			Pattern:        "/artifactory/api/storage/{repoKey}/{itemPath}",
+			OperationID:    "getStorageItem",
+			Cost:           "ordinary",
+			ExpensiveQuery: []string{"list"},
+			Idempotency:    "safe",
+			Pagination:     "complete",
 		},
 	}
 	if diff := cmp.Diff(want, rows); diff != "" {

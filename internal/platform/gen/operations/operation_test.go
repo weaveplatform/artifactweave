@@ -25,16 +25,20 @@ import (
 // router.go gives it, with its 501 stubs as the implementation.
 var mounts = map[string]func(chi.Router){
 	"access": func(r chi.Router) {
-		accessgen.HandlerWithOptions(accessgen.NewStrictHandler(accessgen.UnimplementedStrict{}, nil),
-			accessgen.ChiServerOptions{BaseURL: "/access", BaseRouter: r})
+		accessgen.HandlerWithOptions(
+			accessgen.NewStrictHandler(accessgen.UnimplementedStrict{}, nil),
+			accessgen.ChiServerOptions{BaseURL: "/access", BaseRouter: r},
+		)
 	},
 	"artifactory": func(r chi.Router) {
 		artgen.HandlerWithOptions(artgen.NewStrictHandler(artgen.UnimplementedStrict{}, nil),
 			artgen.ChiServerOptions{BaseURL: "/artifactory", BaseRouter: r})
 	},
 	"distribution": func(r chi.Router) {
-		distributiongen.HandlerWithOptions(distributiongen.NewStrictHandler(distributiongen.UnimplementedStrict{}, nil),
-			distributiongen.ChiServerOptions{BaseURL: "/distribution", BaseRouter: r})
+		distributiongen.HandlerWithOptions(
+			distributiongen.NewStrictHandler(distributiongen.UnimplementedStrict{}, nil),
+			distributiongen.ChiServerOptions{BaseURL: "/distribution", BaseRouter: r},
+		)
 	},
 	"event": func(r chi.Router) {
 		eventgen.HandlerWithOptions(eventgen.NewStrictHandler(eventgen.UnimplementedStrict{}, nil),
@@ -49,8 +53,10 @@ var mounts = map[string]func(chi.Router){
 			pfedgen.ChiServerOptions{BaseURL: "/pfed", BaseRouter: r})
 	},
 	"worker": func(r chi.Router) {
-		workergen.HandlerWithOptions(workergen.NewStrictHandler(workergen.UnimplementedStrict{}, nil),
-			workergen.ChiServerOptions{BaseURL: "/worker", BaseRouter: r})
+		workergen.HandlerWithOptions(
+			workergen.NewStrictHandler(workergen.UnimplementedStrict{}, nil),
+			workergen.ChiServerOptions{BaseURL: "/worker", BaseRouter: r},
+		)
 	},
 }
 
@@ -68,10 +74,13 @@ func TestUnitTableMatchesGeneratedServers(t *testing.T) {
 		r := chi.NewRouter()
 		mount(r)
 		var served []string
-		if err := chi.Walk(r, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
-			served = append(served, method+" "+route)
-			return nil
-		}); err != nil {
+		if err := chi.Walk(
+			r,
+			func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+				served = append(served, method+" "+route)
+				return nil
+			},
+		); err != nil {
 			t.Fatal(err)
 		}
 		var listed []string
@@ -111,9 +120,19 @@ func TestUnitIndexFindsEveryOperation(t *testing.T) {
 
 func TestUnitIndexFind(t *testing.T) {
 	table := []operations.Operation{
-		{Service: "s", Method: "GET", Pattern: "/s/api/repositories/{repoKey}", OperationID: "byKey"},
+		{
+			Service:     "s",
+			Method:      "GET",
+			Pattern:     "/s/api/repositories/{repoKey}",
+			OperationID: "byKey",
+		},
 		{Service: "s", Method: "GET", Pattern: "/s/api/repositories/batch", OperationID: "batch"},
-		{Service: "s", Method: "POST", Pattern: "/s/api/build/append/{buildName}/{buildNumber}", OperationID: "append"},
+		{
+			Service:     "s",
+			Method:      "POST",
+			Pattern:     "/s/api/build/append/{buildName}/{buildNumber}",
+			OperationID: "append",
+		},
 	}
 	x, err := operations.NewIndex(table)
 	if err != nil {
@@ -144,7 +163,9 @@ func TestUnitNewIndexErrors(t *testing.T) {
 		!strings.Contains(err.Error(), "twice") {
 		t.Fatalf("a row listed twice: %v", err)
 	}
-	if _, err := operations.NewIndex([]operations.Operation{{Method: "GET", Pattern: "no-slash"}}); err == nil {
+	if _, err := operations.NewIndex(
+		[]operations.Operation{{Method: "GET", Pattern: "no-slash"}},
+	); err == nil {
 		t.Fatal("expected chi to refuse a pattern without a leading slash")
 	}
 }

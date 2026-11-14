@@ -106,7 +106,10 @@ func Bundle(srcDir string) ([]byte, error) {
 			}
 		}
 	}
-	if err := mergeShared(comps, filepath.Join(filepath.Dir(filepath.Clean(srcDir)), SharedFile)); err != nil {
+	if err := mergeShared(
+		comps,
+		filepath.Join(filepath.Dir(filepath.Clean(srcDir)), SharedFile),
+	); err != nil {
 		return nil, err
 	}
 	injectAdmission(paths, comps["responses"])
@@ -310,7 +313,12 @@ func injectAdmission(paths, responses *yaml.Node) {
 // wherever its fragment did. Range keys such as 4XX sort after their codes
 // and default after every status.
 func insertStatus(resp *yaml.Node, status, ref string) {
-	key := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: status, Style: yaml.SingleQuotedStyle}
+	key := &yaml.Node{
+		Kind:  yaml.ScalarNode,
+		Tag:   "!!str",
+		Value: status,
+		Style: yaml.SingleQuotedStyle,
+	}
 	val := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{
 		scalar("$ref"),
 		{Kind: yaml.ScalarNode, Tag: "!!str", Value: ref, Style: yaml.SingleQuotedStyle},
@@ -323,7 +331,9 @@ func insertStatus(resp *yaml.Node, status, ref string) {
 			break
 		}
 	}
-	resp.Content = append(resp.Content[:at], append([]*yaml.Node{key, val}, resp.Content[at:]...)...)
+	resp.Content = append(
+		resp.Content[:at],
+		append([]*yaml.Node{key, val}, resp.Content[at:]...)...)
 }
 
 func lookup(m *yaml.Node, key string) *yaml.Node {
