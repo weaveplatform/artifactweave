@@ -466,6 +466,10 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectslist.md
       summary: List projects
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: >-
         Creates a project with no members, the predefined roles and no repositories. The key is
@@ -515,6 +519,10 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/createproject.md
       summary: Create a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - body:/project_key
+      x-cost: expensive
   /api/v1/projects/_/attach/repositories/{repoName}:
     delete:
       description: >-
@@ -556,6 +564,10 @@ paths:
       x-oracle-source: >-
         https://docs.jfrog.com/projects/reference/unassignprojectfromrepository.md
       summary: Unassign a repository from its project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+      x-cost: expensive
   /api/v1/projects/_/attach/repositories/{repoName}/{targetProjectKey}:
     put:
       description: >-
@@ -620,6 +632,11 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/attachrepositorytoproject.md
       summary: Assign a repository to a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+        - path:targetProjectKey
+      x-cost: expensive
   /api/v1/projects/_/repositories/{repoName}:
     get:
       description: >-
@@ -696,6 +713,8 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectrepositorystatus.md
       summary: Get a repository's project status
+      x-idempotency: safe
+      x-cost: ordinary
   /api/v1/projects/_/share/repositories/{repoName}:
     delete:
       description: >-
@@ -737,6 +756,10 @@ paths:
       x-oracle-source: >-
         https://docs.jfrog.com/projects/reference/unsharerepositorywithallprojects.md
       summary: Stop sharing a repository with every project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+      x-cost: expensive
     put:
       description: >-
         Lets members of every project use the local or remote repository according to their roles
@@ -784,6 +807,10 @@ paths:
       x-oracle-source: >-
         https://docs.jfrog.com/projects/reference/sharerepositorywithallprojects.md
       summary: Share a repository with every project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+      x-cost: expensive
   /api/v1/projects/_/share/repositories/{repoName}/{targetProjectKey}:
     delete:
       description: Removes the share with the target project. Requires a platform admin.
@@ -831,6 +858,11 @@ paths:
       x-oracle-source: >-
         https://docs.jfrog.com/projects/reference/unsharerepositorywithtargetproject.md
       summary: Stop sharing a repository with one project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+        - path:targetProjectKey
+      x-cost: expensive
     put:
       description: >-
         Lets members of the target project use the local or remote repository according to their
@@ -893,6 +925,11 @@ paths:
       x-oracle-source: >-
         https://docs.jfrog.com/projects/reference/sharerepositorywithtargetproject.md
       summary: Share a repository with one project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoName
+        - path:targetProjectKey
+      x-cost: expensive
   /api/v1/projects/{projectKey}:
     delete:
       description: >-
@@ -934,6 +971,10 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteproject.md
       summary: Delete a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+      x-cost: expensive
     get:
       description: >-
         Returns one project. Requires a platform admin or an admin of the project.
@@ -976,6 +1017,8 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getproject.md
       summary: Get a project
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: >-
         Changes the project's display name, description, quota and admin privileges. The key cannot
@@ -1034,6 +1077,10 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/updateproject.md
       summary: Update a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+      x-cost: expensive
   /api/v1/projects/{projectKey}/groups:
     get:
       description: >-
@@ -1085,6 +1132,10 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectgroups.md
       summary: List project groups
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/projects/{projectKey}/groups/{group}:
     delete:
       description: >-
@@ -1131,6 +1182,11 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectgroup.md
       summary: Remove a group from a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:group
+      x-cost: expensive
     get:
       description: >-
         Returns one group's roles in the project. Requires a platform admin, or a project admin
@@ -1179,6 +1235,8 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectgroup.md
       summary: Get a project group
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: >-
         Adds the group to the project with the given roles, or replaces the roles of a member
@@ -1243,6 +1301,11 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/updateprojectgroup.md
       summary: Add a group to a project or set its roles
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:group
+      x-cost: expensive
   /api/v1/projects/{projectKey}/roles:
     get:
       description: >-
@@ -1290,6 +1353,10 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectroles.md
       summary: List project roles
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: >-
         Defines a CUSTOM role in the project. Unknown actions and unknown environments are rejected
@@ -1348,6 +1415,11 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/createprojectrole.md
       summary: Create a custom project role
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - body:/name
+      x-cost: expensive
   /api/v1/projects/{projectKey}/roles/{role}:
     delete:
       description: >-
@@ -1395,6 +1467,11 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectrole.md
       summary: Delete a custom project role
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:role
+      x-cost: expensive
     get:
       description: >-
         Returns one role usable in the project. Requires a platform admin or an admin of the project.
@@ -1443,6 +1520,8 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectrole.md
       summary: Get a project role
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: >-
         Replaces the role's description, environments and actions. Only CUSTOM roles can be changed;
@@ -1507,6 +1586,11 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/updateprojectrole.md
       summary: Replace a custom project role
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:role
+      x-cost: expensive
   /api/v1/projects/{projectKey}/users:
     get:
       description: >-
@@ -1559,6 +1643,10 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectusers.md
       summary: List project users
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/projects/{projectKey}/users/{user}:
     delete:
       description: >-
@@ -1605,6 +1693,11 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectuser.md
       summary: Remove a user from a project
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:user
+      x-cost: expensive
     get:
       description: >-
         Returns one user's roles in the project. Requires a platform admin, or a project admin
@@ -1653,6 +1746,8 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectuser.md
       summary: Get a project user
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: >-
         Adds the user to the project with the given roles, or replaces the roles of an existing
@@ -1717,6 +1812,11 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/addorupdateprojectuser.md
       summary: Add a user to a project or set their roles
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:projectKey
+        - path:user
+      x-cost: expensive
   /api/v2/projects:
     get:
       description: >-
@@ -1803,3 +1903,10 @@ paths:
         - projects
       x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectsforrole.md
       summary: List projects that use a global role
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: cursor
+      x-pagination-parameters:
+        position: cursor
+        size: limit
+      x-pagination-next: body:/cursor

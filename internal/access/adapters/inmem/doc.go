@@ -22,6 +22,8 @@
 //
 //   - Store, from New, with Users, Groups, Permissions, Tokens, Keys,
 //     Projects and APIRestrictions, and memtx's Tx, AfterCommit and Close.
+//     Permissions' Page answers as the SQL store's does, gathering and
+//     sorting the matches first because the table is a map (#1408).
 //
 // # Invariants
 //

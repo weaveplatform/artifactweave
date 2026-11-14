@@ -31,8 +31,9 @@
 //     WorkTransactions, WorkConcurrency, Instance, Outbox,
 //     OutboxConcurrent, PeerCursors, AppliedMarkers, FailedFetches,
 //     Uploads, Replays, ReplayRollback, ReplayInProgressCancellation,
-//     RequestBudgets and RequestBudgetBoundedPruning; and, from Run only,
-//     ConfigWatches.
+//     KeyedReplays, KeyedReplayPrune, KeyedReplayRollback,
+//     KeyedReplayNested, KeyedReplayCancellation, RequestBudgets and
+//     RequestBudgetBoundedPruning; and, from Run only, ConfigWatches.
 //
 // # Invariants
 //
@@ -57,8 +58,9 @@
 //   - Decision 0027: docs/research/decisions/0027-cloud-blob-backends.md
 //     (upload sessions).
 //   - Decision 0043: docs/research/decisions/0043-api-reliability.md
-//     (API replays and request budgets, and the rollback the replay cases
-//     check).
+//     (API replays and request budgets, the rollback the replay cases
+//     check, and the shared replay of keyed operations the Keyed cases run
+//     over the store).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
 //     ("Persistence": contract suites; "Names the migration introduces",
 //     which lists Store, Factory, Run and RunWithoutWatches).
@@ -77,7 +79,8 @@
 // 3). P7: the work queue cases (issue 297, pull request 299). P9c: the
 // replay and request budget cases (issue 890, pull request 905). Moved here
 // in P9d, which added Store, Factory, Run, RunWithoutWatches and
-// ConfigWatches.
+// ConfigWatches. IDEM-01 (issue 1406): the Keyed cases, which run
+// idempotency.Replay over the store's receipts and unit of work.
 //
 // # Testing
 //

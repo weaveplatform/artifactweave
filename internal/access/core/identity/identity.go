@@ -422,6 +422,12 @@ func (s *Service) Users(ctx context.Context) ([]model.User, error) {
 	return all(ctx, s.Store.Users().List)
 }
 
+// UserPages walks the users a store page at a time, in Users' order, for a
+// list written as it is read.
+func (s *Service) UserPages() *kernel.Pages[model.User] {
+	return kernel.NewPages(s.Store.Users().List, 0)
+}
+
 // --- Groups ----------------------------------------------------------------
 
 // GroupPatch holds the fields an update changes; nil leaves a field as it is.
@@ -556,6 +562,12 @@ func (s *Service) Groups(ctx context.Context) ([]model.Group, error) {
 	return all(ctx, s.Store.Groups().List)
 }
 
+// GroupPages walks the groups a store page at a time, in Groups' order, for
+// a list written as it is read.
+func (s *Service) GroupPages() *kernel.Pages[model.Group] {
+	return kernel.NewPages(s.Store.Groups().List, 0)
+}
+
 // --- Locks and expiry --------------------------------------------------------
 
 // ExpirePasswords forces each named user to set a new password before the
@@ -679,6 +691,12 @@ func (s *Service) recordFailure(ctx context.Context, name string) {
 // Locked returns the names of locked users.
 func (s *Service) Locked(ctx context.Context) ([]string, error) {
 	return s.Store.Users().Locked(ctx) //nolint:wrapcheck // a store error
+}
+
+// LockedPages walks the locked users' names a store page at a time, in
+// Locked's order, for a list written as it is read.
+func (s *Service) LockedPages() *kernel.Pages[string] {
+	return kernel.NewPages(s.Store.Users().LockedPage, 0)
 }
 
 // Unlock unlocks the named users, in whatever case they are spelled;

@@ -45,6 +45,38 @@ func TestAccReplayCrashHelper(t *testing.T) {
 	appstoretest.ReplayCrashChild(t, s)
 }
 
+func TestAccKeyedReplayProcessCrash(t *testing.T) {
+	dsn := platsqltest.PostgresDSN(t)
+	s, err := postgres.Open(t.Context(), dsn, postgres.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	appstoretest.Reset(t, s.DB(), pgdrv.Dialect)
+	appstoretest.KeyedReplayCrash(
+		t,
+		s,
+		[]string{"ARTIFACTWEAVE_KEYED_REPLAY_CRASH_POSTGRES=" + dsn},
+	)
+}
+
+func TestAccKeyedReplayCrashHelper(t *testing.T) {
+	dsn := os.Getenv("ARTIFACTWEAVE_KEYED_REPLAY_CRASH_POSTGRES")
+	if dsn == "" {
+		t.Skip("subprocess helper")
+	}
+	s, err := postgres.Open(
+		t.Context(),
+		dsn,
+		postgres.Options{Options: appsql.Options{SkipMigrate: true}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	appstoretest.KeyedReplayCrashChild(t, s)
+}
+
 func TestAccReplayPruneDoesNotDeleteRenewal(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()

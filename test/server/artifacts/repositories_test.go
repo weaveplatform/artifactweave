@@ -70,6 +70,14 @@ func (f faultyRepos) List(ctx context.Context, rf artport.RepoFilter) ([]repo.Co
 	return f.RepoStore.List(ctx, rf) //nolint:wrapcheck // test double
 }
 
+// Page fails under "list" too: Get Repositories reads its window there.
+func (f faultyRepos) Page(ctx context.Context, l artport.RepoListing) (artport.RepoPage, error) {
+	if f.fail["list"] {
+		return artport.RepoPage{}, errBoom
+	}
+	return f.RepoStore.Page(ctx, l) //nolint:wrapcheck // test double
+}
+
 // Get fails for every key under "get", or for one key under "get:<key>".
 func (f faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
 	if f.fail["get"] || f.fail["get:"+key] {
