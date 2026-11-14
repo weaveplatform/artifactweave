@@ -47,6 +47,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatealpinerepositorymetadata.md
       x-tier: implemented
   /api/bower/{repoKey}/reindex:
@@ -94,6 +98,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatebowerindex.md
       x-tier: implemented
   /api/cargo/{repoKey}/reindex:
@@ -148,6 +156,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecargorepositorymetadata.md
       x-tier: native
   /api/cocoapods/{repoKey}/reindex:
@@ -194,6 +206,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecocoapodsindex.md
       x-tier: native
   /api/conan/{repoKey}/reindex:
@@ -248,6 +264,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateconanrepositorymetadata.md
       x-tier: implemented
   /api/conda/{repoKey}/reindex:
@@ -303,6 +323,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecondarepositorymetadata.md
       x-tier: implemented
   /api/cran/reindex/{repoKey}:
@@ -359,6 +383,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecranrepositorymetadata.md
       x-tier: implemented
   /api/cran/{repoKey}/move-archives:
@@ -428,6 +456,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/movecranarchives.md
       x-tier: implemented
   /api/deb/indexCached/{repoKey}:
@@ -473,6 +505,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecachedremotedebianrepositorycoordinates.md
       x-tier: stub
   /api/deb/reindex/{repoKey}:
@@ -553,6 +589,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatedebianrepositorymetadata.md
       x-tier: native
   /api/deb/{repoKey}/snapshot:
@@ -641,6 +681,11 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/targetRepo
+      - body:/tag
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createdebiansnapshot.md
       x-tier: implemented
   /api/docker/{repoKey}/v2/delete:
@@ -731,6 +776,12 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - body:/dockerRepository
+      - body:/tag
   /api/gems/{repoKey}/reindex:
     post:
       description: Rebuilds the RubyGems package index from valid local or one-node federated gem archives
@@ -775,6 +826,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculaterubygemsindex.md
   /api/helm/{repoKey}/reindex:
     post:
@@ -834,6 +889,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatehelmchartindex.md
       x-unverified: true
   /api/helm/{repoKey}/{pathForPartialReindex}/reindex:
@@ -905,6 +964,11 @@ paths:
       tags:
       - specific
       - handwritten
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - path:pathForPartialReindex
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/helmchartspartialreindexing.md
       x-handwritten: true
       x-unverified: true
@@ -965,6 +1029,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - query:repos
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatemavenindex.md
   /api/maven/calculateMetadata/{repoKey}/{folderPath}:
     post:
@@ -1034,6 +1102,11 @@ paths:
       tags:
       - specific
       - handwritten
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - path:folderPath
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatemavenmetadata.md
       x-handwritten: true
   /api/maven/generatePom/{repoKey}/{jarFilePath}:
@@ -1092,6 +1165,11 @@ paths:
       tags:
       - specific
       - handwritten
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - path:jarFilePath
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/generatemavenpomfile.md
       x-handwritten: true
   /api/npm/auth:
@@ -1126,6 +1204,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: ordinary
+      x-idempotency: safe
       x-unverified: true
   /api/npm/{repoKey}/auth/{scope}:
     get:
@@ -1198,6 +1278,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: ordinary
+      x-idempotency: safe
       x-unverified: true
   /api/npm/{repoKey}/reindex:
     post:
@@ -1267,6 +1349,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatenpmrepositorymetadata.md
   /api/nuget/{repoKey}/reindex:
     post:
@@ -1333,6 +1419,10 @@ paths:
             implemented.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatenugetrepositorymetadata.md
   /api/opkg/reindex/{repoKey}:
     post:
@@ -1405,6 +1495,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateopkgrepositorymetadata.md
       x-tier: native
   /api/pub/{repoKey}/reindex:
@@ -1459,6 +1553,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatepubrepositorymetadata.md
       x-tier: native
   /api/puppet/{repoKey}/v3/modules:
@@ -1570,7 +1668,14 @@ paths:
             65,536 releases; the body carries the error envelope.
       tags:
       - specific
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetmodules.md
+      x-pagination: native
+      x-pagination-next: body:/pagination/next
+      x-pagination-parameters:
+        position: offset
+        size: limit
       x-tier: native
   /api/puppet/{repoKey}/v3/modules/{userModule}:
     get:
@@ -1651,6 +1756,8 @@ paths:
           description: The module has more than 4,096 releases; the body carries the error envelope.
       tags:
       - specific
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetmoduleinfo.md
       x-tier: native
   /api/puppet/{repoKey}/v3/releases:
@@ -1776,7 +1883,14 @@ paths:
             65,536 releases; the body carries the error envelope.
       tags:
       - specific
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetreleases.md
+      x-pagination: native
+      x-pagination-next: body:/pagination/next
+      x-pagination-parameters:
+        position: offset
+        size: limit
       x-tier: native
   /api/puppet/{repoKey}/v3/releases/{userModuleVersion}:
     get:
@@ -1856,6 +1970,8 @@ paths:
           description: The module has more than 4,096 releases; the body carries the error envelope.
       tags:
       - specific
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetreleaseinfo.md
       x-tier: native
   /api/pypi/{repoKey}/reindex:
@@ -1925,6 +2041,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatepypirepositorymetadata.md
   /api/pypi/{repository}/pypi/{package}/json:
     get:
@@ -1985,6 +2105,8 @@ paths:
           description: Remote and virtual PyPI repositories are not implemented.
       tags:
       - specific
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpypilatestpackageversionmetadatainjson.md
   /api/pypi/{repository}/pypi/{package}/{version}/json:
     get:
@@ -2052,6 +2174,8 @@ paths:
           description: Remote and virtual PyPI repositories are not implemented.
       tags:
       - specific
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpypipackageversionmetadatainjson.md
   /api/swift/{repoKey}/reindex:
     post:
@@ -2097,6 +2221,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateswiftindex.md
       x-native-protocol: true
   /api/terraform/{repoKey}/reindex:
@@ -2156,6 +2284,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateterraformindex.md
   /api/v1/migrations/npm/repositories/{repoKey}/migrate:
     post:
@@ -2219,6 +2351,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-unverified: true
   /api/v1/migrations/npm/repositories/{repoKey}/resume:
     post:
@@ -2276,6 +2412,10 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
       x-unverified: true
   /api/vcs/branches/{repoKey}/{userOrg}/{repo}:
     get:
@@ -2348,7 +2488,11 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getvcsbranches.md
+      x-pagination: complete
+      x-pagination-next: none
       x-tier: native
   /api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName}:
     get:
@@ -2431,6 +2575,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsbranchalternative.md
       x-tier: native
   /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName}:
@@ -2516,6 +2662,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsbranchfromsubgrouprepository.md
       x-tier: native
   /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName}:
@@ -2606,6 +2754,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsbranch.md
       x-tier: native
   /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName}:
@@ -2673,6 +2823,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcsbranchalternative.md
       x-tier: native
   /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName}:
@@ -2747,6 +2899,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfileinvcsbranchinsubgrouprepository.md
       x-tier: native
   /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName}:
@@ -2821,6 +2975,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcsbranch.md
       x-tier: native
   /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId}:
@@ -2905,6 +3061,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcscommit.md
       x-tier: native
   /api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName}:
@@ -2989,6 +3147,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsrelease.md
       x-tier: native
   /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName}:
@@ -3074,6 +3234,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcstagfromsubgrouprepository.md
       x-tier: native
   /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName}:
@@ -3158,6 +3320,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcstag.md
       x-tier: native
   /api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName}:
@@ -3235,6 +3399,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcstagalternative.md
       x-tier: native
   /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName}:
@@ -3309,6 +3475,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfileinvcstaginsubgrouprepository.md
       x-tier: native
   /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName}:
@@ -3383,6 +3551,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcstag.md
       x-tier: native
   /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName}:
@@ -3450,6 +3620,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcstagalternative.md
       x-tier: native
   /api/vcs/refs/{repoKey}/{userOrg}/{repo}:
@@ -3509,6 +3681,8 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getvcsrefs.md
       x-tier: native
   /api/vcs/tags/{repoKey}/{userOrg}/{repo}:
@@ -3582,7 +3756,11 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getvcstags.md
+      x-pagination: complete
+      x-pagination-next: none
       x-tier: native
   /api/yum/{repoKey}:
     post:
@@ -3652,6 +3830,11 @@ paths:
           description: The server failed while processing the request; the body carries the error envelope.
       tags:
       - specific
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoKey
+      - query:path
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateyumrepositorymetadata.md
       x-tier: native
 # The Puppet Forge v3 records the four Puppet operations answer. The reference schema of

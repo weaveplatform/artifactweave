@@ -22,6 +22,10 @@ paths:
       tags:
       - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getalldistributionpermissions.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
   /api/v1/security/permissions/{permission_name}:
     delete:
       description: Deletes one destination permission. Administrators only.
@@ -52,6 +56,10 @@ paths:
       tags:
       - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletedistributionpermission.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:permission_name
+      x-cost: expensive
     get:
       description: Returns one destination permission. Administrators only.
       operationId: getDistributionPermissionByName
@@ -85,6 +93,8 @@ paths:
       tags:
       - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionpermissionbyname.md
+      x-idempotency: safe
+      x-cost: ordinary
     put:
       description: Creates the destination permission, or replaces it when the name exists. A destination permission
         grants users and groups the right to distribute release bundles to, or delete them from, the edges its destinations
@@ -133,6 +143,10 @@ paths:
       tags:
       - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setdistributionpermission.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:permission_name
+      x-cost: expensive
   /api/v1/security/token:
     get:
       description: Lists the tokens issued through the Distribution token operations. They are ordinary access
@@ -161,6 +175,10 @@ paths:
       tags:
       - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/gettokeninfos.md
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token
         for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair.
@@ -242,6 +260,9 @@ paths:
       tags:
       - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createorrefreshtoken.md
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: expensive
   /api/v1/security/token/revoke:
     post:
       description: Revokes a token given either its value (access or refresh token) or its id, in a form body, as
@@ -294,3 +315,8 @@ paths:
       tags:
       - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/revoketoken.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/token
+      - body:/token_id
+      x-cost: expensive

@@ -163,6 +163,12 @@ linters:
       # logic was their own code; a wrap would change what the response or
       # the log says. Without these lines wrapcheck reports 20 returns in the
       # artifacts adapter.
+      #
+      # A streamed list's Write (platform/httpkit) returns nil: once the
+      # status is out, a failure aborts the response rather than returning
+      # (decision 0043, "Streaming complete lists"). Each adapter's streamed
+      # response visits with it, as a generated response visits with its
+      # encoder; a wrap would wrap nothing.
       extra-ignore-sigs:
         - apierror.New(
         - format.Rejectf(
@@ -184,6 +190,7 @@ linters:
         - httpkit.Principal(
         - httpkit.Denied(
         - httpkit.BadRequestf(
+        - httpkit.ListStream).Write(
         - itemkit.Kit).Content(
         - itemkit.Kit).InternalError(
         - itemkit.Kit).ItemError(

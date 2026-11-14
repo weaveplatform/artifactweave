@@ -112,9 +112,10 @@
 //     without the schema).
 //
 // The metadata store's SQLite and PostgreSQL packages run
-// TestAccReplayProcessCrash, which kills a process inside a replay's
-// transaction and finds neither its effect nor its receipt, through the
-// platform Store; the PostgreSQL package's
+// TestAccReplayProcessCrash and TestAccKeyedReplayProcessCrash, which kill a
+// process inside a replay's transaction, the second under the shared replay
+// of keyed operations, and find neither its effect nor its receipt, through
+// the platform Store; the PostgreSQL package's
 // TestAccReplayPruneDoesNotDeleteRenewal keeps a renewed receipt that a
 // concurrent prune had selected.
 package sql

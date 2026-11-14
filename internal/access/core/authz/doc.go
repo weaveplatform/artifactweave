@@ -31,7 +31,9 @@
 // # Outputs
 //
 //   - *Decider, from New: the answers for one subject from one snapshot of
-//     the permissions.
+//     the permissions. VisibleRepos describes the repositories
+//     IsRepoVisible admits as an accessapi.RepoVisibility, which a listing's
+//     store applies as a filter.
 //   - AsAPI: the Decider as an accessapi.Decider, and FromAPI, the
 //     evaluator behind one.
 //   - TargetAllows: whether a permission target's include and exclude
@@ -50,12 +52,18 @@
 //     key "<remote>-cache" is judged as its remote.
 //   - Every error starts "authz: " and names the read that failed: the
 //     subject's permissions, a user or a group.
+//   - VisibleRepos().Has(r) equals IsRepoVisible(r) for every stored
+//     repository r: a listing filtered in its store shows exactly what one
+//     that asked about each repository showed.
 //
 // # References
 //
 //   - Decision 0005: docs/research/decisions/0005-authentication-and-tokens.md
 //     (token scopes only narrow).
 //   - Decision 0006: docs/research/decisions/0006-authorization-native-permission-model.md.
+//   - Decision 0043: docs/research/decisions/0043-api-reliability.md,
+//     "Paging classes and the next pointer" (the store applies the
+//     caller's visibility).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md
 //     ("Public types and published api surface": Decider is an interface in
 //     access/api; "Names the migration introduces", which lists AsAPI and
@@ -76,7 +84,8 @@
 // 7.x (pull request 449), refused a MANAGE holder's changes to its own
 // entries (pull request 459) and added the Manage Resources role (pull
 // request 470). Moved here in P9d, which added AsAPI and FromAPI (pull
-// request 1127).
+// request 1127). #1408 added VisibleRepos, so Get Repositories counts and
+// pages what the caller sees in its store query (decision 0043).
 //
 // # Testing
 //
@@ -88,6 +97,9 @@
 //     TestUnitGrantable, TestUnitSelf and TestUnitManagesResources.
 //   - api_test.go: TestUnitAsAPIAndFromAPI (the access/api view answers as
 //     the evaluator does, and a nil or foreign Decider converts to nothing).
+//   - visibility_test.go: TestUnitVisibleReposDescribesIsRepoVisible (over a
+//     matrix of subjects, token scopes and repositories, the set
+//     VisibleRepos describes holds exactly what IsRepoVisible admits).
 //   - username_test.go: TestUnitUsernameFolds (a subject named in another
 //     case holds the grants of its folded name, #1432).
 //

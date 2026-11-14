@@ -79,6 +79,9 @@ type Service struct {
 	Now func() time.Time
 	// Batch bounds the entries per transaction; zero means DefaultBatch.
 	Batch int
+	// page bounds the entries a Walk reads per store page; zero means
+	// kernel.MaxLimit. Tests set it small to cross page boundaries.
+	page int
 }
 
 func (s *Service) now() time.Time {
@@ -447,71 +450,34 @@ type Node struct {
 }
 
 // Below lists the trash can's tree under dir ("" for its root): the direct
-// children, or with deep every descendant, sorted by path.
+// children, or with deep every descendant, sorted by path. It collects
+// Walk, which a caller that writes the tree as it reads it uses instead.
 //
 // sees filters the entries before the tree is derived from them, so a
 // repository or folder shows only when an entry the caller sees lies at or
-// below it. A nil sees shows every entry, for an administrator.
+// below it. A nil sees shows every entry, for an administrator. At each
+// path the node carries the newest entry the caller sees there, and a file
+// trashed where a folder later held trashed items gives way to the folder:
+// Artifactory's trash can replaces it with the folder
+// (TrashServiceImpl.undeployFileWithSameNameInTrash in 6.20).
 func (s *Service) Below(
 	ctx context.Context,
 	dir string,
 	deep bool,
 	sees func(model.Item) bool,
 ) ([]Node, error) {
-	dir = strings.Trim(dir, "/")
-	repoKey, prefix, _ := strings.Cut(dir, "/")
-	entries, err := s.Entries(ctx, repoKey, prefix)
-	if err != nil {
-		return nil, err
-	}
-	visible := make([]model.TrashEntry, 0, len(entries))
-	for _, e := range entries {
-		if sees == nil || sees(e.Record.Item) {
-			visible = append(visible, e)
+	w := s.Walk(dir, deep, sees)
+	var out []Node
+	for {
+		nodes, next, err := w.Page(ctx, kernel.Page{Limit: kernel.MaxLimit})
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, nodes...)
+		if next == "" {
+			return out, nil
 		}
 	}
-	nodes := map[string]*Node{}
-	node := func(p string) *Node {
-		n, ok := nodes[p]
-		if !ok {
-			n = &Node{Path: p}
-			nodes[p] = n
-		}
-		return n
-	}
-	for _, e := range Newest(visible) {
-		rel := strings.Trim(e.Record.Item.RepoKey+"/"+e.Record.Item.FullPath(), "/")
-		if dir != "" {
-			cut, ok := strings.CutPrefix(rel, dir+"/")
-			if !ok {
-				continue
-			}
-			rel = cut
-		}
-		segs := strings.Split(rel, "/")
-		// Every segment above the entry is a folder of the tree, the
-		// repository's among them.
-		for i := 1; i < len(segs) && (deep || i == 1); i++ {
-			node(path.Join(dir, path.Join(segs[:i]...))).Folder = true
-		}
-		if !deep && len(segs) > 1 {
-			continue
-		}
-		n := node(path.Join(dir, rel))
-		n.Entry, n.Folder = &e, n.Folder || e.Record.Item.Folder
-	}
-	out := make([]Node, 0, len(nodes))
-	for _, n := range nodes {
-		// A file trashed where a folder later held trashed items is gone from
-		// Artifactory's trash can, which replaces it with the folder
-		// (TrashServiceImpl.undeployFileWithSameNameInTrash in 6.20).
-		if n.Folder && n.Entry != nil && !n.Entry.Record.Item.Folder {
-			n.Entry = nil
-		}
-		out = append(out, *n)
-	}
-	slices.SortFunc(out, func(a, b Node) int { return strings.Compare(a.Path, b.Path) })
-	return out, nil
 }
 
 // Find returns the newest entry trashed from repoKey at exactly fullPath.

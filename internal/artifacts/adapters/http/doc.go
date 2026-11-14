@@ -4,9 +4,9 @@
 // operations) and the hand-written routes beside it (items, storage,
 // trash, multipart uploads, transfer, the searches and AQL), with the item
 // overlays and private paths of the formats whose files it serves, the
-// package protocol list and the idempotency middleware. The router builds
-// the partial from Deps with New and mounts its registrars in a fixed
-// order.
+// package protocol list and the build actions' replay bindings. The router
+// builds the partial from Deps with New and mounts its registrars in a
+// fixed order.
 //
 // # Role
 //
@@ -24,12 +24,13 @@
 //
 //   - Driving: the router, which embeds ArtifactoryAPI in the generated
 //     strict server beside the other partials and the stubs, mounts the
-//     registrars, SmartStatus and Protocols, and installs IdempotencyRoutes
-//     and HelmPartialReindex as middleware.
+//     registrars, SmartStatus and Protocols, installs HelmPartialReindex as
+//     middleware, and hands KeyedBindings to the shared replay that wraps
+//     the strict server's keyed operations.
 //   - Deps, from the composition root: the metadata store, through Store,
 //     which New gives the item kit too. It is the kit's store
-//     (itemkit.Store), the protocols' (pkgroute.Store) and the build
-//     service's replay records; the handlers read and write it and hand it
+//     (itemkit.Store) and the protocols' (pkgroute.Store); the handlers
+//     read and write it and hand it
 //     to the search, build, trash, garbage collection, repository and usage
 //     code they call. Then the item kit's other dependencies (the blob
 //     store, the remote sources, the work queue, the formats and their
@@ -54,10 +55,12 @@
 //     RegisterMultipartRoutes and RegisterSearchRoutes; SmartStatus;
 //     HelmPartialReindex; and ProtocolOptions, the router kit's options for
 //     every protocol.
-//   - The router's contributions: IdempotencyRoutes, SelfAuthenticated,
-//     SlashCollections, KeepsSearchQuery, KeepsRepositoryBody,
-//     KeepsBuildBody, PrivateItem, and the overlays TryCondaItem,
-//     TryMachineLearningItem and TryChefItem.
+//   - The router's contributions: KeyedBindings (the replay bindings of
+//     build append, both build deletes and build promotion, which confirm a
+//     committed action and answer for it),
+//     SelfAuthenticated, SlashCollections, KeepsSearchQuery,
+//     KeepsRepositoryBody, KeepsBuildBody, PrivateItem, and the overlays
+//     TryCondaItem, TryMachineLearningItem and TryChefItem.
 //   - Protocols: the package protocols with routers of their own.
 //   - The configuration types AQLLimits, SearchLimits, Mirrors and
 //     MirrorStatus, which the router's Config and the application name.
@@ -76,6 +79,17 @@
 //     relocate or skip them by each format's own rule.
 //   - Statuses, envelopes and error, log and metric text are what JFrog's
 //     clients and the operators' logs read, so they stay byte-identical.
+//   - A complete list written from store pages (decision 0043, "Streaming
+//     complete lists"; #1409) answers the bytes it answered when it was
+//     collected whole. The storage API's file list merges its trees' walks
+//     in full path byte order, the order its uri sort gave, keeping the
+//     first readable tree's item at each path; the dependency search names
+//     each build once across its keyset pages; Get Repositories without
+//     limit reads windows after the last key. Folder information walks its
+//     trees' children in name order one tree after another, as it listed
+//     them, and a folder's last-modified view folds the merged walk,
+//     settling a tie as the collected read did. The trash can's views walk
+//     its tree in path order (trash.Walk).
 //
 // # References
 //
@@ -114,8 +128,14 @@
 // The tests here call the partial and its helpers without the router, over
 // in-memory stores and the access module of accesstest, which the package's
 // test fixture binds as the router would: the storage summary and its
-// formatting, the storage view's permissions, the repository operations,
-// the idempotency keys and replays, the transitive AQL peer rows and
+// formatting, the storage view's permissions, the streamed file list,
+// folder information and last-modified view against the views collected
+// whole, on the in-memory store, SQLite and PostgreSQL, and their store
+// faults (storage_list_stream_test.go), the trash can's views likewise
+// (trash_stream_test.go), the
+// repository operations, the build actions' replay bindings and keyed
+// appends, deletes and promotions through the shared replay, the
+// transitive AQL peer rows and
 // bounds, the AQL timeouts behind a router of the item routes alone, and
 // the upstream search disclosures. The route suites under
 // test/server/artifacts reach the rest through the router.
