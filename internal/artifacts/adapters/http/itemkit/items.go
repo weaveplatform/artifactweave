@@ -582,7 +582,8 @@ func (s *Kit) getSidecar(
 const contentTypeProperty = "artifactory.content-type"
 
 // fileContentType is the Content-Type a file downloads with on the item
-// route, GET and HEAD: its contentTypeProperty value, as 7.x's
+// route and from the native APIs that type by it (ServeItemFile), GET and
+// HEAD: its contentTypeProperty value, as 7.x's
 // DbStoringRepoMixin.setMimeType puts it on the resource its download
 // answers from, otherwise the type recorded from its path. 7.x's storage
 // info, deploy answer, archive entries and signed URLs type a file by its
@@ -621,8 +622,9 @@ func checksumType(r *http.Request, name string) string {
 // headers); ranges on a GET and conditional requests are
 // http.ServeContent's, less the two Artifactory's download never evaluates
 // (withoutUnevaluatedPreconditions). A Content-Disposition already in w's
-// headers is kept, so a protocol can send its own form. The native APIs
-// and the Docker registry serve their files with it.
+// headers is kept, so a protocol can send its own form. The Docker
+// registry's blobs and the native APIs that keep the path's type serve
+// their files with it (ProtocolOptions, #1396).
 func (s *Kit) ServeFile(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -635,14 +637,14 @@ func (s *Kit) ServeFile(
 
 // ServeItemFile is ServeFile for a download on the item route,
 // /artifactory/<repo>/<path>, for every package type and repository
-// class: the file is typed by its artifactory.content-type property when
-// that is set (fileContentType). 7.x answers that route through
-// RepoFilter and DownloadServiceImpl.process, which take the type from the
-// resource the repository's getInfo returns, typed by the property in
+// class, and on the native APIs whose 7.x downloads go through the same
+// service (ProtocolOptions): the file is typed by its
+// artifactory.content-type property when that is set (fileContentType).
+// 7.x answers the item route through RepoFilter and
+// DownloadServiceImpl.process, which take the type from the resource the
+// repository's getInfo returns, typed by the property in
 // DbStoringRepoMixin.setMimeType for a local or cache repository of any
 // package type, and send it on a GET and a HEAD (RequestResponseHelper).
-// The native APIs and the Docker registry keep ServeFile's type: their
-// 7.x code is not in the OSS sources, and JFrog's docs do not name them.
 func (s *Kit) ServeItemFile(
 	w http.ResponseWriter,
 	r *http.Request,

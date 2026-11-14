@@ -686,10 +686,14 @@ func (w *itemWorld) setContentType(key, file string) {
 // the repository's package type, as 7.x's item download
 // (DownloadServiceImpl) sends the type of the resource that
 // DbStoringRepoMixin.setMimeType types by the property for a repository
-// of any package type (#1380). The format's native download of the same
-// file keeps the type it had without the property: 7.x's native APIs are
-// not in its OSS sources and JFrog's docs do not name them.
+// of any package type (#1380). RubyGems' and PyPI's native downloads of
+// the same file send the property's type too, as their 7.x downloads go
+// through that service (PackageArtifactServiceImpl; RTFACT-27459 on
+// 7.41.13, pypa/pip#13396 on 7.113.0). The other formats' native
+// downloads keep the type they had without the property, as no source
+// shows theirs [I] (#1396).
 func TestAccContentTypePropertyRoutes(t *testing.T) {
+	typed := map[string]bool{"gems": true, "pypi": true}
 	for _, c := range protocolDownloads() {
 		t.Run(c.name, func(t *testing.T) {
 			w := newItemWorld(t, false)
@@ -721,11 +725,21 @@ func TestAccContentTypePropertyRoutes(t *testing.T) {
 				if got := rec.Header().Get("Content-Type"); got != customType {
 					t.Fatalf("%s item route: Content-Type %q, want %q", m, got, customType)
 				}
+				want := before[m]
+				if typed[c.name] {
+					want = customType
+				}
 				rec = w.do(m, native, "admin", "")
 				wantStatus(t, rec, http.StatusOK)
-				if got := rec.Header().Get("Content-Type"); got != before[m] {
-					t.Fatalf("%s %s: Content-Type %q, want %q as without the property",
-						m, native, got, before[m])
+				if got := rec.Header().Get("Content-Type"); got != want {
+					t.Fatalf("%s %s: Content-Type %q, want %q", m, native, got, want)
+				}
+				body := c.body
+				if m == http.MethodHead {
+					body = ""
+				}
+				if !c.archive && rec.Body.String() != body {
+					t.Fatalf("%s %s: body %q, want %q", m, native, rec.Body, body)
 				}
 			}
 		})
