@@ -48,7 +48,9 @@ immutable versions, serve sparse index records and archive bytes, and support
 yank and unyank. Delete and trash restore change the live sparse view, which
 is derived from the current item tree. The Cargo reindex operation validates
 stored crates and their metadata; it needs an administrator and waits for the
-rebuild unless `async=true`, as 7.x's reference says. A remote repository expects its `url` to
+rebuild unless `async=true`, as 7.x's reference says. On a remote repository, or
+its cache, it expires the cached upstream `config.json`, which the next read
+fetches again, where 7.x re-creates it. A remote repository expects its `url` to
 name an HTTP sparse index root; the remote adapter reads `config.json`, index
 rows and checksum-pinned crates through the shared source policy. The source
 policy controls refresh, offline cache, redirects, credentials, and

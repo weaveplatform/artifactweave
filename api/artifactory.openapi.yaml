@@ -1901,7 +1901,7 @@ paths:
       x-cost: ordinary
   /api/cargo/{repoKey}/reindex:
     post:
-      description: Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
+      description: Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. On a remote repository, named by its key or its cache's, expires the cached upstream config.json before it answers, so that the next read fetches it again. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
       operationId: calculateCargoRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -1924,7 +1924,7 @@ paths:
               schema:
                 description: Plain-text acknowledgement of the reindex.
                 type: string
-          description: The Cargo reindex ran, or was scheduled when async is true.
+          description: The Cargo reindex ran, or was scheduled when async is true; on a remote repository the cached upstream config.json was expired.
         '401':
           content:
             application/json:
@@ -8381,7 +8381,7 @@ paths:
       x-tier: native
   /api/pub/{repoKey}/reindex:
     post:
-      description: Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator.
+      description: Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator. Reindexing a remote repository or its cache is not implemented and answers 501.
       operationId: calculatePubRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -8425,6 +8425,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The server failed while processing the request; the body carries the error envelope.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Reindexing a remote repository or its cache is not implemented.
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       tags:

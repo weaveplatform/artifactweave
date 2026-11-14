@@ -25,15 +25,19 @@ type ReindexOp struct {
 	// repository is enough.
 	IsAdminOnly bool
 	// Classes are the repository classes 7.x reindexes and artifactweave
-	// serves. later are those 7.x reindexes that artifactweave serves only
-	// from P9 (remote, a remote's cache included) and P10 (virtual), which
-	// answer 501 until then (decision 0032). Any other class, or another
-	// package type, answers 400 with refused, a format taking the key.
+	// serves. later are those 7.x reindexes that artifactweave does not
+	// reindex yet (a remote's cache included), which answer 501 (decision
+	// 0032). Any other class, or another package type, answers 400 with
+	// refused, a format taking the key.
 	Classes, later []repo.Class
 	Refused        string
 	// Answer is the 200's text, a format taking the key, or the text
 	// itself when it names no repository, as RubyGems' OK.
 	Answer string
+	// RemoteExpires are the paths of a remote repository's cached upstream
+	// metadata that its reindex expires, so that the next read fetches them
+	// again. Such a reindex queues no work: it is done before the answer.
+	RemoteExpires []string
 }
 
 // Text is op's answer for the repository key.
@@ -78,11 +82,20 @@ var ReindexOps = map[repo.PackageType]ReindexOp{
 	// without async: the archived
 	// jfrog-rest-apis/calculate-cargo-repository-metadata (copy of
 	// 2026-01-18). The current page states neither.
+	//
+	// The current page supports local and remote repositories. On a remote
+	// one 7.x re-creates config.json and config-original.json, the
+	// upstream's (RTFACT-29403, RTFACT-29679). This server derives
+	// config.json from the repository's settings on every read, so the
+	// reindex expires the cached upstream config.json, which the next read
+	// fetches again. It leaves the cached index files and crates as they are
+	// [I] (#216).
 	repo.Cargo: {
-		IsAdminOnly: true,
-		Classes:     Hosted,
-		Refused:     "Repository '%s' is not a local cargo repository",
-		Answer:      "Recalculating index for Cargo repository %s scheduled to run.",
+		IsAdminOnly:   true,
+		Classes:       []repo.Class{repo.Local, repo.Federated, repo.Remote},
+		Refused:       "Repository '%s' is not a local cargo repository",
+		Answer:        "Recalculating index for Cargo repository %s scheduled to run.",
+		RemoteExpires: []string{"index/config.json"},
 	},
 	// "Requires a valid admin user" and the sample answer: the archived
 	// jfrog-rest-apis/calculate-cocoapods-index (copy of 2026-02-07). The
@@ -97,9 +110,13 @@ var ReindexOps = map[repo.PackageType]ReindexOp{
 	// "Requires a valid admin user": the archived
 	// jfrog-rest-apis/calculate-pub-repository-metadata (copy of
 	// 2026-02-09), whose sample shows no answer, so the text is ours [I].
+	// The current page supports remote repositories too, but no page,
+	// release note or issue says what a remote one rebuilds, so a remote
+	// repository and its cache answer 501 [I] (#216).
 	repo.Pub: {
 		IsAdminOnly: true,
 		Classes:     Hosted,
+		later:       []repo.Class{repo.Remote},
 		Refused:     "Repository '%s' is not a local pub repository",
 		Answer:      "Reindex of pub repo %s was scheduled to run.",
 	},
@@ -232,6 +249,8 @@ var ReindexOps = map[repo.PackageType]ReindexOp{
 // Reindex queues the reindex operation of package type t on the repository
 // key names, or on path in it when path is not empty, for its caller. It
 // answers 7.x's text once the work is queued, or once it has run when wait.
+// A remote repository whose operation names RemoteExpires has that metadata
+// expired before the answer, whatever wait says.
 func (s *Kit) Reindex(
 	ctx context.Context,
 	t repo.PackageType,
@@ -276,9 +295,15 @@ func (s *Kit) ReindexAs(
 			}
 		}
 	}
-	if t == repo.NuGet && c.Class == repo.Remote {
+	switch {
+	case c.Class == repo.Remote && op.RemoteExpires != nil:
+		if err = s.expireRemote(ctx, st, c, op.RemoteExpires); err != nil {
+			return "", err
+		}
+		return op.Text(key), nil
+	case t == repo.NuGet && c.Class == repo.Remote:
 		err = s.queueRemoteReindex(ctx, st, c, key)
-	} else {
+	default:
 		err = s.Enqueue(ctx, st, kind, workKey, by)
 	}
 	if err != nil {
@@ -379,6 +404,23 @@ func (s *Kit) queueRequest(
 	}
 	if err != nil {
 		return fmt.Errorf("queue %s of %s: %w", kind, key, err)
+	}
+	return nil
+}
+
+// expireRemote expires the cached upstream metadata at paths in c's remote
+// cache, as zap does, so that the next read revalidates it upstream.
+func (s *Kit) expireRemote(ctx context.Context, st Store, c repo.Config, paths []string) error {
+	err := st.Tx(ctx, func(ctx context.Context) error {
+		for _, p := range paths {
+			if _, err := st.RemoteCache().Invalidate(ctx, c.Key, p, true); err != nil {
+				return fmt.Errorf("expire %s: %w", p, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return s.InternalError(ctx, "remote reindex", err)
 	}
 	return nil
 }

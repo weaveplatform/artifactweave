@@ -79,7 +79,8 @@ func (s ArtifactoryAPI) CalculateAlpineRepositoryMetadata(
 // CalculateCargoRepositoryMetadata validates and rebuilds the hosted crate
 // view, before it answers unless async is true: "The calculation can be
 // synchronous (the default) or asynchronous"
-// (calculatecargorepositorymetadata).
+// (calculatecargorepositorymetadata). On a remote repository it expires the
+// cached upstream config.json instead (itemkit.ReindexOps).
 func (s ArtifactoryAPI) CalculateCargoRepositoryMetadata(
 	ctx context.Context,
 	req artgen.CalculateCargoRepositoryMetadataRequestObject,

@@ -32,7 +32,8 @@ the package/version index through the hosted API. Upload checks the archive's
 pubspec identity and canonical path, and each version is immutable. The
 `POST /artifactory/api/pub/{repo}/reindex` operation rebuilds the local
 index from stored archives. As 7.x's reference says, it needs an administrator
-and queues the rebuild; `async=false` waits for it. Delete removes the version from the native view;
+and queues the rebuild; `async=false` waits for it. A remote repository, or its
+cache, answers 501, as no 7.x source says what its reindex rebuilds. Delete removes the version from the native view;
 restore recreates it and its metadata.
 
 ## Verification

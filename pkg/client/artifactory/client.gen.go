@@ -9947,7 +9947,7 @@ type ClientInterface interface {
 
 	// CalculateCargoRepositoryMetadata performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 	//
-	// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
+	// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. On a remote repository, named by its key or its cache's, expires the cached upstream config.json before it answers, so that the next read fetches it again. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
 	CalculateCargoRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetItemSha256ChecksumWithBody Attach the sha256 property
@@ -10808,7 +10808,7 @@ type ClientInterface interface {
 
 	// CalculatePubRepositoryMetadata performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 	//
-	// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator.
+	// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator. Reindexing a remote repository or its cache is not implemented and answers 501.
 	CalculatePubRepositoryMetadata(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPuppetModules performs a GET /api/puppet/{repoKey}/v3/modules (the `GetPuppetModules` operationId) request.
@@ -13828,7 +13828,7 @@ func (c *Client) GetBuildArtifacts(ctx context.Context, buildName string, buildN
 
 // CalculateCargoRepositoryMetadata performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 //
-// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
+// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. On a remote repository, named by its key or its cache's, expires the cached upstream config.json before it answers, so that the next read fetches it again. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
 func (c *Client) CalculateCargoRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCargoRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -15833,7 +15833,7 @@ func (c *Client) CalculateOpkgRepositoryMetadata(ctx context.Context, repoKey st
 
 // CalculatePubRepositoryMetadata performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 //
-// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator.
+// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator. Reindexing a remote repository or its cache is not implemented and answers 501.
 func (c *Client) CalculatePubRepositoryMetadata(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculatePubRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -37198,7 +37198,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateCargoRepositoryMetadataWithResponse performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 	//
-	// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
+	// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. On a remote repository, named by its key or its cache's, expires the cached upstream config.json before it answers, so that the next read fetches it again. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCargoRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCargoRepositoryMetadataResponse, error)
@@ -38191,7 +38191,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculatePubRepositoryMetadataWithResponse performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 	//
-	// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator.
+	// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator. Reindexing a remote repository or its cache is not implemented and answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculatePubRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculatePubRepositoryMetadataResponse, error)
@@ -52940,6 +52940,8 @@ type CalculatePubRepositoryMetadataResponse struct {
 	JSON429 *TooManyRequests
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+	// JSON501 the response for an HTTP 501 `application/json` response
+	JSON501 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
 	// Headers429 the parsed response headers for an HTTP 429 response
@@ -52966,6 +52968,11 @@ func (r CalculatePubRepositoryMetadataResponse) GetJSON429() *TooManyRequests {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r CalculatePubRepositoryMetadataResponse) GetJSON500() *ErrorResponse {
 	return r.JSON500
+}
+
+// GetJSON501 returns the response for an HTTP 501 `application/json` response
+func (r CalculatePubRepositoryMetadataResponse) GetJSON501() *ErrorResponse {
+	return r.JSON501
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
@@ -73984,7 +73991,7 @@ func (c *ClientWithResponses) GetBuildArtifactsWithResponse(ctx context.Context,
 
 // CalculateCargoRepositoryMetadataWithResponse performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 //
-// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
+// Validates and rebuilds the metadata of a local or one-node federated Cargo repository. Waits for the work to finish unless async is true. On a remote repository, named by its key or its cache's, expires the cached upstream config.json before it answers, so that the next read fetches it again. Requires an administrator. Answers "Recalculating index for Cargo repository <repoKey> scheduled to run."
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCargoRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCargoRepositoryMetadataResponse, error) {
@@ -75666,7 +75673,7 @@ func (c *ClientWithResponses) CalculateOpkgRepositoryMetadataWithResponse(ctx co
 
 // CalculatePubRepositoryMetadataWithResponse performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 //
-// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator.
+// Queues a rebuild of the local or one-node federated Dart pub package index from stored archives and returns once it is queued; async=false waits for the work to finish. Requires an administrator. Reindexing a remote repository or its cache is not implemented and answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculatePubRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculatePubRepositoryMetadataResponse, error) {
@@ -94183,6 +94190,13 @@ func ParseCalculatePubRepositoryMetadataResponse(rsp *http.Response) (*Calculate
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON501 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
 		var dest ServiceUnavailable
