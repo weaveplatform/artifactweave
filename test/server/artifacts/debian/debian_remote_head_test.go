@@ -6,8 +6,11 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -68,6 +71,65 @@ func TestAccDebianRemoteIndexHeadAnswersItsLength(t *testing.T) {
 						w.Upstream.Requests())
 				}
 			}
+		})
+	}
+}
+
+// TestAccDebianRemoteIndexHeadReadsByItsOwnPath: a caller who may read a
+// remote Debian repository's Packages index by its path, but not the
+// package it lists, is refused the index's GET, 403, which checks every
+// listed package; its HEAD, cold and once cached, answers 200 with the
+// index's length and no body. The HEAD is answered from the index's info,
+// as 7.x reads a remote index by its own path's permission, and sends no
+// package list (#1478).
+func TestAccDebianRemoteIndexHeadReadsByItsOwnPath(t *testing.T) {
+	files, _ := queryArchive(t)
+	const p = "dists/stable/main/binary-amd64/Packages"
+	for _, store := range []bool{true, false} {
+		t.Run("store="+strconv.FormatBool(store), func(t *testing.T) {
+			w := harness.NewRemoteWorld(t)
+			w.Repo.PackageType = repo.Debian
+			w.Repo.StoreArtifactsLocally = new(store)
+			w.Update()
+			w.Upstream.Set("/"+p, fakeupstream.Resource{Body: files[p]})
+			if err := w.Runtime.Store.Users().Create(t.Context(), accesstest.User{
+				Name: "indexonly", PasswordHash: support.CheapHash,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Runtime.Store.Permissions().Create(t.Context(), accesstest.Permission{
+				Name: "index-only", Resources: map[api.ResourceType]accesstest.Resource{
+					api.ResourceArtifact: {
+						Actions: accesstest.Grants{
+							Users: map[string]api.Actions{"indexonly": api.ActionRead},
+						},
+						Targets: map[string]accesstest.Target{"remote": {
+							Include: []string{"**"}, Exclude: []string{"pool/**"},
+						}},
+					},
+				},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			target := "/artifactory/remote/" + p
+			cold := w.Request(http.MethodHead, target, "indexonly", "")
+			harness.WantStatus(t, w.Request(http.MethodGet, target, "reader", ""), http.StatusOK)
+			warm := w.Request(http.MethodHead, target, "indexonly", "")
+			for pass, head := range map[string]*httptest.ResponseRecorder{"cold": cold, "warm": warm} {
+				if head.Code != http.StatusOK || head.Body.Len() != 0 ||
+					head.Header().Get("Content-Length") != strconv.Itoa(len(files[p])) {
+					t.Errorf(
+						"%s HEAD: %d, Content-Length %q, %d bytes; want 200, %d and none",
+						pass,
+						head.Code,
+						head.Header().Get("Content-Length"),
+						head.Body.Len(),
+						len(files[p]),
+					)
+				}
+			}
+			queryRefusal(t, w.Request(http.MethodGet, target, "indexonly", ""),
+				http.StatusForbidden, "Forbidden")
 		})
 	}
 }
