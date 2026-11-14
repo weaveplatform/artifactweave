@@ -13,7 +13,6 @@ import (
 	"unicode"
 
 	"github.com/go-chi/chi/v5"
-	"golang.org/x/mod/semver"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
@@ -862,7 +861,11 @@ func (h handler) listingBlackout(r *http.Request) error {
 // archives (stored), in the index's order, as hosted checks them, so that
 // a page holding two that fail answers the failure hosted would. A release
 // deleted between the count and the page leaves the page short, as the
-// whole-repository lists' pages are left.
+// whole-repository lists' pages are left. A caller who may read every
+// path of the module's folder sees every version, so the store counts them
+// and reads the page's names, from the highest OrderKey down, which is the
+// list's order (model.CompareForge), with no name read past the page
+// (#1426).
 func (h handler) hostedPage(
 	r *http.Request,
 	name string,
@@ -875,6 +878,9 @@ func (h handler) hostedPage(
 	}
 	if err != nil {
 		return nil, 0, fmt.Errorf("puppet: find package: %w", err)
+	}
+	if h.k.CanAll(r, name, api.ActionRead) {
+		return h.wholePage(r, p, offset, limit)
 	}
 	indexed, err := h.k.DB().Packages().VersionNames(r.Context(), p.ID)
 	if err != nil {
@@ -916,6 +922,49 @@ func (h handler) hostedPage(
 		}
 	}
 	return out, len(listed), nil
+}
+
+// wholePage is hostedPage for a caller who may read every release of
+// module p. The page's releases are read from the lowest OrderKey up, the
+// index's order, as hostedPage reads them.
+func (h handler) wholePage(
+	r *http.Request,
+	p model.Package,
+	offset, limit int,
+) ([]release, int, error) {
+	ctx := r.Context()
+	st := h.k.DB().Packages()
+	total, err := st.CountVersions(ctx, p.ID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("puppet: package versions: %w", err)
+	}
+	if total > maxVersions {
+		return nil, 0, apierror.New(503, "Puppet releases exceed limit")
+	}
+	listed, err := st.VersionNamesAt(ctx, p.ID, true, offset, limit)
+	if err != nil {
+		return nil, 0, fmt.Errorf("puppet: package versions: %w", err)
+	}
+	found := make(map[string]release, len(listed))
+	for _, version := range slices.Backward(listed) {
+		v, err := st.Version(ctx, p.ID, version)
+		if errors.Is(err, kernel.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("puppet: package version: %w", err)
+		}
+		if found[version], err = h.stored(r, p.Name, v); err != nil {
+			return nil, 0, err
+		}
+	}
+	out := make([]release, 0, len(found))
+	for _, v := range listed {
+		if rel, ok := found[v]; ok {
+			out = append(out, rel)
+		}
+	}
+	return out, total, nil
 }
 
 // stored returns the release of module name that the package index's
@@ -1017,13 +1066,10 @@ func sortReleases(out []release) {
 }
 
 // newestFirst orders Puppet versions from the highest semantic version
-// down, the order every release list answers in.
-func newestFirst(a, b string) int {
-	if cmp := semver.Compare("v"+a, "v"+b); cmp != 0 {
-		return -cmp
-	}
-	return strings.Compare(a, b)
-}
+// down, the order every release list answers in: the reverse of the
+// package index's (model.CompareForge), so a list may read it from the
+// index (#1426).
+func newestFirst(a, b string) int { return model.CompareForge(b, a) }
 
 // writeJSON answers doc as JSON, writing "&", "<" and ">" as they are
 // rather than as &, < and >, as 7.x writes them: in its

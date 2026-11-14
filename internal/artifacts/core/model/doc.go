@@ -32,7 +32,8 @@
 //   - Packages: Package, PackageVersion and VersionFile; VersionComparator
 //     with StringComparator and CreatedOrder, ComparatorFor, SortVersions
 //     and AssignOrderKeys; and CompareSemver, CompareNuGet, ComparePEP440,
-//     CompareMaven and CompareMercury.
+//     CompareMaven, CompareMercury, CompareForge (Puppet and Chef) and
+//     CompareGalaxy (Ansible), the orders their lists answer in, reversed.
 //   - Builds: Build, BuildRun, BuildName, BuildModule, BuildFile,
 //     BuildFileRef, BuildPromotion and BuildRetention, with BuildInfoRepo
 //     and EncodeBuildInfoSegment.
@@ -106,6 +107,9 @@
 //     their limits, the trash record document and archived item expiry.
 //   - version_test.go: each comparator's order, ComparatorFor and sorting,
 //     and AssignOrderKeys.
+//   - list_order_test.go: CompareForge and CompareGalaxy against the
+//     handlers' x/mod/semver orders, including invalid versions and build
+//     metadata, and the order keys they assign (#1426).
 //   - build_test.go: the build-info segment encoding, BuildInfoRepo, a
 //     run's document item and its identity.
 //   - matrix_test.go: matrix parameters against a file's properties.

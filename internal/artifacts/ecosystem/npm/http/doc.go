@@ -72,7 +72,11 @@
 // # Invariants
 //
 //   - A packument, manifest, search result or tag list shows only the
-//     versions the caller may read.
+//     versions the caller may read. A search without text by a caller who
+//     may read every path of the repository sees every package with a
+//     version, so its from is the package index's offset and only the page
+//     is read (#1425); any other search counts from over the candidates
+//     the caller may read.
 //   - The download policy, after read permission: the packument, a
 //     version's manifest and the dist-tags are checked at
 //     .npm/<name>/package.json, where 7.x keeps the packument, so the
@@ -129,6 +133,9 @@
 //   - npm_test.go, publish_test.go, lifecycle_test.go, latest_test.go and
 //     search_test.go: the registry routes through a server, their
 //     permissions, refusals and store faults.
+//   - search_page_test.go: a late search page of 5,000 packages reads the
+//     index a page of candidates at a time, and only its page for a caller
+//     who may read the whole repository.
 //   - user_test.go: login and logout with the real authenticator and token
 //     service, built by the access test kit (access/accesstest).
 //   - remote_test.go, remote_dist_test.go and remote_integrity_test.go:

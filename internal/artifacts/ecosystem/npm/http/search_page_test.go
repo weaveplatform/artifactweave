@@ -15,9 +15,12 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
-// searchReads counts what a search reads of the package index.
+// searchReads counts what a search reads of the package index: searches
+// and the candidates they return, and pages, the packages they return and
+// reads of a page's versions.
 type searchReads struct {
 	searches, candidates, finds, versions, lists int
+	pages, paged, withVersions                   int
 }
 
 type countingStore struct {
@@ -43,6 +46,26 @@ func (p countingPackages) SearchNpm(
 	return found, next, err //nolint:wrapcheck // a test's pass-through
 }
 
+func (p countingPackages) CountPackages(ctx context.Context, r port.PackageRange) (int, error) {
+	panic("npm search counts no packages")
+}
+
+func (p countingPackages) PackagesAt(
+	ctx context.Context, r port.PackageRange, offset, limit int,
+) ([]model.Package, error) {
+	found, err := p.PackageStore.PackagesAt(ctx, r, offset, limit)
+	p.reads.pages++
+	p.reads.paged += len(found)
+	return found, err //nolint:wrapcheck // a test's pass-through
+}
+
+func (p countingPackages) Candidates(
+	ctx context.Context, packages []model.Package,
+) ([]port.SearchCandidate, error) {
+	p.reads.withVersions++
+	return p.PackageStore.Candidates(ctx, packages) //nolint:wrapcheck // a test's pass-through
+}
+
 func (p countingPackages) Find(ctx context.Context, key, name string) (model.Package, error) {
 	p.reads.finds++
 	return p.PackageStore.Find(ctx, key, name) //nolint:wrapcheck // a test's pass-through
@@ -65,8 +88,9 @@ func bulkName(i int) string { return fmt.Sprintf("bulk-%05d", i) }
 
 // A late page of 5000 packages reads the index a page of candidates at a
 // time, each with its versions, never a package or its versions one by
-// one; a term names the packages it reads; and a page a caller may read
-// all of reads only what the page needs.
+// one; a term names the packages it reads; and a search without text by a
+// caller who may read the whole repository reads its page alone, at most
+// 500 packages to a read (#1425).
 func TestAccSearchLatePage(t *testing.T) {
 	reads := &searchReads{}
 	f := newFixture(t, func(st pkgroute.Store) pkgroute.Store {
@@ -94,38 +118,44 @@ func TestAccSearchLatePage(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	late := []string{}
-	for i := count - 20; i < count; i++ {
-		late = append(late, bulkName(i))
+	names := func(from, to int) []string {
+		out := []string{}
+		for i := from; i < to; i++ {
+			out = append(out, bulkName(i))
+		}
+		return out
+	}
+	paged := func(pages, n int) searchReads {
+		return searchReads{pages: pages, paged: n, withVersions: pages}
 	}
 	for _, c := range []struct {
-		query, user        string
-		want               []string
-		searches, inspects int
+		query, user string
+		want        []string
+		reads       searchReads
 	}{
-		// from is counted over what the caller may read, so the scan
-		// passes over 4980 packages, 500 to a read of the index.
-		{"from=4980&size=20", "reader", late, 10, count},
-		{"text=bulk-04990", "reader", []string{"bulk-04990"}, 1, 1},
-		{"size=20", "reader", late[:0:0], 1, 20},
-		// A caller who may read none of them reads them in growing
-		// batches: 20, 40, 80, 160, 320, then 500 at a time.
-		{"size=20", "partial", []string{}, 14, count},
+		{"from=4980&size=20", "reader", names(count-20, count), paged(1, 20)},
+		{"size=20", "reader", names(0, 20), paged(1, 20)},
+		// A page of more than 500 is read 500 at a time, and a read
+		// short of what it asked for ends it.
+		{"from=10&size=1200", "reader", names(10, 1210), paged(3, 1200)},
+		{"from=4900&size=600", "reader", names(4900, count), paged(1, 100)},
+		// A page past the end reads no versions.
+		{"from=6000", "reader", []string{}, searchReads{pages: 1}},
+		{"text=bulk-04990", "reader", []string{"bulk-04990"}, searchReads{searches: 1, candidates: 1}},
+		// from is counted over what a caller whose permission names paths
+		// may read, so the scan passes over every package, 500 to a read
+		// of the index; it reads them in growing batches, 20, 40, 80,
+		// 160, 320, then 500 at a time, when it may read none.
+		{"from=4980&size=20", "partial", []string{}, searchReads{searches: 10, candidates: count}},
+		{"size=20", "partial", []string{}, searchReads{searches: 14, candidates: count}},
 	} {
 		*reads = searchReads{}
 		got := f.search(t, c.query, c.user)
-		if c.query == "size=20" && c.user == "reader" {
-			c.want = []string{}
-			for i := range 20 {
-				c.want = append(c.want, bulkName(i))
-			}
-		}
 		if !slices.Equal(got, c.want) {
 			t.Errorf("%s as %s: %v, want %v", c.query, c.user, got, c.want)
 		}
-		want := searchReads{searches: c.searches, candidates: c.inspects}
-		if *reads != want {
-			t.Errorf("%s as %s read %+v, want %+v", c.query, c.user, *reads, want)
+		if *reads != c.reads {
+			t.Errorf("%s as %s read %+v, want %+v", c.query, c.user, *reads, c.reads)
 		}
 	}
 }

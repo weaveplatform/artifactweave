@@ -1,6 +1,7 @@
 package antpath
 
 import (
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
@@ -82,6 +83,41 @@ func (p Pattern) MatchBelow(folder string) bool {
 		}
 	}
 	return len(p.segs) > len(segs)
+}
+
+// MatchAllBelow reports whether the pattern matches every path below
+// folder, a path of at least one more segment ("" for every path but the
+// root), whatever those segments hold. A list relies on it to count what
+// lies below a folder without matching each path, so it must never be true
+// when some path below the folder fails Match; it may be false when every
+// path matches, which only costs that list its shortcut. It is true when
+// the pattern has a "**", each segment before it matches the folder's
+// segment at its place or, past the folder, is made of '*' alone, each
+// segment after it is made of '*' alone, and the shortest path below the
+// folder has a segment for each of those: "**", "a/**" below "a", "*/**",
+// "**/*" and "a/" (which is "a/**").
+func (p Pattern) MatchAllBelow(folder string) bool {
+	segs := splitPath(folder)
+	first := slices.Index(p.segs, "**")
+	// Without "**" a pattern matches paths of one length only; and the
+	// shortest path below the folder, len(segs)+1 segments, needs one for
+	// each segment the "**" does not stand for.
+	if first < 0 || len(p.segs)-1 > len(segs)+1 {
+		return false
+	}
+	for i, s := range p.segs {
+		switch {
+		case i == first:
+		case i < first && i < len(segs):
+			if !matchSegment(s, segs[i]) {
+				return false
+			}
+		case s == "" || strings.Trim(s, "*") != "":
+			// A segment that may not match whatever a path holds there.
+			return false
+		}
+	}
+	return true
 }
 
 // matchSegment matches one segment against '*' and '?' by runes, with the

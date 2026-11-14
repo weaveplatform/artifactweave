@@ -48,7 +48,10 @@
 //   - Store, the store the kit resolves repositories and reads items in, and
 //     DB() returns. Each composite store in app satisfies it, so the server
 //     passes the store it holds.
-//   - Permission helpers: Can, CanFolder, Require and RequireFolder.
+//   - Permission helpers: Can, CanFolder, CanAll, Require and
+//     RequireFolder. CanAll says whether the caller may read every path
+//     below a folder, so a list may count and page in its store (#1425,
+//     #1426).
 //   - Download helpers: DownloadItem, ResolveDownloadItem, ServeItem,
 //     ServeFound, Read, CheckDownload, ServeResult, ServeStream and
 //     SourceError; and 7.x's download's conditional answers, which the item

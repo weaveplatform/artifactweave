@@ -617,6 +617,23 @@ func (k *Kit) CanFolder(r *http.Request, path string, want accessapi.Actions) bo
 	}, path, want)
 }
 
+// CanAll reports whether the caller holds every action in want on every
+// path below folder ("" for the whole repository) in the request's
+// repository (accessapi.Decider.AllowsAll). A list that filters what it
+// answers by Can asks it first: when it holds, Can holds for every entry,
+// so the list may count and page in the store, and its answer is the one
+// the filter gives. When it does not, the list filters each entry.
+func (k *Kit) CanAll(r *http.Request, folder string, want accessapi.Actions) bool {
+	d, ok := accessapi.DeciderFrom(r.Context())
+	if !ok {
+		return false
+	}
+	c := RequestFrom(r).Repo
+	return d.AllowsAll(accessapi.ResourceArtifact, accessapi.Repo{
+		Key: c.Key, Class: string(c.Class),
+	}, folder, want)
+}
+
 // Annotate changes the properties of it, a file of the request's
 // repository, through the item service, so a format whose index follows
 // properties follows this change too: set replaces the values of its keys
