@@ -31,6 +31,8 @@
 //     through chi's own tree (chi.Mux.Find), so a static segment beats a
 //     parameter as it does in the router, and reports false for a request
 //     no spec pattern matches.
+//   - NewIndex's errors: ErrDuplicate for a method and pattern listed twice,
+//     ErrPattern for a pattern chi cannot route.
 //
 // # Invariants
 //

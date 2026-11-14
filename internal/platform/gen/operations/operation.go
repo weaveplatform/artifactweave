@@ -1,6 +1,7 @@
 package operations
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -40,6 +41,14 @@ type Operation struct {
 	Pagination string
 }
 
+// Errors NewIndex wraps.
+var (
+	// ErrDuplicate: two rows share a method and pattern.
+	ErrDuplicate = errors.New("operations: a method and pattern listed twice")
+	// ErrPattern: chi refused a pattern.
+	ErrPattern = errors.New("operations: a pattern chi cannot route")
+)
+
 // Index finds the operation a request addresses with chi's own routing over
 // the table's patterns, so the lookup applies the router's precedence (a
 // static segment beats a parameter) to the same escaped path.
@@ -56,14 +65,14 @@ func NewIndex(table []Operation) (_ *Index, err error) {
 	defer func() {
 		// chi reports a pattern it cannot route by panicking at registration.
 		if p := recover(); p != nil {
-			err = fmt.Errorf("operations: %v", p)
+			err = fmt.Errorf("%w: %v", ErrPattern, p)
 		}
 	}()
 	noop := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 	for _, op := range table {
 		key := op.Method + " " + op.Pattern
 		if _, dup := x.ops[key]; dup {
-			return nil, fmt.Errorf("operations: %s is listed twice", key)
+			return nil, fmt.Errorf("%w: %s", ErrDuplicate, key)
 		}
 		x.ops[key] = op
 		x.mux.Method(op.Method, op.Pattern, noop)

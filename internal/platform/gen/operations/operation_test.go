@@ -1,6 +1,7 @@
 package operations_test
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -159,13 +160,18 @@ func TestUnitIndexFind(t *testing.T) {
 
 func TestUnitNewIndexErrors(t *testing.T) {
 	op := operations.Operation{Method: "GET", Pattern: "/a/{b}", OperationID: "a"}
-	if _, err := operations.NewIndex([]operations.Operation{op, op}); err == nil ||
-		!strings.Contains(err.Error(), "twice") {
+	if _, err := operations.NewIndex(
+		[]operations.Operation{op, op},
+	); !errors.Is(
+		err,
+		operations.ErrDuplicate,
+	) ||
+		!strings.Contains(err.Error(), "GET /a/{b}") {
 		t.Fatalf("a row listed twice: %v", err)
 	}
 	if _, err := operations.NewIndex(
 		[]operations.Operation{{Method: "GET", Pattern: "no-slash"}},
-	); err == nil {
-		t.Fatal("expected chi to refuse a pattern without a leading slash")
+	); !errors.Is(err, operations.ErrPattern) {
+		t.Fatalf("expected chi to refuse a pattern without a leading slash: %v", err)
 	}
 }
