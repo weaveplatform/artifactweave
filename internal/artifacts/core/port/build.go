@@ -95,6 +95,13 @@ type BuildStore interface {
 	FindArtifacts(ctx context.Context, c kernel.Checksums) ([]model.BuildFileRef, error)
 	// FindDependencies is FindArtifacts for dependencies.
 	FindDependencies(ctx context.Context, c kernel.Checksums) ([]model.BuildFileRef, error)
+	// DependencyPage is one keyset page of FindDependencies, in its order,
+	// for a search that writes its answer as it reads it (#1409).
+	DependencyPage(
+		ctx context.Context,
+		c kernel.Checksums,
+		p kernel.Page,
+	) ([]model.BuildFileRef, string, error)
 
 	// Search runs an AQL builds or build.promotions query (decision
 	// 0012): the matching runs, or promotions with their runs, in the

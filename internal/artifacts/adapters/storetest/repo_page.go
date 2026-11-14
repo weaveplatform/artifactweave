@@ -85,6 +85,13 @@ func testRepoPages(t *testing.T, r port.RepoStore) {
 			{Keys: []string{"a-local", "b-fed", "c-remote"}},
 			{Every: true},
 		}, Limit: 1, Offset: 1, Count: true}, want{[]string{"b-fed"}, false, 2}},
+		{"after a key", port.RepoListing{After: "c-remote"}, want{keys: every[3:]}},
+		{"after a key, a window", port.RepoListing{After: "b-fed", Limit: 2}, want{every[2:4], true, 0}},
+		{"after an absent key", port.RepoListing{After: "c"}, want{keys: every[2:]}},
+		{"after the last key", port.RepoListing{After: "f-local", Limit: 2}, want{nil, false, 0}},
+		{"after a key, filtered", port.RepoListing{
+			After: "a-local", Class: repo.Local, Limit: 1,
+		}, want{[]string{"e-local"}, true, 0}},
 		{"every filter", port.RepoListing{
 			Class: repo.Federated, ProjectKey: "p", PackageTypes: []repo.PackageType{repo.Maven},
 			Visible: []port.RepoSet{{Keys: []string{"b-fed"}}}, Limit: 1, Count: true,

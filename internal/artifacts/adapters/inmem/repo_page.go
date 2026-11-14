@@ -39,6 +39,7 @@ func (r repos) Page(ctx context.Context, l port.RepoListing) (port.RepoPage, err
 func listed(l port.RepoListing, c repo.Config) bool {
 	if l.Class != "" && c.Class != l.Class ||
 		l.ProjectKey != "" && c.ProjectKey != l.ProjectKey ||
+		l.After != "" && c.Key <= l.After ||
 		l.PackageTypes != nil && !slices.Contains(l.PackageTypes, c.PackageType) {
 		return false
 	}

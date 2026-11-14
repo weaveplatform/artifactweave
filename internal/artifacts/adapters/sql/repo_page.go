@@ -83,6 +83,11 @@ func repoListingWhere(l port.RepoListing) (string, []any) {
 		conds = append(conds, "r.project_key = ?")
 		args = append(args, l.ProjectKey)
 	}
+	if l.After != "" {
+		// The primary key seeks past it, in the order the window reads.
+		conds = append(conds, "r.key > ?")
+		args = append(args, l.After)
+	}
 	if l.PackageTypes != nil {
 		conds = append(conds, inList("r.package_type", len(l.PackageTypes)))
 		for _, t := range l.PackageTypes {

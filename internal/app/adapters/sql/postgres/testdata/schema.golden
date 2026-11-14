@@ -181,7 +181,7 @@ column build_dependencies.md5 text NOT NULL DEFAULT ''::text
 constraint build_dependencies.build_dependencies_build_id_module_position_fkey FOREIGN KEY (build_id, module_position) REFERENCES build_modules(build_id, "position") ON DELETE CASCADE
 constraint build_dependencies.build_dependencies_pkey PRIMARY KEY (build_id, module_position, "position")
 index build_dependencies.build_dependencies_pkey CREATE UNIQUE INDEX build_dependencies_pkey ON build_dependencies USING btree (build_id, module_position, "position")
-index build_dependencies.build_dependencies_sha1 CREATE INDEX build_dependencies_sha1 ON build_dependencies USING btree (sha1)
+index build_dependencies.build_dependencies_sha1_order CREATE INDEX build_dependencies_sha1_order ON build_dependencies USING btree (sha1, build_id, module_position, "position")
 index build_dependencies.build_dependencies_sha256 CREATE INDEX build_dependencies_sha256 ON build_dependencies USING btree (sha256)
 table build_modules
 column build_modules.build_id bigint NOT NULL
@@ -518,6 +518,11 @@ constraint items.items_pkey PRIMARY KEY (id)
 index items.items_created CREATE INDEX items_created ON items USING btree (created_at)
 index items.items_docker_images CREATE INDEX items_docker_images ON items USING btree (repo_key, cached, "left"(path, (length(path) - strpos(reverse(path), '/'::text))), path) WHERE ((type = 'file'::text) AND (name = ANY (ARRAY['manifest.json'::text, 'list.manifest.json'::text])))
 index items.items_docker_tags CREATE INDEX items_docker_tags ON items USING btree (repo_key, cached, lower(path), path) WHERE ((type = 'file'::text) AND (name = ANY (ARRAY['manifest.json'::text, 'list.manifest.json'::text])))
+index items.items_full_path CREATE INDEX items_full_path ON items USING btree (repo_key, cached, (
+CASE
+    WHEN (path = '.'::text) THEN name
+    ELSE ((path || '/'::text) || name)
+END))
 index items.items_md5 CREATE INDEX items_md5 ON items USING btree (md5)
 index items.items_modified CREATE INDEX items_modified ON items USING btree (modified_at)
 index items.items_natural CREATE UNIQUE INDEX items_natural ON items USING btree (repo_key, cached, path, name)
