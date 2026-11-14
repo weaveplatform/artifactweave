@@ -911,7 +911,11 @@ paths:
       summary: List build cleanup policies
       tags:
       - cleanup
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallbuildcleanuppolicies.md
+      x-pagination: complete
+      x-pagination-next: none
       x-tier: stub
   /api/cleanup/builds/policies/{policyKey}:
     delete:
@@ -964,6 +968,10 @@ paths:
       summary: Delete a build cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletebuildcleanuppolicy.md
       x-tier: stub
     get:
@@ -1016,6 +1024,8 @@ paths:
       summary: Get a build cleanup policy
       tags:
       - cleanup
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getbuildcleanuppolicy.md
       x-tier: stub
     post:
@@ -1075,6 +1085,10 @@ paths:
       summary: Create a build cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/createbuildcleanuppolicy.md
       x-tier: stub
     put:
@@ -1134,6 +1148,10 @@ paths:
       summary: Replace a build cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatebuildcleanuppolicy.md
       x-tier: stub
   /api/cleanup/builds/policies/{policyKey}/enablement:
@@ -1190,6 +1208,10 @@ paths:
       summary: Enable or disable a build cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/enabledisablebuildcleanuppolicy.md
       x-tier: stub
   /api/cleanup/builds/policies/{policyKey}/run:
@@ -1250,6 +1272,8 @@ paths:
       summary: Run a build cleanup policy now
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: key
       x-oracle-source: https://docs.jfrog.com/administration/reference/runbuildcleanuppolicy.md
       x-tier: stub
   /api/cleanup/bundles/policies:
@@ -1299,7 +1323,11 @@ paths:
       summary: List release bundle cleanup policies
       tags:
       - cleanup
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallreleasebundlecleanuppolicies.md
+      x-pagination: complete
+      x-pagination-next: none
       x-tier: stub
   /api/cleanup/bundles/policies/{policyKey}:
     delete:
@@ -1352,6 +1380,10 @@ paths:
       summary: Delete a release bundle cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletereleasebundlecleanuppolicy.md
       x-tier: stub
     get:
@@ -1404,6 +1436,8 @@ paths:
       summary: Get a release bundle cleanup policy
       tags:
       - cleanup
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getreleasebundlecleanuppolicy.md
       x-tier: stub
     post:
@@ -1463,6 +1497,10 @@ paths:
       summary: Create a release bundle cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/createreleasebundlecleanuppolicy.md
       x-tier: stub
     put:
@@ -1522,6 +1560,10 @@ paths:
       summary: Replace a release bundle cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatereleasebundlecleanuppolicy.md
       x-tier: stub
   /api/cleanup/bundles/policies/{policyKey}/enablement:
@@ -1578,6 +1620,10 @@ paths:
       summary: Enable or disable a release bundle cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/enabledisablereleasebundlecleanuppolicy.md
       x-tier: stub
   /api/cleanup/bundles/policies/{policyKey}/run:
@@ -1638,6 +1684,8 @@ paths:
       summary: Run a release bundle cleanup policy now
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: key
       x-oracle-source: https://docs.jfrog.com/administration/reference/runreleasebundlecleanuppolicy.md
       x-tier: stub
   /api/cleanup/packages/policies:
@@ -1689,7 +1737,11 @@ paths:
       summary: List package cleanup policies
       tags:
       - cleanup
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallpackagecleanuppolicies.md
+      x-pagination: complete
+      x-pagination-next: none
   /api/cleanup/packages/policies/{policyKey}:
     delete:
       description: Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports
@@ -1743,6 +1795,10 @@ paths:
       summary: Delete a package cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletepackagecleanuppolicy.md
     get:
       description: Returns one package cleanup policy. Requires a platform admin, or a project admin when the policy
@@ -1806,6 +1862,8 @@ paths:
       summary: Get a package cleanup policy
       tags:
       - cleanup
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpackagecleanuppolicy.md
     post:
       description: 'Stores a new package cleanup policy under policyKey, disabled. The body''s key must match the
@@ -1866,6 +1924,10 @@ paths:
       summary: Create a package cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/createpackagecleanuppolicy.md
     put:
       description: Replaces the policy's configuration with the body. The key, item type and project cannot change.
@@ -1927,6 +1989,10 @@ paths:
       summary: Replace a package cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatepackagecleanuppolicy.md
   /api/cleanup/packages/policies/{policyKey}/enablement:
     post:
@@ -1984,6 +2050,10 @@ paths:
       summary: Enable or disable a package cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:policyKey
       x-oracle-source: https://docs.jfrog.com/administration/reference/enabledisablepackagecleanuppolicy.md
   /api/cleanup/packages/policies/{policyKey}/run:
     put:
@@ -2046,6 +2116,8 @@ paths:
       summary: Run a package cleanup policy now
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: key
       x-oracle-source: https://docs.jfrog.com/administration/reference/runpackagecleanuppolicy.md
   /api/cleanup/policies/forceDisableAll:
     put:
@@ -2091,6 +2163,10 @@ paths:
       summary: Disable every cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/administration/reference/disableallcleanuppolicies.md
   /api/cleanup/policies/runs/downloadReport:
     get:
@@ -2153,6 +2229,8 @@ paths:
       summary: Download a cleanup run's item report
       tags:
       - cleanup
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/downloadcleanuppolicyrunreport.md
   /api/cleanup/policies/runs/forceStopAll:
     put:
@@ -2189,6 +2267,10 @@ paths:
       summary: Stop every running cleanup policy
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/administration/reference/stopallrunningcleanuppolicies.md
   /api/cleanup/policies/runs/summaryReports:
     get:
@@ -2249,6 +2331,8 @@ paths:
       summary: Get a cleanup run's summary report
       tags:
       - cleanup
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/viewcleanuppolicyrunsummaryreport.md
   /api/cleanup/policies/runs/view:
     get:
@@ -2388,7 +2472,14 @@ paths:
       summary: List cleanup runs
       tags:
       - cleanup
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getcleanuppolicyrunsview.md
+      x-pagination: page
+      x-pagination-next: link
+      x-pagination-parameters:
+        position: page
+        size: pageSize
   /api/cleanup/policies/runs/{policyKey}/{triggerId}:
     get:
       description: Returns the status and counters of one run of a policy, running or finished. Requires a platform
@@ -2447,6 +2538,8 @@ paths:
       summary: Get one cleanup run
       tags:
       - cleanup
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getrunbytriggerid.md
   /api/cleanup/policies/runs/{runId}:
     put:
@@ -2508,6 +2601,10 @@ paths:
       summary: Stop one cleanup run
       tags:
       - cleanup
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:runId
       x-oracle-source: https://docs.jfrog.com/administration/reference/stoprunningcleanuppolicy.md
   /api/cleanup/policies/view:
     get:
@@ -2575,4 +2672,8 @@ paths:
       summary: Overview of cleanup policies
       tags:
       - cleanup
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getcleanuppoliciesview.md
+      x-pagination: complete
+      x-pagination-next: none

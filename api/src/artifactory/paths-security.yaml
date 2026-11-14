@@ -652,6 +652,10 @@ paths:
       summary: Set the GPG private key
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/administration/reference/setgpgprivatekey.md
   /api/gpg/key/public:
     get:
@@ -677,6 +681,8 @@ paths:
       summary: Get the GPG public key
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getgpgpublickey.md
     put:
       description: Stores the instance-wide GPG public key that matches the private key. Admin only.
@@ -708,6 +714,10 @@ paths:
       summary: Set the GPG public key
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/administration/reference/setgpgpublickey.md
   /api/gpg/passphrase:
     put:
@@ -741,6 +751,10 @@ paths:
       summary: Set the GPG passphrase
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/administration/reference/setgpgpassphrase.md
   /api/security/apiKey:
     delete:
@@ -776,6 +790,10 @@ paths:
       summary: Revoke the caller's API key
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/administration/reference/revokeapikey.md
       x-tier: shim
     get:
@@ -801,6 +819,8 @@ paths:
       summary: Get the caller's API key (always absent)
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getapikey.md
       x-tier: shim
     post:
@@ -826,6 +846,9 @@ paths:
       summary: Create an API key (disabled)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: none
+      x-idempotency-reason: secret-response
       x-oracle-source: https://docs.jfrog.com/administration/reference/createapikey.md
       x-tier: shim
     put:
@@ -851,6 +874,9 @@ paths:
       summary: Regenerate an API key (disabled)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: none
+      x-idempotency-reason: secret-response
       x-oracle-source: https://docs.jfrog.com/administration/reference/regenerateapikey.md
       x-tier: shim
   /api/security/apiKey/{username}:
@@ -885,6 +911,10 @@ paths:
       summary: Revoke another user's API key
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:username
       x-oracle-source: https://docs.jfrog.com/administration/reference/revokeuserapikey.md
       x-tier: shim
   /api/security/configuration/passwordExpirationPolicy:
@@ -909,6 +939,8 @@ paths:
       summary: Get the password expiration policy
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpasswordexpirationpolicy.md
     put:
       deprecated: true
@@ -941,6 +973,10 @@ paths:
       summary: Set the password expiration policy
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/administration/reference/setpasswordexpirationpolicy.md
   /api/security/encryptedPassword:
     get:
@@ -966,6 +1002,8 @@ paths:
       summary: Get an encrypted form of the caller's password
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getuserencryptedpassword.md
       x-tier: shim
   /api/security/groups:
@@ -998,6 +1036,10 @@ paths:
       summary: List groups (legacy)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: safe
+      x-pagination: complete
+      x-pagination-next: none
   /api/security/groups/{groupName}:
     delete:
       deprecated: true
@@ -1033,6 +1075,10 @@ paths:
       summary: Delete a group (legacy)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:groupName
     get:
       deprecated: true
       description: Returns the legacy group document. Admin only. Members are included only when includeUsers=true.
@@ -1074,6 +1120,8 @@ paths:
       summary: Get a group (legacy)
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
     post:
       deprecated: true
       description: Changes only the fields present in the body; userNames, when present, replaces the membership.
@@ -1114,6 +1162,10 @@ paths:
       summary: Update a group (legacy)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:groupName
     put:
       deprecated: true
       description: Creates the group or replaces every field of an existing one, including the membership when userNames
@@ -1152,6 +1204,10 @@ paths:
       summary: Create or replace a group (legacy)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:groupName
   /api/security/keypair:
     get:
       description: Lists every key pair without private material. Admin only.
@@ -1175,7 +1231,11 @@ paths:
       summary: List key pairs
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallkeypairs.md
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys
         must match (400). Repositories that reference a replaced pair by name use its new material from the next
@@ -1207,6 +1267,10 @@ paths:
       summary: Create a key pair
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/pairName
       x-oracle-source: https://docs.jfrog.com/administration/reference/createkeypair.md
     put:
       description: Replaces the pair named by pairName in the body. Admin only. The pair must exist (404) and the
@@ -1239,6 +1303,10 @@ paths:
       summary: Replace a key pair
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/pairName
       x-oracle-source: https://docs.jfrog.com/administration/reference/updatekeypair.md
   /api/security/keypair/public/repositories/{repoKey}:
     get:
@@ -1285,6 +1353,8 @@ paths:
       summary: Get the public key assigned to a repository
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getkeypairpublickeyperrepository.md
   /api/security/keypair/verify:
     post:
@@ -1318,6 +1388,8 @@ paths:
       summary: Verify that a key pair matches
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/verifykeypair.md
   /api/security/keypair/{keyPairName}:
     delete:
@@ -1351,6 +1423,10 @@ paths:
       summary: Delete a key pair
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:keyPairName
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletekeypair.md
     get:
       description: Returns the readable projection of one pair, which never includes the private key or the
@@ -1387,6 +1463,8 @@ paths:
       summary: Get a key pair
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getkeypair.md
   /api/security/keys/trusted:
     get:
@@ -1409,6 +1487,10 @@ paths:
       summary: List trusted public keys
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
+      x-pagination: complete
+      x-pagination-next: none
     post:
       description: Stores a public GPG key. Admin only. Answers 201 with the stored key; a duplicate alias is a
         400.
@@ -1444,6 +1526,10 @@ paths:
       summary: Add a trusted public key
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/alias
       x-oracle-source: https://docs.jfrog.com/administration/reference/setdistributionpublicgpgkey.md
   /api/security/keys/trusted/{keyId}:
     delete:
@@ -1471,6 +1557,10 @@ paths:
       summary: Delete a trusted public key
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:keyId
   /api/security/lockedUsers:
     get:
       description: Returns the names of users locked by the user lock policy. Admin only.
@@ -1495,7 +1585,11 @@ paths:
       summary: List locked-out users
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getlockedoutusers.md
+      x-pagination: complete
+      x-pagination-next: none
   /api/security/permissions:
     get:
       deprecated: true
@@ -1527,7 +1621,11 @@ paths:
       summary: List permission targets (v1)
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargets.md
+      x-pagination: complete
+      x-pagination-next: none
   /api/security/permissions/{permissionTargetName}:
     delete:
       deprecated: true
@@ -1562,6 +1660,10 @@ paths:
       summary: Delete a permission target (v1)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:permissionTargetName
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletepermissiontarget.md
     get:
       deprecated: true
@@ -1598,6 +1700,8 @@ paths:
       summary: Get a permission target (v1)
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetdetails.md
     put:
       deprecated: true
@@ -1642,6 +1746,10 @@ paths:
       summary: Create or replace a permission target (v1)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:permissionTargetName
       x-oracle-source: https://docs.jfrog.com/administration/reference/createorreplacepermissiontarget.md
   /api/security/token:
     get:
@@ -1664,6 +1772,10 @@ paths:
       summary: List access tokens (legacy)
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
+      x-pagination: complete
+      x-pagination-next: none
     post:
       deprecated: true
       description: The form-encoded predecessor of POST /access/api/v1/tokens. Issues the same JWT the Access endpoint
@@ -1729,7 +1841,10 @@ paths:
       tags:
       - handwritten
       - security
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: none
+      x-idempotency-reason: secret-response
   /api/security/token/revoke:
     post:
       deprecated: true
@@ -1771,7 +1886,12 @@ paths:
       tags:
       - handwritten
       - security
+      x-cost: expensive
       x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/token
+      - body:/token_id
   /api/security/unlockAllUsers:
     post:
       description: Clears every account lock. Admin only.
@@ -1793,6 +1913,10 @@ paths:
       summary: Unlock every user
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/administration/reference/unlockalllockedoutusers.md
   /api/security/unlockUsers:
     post:
@@ -1829,6 +1953,10 @@ paths:
       summary: Unlock users
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - 'body:'
       x-oracle-source: https://docs.jfrog.com/administration/reference/unlocklockedoutusers.md
   /api/security/unlockUsers/{userName}:
     post:
@@ -1863,6 +1991,10 @@ paths:
       summary: Unlock one user (path form)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:userName
   /api/security/userLockPolicy:
     get:
       description: Returns the lockout settings. Admin only.
@@ -1883,6 +2015,8 @@ paths:
       summary: Get the user lock policy
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getuserlockpolicy.md
     put:
       description: Replaces the lockout settings. Admin only. Disabling the policy also clears existing locks.
@@ -1913,6 +2047,10 @@ paths:
       summary: Set the user lock policy
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/administration/reference/configureuserlockpolicy.md
   /api/security/users:
     get:
@@ -1945,6 +2083,10 @@ paths:
       summary: List users (legacy)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: safe
+      x-pagination: complete
+      x-pagination-next: none
   /api/security/users/authorization/changePassword:
     post:
       deprecated: true
@@ -1982,6 +2124,10 @@ paths:
       summary: Change a password (legacy)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - body:/userName
       x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
   /api/security/users/authorization/expirePassword:
     post:
@@ -2015,6 +2161,10 @@ paths:
       summary: Expire passwords
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - 'body:'
       x-oracle-source: https://docs.jfrog.com/administration/reference/expirepasswordformultipleusers.md
   /api/security/users/authorization/expirePassword/{userName}:
     post:
@@ -2052,6 +2202,10 @@ paths:
       summary: Expire one user's password (legacy)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:userName
       x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
   /api/security/users/authorization/expirePasswordForAllUsers:
     post:
@@ -2078,6 +2232,10 @@ paths:
       summary: Expire every password (legacy)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
   /api/security/users/authorization/unexpirePassword/{userName}:
     post:
@@ -2112,6 +2270,10 @@ paths:
       summary: Unexpire a password
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:userName
       x-oracle-source: https://docs.jfrog.com/administration/reference/unexpirepasswordforsingleuser.md
   /api/security/users/{userName}:
     delete:
@@ -2149,6 +2311,10 @@ paths:
       summary: Delete a user (legacy)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:userName
     get:
       deprecated: true
       description: Returns the legacy user document without the password. Admin only. The seeded anonymous user
@@ -2184,6 +2350,8 @@ paths:
       summary: Get a user (legacy)
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getuserdetails-1.md
     post:
       deprecated: true
@@ -2225,6 +2393,10 @@ paths:
       summary: Update a user (legacy)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:userName
     put:
       deprecated: true
       description: Creates the user, or replaces every field of an existing one. Admin only. name, email and password
@@ -2264,6 +2436,10 @@ paths:
       summary: Create or replace a user (legacy)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:userName
   /api/system/decrypt:
     post:
       description: Accepted and answers DONE without changing anything. Secrets stay sealed at all times (decision
@@ -2286,6 +2462,10 @@ paths:
       summary: Deactivate key encryption
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/administration/reference/deactivateartifactorykeyencryption.md
       x-tier: shim
   /api/system/encrypt:
@@ -2309,6 +2489,10 @@ paths:
       summary: Activate key encryption
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - route
       x-oracle-source: https://docs.jfrog.com/administration/reference/activateartifactorykeyencryption.md
       x-tier: shim
   /api/system/security/certificates:
@@ -2334,7 +2518,11 @@ paths:
       summary: List client certificates
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getcertificates.md
+      x-pagination: complete
+      x-pagination-next: none
   /api/system/security/certificates/{certificateAlias}:
     delete:
       description: Removes the certificate. Admin only. A certificate still referenced by a remote repository is
@@ -2374,6 +2562,10 @@ paths:
       summary: Delete a client certificate
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:certificateAlias
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletecertificate.md
     post:
       description: Stores a PEM bundle holding the certificate and its private key under the alias. Admin only.
@@ -2426,6 +2618,10 @@ paths:
       summary: Add a client certificate
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:certificateAlias
       x-oracle-source: https://docs.jfrog.com/administration/reference/addcertificate.md
   /api/system/service_id:
     get:
@@ -2451,6 +2647,8 @@ paths:
       summary: Get the service id
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getserviceid-1.md
   /api/v2/repositories/{repoName}/keyPairs:
     post:
@@ -2492,6 +2690,10 @@ paths:
       summary: Assign a key pair to a repository
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoName
       x-oracle-source: https://docs.jfrog.com/administration/reference/setrepositorykey.md
   /api/v2/repositories/{repoName}/keyPairs/primary:
     delete:
@@ -2524,6 +2726,10 @@ paths:
       summary: Unset the primary key pair
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoName
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteprimarykey.md
     post:
       description: Sets primaryKeyPairRef. Admin only. Metadata signed from now on uses this pair; existing signatures
@@ -2564,6 +2770,10 @@ paths:
       summary: Set the primary key pair
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoName
       x-oracle-source: https://docs.jfrog.com/administration/reference/setprimarykey.md
   /api/v2/repositories/{repoName}/keyPairs/primary/public:
     get:
@@ -2597,6 +2807,8 @@ paths:
       summary: Download the primary public key
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/downloadprimarykey.md
   /api/v2/repositories/{repoName}/keyPairs/promote:
     post:
@@ -2633,6 +2845,10 @@ paths:
       summary: Promote the secondary key pair
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoName
       x-oracle-source: https://docs.jfrog.com/administration/reference/promotesecondarykey.md
   /api/v2/repositories/{repoName}/keyPairs/secondary:
     delete:
@@ -2665,6 +2881,10 @@ paths:
       summary: Unset the secondary key pair
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoName
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletesecondarykey.md
     post:
       description: Sets secondaryKeyPairRef, the staging slot for key rotation. Admin only. Clients that fetch both
@@ -2705,6 +2925,10 @@ paths:
       summary: Set the secondary key pair
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoName
       x-oracle-source: https://docs.jfrog.com/administration/reference/setsecondarykey.md
   /api/v2/repositories/{repoName}/keyPairs/secondary/public:
     get:
@@ -2738,6 +2962,8 @@ paths:
       summary: Download the secondary public key
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/downloadsecondarypublickey.md
   /api/v2/repositories/{repoName}/keyPairs/{keyName}:
     delete:
@@ -2778,6 +3004,11 @@ paths:
       summary: Unassign a key pair from a repository
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:repoName
+      - path:keyName
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleterepositorykey.md
   /api/v2/security/permissions:
     get:
@@ -2809,7 +3040,11 @@ paths:
       summary: List permission targets (v2)
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetsv2.md
+      x-pagination: complete
+      x-pagination-next: none
   /api/v2/security/permissions/groups/{groupName}:
     get:
       description: Returns every target in which the group appears in any section's actions. Admins and Manage
@@ -2843,7 +3078,11 @@ paths:
       summary: List targets granting a group
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetsbygroupv2.md
+      x-pagination: complete
+      x-pagination-next: none
   /api/v2/security/permissions/users/{userName}:
     get:
       description: Returns every target in which the user appears directly in any section's actions; grants inherited
@@ -2878,7 +3117,11 @@ paths:
       summary: List targets granting a user
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetsbyuserv2.md
+      x-pagination: complete
+      x-pagination-next: none
   /api/v2/security/permissions/{permissionTargetName}:
     delete:
       description: Removes the target and every section. Answers 200 with no body. Admins and Manage Resources
@@ -2907,6 +3150,10 @@ paths:
       summary: Delete a permission target (v2)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:permissionTargetName
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletepermissiontargetv2.md
     get:
       description: Returns the target with every section. Admins, Manage Resources holders and holders of Manage on
@@ -2942,6 +3189,8 @@ paths:
       summary: Get a permission target (v2)
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetdetailsv2.md
     head:
       description: 200 when the target exists, 404 when it does not, with no body.
@@ -2969,6 +3218,8 @@ paths:
       summary: Check that a permission target exists (v2)
       tags:
       - security
+      x-cost: ordinary
+      x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/permissiontargetexistencecheckv2.md
     post:
       description: 'Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins
@@ -3015,6 +3266,10 @@ paths:
       summary: Create a permission target (v2)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:permissionTargetName
       x-oracle-source: https://docs.jfrog.com/administration/reference/createpermissiontargetv2.md
     put:
       description: 'Creates the target or replaces it whole: a section omitted from the body is deleted, not kept.
@@ -3059,4 +3314,8 @@ paths:
       summary: Create or replace a permission target (v2)
       tags:
       - security
+      x-cost: expensive
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:permissionTargetName
       x-oracle-source: https://docs.jfrog.com/administration/reference/createorreplacepermissiontargetv2.md
