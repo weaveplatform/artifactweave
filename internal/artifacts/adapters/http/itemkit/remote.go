@@ -29,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
 // getRemoteItem returns false for existing folder/archive browsing, which remains
@@ -117,6 +118,11 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		return true
 	}
 	resource = query.Resource
+	serveStream, err := s.remoteStreamAnswer(ctx, c, sidecar, &query)
+	if err != nil {
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "cached copy", err))
+		return true
+	}
 	result, err := s.RemoteSources.Read(ctx, query)
 	if err != nil {
 		httpkit.WriteErr(
@@ -133,7 +139,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 	// upstream's answer ("resource will be stream directly to the user"),
 	// neither matched against the request's properties (7.161.26).
 	if result.Stream != nil {
-		s.ServeRemoteStream(w, r, result, c, req, resource, sidecar, p.Anonymous)
+		serveStream(w, r, result, c, req, resource, sidecar, p.Anonymous)
 		return true
 	}
 	if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
@@ -203,6 +209,79 @@ func RemoteCopyMatches(
 		}
 		if next == "" {
 			return true, nil
+		}
+		page.After = next
+	}
+}
+
+// remoteStreamServer answers an item GET or HEAD from a stream a remote
+// source returned, with ServeRemoteStream's parameters.
+type remoteStreamServer func(
+	w http.ResponseWriter,
+	r *http.Request,
+	result source.Result,
+	c repo.Config,
+	req ItemRequest,
+	resource source.Resource,
+	sidecar string,
+	anonymous bool,
+)
+
+// remoteStreamAnswer returns how getRemoteItem answers a stream for q:
+// ServeRemoteStream, or serveInfoChecksum for a checksum request that
+// reads only the info of the file it names, which it makes a HEAD. That
+// is a request for a file that a Maven-family remote storing artifacts
+// locally does not hold: 7.161.26's DownloadServiceImpl.respond hands a
+// checksum request, HEAD or GET, to respondForChecksumRequest, which never
+// downloads the file, before the branch that downloads one.
+// DownloadRequestContext.getResourcePath strips the checksum's extension,
+// so RemoteRepoBase.getInfo resolves the file, from the upstream's HEAD
+// when the cache does not hold it. A copy the cache holds, even one due
+// for a refresh, is read as before.
+func (s *Kit) remoteStreamAnswer(
+	ctx context.Context, c repo.Config, sidecar string, q *source.Request,
+) (remoteStreamServer, error) {
+	if sidecar == "" || !maven.Serves(c.PackageType) || q.CacheOnly ||
+		c.StoreArtifactsLocally != nil && !*c.StoreArtifactsLocally {
+		return s.ServeRemoteStream, nil
+	}
+	held, err := remoteCopyHeld(ctx, s.Store, c, q.Resource.Path)
+	switch {
+	case err != nil:
+		return nil, err
+	case held:
+		return s.ServeRemoteStream, nil
+	}
+	q.Resource.Method = http.MethodHead
+	return s.serveInfoChecksum, nil
+}
+
+// remoteCopyHeld reports whether the cache of the remote repository c
+// holds a copy of path, fresh or not: a file, or a document it keeps
+// without an item, such as Maven's maven-metadata.xml. 7.x's
+// RemoteRepoBase.internalGetInfo reads such a copy from the cache before
+// it asks the upstream (7.161.26).
+func remoteCopyHeld(ctx context.Context, st Store, c repo.Config, path string) (bool, error) {
+	it, err := st.Items().Get(ctx, c.Key, true, path)
+	switch {
+	case err == nil:
+		return !it.Folder, nil
+	case !errors.Is(err, kernel.ErrNotFound):
+		return false, fmt.Errorf("cached copy of %s: %w", path, err)
+	}
+	page := kernel.Page{}
+	for {
+		entries, next, err := st.RemoteCache().Exact(ctx, c.Key, path, page)
+		if err != nil {
+			return false, fmt.Errorf("cached document %s: %w", path, err)
+		}
+		for _, e := range entries {
+			if e.ItemID == 0 && e.Blob.Checksums.SHA256 != "" && e.NegativeUntil.IsZero() {
+				return true, nil
+			}
+		}
+		if next == "" {
+			return false, nil
 		}
 		page.After = next
 	}
@@ -661,6 +740,49 @@ func (s *Kit) serveRemoteChecksum(
 		return
 	}
 	serveChecksum(w, r, name, value, sums, modified)
+}
+
+// serveInfoChecksum answers the checksum request at req.Path for the file
+// at resource.Path, which the cache does not hold, from result, the
+// upstream's answer to a HEAD of that file, as 7.161.26 answers one on a
+// remote that stores artifacts locally. RemoteRepoBase.getChecksum reads
+// the file's info through the remote's checksum policy
+// (localCacheRepo.getChecksum, RepoBase.getChecksum, the cache taking the
+// remote's policy), and that info holds only the checksums the upstream
+// declared, each as its original value (HttpUtils.getChecksums). pass-thru
+// answers the original (ChecksumPolicyPassThru); generate-if-absent, fail
+// and ignore-and-generate answer the actual value, which a file never
+// downloaded does not have. With no value respondForChecksumRequest
+// answers 404 "Checksum not found for <file>", before any conditional
+// header is read, as a local checksum file does (getSidecar). A declared
+// SHA-512 answers as the other three do (DV-073).
+func (s *Kit) serveInfoChecksum(
+	w http.ResponseWriter,
+	r *http.Request,
+	result source.Result,
+	c repo.Config,
+	req ItemRequest,
+	resource source.Resource,
+	sidecar string,
+	anonymous bool,
+) {
+	if !s.RemoteDeliveryAllowed(w, r, result, anonymous) {
+		return
+	}
+	_ = result.Stream.Body.Close()
+	value := ""
+	if c.RemoteRepoChecksumPolicyType == repo.PassThru {
+		value = item.Algorithm(sidecar).Of(result.Stream.Checksums)
+	}
+	if value == "" {
+		httpkit.WriteErr(
+			w, r, apierror.New(http.StatusNotFound, "Checksum not found for "+resource.Path),
+		)
+		return
+	}
+	// The file's headers carry what the upstream declared, as #1459 settled
+	// for a checksum HEAD that streams nothing.
+	s.serveRemoteChecksum(w, r, req.Path, value, result.Stream.Checksums, result.Stream.Modified)
 }
 
 // Cache alias downloads have no source lookup token. Touch only entries naming

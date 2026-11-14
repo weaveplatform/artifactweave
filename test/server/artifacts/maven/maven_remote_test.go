@@ -615,16 +615,19 @@ func TestAccMavenPassThruChecksumsForTransientAndMetadata(t *testing.T) {
 	}
 }
 
+// A cold checksum HEAD under the default checksum policy, whose upstream
+// declares no checksum, answers 404 from the file's info (#1476) and
+// neither downloads nor keeps the file.
 func TestAccMavenColdChecksumHeadDoesNotAdmitOwner(t *testing.T) {
 	w := newMavenRemoteWorld(t)
 	p := "org/acme/app/1.0/app-1.0.jar"
 	w.up.Set("/"+p, fakeupstream.Resource{Body: []byte("artifact")})
-	for _, tc := range []struct{ algorithm, length string }{{"md5", "32"}, {"sha1", "40"}, {"sha256", "64"}, {"sha512", "128"}} {
-		result := w.request("HEAD", "/artifactory/remote/"+p+"."+tc.algorithm, "reader", "")
-		remoteStatus(t, result, 200)
-		if result.Body.Len() != 0 || result.Header().Get("Content-Length") != tc.length {
-			t.Fatal(result.Header(), result.Body)
-		}
+	for _, algorithm := range []string{"md5", "sha1", "sha256", "sha512"} {
+		remoteStatus(
+			t,
+			w.request("HEAD", "/artifactory/remote/"+p+"."+algorithm, "reader", ""),
+			404,
+		)
 	}
 	if w.up.Count("GET", "") != 0 {
 		t.Fatal("HEAD fetched body", w.up.Requests())
@@ -655,6 +658,7 @@ func TestAccMavenNoStorePOMSchedulesCompanionOnlyWhenKept(t *testing.T) {
 				w.c.StoreArtifactsLocally = new(false)
 			}
 			w.update()
+			stopCompanionWorkers(w)
 			p := "org/acme/app/1.0/app-1.0"
 			w.up.Set(
 				"/"+p+".pom",
@@ -662,23 +666,42 @@ func TestAccMavenNoStorePOMSchedulesCompanionOnlyWhenKept(t *testing.T) {
 			)
 			w.up.Set("/"+p+".jar", fakeupstream.Resource{Body: sourceJAR(t, "companion")})
 			remoteStatus(t, w.request("GET", "/artifactory/remote/"+p+".pom", "reader", ""), 200)
-			stats, err := w.rt.Store.WorkQueue().Stats(t.Context())
-			if err != nil {
-				t.Fatal(err)
+			want := int64(0)
+			if mode == "upstream" {
+				want = 1
 			}
-			scheduled := false
-			for _, stat := range stats {
-				if stat.Kind == maven.MavenCompanionKind &&
-					stat.Pending+stat.Leased+stat.Parked > 0 {
-					scheduled = true
-				}
+			if got := pendingCompanions(t, w); got != want {
+				t.Fatalf("%s no-store POM scheduled %d companions, want %d", mode, got, want)
 			}
-			if scheduled != (mode == "upstream") {
-				t.Fatalf("%s no-store POM scheduled companion: %v", mode, scheduled)
-			}
-			if mode == "repository" && w.up.Count("GET", "/"+p+".jar") != 0 {
-				t.Fatal("transient POM fetched companion")
+			if w.up.Count("GET", "/"+p+".jar") != 0 {
+				t.Fatal("companion fetched with the workers stopped")
 			}
 		})
 	}
+}
+
+// stopCompanionWorkers stops the runtime's companion workers, so a job a
+// read schedules stays pending until the test reads the queue. While they
+// run, a worker the enqueue wakes can fetch the companion and delete its
+// job first, and the queue then shows nothing scheduled (#1481).
+func stopCompanionWorkers(w *remoteWorld) { w.rt.Artifacts.MavenEager().Close() }
+
+// pendingCompanions is the number of companion jobs the queue holds
+// pending.
+func pendingCompanions(t *testing.T, w *remoteWorld) int64 {
+	t.Helper()
+	stats, err := w.rt.Store.WorkQueue().Stats(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pending int64
+	for _, stat := range stats {
+		if stat.Kind == maven.MavenCompanionKind {
+			if stat.Leased+stat.Parked != 0 {
+				t.Fatal("companion job ran with the workers stopped", stat)
+			}
+			pending += stat.Pending
+		}
+	}
+	return pending
 }

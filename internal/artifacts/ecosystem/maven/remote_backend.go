@@ -34,10 +34,10 @@ type MavenBackend struct {
 // and a non-unique snapshot as mutable, the path is mapped to the
 // upstream's layout when the repository names another, and the body must
 // pass ValidateRemote before it is cached, or the read fails with a 502
-// integrity failure. After a GET that cached a file, while the upstream
-// may be reached, it hands the read to Eager to queue the file's
-// companion. Other package types, and metadata a protocol adapter has
-// already prepared, go to the policy unchanged.
+// integrity failure. After a GET or HEAD that answered with the cached
+// file, while the upstream may be reached, it hands the read to Eager to
+// queue the file's companion. Other package types, and metadata a protocol
+// adapter has already prepared, go to the policy unchanged.
 func (m *MavenBackend) Read(
 	ctx context.Context,
 	q source.Request,
@@ -52,7 +52,14 @@ func (m *MavenBackend) Read(
 		return source.Result{}, err
 	}
 	result, err := m.Policy.Read(ctx, prepared, permit)
-	if err == nil && result.Item != nil && m.Eager != nil && q.Resource.Method == http.MethodGet &&
+	// A HEAD schedules as a GET does: on a remote that stores artifacts
+	// locally a cold HEAD downloads the file (#1391), and 7.161.26's
+	// RemoteRepoBase.doDownloadAndSave runs beforeResourceDownload, which
+	// starts the eager fetch, before every download whatever the method.
+	// A checksum request's cold read keeps nothing and returns no item, so
+	// it schedules nothing, as 7.x's respondForChecksumRequest never
+	// downloads the file.
+	if err == nil && result.Item != nil && m.Eager != nil &&
 		permit.UpstreamNetworkAllowed &&
 		!enabled(q.Repo.Offline) &&
 		(q.Repo.StoreArtifactsLocally == nil || *q.Repo.StoreArtifactsLocally) {

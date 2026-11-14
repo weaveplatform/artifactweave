@@ -187,7 +187,7 @@ to its native client, controlled fault evidence and final gate.
 | #262 | P21 shared browser approval/native login exit |
 | #303 | P12 anonymous-access configuration and native acceptance |
 | #362 | Delivered: npm local and federated signing and the native `npm audit signatures` proof; remote key relay is #1318 and virtual signature merging #1319 |
-| #523 | P28 client-compatibility owner; retry when the upstream extractor fix is released, without waiting unnecessarily for that phase |
+| #523 | Delivered: `jf mvn` runs on Maven 3.10 with the JFrog Maven extractor 2.44.1 that `jf` 2.131.0 downloads |
 | #216 | P19 first live comparison; P20 onward adds new capture work to its owning phases and P41 verifies the expanded result |
 
 Applicability research is bounded work, not permission to erase a row. For example,

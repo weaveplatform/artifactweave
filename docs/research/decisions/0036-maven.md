@@ -362,11 +362,11 @@ The local behavior in this ADR is unchanged.
 
 ## Owned follow-up
 
-P28 owns required native Gradle, Ivy and SBT qualification and the JFrog Maven
-3.10 extractor unblock (#523); rerun that proof when upstream fixes the extractor,
-without waiting for the phase unnecessarily. Current Maven 3.10/3.9 native and
-JFrog Maven 3.9 results remain valid; informational Gradle or REST layout tests do
-not establish the other client exits. P9/P10 supply remote/virtual semantics, and
+P28 owns required native Gradle, Ivy and SBT qualification. The JFrog Maven
+extractor 2.44.1, which `jf` 2.131.0 downloads, starts on Maven 3.10, so `jf mvn`
+runs there (#523). Current Maven 3.10/3.9 native and JFrog Maven 3.10 results remain
+valid; informational Gradle or REST layout tests do not establish the other client
+exits. P9/P10 supply remote/virtual semantics, and
 P41 broadens the client/platform matrix.
 
 The [capability roadmap](../../implementation/capability-roadmap.md) records the
@@ -390,9 +390,8 @@ These assignments describe planned work, not current runtime support.
   (#283).
 - Layout tables from real Gradle, Ivy and SBT publication paths (#277).
 - `mvn deploy` and resolution, snapshots included, in acceptance (#270, #284), on Maven
-  3.10 and 3.9. `jf mvn` uses Maven 3.9: the pinned JFrog extractor cannot start on Maven
-  3.10 ([#523](https://github.com/weaveplatform/artifactweave/issues/523)). That upstream
-  boundary remains open; the native Maven 3.10 checks still run.
+  3.10 and 3.9. `jf mvn` runs on Maven 3.10 with the JFrog extractor 2.44.1, the first
+  that starts there ([#523](https://github.com/weaveplatform/artifactweave/issues/523)).
 
 ## References
 

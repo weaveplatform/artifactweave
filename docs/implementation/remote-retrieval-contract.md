@@ -198,9 +198,15 @@ skips a HEAD) and does not touch the cleanup clock beyond the commit's own
 ([#1391](https://github.com/weaveplatform/artifactweave/issues/1391)). A checksum
 request's HEAD (a `.md5`, `.sha1`, `.sha256` or `.sha512` path the item route answers
 from the file it names) downloads nothing: `respond` hands a checksum request, HEAD or
-GET, to `respondForChecksumRequest`, which answers from the file's info. A checksum
-request's GET still fills the cache with the file it names, a known difference from
-7.x, which answers that GET from the info too. Never publish an item from an upstream
+GET, to `respondForChecksumRequest`, which answers from the file's info. On a
+Maven-family remote that stores artifacts locally, a checksum request's GET for a file
+the cache does not hold reads that info alone too, with one upstream HEAD, and keeps
+nothing; the remote's checksum policy reads the info's checksums, which hold only the
+upstream's `X-Checksum-*` declarations, so only `pass-thru` finds a value and every
+other answer is 404 "Checksum not found for <file>"
+([#1476](https://github.com/weaveplatform/artifactweave/issues/1476)). A checksum
+request for a file the cache holds, even one due for a refresh, reads that copy as a
+GET does. Never publish an item from an upstream
 HEAD alone: a HEAD that downloads nothing (R13, a checksum request, a checksum-only or
 transient resource, or an answer the cache may not keep) sends the upstream one HEAD,
 and the caller closes the response without publishing anything from it.

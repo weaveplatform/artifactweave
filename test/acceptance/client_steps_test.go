@@ -110,8 +110,7 @@ func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(`^the Go toolchain is available$`, w.goAvailable)
 	sc.Step(`^I run npm "([^"]*)"$`, w.runNPM)
 	sc.Step(`^I run npm "([^"]*)", answering its prompts with:$`, w.runNPMAnswering)
-	sc.Step(`^(npm|gradle) is on the runner's PATH$`, w.onRunnerPath)
-	sc.Step(`^jf mvn runs the Maven 3\.9 client's Maven$`, w.jfMavenFromImage)
+	sc.Step(`^(npm|gradle|mvn) is on the runner's PATH$`, w.onRunnerPath)
 	sc.Step(`^the lockfile pins "([^"]*)" to the tarball at "([^"]*)"$`, w.lockfilePins)
 	sc.Step(`^I run mvn "([^"]*)"$`, w.runMaven)
 	sc.Step(`^the registry is fronted by TLS$`, w.frontWithTLS)
@@ -277,37 +276,6 @@ func (w *world) clientReachable(client string) error {
 		}
 		time.Sleep(5 * time.Second)
 	}
-	return nil
-}
-
-// jfMavenFromImage gives jf mvn the Maven of the Maven 3.9 client image,
-// copied out of it, as M2_HOME, which jf reads before it looks for mvn on
-// PATH. The JFrog Maven extractor jf 2.126.0 downloads (2.43.9, the newest)
-// cannot start on Maven 3.10, the runner's own: Maven fails with
-// NoSuchMethodError on DefaultArtifactResolver's constructor before it
-// builds anything. Maven is Java and scripts, so it runs on the runner's
-// Java.
-func (w *world) jfMavenFromImage() error {
-	if err := w.clientReachable("Maven 3.9"); err != nil {
-		return err
-	}
-	dir, err := w.filesDir()
-	if err != nil {
-		return err
-	}
-	out, err := exec.Command("docker", "create", w.mavenImage).Output()
-	if err != nil {
-		return fmt.Errorf("docker create %s: %w", w.mavenImage, err)
-	}
-	id := strings.TrimSpace(string(out))
-	defer func() { _ = exec.Command("docker", "rm", id).Run() }()
-	home := filepath.Join(dir, "maven-3.9")
-	// MAVEN_HOME in the official maven images.
-	cp := exec.Command("docker", "cp", id+":/usr/share/maven", home)
-	if out, err := cp.CombinedOutput(); err != nil {
-		return fmt.Errorf("docker cp: %w: %s", err, out)
-	}
-	w.jfEnv = append(w.jfEnv, "M2_HOME="+home)
 	return nil
 }
 

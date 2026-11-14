@@ -730,9 +730,14 @@ jobs:
       # by digest, so only the image itself says which Maven and JDK releases
       # the scenarios ran. The Maven recipe's client label sends readers here
       # for them (#1241): the image build log is printed only on failure.
+      # jf mvn runs the runner's own Maven, which moves with the runner image,
+      # and the JFrog extractor starts only on the Maven lines it supports
+      # (#523), so the runner's release is printed too.
       - name: Maven client versions
-        if: ${{ !cancelled() && (needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',maven,')) }}
+        if: ${{ !cancelled() && (needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',maven,') || contains(format(',{0},', needs.impact.outputs.clients), ',jf,')) }}
         run: |
+          echo "runner:"
+          mvn --version || echo "no mvn on PATH"
           for image in artifactweave-accept-maven artifactweave-accept-maven39; do
             if docker image inspect "$image" >/dev/null 2>&1; then
               echo "$image:"

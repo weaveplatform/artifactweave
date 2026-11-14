@@ -14,9 +14,8 @@ what its two Maven REST operations do. Decision [0036](decisions/0036-maven.md) 
 choices; decision [0032](decisions/0032-package-format-handlers.md) sets the hooks they use.
 
 **Roadmap ownership (2026-10-21).** P28 owns the remaining native Gradle, Ivy and SBT
-qualification, and the JFrog Maven 3.10 extractor blocker (#523); P41 expands the
-client/platform matrix. P9 remote Maven resolution is implemented; virtual metadata
-remains P10. See
+qualification; P41 expands the client/platform matrix. P9 remote Maven resolution is
+implemented; virtual metadata remains P10. See
 decision [0036](decisions/0036-maven.md#owned-follow-up); a missing client proof does
 not itself establish a server defect or supersession.
 
@@ -654,9 +653,10 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
 ## Native client verification
 
 The current `maven.feature` runs native publish and restore checks on Maven 3.10 and 3.9.
-The `jf mvn` build-info check uses Maven 3.9 because the pinned JFrog Maven extractor
-fails to start on 3.10 with `NoSuchMethodError`; [#523](https://github.com/weaveplatform/artifactweave/issues/523)
-tracks the upstream fix. This client limit does not remove the native Maven 3.10 checks.
+The `jf mvn` build-info check runs on the runner's Maven 3.10 with the JFrog Maven
+extractor 2.44.1 that `jf` 2.131.0 downloads. Earlier extractors failed to start on 3.10
+with `NoSuchMethodError`, so the check ran on Maven 3.9 until that release
+([#523](https://github.com/weaveplatform/artifactweave/issues/523)).
 The runner details are in [testing/ci.md](../testing/ci.md#package-clients-in-acceptance).
 
 ## 12. Versions at the research baseline
@@ -785,5 +785,5 @@ The following **[I]** compatibility cases remain owned by **#216/P19**:
 The 16 MiB XML/POM, 10,000 JAR entries and 512 MiB expanded-JAR bounds are explicit
 implementation admission limits, not vendor size-limit claims. Required native Gradle,
 Ivy and SBT remote-client exits remain individually owned by **P28**, with the wider
-platform matrix in **P41**. The **#523/P28** JFrog extractor limitation remains explicit;
-this work preserves current native Maven 3.10 evidence and does not downgrade it.
+platform matrix in **P41**. `jf mvn` runs on Maven 3.10 since the JFrog extractor
+2.44.1 (#523).

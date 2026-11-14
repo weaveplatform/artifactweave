@@ -105,7 +105,12 @@
 //     If-Unmodified-Since are never read, a HEAD answers 200 with the
 //     checksum's length and the file's headers, and a GET sends the
 //     checksum alone, dated now, with Range applied whatever If-Range says
-//     and a 416 without a body.
+//     and a 416 without a body. On a Maven-family remote that stores
+//     artifacts locally, a checksum file whose file the cache does not hold
+//     is answered from the file's info, the upstream's answer to one HEAD,
+//     through the remote's checksum policy, and nothing is downloaded or
+//     kept: only pass-thru finds a value, the one the upstream declared, and
+//     every other answer is 404 "Checksum not found for <file>".
 //     A folder listing and an archive entry keep their own answers.
 //
 // # References
@@ -132,9 +137,11 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1438 (the
 //     documents the package routes build),
 //     https://github.com/weaveplatform/artifactweave/issues/1436 (remote
-//     checksum files) and
+//     checksum files),
 //     https://github.com/weaveplatform/artifactweave/issues/1362 (local
-//     checksum files).
+//     checksum files), and
+//     https://github.com/weaveplatform/artifactweave/issues/1476 (a Maven
+//     remote's checksum file for a file the cache does not hold).
 //   - https://github.com/weaveplatform/artifactweave/issues/1435 (Force
 //     Authentication on the item routes); JFrog's virtual repository
 //     settings, https://docs.jfrog.com/artifactory/docs/virtual-repositories,
