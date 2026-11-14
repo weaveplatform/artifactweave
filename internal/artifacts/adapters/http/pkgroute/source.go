@@ -228,7 +228,16 @@ func SourceError(err error, anonymous bool) error {
 	case errors.Is(err, context.DeadlineExceeded):
 		status = http.StatusGatewayTimeout
 	case errors.Is(err, source.ErrSuperseded):
-		status = http.StatusServiceUnavailable
+		// A repeat reads under the configuration that superseded this read,
+		// so the 503 reports a transient condition and hints a retry, as
+		// decision 0043's "Rate headers and Retry-After" asks (#1415). No
+		// 7.x source documents this answer [I].
+		e := apierror.New(
+			http.StatusServiceUnavailable,
+			http.StatusText(http.StatusServiceUnavailable),
+		)
+		e.RetryAfterSeconds = 1
+		return e
 	case errors.Is(err, source.ErrUnavailable),
 		errors.Is(err, source.ErrInvalidResult),
 		errors.Is(err, context.Canceled):

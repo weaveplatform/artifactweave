@@ -76,6 +76,49 @@ func TestUnitPatternMatchBelow(t *testing.T) {
 	}
 }
 
+func TestUnitPatternMatchAllBelow(t *testing.T) {
+	for _, c := range []struct {
+		pattern, folder string
+		expected        bool
+	}{
+		{"**", "", true},
+		{"", "", true},
+		{"/", "a/b", true},
+		{"**/**", "a", true},
+		{"**/*", "", true},
+		{"**/*/*", "", false},
+		{"**/*/*", "a", true},
+		{"*/**", "", true},
+		{"*/**", "a/b", true},
+		{"*/*/**", "", false},
+		{"a/**", "a", true},
+		{"a/", "a", true},
+		{"a/**", "a/b/c", true},
+		{"a/**", "", false},
+		{"a/**", "b", false},
+		{"a*/**", "ab", true},
+		{"a?/**", "ab", true},
+		{"a?/**", "a", false},
+		{"A/**", "a", false},
+		{"a/b/**", "a", false},
+		{"a/**/b", "a", false},
+		{"a/**/*", "a", true},
+		{"a/**/*.tgz", "a", false},
+		{"**/*.jar", "", false},
+		{"a/*", "a", false},
+		{"a/b", "a", false},
+		{"**/?", "", false},
+		{"**/*?", "", false},
+		{"a//**", "a", false},
+		{"a/**/**/*", "a", true},
+		{"org/acme/**", "org/acme/lib", true},
+	} {
+		if got := CompilePattern(c.pattern).MatchAllBelow(c.folder); got != c.expected {
+			t.Errorf("%q all below %q = %v, want %v", c.pattern, c.folder, got, c.expected)
+		}
+	}
+}
+
 // naive is a direct recursive Ant matcher, exponential but obviously
 // right, used to check the table-driven one.
 func naive(pat, path []string) bool {
@@ -136,6 +179,40 @@ func FuzzPatternMatch(f *testing.F) {
 		}
 		if got && !CompilePattern("**").Match(path) {
 			t.Fatalf("** must match %q", path)
+		}
+	})
+}
+
+// FuzzPatternMatchAllBelow checks that MatchAllBelow never claims a path
+// below the folder that Match refuses, whatever the path holds: empty
+// segments included, as no path is too odd for a permission check.
+func FuzzPatternMatchAllBelow(f *testing.F) {
+	for _, seed := range [][3]string{
+		{"**", "", "a"},
+		{"**/*", "", "a/b"},
+		{"*/**", "", "x"},
+		{"a/**", "a", "b/c"},
+		{"a*/**/*", "ab", "c"},
+		{"**/*/*", "a", "b"},
+		{"a/", "a", "/"},
+	} {
+		f.Add(seed[0], seed[1], seed[2])
+	}
+	f.Fuzz(func(t *testing.T, pattern, folder, below string) {
+		if len(pattern) > 24 || len(folder) > 24 || len(below) > 24 {
+			return
+		}
+		p := CompilePattern(pattern)
+		if !p.MatchAllBelow(folder) {
+			return
+		}
+		path := strings.Trim(folder, "/") + "/" + below
+		if len(splitPath(path)) <= len(splitPath(folder)) {
+			// Not below the folder.
+			return
+		}
+		if !p.Match(path) {
+			t.Fatalf("MatchAllBelow(%q, %q) holds, but Match(%q) does not", pattern, folder, path)
 		}
 	})
 }

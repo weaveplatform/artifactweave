@@ -223,7 +223,7 @@ func groupJSON(name, members, realm, extra string, flags [3]bool) string {
 		`,"reports_manager":false,"watch_manager":false}` + "\n"
 }
 
-// TestAccReplaceGroupAnswers follows JFrog's Create or Replace a Group
+// TestAccReplaceGroupAnswers follows JFrog's Replace or Create a Group
 // (https://docs.jfrog.com/administration/reference/replacegroup.md): 201 for
 // a new name, 200 for a replacement that resets every field it leaves out
 // and replaces the members, 400 for a body name that differs from the path,

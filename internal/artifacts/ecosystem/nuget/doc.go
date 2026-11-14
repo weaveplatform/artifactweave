@@ -163,6 +163,8 @@
 //   - guard_test.go and fault_test.go: write lock failures roll back, and
 //     store, drop and blob faults.
 //   - contract_test.go: the format contract suite (artifacts/core/formattest).
+//   - shown_keys_test.go: the metadata keys the package store reads to
+//     count what a search shows (port.NuGetShown) are Metadata's own tags.
 //   - remote_test.go and remote_reindex_test.go: a remote package's
 //     admission, payload limits, entry names and zip directory bounds, and
 //     the reindex of a remote repository's cache, with the access test kit

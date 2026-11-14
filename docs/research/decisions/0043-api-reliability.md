@@ -350,10 +350,11 @@ has no per-minute window to report.
 writes (the rest of the window for a rate refusal, 1 otherwise) and on the replay's
 503. An operation's own 503 that reports a transient condition carries it too. A 503
 that reports configuration, such as a missing signing key, or a size bound is not a
-hint to retry. Two handler 503s that report a transient condition, a deploy whose
-content garbage collection removed and a remote fetch that a configuration change
-superseded, carry none ([#1415](https://github.com/weaveplatform/artifactweave/issues/1415),
-open).
+hint to retry. The two handler 503s that report a transient condition, a deploy
+whose content garbage collection removed and a remote fetch that a configuration
+change superseded, carry `Retry-After: 1` with the status and body they had
+([#1415](https://github.com/weaveplatform/artifactweave/issues/1415)). No 7.x source
+documents either answer, so both are inferred until the P19 capture.
 
 In the specs, the shared 429 response declares `Retry-After` as required and
 `RateLimit` and `RateLimit-Policy` as optional (absent on the permit refusal). The
@@ -418,12 +419,14 @@ not a position either.
   pointer is due, plus a count where the contract needs one.
 - **`native` lists are classified, not rewritten.** Their bytes stay. Where their
   paging has moved into the store behind the same bytes, the research section's
-  [native table](../api-reliability/README.md#native-protocols) says how far: npm
-  and NuGet search still count `from`, `skip` and `totalHits` over every earlier
-  candidate ([#1425](https://github.com/weaveplatform/artifactweave/issues/1425),
-  open), and the Ansible, Chef and Puppet lists still read every version name to
-  count and order a page ([#1426](https://github.com/weaveplatform/artifactweave/issues/1426),
-  open).
+  [native table](../api-reliability/README.md#native-protocols) says how far. For
+  a caller who may read every path of the repository, or of the package's folder,
+  npm and NuGet search and the Ansible, Chef and Puppet lists count and page in the
+  store ([#1425](https://github.com/weaveplatform/artifactweave/issues/1425),
+  [#1426](https://github.com/weaveplatform/artifactweave/issues/1426)). For anyone
+  else they still count over every earlier candidate or version name in Go, as
+  the access module decides read permission path by path, and a store count
+  cannot apply it.
 - **No list is collected and then sliced.** `cursor`, `offset` and `page` lists page
   in the store, and `complete` lists stream from store pages
   ([Streaming complete lists](#streaming-complete-lists)). A served `complete` list

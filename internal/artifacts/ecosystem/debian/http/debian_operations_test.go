@@ -62,7 +62,7 @@ func TestAccDebianReindexWithoutPropertiesFailures(t *testing.T) {
 	}
 	rec = w.do(http.MethodPost, "/artifactory/api/deb/reindex/deb-local?writeProps=0", "admin", "")
 	if rec.Code != http.StatusOK ||
-		rec.Body.String() != "Debian repository deb-local metadata recalculation accepted" {
+		rec.Body.String() != "Recalculating index for Debian repository deb-local scheduled to run." {
 		t.Errorf("unreadable package answered %d %q, want 200", rec.Code, rec.Body)
 	}
 }

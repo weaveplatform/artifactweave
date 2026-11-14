@@ -3,8 +3,10 @@ package access_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
@@ -81,24 +83,24 @@ func TestAccAuthentication(t *testing.T) {
 		},
 		"wrong password on a public route": {
 			"GET", "/artifactory/api/system/ping", basic("admin", "nope"),
-			want{http.StatusUnauthorized, true, "Bad credentials"},
+			want{http.StatusUnauthorized, true, "Bad Credentials"},
 		},
 		"unknown user": {
 			"GET", protected, basic("ghost", "pw"),
-			want{http.StatusUnauthorized, true, "Bad credentials"},
+			want{http.StatusUnauthorized, true, "Bad Credentials"},
 		},
 		"admin": {"GET", protected, basic("admin", "pw"), want{status: http.StatusOK}},
 		"bearer before tokens exist": {
 			"GET", protected,
 			map[string]string{"Authorization": "Bearer abc"},
-			want{http.StatusUnauthorized, true, "Bad credentials"},
+			want{http.StatusUnauthorized, true, "Bad Credentials"},
 		},
 		// A refused API key answers 403 with the challenge, as 7.x's entry
 		// point answers it (isAlreadyAuthedApiKeyRequest, #1464).
 		"api key header": {
 			"GET", protected,
 			map[string]string{"X-JFrog-Art-Api": "cmVmd123"},
-			want{http.StatusForbidden, true, "Bad credentials"},
+			want{http.StatusForbidden, true, "Bad Credentials"},
 		},
 	} {
 		rec := do(t, h, tc.method, tc.path, tc.headers, "")
@@ -162,9 +164,9 @@ func TestAccAuthentication(t *testing.T) {
 func TestAccAPIKeyHeaders(t *testing.T) {
 	const (
 		license   = "/artifactory/api/system/license"
-		refused   = `{"errors":[{"message":"Bad credentials","status":403}]}` + "\n"
+		refused   = `{"errors":[{"message":"Bad Credentials","status":403}]}` + "\n"
 		forbidden = `{"errors":[{"message":"Forbidden","status":403}]}` + "\n"
-		bad       = `{"errors":[{"message":"Bad credentials","status":401}]}` + "\n"
+		bad       = `{"errors":[{"message":"Bad Credentials","status":401}]}` + "\n"
 	)
 	for _, anonymous := range []bool{false, true} {
 		var tokens *token.Service
@@ -345,5 +347,269 @@ func TestAccAPIKeyBesideAWrongPasswordCountsNothing(t *testing.T) {
 		"",
 	); rec.Code != http.StatusNotFound {
 		t.Fatalf("user's password after the key: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// TestAccRefusedAccountsCarryTheChallenge: a locked account, a correct but
+// expired password and a suspended login answer 403 with 7.x's Basic
+// challenge, as its entry point's sendErrorResponse adds it to every answer
+// it gives, the 403s of isUserLocked, isCredentialsExpired and
+// isLoginDisabled included (ArtifactoryBasicAuthenticationEntryPoint,
+// 7.161.26; #1485). The rule is the entry point's, so it holds on every
+// route the middleware covers, each answering in its own envelope: the item
+// route, the REST API, Docker's registry (whose own Bearer challenge is a
+// 401's), npm, a NuGet client, Access, and pub, whose 403 already carried
+// its Bearer realm="pub" challenge. A request of 7.x's UI, by its
+// Request-Agent, gets none (UiRequestUtils.isUiRestRequest).
+func TestAccRefusedAccountsCarryTheChallenge(t *testing.T) {
+	const (
+		locked  = "Login has failed. Due to Incorrect username/password or locked user."
+		expired = "Password has expired"
+		blocked = "This request is blocked due to recurrent login failures, please try again in 600 seconds"
+	)
+	admin := jsonHeaders(basic("admin", "pw"))
+	expire := func(h http.Handler) {
+		t.Helper()
+		if rec := do(
+			t,
+			h,
+			http.MethodPost,
+			secExpire,
+			admin,
+			`["user"]`,
+		); rec.Code != http.StatusOK {
+			t.Fatalf("expire: %d %s", rec.Code, rec.Body)
+		}
+	}
+	// One wrong password suspends user for ten minutes, so the message's
+	// count of seconds cannot change while the test runs.
+	suspend := func(h http.Handler) {
+		t.Helper()
+		if rec := do(t, h, http.MethodPut, "/access/api/v1/config/security/user_lock_policy", admin,
+			`{"clientLoginSuspensionEnabled":true,"maxLoginDelayIncorrectAttempts":1,`+
+				`"baseLoginDelayMillis":600000,"maxLoginDelayMillis":600000}`); rec.Code != http.StatusOK {
+			t.Fatalf("policy: %d %s", rec.Code, rec.Body)
+		}
+		if rec := do(t, h, http.MethodGet, secAPIKey, basic("user", "wrong"), ""); rec.Code !=
+			http.StatusUnauthorized {
+			t.Fatalf("wrong password: %d %s", rec.Code, rec.Body)
+		}
+	}
+	artifactory := func(m string) string { return `{"errors":[{"message":"` + m + `","status":403}]}` }
+	routes := []struct {
+		name, path, userAgent, challenge string
+		body                             func(message string) string
+	}{
+		{
+			"item",
+			"/artifactory/libs-local/fixture/get.txt",
+			"",
+			apierror.BasicChallenge,
+			artifactory,
+		},
+		{"api", "/artifactory/api/repositories", "", apierror.BasicChallenge, artifactory},
+		{
+			"docker", "/v2/", "", apierror.BasicChallenge,
+			func(m string) string { return `{"errors":[{"code":"DENIED","message":"` + m + `"}]}` },
+		},
+		{
+			"npm", "/artifactory/api/npm/npm-local/widget", "", apierror.BasicChallenge,
+			func(m string) string { return `{"error":"` + m + `"}` },
+		},
+		{
+			"nuget",
+			"/artifactory/api/nuget/nuget-local/FindPackagesById()",
+			"NuGet Command Line/6.11.0",
+			apierror.BasicChallenge,
+			artifactory,
+		},
+		{
+			"access",
+			"/access/api/v1/tokens",
+			"",
+			apierror.BasicChallenge,
+			func(m string) string { return `{"errors":[{"code":"FORBIDDEN","message":"` + m + `"}]}` },
+		},
+		{
+			"pub", "/artifactory/api/pub/libs-local/api/packages/widget", "", "pub",
+			func(m string) string { return `{"error":{"code":"FORBIDDEN","message":"` + m + `"}}` },
+		},
+	}
+	for _, c := range []struct {
+		name, user, message string
+		setup               func(http.Handler)
+	}{
+		{"locked", "locked", locked, nil},
+		{"expired", "user", expired, expire},
+		{"suspended", "user", blocked, suspend},
+	} {
+		for _, route := range routes {
+			for _, ui := range []bool{false, true} {
+				h := statusFixture(t, false)
+				if c.setup != nil {
+					c.setup(h)
+				}
+				headers := basic(c.user, "pw")
+				if route.userAgent != "" {
+					headers["User-Agent"] = route.userAgent
+				}
+				challenge := route.challenge
+				if challenge == "pub" {
+					challenge = `Bearer realm="pub", message="` + c.message + `"`
+				}
+				if ui {
+					headers["Request-Agent"] = "artifactoryUI"
+					challenge = ""
+				}
+				rec := do(t, h, http.MethodGet, route.path, headers, "")
+				if rec.Code != http.StatusForbidden ||
+					rec.Header().Get("WWW-Authenticate") != challenge ||
+					rec.Body.String() != route.body(c.message)+"\n" {
+					t.Errorf("%s on %s (UI %v): %d %q %s, want 403 %q %s",
+						c.name, route.name, ui, rec.Code, rec.Header().Get("WWW-Authenticate"),
+						rec.Body, challenge, route.body(c.message))
+				}
+			}
+		}
+	}
+	// The 403s that do not come from the entry point keep no challenge: an
+	// authenticated user without the right, and decision 0043's API
+	// restriction.
+	h := statusFixture(t, false)
+	rec := do(t, h, http.MethodGet, "/artifactory/api/system/license", basic("user", "pw"), "")
+	if rec.Code != http.StatusForbidden || rec.Header().Get("WWW-Authenticate") != "" ||
+		rec.Body.String() != artifactory("Forbidden")+"\n" {
+		t.Errorf("a user without the right: %d %q %s",
+			rec.Code, rec.Header().Get("WWW-Authenticate"), rec.Body)
+	}
+	if rec := do(
+		t,
+		h,
+		http.MethodPut,
+		apiRestrictionPath+"user",
+		admin,
+		restrictionBody(),
+	); rec.Code !=
+		http.StatusOK {
+		t.Fatalf("restrict: %d %s", rec.Code, rec.Body)
+	}
+	rec = do(t, h, http.MethodGet, "/artifactory/api/repositories", basic("user", "pw"), "")
+	if rec.Code != http.StatusForbidden || rec.Header().Get("WWW-Authenticate") != "" ||
+		rec.Body.String() != artifactory("API access is temporarily restricted")+"\n" {
+		t.Errorf("a restricted user: %d %q %s",
+			rec.Code, rec.Header().Get("WWW-Authenticate"), rec.Body)
+	}
+}
+
+// TestAccUIRequestsGetNoChallenge: 7.x's entry point sends its challenge
+// with no answer to a request of its UI, a request URI under
+// /artifactory/ui/ or a Request-Agent of exactly artifactoryUI
+// (sendErrorResponse and UiRequestUtils.isUiRestRequest, 7.161.26), whatever
+// the credential it refuses (#1485). A request without credentials while
+// anonymous access is off is answered by AccessFilter itself, not the entry
+// point's refusal, and keeps its challenge.
+func TestAccUIRequestsGetNoChallenge(t *testing.T) {
+	const api = "/artifactory/api/repositories"
+	bad := func(status int, m string) string {
+		return fmt.Sprintf(`{"errors":[{"message":%q,"status":%d}]}`+"\n", m, status)
+	}
+	ui := func(h map[string]string) map[string]string {
+		out := map[string]string{"Request-Agent": "artifactoryUI"}
+		for k, v := range h {
+			out[k] = v
+		}
+		return out
+	}
+	// Each case has a router of its own: two wrong passwords would
+	// suspend the name.
+	for _, c := range []struct {
+		name, path string
+		headers    map[string]string
+		status     int
+		challenge  string
+		body       string
+	}{
+		{"wrong password", api, ui(basic("admin", "wrong")), 401, "", bad(401, "Bad Credentials")},
+		{
+			"bearer that does not verify", api,
+			ui(map[string]string{"Authorization": "Bearer not-a-token"}), 401, "", bad(401, "Bad Credentials"),
+		},
+		{
+			"refused API key", api, ui(map[string]string{"X-JFrog-Art-Api": "cmVmd123"}),
+			403, "", bad(403, "Bad Credentials"),
+		},
+		{"wrong password, UI path", "/artifactory/ui/x", basic("admin", "wrong"), 401, "", bad(401, "Bad Credentials")},
+		{
+			"another Request-Agent", api,
+			map[string]string{
+				"Request-Agent": "ArtifactoryUI", "Authorization": basic("admin", "wrong")["Authorization"],
+			},
+			401, apierror.BasicChallenge, bad(401, "Bad Credentials"),
+		},
+		{
+			"no credentials", api, ui(nil), 401, apierror.BasicChallenge,
+			bad(401, "Authentication is required"),
+		},
+	} {
+		rec := do(t, statusFixture(t, false), http.MethodGet, c.path, c.headers, "")
+		if rec.Code != c.status || rec.Header().Get("WWW-Authenticate") != c.challenge ||
+			rec.Body.String() != c.body {
+			t.Errorf("%s: %d %q %s, want %d %q %s", c.name, rec.Code,
+				rec.Header().Get("WWW-Authenticate"), rec.Body, c.status, c.challenge, c.body)
+		}
+	}
+}
+
+// TestAccBadCredentialsWording pins the text of credentials that do not
+// verify: "Bad Credentials", which 7.117 and later answer for a password
+// Access refuses while it handles the internal realm
+// (AccessAuthProviderUtils; RTFACT-31253 on 7.117.12), where artifactweave
+// answered Spring's and 6.x's "Bad credentials" (#1486). A token or API key
+// that does not verify answers the same text, on the REST API, the item
+// route and a format route alike.
+func TestAccBadCredentialsWording(t *testing.T) {
+	rest := func(status int) string {
+		return fmt.Sprintf(`{"errors":[{"message":"Bad Credentials","status":%d}]}`+"\n", status)
+	}
+	npm := func(int) string { return `{"error":"Bad Credentials"}` + "\n" }
+	for _, route := range []struct {
+		path string
+		body func(status int) string
+	}{
+		{"/artifactory/api/repositories", rest},
+		{"/artifactory/libs-release-local/org/a.txt", rest},
+		{"/artifactory/api/npm/npm-local/left-pad", npm},
+	} {
+		// Each route has a router of its own: a second wrong password on
+		// one router would suspend the name.
+		h, secrets := newStatusFixture(t, false)
+		jwt := []byte(secrets["short-access"])
+		// A byte inside the signature, not its last, whose low bits may be
+		// padding the decoder ignores.
+		i := strings.LastIndexByte(string(jwt), '.') + 10
+		jwt[i] = map[bool]byte{true: 'B', false: 'A'}[jwt[i] == 'A']
+		for _, c := range []struct {
+			name    string
+			headers map[string]string
+			status  int
+		}{
+			{"wrong password", basic("admin", "wrong"), http.StatusUnauthorized},
+			{
+				"badly signed token",
+				map[string]string{"Authorization": "Bearer " + string(jwt)},
+				http.StatusUnauthorized,
+			},
+			{
+				"refused API key",
+				map[string]string{"X-JFrog-Art-Api": "cmVmd123"},
+				http.StatusForbidden,
+			},
+		} {
+			rec := do(t, h, http.MethodGet, route.path, c.headers, "")
+			if want := route.body(c.status); rec.Code != c.status || rec.Body.String() != want {
+				t.Errorf("%s on %s: %d %s, want %d %s", c.name, route.path, rec.Code, rec.Body,
+					c.status, want)
+			}
+		}
 	}
 }

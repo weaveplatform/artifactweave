@@ -170,11 +170,16 @@ one module's release list on a local or federated repository, count and order
 their releases from the version names alone and read only the releases their
 page answers (#1404), so an index entry or archive that no longer matches fails
 only a page that holds it, and a release deleted between the count and the page
-leaves that page one short. A virtual
+leaves that page one short. For a caller who may read every path of the
+repository, or of the module's folder for one module's list, the package index
+counts and pages them in the list's order, so no version name past the page is
+read (#1426). A virtual
 repository answers both lists 404, as 7.x does
 ([RTFACT-15072](https://jfrog.atlassian.net/browse/RTFACT-15072)). A remote
 repository still answers them 400: JFrog support says a remote serves them, but
-no source shows what it lists.
+no source shows what it lists, whether its upstream's whole catalog or what it
+has cached, nor how it pages them
+([#1286](https://github.com/weaveplatform/artifactweave/issues/1286)).
 
 Delete and trash restore use the normal item APIs and update the native view.
 `POST /artifactory/api/puppet/{repo}/reindex` is the Artifactweave maintenance

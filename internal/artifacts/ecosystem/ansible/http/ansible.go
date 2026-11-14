@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -272,14 +271,13 @@ func (h handler) versionList(r *http.Request, ns, name string) (versionList, err
 
 // localVersionList is the version list releases gives a local or federated
 // repository, read a page at a time (#1404). Read permission and the
-// list's order need only each version's name, so every version is counted
-// and ordered by its name alone, with the same unstable sort releases
-// makes over the versions in the same order, which leaves versions that
-// compare equal, as build metadata does, where releases leaves them. Only
-// the page's versions are then read and checked against their stored
-// collections (localRelease), in the index's order, as localVersions
-// checks them. A version deleted, or whose collection went, between the
-// count and the page leaves the page short.
+// list's order need only each version's name: a caller who may read every
+// path of the collection's folder sees every version, which the store
+// counts and pages from the highest OrderKey down, the list's order
+// (model.CompareGalaxy, #1426); anyone else has every name read, checked
+// and ordered. Only the page's versions are then read and checked against
+// their stored collections (pageStored). A version deleted, or whose
+// collection went, between the count and the page leaves the page short.
 func (h handler) localVersionList(r *http.Request, ns, name string) (versionList, error) {
 	// An empty list until the collection's versions are counted.
 	list := versionList{
@@ -289,61 +287,80 @@ func (h handler) localVersionList(r *http.Request, ns, name string) (versionList
 	// releases' read check on the collection's folder is checkIdentity's,
 	// which every version list has passed.
 	key := pkgroute.RequestFrom(r).Repo.Key
-	p, err := h.k.DB().Packages().Find(r.Context(), key, ns+"."+name)
+	st := h.k.DB().Packages()
+	p, err := st.Find(r.Context(), key, ns+"."+name)
 	if errors.Is(err, kernel.ErrNotFound) {
 		return list, nil
 	}
 	if err != nil {
 		return versionList{}, fmt.Errorf("ansible: package: %w", err)
 	}
-	indexed, err := h.k.DB().Packages().VersionNames(r.Context(), p.ID)
+	if h.k.CanAll(r, "collections/"+ns+"/"+name, api.ActionRead) {
+		if list.count, err = st.CountVersions(r.Context(), p.ID); err != nil {
+			return versionList{}, fmt.Errorf("ansible: versions: %w", err)
+		}
+		list.page = func(ctx context.Context, start, end int) ([]string, error) {
+			page, err := st.VersionNamesAt(ctx, p.ID, true, start, end-start)
+			if err != nil {
+				return nil, fmt.Errorf("ansible: versions: %w", err)
+			}
+			return h.pageStored(ctx, r, ns, name, p.ID, page)
+		}
+		return list, nil
+	}
+	indexed, err := st.VersionNames(r.Context(), p.ID)
 	if err != nil {
 		return versionList{}, fmt.Errorf("ansible: versions: %w", err)
 	}
 	indexed = slices.DeleteFunc(indexed, func(v string) bool {
 		return !h.k.Can(r, ansiblefmt.Path(ns, name, v), api.ActionRead)
 	})
-	listed := slices.Clone(indexed)
-	sort.Slice(listed, func(i, j int) bool {
-		return semver.Compare("v"+listed[i], "v"+listed[j]) > 0
-	})
+	listed := slices.SortedFunc(slices.Values(indexed), newestFirst)
 	list.count = len(listed)
 	list.page = func(ctx context.Context, start, end int) ([]string, error) {
-		onPage := make(map[string]bool, end-start)
-		for _, v := range listed[start:end] {
-			onPage[v] = true
-		}
-		stored := make(map[string]bool, end-start)
-		for _, version := range indexed {
-			if !onPage[version] {
-				continue
-			}
-			v, err := h.k.DB().Packages().Version(ctx, p.ID, version)
-			if errors.Is(err, kernel.ErrNotFound) {
-				continue
-			}
-			if err != nil {
-				return nil, fmt.Errorf("ansible: versions: %w", err)
-			}
-			if _, stored[version], err = h.localRelease(
-				r.WithContext(ctx),
-				ns,
-				name,
-				v,
-			); err != nil {
-				return nil, err
-			}
-		}
-		out := make([]string, 0, end-start)
-		for _, v := range listed[start:end] {
-			if stored[v] {
-				out = append(out, v)
-			}
-		}
-		return out, nil
+		return h.pageStored(ctx, r, ns, name, p.ID, listed[start:end])
 	}
 	return list, nil
 }
+
+// pageStored returns the versions of page, a page of collection ns.name's
+// version list, whose collections are stored, in page's order, reading
+// them under ctx, the page read's own. It reads and checks them against
+// their collections (localRelease) from the page's oldest end, the index's
+// order, in which localVersions checks them.
+func (h handler) pageStored(
+	ctx context.Context,
+	r *http.Request,
+	ns, name string,
+	packageID int64,
+	page []string,
+) ([]string, error) {
+	stored := make(map[string]bool, len(page))
+	for _, version := range slices.Backward(page) {
+		v, err := h.k.DB().Packages().Version(ctx, packageID, version)
+		if errors.Is(err, kernel.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("ansible: versions: %w", err)
+		}
+		if _, stored[version], err = h.localRelease(r.WithContext(ctx), ns, name, v); err != nil {
+			return nil, err
+		}
+	}
+	out := make([]string, 0, len(page))
+	for _, v := range page {
+		if stored[v] {
+			out = append(out, v)
+		}
+	}
+	return out, nil
+}
+
+// newestFirst orders collection versions from the highest semantic version
+// down, the order every version list answers in, which is the reverse of
+// the package index's (model.CompareGalaxy).
+func newestFirst(a, b string) int { return model.CompareGalaxy(b, a) }
 
 func (h handler) memberRequests(r *http.Request) ([]*http.Request, error) {
 	q := pkgroute.RequestFrom(r)
@@ -399,7 +416,11 @@ func (h handler) releases(r *http.Request, ns, name, download string) (catalog, 
 			releases, err = remote.items, readErr
 			out.checks = append(out.checks, remote.checks...)
 		} else {
+			// The index's order reversed is a hosted list's (newestFirst),
+			// so the stable sort below leaves a hosted member's versions
+			// that differ only in build metadata as that list orders them.
 			releases, err = h.localVersions(member, ns, name)
+			slices.Reverse(releases)
 		}
 		if virtual && (isMissing(err) || errors.Is(err, source.ErrDenied)) {
 			continue
@@ -415,8 +436,12 @@ func (h handler) releases(r *http.Request, ns, name, download string) (catalog, 
 			}
 		}
 	}
-	sort.Slice(out.items, func(i, j int) bool {
-		return semver.Compare("v"+out.items[i].Meta.Version, "v"+out.items[j].Meta.Version) > 0
+	// Stable, so versions that differ only in build metadata keep the
+	// order their members list them in, member by member: a remote
+	// member's upstream's own. The sort was unstable before #1426, which
+	// kept them so for twelve versions or fewer.
+	slices.SortStableFunc(out.items, func(a, b release) int {
+		return semver.Compare("v"+b.Meta.Version, "v"+a.Meta.Version)
 	})
 	return out, nil
 }

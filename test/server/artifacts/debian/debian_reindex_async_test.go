@@ -51,7 +51,7 @@ func TestAccDebianReindexAsync(t *testing.T) {
 			w := world(t)
 			rec := w.do(http.MethodPost, "/artifactory/api/deb/reindex/"+key+tc.query, "admin", "")
 			if rec.Code != http.StatusOK ||
-				rec.Body.String() != "Debian repository deb-local metadata recalculation accepted" ||
+				rec.Body.String() != "Recalculating index for Debian repository deb-local scheduled to run." ||
 				!strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") {
 				t.Fatalf("answered %d %q %q", rec.Code, rec.Body, rec.Header().Get("Content-Type"))
 			}

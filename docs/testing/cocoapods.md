@@ -24,7 +24,8 @@ podspec identity must equal the path. The server verifies the compressed
 stream, archive paths and member types before it indexes the version. The
 generated CDN podspec points `source.http` back to the checked archive with
 its SHA-256. Delete, restore, and
-`POST /artifactory/api/cocoapods/<repo>/reindex` rebuild the local view.
+`POST /artifactory/api/cocoapods/<repo>/reindex` rebuild the local view. The
+reindex needs an administrator, as 7.x's reference says, and is queued.
 
 Add the CDN to a clean CocoaPods client home:
 

@@ -62,19 +62,22 @@ type formatReindex struct {
 
 // formatReindexes act on reindex-<type>, a local repository, and
 // reindex-<type>-fed, a federated one.
+//
+// Cargo's, CocoaPods', Conan's, Conda's, Pub's and Swift's need an
+// administrator: "Requires a valid admin user" (the archived 7.x reference
+// pages, #1480).
 var formatReindexes = []formatReindex{
 	{reindexAlpine, repo.Alpine, true, false, false},
 	{reindexBower, repo.Bower, true, false, false},
-	{reindexCargo, repo.Cargo, true, true, false},
-	{reindexCocoaPods, repo.CocoaPods, true, false, false},
-	// "Requires a valid admin user" (the archived 7.x reference).
+	{reindexCargo, repo.Cargo, true, true, true},
+	{reindexCocoaPods, repo.CocoaPods, true, false, true},
 	{reindexConan, repo.Conan, true, true, true},
-	{reindexConda, repo.Conda, true, true, false},
+	{reindexConda, repo.Conda, true, true, true},
 	{reindexCran, repo.Cran, false, true, false},
 	{reindexGems, repo.Gems, true, false, false},
 	{reindexOpkg, repo.Opkg, true, true, false},
-	{reindexPub, repo.Pub, true, true, false},
-	{reindexSwift, repo.Swift, true, false, false},
+	{reindexPub, repo.Pub, true, true, true},
+	{reindexSwift, repo.Swift, true, false, true},
 }
 
 // key is the local repository r acts on.
@@ -229,7 +232,8 @@ func createReindexRepos(t *testing.T, st *inmem.Store) {
 
 // reindexStatusPart is the reindex operations' share of the status
 // table. reindexer holds Manage on their repositories and nothing else,
-// which every operation but Terraform's and Conan's needs.
+// which every operation needs but Terraform's and formatReindexes' admin
+// ones.
 var reindexStatusPart = statusPart{
 	// The partial reindex is matched before routing (HelmPartialReindex).
 	handwritten: map[string]bool{reindexHelmPath: true},

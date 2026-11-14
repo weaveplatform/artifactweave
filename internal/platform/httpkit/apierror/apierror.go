@@ -64,13 +64,17 @@ type Error struct {
 	Code    string
 	Message string
 	Detail  any
-	// NoChallenge distinguishes an upstream refusal from a request to authenticate
-	// against this server. Never turn upstream credentials into a local challenge.
+	// NoChallenge withholds the challenge, whatever the status. It
+	// distinguishes an upstream refusal from a request to authenticate
+	// against this server: never turn upstream credentials into a local
+	// challenge. It also marks the answers 7.x's entry point gives its own
+	// UI, which carry none (sendErrorResponse, 7.161.26).
 	NoChallenge bool
 	// Challenge gives a status other than 401 the profile's challenge too:
 	// 7.x's ArtifactoryBasicAuthenticationEntryPoint adds its Basic
 	// challenge to every answer it gives, so the credentials it refuses
-	// with 403 rather than 401, a refused API key's and a NuGet client's,
+	// with 403 rather than 401, a refused API key's and a NuGet client's, a
+	// locked account's, an expired password's and a suspended login's,
 	// still carry one (sendErrorResponse, 7.161.26).
 	Challenge         bool
 	RetryAfterSeconds int

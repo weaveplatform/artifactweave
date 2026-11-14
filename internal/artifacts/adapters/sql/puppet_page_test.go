@@ -25,6 +25,16 @@ func TestAccVersionNamesContract(t *testing.T) {
 		}, sqltest.WithPostgres())
 }
 
+// TestAccPackagePagesContract runs the list paging contract on SQLite, in
+// memory and in a file, and on PostgreSQL, where the NuGet range reads the
+// metadata through jsonb and the orders run on "C" collated columns.
+func TestAccPackagePagesContract(t *testing.T) {
+	sqltest.RunModule(t, mods, artsql.New,
+		func(t *testing.T, newStore func(*testing.T) *artsql.Store) {
+			artstoretest.RunPackagePages(t, func(t *testing.T) port.Store { return newStore(t) })
+		}, sqltest.WithPostgres())
+}
+
 // TestAccVersionNamesAtScale reads the names of a module of 5,000 versions
 // beside another as large, as a late page of a Puppet, Ansible or Chef list
 // does before it reads its page's records (#1404), on SQLite and on

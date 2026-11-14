@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -164,6 +165,63 @@ func (h handler) eachPackage(
 	}
 }
 
+// pageAll is eachPackage for a search or autocomplete without terms or a
+// package type by a caller who may read every path of the repository
+// (#1425): it calls each with the packages at skip of take, in the same
+// order, and returns how many eachPackage would visit. That caller sees
+// each version whose .nupkg is stored, so a package is visited when one of
+// them is a version f shows, which the store counts and pages from each
+// version's stored metadata (port.NuGetShown); the page is read alone,
+// listPage packages at a time. The answer is the one eachPackage's count
+// gives, unless a version's stored metadata is JSON that does not decode
+// as a version's, which no write stores: eachPackage fails on it wherever
+// it lies, and pageAll only on the page.
+func (h handler) pageAll(
+	r *http.Request,
+	prefix string,
+	f filter,
+	at page,
+	each func(p pkg) error,
+) (int, error) {
+	ctx := r.Context()
+	st := h.k.DB().Packages()
+	shown := port.PackageRange{
+		RepoKey: pkgroute.RequestFrom(r).Repo.Key,
+		Prefix:  prefix,
+		Shown:   &port.NuGetShown{Prerelease: f.allowPrerelease, SemVer2: f.allowSemVer2},
+	}
+	total, err := st.CountPackages(ctx, shown)
+	if err != nil {
+		return 0, fmt.Errorf("nuget: packages of %s: %w", shown.RepoKey, err)
+	}
+	for offset, left := at.skip, at.take; left > 0; {
+		n := min(left, listPage)
+		found, read, err := port.CandidatesAt(ctx, st, shown, offset, n)
+		if err != nil {
+			return 0, fmt.Errorf("nuget: packages of %s: %w", shown.RepoKey, err)
+		}
+		for _, c := range found {
+			p, ok, err := h.visible(r, c.Package, c.Versions)
+			if err != nil {
+				return 0, err
+			}
+			// Left with none only once its versions changed since the
+			// page was read: the page is one short.
+			if p = p.only(f.shows); !ok || len(p.versions) == 0 {
+				continue
+			}
+			if err := each(p); err != nil {
+				return 0, err
+			}
+		}
+		if read < n {
+			break
+		}
+		offset, left = offset+n, left-n
+	}
+	return total, nil
+}
+
 // newest is the package's newest version shown.
 func (p pkg) newest() version { return p.versions[len(p.versions)-1] }
 
@@ -233,6 +291,22 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 	}
 	u := urlsOf(r, hv)
 	answer := searchAnswer{Data: []searchResult{}}
+	if len(q.terms) == 0 && q.packageType == "" && h.k.CanAll(r, "", api.ActionRead) {
+		total, err := h.pageAll(r, "", f, at, func(p pkg) error {
+			res, err := h.result(r, u, p)
+			if err == nil {
+				answer.Data = append(answer.Data, res)
+			}
+			return err
+		})
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		answer.TotalHits = total
+		writeJSON(w, answer)
+		return
+	}
 	err := h.eachPackage(r, scan{terms: q.terms}, f, func(p pkg) error {
 		if !q.matches(p.newest().meta) {
 			return nil
@@ -353,6 +427,19 @@ func (h handler) autocomplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	prefix := strings.ToLower(params.Get("q"))
+	if h.k.CanAll(r, "", api.ActionRead) {
+		total, err := h.pageAll(r, prefix, f, at, func(p pkg) error {
+			answer.Data = append(answer.Data, p.newest().meta.ID)
+			return nil
+		})
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		answer.TotalHits = total
+		writeJSON(w, answer)
+		return
+	}
 	err := h.eachPackage(r, scan{prefix: prefix}, f,
 		func(p pkg) error {
 			add(p.newest().meta.ID)

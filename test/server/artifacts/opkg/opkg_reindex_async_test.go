@@ -61,7 +61,7 @@ func TestAccOpkgReindexAsync(t *testing.T) {
 				)
 				if rec.Code != http.StatusOK ||
 					rec.Body.String() != fmt.Sprintf(
-						"Reindex of opkg repo %s was scheduled to run.",
+						"Recalculating index for Opkg repository %s scheduled to run.",
 						key,
 					) ||
 					!strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") {

@@ -16,9 +16,12 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
-// searchReads counts what a search reads of the package index.
+// searchReads counts what a search reads of the package index: searches
+// and the candidates they return, and counts, pages and the packages they
+// return, and reads of a page's versions.
 type searchReads struct {
 	searches, candidates, finds, versions, lists int
+	counts, pages, paged, withVersions           int
 }
 
 type countingStore struct {
@@ -42,6 +45,27 @@ func (p countingPackages) SearchNuGet(
 	p.reads.searches++
 	p.reads.candidates += len(found)
 	return found, next, err //nolint:wrapcheck // a test's pass-through
+}
+
+func (p countingPackages) CountPackages(ctx context.Context, r port.PackageRange) (int, error) {
+	p.reads.counts++
+	return p.PackageStore.CountPackages(ctx, r) //nolint:wrapcheck // a test's pass-through
+}
+
+func (p countingPackages) PackagesAt(
+	ctx context.Context, r port.PackageRange, offset, limit int,
+) ([]artmodel.Package, error) {
+	found, err := p.PackageStore.PackagesAt(ctx, r, offset, limit)
+	p.reads.pages++
+	p.reads.paged += len(found)
+	return found, err //nolint:wrapcheck // a test's pass-through
+}
+
+func (p countingPackages) Candidates(
+	ctx context.Context, packages []artmodel.Package,
+) ([]port.SearchCandidate, error) {
+	p.reads.withVersions++
+	return p.PackageStore.Candidates(ctx, packages) //nolint:wrapcheck // a test's pass-through
 }
 
 func (p countingPackages) Find(ctx context.Context, key, name string) (artmodel.Package, error) {
@@ -68,9 +92,11 @@ func bulkID(i int) string { return fmt.Sprintf("Bulk.%05d", i) }
 
 // Over 5000 packages, a search reads the index a page of candidates at a
 // time, each with its versions, never a package or its versions one by
-// one: totalHits counts every package the caller may read, so a late page
-// reads them all, but a term, an autocomplete's prefix and a feed of one
-// id's versions read only the packages they name.
+// one. For a caller who may read the whole repository a search without
+// terms, and an autocomplete, count in the store and read their page alone
+// (#1425). For anyone else totalHits counts every package the caller may
+// read, so a late page reads them all; a term, and a feed of one id's
+// versions, read only the packages they name.
 func TestAccSearchLatePage(t *testing.T) {
 	reads := &searchReads{}
 	f := newFixture(t, func(st pkgroute.Store) pkgroute.Store {
@@ -107,18 +133,25 @@ func TestAccSearchLatePage(t *testing.T) {
 		f.push(bulkID(i), "1.0.0", "")
 		lateIDs = append(lateIDs, bulkID(i))
 	}
+	paged := func(n int) searchReads {
+		return searchReads{counts: 1, pages: 1, paged: n, withVersions: 1}
+	}
 	for _, c := range []struct {
-		path               string
-		total              int
-		want               []string
-		searches, inspects int
+		path, user string
+		total      int
+		want       []string
+		reads      searchReads
 	}{
-		{v3 + "/query?skip=4980&take=20", count, lateIDs, 10, count},
-		{v3 + "/query?q=bulk.04990", 1, []string{"Bulk.04990"}, 1, 1},
-		{v3 + "/autocomplete?q=bulk.0499", 10, lateIDs[10:], 1, 10},
+		{v3 + "/query?skip=4980&take=20", "reader", count, lateIDs, paged(20)},
+		{v3 + "/query?q=bulk.04990", "reader", 1, []string{"Bulk.04990"}, searchReads{searches: 1, candidates: 1}},
+		{v3 + "/autocomplete?q=bulk.0499", "reader", 10, lateIDs[10:], paged(10)},
+		{v3 + "/autocomplete?q=bulk.0499&skip=8", "reader", 10, lateIDs[18:], paged(2)},
+		// A caller whose permission names paths has every package
+		// checked, 500 to a read.
+		{v3 + "/query?skip=4980&take=20", "partial", 0, []string{}, searchReads{searches: 10, candidates: count}},
 	} {
 		*reads = searchReads{}
-		rec := f.do(http.MethodGet, c.path, "reader")
+		rec := f.do(http.MethodGet, c.path, c.user)
 		wantStatus(t, rec, http.StatusOK)
 		var doc struct {
 			TotalHits int               `json:"totalHits"`
@@ -140,12 +173,11 @@ func TestAccSearchLatePage(t *testing.T) {
 			got = append(got, hit.ID)
 		}
 		if doc.TotalHits != c.total || !slices.Equal(got, c.want) {
-			t.Errorf("%s: totalHits %d, %v; want %d, %v",
-				c.path, doc.TotalHits, got, c.total, c.want)
+			t.Errorf("%s as %s: totalHits %d, %v; want %d, %v",
+				c.path, c.user, doc.TotalHits, got, c.total, c.want)
 		}
-		want := searchReads{searches: c.searches, candidates: c.inspects}
-		if *reads != want {
-			t.Errorf("%s read %+v, want %+v", c.path, *reads, want)
+		if *reads != c.reads {
+			t.Errorf("%s as %s read %+v, want %+v", c.path, c.user, *reads, c.reads)
 		}
 	}
 	// A feed of one id's versions reads that package alone.

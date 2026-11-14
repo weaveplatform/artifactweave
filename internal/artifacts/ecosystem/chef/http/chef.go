@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"golang.org/x/mod/semver"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
@@ -585,13 +584,10 @@ func sortReleases(out []release) {
 }
 
 // newestFirst orders Chef versions from the highest semantic version down,
-// the order a cookbook's versions are listed in.
-func newestFirst(a, b string) int {
-	if cmp := semver.Compare("v"+a, "v"+b); cmp != 0 {
-		return -cmp
-	}
-	return strings.Compare(a, b)
-}
+// the order a cookbook's versions are listed in: the reverse of the
+// package index's (model.CompareForge), so a list may read it from the
+// index (#1426).
+func newestFirst(a, b string) int { return model.CompareForge(b, a) }
 
 func writeJSON(w http.ResponseWriter, r *http.Request, status int, doc any) {
 	w.Header().Set("Content-Type", mediaType)

@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -158,16 +157,21 @@ func TestAccGenericRemoteTransientSidecarsAndFailures(t *testing.T) {
 		len(entries) != 0 {
 		t.Fatalf("transient entries %v %v", entries, err)
 	}
-	before := len(w.up.Requests())
-	remoteStatus(t, w.request("GET", "/artifactory/remote/cold.bin.sha256", "reader", ""), 404)
-	if before != len(w.up.Requests()) {
-		t.Fatal("disabled cold checksum fetched")
+	// Without retrieveSha256FromServer a remote that stores nothing has no
+	// checksum for a file the upstream holds: one HEAD of the file, and
+	// the checksum file is never asked for (#1495).
+	checksum := strings.Repeat("a", 64)
+	w.up.Set("/cold.bin", fakeupstream.Resource{Body: []byte("cold bytes")})
+	w.up.Set("/cold.bin.sha256", fakeupstream.Resource{Body: []byte(checksum)})
+	got = w.request("GET", "/artifactory/remote/cold.bin.sha256", "reader", "")
+	remoteStatus(t, got, 404)
+	if got.Body.String() != checksumNotFound("cold.bin") ||
+		w.up.Count("HEAD", "/cold.bin") != 1 || w.up.Count("", "/cold.bin.sha256") != 0 {
+		t.Fatal("disabled cold checksum fetched", got.Body, w.up.Requests())
 	}
 	w.c.RetrieveSha256FromServer = new(true)
 	w.c.StoreArtifactsLocally = new(true)
 	w.update()
-	checksum := strings.Repeat("a", 64)
-	w.up.Set("/cold.bin.sha256", fakeupstream.Resource{Body: []byte(checksum)})
 	got = w.request("GET", "/artifactory/remote/cold.bin.sha256", "reader", "")
 	remoteStatus(t, got, 200)
 	if got.Body.String() != checksum || w.up.Count("GET", "/cold.bin") != 0 {
@@ -178,6 +182,7 @@ func TestAccGenericRemoteTransientSidecarsAndFailures(t *testing.T) {
 		w.request("GET", "/artifactory/remote-cache/cold.bin.sha256", "reader", ""),
 		404,
 	)
+	w.up.Set("/large.bin", fakeupstream.Resource{Body: []byte("large bytes")})
 	w.up.Set("/large.bin.sha256", fakeupstream.Resource{Body: []byte(strings.Repeat("a", 5000))})
 	remoteStatus(t, w.request("GET", "/artifactory/remote/large.bin.sha256", "reader", ""), 502)
 	for _, status := range []int{401, 403, 500, 503, 429} {
@@ -469,37 +474,60 @@ func TestAccGenericRemoteOriginOmitsSignedQuery(t *testing.T) {
 	}
 }
 
-func TestAccGenericRemoteRejectsMalformedColdChecksum(t *testing.T) {
-	for _, data := range []string{"not-a-digest", "<html>login</html>", "", strings.Repeat("a", 63)} {
-		t.Run(fmt.Sprintf("size%d", len(data)), func(t *testing.T) {
+// TestAccGenericRemoteChecksumFileForms: a generic remote with
+// retrieveSha256FromServer reads the upstream's checksum file as 7.161.26's
+// ChecksumUtils.checksumStringFromStream does (getChecksumByExternalSha256
+// downloads it through getRemoteChecksumFromPath): its first token,
+// unchecked against the algorithm, or no checksum, 404, for a file with
+// none. A file past the 4096-byte checksum bound is still refused, 502, and
+// nothing is kept (#1495).
+func TestAccGenericRemoteChecksumFileForms(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		status     int
+		want       string
+	}{
+		{"word", "not-a-digest", http.StatusOK, "not-a-digest"},
+		{"short", strings.Repeat("a", 63), http.StatusOK, strings.Repeat("a", 63)},
+		{"empty", "", http.StatusNotFound, checksumNotFound("invalid.bin")},
+		{"large", strings.Repeat("a", 5000), http.StatusBadGateway, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			w := newRemoteWorld(t)
 			w.c.RetrieveSha256FromServer = new(true)
 			w.update()
-			w.up.Set("/invalid.bin.sha256", fakeupstream.Resource{Body: []byte(data)})
-			remoteStatus(
-				t,
-				w.request("GET", "/artifactory/remote/invalid.bin.sha256", "reader", ""),
-				502,
-			)
-			if _, err := w.rt.Store.Items().
-				Get(t.Context(), "remote", true, "invalid.bin.sha256"); !errors.Is(
-				err,
-				kernel.ErrNotFound,
-			) {
-				t.Fatalf("sidecar persisted %v", err)
+			w.up.Set("/invalid.bin", fakeupstream.Resource{Body: []byte("file bytes")})
+			w.up.Set("/invalid.bin.sha256", fakeupstream.Resource{
+				Body:   []byte(tc.body),
+				Header: http.Header{"Content-Type": {"text/plain"}},
+			})
+			got := w.request("GET", "/artifactory/remote/invalid.bin.sha256", "reader", "")
+			remoteStatus(t, got, tc.status)
+			if tc.want != "" && got.Body.String() != tc.want {
+				t.Fatalf("%q, want %q", got.Body, tc.want)
+			}
+			for _, p := range []string{"invalid.bin", "invalid.bin.sha256"} {
+				if _, err := w.rt.Store.Items().
+					Get(t.Context(), "remote", true, p); !errors.Is(err, kernel.ErrNotFound) {
+					t.Fatalf("%s persisted %v", p, err)
+				}
 			}
 		})
 	}
 }
 
 // TestAccGenericRemoteColdChecksumHeadDescribesNormalizedGet: a HEAD of a
-// SHA-256 the remote would retrieve describes the GET's normalized answer,
-// typed application/x-checksum as a checksum HEAD is (#1378).
+// SHA-256 the remote retrieves describes the GET's answer, typed
+// application/x-checksum as a checksum HEAD is (#1378). 7.161.26's
+// respondForChecksumRequest reads the checksum for a HEAD as for a GET
+// (getChecksum), so the HEAD asks the upstream for the checksum file too,
+// after a HEAD of the file, never its body (#1495).
 func TestAccGenericRemoteColdChecksumHeadDescribesNormalizedGet(t *testing.T) {
 	w := newRemoteWorld(t)
 	w.c.RetrieveSha256FromServer = new(true)
 	w.update()
 	digest := strings.Repeat("b", 64)
+	w.up.Set("/named.bin", fakeupstream.Resource{Body: []byte("named bytes")})
 	w.up.Set(
 		"/named.bin.sha256",
 		fakeupstream.Resource{
@@ -516,8 +544,9 @@ func TestAccGenericRemoteColdChecksumHeadDescribesNormalizedGet(t *testing.T) {
 		head.Body.Len() != 0 {
 		t.Fatal(head.Header(), head.Body)
 	}
-	if w.up.Count("GET", "/named.bin.sha256") != 0 {
-		t.Fatal("HEAD requested a checksum body")
+	if w.up.Count("GET", "/named.bin.sha256") != 1 || w.up.Count("GET", "/named.bin") != 0 ||
+		w.up.Count("HEAD", "/named.bin") != 1 {
+		t.Fatal("want a HEAD of the file and a GET of its checksum file", w.up.Requests())
 	}
 	got := w.request("GET", "/artifactory/remote/named.bin.sha256", "reader", "")
 	remoteStatus(t, got, 200)

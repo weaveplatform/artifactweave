@@ -476,7 +476,7 @@ func TestAccUsernameLockFoldsCase(t *testing.T) {
 	eachUserStore(t, func(t *testing.T, h http.Handler) {
 		locked := legacyError(
 			http.StatusForbidden,
-			`User is Locked.\nContact System Administrator to Unlock The Account.`,
+			`Login has failed. Due to Incorrect username/password or locked user.`,
 		)
 		runUserSteps(t, h, []userStep{
 			{

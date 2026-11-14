@@ -352,6 +352,11 @@ func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) 
 		if got.Code != tc.expected {
 			t.Errorf("%s: got %d want %d: %s", tc.path, got.Code, tc.expected, got.Body)
 		}
+		// A missing or broken signing key is configuration, not a transient
+		// condition, so its 503 hints no retry (decision 0043, #1415).
+		if got.Header().Get("Retry-After") != "" {
+			t.Errorf("%s: Retry-After %q", tc.path, got.Header().Get("Retry-After"))
+		}
 	}
 	if got := w.do(http.MethodGet, "/artifactory/api/hex/hex-garbled-key/public_key", "user",
 		""); got.Code != http.StatusForbidden {

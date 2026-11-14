@@ -23,7 +23,8 @@ import (
 
 // changeFormat changes what it names through the kit: PATCH /props/*
 // annotates the file with k=v, DELETE /files/* deletes it, and
-// GET /folder/* reports whether the caller may write below a folder.
+// GET /folder/* reports whether the caller may write below a folder, and
+// GET /all/* whether it may write every path below one.
 func changeFormat() pkgroute.Protocol {
 	return pkgroute.Protocol{
 		Name:         "testfmt",
@@ -58,6 +59,13 @@ func changeFormat() pkgroute.Protocol {
 				}
 				w.WriteHeader(http.StatusForbidden)
 			})
+			r.Get("/all/*", func(w http.ResponseWriter, r *http.Request) {
+				if k.CanAll(r, path(r, "all/"), api.ActionWrite) {
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+				w.WriteHeader(http.StatusForbidden)
+			})
 		},
 	}
 }
@@ -83,6 +91,12 @@ func TestAccAnnotateAndDelete(t *testing.T) {
 		{http.MethodGet, "folder/work", "writer", http.StatusNoContent},
 		{http.MethodGet, "folder/a", "writer", http.StatusForbidden},
 		{http.MethodGet, "folder/a", "", http.StatusForbidden},
+		// The writer may write every path below work, and no other.
+		{http.MethodGet, "all/work", "writer", http.StatusNoContent},
+		{http.MethodGet, "all/work/deep", "writer", http.StatusNoContent},
+		{http.MethodGet, "all/", "writer", http.StatusForbidden},
+		{http.MethodGet, "all/a", "writer", http.StatusForbidden},
+		{http.MethodGet, "all/work", "", http.StatusForbidden},
 	} {
 		rec := f.do(c.method, base+local+"/"+c.path, c.user, "")
 		if rec.Code != c.expected {

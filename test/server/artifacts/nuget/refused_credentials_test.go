@@ -8,7 +8,7 @@ import (
 )
 
 // TestAccNuGetClientRefusedPassword: a NuGet client whose password is
-// refused gets 403 "Bad credentials" with the Basic challenge, where any
+// refused gets 403 "Bad Credentials" with the Basic challenge, where any
 // other client gets 401, so that it stops asking for credentials, as 7.x's
 // entry point answers it (ArtifactoryBasicAuthenticationEntryPoint.
 // isAlreadyAuthedNuGetRequest, 7.161.26): a password that does not verify,
@@ -23,8 +23,8 @@ func TestAccNuGetClientRefusedPassword(t *testing.T) {
 		reindex  = "/artifactory/api/nuget/reindex-nuget/reindex"
 		nugetCLI = "NuGet Command Line/6.11.1 (Microsoft Windows NT 10.0.22631.0)"
 		dotnet   = "NuGet .NET Core MSBuild Task/6.11.1 (.NET 8.0.10; Linux)"
-		refused  = `{"errors":[{"message":"Bad credentials","status":403}]}` + "\n"
-		bad      = `{"errors":[{"message":"Bad credentials","status":401}]}` + "\n"
+		refused  = `{"errors":[{"message":"Bad Credentials","status":403}]}` + "\n"
+		bad      = `{"errors":[{"message":"Bad Credentials","status":401}]}` + "\n"
 		required = `{"errors":[{"message":"Authentication is required","status":401}]}` + "\n"
 	)
 	agent := func(ua string, h map[string]string) map[string]string {

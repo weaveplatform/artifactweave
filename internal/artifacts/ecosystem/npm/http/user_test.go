@@ -162,13 +162,13 @@ func TestAccLoginRefusals(t *testing.T) {
 		expected       int
 		msg            string
 	}{
-		{"ann", "wrong", http.StatusUnauthorized, "Bad credentials"},
-		{"nobody-here", "pw", http.StatusUnauthorized, "Bad credentials"},
-		{"ann", "", http.StatusUnauthorized, "Bad credentials"},
-		{"locked", "pw", http.StatusForbidden, "User is Locked"},
+		{"ann", "wrong", http.StatusUnauthorized, "Bad Credentials"},
+		{"nobody-here", "pw", http.StatusUnauthorized, "Bad Credentials"},
+		{"ann", "", http.StatusUnauthorized, "Bad Credentials"},
+		{"locked", "pw", http.StatusForbidden, "Login has failed. Due to Incorrect username/password or locked user."},
 		{"expired", "pw", http.StatusForbidden, "Password has expired"},
-		{"external", "pw", http.StatusUnauthorized, "Bad credentials"},
-		{"off", "pw", http.StatusUnauthorized, "Bad credentials"},
+		{"external", "pw", http.StatusUnauthorized, "Bad Credentials"},
+		{"off", "pw", http.StatusUnauthorized, "Bad Credentials"},
 	} {
 		wantError(t, f.login(c.name, c.password), c.expected, c.msg)
 	}
@@ -198,9 +198,14 @@ func TestAccLoginCountsFailures(t *testing.T) {
 		settings.SettingAccessLockSettings: accesstest.AccessLockSettings{},
 	}, 0)
 	for range 2 {
-		wantError(t, f.login("ann", "wrong"), http.StatusUnauthorized, "Bad credentials")
+		wantError(t, f.login("ann", "wrong"), http.StatusUnauthorized, "Bad Credentials")
 	}
-	wantError(t, f.login("ann", "pw"), http.StatusForbidden, "User is Locked")
+	wantError(
+		t,
+		f.login("ann", "pw"),
+		http.StatusForbidden,
+		"Login has failed. Due to Incorrect username/password or locked user.",
+	)
 	if _, err := f.kit.API().Authenticator.Basic(
 		context.Background(),
 		"ann",
@@ -222,7 +227,7 @@ func TestAccLoginSuspension(t *testing.T) {
 			BaseLoginDelayMillis: 60_000, MaxLoginDelayMillis: 60_000,
 		},
 	}, 0)
-	wantError(t, f.login("ann", "wrong"), http.StatusUnauthorized, "Bad credentials")
+	wantError(t, f.login("ann", "wrong"), http.StatusUnauthorized, "Bad Credentials")
 	wantError(t, f.login("ann", "pw"), http.StatusForbidden, "recurrent login failures")
 	_, err := f.kit.API().Authenticator.Basic(context.Background(), "ann", "pw")
 	if !errors.Is(err, accesstest.ErrLoginSuspended) {
@@ -278,7 +283,7 @@ func TestAccLoginWithToken(t *testing.T) {
 		if name == "other" {
 			user = "locked"
 		}
-		wantError(t, f.login(user, raw), http.StatusUnauthorized, "Bad credentials")
+		wantError(t, f.login(user, raw), http.StatusUnauthorized, "Bad Credentials")
 	}
 }
 

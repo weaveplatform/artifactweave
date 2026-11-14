@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-12T18:06:13.684096Z",
+  "generated_at": "2026-11-14T16:15:10.94569Z",
   "pages": 648,
   "schemas": [
     {
@@ -781,6 +781,143 @@
       ],
       "variants": 1,
       "used_by": 2
+    },
+    {
+      "family": "administration-jfrog-platform-groups-api",
+      "name": "GroupCreateRequest",
+      "type": "object",
+      "fields": [
+        {
+          "name": "admin_privileges",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "auto_join",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "import_from_ldap_group_setting",
+          "type": "string"
+        },
+        {
+          "name": "manage_resources",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "manage_webhook",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "members",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "policy_manager",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "policy_viewer",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "reports_manager",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "watch_manager",
+          "type": "boolean",
+          "default": false
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "administration-jfrog-platform-groups-api",
+      "name": "GroupDetails",
+      "type": "object",
+      "fields": [
+        {
+          "name": "admin_privileges",
+          "type": "boolean"
+        },
+        {
+          "name": "auto_join",
+          "type": "boolean"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "manage_resources",
+          "type": "boolean"
+        },
+        {
+          "name": "manage_webhook",
+          "type": "boolean"
+        },
+        {
+          "name": "members",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "policy_manager",
+          "type": "boolean"
+        },
+        {
+          "name": "policy_viewer",
+          "type": "boolean"
+        },
+        {
+          "name": "realm",
+          "type": "string"
+        },
+        {
+          "name": "realm_attributes",
+          "type": "string"
+        },
+        {
+          "name": "reports_manager",
+          "type": "boolean"
+        },
+        {
+          "name": "watch_manager",
+          "type": "boolean"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
     },
     {
       "family": "administration-jfrog-platform-rest-apis",
@@ -1922,7 +2059,7 @@
         }
       ],
       "variants": 1,
-      "used_by": 2
+      "used_by": 1
     },
     {
       "family": "administration-jfrog-platform-rest-apis",
@@ -1988,7 +2125,7 @@
         }
       ],
       "variants": 1,
-      "used_by": 4
+      "used_by": 3
     },
     {
       "family": "administration-jfrog-platform-rest-apis",
@@ -15087,6 +15224,47 @@
       }
     },
     {
+      "key": "PUT /access/api/v2/groups/{}",
+      "family": "administration-jfrog-platform-groups-api",
+      "tag": "Groups",
+      "id": "replaceGroup",
+      "method": "PUT",
+      "path": "/access/api/v2/groups/{name}",
+      "source": "https://docs.jfrog.com/administration/reference/replacegroup.md",
+      "params": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "GroupCreateRequest"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "GroupDetails"
+          }
+        ],
+        "201": [
+          {
+            "media": "application/json",
+            "schema": "GroupDetails"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
       "key": "DELETE /access/api/v1/environments/{}",
       "family": "administration-jfrog-platform-rest-apis",
       "tag": "Environments",
@@ -21746,47 +21924,6 @@
         "401": null,
         "403": null,
         "415": null
-      }
-    },
-    {
-      "key": "PUT /access/api/v2/groups/{}",
-      "family": "administration-jfrog-platform-rest-apis",
-      "tag": "Groups",
-      "id": "replaceGroup",
-      "method": "PUT",
-      "path": "/access/api/v2/groups/{name}",
-      "source": "https://docs.jfrog.com/administration/reference/replacegroup.md",
-      "params": [
-        {
-          "name": "name",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "request": [
-        {
-          "media": "application/json",
-          "schema": "GroupCreateRequest"
-        }
-      ],
-      "responses": {
-        "200": [
-          {
-            "media": "application/json",
-            "schema": "GroupDetails"
-          }
-        ],
-        "201": [
-          {
-            "media": "application/json",
-            "schema": "GroupDetails"
-          }
-        ],
-        "400": null,
-        "401": null,
-        "403": null,
-        "404": null
       }
     },
     {

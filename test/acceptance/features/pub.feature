@@ -230,6 +230,7 @@ Feature: Dart pub uses native repositories
     Then the response status is 200
     When I POST "/artifactory/api/pub/pub-life/reindex" as admin
     Then the response status is 200
+    And the queued reindex of "pub-life" completes within 20 seconds
     When I GET "/artifactory/api/pub/pub-life/api/packages/restored_pub" as admin
     Then the response status is 200
     And the JSON field "versions.0.version" equals "1.0.0"

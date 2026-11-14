@@ -31,8 +31,10 @@ uses an owned temporary reader whose close removes the file, without creating a 
 item, blob reference, raw metadata or package index.
 
 Known checksum headers remain integrity evidence under the selected remote checksum
-policy, regardless of `retrieveSha256FromServer`. That flag controls an additional cold
-upstream checksum lookup in #621; this storage path always computes all four hashes.
+policy, regardless of `retrieveSha256FromServer`. That flag lets a cold checksum
+request on a generic remote read the upstream's checksum file when the file's info has
+no value ([#1495](https://github.com/weaveplatform/artifactweave/issues/1495)); this
+storage path always computes all four hashes.
 MIME/header validation, HTML error-page rejection, length and checksum failures preserve
 the prior entry. For extensionless HTML metadata, adapters must supply a trusted
 `ExpectedContentType`; it is never inferred from an upstream header or arbitrary caller
@@ -204,21 +206,31 @@ skips a HEAD) and does not touch the cleanup clock beyond the commit's own
 ([#1391](https://github.com/weaveplatform/artifactweave/issues/1391)). A checksum
 request's HEAD (a `.md5`, `.sha1`, `.sha256` or `.sha512` path the item route answers
 from the file it names) downloads nothing: `respond` hands a checksum request, HEAD or
-GET, to `respondForChecksumRequest`, which answers from the file's info. On a
-Maven-family remote that stores artifacts locally, a checksum request's GET for a file
-the cache does not hold reads that info alone too, with one upstream HEAD, and keeps
-nothing; the remote's checksum policy reads the info's checksums, which hold only the
-upstream's `X-Checksum-*` declarations, so only `pass-thru` finds a value and every
-other answer is 404 "Checksum not found for <file>"
-([#1476](https://github.com/weaveplatform/artifactweave/issues/1476)). A checksum
+GET, to `respondForChecksumRequest`, which answers from the file's info. A checksum
 request for a file the cache holds, even one due for a refresh, reads that copy as a
-GET does; the item route sends every other checksum request upstream as a HEAD of the
-file. On a Maven-family remote that stores nothing, that HEAD is followed by a GET of
-the upstream's own checksum file, `<file>.<alg>`, a checksum-only read under no
-checksum policy that asks for no checksum of it, and the answer is that file's first
-token, or 404 "Checksum not found for <file>" when the upstream has none, as
-`RemoteRepoBase.getRemoteChecksum` downloads it (`getRemoteChecksumFromPath`); like
-every GET sent upstream, it follows a HEAD unless `bypassHeadRequests`. Never publish
+GET does. Every other checksum request the item route answers, on a remote of any type
+whose files it reads (the Maven family, generic, Debian, RPM, Alpine, P2's classified
+files, CRAN and opkg), reads the file's info alone, with one upstream HEAD of the file,
+and keeps nothing, as 7.161.26's `RemoteRepoBase.getChecksum` does
+([#1476](https://github.com/weaveplatform/artifactweave/issues/1476),
+[#1495](https://github.com/weaveplatform/artifactweave/issues/1495)). The value is
+found in this order, and none answers 404 "Checksum not found for <file>":
+
+1. On a remote that stores artifacts locally, the remote's checksum policy reads the
+   info's checksums, which hold only the upstream's `X-Checksum-*` declarations, so
+   only `pass-thru` finds a value (`localCacheRepo.getChecksum`).
+2. On a Maven-family remote that stores nothing, the upstream's own checksum file,
+   `<file>.<alg>` (`getRemoteChecksum`, `getRemoteChecksumFromPath`).
+3. On a generic remote with `retrieveSha256FromServer`, the upstream's own checksum
+   file, for any algorithm, not only SHA-256, since `getChecksumByExternalSha256`
+   downloads the request's own path (RTFACT-22923 asked for SHA-256, SHA-1 and MD5).
+
+The checksum file is a checksum-only read under no checksum policy that asks for no
+checksum of it, bounded to 4096 bytes, and the answer is its first token; an empty file
+or an upstream 404 gives no value. A HEAD finds the value as a GET does, since
+`respondForChecksumRequest` reads it for both. Like every GET sent upstream, the
+checksum file's follows a HEAD unless `bypassHeadRequests`. A file the upstream does not have answers the file's own
+404 before any checksum file is read. Never publish
 an item from an upstream HEAD alone: a HEAD that downloads nothing (R13, a checksum request, a checksum-only or
 transient resource, or an answer the cache may not keep) sends the upstream one HEAD,
 and the caller closes the response without publishing anything from it. A route that
@@ -450,7 +462,7 @@ P20 must retain their capability ledger entries until their receiving phase clos
 | `allowAnyHostAuth`, `enableCookieManagement`, `clientTlsCertificate` | Stored; [#618](https://github.com/weaveplatform/artifactweave/issues/618) | Explicit allowed auth/mTLS/cookie flow; host/downgrade/untrusted certificate denial; cookie isolation/rotation/resource cleanup. |
 | `customHttpHeaders[].name/value/sensitive` | Stored; sensitive values sealed/masked; [#618](https://github.com/weaveplatform/artifactweave/issues/618) | Header reaches permitted source; CRLF/reserved transport header rejected; sensitive values absent from redirects/logs and other repos. |
 | `remoteRepoChecksumPolicyType` | Stored; [#619](https://github.com/weaveplatform/artifactweave/issues/619) integrity, [#625](https://github.com/weaveplatform/artifactweave/issues/625) sidecars | `generate-if-absent`: accept missing, reject mismatch; `fail`: reject missing/mismatch; `ignore-and-generate`: compute; `pass-thru`: retain claimed separately. Test corrupt/partial body and transaction failure. |
-| `retrieveSha256FromServer` | Stored generic flag; [#621](https://github.com/weaveplatform/artifactweave/issues/621)/#619 | Enabled cold checksum lookup can fetch upstream sidecar without inventing an artifact; disabled cold lookup 404; mismatch never changes computed blob hash. |
+| `retrieveSha256FromServer` | Stored generic flag; [#621](https://github.com/weaveplatform/artifactweave/issues/621)/#619/[#1495](https://github.com/weaveplatform/artifactweave/issues/1495) | Enabled, a cold checksum request of any algorithm whose file's info has no value reads the upstream's `<file>.<alg>` without keeping it or the file; disabled, it answers 404 "Checksum not found for <file>"; mismatch never changes computed blob hash. |
 | `blockMismatchingMimeTypes`, `mismatchingMimeTypesOverrideList` | Stored; [#619](https://github.com/weaveplatform/artifactweave/issues/619) with adapter admission; 7.x's block-list rule ([#1316](https://github.com/weaveplatform/artifactweave/issues/1316)) | An upstream label that is none of the requested types is refused only when it is on the block list: `text/html` and `application/xhtml+xml`, or the override list, which replaces them. On the item route the requested types are the client's `Accept` types, without parameters and lowercased, and the type of the URL asked for when the client sends no `Accept` or only `*/*` ([#1377](https://github.com/weaveplatform/artifactweave/issues/1377)); a format route requests the type of the URL asked for [I], which can differ from the path's, as a NuGet v2 download's `packages/<id>/<version>` has no type (7.x's `HttpRepo.getAcceptableHeaders` reads `NamingUtils.getMimeType` of its download URL, [#1392](https://github.com/weaveplatform/artifactweave/issues/1392)). An absent, `*/*` or `application/octet-stream` label, or a requested `application/octet-stream`, is not checked, and the body is not read for its type; an archive format's own validator reads it. On the item route and on a format route a refusal answers 409 with 7.x's message, in the route's own error envelope, `Error fetching <url>: Mismatching mime types found in request: [<types>] and response: <label>, and this repo blocks <label> on mismatch; Path: '<repository>:<path>'`, GET and HEAD, and the path answers it again without an upstream request until `missedRetrievalCachePeriodSecs` pass or the path is zapped ([#1376](https://github.com/weaveplatform/artifactweave/issues/1376)); a cached copy that has expired is served on the request that met the refusal (R12). A format route answered 502 before #1392; how each 7.x native API words the 409 to its client is [I]. Raw metadata an adapter expects as one type (`ExpectedContentType`, `ExpectedContentTypes`) is held to that type instead, body included, by the adapter's own check, which is not 7.x's block list, and a label or body outside it answers 502, not remembered. |
 | `retrievalCachePeriodSecs`, `missedRetrievalCachePeriodSecs` | Shared runtime freshness policy and maintenance; [#620](https://github.com/weaveplatform/artifactweave/issues/620)/#622 | R2–R7 including exact expiry, zero missing TTL, 304, negative delete/zap; errors cannot extend freshness. |
 | `hardFail`, `offline`, `assumedOfflinePeriodSecs` | Stored; [#620](https://github.com/weaveplatform/artifactweave/issues/620) | R9–R12 combinations, fake-clock recovery; 401/403/429 not converted to negative or connection outage. |

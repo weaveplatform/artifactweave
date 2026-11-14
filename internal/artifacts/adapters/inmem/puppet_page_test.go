@@ -17,3 +17,12 @@ func TestUnitVersionNamesContract(t *testing.T) {
 		func(*testing.T) port.Store { return artinmem.New(memtx.New()) },
 	)
 }
+
+// TestUnitPackagePagesContract runs the list paging contract on the
+// module's in-memory adapter.
+func TestUnitPackagePagesContract(t *testing.T) {
+	artstoretest.RunPackagePages(
+		t,
+		func(*testing.T) port.Store { return artinmem.New(memtx.New()) },
+	)
+}

@@ -200,13 +200,13 @@ func TestAccMavenForceAuthenticationOnAVirtual(t *testing.T) {
 		"Authorization",
 		basic("admin", "wrong")["Authorization"],
 	)
-	wantAnswer(t, "a wrong password", bad, http.StatusUnauthorized, `"message":"Bad credentials"`)
+	wantAnswer(t, "a wrong password", bad, http.StatusUnauthorized, `"message":"Bad Credentials"`)
 	// While anonymous access is on, the anonymous user's Basic credentials
 	// and a Bearer token that does not verify count as none, as in 7.x's
 	// filter (OssForceAuthenticationFilter.checkIfAuthenticationShouldBeIgnored,
 	// 7.161.26). On an unforced repository the authentication answers them,
 	// as before.
-	const badCredentials = `"message":"Bad credentials"`
+	const badCredentials = `"message":"Bad Credentials"`
 	open := "/artifactory/mvn-open/org/a/1.0/a-1.0.jar"
 	for _, value := range []string{basic("anonymous", "")["Authorization"], "Bearer not-a-token"} {
 		wantForced(t, http.MethodGet, forcedJar+" as "+value,
@@ -224,7 +224,7 @@ func TestAccMavenForceAuthenticationOnAVirtual(t *testing.T) {
 
 // badCredentialsBody is the whole body of authentication's 401 for
 // credentials that do not verify.
-const badCredentialsBody = `{"errors":[{"message":"Bad credentials","status":401}]}` + "\n"
+const badCredentialsBody = `{"errors":[{"message":"Bad Credentials","status":401}]}` + "\n"
 
 // TestAccMavenForceAuthenticationPassesOtherCredentialsOn: with anonymous
 // access on, the credentials 7.x's force-authentication filter passes on to
@@ -237,9 +237,9 @@ const badCredentialsBody = `{"errors":[{"message":"Bad credentials","status":401
 // X-Api-Key header (getApiKeyTokenKeyValue). Authentication reads no
 // credential from the first two either, as 7.x's chain does, and serves
 // them as the anonymous user (#1451), as it does the empty header; it
-// answers the unpadded value 401 "Bad credentials", and the X-Api-Key,
+// answers the unpadded value 401 "Bad Credentials", and the X-Api-Key,
 // which 7.x's props filter reads as an API key that does not verify, 403
-// "Bad credentials" (isAlreadyAuthedApiKeyRequest, #1464). The world is
+// "Bad Credentials" (isAlreadyAuthedApiKeyRequest, #1464). The world is
 // fresh, so no earlier failed login suspends the anonymous user name
 // (#1435).
 func TestAccMavenForceAuthenticationPassesOtherCredentialsOn(t *testing.T) {
@@ -261,7 +261,7 @@ func TestAccMavenForceAuthenticationPassesOtherCredentialsOn(t *testing.T) {
 		{"Authorization", "", http.StatusOK, "jar"},
 		{
 			"X-Api-Key", "key", http.StatusForbidden,
-			`{"errors":[{"message":"Bad credentials","status":403}]}` + "\n",
+			`{"errors":[{"message":"Bad Credentials","status":403}]}` + "\n",
 		},
 	} {
 		rec := w.do(http.MethodGet, forcedJar, "", "", tc.header, tc.value)

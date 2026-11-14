@@ -473,6 +473,11 @@ func TestAccCatalogStoreFailures(t *testing.T) {
 			if w.Code != want || strings.Contains(w.Body.String(), errFault.Error()) {
 				t.Fatalf("fault %s: %d %s", stage, w.Code, w.Body.String())
 			}
+			// A catalog past its bound is a size limit, not a transient
+			// condition, so its 503 hints no retry (decision 0043, #1415).
+			if w.Header().Get("Retry-After") != "" {
+				t.Fatalf("fault %s: Retry-After %q", stage, w.Header().Get("Retry-After"))
+			}
 		})
 	}
 }

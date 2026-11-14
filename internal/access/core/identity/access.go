@@ -38,7 +38,7 @@ func (s *Service) CreateGroup(ctx context.Context, g model.Group, members []stri
 // ReplaceGroup creates g with members, as CreateGroup does, when no group
 // has g's name, and otherwise replaces that group with g; it reports whether
 // it created the group. It is Access v2's create or replace, not the legacy
-// PutGroup: JFrog's Create or Replace a Group resets every field a request
+// PutGroup: JFrog's Replace or Create a Group resets every field a request
 // leaves out to its create default, so g is stored as given (the caller
 // fills the defaults) and members replaces the membership even when empty.
 // What the request cannot carry survives: the realm and realm attributes,
