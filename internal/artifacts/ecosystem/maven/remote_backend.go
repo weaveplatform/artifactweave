@@ -170,11 +170,13 @@ func (m *MavenBackend) PrepareUpload(
 	opts remote.Options,
 	u *item.CacheUpload,
 ) error {
-	if Serves(q.Repo.PackageType) && q.Resource.ChecksumOnly {
-		// The upstream's checksum file is read as it is: 7.161.26's
-		// getRemoteChecksumFromPath downloads it under no checksum policy
-		// and asks for no checksum of it, so fail's demand that the
-		// upstream declare one does not apply.
+	if q.Resource.ChecksumOnly {
+		// The upstream's checksum file is read as it is, whatever the
+		// remote's type: 7.161.26's getRemoteChecksumFromPath downloads it
+		// under no checksum policy and asks for no checksum of it, for a
+		// Maven-family remote that stores nothing and a generic remote with
+		// retrieveSha256FromServer alike, so fail's demand that the
+		// upstream declare one does not apply (#1495).
 		u.Repo.RemoteRepoChecksumPolicyType = repo.IgnoreAndGenerate
 		return nil
 	}

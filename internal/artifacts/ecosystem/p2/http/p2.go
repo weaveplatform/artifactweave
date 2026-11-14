@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
@@ -62,6 +63,9 @@ func TryP2Item(
 		s.serveP2Virtual(w, r, st, c, req, p, acc)
 		return true
 	}
+	if c.Class == repo.Remote && p2RemoteChecksum(c, req.Path) {
+		return false
+	}
 	if c.Class != repo.Remote || p2.Classify(req.Path) == p2.KindInvalid {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return true
@@ -75,6 +79,22 @@ func TryP2Item(
 		return true
 	}
 	return false
+}
+
+// p2RemoteChecksum reports whether name, asked for on the P2 remote c, is
+// the checksum request of an update-site file P2 classes, which the generic
+// lookup answers from that file, as 7.161.26's
+// DownloadServiceImpl.respondForChecksumRequest answers a checksum request
+// on a remote of any type (#1495). A composite child's or a site archive's
+// file is read through this overlay alone, so its checksum is not.
+func p2RemoteChecksum(c repo.Config, name string) bool {
+	file, _, ok := item.Sidecar(name)
+	if !ok || p2.Classify(name) != p2.KindInvalid || p2.Classify(file) == p2.KindInvalid ||
+		strings.HasPrefix(file, "__p2_ext/") || p2CompositeName(file) {
+		return false
+	}
+	_, archive := p2ArchiveURL(c.URL)
+	return !archive
 }
 
 func p2ArchiveURL(raw string) (string, bool) {

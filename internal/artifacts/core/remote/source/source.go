@@ -131,11 +131,13 @@ type Resource struct {
 	// metadata validation, an Atom MIME expectation and a versioned schema remain required.
 	NuGetEmptyFeed bool
 	// ChecksumOnly is a checksum file (a .sha256, .sha512, .sha1 or .md5
-	// path, ChecksumSubject) the item route reads from the upstream itself:
-	// a generic remote's cold SHA-256 (retrieveSha256FromServer), and the
-	// checksum request of a Maven-family remote that stores nothing, as
-	// 7.161.26's RemoteRepoBase.getRemoteChecksum downloads it. It must
-	// remain transient and authorize the artifact it describes.
+	// path, ChecksumSubject) the item route reads from the upstream itself,
+	// once the upstream found the file it names: the checksum request of a
+	// Maven-family remote that stores nothing (7.161.26's
+	// RemoteRepoBase.getRemoteChecksum), and of a generic remote with
+	// retrieveSha256FromServer whose file's info held no value
+	// (getChecksumByExternalSha256). It must remain transient and
+	// authorize the artifact it describes.
 	ChecksumOnly bool
 	// ChecksumRequest marks a read of the file a checksum request (a
 	// .sha1, .md5, .sha256 or .sha512 path) names. Its HEAD is answered
