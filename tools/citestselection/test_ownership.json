@@ -151,6 +151,7 @@
       "items_test.go",
       "repositories_test.go",
       "searches_upstream_routes_test.go",
+      "storage_list_stream_test.go",
       "storage_test.go",
       "storageinfo_test.go",
       "trash_handlers_test.go"
@@ -239,6 +240,8 @@
       "storage_list_test.go",
       "storage_test.go",
       "storageinfo_test.go",
+      "streamed_lists_test.go",
+      "streamed_memory_test.go",
       "trace_test.go",
       "transfer_test.go",
       "trash_handlers_test.go",
