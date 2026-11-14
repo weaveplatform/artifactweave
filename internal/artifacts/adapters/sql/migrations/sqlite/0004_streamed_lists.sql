@@ -1,4 +1,4 @@
--- Two complete lists read their pages from these indexes (#1409, decision
+-- The complete lists read their pages from these indexes (#1409, decision
 -- 0043, "Streaming complete lists"), so each page is a seek rather than a
 -- sort of the whole list. Each expression must stay written exactly as the
 -- queries in adapters/sql/streamed_lists.go write it, or the planner no
@@ -13,6 +13,15 @@ CREATE INDEX items_full_path ON items (
     repo_key, cached, CASE WHEN path = '.' THEN name ELSE path || '/' || name END
 );
 
+-- The storage API's views of the trash can list its tree in path order:
+-- an entry's original repository key, a slash and its original full path,
+-- byte by byte, then by ID.
+CREATE INDEX trash_path ON trash (
+    original_repo_key || '/' || CASE WHEN original_path = '.' THEN original_name
+        ELSE original_path || '/' || original_name END,
+    id
+);
+
 -- The dependency search reads a checksum's dependencies in run, module and
 -- file order. The leading sha1 serves every lookup the single-column index
 -- it replaces served.
@@ -22,6 +31,7 @@ CREATE INDEX build_dependencies_sha1_order ON build_dependencies (
 );
 
 -- +down
+DROP INDEX trash_path;
 DROP INDEX build_dependencies_sha1_order;
 CREATE INDEX build_dependencies_sha1 ON build_dependencies (sha1);
 DROP INDEX items_full_path;

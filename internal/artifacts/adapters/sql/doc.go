@@ -45,8 +45,10 @@
 //     order from the expression index items_full_path, and Builds'
 //     DependencyPage a checksum's dependencies in run, module and file
 //     order from build_dependencies_sha1_order, which replaces
-//     build_dependencies_sha1 (migration 0004, #1409); each is cut a page
-//     at a time, so a streamed list holds one page.
+//     build_dependencies_sha1, and Trash's BelowByPath the trash can's
+//     tree in path order from the expression index trash_path (migration
+//     0004, #1409); each is cut a page at a time, so a streamed list holds
+//     one page.
 //   - Module: the name artifacts, the stream migrations.FS, the two sealed
 //     columns and the BeforeReseal and AfterMigrate hooks.
 //
@@ -179,12 +181,13 @@
 //     read through its index, with no sort, on SQLite and PostgreSQL) and
 //     TestAccDockerPagesClosedDatabase.
 //   - streamed_lists_test.go: TestAccStreamedListsAtScale (over 15,000
-//     items and 5,000 dependency rows sharing one checksum, a late page of a
-//     deep list and of a dependency search is one seek on items_full_path or
-//     build_dependencies_sha1_order, with no sort, on SQLite and PostgreSQL)
-//     and TestAccStreamedListsClosedDatabase. Their contracts run in
-//     adapters/storetest (ItemsByFullPath, the build store's DependencyPage
-//     and the repository window's After).
+//     items and trash entries and 5,000 dependency rows sharing one
+//     checksum, a late page of a deep list, of a dependency search and of
+//     the trash can's tree is one seek on items_full_path,
+//     build_dependencies_sha1_order or trash_path, with no sort, on SQLite
+//     and PostgreSQL) and TestAccStreamedListsClosedDatabase. Their
+//     contracts run in adapters/storetest (ItemsByFullPath, TrashByPath,
+//     the build store's DependencyPage and the repository window's After).
 //   - repo_page_test.go: TestAccRepoPagesContract (the repository window's
 //     contract, adapters/storetest.RunRepoPages, on SQLite in memory and in
 //     a file and on PostgreSQL) and TestAccRepoPagesAtScale (the first and

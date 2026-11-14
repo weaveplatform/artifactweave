@@ -33,6 +33,7 @@ func runContent(t *testing.T, newStore Factory) {
 	t.Run("LongPropertyValues", func(t *testing.T) { testLongPropertyValues(t, newStore(t)) })
 	t.Run("LongPropertyKeys", func(t *testing.T) { testLongPropertyKeys(t, newStore(t)) })
 	t.Run("Trash", func(t *testing.T) { testTrash(t, newStore(t).Trash()) })
+	t.Run("TrashByPath", func(t *testing.T) { testTrashByPath(t, newStore(t).Trash()) })
 	t.Run("Packages", func(t *testing.T) { testPackages(t, newStore(t)) })
 }
 
