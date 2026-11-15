@@ -330,6 +330,14 @@ func TestAccRemoteSearchFiltersAndKeepsUpstreamFields(t *testing.T) {
 	requireRemote(t, f.do("POST", remoteRegistry+"-/npm/v1/security/audits/quick", "reader"), 405)
 }
 
+// TestAccRemoteExternalURLCredentialsAndDeniedDestinations: a tarball on
+// another host than the remote's registry is fetched from there, as 7.x
+// follows a tarball's location (RTFACT-23931, 7.24.1), with no
+// externalDependencies setting on the remote, which 7.x keeps for npm
+// virtual repositories alone (#1574). The safety rules stay: the remote's
+// credentials do not follow the tarball to its host, and a cloud metadata
+// address is refused by the transport, so its tarball answers 502 while the
+// packument lists the version.
 func TestAccRemoteExternalURLCredentialsAndDeniedDestinations(t *testing.T) {
 	f := newRemoteFixture(t)
 	target := fakeupstream.New(t, fakeupstream.Options{})
@@ -345,14 +353,7 @@ func TestAccRemoteExternalURLCredentialsAndDeniedDestinations(t *testing.T) {
 	dist := doc["versions"].(map[string]any)["1.0.0"].(map[string]any)["dist"].(map[string]any)
 	dist["tarball"] = target.URL + "/pkg.tgz"
 	f.setJSON("/pkg", doc)
-	requireRemote(t, f.do("GET", remoteRegistry+"pkg", "reader"), 502)
-	if len(target.Requests()) != 0 {
-		t.Fatal("disabled URL contacted")
-	}
 	c, _ := f.db.Repos().Get(t.Context(), "npm-remote")
-	yes := true
-	c.ExternalDependenciesEnabled = &yes
-	c.ExternalDependenciesPatterns = []string{target.URL + "/**"}
 	c.Username = "upstream-user"
 	c.Password = "upstream-secret"
 	if err := f.db.Repos().Update(t.Context(), c); err != nil {
@@ -370,20 +371,98 @@ func TestAccRemoteExternalURLCredentialsAndDeniedDestinations(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.policy.Options = resolver.Options
-	requireRemote(t, f.do("GET", remoteRegistry+"pkg/-/pkg-1.0.0.tgz", "reader"), 200)
+	requireRemote(t, f.do("GET", remoteRegistry+"pkg", "reader"), 200,
+		`"tarball":"`+base+remoteRegistry+`pkg/-/pkg-1.0.0.tgz"`)
+	res := f.do("GET", remoteRegistry+"pkg/-/pkg-1.0.0.tgz", "reader")
+	requireRemote(t, res, 200)
+	if res.Body.String() != string(data) || target.Count(http.MethodGet, "/pkg.tgz") != 1 {
+		t.Fatalf("tarball not fetched from its host: %v", target.Requests())
+	}
 	for _, request := range target.Requests() {
 		if request.Header.Get("Authorization") != "" {
 			t.Fatal("origin credential leaked")
 		}
 	}
-	// Even a broad administrator allow pattern cannot authorize cloud metadata.
-	c.ExternalDependenciesPatterns = []string{"**"}
-	if err = f.db.Repos().Update(t.Context(), c); err != nil {
-		t.Fatal(err)
-	}
 	dist["tarball"] = "http://169.254.169.254/latest/meta-data/"
 	f.setJSON("/pkg", doc)
+	f.clock.Advance(10 * time.Second)
+	requireRemote(t, f.do("GET", remoteRegistry+"pkg", "reader"), 200, `"1.0.0"`)
 	requireRemote(t, f.do("GET", remoteRegistry+"pkg/-/pkg-1.0.0.tgz", "reader"), 502)
+}
+
+// TestAccRemoteTarballOutsideRegistry: a remote whose URL has a path lists
+// and serves a version whose dist.tarball is in the registry, relative to
+// it, elsewhere on its host or on another host, each through its canonical
+// path under the remote, and fetches the tarball from where the packument
+// puts it. 7.x stopped answering 404 for a tarball outside the registry's
+// root in 7.24.1 (RTFACT-23931, a registry at /api/v4/packages/npm whose
+// tarballs are under /api/v4/projects/<id>), and
+// sets no repository field for it: externalDependenciesEnabled and its
+// patterns, here on and naming no URL in use, are an npm virtual
+// repository's (#1574). The packument, version and dist-tags reads and the
+// tarball each answered 502 for every out-of-registry case.
+func TestAccRemoteTarballOutsideRegistry(t *testing.T) {
+	yes := true
+	for _, tc := range []struct{ name, tarball, served string }{
+		{"in registry", "{up}/registry/pkg/-/pkg-1.0.0.tgz", "/registry/pkg/-/pkg-1.0.0.tgz"},
+		{"relative", "pkg/-/pkg-1.0.0.tgz", "/registry/pkg/-/pkg-1.0.0.tgz"},
+		{"relative outside", "../files/pkg-1.0.0.tgz", "/files/pkg-1.0.0.tgz"},
+		{"rooted outside", "/files/pkg-1.0.0.tgz", "/files/pkg-1.0.0.tgz"},
+		{"same host outside", "{up}/api/v4/projects/1/pkg-1.0.0.tgz", "/api/v4/projects/1/pkg-1.0.0.tgz"},
+		{"other host", "{cdn}/pkg-1.0.0.tgz", "/pkg-1.0.0.tgz"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newRemoteFixture(t)
+			cdn := fakeupstream.New(t, fakeupstream.Options{})
+			data := tarball(`{"name":"pkg","version":"1.0.0"}`)
+			sum := sha512.Sum512(data)
+			host := f.up
+			if strings.HasPrefix(tc.tarball, "{cdn}") {
+				host = cdn
+			}
+			host.Set(tc.served, fakeupstream.Resource{
+				Body:   data,
+				Header: http.Header{"Content-Type": []string{"application/octet-stream"}},
+			})
+			ref := strings.NewReplacer("{up}", f.up.URL, "{cdn}", cdn.URL).Replace(tc.tarball)
+			f.setJSON("/registry/pkg", map[string]any{
+				"name": "pkg",
+				"versions": map[string]any{"1.0.0": map[string]any{
+					"name": "pkg", "version": "1.0.0",
+					"dist": map[string]any{
+						"tarball":   ref,
+						"integrity": "sha512-" + base64.StdEncoding.EncodeToString(sum[:]),
+					},
+				}},
+				"dist-tags": map[string]string{"latest": "1.0.0"},
+			})
+			c, _ := f.db.Repos().Get(t.Context(), "npm-remote")
+			c.URL = f.up.URL + "/registry"
+			c.ExternalDependenciesEnabled = &yes
+			c.ExternalDependenciesPatterns = []string{"https://nowhere.example/**"}
+			if err := f.db.Repos().Update(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			resolver, err := upstream.NewResolver(f.db, nil, upstream.ResolverOptions{
+				RevisionKey:           []byte(strings.Repeat("k", 32)),
+				AllowedPrivateOrigins: []string{cdn.URL},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.policy.Options = resolver.Options
+			canonical := `"tarball":"` + base + remoteRegistry + `pkg/-/pkg-1.0.0.tgz"`
+			requireRemote(t, f.do("GET", remoteRegistry+"pkg", "reader"), 200, canonical)
+			requireRemote(t, f.do("GET", remoteRegistry+"pkg/1.0.0", "reader"), 200, canonical)
+			requireRemote(t, f.do("GET", remoteRegistry+"-/package/pkg/dist-tags", "reader"), 200,
+				`{"latest":"1.0.0"}`)
+			res := f.do("GET", remoteRegistry+"pkg/-/pkg-1.0.0.tgz", "reader")
+			requireRemote(t, res, 200)
+			if res.Body.String() != string(data) || host.Count(http.MethodGet, tc.served) != 1 {
+				t.Fatalf("tarball not fetched from %s: %v", tc.served, host.Requests())
+			}
+		})
+	}
 }
 
 func TestAccRemotePackageMutationsRemainReadOnly(t *testing.T) {
