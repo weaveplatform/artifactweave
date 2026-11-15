@@ -752,9 +752,10 @@ func TestAccContentTypePropertyRoutes(t *testing.T) {
 // 7.161.26's JerseyArtifactoryResponse writes for the package download
 // service, which their 7.x downloads go through (RTFACT-27459 on 7.41.13,
 // pypa/pip#13396 on 7.113.0). The item route on the same file keeps the
-// filename* part HttpArtifactoryResponse adds. Every other format's
-// native download keeps the form it had, as no source shows theirs [I]:
-// the item route's, or Swift's own (#1505).
+// filename* part HttpArtifactoryResponse adds. A Hugging Face resolve
+// sends none, as 7.117.12's did (RTFACT-31280, #1581). Every other
+// format's native download keeps the form it had, as no source shows
+// theirs [I]: the item route's, or Swift's own (#1505).
 func TestAccNativeDownloadDispositionRoutes(t *testing.T) {
 	packageService := map[string]bool{"gems": true, "pypi": true}
 	for _, c := range protocolDownloads() {
@@ -786,6 +787,8 @@ func TestAccNativeDownloadDispositionRoutes(t *testing.T) {
 				// Swift names its source archive itself, before the item
 				// download.
 				native = `attachment; filename="` + name + `"`
+			case c.name == "huggingface":
+				native = ""
 			}
 			for route, want := range map[string]string{
 				"/artifactory/api/" + c.route:               native,

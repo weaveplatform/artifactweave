@@ -2563,7 +2563,7 @@ paths:
           description: The archive, typed by its extension and named `<userOrg>-<branch>-<commit>.<ext>`.
           headers:
             Content-Disposition:
-              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -2676,7 +2676,7 @@ paths:
           description: The archive, typed by its extension and named `<repo>-<branch>-<commit>.<ext>`.
           headers:
             Content-Disposition:
-              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -2794,7 +2794,7 @@ paths:
           description: The archive, typed by its extension and named `<repo>-<branch>-<commit>.<ext>`.
           headers:
             Content-Disposition:
-              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -3127,7 +3127,7 @@ paths:
           description: The archive, typed by its extension and named `<repo>-<commit>.<ext>`.
           headers:
             Content-Disposition:
-              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -3239,7 +3239,7 @@ paths:
           description: The archive, typed by its extension and named `<repo>-<release>.<ext>`.
           headers:
             Content-Disposition:
-              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -3352,7 +3352,7 @@ paths:
           description: The archive, typed by its extension and named `<repo>-<tag>.<ext>`.
           headers:
             Content-Disposition:
-              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -3464,7 +3464,7 @@ paths:
           description: The archive, typed by its extension and named `<repo>-<tag>.<ext>`.
           headers:
             Content-Disposition:
-              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -3569,7 +3569,7 @@ paths:
           description: The archive, typed by its extension and named `<userOrg>-<tag>.<ext>`.
           headers:
             Content-Disposition:
-              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
               schema:
                 type: string
             X-Artifactory-Filename:
