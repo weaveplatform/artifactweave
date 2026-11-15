@@ -9,8 +9,9 @@
 // Artifactory VCS repository or a CUSTOM template; parses the references a
 // provider lists (ParseRefs, RefEndpoint.Parse); checks an archive in full
 // before the remote cache admits it (ValidateArchive,
-// ValidateCommitArchive, ValidateFileZIP); and selects one file from an
-// archive (FileZIP, WrappedFileZIP, CustomFileZIP).
+// ValidateCommitArchive, ValidateFile); selects one file from an archive
+// (SelectFile, SelectWrappedFile, SelectCustomFile); and zips a selected
+// file for ext=zip (FileZIP).
 //
 // # Role
 //
@@ -32,11 +33,15 @@
 //     within MaxRefsBytes and MaxRefs); vcs_download.go resolves a branch,
 //     tag or release to its commit (ValidRef, ValidCommitID), fetches that
 //     commit's archive (ArchiveURL, ValidateCommitArchive) and selects a
-//     file from it within MaxArchiveBytes (ValidFilePath, FileZIP,
-//     WrappedFileZIP, CustomFileZIP, ErrInvalidPath); vcs_nested.go routes
-//     GitLab subgroup paths (ValidProject, ValidRef, ValidFilePath,
-//     ValidExtension); and vcs_peer_file.go asks a peer for a selected file
-//     (PeerFileURL, ValidateFileZIP, within MaxFileZIPBytes).
+//     file from it within MaxArchiveBytes (ValidFilePath, SelectFile,
+//     SelectWrappedFile, SelectCustomFile, ErrInvalidPath); vcs_nested.go
+//     routes GitLab subgroup paths (ValidProject, ValidRef, ValidFilePath,
+//     ValidExtension); vcs_peer_file.go asks a peer for a selected file
+//     itself (PeerFileURL, ValidateFile, within MaxSelectedFileBytes); and
+//     vcs_served.go answers every archive and file download.
+//   - KeepRequest, which app's router adds to the strict server's
+//     middleware, hands the 14 archive and file downloads their request,
+//     whose validators and range their answer needs.
 //   - Driven: the item kit (artifacts/adapters/http/itemkit), which
 //     resolves the repository and the caller's access, reads a cached
 //     archive's properties through the content store, opens cached blobs
@@ -55,11 +60,15 @@
 //     application/zip by their extension, named as 7.x's GitRef names them
 //     (<repo>-<tag>.<ext>, <repo>-<branch>-<commit>.<ext>) in
 //     X-Artifactory-Filename and Content-Disposition, with the checksums
-//     their read knows (#1580); and selected files (a ZIP that holds the
-//     file) as application/octet-stream.
+//     their read knows (#1580); and a selected file as the file itself,
+//     typed by its extension and named by its base name (RTFACT-29495), or
+//     with ext=zip as the ZIP that holds it, named <file>.zip [I]. Every
+//     archive and file answers as a 7.x file download does [I]: its SHA-1
+//     as a bare ETag, its time as Last-Modified, a 304 to either, and a
+//     range with 206, or 416 past its end.
 //   - VCSNested: the handler of the GitLab subgroup path forms, which
-//     answers an archive as VCSAPI does, a selected file as
-//     application/zip and a form it does not own with 404.
+//     answers an archive and a selected file as VCSAPI does and a form it
+//     does not own with 404.
 //   - The name rules: ValidProject, ValidRef, ValidCommitID, ValidFilePath
 //     and ValidExtension.
 //   - The provider addresses: RefEndpoints, GitRefsURL, ArchiveURL and
@@ -67,10 +76,10 @@
 //   - The reference rules: Ref, RefEndpoint with Variant and Parse, and
 //     ParseRefs, which fail with ErrInvalidRefs; MaxRefsBytes and MaxRefs.
 //   - The archive rules: ValidateArchive, ValidateCommitArchive,
-//     ValidateFileZIP, FileZIP, WrappedFileZIP and CustomFileZIP, which fail
-//     with ErrInvalidArchive, or ErrInvalidPath for a file the archive does
-//     not hold; MaxArchiveBytes, MaxExpandedBytes, MaxArchiveFiles,
-//     MaxSelectedFileBytes and MaxFileZIPBytes.
+//     ValidateFile, SelectFile, SelectWrappedFile, SelectCustomFile and
+//     FileZIP, which fail with ErrInvalidArchive, or ErrInvalidPath for a
+//     file the archive does not hold; MaxArchiveBytes, MaxExpandedBytes,
+//     MaxArchiveFiles and MaxSelectedFileBytes.
 //
 // # Invariants
 //
@@ -108,7 +117,9 @@
 //   - A peer's selected file follows a reference that can move, so it is
 //     never treated as an immutable commit archive.
 //   - The Variant values are part of the remote cache key, so they stay
-//     byte-identical, as do statuses and error and log text.
+//     byte-identical, as do statuses and error and log text, until what is
+//     cached changes: vcs-peer-file-v2 holds the peer's file itself, where
+//     v1 held a ZIP of it.
 //
 // # References
 //
@@ -151,8 +162,9 @@
 //     configuration, unsafe ZIP entries, and missing, duplicate and corrupt
 //     selections.
 //   - archive_git_test.go: real git archive output bound to its commit with
-//     rootless paths, global PAX records, a peer's selected-file ZIP, and
-//     CUSTOM exact and wrapped layouts; the VCS client recipe cites it.
+//     rootless paths, global PAX records, a peer's selected file within
+//     its bound, and CUSTOM exact and wrapped layouts; the VCS client
+//     recipe cites it.
 //   - paths_test.go: the STASH and OLDSTASH addresses.
 //   - peer_test.go: the peer's endpoints and payloads, malformed or
 //     ambiguous references, and the selected-file address.
@@ -165,9 +177,12 @@
 //     the property filter's parsing and its match against a cached item's
 //     properties, archive requests refused before the source, and a
 //     result's revalidation, usage and missing cached blob.
+//   - vcs_served_test.go: a download's headers, 304, range, 416 and HEAD,
+//     a body that cannot seek or whose checksums are not known, and
+//     KeepRequest.
 //
 // testdata holds unchanged git archive output, the legacy and refreshed
-// archive, index and readme fixtures, with git-archives.json, which
+// tar.gz and ZIP archives, with git-archives.json, which
 // records each commit and archive digest, and generate.py, which builds
 // them (testdata/README.md). The route suite test/server/artifacts/vcs and
 // the acceptance steps also read it. The REST evidence is

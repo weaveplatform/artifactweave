@@ -19215,8 +19215,20 @@ paths:
                 type: string
           description: The archive, typed by its extension and named `<userOrg>-<branch>-<commit>.<ext>`.
           headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
             Content-Disposition:
               description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -19233,6 +19245,31 @@ paths:
                 type: string
             X-Checksum-Sha256:
               description: SHA-256 of the archive, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/x-gzip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
               schema:
                 type: string
         '401':
@@ -19253,6 +19290,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -19328,8 +19372,20 @@ paths:
                 type: string
           description: The archive, typed by its extension and named `<repo>-<branch>-<commit>.<ext>`.
           headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
             Content-Disposition:
               description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -19346,6 +19402,31 @@ paths:
                 type: string
             X-Checksum-Sha256:
               description: SHA-256 of the archive, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/x-gzip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
               schema:
                 type: string
         '401':
@@ -19366,6 +19447,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -19446,8 +19534,20 @@ paths:
                 type: string
           description: The archive, typed by its extension and named `<repo>-<branch>-<commit>.<ext>`.
           headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
             Content-Disposition:
               description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -19464,6 +19564,31 @@ paths:
                 type: string
             X-Checksum-Sha256:
               description: SHA-256 of the archive, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/x-gzip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
               schema:
                 type: string
         '401':
@@ -19484,6 +19609,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -19526,15 +19658,84 @@ paths:
           schema:
             description: Name of the branch to download.
             type: string
+        - description: Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+          in: query
+          name: ext
+          schema:
+            description: '`zip` for the file in a ZIP; otherwise the file itself.'
+            type: string
       responses:
         '200':
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes.
+                description: The file's bytes. The file is typed by its name through the MIME table, `application/octet-stream` when the table has no row for it.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: With `ext=zip`, a ZIP holding the file at its path.
+                format: binary
+                type: string
+          description: The file named after `!`, itself or with `ext=zip` in a ZIP, named by its base name (with `.zip` added for the ZIP).
+          headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
+            Content-Disposition:
+              description: '`attachment` with the file''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The file's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the bytes, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/octet-stream:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -19553,6 +19754,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -19602,15 +19810,84 @@ paths:
           schema:
             description: Name of the branch to download.
             type: string
+        - description: Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+          in: query
+          name: ext
+          schema:
+            description: '`zip` for the file in a ZIP; otherwise the file itself.'
+            type: string
       responses:
         '200':
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes.
+                description: The file's bytes. The file is typed by its name through the MIME table, `application/octet-stream` when the table has no row for it.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: With `ext=zip`, a ZIP holding the file at its path.
+                format: binary
+                type: string
+          description: The file named after `!`, itself or with `ext=zip` in a ZIP, named by its base name (with `.zip` added for the ZIP).
+          headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
+            Content-Disposition:
+              description: '`attachment` with the file''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The file's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the bytes, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/octet-stream:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -19629,6 +19906,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -19678,15 +19962,84 @@ paths:
           schema:
             description: Name of the branch to download.
             type: string
+        - description: Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+          in: query
+          name: ext
+          schema:
+            description: '`zip` for the file in a ZIP; otherwise the file itself.'
+            type: string
       responses:
         '200':
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes.
+                description: The file's bytes. The file is typed by its name through the MIME table, `application/octet-stream` when the table has no row for it.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: With `ext=zip`, a ZIP holding the file at its path.
+                format: binary
+                type: string
+          description: The file named after `!`, itself or with `ext=zip` in a ZIP, named by its base name (with `.zip` added for the ZIP).
+          headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
+            Content-Disposition:
+              description: '`attachment` with the file''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The file's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the bytes, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/octet-stream:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -19705,6 +20058,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -19779,8 +20139,20 @@ paths:
                 type: string
           description: The archive, typed by its extension and named `<repo>-<commit>.<ext>`.
           headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
             Content-Disposition:
               description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -19797,6 +20169,31 @@ paths:
                 type: string
             X-Checksum-Sha256:
               description: SHA-256 of the archive, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/x-gzip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
               schema:
                 type: string
         '401':
@@ -19817,6 +20214,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -19891,8 +20295,20 @@ paths:
                 type: string
           description: The archive, typed by its extension and named `<repo>-<release>.<ext>`.
           headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
             Content-Disposition:
               description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -19909,6 +20325,31 @@ paths:
                 type: string
             X-Checksum-Sha256:
               description: SHA-256 of the archive, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/x-gzip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
               schema:
                 type: string
         '401':
@@ -19929,6 +20370,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -20004,8 +20452,20 @@ paths:
                 type: string
           description: The archive, typed by its extension and named `<repo>-<tag>.<ext>`.
           headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
             Content-Disposition:
               description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -20022,6 +20482,31 @@ paths:
                 type: string
             X-Checksum-Sha256:
               description: SHA-256 of the archive, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/x-gzip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
               schema:
                 type: string
         '401':
@@ -20042,6 +20527,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -20116,8 +20608,20 @@ paths:
                 type: string
           description: The archive, typed by its extension and named `<repo>-<tag>.<ext>`.
           headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
             Content-Disposition:
               description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -20134,6 +20638,31 @@ paths:
                 type: string
             X-Checksum-Sha256:
               description: SHA-256 of the archive, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/x-gzip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
               schema:
                 type: string
         '401':
@@ -20154,6 +20683,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -20221,8 +20757,20 @@ paths:
                 type: string
           description: The archive, typed by its extension and named `<userOrg>-<tag>.<ext>`.
           headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
             Content-Disposition:
               description: '`attachment` with the archive''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
               schema:
                 type: string
             X-Artifactory-Filename:
@@ -20239,6 +20787,31 @@ paths:
                 type: string
             X-Checksum-Sha256:
               description: SHA-256 of the archive, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/x-gzip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
               schema:
                 type: string
         '401':
@@ -20259,6 +20832,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -20308,15 +20888,84 @@ paths:
           schema:
             description: Name of the tag to download.
             type: string
+        - description: Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+          in: query
+          name: ext
+          schema:
+            description: '`zip` for the file in a ZIP; otherwise the file itself.'
+            type: string
       responses:
         '200':
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes.
+                description: The file's bytes. The file is typed by its name through the MIME table, `application/octet-stream` when the table has no row for it.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: With `ext=zip`, a ZIP holding the file at its path.
+                format: binary
+                type: string
+          description: The file named after `!`, itself or with `ext=zip` in a ZIP, named by its base name (with `.zip` added for the ZIP).
+          headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
+            Content-Disposition:
+              description: '`attachment` with the file''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The file's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the bytes, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/octet-stream:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -20335,6 +20984,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -20384,15 +21040,84 @@ paths:
           schema:
             description: Name of the tag to download.
             type: string
+        - description: Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+          in: query
+          name: ext
+          schema:
+            description: '`zip` for the file in a ZIP; otherwise the file itself.'
+            type: string
       responses:
         '200':
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes.
+                description: The file's bytes. The file is typed by its name through the MIME table, `application/octet-stream` when the table has no row for it.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: With `ext=zip`, a ZIP holding the file at its path.
+                format: binary
+                type: string
+          description: The file named after `!`, itself or with `ext=zip` in a ZIP, named by its base name (with `.zip` added for the ZIP).
+          headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
+            Content-Disposition:
+              description: '`attachment` with the file''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The file's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the bytes, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/octet-stream:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -20411,6 +21136,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -20453,15 +21185,84 @@ paths:
           schema:
             description: Name of the tag to download.
             type: string
+        - description: Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+          in: query
+          name: ext
+          schema:
+            description: '`zip` for the file in a ZIP; otherwise the file itself.'
+            type: string
       responses:
         '200':
           content:
             application/octet-stream:
               schema:
-                description: Archive bytes.
+                description: The file's bytes. The file is typed by its name through the MIME table, `application/octet-stream` when the table has no row for it.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: With `ext=zip`, a ZIP holding the file at its path.
+                format: binary
+                type: string
+          description: The file named after `!`, itself or with `ext=zip` in a ZIP, named by its base name (with `.zip` added for the ZIP).
+          headers:
+            Accept-Ranges:
+              description: '`bytes`: a GET may ask for a range.'
+              schema:
+                type: string
+            Content-Disposition:
+              description: '`attachment` with the file''s name, quoted, as `X-Artifactory-Filename` gives it.'
+              schema:
+                type: string
+            ETag:
+              description: SHA-1 of the bytes, unquoted, when known.
+              schema:
+                type: string
+            Last-Modified:
+              description: When the file last changed, when known.
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The file's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the bytes, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the bytes, when known.
+              schema:
+                type: string
+        '206':
+          content:
+            application/octet-stream:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: The bytes of the range.
+                format: binary
+                type: string
+          description: The range `Range` asked for, when `If-Range` is absent or still names the file.
+          headers:
+            Content-Range:
+              description: The range served and the file's length.
+              schema:
+                type: string
+        '304':
+          description: '`If-None-Match` names the file''s SHA-1, or else `If-Modified-Since` is not older than the file; the answer carries the file''s headers less its type and length.'
+          headers:
+            ETag:
+              description: SHA-1 of the file, unquoted, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -20480,6 +21281,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository, package or path named in the request does not exist; the body carries the error envelope.
+        '416':
+          description: The range does not overlap the file; the answer carries `Content-Range` alone.
+          headers:
+            Content-Range:
+              description: '`bytes */<length>`.'
+              schema:
+                type: string
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':

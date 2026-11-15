@@ -134,31 +134,16 @@ func TestUnitVCSResultStreamRevalidationAndUsage(t *testing.T) {
 	if data, err := io.ReadAll(body); err != nil || string(data) != "archive" {
 		t.Fatalf("read = %q, %v", data, err)
 	}
-	if used != 1 {
-		t.Fatalf("used callback = %d, want 1 after EOF", used)
+	if used != 0 {
+		t.Fatalf("used callback = %d; the delivery records the use (vcsServed.serve)", used)
 	}
 	if err := body.Close(); err != nil || closed != 1 {
 		t.Fatalf("close = %v, count %d", err, closed)
 	}
-	result = source.Result{
-		Stream: newBody("partial"),
-		Used:   func(context.Context) error { used++; return nil },
-	}
-	partial, _, err := s.vcsOpenResult(t.Context(), result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	buffer := make([]byte, 1)
-	if _, err := partial.Read(buffer); err != nil {
-		t.Fatal(err)
-	}
-	if err := partial.Close(); err != nil || used != 1 {
-		t.Fatalf("partial close = %v, used %d; incomplete stream must not count as used", err, used)
-	}
 	result = source.Result{Stream: newBody("unknown")}
 	result.Stream.Size = -1
 	unknown, size, err := s.vcsOpenResult(t.Context(), result)
-	if err != nil || size != 0 {
+	if err != nil || size != -1 {
 		t.Fatalf("unknown-length source = size %d, err %v", size, err)
 	}
 	if err := unknown.Close(); err != nil {
@@ -173,7 +158,7 @@ func TestUnitVCSResultStreamRevalidationAndUsage(t *testing.T) {
 		t.Context(),
 		result,
 	); !errors.As(err, &denied) || denied.Status != http.StatusForbidden ||
-		closed != 4 {
+		closed != 3 {
 		t.Fatalf("revoked source = %v, closed %d", err, closed)
 	}
 	if _, _, err := s.vcsOpenResult(

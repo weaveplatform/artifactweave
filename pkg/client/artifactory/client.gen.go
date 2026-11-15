@@ -8101,6 +8101,24 @@ type DownloadVcsBranchParams struct {
 // DownloadVcsBranchParamsExt defines parameters for DownloadVcsBranch.
 type DownloadVcsBranchParamsExt string
 
+// DownloadFileWithinVcsBranchAlternativeParams defines parameters for DownloadFileWithinVcsBranchAlternative.
+type DownloadFileWithinVcsBranchAlternativeParams struct {
+	// Ext Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+	Ext *string `form:"ext,omitempty" json:"ext,omitempty"`
+}
+
+// DownloadFileInVcsBranchInSubgroupRepositoryParams defines parameters for DownloadFileInVcsBranchInSubgroupRepository.
+type DownloadFileInVcsBranchInSubgroupRepositoryParams struct {
+	// Ext Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+	Ext *string `form:"ext,omitempty" json:"ext,omitempty"`
+}
+
+// DownloadFileWithinVcsBranchParams defines parameters for DownloadFileWithinVcsBranch.
+type DownloadFileWithinVcsBranchParams struct {
+	// Ext Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+	Ext *string `form:"ext,omitempty" json:"ext,omitempty"`
+}
+
 // DownloadVcsCommitParams defines parameters for DownloadVcsCommit.
 type DownloadVcsCommitParams struct {
 	// Ext Optional query parameter. Archive format to produce (tar.gz or zip).
@@ -8145,6 +8163,24 @@ type DownloadVcsTagAlternativeParams struct {
 
 // DownloadVcsTagAlternativeParamsExt defines parameters for DownloadVcsTagAlternative.
 type DownloadVcsTagAlternativeParamsExt string
+
+// DownloadFileInVcsTagInSubgroupRepositoryParams defines parameters for DownloadFileInVcsTagInSubgroupRepository.
+type DownloadFileInVcsTagInSubgroupRepositoryParams struct {
+	// Ext Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+	Ext *string `form:"ext,omitempty" json:"ext,omitempty"`
+}
+
+// DownloadFileWithinVcsTagParams defines parameters for DownloadFileWithinVcsTag.
+type DownloadFileWithinVcsTagParams struct {
+	// Ext Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+	Ext *string `form:"ext,omitempty" json:"ext,omitempty"`
+}
+
+// DownloadFileWithinVcsTagAlternativeParams defines parameters for DownloadFileWithinVcsTagAlternative.
+type DownloadFileWithinVcsTagAlternativeParams struct {
+	// Ext Optional query parameter. `zip` answers the file in a ZIP that holds it at its path; any other value, or none, answers the file itself.
+	Ext *string `form:"ext,omitempty" json:"ext,omitempty"`
+}
 
 // CalculateYumRepositoryMetadataParams defines parameters for CalculateYumRepositoryMetadata.
 type CalculateYumRepositoryMetadataParams struct {
@@ -12829,17 +12865,17 @@ type ClientInterface interface {
 	// DownloadFileWithinVcsBranchAlternative performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName} (the `DownloadFileWithinVcsBranchAlternative` operationId) request.
 	//
 	// Resolves VCS references or source archives from a remote VCS repository.
-	DownloadFileWithinVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DownloadFileWithinVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadFileWithinVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileInVcsBranchInSubgroupRepository performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadFileInVcsBranchInSubgroupRepository` operationId) request.
 	//
 	// Resolves VCS references or source archives from a remote VCS repository.
-	DownloadFileInVcsBranchInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DownloadFileInVcsBranchInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadFileInVcsBranchInSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileWithinVcsBranch performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadFileWithinVcsBranch` operationId) request.
 	//
 	// Resolves VCS references or source archives from a remote VCS repository.
-	DownloadFileWithinVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DownloadFileWithinVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadFileWithinVcsBranchParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsCommit performs a GET /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId} (the `DownloadVcsCommit` operationId) request.
 	//
@@ -12869,17 +12905,17 @@ type ClientInterface interface {
 	// DownloadFileInVcsTagInSubgroupRepository performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadFileInVcsTagInSubgroupRepository` operationId) request.
 	//
 	// Resolves VCS references or source archives from a remote VCS repository.
-	DownloadFileInVcsTagInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DownloadFileInVcsTagInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadFileInVcsTagInSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileWithinVcsTag performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadFileWithinVcsTag` operationId) request.
 	//
 	// Resolves VCS references or source archives from a remote VCS repository.
-	DownloadFileWithinVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DownloadFileWithinVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadFileWithinVcsTagParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileWithinVcsTagAlternative performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName} (the `DownloadFileWithinVcsTagAlternative` operationId) request.
 	//
 	// Resolves VCS references or source archives from a remote VCS repository.
-	DownloadFileWithinVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DownloadFileWithinVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadFileWithinVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetVcsRefs performs a GET /api/vcs/refs/{repoKey}/{userOrg}/{repo} (the `GetVcsRefs` operationId) request.
 	//
@@ -20502,8 +20538,8 @@ func (c *Client) DownloadVcsBranch(ctx context.Context, repoKey string, userOrg 
 // DownloadFileWithinVcsBranchAlternative performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName} (the `DownloadFileWithinVcsBranchAlternative` operationId) request.
 //
 // Resolves VCS references or source archives from a remote VCS repository.
-func (c *Client) DownloadFileWithinVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDownloadFileWithinVcsBranchAlternativeRequest(c.Server, repoKey, userOrg, branchName)
+func (c *Client) DownloadFileWithinVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadFileWithinVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadFileWithinVcsBranchAlternativeRequest(c.Server, repoKey, userOrg, branchName, params)
 	if err != nil {
 		return nil, err
 	}
@@ -20517,8 +20553,8 @@ func (c *Client) DownloadFileWithinVcsBranchAlternative(ctx context.Context, rep
 // DownloadFileInVcsBranchInSubgroupRepository performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadFileInVcsBranchInSubgroupRepository` operationId) request.
 //
 // Resolves VCS references or source archives from a remote VCS repository.
-func (c *Client) DownloadFileInVcsBranchInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDownloadFileInVcsBranchInSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, branchName)
+func (c *Client) DownloadFileInVcsBranchInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadFileInVcsBranchInSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadFileInVcsBranchInSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, branchName, params)
 	if err != nil {
 		return nil, err
 	}
@@ -20532,8 +20568,8 @@ func (c *Client) DownloadFileInVcsBranchInSubgroupRepository(ctx context.Context
 // DownloadFileWithinVcsBranch performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadFileWithinVcsBranch` operationId) request.
 //
 // Resolves VCS references or source archives from a remote VCS repository.
-func (c *Client) DownloadFileWithinVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDownloadFileWithinVcsBranchRequest(c.Server, repoKey, userOrg, repo, branchName)
+func (c *Client) DownloadFileWithinVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadFileWithinVcsBranchParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadFileWithinVcsBranchRequest(c.Server, repoKey, userOrg, repo, branchName, params)
 	if err != nil {
 		return nil, err
 	}
@@ -20622,8 +20658,8 @@ func (c *Client) DownloadVcsTagAlternative(ctx context.Context, repoKey string, 
 // DownloadFileInVcsTagInSubgroupRepository performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadFileInVcsTagInSubgroupRepository` operationId) request.
 //
 // Resolves VCS references or source archives from a remote VCS repository.
-func (c *Client) DownloadFileInVcsTagInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDownloadFileInVcsTagInSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, tagName)
+func (c *Client) DownloadFileInVcsTagInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadFileInVcsTagInSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadFileInVcsTagInSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, tagName, params)
 	if err != nil {
 		return nil, err
 	}
@@ -20637,8 +20673,8 @@ func (c *Client) DownloadFileInVcsTagInSubgroupRepository(ctx context.Context, r
 // DownloadFileWithinVcsTag performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadFileWithinVcsTag` operationId) request.
 //
 // Resolves VCS references or source archives from a remote VCS repository.
-func (c *Client) DownloadFileWithinVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDownloadFileWithinVcsTagRequest(c.Server, repoKey, userOrg, repo, tagName)
+func (c *Client) DownloadFileWithinVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadFileWithinVcsTagParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadFileWithinVcsTagRequest(c.Server, repoKey, userOrg, repo, tagName, params)
 	if err != nil {
 		return nil, err
 	}
@@ -20652,8 +20688,8 @@ func (c *Client) DownloadFileWithinVcsTag(ctx context.Context, repoKey string, u
 // DownloadFileWithinVcsTagAlternative performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName} (the `DownloadFileWithinVcsTagAlternative` operationId) request.
 //
 // Resolves VCS references or source archives from a remote VCS repository.
-func (c *Client) DownloadFileWithinVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDownloadFileWithinVcsTagAlternativeRequest(c.Server, repoKey, userOrg, tagName)
+func (c *Client) DownloadFileWithinVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadFileWithinVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadFileWithinVcsTagAlternativeRequest(c.Server, repoKey, userOrg, tagName, params)
 	if err != nil {
 		return nil, err
 	}
@@ -35764,7 +35800,7 @@ func NewDownloadVcsBranchRequest(server string, repoKey string, userOrg string, 
 }
 
 // NewDownloadFileWithinVcsBranchAlternativeRequest constructs an http.Request for the DownloadFileWithinVcsBranchAlternative method
-func NewDownloadFileWithinVcsBranchAlternativeRequest(server string, repoKey string, userOrg string, branchName string) (*http.Request, error) {
+func NewDownloadFileWithinVcsBranchAlternativeRequest(server string, repoKey string, userOrg string, branchName string, params *DownloadFileWithinVcsBranchAlternativeParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -35803,6 +35839,33 @@ func NewDownloadFileWithinVcsBranchAlternativeRequest(server string, repoKey str
 		return nil, err
 	}
 
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Ext != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ext", *params.Ext, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
@@ -35812,7 +35875,7 @@ func NewDownloadFileWithinVcsBranchAlternativeRequest(server string, repoKey str
 }
 
 // NewDownloadFileInVcsBranchInSubgroupRepositoryRequest constructs an http.Request for the DownloadFileInVcsBranchInSubgroupRepository method
-func NewDownloadFileInVcsBranchInSubgroupRepositoryRequest(server string, repoKey string, userOrg string, repo string, branchName string) (*http.Request, error) {
+func NewDownloadFileInVcsBranchInSubgroupRepositoryRequest(server string, repoKey string, userOrg string, repo string, branchName string, params *DownloadFileInVcsBranchInSubgroupRepositoryParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -35858,6 +35921,33 @@ func NewDownloadFileInVcsBranchInSubgroupRepositoryRequest(server string, repoKe
 		return nil, err
 	}
 
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Ext != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ext", *params.Ext, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
@@ -35867,7 +35957,7 @@ func NewDownloadFileInVcsBranchInSubgroupRepositoryRequest(server string, repoKe
 }
 
 // NewDownloadFileWithinVcsBranchRequest constructs an http.Request for the DownloadFileWithinVcsBranch method
-func NewDownloadFileWithinVcsBranchRequest(server string, repoKey string, userOrg string, repo string, branchName string) (*http.Request, error) {
+func NewDownloadFileWithinVcsBranchRequest(server string, repoKey string, userOrg string, repo string, branchName string, params *DownloadFileWithinVcsBranchParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -35911,6 +36001,33 @@ func NewDownloadFileWithinVcsBranchRequest(server string, repoKey string, userOr
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Ext != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ext", *params.Ext, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -36337,7 +36454,7 @@ func NewDownloadVcsTagAlternativeRequest(server string, repoKey string, userOrg 
 }
 
 // NewDownloadFileInVcsTagInSubgroupRepositoryRequest constructs an http.Request for the DownloadFileInVcsTagInSubgroupRepository method
-func NewDownloadFileInVcsTagInSubgroupRepositoryRequest(server string, repoKey string, userOrg string, repo string, tagName string) (*http.Request, error) {
+func NewDownloadFileInVcsTagInSubgroupRepositoryRequest(server string, repoKey string, userOrg string, repo string, tagName string, params *DownloadFileInVcsTagInSubgroupRepositoryParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -36383,6 +36500,33 @@ func NewDownloadFileInVcsTagInSubgroupRepositoryRequest(server string, repoKey s
 		return nil, err
 	}
 
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Ext != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ext", *params.Ext, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
@@ -36392,7 +36536,7 @@ func NewDownloadFileInVcsTagInSubgroupRepositoryRequest(server string, repoKey s
 }
 
 // NewDownloadFileWithinVcsTagRequest constructs an http.Request for the DownloadFileWithinVcsTag method
-func NewDownloadFileWithinVcsTagRequest(server string, repoKey string, userOrg string, repo string, tagName string) (*http.Request, error) {
+func NewDownloadFileWithinVcsTagRequest(server string, repoKey string, userOrg string, repo string, tagName string, params *DownloadFileWithinVcsTagParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -36438,6 +36582,33 @@ func NewDownloadFileWithinVcsTagRequest(server string, repoKey string, userOrg s
 		return nil, err
 	}
 
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Ext != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ext", *params.Ext, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
@@ -36447,7 +36618,7 @@ func NewDownloadFileWithinVcsTagRequest(server string, repoKey string, userOrg s
 }
 
 // NewDownloadFileWithinVcsTagAlternativeRequest constructs an http.Request for the DownloadFileWithinVcsTagAlternative method
-func NewDownloadFileWithinVcsTagAlternativeRequest(server string, repoKey string, userOrg string, tagName string) (*http.Request, error) {
+func NewDownloadFileWithinVcsTagAlternativeRequest(server string, repoKey string, userOrg string, tagName string, params *DownloadFileWithinVcsTagAlternativeParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -36484,6 +36655,33 @@ func NewDownloadFileWithinVcsTagAlternativeRequest(server string, repoKey string
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Ext != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ext", *params.Ext, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -40512,21 +40710,21 @@ type ClientWithResponsesInterface interface {
 	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	DownloadFileWithinVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchAlternativeResponse, error)
+	DownloadFileWithinVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadFileWithinVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchAlternativeResponse, error)
 
 	// DownloadFileInVcsBranchInSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadFileInVcsBranchInSubgroupRepository` operationId) request.
 	//
 	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	DownloadFileInVcsBranchInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsBranchInSubgroupRepositoryResponse, error)
+	DownloadFileInVcsBranchInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadFileInVcsBranchInSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadFileInVcsBranchInSubgroupRepositoryResponse, error)
 
 	// DownloadFileWithinVcsBranchWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadFileWithinVcsBranch` operationId) request.
 	//
 	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	DownloadFileWithinVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchResponse, error)
+	DownloadFileWithinVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadFileWithinVcsBranchParams, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchResponse, error)
 
 	// DownloadVcsCommitWithResponse performs a GET /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId} (the `DownloadVcsCommit` operationId) request.
 	//
@@ -40568,21 +40766,21 @@ type ClientWithResponsesInterface interface {
 	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	DownloadFileInVcsTagInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsTagInSubgroupRepositoryResponse, error)
+	DownloadFileInVcsTagInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadFileInVcsTagInSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadFileInVcsTagInSubgroupRepositoryResponse, error)
 
 	// DownloadFileWithinVcsTagWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadFileWithinVcsTag` operationId) request.
 	//
 	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	DownloadFileWithinVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagResponse, error)
+	DownloadFileWithinVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadFileWithinVcsTagParams, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagResponse, error)
 
 	// DownloadFileWithinVcsTagAlternativeWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName} (the `DownloadFileWithinVcsTagAlternative` operationId) request.
 	//
 	// Resolves VCS references or source archives from a remote VCS repository.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	DownloadFileWithinVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagAlternativeResponse, error)
+	DownloadFileWithinVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadFileWithinVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagAlternativeResponse, error)
 
 	// GetVcsRefsWithResponse performs a GET /api/vcs/refs/{repoKey}/{userOrg}/{repo} (the `GetVcsRefs` operationId) request.
 	//
@@ -71604,11 +71802,29 @@ func (r GetVcsBranchesResponse) ContentType() string {
 
 // DownloadVcsBranchAlternativeResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsBranchAlternative
 type DownloadVcsBranchAlternativeResponse200Headers struct {
+	AcceptRanges         *string
 	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
 	XArtifactoryFilename *string
 	XChecksumMd5         *string
 	XChecksumSha1        *string
 	XChecksumSha256      *string
+}
+
+// DownloadVcsBranchAlternativeResponse206Headers the declared response headers of an HTTP 206 response for DownloadVcsBranchAlternative
+type DownloadVcsBranchAlternativeResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadVcsBranchAlternativeResponse304Headers the declared response headers of an HTTP 304 response for DownloadVcsBranchAlternative
+type DownloadVcsBranchAlternativeResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadVcsBranchAlternativeResponse416Headers the declared response headers of an HTTP 416 response for DownloadVcsBranchAlternative
+type DownloadVcsBranchAlternativeResponse416Headers struct {
+	ContentRange *string
 }
 
 // DownloadVcsBranchAlternativeResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsBranchAlternative
@@ -71642,6 +71858,12 @@ type DownloadVcsBranchAlternativeResponse struct {
 	JSON503 *ServiceUnavailable
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *DownloadVcsBranchAlternativeResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadVcsBranchAlternativeResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadVcsBranchAlternativeResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadVcsBranchAlternativeResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsBranchAlternativeResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -71709,11 +71931,29 @@ func (r DownloadVcsBranchAlternativeResponse) ContentType() string {
 
 // DownloadVcsBranchFromSubgroupRepositoryResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsBranchFromSubgroupRepository
 type DownloadVcsBranchFromSubgroupRepositoryResponse200Headers struct {
+	AcceptRanges         *string
 	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
 	XArtifactoryFilename *string
 	XChecksumMd5         *string
 	XChecksumSha1        *string
 	XChecksumSha256      *string
+}
+
+// DownloadVcsBranchFromSubgroupRepositoryResponse206Headers the declared response headers of an HTTP 206 response for DownloadVcsBranchFromSubgroupRepository
+type DownloadVcsBranchFromSubgroupRepositoryResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadVcsBranchFromSubgroupRepositoryResponse304Headers the declared response headers of an HTTP 304 response for DownloadVcsBranchFromSubgroupRepository
+type DownloadVcsBranchFromSubgroupRepositoryResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadVcsBranchFromSubgroupRepositoryResponse416Headers the declared response headers of an HTTP 416 response for DownloadVcsBranchFromSubgroupRepository
+type DownloadVcsBranchFromSubgroupRepositoryResponse416Headers struct {
+	ContentRange *string
 }
 
 // DownloadVcsBranchFromSubgroupRepositoryResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsBranchFromSubgroupRepository
@@ -71747,6 +71987,12 @@ type DownloadVcsBranchFromSubgroupRepositoryResponse struct {
 	JSON503 *ServiceUnavailable
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *DownloadVcsBranchFromSubgroupRepositoryResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadVcsBranchFromSubgroupRepositoryResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadVcsBranchFromSubgroupRepositoryResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadVcsBranchFromSubgroupRepositoryResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsBranchFromSubgroupRepositoryResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -71814,11 +72060,29 @@ func (r DownloadVcsBranchFromSubgroupRepositoryResponse) ContentType() string {
 
 // DownloadVcsBranchResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsBranch
 type DownloadVcsBranchResponse200Headers struct {
+	AcceptRanges         *string
 	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
 	XArtifactoryFilename *string
 	XChecksumMd5         *string
 	XChecksumSha1        *string
 	XChecksumSha256      *string
+}
+
+// DownloadVcsBranchResponse206Headers the declared response headers of an HTTP 206 response for DownloadVcsBranch
+type DownloadVcsBranchResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadVcsBranchResponse304Headers the declared response headers of an HTTP 304 response for DownloadVcsBranch
+type DownloadVcsBranchResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadVcsBranchResponse416Headers the declared response headers of an HTTP 416 response for DownloadVcsBranch
+type DownloadVcsBranchResponse416Headers struct {
+	ContentRange *string
 }
 
 // DownloadVcsBranchResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsBranch
@@ -71852,6 +72116,12 @@ type DownloadVcsBranchResponse struct {
 	JSON503 *ServiceUnavailable
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *DownloadVcsBranchResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadVcsBranchResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadVcsBranchResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadVcsBranchResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsBranchResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -71917,6 +72187,33 @@ func (r DownloadVcsBranchResponse) ContentType() string {
 	return ""
 }
 
+// DownloadFileWithinVcsBranchAlternativeResponse200Headers the declared response headers of an HTTP 200 response for DownloadFileWithinVcsBranchAlternative
+type DownloadFileWithinVcsBranchAlternativeResponse200Headers struct {
+	AcceptRanges         *string
+	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
+// DownloadFileWithinVcsBranchAlternativeResponse206Headers the declared response headers of an HTTP 206 response for DownloadFileWithinVcsBranchAlternative
+type DownloadFileWithinVcsBranchAlternativeResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadFileWithinVcsBranchAlternativeResponse304Headers the declared response headers of an HTTP 304 response for DownloadFileWithinVcsBranchAlternative
+type DownloadFileWithinVcsBranchAlternativeResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadFileWithinVcsBranchAlternativeResponse416Headers the declared response headers of an HTTP 416 response for DownloadFileWithinVcsBranchAlternative
+type DownloadFileWithinVcsBranchAlternativeResponse416Headers struct {
+	ContentRange *string
+}
+
 // DownloadFileWithinVcsBranchAlternativeResponse429Headers the declared response headers of an HTTP 429 response for DownloadFileWithinVcsBranchAlternative
 type DownloadFileWithinVcsBranchAlternativeResponse429Headers struct {
 	RateLimit       *string
@@ -71946,6 +72243,14 @@ type DownloadFileWithinVcsBranchAlternativeResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadFileWithinVcsBranchAlternativeResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadFileWithinVcsBranchAlternativeResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadFileWithinVcsBranchAlternativeResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadFileWithinVcsBranchAlternativeResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadFileWithinVcsBranchAlternativeResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72011,6 +72316,33 @@ func (r DownloadFileWithinVcsBranchAlternativeResponse) ContentType() string {
 	return ""
 }
 
+// DownloadFileInVcsBranchInSubgroupRepositoryResponse200Headers the declared response headers of an HTTP 200 response for DownloadFileInVcsBranchInSubgroupRepository
+type DownloadFileInVcsBranchInSubgroupRepositoryResponse200Headers struct {
+	AcceptRanges         *string
+	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
+// DownloadFileInVcsBranchInSubgroupRepositoryResponse206Headers the declared response headers of an HTTP 206 response for DownloadFileInVcsBranchInSubgroupRepository
+type DownloadFileInVcsBranchInSubgroupRepositoryResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadFileInVcsBranchInSubgroupRepositoryResponse304Headers the declared response headers of an HTTP 304 response for DownloadFileInVcsBranchInSubgroupRepository
+type DownloadFileInVcsBranchInSubgroupRepositoryResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadFileInVcsBranchInSubgroupRepositoryResponse416Headers the declared response headers of an HTTP 416 response for DownloadFileInVcsBranchInSubgroupRepository
+type DownloadFileInVcsBranchInSubgroupRepositoryResponse416Headers struct {
+	ContentRange *string
+}
+
 // DownloadFileInVcsBranchInSubgroupRepositoryResponse429Headers the declared response headers of an HTTP 429 response for DownloadFileInVcsBranchInSubgroupRepository
 type DownloadFileInVcsBranchInSubgroupRepositoryResponse429Headers struct {
 	RateLimit       *string
@@ -72040,6 +72372,14 @@ type DownloadFileInVcsBranchInSubgroupRepositoryResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadFileInVcsBranchInSubgroupRepositoryResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadFileInVcsBranchInSubgroupRepositoryResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadFileInVcsBranchInSubgroupRepositoryResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadFileInVcsBranchInSubgroupRepositoryResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadFileInVcsBranchInSubgroupRepositoryResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72105,6 +72445,33 @@ func (r DownloadFileInVcsBranchInSubgroupRepositoryResponse) ContentType() strin
 	return ""
 }
 
+// DownloadFileWithinVcsBranchResponse200Headers the declared response headers of an HTTP 200 response for DownloadFileWithinVcsBranch
+type DownloadFileWithinVcsBranchResponse200Headers struct {
+	AcceptRanges         *string
+	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
+// DownloadFileWithinVcsBranchResponse206Headers the declared response headers of an HTTP 206 response for DownloadFileWithinVcsBranch
+type DownloadFileWithinVcsBranchResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadFileWithinVcsBranchResponse304Headers the declared response headers of an HTTP 304 response for DownloadFileWithinVcsBranch
+type DownloadFileWithinVcsBranchResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadFileWithinVcsBranchResponse416Headers the declared response headers of an HTTP 416 response for DownloadFileWithinVcsBranch
+type DownloadFileWithinVcsBranchResponse416Headers struct {
+	ContentRange *string
+}
+
 // DownloadFileWithinVcsBranchResponse429Headers the declared response headers of an HTTP 429 response for DownloadFileWithinVcsBranch
 type DownloadFileWithinVcsBranchResponse429Headers struct {
 	RateLimit       *string
@@ -72134,6 +72501,14 @@ type DownloadFileWithinVcsBranchResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadFileWithinVcsBranchResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadFileWithinVcsBranchResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadFileWithinVcsBranchResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadFileWithinVcsBranchResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadFileWithinVcsBranchResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72201,11 +72576,29 @@ func (r DownloadFileWithinVcsBranchResponse) ContentType() string {
 
 // DownloadVcsCommitResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsCommit
 type DownloadVcsCommitResponse200Headers struct {
+	AcceptRanges         *string
 	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
 	XArtifactoryFilename *string
 	XChecksumMd5         *string
 	XChecksumSha1        *string
 	XChecksumSha256      *string
+}
+
+// DownloadVcsCommitResponse206Headers the declared response headers of an HTTP 206 response for DownloadVcsCommit
+type DownloadVcsCommitResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadVcsCommitResponse304Headers the declared response headers of an HTTP 304 response for DownloadVcsCommit
+type DownloadVcsCommitResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadVcsCommitResponse416Headers the declared response headers of an HTTP 416 response for DownloadVcsCommit
+type DownloadVcsCommitResponse416Headers struct {
+	ContentRange *string
 }
 
 // DownloadVcsCommitResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsCommit
@@ -72239,6 +72632,12 @@ type DownloadVcsCommitResponse struct {
 	JSON503 *ServiceUnavailable
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *DownloadVcsCommitResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadVcsCommitResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadVcsCommitResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadVcsCommitResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsCommitResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72306,11 +72705,29 @@ func (r DownloadVcsCommitResponse) ContentType() string {
 
 // DownloadVcsReleaseResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsRelease
 type DownloadVcsReleaseResponse200Headers struct {
+	AcceptRanges         *string
 	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
 	XArtifactoryFilename *string
 	XChecksumMd5         *string
 	XChecksumSha1        *string
 	XChecksumSha256      *string
+}
+
+// DownloadVcsReleaseResponse206Headers the declared response headers of an HTTP 206 response for DownloadVcsRelease
+type DownloadVcsReleaseResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadVcsReleaseResponse304Headers the declared response headers of an HTTP 304 response for DownloadVcsRelease
+type DownloadVcsReleaseResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadVcsReleaseResponse416Headers the declared response headers of an HTTP 416 response for DownloadVcsRelease
+type DownloadVcsReleaseResponse416Headers struct {
+	ContentRange *string
 }
 
 // DownloadVcsReleaseResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsRelease
@@ -72344,6 +72761,12 @@ type DownloadVcsReleaseResponse struct {
 	JSON503 *ServiceUnavailable
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *DownloadVcsReleaseResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadVcsReleaseResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadVcsReleaseResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadVcsReleaseResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsReleaseResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72411,11 +72834,29 @@ func (r DownloadVcsReleaseResponse) ContentType() string {
 
 // DownloadVcsTagFromSubgroupRepositoryResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsTagFromSubgroupRepository
 type DownloadVcsTagFromSubgroupRepositoryResponse200Headers struct {
+	AcceptRanges         *string
 	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
 	XArtifactoryFilename *string
 	XChecksumMd5         *string
 	XChecksumSha1        *string
 	XChecksumSha256      *string
+}
+
+// DownloadVcsTagFromSubgroupRepositoryResponse206Headers the declared response headers of an HTTP 206 response for DownloadVcsTagFromSubgroupRepository
+type DownloadVcsTagFromSubgroupRepositoryResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadVcsTagFromSubgroupRepositoryResponse304Headers the declared response headers of an HTTP 304 response for DownloadVcsTagFromSubgroupRepository
+type DownloadVcsTagFromSubgroupRepositoryResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadVcsTagFromSubgroupRepositoryResponse416Headers the declared response headers of an HTTP 416 response for DownloadVcsTagFromSubgroupRepository
+type DownloadVcsTagFromSubgroupRepositoryResponse416Headers struct {
+	ContentRange *string
 }
 
 // DownloadVcsTagFromSubgroupRepositoryResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsTagFromSubgroupRepository
@@ -72449,6 +72890,12 @@ type DownloadVcsTagFromSubgroupRepositoryResponse struct {
 	JSON503 *ServiceUnavailable
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *DownloadVcsTagFromSubgroupRepositoryResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadVcsTagFromSubgroupRepositoryResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadVcsTagFromSubgroupRepositoryResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadVcsTagFromSubgroupRepositoryResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsTagFromSubgroupRepositoryResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72516,11 +72963,29 @@ func (r DownloadVcsTagFromSubgroupRepositoryResponse) ContentType() string {
 
 // DownloadVcsTagResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsTag
 type DownloadVcsTagResponse200Headers struct {
+	AcceptRanges         *string
 	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
 	XArtifactoryFilename *string
 	XChecksumMd5         *string
 	XChecksumSha1        *string
 	XChecksumSha256      *string
+}
+
+// DownloadVcsTagResponse206Headers the declared response headers of an HTTP 206 response for DownloadVcsTag
+type DownloadVcsTagResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadVcsTagResponse304Headers the declared response headers of an HTTP 304 response for DownloadVcsTag
+type DownloadVcsTagResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadVcsTagResponse416Headers the declared response headers of an HTTP 416 response for DownloadVcsTag
+type DownloadVcsTagResponse416Headers struct {
+	ContentRange *string
 }
 
 // DownloadVcsTagResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsTag
@@ -72554,6 +73019,12 @@ type DownloadVcsTagResponse struct {
 	JSON503 *ServiceUnavailable
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *DownloadVcsTagResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadVcsTagResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadVcsTagResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadVcsTagResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsTagResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72621,11 +73092,29 @@ func (r DownloadVcsTagResponse) ContentType() string {
 
 // DownloadVcsTagAlternativeResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsTagAlternative
 type DownloadVcsTagAlternativeResponse200Headers struct {
+	AcceptRanges         *string
 	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
 	XArtifactoryFilename *string
 	XChecksumMd5         *string
 	XChecksumSha1        *string
 	XChecksumSha256      *string
+}
+
+// DownloadVcsTagAlternativeResponse206Headers the declared response headers of an HTTP 206 response for DownloadVcsTagAlternative
+type DownloadVcsTagAlternativeResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadVcsTagAlternativeResponse304Headers the declared response headers of an HTTP 304 response for DownloadVcsTagAlternative
+type DownloadVcsTagAlternativeResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadVcsTagAlternativeResponse416Headers the declared response headers of an HTTP 416 response for DownloadVcsTagAlternative
+type DownloadVcsTagAlternativeResponse416Headers struct {
+	ContentRange *string
 }
 
 // DownloadVcsTagAlternativeResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsTagAlternative
@@ -72659,6 +73148,12 @@ type DownloadVcsTagAlternativeResponse struct {
 	JSON503 *ServiceUnavailable
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *DownloadVcsTagAlternativeResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadVcsTagAlternativeResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadVcsTagAlternativeResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadVcsTagAlternativeResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsTagAlternativeResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72724,6 +73219,33 @@ func (r DownloadVcsTagAlternativeResponse) ContentType() string {
 	return ""
 }
 
+// DownloadFileInVcsTagInSubgroupRepositoryResponse200Headers the declared response headers of an HTTP 200 response for DownloadFileInVcsTagInSubgroupRepository
+type DownloadFileInVcsTagInSubgroupRepositoryResponse200Headers struct {
+	AcceptRanges         *string
+	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
+// DownloadFileInVcsTagInSubgroupRepositoryResponse206Headers the declared response headers of an HTTP 206 response for DownloadFileInVcsTagInSubgroupRepository
+type DownloadFileInVcsTagInSubgroupRepositoryResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadFileInVcsTagInSubgroupRepositoryResponse304Headers the declared response headers of an HTTP 304 response for DownloadFileInVcsTagInSubgroupRepository
+type DownloadFileInVcsTagInSubgroupRepositoryResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadFileInVcsTagInSubgroupRepositoryResponse416Headers the declared response headers of an HTTP 416 response for DownloadFileInVcsTagInSubgroupRepository
+type DownloadFileInVcsTagInSubgroupRepositoryResponse416Headers struct {
+	ContentRange *string
+}
+
 // DownloadFileInVcsTagInSubgroupRepositoryResponse429Headers the declared response headers of an HTTP 429 response for DownloadFileInVcsTagInSubgroupRepository
 type DownloadFileInVcsTagInSubgroupRepositoryResponse429Headers struct {
 	RateLimit       *string
@@ -72753,6 +73275,14 @@ type DownloadFileInVcsTagInSubgroupRepositoryResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadFileInVcsTagInSubgroupRepositoryResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadFileInVcsTagInSubgroupRepositoryResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadFileInVcsTagInSubgroupRepositoryResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadFileInVcsTagInSubgroupRepositoryResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadFileInVcsTagInSubgroupRepositoryResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72818,6 +73348,33 @@ func (r DownloadFileInVcsTagInSubgroupRepositoryResponse) ContentType() string {
 	return ""
 }
 
+// DownloadFileWithinVcsTagResponse200Headers the declared response headers of an HTTP 200 response for DownloadFileWithinVcsTag
+type DownloadFileWithinVcsTagResponse200Headers struct {
+	AcceptRanges         *string
+	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
+// DownloadFileWithinVcsTagResponse206Headers the declared response headers of an HTTP 206 response for DownloadFileWithinVcsTag
+type DownloadFileWithinVcsTagResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadFileWithinVcsTagResponse304Headers the declared response headers of an HTTP 304 response for DownloadFileWithinVcsTag
+type DownloadFileWithinVcsTagResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadFileWithinVcsTagResponse416Headers the declared response headers of an HTTP 416 response for DownloadFileWithinVcsTag
+type DownloadFileWithinVcsTagResponse416Headers struct {
+	ContentRange *string
+}
+
 // DownloadFileWithinVcsTagResponse429Headers the declared response headers of an HTTP 429 response for DownloadFileWithinVcsTag
 type DownloadFileWithinVcsTagResponse429Headers struct {
 	RateLimit       *string
@@ -72847,6 +73404,14 @@ type DownloadFileWithinVcsTagResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadFileWithinVcsTagResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadFileWithinVcsTagResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadFileWithinVcsTagResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadFileWithinVcsTagResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadFileWithinVcsTagResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72912,6 +73477,33 @@ func (r DownloadFileWithinVcsTagResponse) ContentType() string {
 	return ""
 }
 
+// DownloadFileWithinVcsTagAlternativeResponse200Headers the declared response headers of an HTTP 200 response for DownloadFileWithinVcsTagAlternative
+type DownloadFileWithinVcsTagAlternativeResponse200Headers struct {
+	AcceptRanges         *string
+	ContentDisposition   *string
+	ETag                 *string
+	LastModified         *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
+// DownloadFileWithinVcsTagAlternativeResponse206Headers the declared response headers of an HTTP 206 response for DownloadFileWithinVcsTagAlternative
+type DownloadFileWithinVcsTagAlternativeResponse206Headers struct {
+	ContentRange *string
+}
+
+// DownloadFileWithinVcsTagAlternativeResponse304Headers the declared response headers of an HTTP 304 response for DownloadFileWithinVcsTagAlternative
+type DownloadFileWithinVcsTagAlternativeResponse304Headers struct {
+	ETag *string
+}
+
+// DownloadFileWithinVcsTagAlternativeResponse416Headers the declared response headers of an HTTP 416 response for DownloadFileWithinVcsTagAlternative
+type DownloadFileWithinVcsTagAlternativeResponse416Headers struct {
+	ContentRange *string
+}
+
 // DownloadFileWithinVcsTagAlternativeResponse429Headers the declared response headers of an HTTP 429 response for DownloadFileWithinVcsTagAlternative
 type DownloadFileWithinVcsTagAlternativeResponse429Headers struct {
 	RateLimit       *string
@@ -72941,6 +73533,14 @@ type DownloadFileWithinVcsTagAlternativeResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadFileWithinVcsTagAlternativeResponse200Headers
+	// Headers206 the parsed response headers for an HTTP 206 response
+	Headers206 *DownloadFileWithinVcsTagAlternativeResponse206Headers
+	// Headers304 the parsed response headers for an HTTP 304 response
+	Headers304 *DownloadFileWithinVcsTagAlternativeResponse304Headers
+	// Headers416 the parsed response headers for an HTTP 416 response
+	Headers416 *DownloadFileWithinVcsTagAlternativeResponse416Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadFileWithinVcsTagAlternativeResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -79689,8 +80289,8 @@ func (c *ClientWithResponses) DownloadVcsBranchWithResponse(ctx context.Context,
 // Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) DownloadFileWithinVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchAlternativeResponse, error) {
-	rsp, err := c.DownloadFileWithinVcsBranchAlternative(ctx, repoKey, userOrg, branchName, reqEditors...)
+func (c *ClientWithResponses) DownloadFileWithinVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadFileWithinVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchAlternativeResponse, error) {
+	rsp, err := c.DownloadFileWithinVcsBranchAlternative(ctx, repoKey, userOrg, branchName, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -79702,8 +80302,8 @@ func (c *ClientWithResponses) DownloadFileWithinVcsBranchAlternativeWithResponse
 // Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) DownloadFileInVcsBranchInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsBranchInSubgroupRepositoryResponse, error) {
-	rsp, err := c.DownloadFileInVcsBranchInSubgroupRepository(ctx, repoKey, userOrg, repo, branchName, reqEditors...)
+func (c *ClientWithResponses) DownloadFileInVcsBranchInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadFileInVcsBranchInSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadFileInVcsBranchInSubgroupRepositoryResponse, error) {
+	rsp, err := c.DownloadFileInVcsBranchInSubgroupRepository(ctx, repoKey, userOrg, repo, branchName, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -79715,8 +80315,8 @@ func (c *ClientWithResponses) DownloadFileInVcsBranchInSubgroupRepositoryWithRes
 // Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) DownloadFileWithinVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchResponse, error) {
-	rsp, err := c.DownloadFileWithinVcsBranch(ctx, repoKey, userOrg, repo, branchName, reqEditors...)
+func (c *ClientWithResponses) DownloadFileWithinVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadFileWithinVcsBranchParams, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchResponse, error) {
+	rsp, err := c.DownloadFileWithinVcsBranch(ctx, repoKey, userOrg, repo, branchName, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -79793,8 +80393,8 @@ func (c *ClientWithResponses) DownloadVcsTagAlternativeWithResponse(ctx context.
 // Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) DownloadFileInVcsTagInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsTagInSubgroupRepositoryResponse, error) {
-	rsp, err := c.DownloadFileInVcsTagInSubgroupRepository(ctx, repoKey, userOrg, repo, tagName, reqEditors...)
+func (c *ClientWithResponses) DownloadFileInVcsTagInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadFileInVcsTagInSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadFileInVcsTagInSubgroupRepositoryResponse, error) {
+	rsp, err := c.DownloadFileInVcsTagInSubgroupRepository(ctx, repoKey, userOrg, repo, tagName, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -79806,8 +80406,8 @@ func (c *ClientWithResponses) DownloadFileInVcsTagInSubgroupRepositoryWithRespon
 // Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) DownloadFileWithinVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagResponse, error) {
-	rsp, err := c.DownloadFileWithinVcsTag(ctx, repoKey, userOrg, repo, tagName, reqEditors...)
+func (c *ClientWithResponses) DownloadFileWithinVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadFileWithinVcsTagParams, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagResponse, error) {
+	rsp, err := c.DownloadFileWithinVcsTag(ctx, repoKey, userOrg, repo, tagName, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -79819,8 +80419,8 @@ func (c *ClientWithResponses) DownloadFileWithinVcsTagWithResponse(ctx context.C
 // Resolves VCS references or source archives from a remote VCS repository.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) DownloadFileWithinVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagAlternativeResponse, error) {
-	rsp, err := c.DownloadFileWithinVcsTagAlternative(ctx, repoKey, userOrg, tagName, reqEditors...)
+func (c *ClientWithResponses) DownloadFileWithinVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadFileWithinVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagAlternativeResponse, error) {
+	rsp, err := c.DownloadFileWithinVcsTagAlternative(ctx, repoKey, userOrg, tagName, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -116210,6 +116810,9 @@ func ParseDownloadVcsBranchAlternativeResponse(rsp *http.Response) (*DownloadVcs
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -116230,6 +116833,9 @@ func ParseDownloadVcsBranchAlternativeResponse(rsp *http.Response) (*DownloadVcs
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -116257,12 +116863,33 @@ func ParseDownloadVcsBranchAlternativeResponse(rsp *http.Response) (*DownloadVcs
 	switch {
 	case rsp.StatusCode == 200:
 		var headers DownloadVcsBranchAlternativeResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
 		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
 			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
 		}
 		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
 			var value string
@@ -116293,6 +116920,36 @@ func ParseDownloadVcsBranchAlternativeResponse(rsp *http.Response) (*DownloadVcs
 			headers.XChecksumSha256 = &value
 		}
 		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadVcsBranchAlternativeResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadVcsBranchAlternativeResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadVcsBranchAlternativeResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsBranchAlternativeResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -116360,6 +117017,9 @@ func ParseDownloadVcsBranchFromSubgroupRepositoryResponse(rsp *http.Response) (*
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -116380,6 +117040,9 @@ func ParseDownloadVcsBranchFromSubgroupRepositoryResponse(rsp *http.Response) (*
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -116407,12 +117070,33 @@ func ParseDownloadVcsBranchFromSubgroupRepositoryResponse(rsp *http.Response) (*
 	switch {
 	case rsp.StatusCode == 200:
 		var headers DownloadVcsBranchFromSubgroupRepositoryResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
 		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
 			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
 		}
 		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
 			var value string
@@ -116443,6 +117127,36 @@ func ParseDownloadVcsBranchFromSubgroupRepositoryResponse(rsp *http.Response) (*
 			headers.XChecksumSha256 = &value
 		}
 		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadVcsBranchFromSubgroupRepositoryResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadVcsBranchFromSubgroupRepositoryResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadVcsBranchFromSubgroupRepositoryResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsBranchFromSubgroupRepositoryResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -116510,6 +117224,9 @@ func ParseDownloadVcsBranchResponse(rsp *http.Response) (*DownloadVcsBranchRespo
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -116530,6 +117247,9 @@ func ParseDownloadVcsBranchResponse(rsp *http.Response) (*DownloadVcsBranchRespo
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -116557,12 +117277,33 @@ func ParseDownloadVcsBranchResponse(rsp *http.Response) (*DownloadVcsBranchRespo
 	switch {
 	case rsp.StatusCode == 200:
 		var headers DownloadVcsBranchResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
 		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
 			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
 		}
 		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
 			var value string
@@ -116593,6 +117334,36 @@ func ParseDownloadVcsBranchResponse(rsp *http.Response) (*DownloadVcsBranchRespo
 			headers.XChecksumSha256 = &value
 		}
 		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadVcsBranchResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadVcsBranchResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadVcsBranchResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsBranchResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -116660,6 +117431,9 @@ func ParseDownloadFileWithinVcsBranchAlternativeResponse(rsp *http.Response) (*D
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -116680,6 +117454,9 @@ func ParseDownloadFileWithinVcsBranchAlternativeResponse(rsp *http.Response) (*D
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -116705,6 +117482,95 @@ func ParseDownloadFileWithinVcsBranchAlternativeResponse(rsp *http.Response) (*D
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadFileWithinVcsBranchAlternativeResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadFileWithinVcsBranchAlternativeResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadFileWithinVcsBranchAlternativeResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadFileWithinVcsBranchAlternativeResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadFileWithinVcsBranchAlternativeResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -116772,6 +117638,9 @@ func ParseDownloadFileInVcsBranchInSubgroupRepositoryResponse(rsp *http.Response
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -116792,6 +117661,9 @@ func ParseDownloadFileInVcsBranchInSubgroupRepositoryResponse(rsp *http.Response
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -116817,6 +117689,95 @@ func ParseDownloadFileInVcsBranchInSubgroupRepositoryResponse(rsp *http.Response
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadFileInVcsBranchInSubgroupRepositoryResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadFileInVcsBranchInSubgroupRepositoryResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadFileInVcsBranchInSubgroupRepositoryResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadFileInVcsBranchInSubgroupRepositoryResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadFileInVcsBranchInSubgroupRepositoryResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -116884,6 +117845,9 @@ func ParseDownloadFileWithinVcsBranchResponse(rsp *http.Response) (*DownloadFile
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -116904,6 +117868,9 @@ func ParseDownloadFileWithinVcsBranchResponse(rsp *http.Response) (*DownloadFile
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -116929,6 +117896,95 @@ func ParseDownloadFileWithinVcsBranchResponse(rsp *http.Response) (*DownloadFile
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadFileWithinVcsBranchResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadFileWithinVcsBranchResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadFileWithinVcsBranchResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadFileWithinVcsBranchResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadFileWithinVcsBranchResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -116996,6 +118052,9 @@ func ParseDownloadVcsCommitResponse(rsp *http.Response) (*DownloadVcsCommitRespo
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -117016,6 +118075,9 @@ func ParseDownloadVcsCommitResponse(rsp *http.Response) (*DownloadVcsCommitRespo
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -117043,12 +118105,33 @@ func ParseDownloadVcsCommitResponse(rsp *http.Response) (*DownloadVcsCommitRespo
 	switch {
 	case rsp.StatusCode == 200:
 		var headers DownloadVcsCommitResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
 		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
 			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
 		}
 		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
 			var value string
@@ -117079,6 +118162,36 @@ func ParseDownloadVcsCommitResponse(rsp *http.Response) (*DownloadVcsCommitRespo
 			headers.XChecksumSha256 = &value
 		}
 		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadVcsCommitResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadVcsCommitResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadVcsCommitResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsCommitResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -117146,6 +118259,9 @@ func ParseDownloadVcsReleaseResponse(rsp *http.Response) (*DownloadVcsReleaseRes
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -117166,6 +118282,9 @@ func ParseDownloadVcsReleaseResponse(rsp *http.Response) (*DownloadVcsReleaseRes
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -117193,12 +118312,33 @@ func ParseDownloadVcsReleaseResponse(rsp *http.Response) (*DownloadVcsReleaseRes
 	switch {
 	case rsp.StatusCode == 200:
 		var headers DownloadVcsReleaseResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
 		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
 			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
 		}
 		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
 			var value string
@@ -117229,6 +118369,36 @@ func ParseDownloadVcsReleaseResponse(rsp *http.Response) (*DownloadVcsReleaseRes
 			headers.XChecksumSha256 = &value
 		}
 		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadVcsReleaseResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadVcsReleaseResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadVcsReleaseResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsReleaseResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -117296,6 +118466,9 @@ func ParseDownloadVcsTagFromSubgroupRepositoryResponse(rsp *http.Response) (*Dow
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -117316,6 +118489,9 @@ func ParseDownloadVcsTagFromSubgroupRepositoryResponse(rsp *http.Response) (*Dow
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -117343,12 +118519,33 @@ func ParseDownloadVcsTagFromSubgroupRepositoryResponse(rsp *http.Response) (*Dow
 	switch {
 	case rsp.StatusCode == 200:
 		var headers DownloadVcsTagFromSubgroupRepositoryResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
 		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
 			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
 		}
 		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
 			var value string
@@ -117379,6 +118576,36 @@ func ParseDownloadVcsTagFromSubgroupRepositoryResponse(rsp *http.Response) (*Dow
 			headers.XChecksumSha256 = &value
 		}
 		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadVcsTagFromSubgroupRepositoryResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadVcsTagFromSubgroupRepositoryResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadVcsTagFromSubgroupRepositoryResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsTagFromSubgroupRepositoryResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -117446,6 +118673,9 @@ func ParseDownloadVcsTagResponse(rsp *http.Response) (*DownloadVcsTagResponse, e
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -117466,6 +118696,9 @@ func ParseDownloadVcsTagResponse(rsp *http.Response) (*DownloadVcsTagResponse, e
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -117493,12 +118726,33 @@ func ParseDownloadVcsTagResponse(rsp *http.Response) (*DownloadVcsTagResponse, e
 	switch {
 	case rsp.StatusCode == 200:
 		var headers DownloadVcsTagResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
 		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
 			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
 		}
 		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
 			var value string
@@ -117529,6 +118783,36 @@ func ParseDownloadVcsTagResponse(rsp *http.Response) (*DownloadVcsTagResponse, e
 			headers.XChecksumSha256 = &value
 		}
 		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadVcsTagResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadVcsTagResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadVcsTagResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsTagResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -117596,6 +118880,9 @@ func ParseDownloadVcsTagAlternativeResponse(rsp *http.Response) (*DownloadVcsTag
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -117616,6 +118903,9 @@ func ParseDownloadVcsTagAlternativeResponse(rsp *http.Response) (*DownloadVcsTag
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -117643,12 +118933,33 @@ func ParseDownloadVcsTagAlternativeResponse(rsp *http.Response) (*DownloadVcsTag
 	switch {
 	case rsp.StatusCode == 200:
 		var headers DownloadVcsTagAlternativeResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
 		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
 			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
 		}
 		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
 			var value string
@@ -117679,6 +118990,36 @@ func ParseDownloadVcsTagAlternativeResponse(rsp *http.Response) (*DownloadVcsTag
 			headers.XChecksumSha256 = &value
 		}
 		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadVcsTagAlternativeResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadVcsTagAlternativeResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadVcsTagAlternativeResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsTagAlternativeResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -117746,6 +119087,9 @@ func ParseDownloadFileInVcsTagInSubgroupRepositoryResponse(rsp *http.Response) (
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -117766,6 +119110,9 @@ func ParseDownloadFileInVcsTagInSubgroupRepositoryResponse(rsp *http.Response) (
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -117791,6 +119138,95 @@ func ParseDownloadFileInVcsTagInSubgroupRepositoryResponse(rsp *http.Response) (
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadFileInVcsTagInSubgroupRepositoryResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadFileInVcsTagInSubgroupRepositoryResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadFileInVcsTagInSubgroupRepositoryResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadFileInVcsTagInSubgroupRepositoryResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadFileInVcsTagInSubgroupRepositoryResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -117858,6 +119294,9 @@ func ParseDownloadFileWithinVcsTagResponse(rsp *http.Response) (*DownloadFileWit
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -117878,6 +119317,9 @@ func ParseDownloadFileWithinVcsTagResponse(rsp *http.Response) (*DownloadFileWit
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -117903,6 +119345,95 @@ func ParseDownloadFileWithinVcsTagResponse(rsp *http.Response) (*DownloadFileWit
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadFileWithinVcsTagResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadFileWithinVcsTagResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadFileWithinVcsTagResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadFileWithinVcsTagResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadFileWithinVcsTagResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -117970,6 +119501,9 @@ func ParseDownloadFileWithinVcsTagAlternativeResponse(rsp *http.Response) (*Down
 	}
 
 	switch {
+	case rsp.StatusCode == 304:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -117990,6 +119524,9 @@ func ParseDownloadFileWithinVcsTagAlternativeResponse(rsp *http.Response) (*Down
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 416:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
@@ -118015,6 +119552,95 @@ func ParseDownloadFileWithinVcsTagAlternativeResponse(rsp *http.Response) (*Down
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadFileWithinVcsTagAlternativeResponse200Headers
+		if values := rsp.Header.Values("Accept-Ranges"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Accept-Ranges", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.AcceptRanges = &value
+		}
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		if values := rsp.Header.Values("Last-Modified"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Last-Modified", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.LastModified = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 206:
+		var headers DownloadFileWithinVcsTagAlternativeResponse206Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers206 = &headers
+	case rsp.StatusCode == 304:
+		var headers DownloadFileWithinVcsTagAlternativeResponse304Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers304 = &headers
+	case rsp.StatusCode == 416:
+		var headers DownloadFileWithinVcsTagAlternativeResponse416Headers
+		if values := rsp.Header.Values("Content-Range"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Range", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentRange = &value
+		}
+		response.Headers416 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadFileWithinVcsTagAlternativeResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {

@@ -13,73 +13,56 @@ import (
 )
 
 // MaxSelectedFileBytes bounds a selected file, 64 MiB, whether it is taken
-// from an archive (FileZIP, WrappedFileZIP, CustomFileZIP) or arrives in a
-// peer's selected-file ZIP (ValidateFileZIP).
+// from an archive (SelectFile, SelectWrappedFile, SelectCustomFile) or
+// arrives from a peer (ValidateFile).
 const MaxSelectedFileBytes = 64 << 20
 
-// MaxFileZIPBytes bounds a peer's selected-file ZIP as fetched: the
-// selected file's bound plus 1 MiB for the ZIP's headers and directory.
-const MaxFileZIPBytes = MaxSelectedFileBytes + 1<<20
-
-// ValidateFileZIP admits only a bounded ZIP containing the exact selected file.
-// A peer response is returned unchanged after validation, without root inference.
-func ValidateFileZIP(ctx context.Context, body io.ReadSeeker, size int64, filename string) error {
-	if size <= 0 || size > MaxFileZIPBytes || !ValidFilePath(filename) {
+// ValidateFile admits a peer's selected file of size bytes within
+// MaxSelectedFileBytes. A 7.x peer answers the file itself, as a remote VCS
+// repository answered downloadBranchFile/.../main!bazel_registry.json with
+// its JSON (RTFACT-29495), so its bytes are not otherwise checked.
+func ValidateFile(ctx context.Context, body io.ReadSeeker, size int64) error {
+	if size < 0 || size > MaxSelectedFileBytes {
 		return ErrInvalidArchive
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("validate vcs file: %w", err)
 	}
 	if _, err := body.Seek(0, io.SeekStart); err != nil {
 		return ErrInvalidArchive
 	}
-	data, err := io.ReadAll(io.LimitReader(body, MaxFileZIPBytes+1))
-	if err != nil || int64(len(data)) != size {
+	n, err := io.Copy(io.Discard, io.LimitReader(body, MaxSelectedFileBytes+1))
+	if err != nil || n != size {
 		return ErrInvalidArchive
 	}
-	zr, err := zip.NewReader(bytes.NewReader(data), size)
-	if err != nil {
-		return ErrInvalidArchive
-	}
-	selected := false
-	for _, file := range zr.File {
-		if file.FileInfo().IsDir() && strings.HasSuffix(file.Name, "/") &&
-			strings.HasPrefix(filename, file.Name) {
-			continue
-		}
-		if selected || file.Name != filename || !file.Mode().IsRegular() ||
-			file.UncompressedSize64 > MaxSelectedFileBytes {
-			return ErrInvalidArchive
-		}
-		selected = true
-	}
-	if !selected {
-		return ErrInvalidArchive
-	}
-	return validateZIP(ctx, data, "")
+	return nil
 }
 
-// FileZIP selects one file from an already validated provider archive and
-// returns a ZIP with that file at its repository-relative path.
-func FileZIP(ctx context.Context, archive []byte, ext, filename string) ([]byte, error) {
-	return fileZIP(ctx, archive, ext, filename, false)
+// SelectFile selects one file's bytes from an already validated provider
+// archive by its repository-relative path.
+func SelectFile(ctx context.Context, archive []byte, ext, filename string) ([]byte, error) {
+	return selectFile(ctx, archive, ext, filename, false)
 }
 
-// WrappedFileZIP selects a path from providers whose archive contract adds one
-// enclosing directory. Rootless providers must use FileZIP instead.
-func WrappedFileZIP(ctx context.Context, archive []byte, ext, filename string) ([]byte, error) {
-	return fileZIP(ctx, archive, ext, filename, true)
+// SelectWrappedFile selects a path from providers whose archive contract
+// adds one enclosing directory. Rootless providers must use SelectFile
+// instead.
+func SelectWrappedFile(ctx context.Context, archive []byte, ext, filename string) ([]byte, error) {
+	return selectFile(ctx, archive, ext, filename, true)
 }
 
-// CustomFileZIP preserves custom templates that return rootless or wrapped
-// archives. An exact repository path takes precedence; fallback still rejects
-// multiple matching wrapper directories.
-func CustomFileZIP(ctx context.Context, archive []byte, ext, filename string) ([]byte, error) {
-	data, err := FileZIP(ctx, archive, ext, filename)
+// SelectCustomFile preserves custom templates that return rootless or
+// wrapped archives. An exact repository path takes precedence; fallback
+// still rejects multiple matching wrapper directories.
+func SelectCustomFile(ctx context.Context, archive []byte, ext, filename string) ([]byte, error) {
+	data, err := SelectFile(ctx, archive, ext, filename)
 	if !errors.Is(err, ErrInvalidPath) {
 		return data, err
 	}
-	return WrappedFileZIP(ctx, archive, ext, filename)
+	return SelectWrappedFile(ctx, archive, ext, filename)
 }
 
-func fileZIP(
+func selectFile(
 	ctx context.Context,
 	archive []byte,
 	ext, filename string,
@@ -89,23 +72,24 @@ func fileZIP(
 		!ValidFilePath(filename) {
 		return nil, ErrInvalidArchive
 	}
-	var selected []byte
-	var err error
 	if ext == "zip" {
-		selected, err = selectZIP(ctx, archive, filename, wrapped)
-	} else {
-		selected, err = selectTAR(ctx, archive, filename, wrapped)
+		return selectZIP(ctx, archive, filename, wrapped)
 	}
-	if err != nil {
-		return nil, err
-	}
+	return selectTAR(ctx, archive, filename, wrapped)
+}
+
+// FileZIP is a ZIP holding data, a selected file, at its
+// repository-relative path filename, which a file within a tag or branch
+// answers when ext=zip asks for one (JFrog's VCS repositories page,
+// "download a file within a tag as a zip").
+func FileZIP(filename string, data []byte) ([]byte, error) {
 	var out bytes.Buffer
 	zw := zip.NewWriter(&out)
 	w, err := zw.Create(filename)
 	if err != nil {
 		return nil, ErrInvalidArchive
 	}
-	if _, err := w.Write(selected); err != nil {
+	if _, err := w.Write(data); err != nil {
 		return nil, ErrInvalidArchive
 	}
 	if err := zw.Close(); err != nil {

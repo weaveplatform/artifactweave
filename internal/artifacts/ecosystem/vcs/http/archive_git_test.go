@@ -2,12 +2,12 @@ package vcshttp
 
 import (
 	"archive/tar"
-	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
-	"io"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -52,25 +52,12 @@ func TestUnitVCSRealGitArchivesValidateCommitAndRootlessPaths(t *testing.T) {
 				}
 			}
 			for name, want := range map[string]string{"README.md": "root readme\n", "sub/README.md": "nested readme\n"} {
-				selected, err := FileZIP(t.Context(), data, ext, name)
-				if err != nil {
-					t.Fatal(err)
-				}
-				zr, err := zip.NewReader(bytes.NewReader(selected), int64(len(selected)))
-				if err != nil {
-					t.Fatal(err)
-				}
-				r, err := zr.File[0].Open()
-				if err != nil {
-					t.Fatal(err)
-				}
-				body, err := io.ReadAll(r)
-				_ = r.Close()
+				body, err := SelectFile(t.Context(), data, ext, name)
 				if err != nil || string(body) != want {
 					t.Fatalf("selected %s: %q %v", name, body, err)
 				}
 			}
-			if _, err := FileZIP(
+			if _, err := SelectFile(
 				t.Context(),
 				data,
 				ext,
@@ -155,61 +142,38 @@ func TestUnitVCSGlobalPAXMetadataCannotChangeEntryIdentity(t *testing.T) {
 	}
 }
 
-func TestUnitVCSPeerSelectedFileZIPMustMatchExactPath(t *testing.T) {
-	valid, err := os.ReadFile("testdata/legacy-vcs-index.zip")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := ValidateFileZIP(
-		t.Context(),
-		bytes.NewReader(valid),
-		int64(len(valid)),
-		"index.js",
-	); err != nil {
-		t.Fatal(err)
-	}
-	nested, err := os.ReadFile("testdata/legacy-vcs-nested-readme.zip")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := ValidateFileZIP(
-		t.Context(),
-		bytes.NewReader(nested),
-		int64(len(nested)),
-		"sub/README.md",
-	); err != nil {
-		t.Fatal(err)
+// TestUnitVCSPeerSelectedFileIsBounded: a peer's selected file, which 7.x
+// answers as the file itself (RTFACT-29495), is admitted whole within
+// MaxSelectedFileBytes, an empty one included, and refused when its length
+// is not the one declared or the bound is passed.
+func TestUnitVCSPeerSelectedFileIsBounded(t *testing.T) {
+	for _, body := range []string{"module.exports = 1;\n", ""} {
+		if err := ValidateFile(
+			t.Context(), strings.NewReader(body), int64(len(body)),
+		); err != nil {
+			t.Fatalf("%q: %v", body, err)
+		}
 	}
 	for _, tc := range []struct {
-		name, file string
-		data       []byte
-		size       int64
+		name string
+		size int64
 	}{
-		{"wrong file", "README.md", valid, int64(len(valid))},
-		{"wrapped", "index.js", vcsZIP(t, "root/index.js"), -1},
-		{"multiple entries", "index.js", vcsZIP(t, "index.js", "sub/index.js"), -1},
-		{"bad ZIP", "index.js", []byte("invalid"), 7},
-		{"invalid path", "../index.js", valid, int64(len(valid))},
-		{"too large", "index.js", valid, MaxFileZIPBytes + 1},
-		{"empty", "index.js", nil, 0},
-		{"wrong size", "index.js", valid, int64(len(valid)) + 1},
+		{"too large", MaxSelectedFileBytes + 1},
+		{"negative", -1},
+		{"wrong size", 3},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.size == -1 {
-				tc.size = int64(len(tc.data))
-			}
-			if err := ValidateFileZIP(
-				t.Context(),
-				bytes.NewReader(tc.data),
-				tc.size,
-				tc.file,
-			); !errors.Is(
-				err,
-				ErrInvalidArchive,
-			) {
-				t.Fatalf("invalid peer ZIP admitted: %v", err)
+			if err := ValidateFile(
+				t.Context(), strings.NewReader("index"), tc.size,
+			); !errors.Is(err, ErrInvalidArchive) {
+				t.Fatalf("invalid peer file admitted: %v", err)
 			}
 		})
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := ValidateFile(ctx, strings.NewReader("x"), 1); !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled validation = %v", err)
 	}
 }
 
@@ -219,11 +183,11 @@ func TestUnitVCSCustomFileSupportsExactAndWrappedLayouts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, err := CustomFileZIP(t.Context(), data, ext, "README.md")
+		got, err := SelectCustomFile(t.Context(), data, ext, "README.md")
 		if err != nil {
 			t.Fatal(err)
 		}
-		exact, err := FileZIP(t.Context(), data, ext, "README.md")
+		exact, err := SelectFile(t.Context(), data, ext, "README.md")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -243,7 +207,7 @@ func TestUnitVCSCustomFileSupportsExactAndWrappedLayouts(t *testing.T) {
 		{name: "corrupt", archive: []byte("invalid"), want: ErrInvalidArchive},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := CustomFileZIP(t.Context(), tc.archive, "zip", "README.md")
+			_, err := SelectCustomFile(t.Context(), tc.archive, "zip", "README.md")
 			if !errors.Is(err, tc.want) {
 				t.Fatalf("custom selection: %v, want %v", err, tc.want)
 			}

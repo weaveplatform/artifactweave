@@ -1,7 +1,6 @@
 package vcs_test
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
 	"io"
@@ -69,30 +68,14 @@ func TestAccVCSCustomRootlessFilePrecedesNestedBasename(t *testing.T) {
 	if res.Code != 200 {
 		t.Fatalf("rootless CUSTOM request now returns %d: %s", res.Code, res.Body.String())
 	}
-	zr, err := zip.NewReader(bytes.NewReader(res.Body.Bytes()), int64(res.Body.Len()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	r, err := zr.File[0].Open()
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := io.ReadAll(r)
-	r.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != "root readme\n" {
+	if got := res.Body.String(); got != "root readme\n" {
 		t.Fatalf("rootless CUSTOM README.md got %q; want root readme", got)
 	}
 }
 
 func TestAccVCSPeerFileUsageRequiresSuccessfulDelivery(t *testing.T) {
-	data, err := os.ReadFile(repopath.Path(t,
-		"internal/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-readme.zip"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	// A 7.x peer answers a selected file as the file itself (RTFACT-29495).
+	data := []byte("root readme\n")
 	for _, tc := range []struct {
 		name, method, user string
 		deny, failWrite    bool

@@ -161,20 +161,27 @@ func TestAccVCSRemoteRESTAndSubgroup(t *testing.T) {
 			t.Fatalf("%s altered provider archive", path)
 		}
 	}
-	for _, tc := range []struct{ path, filename string }{
-		{base + "/downloadTagFile/vcs-remote/team/project/v1.0.0!README.md", "README.md"},
-		{base + "/downloadTagFile/vcs-remote/team/subgroup/project/v1.0.0!README.md", "README.md"},
-		{base + "/downloadTagFile/vcs-remote/team/subgroup/project/archive/refs/v1.0.0!README.md", "README.md"},
-		{base + "/downloadBranchFile/vcs-remote/team/project/archive/refs/feature/one!README.md", "README.md"},
-		{base + "/downloadBranchFile/vcs-remote/team/subgroup/project/archive/refs/feature/one!README.md", "README.md"},
-		{base + "/downloadTagFile/vcs-remote/team/project/v1.0.0!src/main.go", "src/main.go"},
-		{base + "/downloadTagFile/vcs-remote/team/subgroup/project/archive/refs/v1.0.0!src/main.go", "src/main.go"},
+	// A file within a tag or branch answers the file itself (RTFACT-29495),
+	// and with ext=zip a ZIP of it at its path, as JFrog's VCS page lists.
+	for _, tc := range []struct{ path, filename, body string }{
+		{base + "/downloadTagFile/vcs-remote/team/project/v1.0.0!README.md", "README.md", "module example\n"},
+		{base + "/downloadTagFile/vcs-remote/team/subgroup/project/v1.0.0!README.md", "README.md", "module example\n"},
+		{base + "/downloadTagFile/vcs-remote/team/subgroup/project/archive/refs/v1.0.0!README.md", "README.md", "module example\n"},
+		{base + "/downloadBranchFile/vcs-remote/team/project/archive/refs/feature/one!README.md", "README.md", "module example\n"},
+		{base + "/downloadBranchFile/vcs-remote/team/subgroup/project/archive/refs/feature/one!README.md", "README.md", "module example\n"},
+		{base + "/downloadTagFile/vcs-remote/team/project/v1.0.0!src/main.go", "src/main.go", "package main\n"},
+		{base + "/downloadTagFile/vcs-remote/team/subgroup/project/archive/refs/v1.0.0!src/main.go", "src/main.go", "package main\n"},
 	} {
 		response := w.do(http.MethodGet, tc.path, "reader", "")
 		wantStatus(t, response, http.StatusOK)
-		z, err := zip.NewReader(bytes.NewReader(response.Body.Bytes()), int64(response.Body.Len()))
+		if response.Body.String() != tc.body {
+			t.Fatalf("%s returned %q, want the file", tc.path, response.Body)
+		}
+		zipped := w.do(http.MethodGet, tc.path+"?ext=zip", "reader", "")
+		wantStatus(t, zipped, http.StatusOK)
+		z, err := zip.NewReader(bytes.NewReader(zipped.Body.Bytes()), int64(zipped.Body.Len()))
 		if err != nil || len(z.File) != 1 || z.File[0].Name != tc.filename {
-			t.Fatalf("%s returned invalid selected-file ZIP: %v", tc.path, err)
+			t.Fatalf("%s?ext=zip returned invalid selected-file ZIP: %v", tc.path, err)
 		}
 	}
 	if curl, err := exec.LookPath("curl"); err == nil {
@@ -350,9 +357,14 @@ func TestAccVCSBranchRefCommitReleaseAndAlternativeDownloads(t *testing.T) {
 	} {
 		res := w.do(http.MethodGet, base+path, "reader", "")
 		wantStatus(t, res, http.StatusOK)
+		if res.Body.String() != "module example\n" {
+			t.Fatalf("%s selected file = %q", path, res.Body)
+		}
+		res = w.do(http.MethodGet, base+path+"?ext=zip", "reader", "")
+		wantStatus(t, res, http.StatusOK)
 		selected, err := zip.NewReader(bytes.NewReader(res.Body.Bytes()), int64(res.Body.Len()))
 		if err != nil || len(selected.File) != 1 || selected.File[0].Name != "README.md" {
-			t.Fatalf("%s returned wrong selected ZIP: %v, files %v", path, err, selected)
+			t.Fatalf("%s?ext=zip returned wrong selected ZIP: %v, files %v", path, err, selected)
 		}
 		body, err := selected.File[0].Open()
 		if err != nil {

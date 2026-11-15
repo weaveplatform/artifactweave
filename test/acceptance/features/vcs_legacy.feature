@@ -142,6 +142,6 @@ Feature: Legacy VCS providers preserve the native archive and reference contract
       | STASH | archive | wrong-commit | downloadTag | /v1.0.0 | 502 |
       | OLDSTASH | archive | wrong-commit | downloadTag | /v1.0.0 | 502 |
       | ARTIFACTORY | archive | wrong-commit | downloadTag | /v1.0.0 | 502 |
-      | ARTIFACTORY | file | malformed | downloadBranchFile | /main!index.js | 502 |
+      | ARTIFACTORY | file | oversize | downloadBranchFile | /main!index.js | 502 |
       | ARTIFACTORY | file | unavailable | downloadBranchFile | /main!index.js | 503 |
       | ARTIFACTORY | file | redirect | downloadBranchFile | /main!index.js | 502 |

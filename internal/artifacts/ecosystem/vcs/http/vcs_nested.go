@@ -2,9 +2,7 @@ package vcshttp
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -174,14 +172,12 @@ func (s VCSAPI) VCSNested(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if file {
-		body, size, err := s.vcsFile(r.Context(), key, owner, name, kind, ref)
+		served, err := s.vcsFile(r.Context(), key, owner, name, kind, ref, r.URL.Query().Get("ext"))
 		if err != nil {
 			apierror.Write(w, apierror.ProfileArtifactory, err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/zip")
-		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
-		if _, err := io.Copy(w, body); err != nil {
+		if err := served.serve(w, r); err != nil {
 			httpkit.NoteCause(r.Context(), err)
 		}
 		return
@@ -208,7 +204,7 @@ func (s VCSAPI) VCSNested(w http.ResponseWriter, r *http.Request) {
 		apierror.Write(w, apierror.ProfileArtifactory, err)
 		return
 	}
-	if err := served.write(w); err != nil {
+	if err := served.serve(w, r); err != nil {
 		httpkit.NoteCause(r.Context(), err)
 	}
 }

@@ -40,12 +40,8 @@ def main():
             git(root, "add", ".")
             git(root, "commit", "-m", marker)
             record = {"commit": git(root, "rev-parse", "HEAD").decode().strip(), "files": {}}
-            for suffix, fmt, paths in (
-                    ("archive.tar.gz", "tar.gz", []), ("archive.zip", "zip", []),
-                    ("index.zip", "zip", ["index.js"]),
-                    ("readme.zip", "zip", ["README.md"]),
-                    ("nested-readme.zip", "zip", ["sub/README.md"])):
-                data = git(root, "archive", "--format=" + fmt, "HEAD", *paths)
+            for suffix, fmt in (("archive.tar.gz", "tar.gz"), ("archive.zip", "zip")):
+                data = git(root, "archive", "--format=" + fmt, "HEAD")
                 name = marker + "-" + suffix
                 (args.output / name).write_bytes(data)
                 record["files"][name] = hashlib.sha256(data).hexdigest()

@@ -130,7 +130,7 @@ func TestUnitVCSPeerSelectedFileURLBindsReferenceAndPath(t *testing.T) {
 		{"tags", "downloadTagFile"}, {"heads", "downloadBranchFile"},
 	} {
 		got, err := PeerFileURL(c, "team", "project", tc.kind, "release/one", "sub/README.md")
-		want := "https://peer.example/context/api/vcs/" + tc.action + "/source/team/project/release/one%21sub/README.md?ext=zip"
+		want := "https://peer.example/context/api/vcs/" + tc.action + "/source/team/project/release/one%21sub/README.md"
 		if err != nil || got.String() != want {
 			t.Fatalf("file URL: %v %v", got, err)
 		}
