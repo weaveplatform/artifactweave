@@ -135,7 +135,9 @@ func coldFiles() []coldFile {
 // does not hold answer 200 with the upstream's file, and a second GET and
 // the file's checksum are answered from the copy kept, with no upstream
 // request. These answered 404 "Could not find resource" without asking
-// the upstream.
+// the upstream. A remote 7.x gives bypassHeadRequests, an AI Editor
+// Extensions one and a Terraform one on its default registry, sends the
+// upstream the GET alone (#1511, #1583).
 func TestAccRemoteColdReadFetchesEveryType(t *testing.T) {
 	for _, tc := range coldFiles() {
 		t.Run(string(tc.pt), func(t *testing.T) {
@@ -160,9 +162,13 @@ func TestAccRemoteColdReadFetchesEveryType(t *testing.T) {
 			if sum.Body.Len() != 40 {
 				t.Fatal("checksum", sum.Body)
 			}
+			heads := 1
+			if *w.c.BypassHeadRequests {
+				heads = 0
+			}
 			if n := w.up.Count(http.MethodGet, "/"+tc.path); n != 1 ||
-				w.up.Count(http.MethodHead, "/"+tc.path) != 1 {
-				t.Fatal("want one upstream HEAD and GET", n, w.up.Requests())
+				w.up.Count(http.MethodHead, "/"+tc.path) != heads {
+				t.Fatal("want one upstream GET and", heads, "HEAD", n, w.up.Requests())
 			}
 		})
 	}
@@ -406,4 +412,74 @@ func TestAccRemoteColdReadOutsideTheLayoutIsRefusedByTheCache(t *testing.T) {
 func hexDigest(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
+}
+
+// TestAccRemoteBypassHeadFetchesWithGETOnly (#1583): a Terraform remote
+// created through the API on its default registry, and an npm remote
+// created on https://npm.pkg.github.com and then pointed at another
+// upstream, have bypassHeadRequests on, as 7.x sets it, so a cold GET of a
+// file sends the upstream one GET and no HEAD. A Terraform remote on another
+// registry and an npm remote on another URL send a HEAD first.
+func TestAccRemoteBypassHeadFetchesWithGETOnly(t *testing.T) {
+	const tf, npm = "acme/widget/aws/1.0.0.zip", "widget/-/widget-1.0.0.tgz"
+	for _, tc := range []struct {
+		name, create, update, path string
+		heads                      int
+	}{
+		{"terraform", `{"rclass":"remote","packageType":"terraform","url":"{up}"}`, "", tf, 0},
+		{
+			"terraform on another registry",
+			`{"rclass":"remote","packageType":"terraform","url":"{up}","terraformRegistryUrl":"https://tf.example"}`,
+			"", tf, 1,
+		},
+		{
+			"npm on GitHub",
+			`{"rclass":"remote","packageType":"npm","url":"https://npm.pkg.github.com"}`,
+			`{"url":"{up}"}`, npm, 0,
+		},
+		{"npm", `{"rclass":"remote","packageType":"npm","url":"{up}"}`, "", npm, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newRemoteWorld(t)
+			if err := w.rt.Store.Repos().Delete(t.Context(), "remote"); err != nil {
+				t.Fatal(err)
+			}
+			const p = "/artifactory/api/repositories/remote"
+			up := strings.NewReplacer("{up}", w.up.URL)
+			const ct = "application/json"
+			remoteStatus(
+				t,
+				w.request(http.MethodPut, p, "admin", up.Replace(tc.create), "Content-Type", ct),
+				http.StatusOK,
+			)
+			if tc.update != "" {
+				remoteStatus(
+					t,
+					w.request(
+						http.MethodPost,
+						p,
+						"admin",
+						up.Replace(tc.update),
+						"Content-Type",
+						ct,
+					),
+					http.StatusOK,
+				)
+			}
+			body := payload(t)
+			if tc.path == npm {
+				body = support.NPMTarballOf("widget", "1.0.0")
+			}
+			w.up.Set("/"+tc.path, declaring(body, false))
+			got := w.request(http.MethodGet, "/artifactory/remote/"+tc.path, "reader", "")
+			remoteStatus(t, got, http.StatusOK)
+			if !bytes.Equal(got.Body.Bytes(), body) {
+				t.Fatal("body", got.Body)
+			}
+			if n := w.up.Count(http.MethodGet, "/"+tc.path); n != 1 ||
+				w.up.Count(http.MethodHead, "/"+tc.path) != tc.heads {
+				t.Fatal("want one upstream GET and", tc.heads, "HEAD", n, w.up.Requests())
+			}
+		})
+	}
 }
