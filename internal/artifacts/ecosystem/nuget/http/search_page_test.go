@@ -16,12 +16,14 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
-// searchReads counts what a search reads of the package index: searches
-// and the candidates they return, and counts, pages and the packages they
-// return, and reads of a page's versions.
+// searchReads counts what a search or feed reads of the package index:
+// searches and the candidates they return, counts, pages and the packages
+// they return, counts and pages of versions and the versions they return,
+// and reads of a page's versions.
 type searchReads struct {
 	searches, candidates, finds, versions, lists int
 	counts, pages, paged, withVersions           int
+	versionCounts, versionPages, versionsPaged   int
 }
 
 type countingStore struct {
@@ -61,6 +63,23 @@ func (p countingPackages) PackagesAt(
 	return found, err //nolint:wrapcheck // a test's pass-through
 }
 
+func (p countingPackages) CountRangeVersions(
+	ctx context.Context,
+	r port.PackageRange,
+) (int, error) {
+	p.reads.versionCounts++
+	return p.PackageStore.CountRangeVersions(ctx, r) //nolint:wrapcheck // a test's pass-through
+}
+
+func (p countingPackages) RangeVersionsAt(
+	ctx context.Context, r port.PackageRange, offset, limit int,
+) ([]port.ReleaseName, error) {
+	found, err := p.PackageStore.RangeVersionsAt(ctx, r, offset, limit)
+	p.reads.versionPages++
+	p.reads.versionsPaged += len(found)
+	return found, err //nolint:wrapcheck // a test's pass-through
+}
+
 func (p countingPackages) Candidates(
 	ctx context.Context, packages []artmodel.Package,
 ) ([]port.SearchCandidate, error) {
@@ -93,10 +112,11 @@ func bulkID(i int) string { return fmt.Sprintf("Bulk.%05d", i) }
 // Over 5000 packages, a search reads the index a page of candidates at a
 // time, each with its versions, never a package or its versions one by
 // one. For a caller who may read the whole repository a search without
-// terms, and an autocomplete, count in the store and read their page alone
-// (#1425). For anyone else totalHits counts every package the caller may
-// read, so a late page reads them all; a term, and a feed of one id's
-// versions, read only the packages they name.
+// terms, an autocomplete and a V2 feed without a search term, of every
+// version or of each package's latest, count in the store and read their
+// page alone (#1425). For anyone else totalHits, or a feed's count, counts
+// every package the caller may read, so a late page reads them all; a
+// term, and a feed of one id's versions, read only the packages they name.
 func TestAccSearchLatePage(t *testing.T) {
 	reads := &searchReads{}
 	f := newFixture(t, func(st pkgroute.Store) pkgroute.Store {
@@ -178,6 +198,73 @@ func TestAccSearchLatePage(t *testing.T) {
 		}
 		if *reads != c.reads {
 			t.Errorf("%s as %s read %+v, want %+v", c.path, c.user, *reads, c.reads)
+		}
+	}
+	versionPage := func(n int) searchReads {
+		return searchReads{versionCounts: 1, versionPages: 1, versionsPaged: n, withVersions: 1}
+	}
+	for _, c := range []struct {
+		path, user string
+		want       []string
+		reads      searchReads
+	}{
+		{legacyV2URL("Packages()", url.Values{"$skip": {"4980"}, "$top": {"20"}}), "reader", lateIDs, versionPage(20)},
+		{legacyV2URL("Search()", url.Values{"$skip": {"4990"}, "searchTerm": {"''"}}), "reader", lateIDs[10:], versionPage(10)},
+		{
+			legacyV2URL("Search()", url.Values{"$skip": {"4980"}, "$filter": {"IsLatestVersion"}}),
+			"reader", lateIDs, paged(20),
+		},
+		{
+			legacyV2URL("Packages", url.Values{"$skip": {"4995"}, "$filter": {"IsAbsoluteLatestVersion"}}),
+			"reader", lateIDs[15:], paged(5),
+		},
+		// A filter the store does not apply, and a caller whose permission
+		// names paths, have every package checked.
+		{
+			legacyV2URL("Packages()", url.Values{"$skip": {"4980"}, "$filter": {"(IsLatestVersion)"}}),
+			"reader", lateIDs,
+			searchReads{searches: 10, candidates: count},
+		},
+		{
+			legacyV2URL("Packages()", url.Values{"$skip": {"4980"}}),
+			"partial", nil,
+			searchReads{searches: 10, candidates: count},
+		},
+	} {
+		*reads = searchReads{}
+		feed := f.feed(c.path, c.user)
+		var got []string
+		for _, e := range feed.Entries {
+			got = append(got, e.prop(t, "Id"))
+		}
+		if !slices.Equal(got, c.want) || len(feed.Links) != 0 {
+			t.Errorf("%s as %s: %v, links %v; want %v", c.path, c.user, got, feed.Links, c.want)
+		}
+		if *reads != c.reads {
+			t.Errorf("%s as %s read %+v, want %+v", c.path, c.user, *reads, c.reads)
+		}
+	}
+	for _, c := range []struct {
+		path, user, want string
+		reads            searchReads
+	}{
+		{legacyV2 + "/Packages()/$count", "reader", "5000", searchReads{versionCounts: 1}},
+		{legacyV2 + "/Search()/$count?$filter=IsLatestVersion", "reader", "5000", searchReads{counts: 1}},
+		{legacyV2 + "/Packages()/$count", "partial", "0", searchReads{searches: 10, candidates: count}},
+	} {
+		*reads = searchReads{}
+		rec := f.do(http.MethodGet, c.path, c.user)
+		wantStatus(t, rec, http.StatusOK)
+		if got := rec.Body.String(); got != c.want || *reads != c.reads {
+			t.Errorf(
+				"%s as %s: %s, read %+v; want %s, %+v",
+				c.path,
+				c.user,
+				got,
+				*reads,
+				c.want,
+				c.reads,
+			)
 		}
 	}
 	// A feed of one id's versions reads that package alone.

@@ -712,9 +712,11 @@ func repositoryMatrix() []matrixRow {
 		at("GET "+r, "", anyone, 200),
 		at("GET "+r+"/configurations", "", administrators, 200),
 		row("GET "+r+"/existence", r+"/existence?type=local", "", administrators, 200),
+		// Anonymous too while anonymous access is on: 7.161.26's
+		// RestAuthenticationFilter gives it ROLE_USER (#1509).
 		row(
 			"GET "+r+"/{remoteRepoName}/configuration", r+"/remote-shared/configuration", "",
-			signedIn, 200,
+			anyone, 200,
 		),
 		row("GET "+r+"/{repoKey}", r+"/libs-local", "", sees("libs-local"), 200),
 		row("GET "+r+"/{repoKey}", r+"/libs-b", "", sees("libs-b"), 200),

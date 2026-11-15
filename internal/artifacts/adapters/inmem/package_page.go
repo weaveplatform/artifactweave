@@ -51,6 +51,20 @@ func window[T any](all []T, offset, limit int) []T {
 // call it under the lock. A version's metadata that is not JSON fails it,
 // as it fails the SQL stores' reads.
 func (p packages) inRange(r port.PackageRange) ([]model.Package, error) {
+	versions, err := p.rangeVersions(r)
+	var out []model.Package
+	for _, v := range versions {
+		if len(out) == 0 || out[len(out)-1].ID != v.PackageID {
+			out = append(out, p.t().Rows[v.PackageID])
+		}
+	}
+	return out, err
+}
+
+// rangeVersions returns the versions of r's packages that r admits, by
+// package name and then in Versions' order, as the SQL stores page them;
+// call it under the lock.
+func (p packages) rangeVersions(r port.PackageRange) ([]port.ReleaseName, error) {
 	if strings.ContainsRune(r.Prefix, 0) {
 		return nil, nil
 	}
@@ -60,7 +74,7 @@ func (p packages) inRange(r port.PackageRange) ([]model.Package, error) {
 		},
 		func(a, b model.Package) int { return cmp.Compare(a.Name, b.Name) },
 	)
-	out := rows[:0]
+	var out []port.ReleaseName
 	for _, pkg := range rows {
 		for _, v := range p.sorted(pkg.ID) {
 			ok, err := shown(r.Shown, v.Metadata)
@@ -68,8 +82,10 @@ func (p packages) inRange(r port.PackageRange) ([]model.Package, error) {
 				return nil, err
 			}
 			if ok {
-				out = append(out, pkg)
-				break
+				out = append(
+					out,
+					port.ReleaseName{PackageID: pkg.ID, Package: pkg.Name, Version: v.Version},
+				)
 			}
 		}
 	}
@@ -118,6 +134,30 @@ func (p packages) PackagesAt(
 	var out []model.Package
 	err := p.s.Do(ctx, func() error {
 		rows, err := p.inRange(r)
+		out = slices.Clone(window(rows, offset, limit))
+		return err
+	})
+	return out, err
+}
+
+func (p packages) CountRangeVersions(ctx context.Context, r port.PackageRange) (int, error) {
+	var n int
+	err := p.s.Do(ctx, func() error {
+		rows, err := p.rangeVersions(r)
+		n = len(rows)
+		return err
+	})
+	return n, err
+}
+
+func (p packages) RangeVersionsAt(
+	ctx context.Context,
+	r port.PackageRange,
+	offset, limit int,
+) ([]port.ReleaseName, error) {
+	var out []port.ReleaseName
+	err := p.s.Do(ctx, func() error {
+		rows, err := p.rangeVersions(r)
 		out = slices.Clone(window(rows, offset, limit))
 		return err
 	})

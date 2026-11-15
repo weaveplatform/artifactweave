@@ -421,8 +421,8 @@ not a position either.
   paging has moved into the store behind the same bytes, the research section's
   [native table](../api-reliability/README.md#native-protocols) says how far. For
   a caller who may read every path of the repository, or of the package's folder,
-  npm and NuGet search and the Ansible, Chef and Puppet lists count and page in the
-  store ([#1425](https://github.com/weaveplatform/artifactweave/issues/1425),
+  npm and NuGet search, NuGet's V2 feeds without a search term and the Ansible,
+  Chef and Puppet lists count and page in the store ([#1425](https://github.com/weaveplatform/artifactweave/issues/1425),
   [#1426](https://github.com/weaveplatform/artifactweave/issues/1426)). For anyone
   else they still count over every earlier candidate or version name in Go, as
   the access module decides read permission path by path, and a store count

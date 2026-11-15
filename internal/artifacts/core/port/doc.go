@@ -46,9 +46,10 @@
 //     count and a page of them for one who may read every path
 //     (CountVersions, VersionNamesAt); and PackagePages, with PackageRange,
 //     NuGetShown, VersionTally, ReleaseName and CandidatesAt: a
-//     repository's packages with a version counted and paged by name,
-//     tallied and listed by release, which npm's and NuGet's searches and
-//     the Chef and Puppet lists read for such a caller (#1425, #1426).
+//     repository's packages with a version, and their versions, counted
+//     and paged by name, tallied and listed by release, which npm's and
+//     NuGet's searches, NuGet's V2 feeds and the Chef and Puppet lists read
+//     for such a caller (#1425, #1426).
 //   - DockerPageStore, the item store's reader of a registry repository's
 //     image layout a page at a time (ItemStore.DockerPages), with
 //     DockerFolderQuery, DockerImageQuery, DockerImageManifest and

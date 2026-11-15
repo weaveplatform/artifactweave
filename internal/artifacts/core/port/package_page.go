@@ -9,8 +9,8 @@ import (
 // PackagePages counts and pages a repository's packages in the store, for
 // the lists whose caller may read every path of the repository
 // (accessapi.Decider.AllowsAll): npm and NuGet search, NuGet's
-// autocomplete, Chef's catalog and Puppet's whole-repository lists (#1425,
-// #1426). Such a caller sees every package with a version, so the count and
+// autocomplete and V2 feeds, Chef's catalog and Puppet's whole-repository
+// lists (#1425, #1426). Such a caller sees every package with a version, so the count and
 // the page are exact in the store; a caller whose permissions name paths
 // still has each version checked by the handler, over SearchNpm,
 // SearchNuGet, List or VersionNames.
@@ -21,6 +21,13 @@ type PackagePages interface {
 	// PackagesAt returns the packages CountPackages counts that come at
 	// offset of limit by name, in byte order, as List orders them.
 	PackagesAt(ctx context.Context, r PackageRange, offset, limit int) ([]model.Package, error)
+	// CountRangeVersions returns how many versions of r's packages r
+	// admits: what a NuGet V2 feed of every version counts.
+	CountRangeVersions(ctx context.Context, r PackageRange) (int, error)
+	// RangeVersionsAt returns the versions CountRangeVersions counts at
+	// offset of limit in a list of them by package name and then, within a
+	// package, in Versions' order: a NuGet V2 feed's page.
+	RangeVersionsAt(ctx context.Context, r PackageRange, offset, limit int) ([]ReleaseName, error)
 	// Candidates returns packages, in their order, each with every one of
 	// its versions in Versions' order, in one read; a package with no
 	// version left, deleted since it was paged, is left out, as SearchNpm
@@ -102,8 +109,9 @@ type VersionTally struct {
 	Versions, MostVersions int
 }
 
-// ReleaseName is a version ReleasesAt lists: its package's ID and name,
-// and the version string, whose record PackageStore.Version reads.
+// ReleaseName is a version ReleasesAt or RangeVersionsAt lists: its
+// package's ID and name, and the version string, whose record
+// PackageStore.Version reads.
 type ReleaseName struct {
 	PackageID int64
 	Package   string
