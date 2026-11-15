@@ -132,8 +132,17 @@ mkdir -p "${GOCOVERDIR:-$work/cover}"
 # default) admission fails closed with a 503 that the provider does not
 # retry (#1147). This job tests the providers against the API, not that
 # default, so the server allows the maximum.
+#
+# The provider also posts a usage report (POST /api/system/usage) for every
+# resource it creates, reads, updates or deletes, and each is charged to the
+# admin's expensive budget, 600 a minute by default. The virtual-repositories
+# scenario's 102 resources go through create, two refreshed plans, an update
+# and a destroy in about fifteen seconds, and its destroy met 429s at that
+# budget. The per-principal budget is raised to the shared one, 6000, for the
+# same reason as the timeout.
 GOCOVERDIR=${GOCOVERDIR:-$work/cover} \
 	ARTIFACTWEAVE_API_BUDGET_TIMEOUT=5s \
+	ARTIFACTWEAVE_API_EXPENSIVE_PRINCIPAL_PER_MINUTE=6000 \
 	ARTIFACTWEAVE_MASTER_KEY=terraform-master-key-0123456789abcdef0123456789abcdef \
 	ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD=$password \
 	ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH=true \
@@ -198,16 +207,21 @@ sys.exit(None if listed == "Generic" else f"{sys.argv[1]} is listed as {listed!r
 ' "$TF_VAR_repository_key"
 }
 
-# The identity scenario: a fresh RSA key pair per run, passed through the
-# environment so the private key never appears in a process listing. The
+# rsa_keypair writes a fresh 2048-bit RSA pair to $1.pem and $1.pub. The
 # provider accepts only a PKCS#1 private key ("RSA PRIVATE KEY"), which
 # OpenSSL 3 writes only with -traditional and LibreSSL writes by default.
-apply_identity() {
-	openssl genrsa -out "$work/keypair.pem" 2048 2>/dev/null
-	if ! grep -q 'BEGIN RSA PRIVATE KEY' "$work/keypair.pem"; then
-		openssl rsa -in "$work/keypair.pem" -traditional -out "$work/keypair.pem" 2>/dev/null
+rsa_keypair() {
+	openssl genrsa -out "$1.pem" 2048 2>/dev/null
+	if ! grep -q 'BEGIN RSA PRIVATE KEY' "$1.pem"; then
+		openssl rsa -in "$1.pem" -traditional -out "$1.pem" 2>/dev/null
 	fi
-	openssl rsa -in "$work/keypair.pem" -pubout -out "$work/keypair.pub" 2>/dev/null
+	openssl rsa -in "$1.pem" -pubout -out "$1.pub" 2>/dev/null
+}
+
+# The identity scenario: a fresh RSA key pair per run, passed through the
+# environment so the private key never appears in a process listing.
+apply_identity() {
+	rsa_keypair "$work/keypair"
 	TF_VAR_keypair_private_key=$(cat "$work/keypair.pem")
 	TF_VAR_keypair_public_key=$(cat "$work/keypair.pub")
 	TF_VAR_user_password=Terraform-user-1
@@ -269,6 +283,69 @@ print(json.dumps({name: sys.argv[1] + "/controlled-upstream/" + name for name in
 	python3 -I "$here/check-remotes.py" "$work/data" "$dir/terraform.tfstate"
 }
 
+# check_virtual_members reads every virtual of the virtual-repositories
+# scenario through the repositories API and requires its members in the
+# order the revision gave them, with the local member as its deployment
+# repository. The empty plan already shows the provider reads back what it
+# wrote; this reads the API itself, so the order and the deployment
+# repository do not rest on how the provider compares lists, and the count
+# catches a virtual dropped from the scenario.
+check_virtual_members() {
+	tf output -json virtual_repository_keys >"$work/virtual-keys.json"
+	tf output -json virtual_members >"$work/virtual-members.json"
+	TERRAFORM_TOKEN=$token python3 -I - "$url" "$work/virtual-keys.json" "$work/virtual-members.json" <<'PY'
+import json, os, sys, urllib.request
+url, keys, members = sys.argv[1], json.load(open(sys.argv[2])), json.load(open(sys.argv[3]))
+token = os.environ["TERRAFORM_TOKEN"]
+bad = []
+for kind, key in sorted(keys.items()):
+    req = urllib.request.Request(f"{url}/artifactory/api/repositories/{key}",
+                                 headers={"Authorization": f"Bearer {token}"})
+    got = json.load(urllib.request.urlopen(req))
+    want = members[kind]
+    local = next(m for m in want if m.endswith("-local"))
+    if got.get("repositories") != want or got.get("defaultDeploymentRepo") != local:
+        bad.append(f"{key}: repositories {got.get('repositories')} deploying to "
+                   f"{got.get('defaultDeploymentRepo')!r}, want {want} deploying to {local!r}")
+if len(keys) != 33:
+    bad.append(f"{len(keys)} virtual repositories, want 33")
+sys.exit("\n".join(bad) or None)
+PY
+}
+
+# The virtual-repositories scenario: every provider virtual resource over a
+# local and a remote member. Remote URLs point at this fixture's loopback
+# server and nothing is fetched. The GPG pairs come from tools/gpgkey and
+# the RSA pair from openssl, as the repositories and identity scenarios make
+# theirs. Revision 2 reverses every member list and changes one field of
+# each virtual, and must plan empty again before the shared plan and destroy.
+apply_virtual_repositories() {
+	export TF_VAR_repository_prefix=tf-virtual TF_VAR_revision=1 \
+		TF_VAR_upstream_url="$url/controlled-upstream" \
+		TF_VAR_gpg_primary_keypair_name=tf-virtual-gpg-primary \
+		TF_VAR_gpg_secondary_keypair_name=tf-virtual-gpg-secondary \
+		TF_VAR_rsa_keypair_name=tf-virtual-rsa
+	(cd "$root" && GOWORK=off go run ./tools/gpgkey "$work/virtual-gpg-primary")
+	(cd "$root" && GOWORK=off go run ./tools/gpgkey "$work/virtual-gpg-secondary")
+	rsa_keypair "$work/virtual-rsa"
+	TF_VAR_gpg_primary_private_key=$(cat "$work/virtual-gpg-primary/private.asc")
+	TF_VAR_gpg_primary_public_key=$(cat "$work/virtual-gpg-primary/public.asc")
+	TF_VAR_gpg_secondary_private_key=$(cat "$work/virtual-gpg-secondary/private.asc")
+	TF_VAR_gpg_secondary_public_key=$(cat "$work/virtual-gpg-secondary/public.asc")
+	TF_VAR_rsa_private_key=$(cat "$work/virtual-rsa.pem")
+	TF_VAR_rsa_public_key=$(cat "$work/virtual-rsa.pub")
+	export TF_VAR_gpg_primary_private_key TF_VAR_gpg_primary_public_key \
+		TF_VAR_gpg_secondary_private_key TF_VAR_gpg_secondary_public_key \
+		TF_VAR_rsa_private_key TF_VAR_rsa_public_key
+	tf apply -auto-approve
+	tf plan -detailed-exitcode
+	check_virtual_members
+	export TF_VAR_revision=2
+	tf apply -auto-approve
+	tf plan -detailed-exitcode
+	check_virtual_members
+}
+
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
 	case $scenario in
@@ -277,6 +354,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/oidc) apply_oidc ;;
 	deploy/artifactweave/terraform/cdn-repositories) apply_cdn_repositories ;;
 	deploy/artifactweave/terraform/remote-repositories) apply_remote_repositories ;;
+	deploy/artifactweave/terraform/virtual-repositories) apply_virtual_repositories ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1
