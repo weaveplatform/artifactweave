@@ -24,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -330,12 +331,13 @@ func newDownload(p string, folder bool, m model.Matrix, resolve resolver) *Downl
 }
 
 // Lookup finds the item at p for a download from c: a local repository's
-// own tree, a remote repository's cache (nothing is fetched upstream until
-// P9), or the first member of a virtual repository, in order, that the
-// caller may read and that holds it. root reports the repository root, which
-// is not an item. A non-nil dl refuses what Artifactory refuses in each
-// repository it reaches, and rewrites p as each repository that holds items
-// resolves it before looking there; the storage API passes nil.
+// own tree, a remote repository's cache (GetItem asks the upstream for
+// what the cache lacks), or the first member of a virtual repository, in
+// order, that the caller may read and that holds it. root reports the
+// repository root, which is not an item. A non-nil dl refuses what
+// Artifactory refuses in each repository it reaches, and rewrites p as
+// each repository that holds items resolves it before looking there; the
+// storage API passes nil.
 func Lookup(
 	ctx context.Context,
 	st Store,
@@ -487,6 +489,9 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, map[string]bool{})
 	if errors.Is(err, kernel.ErrNotFound) {
+		if s.getColdRemoteItem(w, r, st, c, cached, req, p, acc, dl) {
+			return
+		}
 		// "<archive>!/<entry>" names an entry inside an archive file; a path
 		// that exists as an item is served as one first.
 		if archive, entry, ok := strings.Cut(req.Path, "!/"); ok {
@@ -641,17 +646,15 @@ func (s *Kit) ServeFile(
 	f Found,
 	p kernel.Principal,
 ) {
-	s.serveFile(w, r, st, f, p, f.Item.MimeType)
+	s.serveFile(w, r, st, f, p, f.Item.MimeType, blob.Disposition(f.Item.Name))
 }
 
 // ServeItemFile is ServeFile for a download on the item route,
 // /artifactory/<repo>/<path>, for every package type and repository
-// class, and on the native APIs whose 7.x downloads go through the same
-// service (ProtocolOptions): the file is typed by its
-// artifactory.content-type property when that is set (fileContentType).
-// 7.x answers the item route through RepoFilter and
-// DownloadServiceImpl.process, which take the type from the resource the
-// repository's getInfo returns, typed by the property in
+// class: the file is typed by its artifactory.content-type property when
+// that is set (fileContentType). 7.x answers the item route through
+// RepoFilter and DownloadServiceImpl.process, which take the type from the
+// resource the repository's getInfo returns, typed by the property in
 // DbStoringRepoMixin.setMimeType for a local or cache repository of any
 // package type, and send it on a GET and a HEAD (RequestResponseHelper).
 func (s *Kit) ServeItemFile(
@@ -661,12 +664,93 @@ func (s *Kit) ServeItemFile(
 	f Found,
 	p kernel.Principal,
 ) {
+	s.serveTypedFile(w, r, st, f, p, blob.Disposition(f.Item.Name))
+}
+
+// ServePackageFile is ServeItemFile for a native API whose 7.x downloads
+// go through the package download service (ProtocolOptions): typed by the
+// property as the item route types a file, and named by
+// PackageDisposition, without the item route's filename* part. 7.161.26's
+// PackageArtifactServiceImpl hands the request to the item route's
+// DownloadServiceImpl.process, but with a JerseyArtifactoryResponse, whose
+// setContentDispositionAttachment writes the quoted name alone where the
+// item route's HttpArtifactoryResponse adds filename* (#1505).
+func (s *Kit) ServePackageFile(
+	w http.ResponseWriter,
+	r *http.Request,
+	st Store,
+	f Found,
+	p kernel.Principal,
+) {
+	s.serveTypedFile(w, r, st, f, p, PackageDisposition(f.Item.Name))
+}
+
+func (s *Kit) serveTypedFile(
+	w http.ResponseWriter,
+	r *http.Request,
+	st Store,
+	f Found,
+	p kernel.Principal,
+	disposition string,
+) {
 	contentType, err := fileContentType(r.Context(), st, f.Item)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "item properties", err))
 		return
 	}
-	s.serveFile(w, r, st, f, p, contentType)
+	s.serveFile(w, r, st, f, p, contentType, disposition)
+}
+
+// packageNameEscaper escapes the two characters a quoted-string cannot
+// hold bare (RFC 9110 section 5.6.4).
+var packageNameEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+
+// PackageDisposition is the Content-Disposition 7.x's package download
+// service names a file with. JerseyArtifactoryResponse writes
+// attachment; filename="<name>" with the name as it is and no filename*
+// part (7.161.26). A space stays a space: on 7.59.9 a download's saved
+// name had %20 for it, which JFrog took as a fault and fixed
+// (RTFACT-29749). 7.x refuses a path holding a quote or a backslash
+// (PathValidator), so it never writes either; here they are escaped as
+// quoted pairs, so that such a name cannot end the quoted string early.
+//
+// A name with a character outside printable ASCII is named by filename*
+// alone instead: on a GET and a HEAD, whichever response type answers,
+// RequestResponseHelper.setHeaderForNonAscii replaces the header with an
+// attachment whose only parameter is filename* in UTF-8, every byte but
+// RFC 3986's unreserved characters percent-encoded (Spring's
+// UriUtils.encode). 7.x's 304 skips that step and keeps the quoted form;
+// this sends filename* there too, as no source shows what a client reads
+// from it [I].
+func PackageDisposition(name string) string {
+	for i := range len(name) {
+		if name[i] < ' ' || name[i] > '~' {
+			return "attachment; filename*=UTF-8''" + unreservedEscape(name)
+		}
+	}
+	return `attachment; filename="` + packageNameEscaper.Replace(name) + `"`
+}
+
+// unreservedEscape percent-encodes every byte of s but RFC 3986's
+// unreserved characters, in upper-case hex, as Spring's UriUtils.encode
+// does for a URI component. url.PathEscape keeps sub-delimiters such as
+// '+' and '&', which UriUtils.encode encodes.
+func unreservedEscape(s string) string {
+	const hex = "0123456789ABCDEF"
+	var b strings.Builder
+	for i := range len(s) {
+		c := s[i]
+		switch {
+		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9',
+			c == '-', c == '.', c == '_', c == '~':
+			b.WriteByte(c)
+		default:
+			b.WriteByte('%')
+			b.WriteByte(hex[c>>4])
+			b.WriteByte(hex[c&15])
+		}
+	}
+	return b.String()
 }
 
 func (s *Kit) serveFile(
@@ -675,7 +759,7 @@ func (s *Kit) serveFile(
 	st Store,
 	f Found,
 	p kernel.Principal,
-	contentType string,
+	contentType, disposition string,
 ) {
 	ctx := r.Context()
 	it := f.Item
@@ -687,7 +771,7 @@ func (s *Kit) serveFile(
 	h.Set("X-Artifactory-Filename", it.Name)
 	h.Set("Content-Type", contentType)
 	if h.Get("Content-Disposition") == "" {
-		h.Set("Content-Disposition", blob.Disposition(it.Name))
+		h.Set("Content-Disposition", disposition)
 	}
 	if it.Actual.SHA1 != "" {
 		// Quoted for ServeContent's If-Range; the client receives it bare,
@@ -895,6 +979,65 @@ func fileChecksumRoute(c repo.Config, cached bool, p string) bool {
 			opkg.IsIndex(file) && (name == opkg.PackagesName || name == opkg.PackagesGzipName)
 	}
 	return false
+}
+
+// coldReadType reports whether c is a remote whose item route asks the
+// upstream for a file its cache does not hold once the cache lookup has
+// not found it: every remote type but those remoteDownloadType reads
+// through its source first, and CRAN and opkg, whose overlays fetch their
+// packages and indexes. 7.161.26's RemoteRepoBase.getInfo and
+// HttpRepo.retrieveInfo ask <url>/<path> whatever the package type, and
+// JFrog's remote repositories page says a download at
+// /artifactory/<remote>/<path> "returns the remote artifact and stores it
+// in the cache if it isn't stored yet" (#1507).
+func coldReadType(c repo.Config, cached bool) bool {
+	return c.Class == repo.Remote && !cached && !remoteDownloadType(c, false) &&
+		!cran.Serves(c.PackageType) && !opkg.Serves(c.PackageType)
+}
+
+// coldReadPath reports whether the item route asks c's upstream for the
+// file at p. A path the format builds itself (format.ClassDerived, such as
+// Helm's index.yaml) is one a remote reads from its cache alone
+// (remote.Policy), so it keeps the cache lookup's 404 [I]. An npm remote
+// asks only for a tarball (<name>/-/<file>): its upstream answers
+// <url>/<name> with the package's document, and a copy of it kept as the
+// file <name> would take the place of the folder that holds the package's
+// tarballs, so a later tarball download through the npm route would fail.
+// No 7.x source says what its npm remote does with such a path [I], so it
+// keeps the cache lookup's 404 too.
+func (s *Kit) coldReadPath(c repo.Config, p string) bool {
+	if format.ClassOf(s.Format(c.PackageType), c, p) == format.ClassDerived {
+		return false
+	}
+	return !npm.Serves(c.PackageType) || strings.Contains(p, "/-/")
+}
+
+// getColdRemoteItem answers a file, or the checksum of a file, that the
+// cache lookup did not find on a remote of a coldReadType type, from the
+// upstream at <url>/<path>, through getRemoteItem. The lookup has already
+// applied the download policy and the format's own refusals, which keep
+// their answers. A checksum whose file the lookup finds keeps the cache's
+// answer (getSidecar).
+func (s *Kit) getColdRemoteItem(
+	w http.ResponseWriter, r *http.Request, st Store, c repo.Config, cached bool,
+	req ItemRequest, p kernel.Principal, acc Access, dl *Download,
+) bool {
+	if !coldReadType(c, cached) || s.RemoteSources == nil || req.Path == "" || req.IsFolder ||
+		strings.Contains(req.Path, "!/") {
+		return false
+	}
+	file := req.Path
+	if artifact, _, ok := item.Sidecar(req.Path); ok {
+		_, err := Lookup(r.Context(), st, c, cached, artifact, acc, dl, map[string]bool{})
+		if !errors.Is(err, kernel.ErrNotFound) {
+			return false
+		}
+		file = artifact
+	}
+	if !s.coldReadPath(c, file) {
+		return false
+	}
+	return s.getRemoteItem(w, r, c, req, p, acc)
 }
 
 func remoteDownloadType(c repo.Config, cached bool) bool {

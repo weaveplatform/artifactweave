@@ -274,18 +274,40 @@ PyPI, NuGet, Helm and Terraform) mount through one kit,
 - A `ServeItem` callback reuses the item download path, so redirects (decision 0029) and
   download counts apply.
   - **Content type** (amended 2026-11-14,
-    [#1396](https://github.com/weaveplatform/artifactweave/issues/1396)). PyPI, Conda, RubyGems
-    and Vagrant type a stored file by its `artifactory.content-type` property, GET and HEAD,
-    as the item route does (`Kit.ServeItemFile`). 7.x's package handlers download through
-    `PackageArtifactServiceImpl`, which hands the request to `DownloadServiceImpl.process`,
-    and that answers with the type `DbStoringRepoMixin.setMimeType` takes from the property
-    (7.161.26 OSS sources). The sources do not say which handlers use that service, so a
-    format follows it only where a 7.x capture shows its native download in that service's
-    form (`X-Artifactory-Filename`, and `Content-Disposition` without `filename*`): PyPI on
-    7.113.0 (pypa/pip#13396), Conda on 7.33.12 (mamba-org/mamba#2105), Vagrant on 7.37.15
-    (RTFACT-27264) and RubyGems on 7.41.13 (RTFACT-27459). Every other native download, the
-    Debian snapshot read and the agent plugins API path keep the path's type [I] (#216);
-    Hugging Face's resolve answered 7.117.12 with headers of its own (RTFACT-31280).
+    [#1396](https://github.com/weaveplatform/artifactweave/issues/1396), and 2026-11-15 for
+    NuGet, [#1505](https://github.com/weaveplatform/artifactweave/issues/1505)). PyPI, Conda,
+    RubyGems, Vagrant and NuGet type a stored file by its `artifactory.content-type` property,
+    GET and HEAD, as the item route does (`Kit.ServeItemFile`). 7.x's package handlers download
+    through `PackageArtifactServiceImpl`, which hands the request to
+    `DownloadServiceImpl.process`, and that answers with the type
+    `DbStoringRepoMixin.setMimeType` takes from the property (7.161.26 OSS sources). The sources
+    do not say which handlers use that service, so a format follows it only where a 7.x capture
+    shows its native download in that service's form (`X-Artifactory-Filename`, and
+    `Content-Disposition` without `filename*`): PyPI on 7.113.0 (pypa/pip#13396), Conda on
+    7.33.12 (mamba-org/mamba#2105), Vagrant on 7.37.15 (RTFACT-27264), RubyGems on 7.41.13
+    (RTFACT-27459) and NuGet's v2 `Download` on 7.35.2 (chocolatey/choco#3022). NuGet's flat
+    container, registration `Download` and symbol files follow its v2 `Download`, as no capture
+    shows them [I] (#216). Every other native download, the Debian snapshot read and the agent
+    plugins API path keep the path's type [I] (#216); Hugging Face's resolve answered 7.117.12
+    with headers of its own (RTFACT-31280).
+  - **File name** (amended 2026-11-15,
+    [#1505](https://github.com/weaveplatform/artifactweave/issues/1505)). The same formats name
+    a stored file by `Content-Disposition: attachment; filename="<name>"`, with no `filename*`
+    part, on every answer of a native download (GET, HEAD, 206 and 304), from a local,
+    federated, remote or virtual repository (`Kit.ServePackageFile`). 7.161.26's
+    `JerseyArtifactoryResponse`, which `PackageArtifactServiceImpl` hands to
+    `DownloadServiceImpl.process`, writes the quoted name alone, where the item route's
+    `HttpArtifactoryResponse` adds `filename*=UTF-8''<name>`; the captures named above show that
+    form, while the item route sent `filename*` on 7.17.11 (RTFACT-25859). The name is written
+    as it is: on 7.59.9 a saved name had `%20` for a space, which JFrog fixed as a fault
+    (RTFACT-29749). A name holding a quote or a backslash, which 7.x's `PathValidator` refuses,
+    has it escaped as a quoted pair. A name with a character outside printable ASCII is named by
+    `attachment; filename*=UTF-8''<name>` alone, every byte but RFC 3986's unreserved characters
+    percent-encoded, as 7.161.26's `RequestResponseHelper.setHeaderForNonAscii` replaces the
+    header on a GET and a HEAD; 7.x's 304 skips that step, and sending the same there is [I]
+    (#216). The item route keeps `filename*` on the same file. The other formats' native
+    downloads keep the form they had, the item route's or their own, until a source shows theirs
+    [I].
 - A deploy helper with the item routes' matrix and checksum parsing exported, answering 201
   with the `X-Checksum-Sha1`, `-Sha256` and `-Md5` headers.
 - Raw-path parsing for encoded slashes (`@scope%2fname`).

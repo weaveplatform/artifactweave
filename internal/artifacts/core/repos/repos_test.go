@@ -168,6 +168,70 @@ func TestUnitMergeKeepsCreationOnlyFields(t *testing.T) {
 	}
 }
 
+// A remote's URL that carries a user name and a password gives them up to
+// username and password on create and update, and loses its query and
+// fragment with them; a URL with no password, or an empty one, or one that
+// does not parse, stays as it was sent (#1510).
+func TestUnitRemoteURLCredentialsMoveOnSave(t *testing.T) {
+	type saved struct{ url, username, password string }
+	for raw, want := range map[string]saved{
+		"https://u:p@up.example/private":      {"https://up.example/private", "u", "p"},
+		"https://u:p@up.example:8443/a?b=c#d": {"https://up.example:8443/a", "u", "p"},
+		"https://u:p@up.example":              {"https://up.example", "u", "p"},
+		"https://u:p%40ss@up.example/a/":      {"https://up.example/a/", "u", "p@ss"},
+		"https://u:p:q@up.example/a":          {"https://up.example/a", "u", "p:q"},
+		"https://:p@up.example/a":             {"https://up.example/a", "", "p"},
+		"https://u@up.example/a":              {"https://u@up.example/a", "", ""},
+		"https://u:@up.example/a":             {"https://u:@up.example/a", "", ""},
+		"https://up.example/a?b=c":            {"https://up.example/a?b=c", "", ""},
+		"https://u:p@up.example/%zz":          {"https://u:p@up.example/%zz", "", ""},
+	} {
+		created, err := PrepareCreate(repo.Config{Key: "r", Class: repo.Remote, URL: raw}, nil)
+		if got := (saved{created.URL, created.Username, created.Password}); err != nil ||
+			got != want {
+			t.Errorf("create %s: %+v %v, want %+v", raw, got, err, want)
+		}
+		stored := repo.Config{Key: "r", Class: repo.Remote, URL: "https://old.example"}
+		updated, err := update(t, stored, `{"url": "`+raw+`"}`)
+		if got := (saved{updated.URL, updated.Username, updated.Password}); err != nil ||
+			got != want {
+			t.Errorf("update %s: %+v %v, want %+v", raw, got, err, want)
+		}
+	}
+	// The URL's pair replaces one sent beside it or stored before.
+	sent, err := PrepareCreate(repo.Config{
+		Key: "r", Class: repo.Remote, URL: "https://u:p@up.example/a",
+		Username: "other", Password: "secret",
+	}, nil)
+	if err != nil || sent.Username != "u" || sent.Password != "p" {
+		t.Errorf("create beside a pair: %s %s %s %v", sent.URL, sent.Username, sent.Password, err)
+	}
+	stored := repo.Config{
+		Key: "r", Class: repo.Remote, URL: "https://up.example/a",
+		Username: "other", Password: "secret",
+	}
+	kept, err := update(t, stored, `{"url": "https://u:p@up.example/a"}`)
+	if err != nil || kept.URL != "https://up.example/a" || kept.Username != "u" ||
+		kept.Password != "p" {
+		t.Errorf(
+			"update over a stored pair: %s %s %s %v",
+			kept.URL,
+			kept.Username,
+			kept.Password,
+			err,
+		)
+	}
+	// A refused write keeps the URL it refused: validation sees it first.
+	vcs := repo.Config{
+		Key: "r", Class: repo.Remote, PackageType: repo.VCS, VCSGitProvider: repo.ArtifactoryVCS,
+		URL: "https://u:p@art.example/artifactory/api/vcs/peer",
+	}
+	if _, err := PrepareCreate(vcs, nil); err == nil ||
+		!strings.Contains(err.Error(), "must end in /api/vcs/<peer-repository>") {
+		t.Errorf("Artifactory VCS URL with credentials: %v", err)
+	}
+}
+
 // The support bundle repository is jfrog-support-bundle, as JFrog's reserved
 // names spell it; the plural is an ordinary key (#472).
 func TestUnitProtectedKeys(t *testing.T) {

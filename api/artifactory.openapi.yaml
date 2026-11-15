@@ -26896,7 +26896,7 @@ components:
           description: Optional within this object. Hours after which cached artifacts that were not requested are deleted. 0 (the default) disables cleanup.
           type: integer
         url:
-          description: Required within this object. Upstream registry URL, for example https://registry-1.docker.io or https://repo1.maven.org/maven2/. Required on create and must be absolute.
+          description: Required within this object. Upstream registry URL, for example https://registry-1.docker.io or https://repo1.maven.org/maven2/. Required on create and must be absolute. A user name and password written into it move into username and password when the repository is saved, and the URL keeps only its scheme, host, port and path; a user name without a password stays in the URL.
           format: uri
           type: string
         username:

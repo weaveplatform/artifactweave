@@ -293,6 +293,7 @@ Sources:
 | It reads `entry`, `title`, `summary`, `author/name`, `content@src` (the download URL) and, under `m:properties`, the `d:` elements `Id`, `Version`, `Description`, `IconUrl`, `LicenseUrl`, `ProjectUrl`, `Tags`, `GalleryDetailsUrl`, `ReportAbuseUrl`, `Dependencies`, `RequireLicenseAcceptance`, `DownloadCount`, `Created`, `LastEdited`, `Published`, `PackageHash`, `PackageHashAlgorithm`, `MinClientVersion` | [S] `V2FeedParser.cs:28-58,328-387` |
 | A version is unlisted when `Published` falls in 1901 or earlier | [S] `V2FeedPackageInfo.cs:219-225` |
 | 7.x's entries download from `<base>/api/nuget/<repo>/Download/<Id>/<version>`, the id in its stored case | [J] RTFACT-18567, RTFACT-26555, RTFACT-31126 |
+| A 7.35.2 download through `<base>/api/nuget/<repo>/Download/<id>/<version>` carried `X-Checksum-Sha1`, `-Sha256` and `-Md5`, `ETag` equal to the SHA-1, `Accept-Ranges: bytes`, `X-Artifactory-Filename: <id>.<version>.nupkg`, `Content-Type: application/x-nupkg` and `Content-Disposition: attachment; filename="<id>.<version>.nupkg"`, with no `filename*` part: the package download service's form (decision 0032). 6.11.1 answered a `HEAD` the same way. The NuGet API's downloads send that form and type a package by its `artifactory.content-type` property ([#1505](https://github.com/weaveplatform/artifactweave/issues/1505)); the flat container's, the registration's `Download` and symbol files follow it [I] | [C] chocolatey/choco#3022 (7.35.2), NuGet/Home#8551 (6.11.1) |
 | `FindPackagesById()` pages with `$skip` and `$top`; a `next` link exists, and 7.38.0 fixed it vanishing under priority resolution | [J] RTFACT-21838, RTFACT-26719 (7.38.0) |
 | `IsLatestVersion` on a local repository once picked the wrong four-part version; fixed in 2020 | [J] RTFACT-21838 (Done) |
 | 6.20 defines `artifactory.nuget.ignoreIsLatestVersionFilter`, true by default; only the closed NuGet add-on reads it, so what it ignores is not shown | [S] 6.20 `ConstantValues.java:255`; [I] its effect |
@@ -411,6 +412,8 @@ Each item below is on #216 for the live comparison in P19:
 13. Whether `Packages(Id,Version)` and `FindPackagesById()` match ids and versions ignoring
     case on 7.x, as the 7.31.10 download fixes suggest (sections 5 and 11).
 14. What 7.x answers `GetUpdates()` since its deprecation (section 11).
+15. The headers of a download from the flat container, the registration's `Download` and the
+    symbol server, which follow the v2 `Download` capture of 7.35.2 (section 11, #1505).
 
 ## Native exit evidence (#547)
 

@@ -209,11 +209,12 @@ from the file it names) downloads nothing: `respond` hands a checksum request, H
 GET, to `respondForChecksumRequest`, which answers from the file's info. A checksum
 request for a file the cache holds, even one due for a refresh, reads that copy as a
 GET does. Every other checksum request the item route answers, on a remote of any type
-whose files it reads (the Maven family, generic, Debian, RPM, Alpine, P2's classified
-files, CRAN and opkg), reads the file's info alone, with one upstream HEAD of the file,
+whose files it reads (every type, below, and for CRAN, opkg and P2 the files their routes
+fetch), reads the file's info alone, with one upstream HEAD of the file,
 and keeps nothing, as 7.161.26's `RemoteRepoBase.getChecksum` does
 ([#1476](https://github.com/weaveplatform/artifactweave/issues/1476),
-[#1495](https://github.com/weaveplatform/artifactweave/issues/1495)). The value is
+[#1495](https://github.com/weaveplatform/artifactweave/issues/1495),
+[#1507](https://github.com/weaveplatform/artifactweave/issues/1507)). The value is
 found in this order, and none answers 404 "Checksum not found for <file>":
 
 1. On a remote that stores artifacts locally, the remote's checksum policy reads the
@@ -243,6 +244,29 @@ computed hashes; that is an explicit fill, not proof that a HEAD cached bytes. A
 Range request with storage enabled fetches a complete 200 into the ordinary ingestion
 path, then serves the requested range; an upstream 206 is never labeled complete. A
 no-store range may relay a validated 206 without durable caching ([#621](https://github.com/weaveplatform/artifactweave/issues/621)).
+
+The item route, `/artifactory/<remote>/<path>`, reads a file its cache does not hold
+from `<url>/<path>` on a remote of every type, under the checks a generic remote's
+download makes: Read first, then the download policy (DV-057), the remote's patterns, its
+checksum policy and its store setting (R1, R13). JFrog's remote repositories page says
+that URL "returns the remote artifact and stores it in the cache if it isn't stored yet",
+and 7.161.26's `RemoteRepoBase.getInfo` and `HttpRepo.retrieveInfo` ask the upstream for
+the path whatever the package type. Generic, the Maven family and P2 read through their
+source first; Debian, RPM and Alpine do for a file the cache does not hold; CRAN and opkg
+fetch through their overlays; every other type asks the upstream once the cache lookup
+has not found the file, so a copy the cache holds, an overlay's answer and a format's own
+refusal keep their answers: a Nix remote's generic download (400), a Hugging Face Xet
+record, a Conda shard. A `-cache` key reads the cache alone (R8), and so does a path the
+format builds itself, such as Helm's `index.yaml` or RubyGems' `specs.4.8.gz`, which keeps
+the lookup's 404 [I]. A cold file an offline remote lacks (R9), or one its upstream does not
+have, answers 404 "Not Found", as on a generic remote. On an npm remote only a
+tarball path (`<name>/-/<file>`) is read: the upstream answers `<url>/<name>` with the
+package's document, which kept as a file would take the place of the folder holding the
+package's tarballs, and no 7.x source says what its npm remote does with that path [I].
+A file the remote's cache refuses, such as one outside Cargo's, Chef's or Swift's layout,
+answers 502 as a format route's refused upstream file does [I]; 7.161.26 checks a layout
+only for a local repository's own deploys (`PackageStorageInterceptorImpl.beforeCreate`)
+([#1507](https://github.com/weaveplatform/artifactweave/issues/1507)).
 
 A remote file served from a stream, the upstream's on a remote that stores nothing
 (R13) or a document the cache keeps without an item, such as a `maven-metadata.xml`,

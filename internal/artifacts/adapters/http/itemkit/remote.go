@@ -43,9 +43,9 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		return false
 	}
 	existing, err := s.Store.Items().Get(ctx, c.Key, true, req.Path)
-	// A CRAN or opkg remote reaches this route only for a checksum request
-	// (fileChecksumRoute), so whatever its cache holds at the path is the
-	// cache lookup's, as before.
+	// A remote that reaches this route only for what its cache lookup did
+	// not find (fileChecksumRoute, getColdRemoteItem) leaves whatever its
+	// cache holds at the path to that lookup, as before.
 	if err == nil && (existing.Folder || !remoteDownloadType(c, false)) {
 		return false
 	}
@@ -82,7 +82,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 			httpkit.WriteErr(w, r, ItemNotFound())
 			return true
 		}
-		if !remoteDownloadType(c, false) {
+		if cran.Serves(c.PackageType) || opkg.Serves(c.PackageType) {
 			// A CRAN or opkg copy the cache holds answers its checksum from
 			// the cache lookup, as it did before this route took the cold
 			// ones (fileChecksumRoute).

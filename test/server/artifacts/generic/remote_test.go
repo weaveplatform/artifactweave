@@ -16,10 +16,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	platsqltest "github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -284,6 +286,61 @@ func TestAccGenericRemoteAuthorizationAndRevocation(t *testing.T) {
 	remoteStatus(t, w.request("GET", "/artifactory/remote/file.bin", "reader", ""), 404)
 	if len(w.up.Requests()) != 0 {
 		t.Fatal("denial fetched")
+	}
+}
+
+// A remote created with its upstream's user name and password in its URL
+// keeps them as its own username and sealed password, and its upstream
+// still receives them as basic credentials, in both SQL stores (#1510).
+func TestAccGenericRemoteURLCredentialsReachTheUpstream(t *testing.T) {
+	for _, backend := range []string{"sqlite", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			rt := harness.App(t, func(cfg *config.Config) {
+				cfg.Bootstrap.AdminPassword = "pw"
+				if backend == "postgres" {
+					cfg.Database.Driver = "postgres"
+					cfg.Database.DSN = platsqltest.ScratchDSN(t, platsqltest.PostgresDSN(t))
+				}
+			})
+			up := fakeupstream.New(
+				t,
+				fakeupstream.Options{Auth: fakeupstream.Auth{Username: "u", Password: "p"}},
+			)
+			up.Set("/private/file.bin", fakeupstream.Resource{Body: []byte("private bytes")})
+			w := &harness.RemoteWorld{
+				T:        t,
+				Runtime:  rt,
+				Upstream: up,
+				H: harness.Router(harness.Config{
+					Store:         rt.Store,
+					Blobs:         rt.Blobs,
+					Auth:          rt.Auth,
+					Tokens:        rt.Tokens,
+					Keys:          rt.Keys,
+					RemoteSources: rt.Artifacts.RemoteSources(),
+					RemoteHTTP:    rt.Artifacts.RemoteHTTP(),
+					Logger:        slog.New(slog.DiscardHandler),
+				}),
+			}
+			url := strings.Replace(up.URL, "://", "://u:p@", 1) + "/private"
+			remoteStatus(t, w.Request(
+				"PUT", "/artifactory/api/repositories/private", "admin",
+				`{"rclass":"remote","packageType":"generic","url":"`+url+`"}`,
+				"Content-Type", "application/json",
+			), 200)
+			stored, err := rt.Store.Repos().Get(t.Context(), "private")
+			if err != nil || stored.URL != up.URL+"/private" || stored.Username != "u" ||
+				stored.Password != "p" {
+				t.Fatalf("stored %s %q %q %v", stored.URL, stored.Username, stored.Password, err)
+			}
+			got := w.Request("GET", "/artifactory/private/file.bin", "admin", "")
+			remoteStatus(t, got, 200)
+			requests := up.Requests()
+			if got.Body.String() != "private bytes" || len(requests) == 0 ||
+				!requests[len(requests)-1].HeaderMatches("Authorization", "Basic dTpw") {
+				t.Fatalf("%q after %+v", got.Body, requests)
+			}
+		})
 	}
 }
 
