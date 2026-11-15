@@ -26,8 +26,8 @@
 // # Outputs
 //
 //   - Store, from New, with Repos, RemoteCache, Items, Trash, Packages,
-//     Blobs, Replicas, GitLFSLocks, BowerRegistrations, Builds,
-//     ArchivedItems, ColdBlobs and ColdReplicas, LayoutWatch, and memtx's
+//     Blobs, Replicas, GitLFSLocks, BowerRegistrations, UploadDigests,
+//     Builds, ArchivedItems, ColdBlobs and ColdReplicas, LayoutWatch, and memtx's
 //     Tx, AfterCommit and Close.
 //
 // # Invariants
@@ -89,6 +89,7 @@
 // the remote cache (pull request 646), layout fencing (pull request 680),
 // Git LFS locks (pull request 849) and Bower registrations (pull request
 // 912). Moved here in P9d, which added Store, New and LayoutWatch.
+// UploadDigests keeps a Hugging Face LFS upload's SHA-1 and MD5 (#1581).
 //
 // # Testing
 //

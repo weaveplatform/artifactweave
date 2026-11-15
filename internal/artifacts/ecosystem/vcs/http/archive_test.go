@@ -90,7 +90,7 @@ func TestUnitValidateArchiveRejectsTraversalAndCorruption(t *testing.T) {
 	}
 }
 
-func TestUnitFileZIPSelectsExactRepositoryRelativePath(t *testing.T) {
+func TestUnitSelectFileTakesExactRepositoryRelativePath(t *testing.T) {
 	files := []struct{ name, body string }{
 		{"repo-abc/README.md", "root"},
 		{"repo-abc/vendor/pkg/README.md", "nested"},
@@ -138,23 +138,13 @@ func TestUnitFileZIPSelectsExactRepositoryRelativePath(t *testing.T) {
 			{"vendor/pkg/README.md", "nested"},
 		} {
 			t.Run(archive.ext+"/"+selected.path, func(t *testing.T) {
-				data, err := WrappedFileZIP(t.Context(), archive.data, archive.ext, selected.path)
+				content, err := SelectWrappedFile(
+					t.Context(),
+					archive.data,
+					archive.ext,
+					selected.path,
+				)
 				if err != nil {
-					t.Fatal(err)
-				}
-				out, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
-				if err != nil || len(out.File) != 1 || out.File[0].Name != selected.path {
-					t.Fatalf("selected ZIP mismatch: %v", err)
-				}
-				reader, err := out.File[0].Open()
-				if err != nil {
-					t.Fatal(err)
-				}
-				content, err := io.ReadAll(reader)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := reader.Close(); err != nil {
 					t.Fatal(err)
 				}
 				if string(content) != selected.body {
@@ -165,14 +155,37 @@ func TestUnitFileZIPSelectsExactRepositoryRelativePath(t *testing.T) {
 	}
 }
 
-func TestUnitFileZIPAcceptsRootlessFile(t *testing.T) {
-	data, err := FileZIP(t.Context(), tarGZ(t, "README.md"), "tar.gz", "README.md")
+func TestUnitSelectFileAcceptsRootlessFile(t *testing.T) {
+	archive := tarGZ(t, "README.md")
+	want, err := SelectWrappedFile(t.Context(), tarGZ(t, "root/README.md"), "tar.gz", "README.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := SelectFile(t.Context(), archive, "tar.gz", "README.md")
+	if err != nil || !bytes.Equal(data, want) {
+		t.Fatalf("rootless selected file = %q, %v; want %q", data, err, want)
+	}
+}
+
+// TestUnitFileZIPHoldsTheFileAtItsPath: ext=zip answers a ZIP with the
+// selected file alone, at its repository-relative path.
+func TestUnitFileZIPHoldsTheFileAtItsPath(t *testing.T) {
+	data, err := FileZIP("sub/README.md", []byte("nested"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	out, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
-	if err != nil || len(out.File) != 1 || out.File[0].Name != "README.md" {
-		t.Fatalf("rootless selected ZIP mismatch: %v", err)
+	if err != nil || len(out.File) != 1 || out.File[0].Name != "sub/README.md" {
+		t.Fatalf("selected ZIP mismatch: %v", err)
+	}
+	reader, err := out.File[0].Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := io.ReadAll(reader)
+	_ = reader.Close()
+	if err != nil || string(content) != "nested" {
+		t.Fatalf("selected ZIP content = %q, %v", content, err)
 	}
 }
 
@@ -407,7 +420,7 @@ func TestUnitVCSArchiveRejectsUnsafeZIPEntriesAndBadEnvelope(t *testing.T) {
 	}
 }
 
-func TestUnitVCSFileZIPRejectsMissingDuplicateAndCorruptSelections(t *testing.T) {
+func TestUnitVCSSelectFileRejectsMissingDuplicateAndCorruptSelections(t *testing.T) {
 	zipData := vcsZIP(t, "repo/README.md", "repo/src/main.go")
 	tarData := tarGZ(t, "repo/README.md")
 	for _, tc := range []struct {
@@ -425,7 +438,7 @@ func TestUnitVCSFileZIPRejectsMissingDuplicateAndCorruptSelections(t *testing.T)
 		{"empty input", "zip", "README.md", nil, ErrInvalidArchive},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := WrappedFileZIP(
+			if _, err := SelectWrappedFile(
 				t.Context(),
 				tc.data,
 				tc.ext,
@@ -434,7 +447,7 @@ func TestUnitVCSFileZIPRejectsMissingDuplicateAndCorruptSelections(t *testing.T)
 				err,
 				tc.expected,
 			) {
-				t.Fatalf("FileZIP = %v, want %v", err, tc.expected)
+				t.Fatalf("SelectWrappedFile = %v, want %v", err, tc.expected)
 			}
 		})
 	}
@@ -444,7 +457,15 @@ func TestUnitVCSFileZIPRejectsMissingDuplicateAndCorruptSelections(t *testing.T)
 		ext  string
 		data []byte
 	}{{"zip", zipData}, {"tar.gz", tarData}} {
-		if _, err := FileZIP(ctx, tc.data, tc.ext, "README.md"); !errors.Is(err, context.Canceled) {
+		if _, err := SelectFile(
+			ctx,
+			tc.data,
+			tc.ext,
+			"README.md",
+		); !errors.Is(
+			err,
+			context.Canceled,
+		) {
 			t.Errorf("canceled %s selection = %v", tc.ext, err)
 		}
 	}

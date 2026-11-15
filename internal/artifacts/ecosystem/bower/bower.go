@@ -151,17 +151,20 @@ type inspection struct {
 
 // Inspect reads and checks the stored bower.json a write puts at a
 // manifest path, before the write's transaction, and returns it for Admit,
-// so a manifest is read once per write. A checksum deploy and any other
-// file inspect nothing. A manifest that is invalid or does not match its
-// path is refused with 400.
+// so a manifest is read once per write. A checksum deploy, a remote's copy
+// outside the package layout and any other file inspect nothing. A
+// manifest that is invalid or does not match its path is refused with 400.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
-	_ repo.Config,
+	c repo.Config,
 	w format.Write,
 ) (any, error) {
 	if w.Op == format.OpChecksum || !strings.HasSuffix(w.Path, "/bower.json") {
 		return nil, nil //nolint:nilnil // Ordinary package files need no manifest inspection.
+	}
+	if _, _, _, ok := ParsePath(w.Path); !ok && format.RemoteCopy(c, w) {
+		return nil, nil //nolint:nilnil // Admit keeps it as a plain file
 	}
 	m, err := stored(ctx, env, w.Checksums.SHA256, w.Path)
 	if err != nil {
@@ -174,7 +177,8 @@ func (Handler) Inspect(
 // passes a checksum deploy. Any other write must be inside a versioned
 // package tree (400), and a bower.json must pass the checks Inspect makes,
 // which Admit repeats unless Inspect already read the same content at the
-// same path.
+// same path. A remote's copy outside a package tree is kept as a plain
+// file (format.RemoteCopy).
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -190,6 +194,9 @@ func (Handler) Admit(
 	}
 	name, version, file, ok := ParsePath(w.Path)
 	if !ok {
+		if format.RemoteCopy(c, w) {
+			return w, nil
+		}
 		return w, format.Rejectf(http.StatusBadRequest, "invalid Bower package path")
 	}
 	if file != "bower.json" {
@@ -208,9 +215,10 @@ func (Handler) Admit(
 
 // Deployed links a stored bower.json to its version in the package index,
 // creating the package and version when they are new. Folders and other
-// files change nothing.
+// files change nothing, and so does a bower.json outside a package tree,
+// which only a remote's cache keeps (format.RemoteCopy).
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
-	if it.Folder || !strings.HasSuffix(it.FullPath(), "/bower.json") {
+	if it.Folder || !manifestInTree(it.FullPath()) {
 		return nil
 	}
 	m, err := stored(ctx, env, it.Actual.SHA256, it.FullPath())
@@ -240,7 +248,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 			return fmt.Errorf("bower: list manifests: %w", err)
 		}
 		for _, it := range items {
-			if it.Folder || !strings.HasSuffix(it.FullPath(), "/bower.json") {
+			if it.Folder || !manifestInTree(it.FullPath()) {
 				continue
 			}
 			m, err := stored(ctx, env, it.Actual.SHA256, it.FullPath())
@@ -273,6 +281,14 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 		return fmt.Errorf("bower: reconcile package index: %w", err)
 	}
 	return nil
+}
+
+// manifestInTree reports whether p names a bower.json inside a package
+// tree, the files Deployed and Reindex index. One outside every tree is a
+// remote's plain copy (format.RemoteCopy), which indexes nothing.
+func manifestInTree(p string) bool {
+	_, _, _, ok := ParsePath(p)
+	return ok && strings.HasSuffix(p, "/bower.json")
 }
 
 func stored(ctx context.Context, env format.Env, sha, p string) (Manifest, error) {

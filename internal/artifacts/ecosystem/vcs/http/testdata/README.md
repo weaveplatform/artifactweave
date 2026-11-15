@@ -14,8 +14,7 @@ python3 internal/artifacts/ecosystem/vcs/http/testdata/generate.py --output /tmp
 
 Full archives contain both `README.md` and `sub/README.md`, plus `sub/ONLY.md`
 without a corresponding root `ONLY.md`. This detects accidental removal of a
-path component during selected-file extraction. The single-file archives retain
-Git's commit comment and, for nested paths, its ancestor directory entry.
+path component during selected-file extraction.
 
 Git writes the source commit into a global PAX comment for tar archives and the
 ZIP comment for ZIP archives. Tests validate that metadata against the requested

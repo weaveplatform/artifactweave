@@ -51,8 +51,9 @@ func (Handler) Inspect(
 // checksum write. Any other write must be a tarball at its canonical
 // path: a write of a registry resource that is not cached is refused with
 // 409, and any other path, or a tarball whose name and version do not give
-// its path, with 400. It reuses Inspect's result for the same content at
-// the same path, and reads the tarball again otherwise.
+// its path, with 400. A remote's copy at any other path is kept as a plain
+// file (format.RemoteCopy). It reuses Inspect's result for the same
+// content at the same path, and reads the tarball again otherwise.
 func (Handler) Admit(
 	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (format.Write, error) {
@@ -76,6 +77,9 @@ func (Handler) Admit(
 		)
 	}
 	if !IsTarballPath(w.Path) {
+		if format.RemoteCopy(c, w) {
+			return w, nil
+		}
 		return w, format.Rejectf(http.StatusBadRequest, "invalid Hex package path")
 	}
 	var p Package

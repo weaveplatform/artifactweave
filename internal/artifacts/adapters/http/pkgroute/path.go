@@ -213,11 +213,18 @@ func DeclaredChecksums(h http.Header) kernel.Checksums {
 
 // SetChecksums sets the X-Checksum-Sha1, -Sha256 and -Md5 headers a
 // download and a protocol deploy answer with; jf go-publish reads the
-// SHA-256 from a deploy's (research 26 section 3.1).
+// SHA-256 from a deploy's (research 26 section 3.1). A checksum that is not
+// known is left out rather than sent empty, as 7.x's responses set none for
+// a null one (HttpArtifactoryResponse.setSha1, setSha2 and setMd5,
+// 7.161.26), so a client that reads the header finds no value to compare.
 func SetChecksums(h http.Header, c kernel.Checksums) {
-	h.Set("X-Checksum-Sha1", c.SHA1)
-	h.Set("X-Checksum-Sha256", c.SHA256)
-	h.Set("X-Checksum-Md5", c.MD5)
+	for k, v := range map[string]string{
+		"X-Checksum-Sha1": c.SHA1, "X-Checksum-Sha256": c.SHA256, "X-Checksum-Md5": c.MD5,
+	} {
+		if v != "" {
+			h.Set(k, v)
+		}
+	}
 }
 
 func badRequestf(format string, a ...any) error {

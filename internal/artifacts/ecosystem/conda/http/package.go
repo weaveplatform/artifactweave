@@ -77,18 +77,18 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 				continue
 			}
 			indexPath := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
-			index, fence, err := h.memberIndex(mr, indexPath, packageLookup(id), map[string]bool{})
+			index, err := h.memberIndex(mr, indexPath, packageLookup(id), map[string]bool{})
 			if shardNotFound(err) {
 				continue
 			}
 			if err != nil {
 				return err
 			}
-			if _, ok := recordOf(index, id); !ok {
+			if _, ok := recordOf(index.records, id); !ok {
 				continue
 			}
-			if fence != nil {
-				if err := fence(r.Context()); err != nil {
+			if index.finish != nil {
+				if err := index.finish(r.Context()); err != nil {
 					return fmt.Errorf("conda: virtual member authority: %w", err)
 				}
 			}
@@ -101,16 +101,16 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 		return source.ErrDenied
 	}
 	indexPath := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
-	index, finish, err := h.memberIndex(r, indexPath, packageLookup(id), map[string]bool{})
+	index, err := h.memberIndex(r, indexPath, packageLookup(id), map[string]bool{})
 	if err != nil {
 		return err
 	}
-	rec, ok := recordOf(index, id)
+	rec, ok := recordOf(index.records, id)
 	if !ok {
 		return kernel.ErrNotFound
 	}
-	if finish != nil {
-		if err := finish(r.Context()); err != nil {
+	if index.finish != nil {
+		if err := index.finish(r.Context()); err != nil {
 			return fmt.Errorf("conda: package index authority: %w", err)
 		}
 	}

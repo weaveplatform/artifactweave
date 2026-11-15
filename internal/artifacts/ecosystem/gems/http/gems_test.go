@@ -42,7 +42,7 @@ func TestUnitRubyGemsDetailsAndVersionDocuments(t *testing.T) {
 	if body, media, err := render(
 		"info/missing",
 		rows,
-	); err != nil || media != "text/plain; charset=utf-8" ||
+	); err != nil || media != "application/octet-stream" ||
 		!strings.HasPrefix(string(body), "---\n") {
 		t.Fatalf("empty compact info = %q, %q, %v", body, media, err)
 	}

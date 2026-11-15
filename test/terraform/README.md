@@ -43,3 +43,11 @@ secret redaction, checks that persistent data contains no plaintext fixture cred
 and destroys the resources. It seeds/removes its proxy through the YAML descriptor;
 provider `artifactory_proxy` CRUD depends on the XML reads owned by P12/#303. Its endpoints belong to the controlled fixture server. It
 proves management only; native content adapters have separate client acceptance scenarios.
+
+The virtual-repositories scenario applies all 33 provider virtual resources, each over a local
+and a remote member, with every virtual field set away from its default. It applies two
+revisions, the second reversing every member list, and after each requires an empty plan and
+reads each virtual's member order back through the repositories API. Its 102 resources make
+the provider post more usage reports a minute (`POST /artifactory/api/system/usage`, one per
+resource operation) than the default expensive budget of 600 per principal admits, so the
+apply run starts the server with `api.expensive_principal_per_minute` at 6000.

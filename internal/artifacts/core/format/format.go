@@ -198,6 +198,18 @@ type Write struct {
 	From model.Item
 }
 
+// RemoteCopy reports whether w keeps, in the cache of c, a remote
+// repository, a file its upstream served. A format that refuses a deploy
+// outside its layout admits such a copy as a plain file, which it indexes
+// nothing from, and holds a copy inside its layout to every check of its
+// content, as a deploy is held. 7.161.26 checks a package's layout only for
+// a local repository's own deploys (PackageStorageInterceptorImpl.beforeCreate
+// skips a cache), and its remote interceptors refuse no path, so a remote
+// keeps whatever its download fetches (RemoteRepoBase.downloadAndSave). The
+// per-type Pro interceptors are not in the OSS tree, so this is inferred for
+// the types whose deploy checks the layout [I] (#1575).
+func RemoteCopy(c repo.Config, w Write) bool { return w.Cached && c.Class == repo.Remote }
+
 // Inspector is a format that reads deployed content before the write's
 // transaction, so no decompression or parsing holds the database's write
 // lock. The item service calls Inspect once the content is in the blob

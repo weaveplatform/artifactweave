@@ -40,16 +40,20 @@ func inspect(ctx context.Context, env format.Env, sha, path string) (inspection,
 
 // Inspect reads and validates the stored archive of a write to a .crate
 // path before the write's transaction, and returns what it found for Admit,
-// so an archive is read once per write. A checksum deploy and any other
-// file inspect nothing. An invalid crate is refused with 400; an archive
-// that cannot be opened fails the write.
+// so an archive is read once per write. A checksum deploy, a remote's copy
+// outside the crate layout and any other file inspect nothing. An invalid
+// crate is refused with 400; an archive that cannot be opened fails the
+// write.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
-	_ repo.Config,
+	c repo.Config,
 	w format.Write,
 ) (any, error) {
 	if w.Op == format.OpChecksum || !strings.HasSuffix(w.Path, ".crate") {
+		return inspection{}, nil
+	}
+	if _, _, ok := ParseCratePath(w.Path); !ok && format.RemoteCopy(c, w) {
 		return inspection{}, nil
 	}
 	return inspect(ctx, env, w.Checksums.SHA256, w.Path)
@@ -58,9 +62,10 @@ func (Handler) Inspect(
 // Admit applies the generic deploy policy, wrapping its refusal, then
 // passes a checksum deploy. Any other write must be at a crate path,
 // crates/<name>/<name>-<version>.crate (400), and its archive must be a
-// valid crate whose Cargo.toml names that crate and version (400). It
-// reuses Inspect's reading when it covers the same content and path, and
-// reads the stored archive itself otherwise.
+// valid crate whose Cargo.toml names that crate and version (400). A
+// remote's copy at any other path is kept as a plain file
+// (format.RemoteCopy). It reuses Inspect's reading when it covers the
+// same content and path, and reads the stored archive itself otherwise.
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -75,6 +80,9 @@ func (Handler) Admit(
 		return w, nil
 	}
 	if _, _, ok := ParseCratePath(w.Path); !ok {
+		if format.RemoteCopy(c, w) {
+			return w, nil
+		}
 		return w, format.Rejectf(
 			http.StatusBadRequest,
 			"Cargo crates require crates/<name>/<name>-<version>.crate",

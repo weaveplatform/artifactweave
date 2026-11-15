@@ -111,4 +111,10 @@ func TestUnitChecksumHeaders(t *testing.T) {
 		h.Get("X-Checksum-Md5") != md5 || len(h) != 3 {
 		t.Fatalf("%v", h)
 	}
+	// A checksum that is not known is left out, as 7.x sets none for null.
+	h = http.Header{}
+	pkgroute.SetChecksums(h, kernel.Checksums{SHA256: sha256})
+	if h.Get("X-Checksum-Sha256") != sha256 || len(h) != 1 {
+		t.Fatalf("unknown checksums sent: %v", h)
+	}
 }

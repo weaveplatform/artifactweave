@@ -32,112 +32,35 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
+// remoteRead is getRemoteItem's read of a remote file, or of the file a
+// checksum request names, before anything is answered: the source's result
+// for resource, or err, which the route answers in its place. infoSum is
+// set for a checksum request read from the file's info alone
+// (remoteStreamAnswer): the read of the upstream's checksum file that
+// serveInfoChecksum may make.
+type remoteRead struct {
+	err      error
+	result   source.Result
+	resource source.Resource
+	sidecar  string
+	infoSum  *source.Request
+}
+
 // getRemoteItem returns false for existing folder/archive browsing, which remains
 // cache-only. Native adapters and virtual member fetching require their own opt-in.
 func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Config,
 	req ItemRequest, p kernel.Principal, acc Access,
 ) bool {
+	read, ok := s.readRemoteItem(r, c, req, p, acc, nil)
+	if !ok {
+		return false
+	}
+	if read.err != nil {
+		httpkit.WriteErr(w, r, read.err)
+		return true
+	}
 	ctx := r.Context()
-	if strings.HasSuffix(req.Key, model.CacheSuffix) && maven.Serves(c.PackageType) &&
-		!maven.IsMetadata(req.Path) {
-		return false
-	}
-	existing, err := s.Store.Items().Get(ctx, c.Key, true, req.Path)
-	// A remote that reaches this route only for what its cache lookup did
-	// not find (fileChecksumRoute, getColdRemoteItem) leaves whatever its
-	// cache holds at the path to that lookup, as before.
-	if err == nil && (existing.Folder || !remoteDownloadType(c, false)) {
-		return false
-	}
-	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "cached item", err))
-		return true
-	}
-	if errors.Is(err, kernel.ErrNotFound) && strings.Contains(req.Path, "!/") {
-		return false
-	}
-	resource := RemoteResource(r, req.Path)
-	// The item route checks an upstream's label against the client's
-	// Accept, and answers a refusal 409, as 7.x's download does.
-	resource.ClientMIME = &source.ClientMIME{
-		Accept: append([]string(nil), r.Header.Values("Accept")...),
-	}
-	sidecar := ""
-	if artifact, alg, ok := item.Sidecar(req.Path); ok && errors.Is(err, kernel.ErrNotFound) {
-		// A checksum cannot disclose a file the caller cannot read.
-		if !acc.File(c, artifact, accessapi.ActionRead) {
-			httpkit.WriteErr(w, r, checksumRefused(c, req, p))
-			return true
-		}
-		// Every type resolves a checksum request through the file it names:
-		// 7.161.26's DownloadRequestContext.getResourcePath strips the
-		// checksum's extension whatever the remote's type, so
-		// RemoteRepoBase.getInfo resolves the file, from the upstream's HEAD
-		// when the cache does not hold it (#1495).
-		cached, getErr := s.Store.Items().Get(ctx, c.Key, true, artifact)
-		switch {
-		case maven.Serves(c.PackageType), getErr == nil && !cached.Folder,
-			errors.Is(getErr, kernel.ErrNotFound):
-		default:
-			httpkit.WriteErr(w, r, ItemNotFound())
-			return true
-		}
-		if cran.Serves(c.PackageType) || opkg.Serves(c.PackageType) {
-			// A CRAN or opkg copy the cache holds answers its checksum from
-			// the cache lookup, as it did before this route took the cold
-			// ones (fileChecksumRoute).
-			held, heldErr := remoteCopyHeld(ctx, s.Store, c, artifact)
-			if heldErr != nil {
-				httpkit.WriteErr(w, r, s.InternalError(ctx, "cached copy", heldErr))
-				return true
-			}
-			if held {
-				return false
-			}
-		}
-		sidecar = string(alg)
-		resource.Path = artifact
-		resource.EscapedPath = strings.TrimSuffix(resource.EscapedPath, "."+sidecar)
-		resource.ChecksumRequest = true
-	}
-	// The copy the cache already holds is matched before the upstream is
-	// asked: a mismatch is not found, and the upstream is not asked, as
-	// 7.x's RemoteRepoBase.internalGetInfo returns the PROPERTY_MISMATCH
-	// that DbStoringRepoMixin.getInfo answers for a cached copy
-	// (shouldReturnCachedResource), in 7.161.26.
-	if ok, matchErr := RemoteCopyMatches(ctx, s.Store, c, resource.Path, req); matchErr != nil {
-		httpkit.WriteErr(w, r, s.InternalError(ctx, "item properties", matchErr))
-		return true
-	} else if !ok {
-		httpkit.WriteErr(w, r, mismatched(c, req))
-		return true
-	}
-	query := source.Request{
-		Repo:         c,
-		Subject:      accessapi.SubjectOf(p),
-		Access:       acc.Decider,
-		Resource:     resource,
-		Matrix:       req.matrix(),
-		MatrixParams: pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
-		Project:      c.ProjectKey,
-		CacheOnly:    strings.HasSuffix(req.Key, model.CacheSuffix),
-	}
-	query, err = s.formatRemoteSourceRequest(ctx, query, acc)
-	if err != nil {
-		httpkit.WriteErr(w, r, sourceAnswer(c, req, p, err))
-		return true
-	}
-	resource = query.Resource
-	serveStream, err := s.remoteStreamAnswer(ctx, c, sidecar, &query)
-	if err != nil {
-		httpkit.WriteErr(w, r, s.InternalError(ctx, "cached copy", err))
-		return true
-	}
-	result, err := s.RemoteSources.Read(ctx, query)
-	if err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "read source", sourceAnswer(c, req, p, err)))
-		return true
-	}
+	result, resource, sidecar := read.result, read.resource, read.sidecar
 	// What the source returns now is the upstream's answer to a URL that
 	// carried the matrix parameters, or the copy matched above, so it is
 	// served without another match: 7.x's downloadAndSave hands back the
@@ -145,7 +68,11 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 	// upstream's answer ("resource will be stream directly to the user"),
 	// neither matched against the request's properties (7.161.26).
 	if result.Stream != nil {
-		serveStream(w, r, result, c, req, resource, sidecar, p.Anonymous)
+		if read.infoSum != nil {
+			s.serveInfoChecksum(w, r, result, c, *read.infoSum, req, resource, sidecar, p.Anonymous)
+		} else {
+			s.ServeRemoteStream(w, r, result, c, req, resource, sidecar, p.Anonymous)
+		}
 		return true
 	}
 	if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
@@ -169,6 +96,113 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		s.ServeItemFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 	}
 	return true
+}
+
+// readRemoteItem makes getRemoteItem's read, which a trace of the same
+// request makes too (traceRemoteItem), recording its steps in t when t is
+// not nil. It reports false where the route leaves the path to the cache
+// lookup.
+func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
+	p kernel.Principal, acc Access, t *resolutionTrace,
+) (remoteRead, bool) {
+	ctx := r.Context()
+	if strings.HasSuffix(req.Key, model.CacheSuffix) && maven.Serves(c.PackageType) &&
+		!maven.IsMetadata(req.Path) {
+		return remoteRead{}, false
+	}
+	existing, err := s.Store.Items().Get(ctx, c.Key, true, req.Path)
+	// A remote that reaches this route only for what its cache lookup did
+	// not find (fileChecksumRoute, getColdRemoteItem) leaves whatever its
+	// cache holds at the path to that lookup, as before.
+	if err == nil && (existing.Folder || !remoteDownloadType(c, false)) {
+		return remoteRead{}, false
+	}
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
+		return remoteRead{err: s.ItemError(ctx, "cached item", err)}, true
+	}
+	if errors.Is(err, kernel.ErrNotFound) && strings.Contains(req.Path, "!/") {
+		return remoteRead{}, false
+	}
+	resource := RemoteResource(r, req.Path)
+	// The item route checks an upstream's label against the client's
+	// Accept, and answers a refusal 409, as 7.x's download does.
+	resource.ClientMIME = &source.ClientMIME{
+		Accept: append([]string(nil), r.Header.Values("Accept")...),
+	}
+	sidecar := ""
+	if artifact, alg, ok := item.Sidecar(req.Path); ok && errors.Is(err, kernel.ErrNotFound) {
+		t.stepf("Request is for a checksum")
+		// A checksum cannot disclose a file the caller cannot read.
+		if !acc.File(c, artifact, accessapi.ActionRead) {
+			return remoteRead{err: checksumRefused(c, req, p)}, true
+		}
+		// Every type resolves a checksum request through the file it names:
+		// 7.161.26's DownloadRequestContext.getResourcePath strips the
+		// checksum's extension whatever the remote's type, so
+		// RemoteRepoBase.getInfo resolves the file, from the upstream's HEAD
+		// when the cache does not hold it (#1495).
+		cached, getErr := s.Store.Items().Get(ctx, c.Key, true, artifact)
+		switch {
+		case maven.Serves(c.PackageType), getErr == nil && !cached.Folder,
+			errors.Is(getErr, kernel.ErrNotFound):
+		default:
+			return remoteRead{err: ItemNotFound()}, true
+		}
+		if cran.Serves(c.PackageType) || opkg.Serves(c.PackageType) {
+			// A CRAN or opkg copy the cache holds answers its checksum from
+			// the cache lookup, as it did before this route took the cold
+			// ones (fileChecksumRoute).
+			held, heldErr := remoteCopyHeld(ctx, s.Store, c, artifact)
+			if heldErr != nil {
+				return remoteRead{err: s.InternalError(ctx, "cached copy", heldErr)}, true
+			}
+			if held {
+				return remoteRead{}, false
+			}
+		}
+		sidecar = string(alg)
+		resource.Path = artifact
+		resource.EscapedPath = strings.TrimSuffix(resource.EscapedPath, "."+sidecar)
+		resource.ChecksumRequest = true
+	}
+	// The copy the cache already holds is matched before the upstream is
+	// asked: a mismatch is not found, and the upstream is not asked, as
+	// 7.x's RemoteRepoBase.internalGetInfo returns the PROPERTY_MISMATCH
+	// that DbStoringRepoMixin.getInfo answers for a cached copy
+	// (shouldReturnCachedResource), in 7.161.26.
+	if ok, matchErr := RemoteCopyMatches(ctx, s.Store, c, resource.Path, req); matchErr != nil {
+		return remoteRead{err: s.InternalError(ctx, "item properties", matchErr)}, true
+	} else if !ok {
+		t.stepf("Found resource in local cache, but property doesn't match.")
+		return remoteRead{err: mismatched(c, req)}, true
+	}
+	query := source.Request{
+		Repo:         c,
+		Subject:      accessapi.SubjectOf(p),
+		Access:       acc.Decider,
+		Resource:     resource,
+		Matrix:       req.matrix(),
+		MatrixParams: pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
+		Project:      c.ProjectKey,
+		CacheOnly:    strings.HasSuffix(req.Key, model.CacheSuffix),
+	}
+	query, err = s.formatRemoteSourceRequest(ctx, query, acc)
+	if err != nil {
+		return remoteRead{err: sourceAnswer(c, req, p, err)}, true
+	}
+	read := remoteRead{resource: query.Resource, sidecar: sidecar}
+	read.infoSum, err = s.remoteStreamAnswer(ctx, c, sidecar, &query)
+	if err != nil {
+		return remoteRead{err: s.InternalError(ctx, "cached copy", err)}, true
+	}
+	t.stepf("Resolving remote source with current read authorization")
+	read.result, err = s.RemoteSources.Read(ctx, query)
+	if err != nil {
+		return remoteRead{
+			err: s.ItemError(ctx, "read source", sourceAnswer(c, req, p, err)),
+		}, true
+	}
+	return read, true
 }
 
 // Matrix returns the request's matrix parameters as a download matches them.
@@ -221,22 +255,10 @@ func RemoteCopyMatches(
 	}
 }
 
-// remoteStreamServer answers an item GET or HEAD from a stream a remote
-// source returned, with ServeRemoteStream's parameters.
-type remoteStreamServer func(
-	w http.ResponseWriter,
-	r *http.Request,
-	result source.Result,
-	c repo.Config,
-	req ItemRequest,
-	resource source.Resource,
-	sidecar string,
-	anonymous bool,
-)
-
-// remoteStreamAnswer returns how getRemoteItem answers a stream for q:
-// ServeRemoteStream, or, for a checksum request that reads only the info
-// of the file it names, which it makes a HEAD, serveInfoChecksum. 7.161.26's
+// remoteStreamAnswer returns how getRemoteItem answers a stream for q: nil
+// for ServeRemoteStream, or, for a checksum request that reads only the
+// info of the file it names, which it makes a HEAD, the read of the
+// upstream's checksum file that serveInfoChecksum may make. 7.161.26's
 // DownloadServiceImpl.respond hands a checksum request, HEAD or GET, to
 // respondForChecksumRequest, which never downloads the file, before the
 // branch that downloads one, on a remote of any type.
@@ -248,9 +270,9 @@ type remoteStreamServer func(
 // getRemoteChecksum there, whatever the cache holds).
 func (s *Kit) remoteStreamAnswer(
 	ctx context.Context, c repo.Config, sidecar string, q *source.Request,
-) (remoteStreamServer, error) {
+) (*source.Request, error) {
 	if sidecar == "" || q.CacheOnly {
-		return s.ServeRemoteStream, nil
+		return nil, nil //nolint:nilnil // nil: ServeRemoteStream answers
 	}
 	if c.StoreArtifactsLocally == nil || *c.StoreArtifactsLocally {
 		held, err := remoteCopyHeld(ctx, s.Store, c, q.Resource.Path)
@@ -258,17 +280,12 @@ func (s *Kit) remoteStreamAnswer(
 		case err != nil:
 			return nil, err
 		case held:
-			return s.ServeRemoteStream, nil
+			return nil, nil //nolint:nilnil // nil: the held copy answers
 		}
 	}
 	sum := upstreamChecksumRequest(*q, sidecar)
 	q.Resource.Method = http.MethodHead
-	return func(
-		w http.ResponseWriter, r *http.Request, result source.Result, c repo.Config,
-		req ItemRequest, resource source.Resource, sidecar string, anonymous bool,
-	) {
-		s.serveInfoChecksum(w, r, result, c, sum, req, resource, sidecar, anonymous)
-	}, nil
+	return &sum, nil
 }
 
 // remoteCopyHeld reports whether the cache of the remote repository c
@@ -440,16 +457,28 @@ func (s *Kit) RemoteDeliveryAllowed(
 	result source.Result,
 	anonymous bool,
 ) bool {
-	if result.Revalidate != nil {
-		if err := result.Revalidate(r.Context()); err != nil {
-			if result.Stream != nil {
-				_ = result.Stream.Body.Close()
-			}
-			httpkit.WriteErr(w, r, pkgroute.SourceError(err, anonymous))
-			return false
-		}
+	if err := remoteDeliveryErr(r.Context(), result, anonymous); err != nil {
+		httpkit.WriteErr(w, r, err)
+		return false
 	}
 	return true
+}
+
+// remoteDeliveryErr is RemoteDeliveryAllowed's refusal of result, or nil,
+// for a caller that answers it itself, as a trace does. A refused stream
+// is closed.
+func remoteDeliveryErr(ctx context.Context, result source.Result, anonymous bool) error {
+	if result.Revalidate == nil {
+		return nil
+	}
+	err := result.Revalidate(ctx)
+	if err == nil {
+		return nil
+	}
+	if result.Stream != nil {
+		_ = result.Stream.Body.Close()
+	}
+	return pkgroute.SourceError(err, anonymous) //nolint:wrapcheck // the answer the route writes
 }
 
 // RemoteResource is the source resource an item request for path names,
@@ -788,8 +817,28 @@ func (s *Kit) serveInfoChecksum(
 	sidecar string,
 	anonymous bool,
 ) {
-	if !s.RemoteDeliveryAllowed(w, r, result, anonymous) {
+	value, err := s.infoChecksum(r.Context(), result, c, sum, resource, sidecar, anonymous)
+	if err != nil {
+		httpkit.WriteErr(w, r, err)
 		return
+	}
+	s.serveRemoteChecksum(w, r, c, req.Path, value, result.Stream.Checksums, result.Stream.Modified)
+}
+
+// infoChecksum is the value serveInfoChecksum answers, or the error it
+// answers in its place, which a trace reports without serving it. It
+// closes result's stream.
+func (s *Kit) infoChecksum(
+	ctx context.Context,
+	result source.Result,
+	c repo.Config,
+	sum source.Request,
+	resource source.Resource,
+	sidecar string,
+	anonymous bool,
+) (string, error) {
+	if err := remoteDeliveryErr(ctx, result, anonymous); err != nil {
+		return "", err
 	}
 	_ = result.Stream.Body.Close()
 	storesLocally := c.StoreArtifactsLocally == nil || *c.StoreArtifactsLocally
@@ -800,18 +849,15 @@ func (s *Kit) serveInfoChecksum(
 	if value == "" && (!storesLocally && maven.Serves(c.PackageType) ||
 		c.PackageType == repo.Generic && c.RetrieveSha256FromServer != nil &&
 			*c.RetrieveSha256FromServer) {
-		var ok bool
-		if value, ok = s.upstreamChecksumValue(w, r, sum, anonymous); !ok {
-			return
+		var err error
+		if value, err = s.upstreamChecksumValue(ctx, sum, anonymous); err != nil {
+			return "", err
 		}
 	}
 	if value == "" {
-		httpkit.WriteErr(
-			w, r, apierror.New(http.StatusNotFound, "Checksum not found for "+resource.Path),
-		)
-		return
+		return "", apierror.New(http.StatusNotFound, "Checksum not found for "+resource.Path)
 	}
-	s.serveRemoteChecksum(w, r, c, req.Path, value, result.Stream.Checksums, result.Stream.Modified)
+	return value, nil
 }
 
 // upstreamChecksumRequest is the read of the checksum file the upstream
@@ -842,31 +888,27 @@ func upstreamChecksumRequest(q source.Request, sidecar string) source.Request {
 // (ChecksumUtils.checksumStringFromStream). An upstream with no checksum
 // file, or one with no checksum in it, is no value: getChecksum's
 // handleRemoteRequestException returns null for the upstream's 404. Any
-// other failure is answered here, and ok is false.
+// other failure is the error the route answers.
 func (s *Kit) upstreamChecksumValue(
-	w http.ResponseWriter, r *http.Request, sum source.Request, anonymous bool,
-) (value string, ok bool) {
-	ctx := r.Context()
+	ctx context.Context, sum source.Request, anonymous bool,
+) (string, error) {
+	value := ""
 	fetched, err := s.RemoteSources.Read(ctx, sum)
 	switch {
 	case err != nil:
 	case fetched.Stream == nil:
 		err = fmt.Errorf("checksum file %s: %w", sum.Resource.Path, source.ErrInvalidRequest)
-	case !s.RemoteDeliveryAllowed(w, r, fetched, anonymous):
-		return "", false
 	default:
+		if refused := remoteDeliveryErr(ctx, fetched, anonymous); refused != nil {
+			return "", refused
+		}
 		value, err = checksumFileValue(fetched.Stream.Body)
 		_ = fetched.Stream.Body.Close()
 	}
 	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
-		httpkit.WriteErr(
-			w,
-			r,
-			s.ItemError(ctx, "read source", pkgroute.SourceError(err, anonymous)),
-		)
-		return "", false
+		return "", s.ItemError(ctx, "read source", pkgroute.SourceError(err, anonymous))
 	}
-	return value, true
+	return value, nil
 }
 
 // checksumFileValue reads a checksum file as 7.161.26's

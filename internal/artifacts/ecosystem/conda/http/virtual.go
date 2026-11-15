@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
@@ -54,15 +55,16 @@ func (h handler) virtualIndex(
 	id condafmt.MetadataPath,
 	policy readPolicy,
 	seen map[string]bool,
-) (
-	condafmt.Repodata, func(context.Context) error, error,
-) {
+) (channelIndex, error) {
 	members, err := h.members(r)
 	if err != nil {
-		return condafmt.Repodata{}, nil, err
+		return channelIndex{}, err
 	}
 	combined := condafmt.EmptyRepodata(id.Subdir)
 	var fences []func(context.Context) error
+	// 7.x keeps a virtual repository's merged index, recalculated as its
+	// members change, so it last changed when its latest member did [I].
+	var modified time.Time
 	for _, mr := range members {
 		if !h.k.CanFolder(mr, path.Dir(id.Path), api.ActionRead) ||
 			!h.k.Can(mr, id.Path, api.ActionRead) {
@@ -75,22 +77,25 @@ func (h handler) virtualIndex(
 		if generic.CheckDownload(pkgroute.RequestFrom(mr).Repo, policy.path, false) != nil {
 			continue
 		}
-		index, finish, err := h.memberIndex(mr, id.Path, policy, seen)
+		index, err := h.memberIndex(mr, id.Path, policy, seen)
 		if shardNotFound(err) {
 			continue
 		}
 		if err != nil {
-			return condafmt.Repodata{}, nil, err
+			return channelIndex{}, err
 		}
-		if finish != nil {
-			fences = append(fences, finish)
+		if index.finish != nil {
+			fences = append(fences, index.finish)
 		}
-		for name, rec := range index.Packages {
+		if index.modified.After(modified) {
+			modified = index.modified
+		}
+		for name, rec := range index.records.Packages {
 			if _, exists := combined.Packages[name]; !exists {
 				combined.Packages[name] = rec
 			}
 		}
-		for name, rec := range index.PackagesConda {
+		for name, rec := range index.records.PackagesConda {
 			if _, exists := combined.PackagesConda[name]; !exists {
 				combined.PackagesConda[name] = rec
 			}
@@ -98,14 +103,18 @@ func (h handler) virtualIndex(
 	}
 	filtered, err := h.filterIndex(r.Context(), r, combined, id, nil)
 	if err != nil {
-		return condafmt.Repodata{}, nil, err
+		return channelIndex{}, err
 	}
-	return filtered, func(ctx context.Context) error {
-		for _, fence := range fences {
-			if err := fence(ctx); err != nil {
-				return fmt.Errorf("conda: virtual source authority: %w", err)
+	return channelIndex{
+		records:  filtered,
+		modified: modified,
+		finish: func(ctx context.Context) error {
+			for _, fence := range fences {
+				if err := fence(ctx); err != nil {
+					return fmt.Errorf("conda: virtual source authority: %w", err)
+				}
 			}
-		}
-		return nil
+			return nil
+		},
 	}, nil
 }

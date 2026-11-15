@@ -503,6 +503,17 @@ func (h handler) storeCommitFile(target *http.Request, path string, op commitOp)
 	if err := h.authorizeXetCommit(target, path, op.oid); err != nil {
 		return err
 	}
+	// Stat knows the SHA-256 alone; the upload kept the SHA-1 and MD5 it
+	// computed (lfsUpload), so the file is stored with all three, as a 7.x
+	// deploy stores every file. An object no upload recorded, such as one
+	// a Xet upload stored, keeps the SHA-256 alone and its downloads leave
+	// the other two headers out.
+	switch digests, err := h.k.DB().UploadDigests().Get(ctx, op.oid); {
+	case err == nil:
+		info.Digests.SHA1, info.Digests.MD5 = digests.SHA1, digests.MD5
+	case !errors.Is(err, kernel.ErrNotFound):
+		return fmt.Errorf("huggingface: read lfs upload digests: %w", err)
+	}
 	_, err = h.k.StoreNew(target, path, info, nil,
 		kernel.Checksums{SHA256: op.oid}, func() error {
 			it, getErr := h.k.DB().Items().Get(ctx,
@@ -732,6 +743,13 @@ func (h handler) lfsUpload(w http.ResponseWriter, r *http.Request) {
 			r,
 			apierror.New(http.StatusUnprocessableEntity, "LFS object integrity mismatch"),
 		)
+		return
+	}
+	// The commit that names this object's path stores its item from the
+	// blob store's Stat, which knows the SHA-256 alone; keep the SHA-1 and
+	// MD5 computed here for it (storeCommitFile).
+	if err := h.k.DB().UploadDigests().Put(r.Context(), info.Digests); err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	if _, err = h.storeXet(

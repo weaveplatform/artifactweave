@@ -595,7 +595,8 @@ func NewRouter(cfg RouterConfig) http.Handler {
 
 	// Generated strict servers, one per spec, each under its service prefix
 	// with the management body limit, and the replay wrapping each keyed
-	// operation.
+	// operation. The VCS file downloads also keep their request, whose
+	// conditional and range headers decide their answer.
 	keyed := newKeyedOperations(cfg, artAPI)
 	r.Group(func(g chi.Router) {
 		g.Use(
@@ -617,7 +618,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				DebianAPI:      &debianOps,
 				CranAPI:        &cranOps,
 				RPMAPI:         &rpmOps,
-			}, keyed.artifactory(), strictOpts),
+			}, append(keyed.artifactory(), vcshttp.KeepRequest), strictOpts),
 			artgen.ChiServerOptions{
 				BaseURL:          "/artifactory",
 				BaseRouter:       g,

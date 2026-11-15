@@ -41,8 +41,15 @@
 //     quick/Marshal.4.8/<file>.gemspec.rz), and JSON for a gem's latest
 //     version (api/v1/gems/<name>.json), its versions
 //     (api/v1/versions/<name>) and a name search (api/v1/search.json).
-//     Index answers are private and kept by no cache (Cache-Control:
-//     private, no-store), with an MD5 ETag and a SHA-256 Repr-Digest.
+//     The compact index and the Marshal indexes, which 7.x stores, answer
+//     as a stored file in the package download service's form
+//     (serveDocument, RTFACT-27459): X-Artifactory-Filename,
+//     Content-Disposition, the X-Checksum headers, Last-Modified,
+//     Accept-Ranges and Cache-Control: no-store, with the quoted MD5 as
+//     the compact index's ETag and the bare SHA-1 as a Marshal index's.
+//     The JSON answers are private and kept by no cache (Cache-Control:
+//     private, no-store), with an MD5 ETag. Every index answer carries a
+//     SHA-256 Repr-Digest.
 //
 // # Invariants
 //
@@ -118,8 +125,9 @@
 // permissions, refused requests, yank, token authentication, a virtual
 // repository's member filtering and cycles, stored gems that fail closed,
 // the remote's index checks, cache, offline reads and redirects, the
-// download policy on local, virtual and remote reads, and the
-// gem and Bundler clients installing a pinned rake
+// download policy on local, virtual and remote reads, the stored index
+// documents' file headers and revalidation (gems_index_headers_test.go),
+// and the gem and Bundler clients installing a pinned rake
 // (TestAccRubyClientsInstallPinnedRake, which skips unless gem and bundle
 // are installed). The @gems acceptance scenarios drive gem and Bundler
 // against all four classes.

@@ -16,7 +16,7 @@ type Factory func(t *testing.T) port.Store
 // Items, ItemCreate, ColonPaths, ItemProperties, RepositoryRoot, ItemStats,
 // ItemSearch, ItemsByFullPath, LongPropertyValues, LongPropertyKeys, Trash,
 // TrashByPath, Packages,
-// GitLFSLocks, BowerRegistrations, RemoteCache, RemoteCacheFences,
+// GitLFSLocks, BowerRegistrations, UploadDigests, RemoteCache, RemoteCacheFences,
 // RemoteCacheAtomic, RemoteCacheEvict, RemoteCacheConcurrent,
 // RemoteCacheUsage, RemoteSmartState, ArchivedItems, Builds, BuildRuns,
 // BuildDeletes, BuildRename, BuildPromotions, BuildFiles, BuildRetention and
@@ -28,6 +28,7 @@ func Run(t *testing.T, newStore Factory) {
 	runContent(t, newStore)
 	runGitLFSLocks(t, newStore)
 	runBowerRegistrations(t, newStore)
+	runUploadDigests(t, newStore)
 	runRemoteCache(t, newStore)
 	runArchivedItems(t, newStore)
 	runBuilds(t, newStore)

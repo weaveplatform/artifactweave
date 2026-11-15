@@ -28,6 +28,14 @@ curl --fail-with-body --user "$REGISTRY_USER:$REGISTRY_PASSWORD" \
 tar -tzf source.tar.gz
 ```
 
+A file within a tag or branch, `downloadTagFile/vcs-github/OWNER/REPOSITORY/TAG!PATH`,
+answers the file itself, typed by its extension and named by its base name in
+`X-Artifactory-Filename`, as 7.x answers it
+([RTFACT-29495](https://jfrog.atlassian.net/browse/RTFACT-29495)); add
+`?ext=zip` for a ZIP that holds it at its path. Archives and files answer
+`If-None-Match` with their SHA-1, `If-Modified-Since` and `Range` as any 7.x
+file download does.
+
 For GitLab projects in a subgroup on the current target release, set
 `vcsGitProvider` to `GITLAB`, point the remote URL to the GitLab host, and use
 the full group/subgroup path. The `archive/refs` form is required for subgroup
@@ -71,8 +79,8 @@ The older provider requires the archive plugin; after upgrading Bitbucket to
 repository URL to this explicit API form before selecting this provider.
 The peer's documented tag/branch JSON endpoints resolve immutable commits;
 `downloadCommit` supplies the unchanged source archive. Peer selected-file APIs
-return a validated, unchanged ZIP with the exact requested file; these ref-based
-responses use mutable cache freshness. Metadata zap leaves these binary entries
+are asked without `ext` and return the file itself, kept unchanged within
+64 MiB; these ref-based responses use mutable cache freshness. Metadata zap leaves these binary entries
 intact; expiry or explicit cache deletion refreshes them. Stash file selection
 uses exact rootless paths. Git commit markers in archives must match the
 requested commit. CUSTOM templates retain both rootless and wrapped archive
