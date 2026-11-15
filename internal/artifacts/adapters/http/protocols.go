@@ -85,14 +85,18 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 // These formats' native downloads were captured answering in that
 // response's form, X-Artifactory-Filename and a Content-Disposition
 // without filename*: PyPI on 7.113.0 (pypa/pip#13396), Conda on 7.33.12
-// (mamba-org/mamba#2105), Vagrant on 7.37.15 (RTFACT-27264) and RubyGems
-// on 7.41.13 (RTFACT-27459), where the item route already sent filename*
-// (RTFACT-25859 on 7.17.11). The other formats keep the path's type and
-// the item route's disposition until a source shows theirs [I] (#1396,
-// #1505); Hugging Face's resolve answered 7.117.12 with headers of its
-// own, none of that response's (RTFACT-31280).
+// (mamba-org/mamba#2105), Vagrant on 7.37.15 (RTFACT-27264), RubyGems on
+// 7.41.13 (RTFACT-27459) and NuGet's v2 Download on 7.35.2
+// (chocolatey/choco#3022), where the item route already sent filename*
+// (RTFACT-25859 on 7.17.11). NuGet's flat container, registration
+// Download and symbol files follow its v2 Download, as no capture shows
+// them [I]. The other formats keep the path's type and the item route's
+// disposition until a source shows theirs [I] (#1396, #1505); Hugging
+// Face's resolve answered 7.117.12 with headers of its own, none of that
+// response's (RTFACT-31280).
 func packageServiceDownload(t repo.PackageType) bool {
-	return slices.Contains([]repo.PackageType{repo.PyPI, repo.Conda, repo.Vagrant, repo.Gems}, t)
+	return slices.Contains(
+		[]repo.PackageType{repo.PyPI, repo.Conda, repo.Vagrant, repo.Gems, repo.NuGet}, t)
 }
 
 // Protocols returns the package protocols with routers of their own, which

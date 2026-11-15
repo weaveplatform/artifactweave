@@ -274,18 +274,22 @@ PyPI, NuGet, Helm and Terraform) mount through one kit,
 - A `ServeItem` callback reuses the item download path, so redirects (decision 0029) and
   download counts apply.
   - **Content type** (amended 2026-11-14,
-    [#1396](https://github.com/weaveplatform/artifactweave/issues/1396)). PyPI, Conda, RubyGems
-    and Vagrant type a stored file by its `artifactory.content-type` property, GET and HEAD,
-    as the item route does (`Kit.ServeItemFile`). 7.x's package handlers download through
-    `PackageArtifactServiceImpl`, which hands the request to `DownloadServiceImpl.process`,
-    and that answers with the type `DbStoringRepoMixin.setMimeType` takes from the property
-    (7.161.26 OSS sources). The sources do not say which handlers use that service, so a
-    format follows it only where a 7.x capture shows its native download in that service's
-    form (`X-Artifactory-Filename`, and `Content-Disposition` without `filename*`): PyPI on
-    7.113.0 (pypa/pip#13396), Conda on 7.33.12 (mamba-org/mamba#2105), Vagrant on 7.37.15
-    (RTFACT-27264) and RubyGems on 7.41.13 (RTFACT-27459). Every other native download, the
-    Debian snapshot read and the agent plugins API path keep the path's type [I] (#216);
-    Hugging Face's resolve answered 7.117.12 with headers of its own (RTFACT-31280).
+    [#1396](https://github.com/weaveplatform/artifactweave/issues/1396), and 2026-11-15 for
+    NuGet, [#1505](https://github.com/weaveplatform/artifactweave/issues/1505)). PyPI, Conda,
+    RubyGems, Vagrant and NuGet type a stored file by its `artifactory.content-type` property,
+    GET and HEAD, as the item route does (`Kit.ServeItemFile`). 7.x's package handlers download
+    through `PackageArtifactServiceImpl`, which hands the request to
+    `DownloadServiceImpl.process`, and that answers with the type
+    `DbStoringRepoMixin.setMimeType` takes from the property (7.161.26 OSS sources). The sources
+    do not say which handlers use that service, so a format follows it only where a 7.x capture
+    shows its native download in that service's form (`X-Artifactory-Filename`, and
+    `Content-Disposition` without `filename*`): PyPI on 7.113.0 (pypa/pip#13396), Conda on
+    7.33.12 (mamba-org/mamba#2105), Vagrant on 7.37.15 (RTFACT-27264), RubyGems on 7.41.13
+    (RTFACT-27459) and NuGet's v2 `Download` on 7.35.2 (chocolatey/choco#3022). NuGet's flat
+    container, registration `Download` and symbol files follow its v2 `Download`, as no capture
+    shows them [I] (#216). Every other native download, the Debian snapshot read and the agent
+    plugins API path keep the path's type [I] (#216); Hugging Face's resolve answered 7.117.12
+    with headers of its own (RTFACT-31280).
   - **File name** (amended 2026-11-15,
     [#1505](https://github.com/weaveplatform/artifactweave/issues/1505)). The same formats name
     a stored file by `Content-Disposition: attachment; filename="<name>"`, with no `filename*`
