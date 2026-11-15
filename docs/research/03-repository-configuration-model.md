@@ -901,7 +901,7 @@ virtualRepositories:
 | cocoapods | | `podsSpecsRepoUrl`, `vcsType`, `vcsGitProvider`, `vcsGitDownloadUrl` | |
 | hex | | `hexPublicKey` | |
 | bower | | `bowerRegistryUrl`, `vcsType`, `vcsGitProvider`, `vcsGitDownloadUrl` | `externalDependenciesEnabled`, `externalDependenciesPatterns`, `externalDependenciesRemoteRepo` |
-| aieditorextensions | — | `externalDependenciesEnabled` `true` and `externalDependenciesPatterns` `["**/**vsassets.io/**"]` by default, and `bypassHeadRequests` always `true` ("Remote fields"); remote only | — |
+| aieditorextensions | | `externalDependenciesEnabled` `true` and `externalDependenciesPatterns` `["**/**vsassets.io/**"]` by default, and `bypassHeadRequests` always `true` ("Remote fields"); remote only | |
 
 `pkg/repo.Relevant` keeps each field for the package types and classes 7.161.26's annotation
 names (the v2 read and the configurations list, "Field sets of the reads"; "The v2 read and
