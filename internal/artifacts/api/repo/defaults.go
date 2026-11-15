@@ -27,6 +27,11 @@ const (
 	DefaultTerraformRegistryURL           = "https://registry.terraform.io"
 	DefaultTerraformProvidersURL          = "https://releases.hashicorp.com"
 	DefaultNIMModelURL                    = "https://api.ngc.nvidia.com"
+	// DefaultAIEditorExtensionsPattern is the external dependency pattern an
+	// AI Editor Extensions remote takes: VSCODE_EXTERNAL_DEPENDENCIES_PATTERNS
+	// of 7.161.26's PackageTypeConfigFields, which covers the Visual Studio
+	// Marketplace's CDN.
+	DefaultAIEditorExtensionsPattern = "**/**vsassets.io/**"
 	// DefaultSignedURLTTL is what a read gives signedUrlTtl when it was
 	// never set (Full), the default of 7.161.26's RepositoryConfigurationBase
 	// and RepoBaseDescriptor.
@@ -162,7 +167,22 @@ func remoteDefaults(c *Config) {
 	setBool(&c.BypassHeadRequests, false)
 	setFlex(&c.ListRemoteFolderItems, false)
 	setBool(&c.DisableURLNormalization, false)
-	setBool(&c.ExternalDependenciesEnabled, false)
+	setBool(&c.ExternalDependenciesEnabled, c.PackageType == AIEditorExtensions)
+	if c.PackageType == AIEditorExtensions {
+		// 7.161.26's RemoteDefaultPackageConfigSetter gives this type
+		// external dependencies on, with the vsassets.io pattern, since the
+		// Marketplace serves each extension's files from its CDN rather
+		// than the gallery host. A value the client sends wins. The pattern
+		// is filled whether or not they are on, and in place of an empty
+		// list, as the Terraform provider (12.11.14) finds 7.x does.
+		if len(c.ExternalDependenciesPatterns) == 0 {
+			c.ExternalDependenciesPatterns = []string{DefaultAIEditorExtensionsPattern}
+		}
+		// 7.161.26's PackageRepoConfigChangeInterceptor turns it on at every
+		// create and update of this type, whatever was sent; an update that
+		// turns it off is refused first (ValidateBypassHead).
+		c.BypassHeadRequests = new(true)
+	}
 	// As for a local repository (localDefaults); every remote sample read
 	// of the Terraform provider gives true.
 	setFlex(&c.BlockPushingSchema1, true)

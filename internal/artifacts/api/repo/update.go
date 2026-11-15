@@ -95,3 +95,31 @@ func ValidateUpdate(stored, updated *Config) error {
 	}
 	return nil
 }
+
+// BypassHeadError is an update that turns bypassHeadRequests off on an AI
+// Editor Extensions remote that has it on. It unwraps to ErrInvalid.
+type BypassHeadError struct{ Key string }
+
+// Error is 7.161.26's own message for the change, which its
+// PackageRepoConfigChangeInterceptor throws as an IllegalArgumentException;
+// the text is the message of the 400 response a refused update gets.
+func (e BypassHeadError) Error() string {
+	return "Changing 'bypass Head Requests' is not allowed for VS Code remote repository: " + e.Key
+}
+
+// Unwrap lets errors.Is(err, ErrInvalid) work.
+func (BypassHeadError) Unwrap() error { return ErrInvalid }
+
+// ValidateBypassHead checks updated, the configuration an update of stored
+// leaves once merged but before Defaults, which turns bypassHeadRequests
+// back on for this type whatever the update sent. As 7.161.26's interceptor
+// does, it refuses only a change from on to off; an update that leaves the
+// field out, resets it with null or repeats true passes.
+func ValidateBypassHead(stored, updated *Config) error {
+	if stored.Class != Remote || stored.PackageType != AIEditorExtensions ||
+		!isOn(stored.BypassHeadRequests) || updated.BypassHeadRequests == nil ||
+		*updated.BypassHeadRequests {
+		return nil
+	}
+	return BypassHeadError{Key: stored.Key}
+}

@@ -26536,7 +26536,7 @@ components:
           description: Optional within this object. Upstream Bower registry URL. Defaults to https://registry.bower.io on a bower repository. Stored only; Bower is not served.
           type: string
         bypassHeadRequests:
-          description: Optional within this object. When true the server skips the HEAD probe before fetching and issues GET directly. Defaults to false.
+          description: Optional within this object. When true the server skips the HEAD probe before fetching and issues GET directly. Defaults to false. Always true on an aieditorextensions repository, whatever is sent; an update that turns it from true to false is refused with 400.
           type: boolean
         cargoAnonymousAccess:
           description: Optional within this object. When true anonymous Cargo clients may download and search crates in a cargo repository. Native sparse reads still require the repository's permission grants. The v1 read gives false when unset, and for a repository of another type whatever was sent.
@@ -26701,10 +26701,10 @@ components:
           description: Optional within this object. Comma-separated Ant-style patterns; matching paths are rejected on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
           type: string
         externalDependenciesEnabled:
-          description: Optional within this object. When true the server follows references to other hosts that package metadata points at, limited by externalDependenciesPatterns. Defaults to false.
+          description: Optional within this object. When true the server follows references to other hosts that package metadata points at, limited by externalDependenciesPatterns. Defaults to true on an aieditorextensions repository, which fetches extension files from the Marketplace's vsassets.io CDN, and to false otherwise.
           type: boolean
         externalDependenciesPatterns:
-          description: Optional within this object. Allow-list of URL patterns for external dependencies, for example **/github.com/**.
+          description: Optional within this object. Allow-list of URL patterns for external dependencies, for example **/github.com/**. An aieditorextensions repository created without patterns, or with an empty list, gets **/**vsassets.io/**.
           items:
             description: Optional within this object. A URL pattern such as **/github.com/**.
             type: string

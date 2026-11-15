@@ -211,9 +211,11 @@ func projectEnvironment(projectKey, name string) string {
 // Artifactory's rules: a field present replaces the stored value, a field
 // left out keeps it, and null resets it to its default. The key, class and
 // package type cannot change, nor can a field the package type takes only
-// when the repository is created (repo.ValidateUpdate). A key that differs from the stored one only in
-// case is a change too: the store finds a repository by its exact key, so
-// accepting the respelling would fail the write after validation (#472).
+// when the repository is created (repo.ValidateUpdate), nor can an AI Editor
+// Extensions remote turn bypassHeadRequests off (repo.ValidateBypassHead).
+// A key that differs from the stored one only in case is a change too: the
+// store finds a repository by its exact key, so accepting the respelling
+// would fail the write after validation (#472).
 //
 // A class or package type that differs only in case names the stored one,
 // which keeps its spelling (#492): 6.20 reads a package type without regard
@@ -272,6 +274,10 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 		return stored, badRequestf("Invalid repository configuration: %s", err.Error())
 	}
 	repo.RestoreSecrets(stored, &out)
+	// Before Defaults, which turns the field back on whatever was sent.
+	if err := repo.ValidateBypassHead(&stored, &out); err != nil {
+		return stored, badRequestf("%s", err.Error())
+	}
 	repo.Defaults(&out)
 	// An update cannot choose a key, so the key rules would only refuse
 	// names the server took for itself, such as artifactory-build-info.

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1690,4 +1691,102 @@ func TestAccV2ReadFollowsTheAnnotations(t *testing.T) {
 	if got := slices.Sorted(maps.Keys(listed["generic-local"])); !slices.Equal(sample, got) {
 		t.Errorf("configurations generic-local\n got %v\nwant %v", got, sample)
 	}
+}
+
+// An AI Editor Extensions remote created without the external dependency
+// fields reads them on, with the vsassets.io pattern, in the v1 and v2
+// reads, the configurations list and the shared configuration, as 7.161.26's
+// RemoteDefaultPackageConfigSetter gives them; its bypassHeadRequests reads
+// true, as PackageRepoConfigChangeInterceptor sets it. An update that leaves
+// the fields out keeps them, null resets them, and turning bypassHeadRequests
+// off is refused in 7.x's words. A Swift remote keeps external dependencies
+// off: the setter has no case for it (#1511).
+func TestAccAIEditorExtensionsRemoteExternalDependencyDefaults(t *testing.T) {
+	w := newRepoWorld(t)
+	const p = "/artifactory/api/repositories/"
+	for key, body := range map[string]string{
+		"vscode": `{"rclass":"remote","packageType":"aieditorextensions",` +
+			`"url":"https://marketplace.visualstudio.com/_apis/public/gallery","shareConfiguration":true}`,
+		"vscode-off": `{"rclass":"remote","packageType":"aieditorextensions",` +
+			`"url":"https://marketplace.visualstudio.com/_apis/public/gallery",` +
+			`"externalDependenciesEnabled":false,"bypassHeadRequests":false}`,
+		"swift": `{"rclass":"remote","packageType":"swift","url":"https://github.com",` +
+			`"shareConfiguration":true}`,
+	} {
+		if rec := w.do("PUT", p+key, "admin", body); rec.Code != http.StatusOK {
+			t.Fatalf("create %s: %d %s", key, rec.Code, rec.Body)
+		}
+	}
+	var groups map[string][]map[string]any
+	jsonBody(t, w.do("GET", p+"configurations", "admin", "", "Accept", mediaConfigs), &groups)
+	listed := map[string]map[string]any{}
+	for _, e := range groups["REMOTE"] {
+		listed[e["key"].(string)] = e
+	}
+	vsassets := []any{"**/**vsassets.io/**"}
+	check := func(key string, enabled bool, patterns []any, bypass bool) {
+		t.Helper()
+		for _, read := range []string{p, "/artifactory/api/v2/repositories/", "configurations"} {
+			var doc map[string]any
+			if read == "configurations" {
+				doc = listed[key]
+			} else {
+				jsonBody(t, w.do("GET", read+key, "admin", ""), &doc)
+			}
+			got, _ := doc["externalDependenciesPatterns"].([]any)
+			if doc["externalDependenciesEnabled"] != enabled || !slices.Equal(got, patterns) ||
+				doc["bypassHeadRequests"] != bypass {
+				t.Errorf(
+					"%s %s: externalDependenciesEnabled %v, patterns %v, bypassHeadRequests %v",
+					read,
+					key,
+					doc["externalDependenciesEnabled"],
+					doc["externalDependenciesPatterns"],
+					doc["bypassHeadRequests"],
+				)
+			}
+		}
+	}
+	check("vscode", true, vsassets, true)
+	check("vscode-off", false, vsassets, true)
+	check("swift", false, nil, false)
+	for key, want := range map[string]string{
+		"vscode": `{"enabled":true,"pattern":["**/**vsassets.io/**"]}`,
+		"swift":  `{"enabled":false}`,
+	} {
+		var shared map[string]json.RawMessage
+		jsonBody(t, w.do("GET", p+key+"/configuration", "reader", ""), &shared)
+		if string(shared["externalDependencies"]) != want ||
+			string(shared["bypassHeadRequests"]) != strconv.FormatBool(key == "vscode") {
+			t.Errorf("shared %s: externalDependencies %s, bypassHeadRequests %s", key,
+				shared["externalDependencies"], shared["bypassHeadRequests"])
+		}
+	}
+
+	for _, body := range []string{
+		`{"description":"left out"}`,
+		`{"externalDependenciesEnabled":false,"externalDependenciesPatterns":["**/cdn.example/**"]}`,
+		`{"externalDependenciesEnabled":null,"externalDependenciesPatterns":null,"bypassHeadRequests":null}`,
+		`{"bypassHeadRequests":true}`,
+	} {
+		if rec := w.do("POST", p+"vscode", "admin", body); rec.Code != http.StatusOK {
+			t.Fatalf("update %s: %d %s", body, rec.Code, rec.Body)
+		}
+		jsonBody(t, w.do("GET", p+"configurations", "admin", "", "Accept", mediaConfigs), &groups)
+		for _, e := range groups["REMOTE"] {
+			listed[e["key"].(string)] = e
+		}
+		if strings.Contains(body, "cdn.example") {
+			check("vscode", false, []any{"**/cdn.example/**"}, true)
+		} else {
+			check("vscode", true, vsassets, true)
+		}
+	}
+	rec := w.do("POST", p+"vscode", "admin", `{"bypassHeadRequests":false}`)
+	if rec.Code != http.StatusBadRequest ||
+		strings.TrimSpace(rec.Body.String()) != `{"errors":[{"message":`+
+			`"Changing 'bypass Head Requests' is not allowed for VS Code remote repository: vscode","status":400}]}` {
+		t.Fatalf("bypassHeadRequests off: %d %s", rec.Code, rec.Body)
+	}
+	check("vscode", true, vsassets, true)
 }

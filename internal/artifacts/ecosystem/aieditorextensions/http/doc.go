@@ -54,11 +54,14 @@
 //   - An upstream gallery answer is taken only when it validates, within
 //     8 MiB of JSON: each extension's publisher, name, version, asset types
 //     and asset origins. An asset is fetched only when the gallery lists
-//     its version and type, from an approved origin; the VSIX must match
-//     the gallery's SHA-256 claim and the signature's package digest the
-//     same claim, and both ZIPs are bounded (512 MiB and 1 MiB). Of the
-//     asset types the format names, only these three are served (404 for
-//     the others); any other is refused (400).
+//     its version and type, from an approved origin; from any origin but
+//     the remote's own, such as the Marketplace's CDN, only while the
+//     remote's externalDependenciesEnabled is on and one of its
+//     externalDependenciesPatterns matches the URL (502 otherwise). The
+//     VSIX must match the gallery's SHA-256 claim and the signature's
+//     package digest the same claim, and both ZIPs are bounded (512 MiB and
+//     1 MiB). Of the asset types the format names, only these three are
+//     served (404 for the others); any other is refused (400).
 //   - Caller headers and credentials are never sent upstream.
 //   - Statuses and error texts stay byte-identical.
 //
@@ -102,6 +105,9 @@
 //     upstream metadata.
 //   - query_test.go: the query grammar, cache separation and the asset
 //     query whitelist.
+//   - external_test.go (external): a Marketplace remote's CDN assets under
+//     its external dependency settings, over TLS with both hosts resolved
+//     to the test server, and same-origin assets with them off.
 //   - validate_test.go: the asset validators, the ZIP path grammar,
 //     streamed and malformed signatures, and the asset type and origin
 //     grammar.

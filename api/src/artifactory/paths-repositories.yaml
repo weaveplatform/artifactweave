@@ -1184,7 +1184,8 @@ components:
           type: string
         bypassHeadRequests:
           description: Optional within this object. When true the server skips the HEAD probe before fetching and
-            issues GET directly. Defaults to false.
+            issues GET directly. Defaults to false. Always true on an aieditorextensions repository, whatever is
+            sent; an update that turns it from true to false is refused with 400.
           type: boolean
         cargoAnonymousAccess:
           description: Optional within this object. When true anonymous Cargo clients may download and search crates
@@ -1453,11 +1454,14 @@ components:
           type: string
         externalDependenciesEnabled:
           description: Optional within this object. When true the server follows references to other hosts that
-            package metadata points at, limited by externalDependenciesPatterns. Defaults to false.
+            package metadata points at, limited by externalDependenciesPatterns. Defaults to true on an
+            aieditorextensions repository, which fetches extension files from the Marketplace's vsassets.io CDN, and
+            to false otherwise.
           type: boolean
         externalDependenciesPatterns:
           description: Optional within this object. Allow-list of URL patterns for external dependencies, for example
-            **/github.com/**.
+            **/github.com/**. An aieditorextensions repository created without patterns, or with an empty list, gets
+            **/**vsassets.io/**.
           items:
             description: Optional within this object. A URL pattern such as **/github.com/**.
             type: string
