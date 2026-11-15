@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/internal/platform/cdn"
 	"github.com/weaveplatform/artifactweave/internal/platform/cdn/cdntest"
@@ -75,9 +74,9 @@ func TestUnitCloudCDNSignsTheOverridesAndStripsThePathPrefix(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "https://cdn.example.com/sha256/ab/abcdef?response-content-disposition=" +
-		"attachment%3B%20filename%3D%22big.bin%22%3B%20filename%2A%3DUTF-8%27%27big.bin" +
+		"attachment%3Bfilename%3D%22big.bin%22" +
 		"&response-content-type=application%2Foctet-stream" +
-		"&Expires=1767225600&KeyName=artifactweave-1&Signature=nUxXqxDlqRr0mBnQaRiqObXzwtM="
+		"&Expires=1767225600&KeyName=artifactweave-1&Signature=oQCkZVU5qz0XbIV0GBuCqDg5EnI="
 	if got != want {
 		t.Fatalf("Sign\n got  %s\n want %s", got, want)
 	}
@@ -121,9 +120,23 @@ func TestAccCloudCDNURLsPassTheEdge(t *testing.T) {
 	if resp.StatusCode != http.StatusPartialContent || !bytes.Equal(got, body[10:20]) {
 		t.Fatalf("signed ranged GET: %d %q", resp.StatusCode, got)
 	}
-	if resp.Header.Get("Content-Disposition") != blob.Disposition("lib 1.0+beta.tgz") ||
+	if resp.Header.Get("Content-Disposition") != `attachment;filename="lib 1.0+beta.tgz"` ||
 		resp.Header.Get("Content-Type") != "application/gzip" {
 		t.Fatalf("overrides: %v", resp.Header)
+	}
+	// A name outside printable ASCII is asked for by filename* alone, so
+	// the override the edge forwards stays ASCII (issue 1577) [I].
+	wide, err := s.Sign("art/sha256/"+sha[:2]+"/"+sha, cdn.Request{
+		TTL: time.Minute, Filename: "naïve 1.0.tgz",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp, _ := get(t, wide, nil); resp.StatusCode != http.StatusOK ||
+		resp.Header.Get(
+			"Content-Disposition",
+		) != "attachment;filename*=UTF-8''na%C3%AFve%201.0.tgz" {
+		t.Fatalf("non-ASCII override: %d %v", resp.StatusCode, resp.Header)
 	}
 	refused := map[string]string{
 		"unsigned":         strings.SplitN(u, "?", 2)[0],

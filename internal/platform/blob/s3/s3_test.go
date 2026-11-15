@@ -494,7 +494,7 @@ func TestUnitDeleteWalkPresignErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if q := u.Query(); q.Get("response-content-disposition") != blob.Disposition("a b.tgz") ||
+	if q := u.Query(); q.Get("response-content-disposition") != `attachment;filename="a b.tgz"` ||
 		q.Get("response-content-type") != "application/x-gzip" || q.Get("expires") != "1m0s" {
 		t.Fatalf("overrides and expiry: %v", q)
 	}

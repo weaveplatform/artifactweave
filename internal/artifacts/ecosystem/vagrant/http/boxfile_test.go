@@ -105,12 +105,14 @@ func TestAccBoxFileRouteServesTheStoredBox(t *testing.T) {
 
 			sha1sum, sha256sum, md5sum := sha1.Sum(body), sha256.Sum256(body), md5.Sum(body)
 			headers := map[string]string{
-				"Content-Length":         strconv.Itoa(len(body)),
-				"Accept-Ranges":          "bytes",
-				"X-Checksum-Sha1":        hex.EncodeToString(sha1sum[:]),
-				"X-Checksum-Sha256":      hex.EncodeToString(sha256sum[:]),
-				"X-Checksum-Md5":         hex.EncodeToString(md5sum[:]),
-				"X-Artifactory-Filename": "release one.box",
+				"Content-Length":    strconv.Itoa(len(body)),
+				"Accept-Ranges":     "bytes",
+				"X-Checksum-Sha1":   hex.EncodeToString(sha1sum[:]),
+				"X-Checksum-Sha256": hex.EncodeToString(sha256sum[:]),
+				"X-Checksum-Md5":    hex.EncodeToString(md5sum[:]),
+				// Query-encoded, as 7.161.26's JerseyArtifactoryResponse
+				// writes it (BasicHttpUtils.encodeQuery, #1578).
+				"X-Artifactory-Filename": "release%20one.box",
 				// The quoted name alone, its space as it is, as 7.37.15's
 				// box file route named a box (RTFACT-27264, #1505).
 				"Content-Disposition": `attachment; filename="release one.box"`,

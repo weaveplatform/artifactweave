@@ -135,9 +135,17 @@ A sidecar answers as 7.x's download answers a checksum on every repository class
 - `If-Match` and `If-Unmodified-Since` are never read;
 - a HEAD answers 200 with the checksum's type and length and the file's headers, whatever
   `Range` it sends;
+- the file's headers name it as its file's download does: `X-Artifactory-Filename`
+  query-encoded, and the item route's `Content-Disposition` by the flag of the repository that
+  holds the file, none where it allows content browsing ([#1578](https://github.com/weaveplatform/artifactweave/issues/1578),
+  [#1579](https://github.com/weaveplatform/artifactweave/issues/1579), decision
+  [0032](0032-package-format-handlers.md));
 - a GET sends the checksum alone, dated the time of the response, and applies `Range`
   whatever `If-Range` says, with a 416 that has no body ([#1436](https://github.com/weaveplatform/artifactweave/issues/1436),
-  [#1362](https://github.com/weaveplatform/artifactweave/issues/1362)).
+  [#1362](https://github.com/weaveplatform/artifactweave/issues/1362)); a browser's GET of
+  a `.sha1` or `.md5` from a repository that allows content browsing is `text/plain` with
+  `Content-Security-Policy: sandbox`, by the flag of the repository the request names, as
+  `sendBodyResponseForChecksum` reads it (**[S]** 7.161.26).
 
 The file itself answers `If-None-Match` and `If-Modified-Since` as its sidecar does, local,
 virtual, redirected or remote, from the cache or the upstream's stream: one `If-None-Match`

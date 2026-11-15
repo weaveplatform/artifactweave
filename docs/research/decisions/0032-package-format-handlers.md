@@ -308,6 +308,38 @@ PyPI, NuGet, Helm and Terraform) mount through one kit,
     (#216). The item route keeps `filename*` on the same file. The other formats' native
     downloads keep the form they had, the item route's or their own, until a source shows theirs
     [I].
+  - **File name encoding** (amended 2026-11-15,
+    [#1578](https://github.com/weaveplatform/artifactweave/issues/1578)). Every download that
+    names its file, on the item route, a native download, a checksum's HEAD and 304 and the
+    Docker registry, sends `X-Artifactory-Filename` query-encoded, as 7.161.26's
+    `HttpArtifactoryResponse`, `JerseyArtifactoryResponse` and `DockerManifestResponse` write it
+    (`BasicHttpUtils.encodeQuery`): letters, digits, `-_.!~*'()` and `;/?:@&=+$,` stay, and a
+    space, `"`, `%` and each byte outside ASCII become `%XX` in upper-case hex. The item route
+    writes its `filename*` the same way, `@` raw as 7.17.11 sent it (RTFACT-25859), and its
+    quoted part as the name is. A name outside printable ASCII is named on the item route too by
+    `filename*` alone, every byte but RFC 3986's unreserved characters encoded, as
+    `setHeaderForNonAscii` names it on a GET and a HEAD, and on a 304 the same [I] (#216).
+  - **Content browsing** (amended 2026-11-15,
+    [#1579](https://github.com/weaveplatform/artifactweave/issues/1579)). A local, federated or
+    remote repository that allows content browsing (`archiveBrowsingEnabled`, "Allow Artifact
+    Content Browsing") sends no `Content-Disposition` on a GET, HEAD, 206 or 304 of a file, on
+    the item route, a native download, a checksum's HEAD and 304 and the Docker registry, and
+    names a file outside printable ASCII `inline; filename*=UTF-8''<name>` on a GET and a HEAD.
+    7.161.26's `RequestResponseHelper.setBasicHeaders` sends the attachment only when
+    `contentBrowsingDisabled` holds for the response's repository, and `setHeaderForNonAscii`
+    names such a file inline there. A virtual repository never allows it, whatever its flag: a
+    download through one follows the member that holds the file. A remote's cache reads the
+    remote's flag (`LocalCacheRepoDescriptor.isArchiveBrowsingEnabled`). A protocol that sends
+    its own form (JetBrains plugins, Swift) keeps it. A browser's GET with a body from such a
+    repository, a `User-Agent` starting `Mozilla` and naming one of `webkit`, `blink`,
+    `edgehtml`, `trident`, `gecko`, `flow` and `goanna`, gets `Content-Security-Policy: sandbox`,
+    and a `.pom` `application/xml` and a `.md`, `.md5` or `.sha1` `text/plain`
+    (`getModifiedMimeType`, `BrowserRequestHelper.getMimeType`, RTFACT-8743; JFrog closed
+    RTFACT-26502 on 7.41.13 naming the sandbox as intended). It is set before the range is read,
+    so a 416 keeps the policy, and never on a HEAD, a 304 or a redirect. A checksum's GET reads
+    the requested repository's flag, so through a virtual repository it gets neither. The
+    properties that tune these answers are not offered (DV-202). A Docker repository follows the
+    same rule, which no capture shows [I] (#216).
 - A deploy helper with the item routes' matrix and checksum parsing exported, answering 201
   with the `X-Checksum-Sha1`, `-Sha256` and `-Md5` headers.
 - Raw-path parsing for encoded slashes (`@scope%2fname`).
@@ -356,6 +388,12 @@ Artifactory 6.20's source elsewhere, with two departures:
   engine (decision [0012](0012-search-and-aql.md)), so they hide what AQL hides; Artifactory's
   search APIs filter their results apart from AQL and exempt a caller who may annotate
   (DV-058).
+
+**Fixed download properties.** 7.x lets an administrator drop the file's name from
+`Content-Disposition`, change the sandbox policy a browser gets from a repository that allows
+content browsing, and change the engines that make a `User-Agent` a browser, through system
+properties. artifactweave has none and answers with their defaults, which is what a client of
+a default 7.x sees (DV-202).
 
 **No token in a Vagrant URL.** Artifactory takes a token from a Vagrant URL's
 `access_token` query, where Vagrant 2.2.10 and earlier sent it. The box file route takes

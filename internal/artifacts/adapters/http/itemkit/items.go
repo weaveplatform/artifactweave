@@ -28,7 +28,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
-	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
@@ -587,7 +586,7 @@ func (s *Kit) getSidecar(
 			"Checksum not found for "+f.Item.FullPath()))
 		return
 	}
-	serveChecksum(w, r, p, value, f.Item.Actual, f.Item.Modified)
+	serveChecksum(w, r, f.Repo, c, p, value, f.Item.Actual, f.Item.Modified)
 }
 
 // contentTypeProperty is the property whose first value, when not blank,
@@ -635,10 +634,11 @@ func checksumType(r *http.Request, name string) string {
 // the JFrog CLI reads (Content-Length, Accept-Ranges and the X-Checksum
 // headers); ranges on a GET and conditional requests are
 // http.ServeContent's, less the two Artifactory's download never evaluates
-// (withoutUnevaluatedPreconditions). A Content-Disposition already in w's
-// headers is kept, so a protocol can send its own form. The Docker
-// registry's blobs and the native APIs that keep the path's type serve
-// their files with it (ProtocolOptions, #1396).
+// (withoutUnevaluatedPreconditions). The file is named as the item route
+// names it (ItemDisposition, FileDisposition); a Content-Disposition
+// already in w's headers is kept, so a protocol can send its own form. The
+// Docker registry's blobs and the native APIs that keep the path's type
+// serve their files with it (ProtocolOptions, #1396).
 func (s *Kit) ServeFile(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -646,7 +646,7 @@ func (s *Kit) ServeFile(
 	f Found,
 	p kernel.Principal,
 ) {
-	s.serveFile(w, r, st, f, p, f.Item.MimeType, blob.Disposition(f.Item.Name))
+	s.serveFile(w, r, st, f, p, f.Item.MimeType, ItemDisposition)
 }
 
 // ServeItemFile is ServeFile for a download on the item route,
@@ -664,7 +664,7 @@ func (s *Kit) ServeItemFile(
 	f Found,
 	p kernel.Principal,
 ) {
-	s.serveTypedFile(w, r, st, f, p, blob.Disposition(f.Item.Name))
+	s.serveTypedFile(w, r, st, f, p, ItemDisposition)
 }
 
 // ServePackageFile is ServeItemFile for a native API whose 7.x downloads
@@ -682,31 +682,31 @@ func (s *Kit) ServePackageFile(
 	f Found,
 	p kernel.Principal,
 ) {
-	s.serveTypedFile(w, r, st, f, p, PackageDisposition(f.Item.Name))
+	s.serveTypedFile(w, r, st, f, p, PackageDisposition)
 }
 
+// serveTypedFile is serveFile typed by fileContentType, naming the file
+// with form where its repository wants a Content-Disposition
+// (FileDisposition).
 func (s *Kit) serveTypedFile(
 	w http.ResponseWriter,
 	r *http.Request,
 	st Store,
 	f Found,
 	p kernel.Principal,
-	disposition string,
+	form func(string) string,
 ) {
 	contentType, err := fileContentType(r.Context(), st, f.Item)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "item properties", err))
 		return
 	}
-	s.serveFile(w, r, st, f, p, contentType, disposition)
+	s.serveFile(w, r, st, f, p, contentType, form)
 }
 
-// packageNameEscaper escapes the two characters a quoted-string cannot
-// hold bare (RFC 9110 section 5.6.4).
-var packageNameEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
-
 // PackageDisposition is the Content-Disposition 7.x's package download
-// service names a file with. JerseyArtifactoryResponse writes
+// service names a file with on a repository that does not allow content
+// browsing (FileDisposition). JerseyArtifactoryResponse writes
 // attachment; filename="<name>" with the name as it is and no filename*
 // part (7.161.26). A space stays a space: on 7.59.9 a download's saved
 // name had %20 for it, which JFrog took as a fault and fixed
@@ -723,34 +723,10 @@ var packageNameEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
 // this sends filename* there too, as no source shows what a client reads
 // from it [I].
 func PackageDisposition(name string) string {
-	for i := range len(name) {
-		if name[i] < ' ' || name[i] > '~' {
-			return "attachment; filename*=UTF-8''" + unreservedEscape(name)
-		}
+	if !httpkit.PrintableASCII(name) {
+		return nonASCIIDisposition("attachment", name)
 	}
-	return `attachment; filename="` + packageNameEscaper.Replace(name) + `"`
-}
-
-// unreservedEscape percent-encodes every byte of s but RFC 3986's
-// unreserved characters, in upper-case hex, as Spring's UriUtils.encode
-// does for a URI component. url.PathEscape keeps sub-delimiters such as
-// '+' and '&', which UriUtils.encode encodes.
-func unreservedEscape(s string) string {
-	const hex = "0123456789ABCDEF"
-	var b strings.Builder
-	for i := range len(s) {
-		c := s[i]
-		switch {
-		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9',
-			c == '-', c == '.', c == '_', c == '~':
-			b.WriteByte(c)
-		default:
-			b.WriteByte('%')
-			b.WriteByte(hex[c>>4])
-			b.WriteByte(hex[c&15])
-		}
-	}
-	return b.String()
+	return `attachment; filename="` + httpkit.EscapeQuoted(name) + `"`
 }
 
 func (s *Kit) serveFile(
@@ -759,7 +735,8 @@ func (s *Kit) serveFile(
 	st Store,
 	f Found,
 	p kernel.Principal,
-	contentType, disposition string,
+	contentType string,
+	form func(string) string,
 ) {
 	ctx := r.Context()
 	it := f.Item
@@ -768,10 +745,13 @@ func (s *Kit) serveFile(
 	r = downloadRequest(r)
 	h := w.Header()
 	pkgroute.SetChecksums(h, it.Actual)
-	h.Set("X-Artifactory-Filename", it.Name)
+	h.Set("X-Artifactory-Filename", FilenameHeader(it.Name))
 	h.Set("Content-Type", contentType)
-	if h.Get("Content-Disposition") == "" {
-		h.Set("Content-Disposition", disposition)
+	// The repository that holds the file decides, a virtual repository's
+	// member included: 7.x reads the flag of the response's repository.
+	own := h.Get("Content-Disposition") != ""
+	if !own {
+		setDisposition(h, FileDisposition(f.Repo, it.Name, form))
 	}
 	if it.Actual.SHA1 != "" {
 		// Quoted for ServeContent's If-Range; the client receives it bare,
@@ -790,6 +770,9 @@ func (s *Kit) serveFile(
 		if !it.Modified.IsZero() {
 			h.Set("Last-Modified", it.Modified.UTC().Format(http.TimeFormat))
 		}
+		if !own {
+			setDisposition(h, notModifiedDisposition(f.Repo, it.Name, form))
+		}
 		pkgroute.WriteNotModified(w)
 		return
 	}
@@ -800,6 +783,7 @@ func (s *Kit) serveFile(
 	if s.redirect(w, r, st, f, p) {
 		return
 	}
+	browserView(h, r, f.Repo, it.Name)
 	content, _, err := s.Blobs.Open(ctx, it.Actual.SHA256)
 	if err != nil {
 		// The index names content the blob store does not hold: data loss,
@@ -1098,7 +1082,7 @@ func (s *Kit) getArchiveEntry(
 		h := sw.Header()
 		h.Set("Content-Type", item.MimeType(entry))
 		h.Set("Content-Length", strconv.FormatInt(size, 10))
-		h.Set("X-Artifactory-Filename", path.Base(entry))
+		h.Set("X-Artifactory-Filename", FilenameHeader(path.Base(entry)))
 		sw.WriteHeader(http.StatusOK)
 		if r.Method == http.MethodHead {
 			return nil

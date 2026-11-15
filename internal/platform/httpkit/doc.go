@@ -35,6 +35,9 @@
 //   - Error profiles: ProfileRule, ProfileFor, ErrorProfiles, ErrorProfile
 //     and WithProfileRules.
 //   - Writing: WriteErr, WriteJSON, EscapePath and FormatTime.
+//   - File names: EncodeQuery, EncodeUnreserved, EscapeQuoted and
+//     PrintableASCII, the encodings 7.x writes a downloaded file's name in
+//     (X-Artifactory-Filename, Content-Disposition).
 //   - Streamed lists: StreamList reads a list's first store page and
 //     returns a ListStream, whose Write sends the list page by page;
 //     ListOptions name its content type and Envelope, which ArrayEnvelope

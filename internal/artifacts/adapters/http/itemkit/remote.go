@@ -160,6 +160,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		s.serveRemoteChecksum(
 			sw,
 			r,
+			c,
 			req.Path,
 			item.ServedChecksum(c, *result.Item, item.Algorithm(sidecar)),
 			result.Item.Actual,
@@ -408,7 +409,7 @@ func (s *Kit) ServeRemoteStream(
 			checksum = strings.Repeat("0", size)
 		}
 		sw := &StatusWriter{ResponseWriter: w}
-		s.serveRemoteChecksum(sw, r, req.Path, checksum, result.Stream.Checksums,
+		s.serveRemoteChecksum(sw, r, c, req.Path, checksum, result.Stream.Checksums,
 			result.Stream.Modified)
 		if sw.Complete(r) && result.Used != nil {
 			_ = result.Used(ctx)
@@ -732,14 +733,17 @@ func RPMSourceIntegrity() error {
 	return &source.HTTPError{Status: http.StatusBadGateway, Kind: source.FailureKindIntegrity}
 }
 
-// serveRemoteChecksum serves value, a remote repository's checksum file
-// at name, of a file whose checksums are sums (empty when only the
+// serveRemoteChecksum serves value, the remote repository c's checksum
+// file at name, of a file whose checksums are sums (empty when only the
 // checksum is known) and which last changed at modified, as a local one is
 // served (serveChecksum): 7.x answers both through the same
-// DownloadServiceImpl.respond.
+// DownloadServiceImpl.respond. c is the repository the request named and
+// the one whose cache holds the file, which reads c's content browsing
+// flag (LocalCacheRepoDescriptor.isArchiveBrowsingEnabled).
 func (s *Kit) serveRemoteChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
+	c repo.Config,
 	name, value string,
 	sums kernel.Checksums,
 	modified time.Time,
@@ -748,7 +752,7 @@ func (s *Kit) serveRemoteChecksum(
 		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	serveChecksum(w, r, name, value, sums, modified)
+	serveChecksum(w, r, c, c, name, value, sums, modified)
 }
 
 // serveInfoChecksum answers the checksum request at req.Path for the file
@@ -811,7 +815,7 @@ func (s *Kit) serveInfoChecksum(
 		)
 		return
 	}
-	s.serveRemoteChecksum(w, r, req.Path, value, result.Stream.Checksums, result.Stream.Modified)
+	s.serveRemoteChecksum(w, r, c, req.Path, value, result.Stream.Checksums, result.Stream.Modified)
 }
 
 // upstreamChecksumRequest is the read of the checksum file the upstream

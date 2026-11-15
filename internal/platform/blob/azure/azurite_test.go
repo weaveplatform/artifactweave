@@ -124,7 +124,7 @@ func frontDoorOnAzurite(t *testing.T, az containertest.AzuriteEndpoint) {
 	}
 	resp, got := fetch(t, signed, "")
 	if resp.StatusCode != http.StatusOK || !bytes.Equal(got, body) ||
-		resp.Header.Get("Content-Disposition") != blob.Disposition("fd file.bin") ||
+		resp.Header.Get("Content-Disposition") != `attachment;filename="fd file.bin"` ||
 		resp.Header.Get("Content-Type") != "text/plain" ||
 		resp.Header.Get("Cache-Control") != "public, max-age=300" {
 		t.Fatalf("GET through the edge = %d %v", resp.StatusCode, resp.Header)

@@ -132,6 +132,17 @@ check, `BEFORE_DOWNLOAD` workers ([0026](0026-workers-runtime.md)) and archived 
 - The signed URL carries the item's name and media type as response overrides:
   `response-content-disposition` and `response-content-type` on S3 and GCS, `rscd` and
   `rsct` on Azure.
+- The name override is `attachment;filename="<name>"` on every backend and the CDN, with no
+  space after the semicolon and no `filename*` part, the name as it is (amended 2026-11-15,
+  [#1577](https://github.com/weaveplatform/artifactweave/issues/1577)). Every 7.x signed URL
+  in a capture asks for that form: CloudFront on 7.4.3 (RTFACT-23307) and in 2021
+  (sbt/sbt#6614), S3 in 2020 (RTFACT-24153) and on 7.71.1 (adoptium/adoptium-support#923); a
+  store answered a `+` in the name raw (adoptium/installer#766). The signer is not in 7.x's OSS
+  sources and no capture shows a name outside printable ASCII or holding a quote: such a name
+  is asked for by `attachment;filename*=UTF-8''<name>` alone, every byte but RFC 3986's
+  unreserved characters percent-encoded, as a streamed download names it, and a quote or a
+  backslash is escaped as a quoted pair [I] (#216). A streamed download keeps its own form
+  (decision [0032](0032-package-format-handlers.md)).
 - A redirected download is counted under the same rule as a streamed one: a whole file, or
   a range starting at byte 0, unless `skipUpdateStats=true`.
 

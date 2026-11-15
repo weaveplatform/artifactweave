@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
@@ -330,7 +332,8 @@ func TestUnitServeChecksum(t *testing.T) {
 			r.Header.Set(headers[i], headers[i+1])
 		}
 		rec := httptest.NewRecorder()
-		serveChecksum(rec, r, "dir/a.bin.sha1", sha, file, at)
+		libs := repo.Config{Key: "libs-local", Class: repo.Local}
+		serveChecksum(rec, r, libs, libs, "dir/a.bin.sha1", sha, file, at)
 		return rec
 	}
 	fileHeaders := map[string]string{
@@ -470,5 +473,142 @@ func TestUnitEcosystemHandlersServeThroughServeContent(t *testing.T) {
 	}
 	for _, rel := range found {
 		t.Errorf("%s calls %s; serve through itemkit.ServeContent", rel, directServeContent)
+	}
+}
+
+// A browser is a User-Agent that starts with "mozilla" and names one of
+// 7.161.26's default engines, in any case; a client that names neither is
+// not one (BrowserRequestHelper.isBrowserUserAgent).
+func TestUnitBrowserAgentMatchesSevenXEngines(t *testing.T) {
+	for agent, want := range map[string]bool{
+		"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0": true,
+		"Mozilla/5.0 (Windows NT 10.0; rv:121.0) Gecko/20100101 Firefox/121.0":                true,
+		"MOZILLA/4.0 (compatible; MSIE 7.0; Trident/4.0)":                                     true,
+		"Mozilla/5.0 (compatible)":                                                            false,
+		"JFrog-Cli/2.70.0":                                                                    false,
+		"curl/8.4.0 AppleWebKit":                                                              false,
+		"":                                                                                    false,
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.Header.Set("User-Agent", agent)
+		if got := browserAgent(r); got != want {
+			t.Errorf("browserAgent(%q) = %t, want %t", agent, got, want)
+		}
+	}
+}
+
+// A browser's GET of a file on a repository that allows content browsing
+// gets the sandbox policy and, for a .pom, .md, .md5 or .sha1, a type it
+// shows as text (getModifiedMimeType, RTFACT-8743); a HEAD, a client that
+// is not a browser and a repository that does not allow browsing get
+// neither (#1579).
+func TestUnitBrowserViewSandboxesBrowsableFiles(t *testing.T) {
+	on := true
+	browsing := repo.Config{Class: repo.Local, ArchiveBrowsingEnabled: &on}
+	const browser = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)"
+	for _, c := range []struct {
+		method, agent, name string
+		config              repo.Config
+		csp, contentType    string
+	}{
+		{http.MethodGet, browser, "lib.pom", browsing, "sandbox", "application/xml"},
+		{http.MethodGet, browser, "README.md", browsing, "sandbox", "text/plain"},
+		{http.MethodGet, browser, "a.jar.md5", browsing, "sandbox", "text/plain"},
+		{http.MethodGet, browser, "a.jar.sha1", browsing, "sandbox", "text/plain"},
+		{http.MethodGet, browser, "a.jar.sha256", browsing, "sandbox", "kept/type"},
+		{http.MethodGet, browser, "page.html", browsing, "sandbox", "kept/type"},
+		{http.MethodHead, browser, "lib.pom", browsing, "", "kept/type"},
+		{http.MethodGet, "Apache-Maven/3.9.6", "lib.pom", browsing, "", "kept/type"},
+		{http.MethodGet, browser, "lib.pom", repo.Config{Class: repo.Local}, "", "kept/type"},
+	} {
+		r := httptest.NewRequest(c.method, "/", nil)
+		r.Header.Set("User-Agent", c.agent)
+		h := http.Header{"Content-Type": {"kept/type"}}
+		browserView(h, r, c.config, c.name)
+		if h.Get("Content-Security-Policy") != c.csp || h.Get("Content-Type") != c.contentType {
+			t.Errorf("%s %q by %q: %v", c.method, c.name, c.agent, h)
+		}
+	}
+}
+
+// On a repository that allows content browsing a checksum's 304 and HEAD
+// name its file with no Content-Disposition, by the file's repository, and
+// a browser's GET of it is sandboxed and typed as text by the requested
+// repository, a 416 included; through a virtual repository the GET gets
+// neither (sendBodyResponseForChecksum asks with the requested key).
+func TestUnitServeChecksumOnBrowsableRepository(t *testing.T) {
+	on := true
+	member := repo.Config{Key: "libs-local", Class: repo.Local, ArchiveBrowsingEnabled: &on}
+	virtual := repo.Config{Key: "libs", Class: repo.Virtual, Repositories: []string{"libs-local"}}
+	sha := strings.Repeat("a", 40)
+	sums := kernel.Checksums{SHA1: sha}
+	modified := time.Unix(1700000000, 0).UTC()
+	const browser = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)"
+	serve := func(method string, requested repo.Config, name string, headers ...string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, "/"+requested.Key+"/"+url.PathEscape(name), nil)
+		for i := 0; i+1 < len(headers); i += 2 {
+			r.Header.Set(headers[i], headers[i+1])
+		}
+		rec := httptest.NewRecorder()
+		serveChecksum(rec, r, member, requested, name, sha, sums, modified)
+		return rec
+	}
+	for _, c := range []struct {
+		label       string
+		rec         *httptest.ResponseRecorder
+		status      int
+		disposition string
+		filename    string
+	}{
+		{"304", serve(http.MethodGet, member, "d/a b.bin.sha1", "If-None-Match", sha), 304, "", "a%20b.bin"},
+		{"HEAD", serve(http.MethodHead, member, "d/a b.bin.sha1"), 200, "", "a%20b.bin"},
+		{
+			"HEAD non-ASCII", serve(http.MethodHead, member, "d/naïve.bin.sha1"), 200,
+			"inline; filename*=UTF-8''na%C3%AFve.bin", "na%C3%AFve.bin",
+		},
+		{
+			"304 non-ASCII", serve(http.MethodGet, member, "d/naïve.bin.sha1", "If-None-Match", sha), 304,
+			"", "na%C3%AFve.bin",
+		},
+	} {
+		h := c.rec.Header()
+		if c.rec.Code != c.status || h.Get("Content-Disposition") != c.disposition ||
+			h.Get("X-Artifactory-Filename") != c.filename {
+			t.Errorf("%s: %d %v", c.label, c.rec.Code, h)
+		}
+		if _, sent := h["Content-Disposition"]; sent != (c.disposition != "") {
+			t.Errorf("%s: Content-Disposition sent %t", c.label, sent)
+		}
+	}
+	for _, c := range []struct {
+		label            string
+		rec              *httptest.ResponseRecorder
+		status           int
+		csp, contentType string
+	}{
+		{"GET", serve(http.MethodGet, member, "d/a.bin.sha1", "User-Agent", browser), 200, "sandbox", "text/plain"},
+		{
+			"GET 416", serve(http.MethodGet, member, "d/a.bin.sha1", "User-Agent", browser, "Range", "bytes=900-"),
+			416, "sandbox", "text/plain",
+		},
+		{
+			"GET sha256", serve(http.MethodGet, member, "d/a.bin.sha256", "User-Agent", browser), 200,
+			"sandbox", "application/x-checksum",
+		},
+		{"GET client", serve(http.MethodGet, member, "d/a.bin.sha1"), 200, "", "application/x-checksum"},
+		{
+			"GET virtual", serve(http.MethodGet, virtual, "d/a.bin.sha1", "User-Agent", browser), 200,
+			"", "application/x-checksum",
+		},
+		{
+			"HEAD", serve(http.MethodHead, member, "d/a.bin.sha1", "User-Agent", browser), 200,
+			"", "application/x-checksum",
+		},
+	} {
+		h := c.rec.Header()
+		if c.rec.Code != c.status || h.Get("Content-Security-Policy") != c.csp ||
+			h.Get("Content-Type") != c.contentType {
+			t.Errorf("%s: %d %v", c.label, c.rec.Code, h)
+		}
 	}
 }

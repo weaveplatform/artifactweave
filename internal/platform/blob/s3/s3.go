@@ -629,7 +629,7 @@ func (s *Store) SignURL(ctx context.Context, sha string, o blob.SignOptions) (st
 	key := s.blobKey(sha)
 	in := &s3.GetObjectInput{Bucket: &s.bucket, Key: &key}
 	if o.Filename != "" {
-		in.ResponseContentDisposition = aws.String(blob.Disposition(o.Filename))
+		in.ResponseContentDisposition = aws.String(blob.SignedDisposition(o.Filename))
 	}
 	if o.ContentType != "" {
 		in.ResponseContentType = aws.String(o.ContentType)

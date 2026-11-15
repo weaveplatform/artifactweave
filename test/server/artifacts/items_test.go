@@ -1166,8 +1166,11 @@ func TestAccServeFilePreservesProtocolDisposition(t *testing.T) {
 	ordinary := httptest.NewRecorder()
 	s.ServeFile(ordinary, r, w.db, f, kernel.Principal{Name: "reader"})
 	wantStatus(t, ordinary, http.StatusOK)
-	if got := ordinary.Header().Get("Content-Disposition"); got != blob.Disposition(it.Name) {
-		t.Fatalf("default disposition %q, want %q", got, blob.Disposition(it.Name))
+	if got := ordinary.Header().
+		Get("Content-Disposition"); got != itemkit.ItemDisposition(
+		it.Name,
+	) {
+		t.Fatalf("default disposition %q, want %q", got, itemkit.ItemDisposition(it.Name))
 	}
 }
 
