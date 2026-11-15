@@ -90,7 +90,7 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 		// X-Artifactory-Docker-Registry: 7.55.8 answered a remote blob GET
 		// with the name and without that header (RTFACT-29977), as 7.71.4
 		// answered a blob GET (RTFACT-30157).
-		setFileHeaders(w.Header(), layout.BlobFile(stream.Checksums.SHA256))
+		setFileHeaders(w.Header(), q.Repo, layout.BlobFile(stream.Checksums.SHA256))
 		// A remote blob's ETag is its bare SHA-1, equal to X-Checksum-Sha1,
 		// as 7.55.8 answered a remote blob GET (RTFACT-29977) and as a
 		// local blob's GET answers through ServeFile. The stream's
@@ -103,7 +103,7 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 		// A remote manifest carries a local one's file headers. 6.11.3 sent
 		// its checksums (RTFACT-19842); no capture shows the rest of a
 		// remote one's headers [I].
-		setFileHeaders(w.Header(), manifestFileFor(stream.MediaType))
+		setFileHeaders(w.Header(), q.Repo, manifestFileFor(stream.MediaType))
 		w.Header().Set("Cache-Control", noStore)
 		// A remote manifest keeps its digest as ETag. 7.x sends a local
 		// manifest's SHA-1 (manifests.go), but no capture shows a remote

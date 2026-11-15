@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
-	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
 // dockerDisposition is the Content-Disposition 7.x's Docker API sends: the
@@ -165,7 +165,7 @@ func TestAccRegistryBlobDispositionIsTheQuotedName(t *testing.T) {
 		item := "/artifactory/" + key + "/app/_uploads/" + name
 		wantAnswer(t, "item route "+item, w.do(http.MethodGet, item, "admin", "",
 			"X-JFrog-Download-Redirect-To", "None"), answer{200, layer, map[string]string{
-			"Content-Disposition": blob.Disposition(name),
+			"Content-Disposition": itemkit.ItemDisposition(name),
 		}})
 	}
 }
@@ -390,5 +390,51 @@ func TestAccRegistryRemoteAnswersRangeWithTheWholeContent(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// A blob and a manifest of a Docker repository that allows content
+// browsing carry X-Artifactory-Filename and no Content-Disposition, GET and
+// HEAD, on both routes, as on any download from such a repository:
+// 7.161.26's DockerManifestResponse writes the attachment only from
+// RequestResponseHelper.setBasicHeaders, which skips it when the
+// repository allows content browsing (#1579).
+func TestAccRegistryBrowsableRepositoryNamesNoAttachment(t *testing.T) {
+	const layer = "a layer of a browsable repository"
+	body := registryManifest("browsable")
+	w := newItemWorld(t, false)
+	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&repo.Config{
+		Key: "docker-browse", Class: repo.Local, PackageType: repo.Docker,
+		ArchiveBrowsingEnabled: new(true),
+	})); err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range []string{layer, registryConfig, "registry layer"} {
+		wantStatus(t, w.do(http.MethodPost, "/v2/docker-browse/app/blobs/uploads/?digest="+
+			sha256Digest(b), "admin", b), http.StatusCreated)
+	}
+	wantStatus(t, w.do(http.MethodPut, "/v2/docker-browse/app/manifests/v1", "admin", body,
+		"Content-Type", layout.MediaTypeOCIManifest), http.StatusCreated)
+	blob := layout.BlobFile(sumsOf(layer).sha256)
+	for _, base := range []string{"/v2/docker-browse/app/", "/artifactory/api/docker/docker-browse/v2/app/"} {
+		for _, c := range []struct{ path, name, body string }{
+			{base + "blobs/sha256:" + sumsOf(layer).sha256, blob, layer},
+			{base + "manifests/v1", layout.ManifestFile, body},
+		} {
+			for _, method := range []string{http.MethodGet, http.MethodHead} {
+				rec := w.do(method, c.path, "admin", "", "Accept", layout.MediaTypeOCIManifest)
+				want := c.body
+				if method == http.MethodHead {
+					want = ""
+				}
+				wantAnswer(t, method+" "+c.path, rec, answer{200, want, map[string]string{
+					"X-Artifactory-Filename": c.name,
+				}})
+				if _, sent := rec.Header()["Content-Disposition"]; sent {
+					t.Errorf("%s %s: Content-Disposition %q, want none", method, c.path,
+						rec.Header().Get("Content-Disposition"))
+				}
+			}
+		}
 	}
 }

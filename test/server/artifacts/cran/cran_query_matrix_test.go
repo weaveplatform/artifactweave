@@ -111,7 +111,9 @@ func cranQueryWorld(t *testing.T) (*itemWorld, *cranAsked, []byte) {
 // resolution conditional on properties" (JFrog's guide, Using Properties in
 // Deployment and Resolution); neither names a package type it leaves out.
 // The read check comes first (DV-057): a user without read is refused 403
-// and an anonymous caller 401, without asking the upstream.
+// and an anonymous caller 401, without asking the upstream. A local
+// repository's package, which the item route reads, refuses the user with
+// 7.x's download answer (cranRefused); the CRAN routes keep "Forbidden".
 func TestAccCRANRoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 	w, asked, archive := cranQueryWorld(t)
 	for _, key := range []string{"cran-local", "cran-remote", "cran-virtual"} {
@@ -123,7 +125,7 @@ func TestAccCRANRoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 					got := w.do(http.MethodGet, target, caller, "")
 					switch caller {
 					case "user":
-						wantCRANError(t, got, http.StatusForbidden, "Forbidden")
+						wantCRANError(t, got, http.StatusForbidden, cranRefused(key, path))
 					case "":
 						wantCRANError(t, got, http.StatusUnauthorized,
 							"Authentication is required")
@@ -186,6 +188,32 @@ func TestAccCRANRemotePassesItsQueryAndMatrixParametersUpstream(t *testing.T) {
 	}
 }
 
+// cranRefused is the answer to user, who may not read key, for path: on a
+// local repository's package, which the item route reads, 7.161.26's
+// download refusal (RealRepoBase.assertReadPermissions and the path
+// DownloadServiceImpl.respondResourceNotFound appends, #1572); on the
+// CRAN routes, "Forbidden".
+func cranRefused(key, path string) string {
+	if path != cranAssertthat || (key != "cran-local" && key != "cran-tagged") {
+		return "Forbidden"
+	}
+	return "Download request for repo:path '" + key + ":" + path + "' is forbidden for user: 'user'.; Path: '" +
+		key + ":" + path + "'"
+}
+
+// cranMismatch is the answer to a file under key that lacks a mandatory
+// matrix key: on a local repository's package, which the item route reads,
+// 7.161.26's DbStoringRepoMixin.getInfo PROPERTY_MISMATCH reason and the
+// path DownloadServiceImpl.respondResourceNotFound appends (#1572); on the
+// CRAN routes, "Could not find resource".
+func cranMismatch(key, path string) string {
+	if path != cranAssertthat || (key != "cran-local" && key != "cran-tagged") {
+		return "Could not find resource"
+	}
+	return "File '" + key + ":" + path + "' was found, but mandatory properties do not match.; Path: '" +
+		key + ":" + path + "'"
+}
+
 // TestAccCRANMandatoryMatrixParameters (#1350): a mandatory matrix
 // parameter ("key+=value") serves a stored index or package only when the
 // file carries the property, as 7.x's PropertiesImpl.matchQuery answers
@@ -196,7 +224,9 @@ func TestAccCRANRemotePassesItsQueryAndMatrixParametersUpstream(t *testing.T) {
 // over a member that does not find the file [I]; a remote's cached copy
 // is matched the same way, without asking the upstream (#1371). A virtual
 // repository's composed index carries no properties [I], so a mandatory key
-// is not found there and a key it may lack is served.
+// is not found there and a key it may lack is served. A local repository's
+// package, which the item route reads, answers the mismatch with 7.x's
+// text (cranMismatch); the CRAN routes keep "Could not find resource".
 func TestAccCRANMandatoryMatrixParameters(t *testing.T) {
 	w, asked, archive := cranQueryWorld(t)
 	for _, tc := range []struct {
@@ -218,7 +248,7 @@ func TestAccCRANMandatoryMatrixParameters(t *testing.T) {
 		for _, caller := range []string{"admin", "reader"} {
 			got := w.do(http.MethodGet, target, caller, "")
 			if tc.status == http.StatusNotFound {
-				wantCRANError(t, got, http.StatusNotFound, "Could not find resource")
+				wantCRANError(t, got, http.StatusNotFound, cranMismatch(tc.key, tc.path))
 				continue
 			}
 			if got.Code != tc.status {
@@ -229,7 +259,7 @@ func TestAccCRANMandatoryMatrixParameters(t *testing.T) {
 			}
 		}
 		wantCRANError(t, w.do(http.MethodGet, target, "user", ""), http.StatusForbidden,
-			"Forbidden")
+			cranRefused(tc.key, tc.path))
 		// A virtual repository reads its remote member's PACKAGES to find
 		// the archive; the file the client asked for is matched in the
 		// cache alone.
@@ -240,12 +270,13 @@ func TestAccCRANMandatoryMatrixParameters(t *testing.T) {
 		}
 	}
 	// A key the file carries with another value does not match either.
-	for _, target := range []string{
-		"/artifactory/cran-tagged/" + cranAssertthat + ";x=2",
-		"/artifactory/cran-virtual/" + cranAssertthat + ";x+=2",
+	for _, tc := range []struct{ key, matrix string }{
+		{"cran-tagged", ";x=2"},
+		{"cran-virtual", ";x+=2"},
 	} {
+		target := "/artifactory/" + tc.key + "/" + cranAssertthat + tc.matrix
 		wantCRANError(t, w.do(http.MethodGet, target, "admin", ""), http.StatusNotFound,
-			"Could not find resource")
+			cranMismatch(tc.key, cranAssertthat))
 	}
 	// A key the file may lack is served by the remote whose cached copies
 	// lack the mandatory one, which asks the upstream.

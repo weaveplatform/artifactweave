@@ -160,6 +160,15 @@ func queryRefusal(t *testing.T, rec *httptest.ResponseRecorder, status int, mess
 	}
 }
 
+// remoteRefused is the reason 7.161.26's download refuses user a remote's
+// file p with (#1572): RealRepoBase.assertReadPermissions names the
+// remote's cache, which RemoteRepoBase checks, and respondResourceNotFound
+// appends the path under key, the repository the request named.
+func remoteRefused(key, p, user string) string {
+	return "Download request for repo:path 'remote-cache:" + p + "' is forbidden for user: '" +
+		user + "'.; Path: '" + key + ":" + p + "'"
+}
+
 // queryDenied fails the test unless rec refused caller as one without read
 // permission is refused: 403, or 401 to an anonymous caller.
 func queryDenied(t *testing.T, rec *httptest.ResponseRecorder, caller queryCaller) {

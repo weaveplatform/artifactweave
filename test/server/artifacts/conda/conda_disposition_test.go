@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
 // packageName is the package these tests download.
@@ -54,7 +54,7 @@ func wantNamed(
 // adds it (HttpArtifactoryResponse; RTFACT-30882 on 7.99.2). The Conda
 // API sent the item route's form (#1505).
 func TestAccCondaPackageNamedWithoutFilenameStar(t *testing.T) {
-	itemForm := blob.Disposition(packageName)
+	itemForm := itemkit.ItemDisposition(packageName)
 
 	t.Run("local, federated and virtual", func(t *testing.T) {
 		w := newCondaShardWorld(t, false, nil)

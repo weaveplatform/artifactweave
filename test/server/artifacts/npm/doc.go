@@ -39,6 +39,10 @@
 //     remote tarball whose record of the upstream's 200 or 404 in the
 //     availability state meets a statement the database fails to run
 //     answers other than 500 "internal error", logged once (issue 1489).
+//   - TestAccNPMRemoteTarballOutsideRegistry fails while a remote answers
+//     502 for a packument whose tarball lies outside its registry, on its
+//     host or another, unless its externalDependencies fields allow it, or
+//     sends its credentials to that other host (issue 1574).
 //
 // # References
 //

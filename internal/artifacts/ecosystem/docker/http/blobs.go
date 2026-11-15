@@ -80,7 +80,7 @@ func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 		return
 	}
 	w.Header().Set(contentDigestHeader, "sha256:"+hex)
-	setFileHeaders(w.Header(), it.Name)
+	setFileHeaders(w.Header(), q.Repo, it.Name)
 	g.serveBlob(w, pullRequest(r), q.Repo, it)
 }
 

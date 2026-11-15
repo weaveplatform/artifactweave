@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -778,7 +779,7 @@ func TestAccNativeDownloadDispositionRoutes(t *testing.T) {
 					f.body), http.StatusCreated)
 			}
 			name := path.Base(c.file)
-			native := blob.Disposition(name)
+			native := itemkit.ItemDisposition(name)
 			switch {
 			case packageService[c.name]:
 				native = `attachment; filename="` + name + `"`
@@ -789,7 +790,7 @@ func TestAccNativeDownloadDispositionRoutes(t *testing.T) {
 			}
 			for route, want := range map[string]string{
 				"/artifactory/api/" + c.route:               native,
-				"/artifactory/" + c.repo.Key + "/" + c.file: blob.Disposition(name),
+				"/artifactory/" + c.repo.Key + "/" + c.file: itemkit.ItemDisposition(name),
 			} {
 				for _, m := range []string{http.MethodGet, http.MethodHead} {
 					rec := w.do(m, route, "admin", "")

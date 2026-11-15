@@ -30,7 +30,8 @@ var componentFiles = map[string][]byte{
 // to the Retrieval Cache Period", so the first reader's GET asks the
 // upstream and the next GET, on the remote or the virtual, is served from
 // the cache. A user without read permission is refused 403 and an
-// anonymous caller 401 before the upstream is asked (DV-057).
+// anonymous caller 401 before the upstream is asked (DV-057), the user on
+// the remote with 7.x's download answer (#1572).
 func TestAccDebianRemoteServesComponentFiles(t *testing.T) {
 	files, _ := queryArchive(t)
 	for p, body := range componentFiles {
@@ -45,7 +46,11 @@ func TestAccDebianRemoteServesComponentFiles(t *testing.T) {
 					r := w.Request(http.MethodGet, target, caller, "")
 					switch caller {
 					case "denied":
-						queryRefusal(t, r, http.StatusForbidden, "Forbidden")
+						refusal := "Forbidden"
+						if key == "remote" {
+							refusal = remoteRefused(key, p, caller)
+						}
+						queryRefusal(t, r, http.StatusForbidden, refusal)
 					case "":
 						queryRefusal(t, r, http.StatusUnauthorized, "Authentication is required")
 					default:
@@ -76,10 +81,11 @@ func TestAccDebianRemoteServesComponentFiles(t *testing.T) {
 // Remote Repositories page reads what is "already stored in the cache" at
 // <remote-repository-name>-cache "to avoid remote update checks". Before
 // the remote's GET the alias still answers 404 and asks nothing. A user
-// without read permission is refused 403 and an anonymous caller 401. A
+// without read permission is refused 403 and an anonymous caller 401; the
+// miss and the user's refusal with 7.x's download answers (#1572). A
 // Packages index's by-hash copy is a kept case: the index route served it
-// on the alias before this change, and answers a miss "Not Found", as it
-// did.
+// on the alias before this change, and answers a miss "Not Found" and a
+// user "Forbidden", as it did.
 func TestAccDebianRemoteCacheAliasServesCachedMetadata(t *testing.T) {
 	files, _ := queryArchive(t)
 	const installer = "dists/stable/main/debian-installer/binary-amd64/Packages.gz"
@@ -97,9 +103,10 @@ func TestAccDebianRemoteCacheAliasServesCachedMetadata(t *testing.T) {
 		t.Run(p, func(t *testing.T) {
 			w, up := queryRemote(t, files)
 			alias := "/artifactory/remote-cache/" + p
-			miss := "Could not find resource"
+			miss := "File not found.; Path: 'remote-cache:" + p + "'"
+			refusal := remoteRefused("remote-cache", p, "denied")
 			if strings.Contains(p, "/binary-amd64/by-hash/") {
-				miss = "Not Found"
+				miss, refusal = "Not Found", "Forbidden"
 			}
 			queryRefusal(
 				t,
@@ -121,7 +128,7 @@ func TestAccDebianRemoteCacheAliasServesCachedMetadata(t *testing.T) {
 				r := w.Request(http.MethodGet, alias, caller, "")
 				switch caller {
 				case "denied":
-					queryRefusal(t, r, http.StatusForbidden, "Forbidden")
+					queryRefusal(t, r, http.StatusForbidden, refusal)
 				case "":
 					queryRefusal(t, r, http.StatusUnauthorized, "Authentication is required")
 				default:

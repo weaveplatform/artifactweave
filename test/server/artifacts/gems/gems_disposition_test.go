@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	gemfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/gems"
-	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
 // packageDisposition is the Content-Disposition 7.41.13's gems API named
@@ -46,7 +46,7 @@ func (w *world) wantNamed(path, want string, body []byte) {
 // API sent the item route's form (#1505).
 func TestAccNativeGemNamedWithoutFilenameStar(t *testing.T) {
 	const gem = "gems/rake-12.3.1.gem"
-	itemForm := blob.Disposition("rake-12.3.1.gem")
+	itemForm := itemkit.ItemDisposition("rake-12.3.1.gem")
 
 	t.Run("local, federated and virtual", func(t *testing.T) {
 		w := newWorld(t)

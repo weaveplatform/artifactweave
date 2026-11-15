@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -152,7 +153,9 @@ func p2QueryWorld(t *testing.T) (*itemWorld, *p2Asked) {
 // conditional on properties" (JFrog's guide, Using Properties in
 // Deployment and Resolution); neither names a package type it leaves out.
 // The read check comes first (DV-057): a user without read is refused 403
-// and an anonymous caller 401, without asking the upstream.
+// and an anonymous caller 401, without asking the upstream; the user, on a
+// remote's file, which the item route reads, with 7.161.26's download
+// answer (#1572), and on the P2 routes with "Forbidden".
 func TestAccP2RoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 	w, asked := p2QueryWorld(t)
 	for _, path := range []string{
@@ -171,7 +174,12 @@ func TestAccP2RoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 				got := w.do(http.MethodGet, target, caller, "")
 				switch caller {
 				case "user":
-					wantP2Error(t, got, http.StatusForbidden, "Forbidden")
+					refusal := "Forbidden"
+					if file, ok := strings.CutPrefix(path, "p2-remote/"); ok {
+						refusal = "Download request for repo:path 'p2-remote-cache:" + file +
+							"' is forbidden for user: 'user'.; Path: 'p2-remote:" + file + "'"
+					}
+					wantP2Error(t, got, http.StatusForbidden, refusal)
 				case "":
 					wantP2Error(t, got, http.StatusUnauthorized, "Authentication is required")
 				default:

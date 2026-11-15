@@ -129,7 +129,7 @@ func (o origin) url(key string, r Request) (string, error) {
 	u.Path = "/" + rest
 	q := url.Values{}
 	if r.Filename != "" {
-		q.Set("response-content-disposition", blob.Disposition(r.Filename))
+		q.Set("response-content-disposition", blob.SignedDisposition(r.Filename))
 	}
 	if r.ContentType != "" {
 		q.Set("response-content-type", r.ContentType)

@@ -21,6 +21,13 @@ const (
 	matrixBody = "matrix bytes"
 )
 
+// matrixMismatch is 7.161.26's answer to a cached copy that lacks a
+// mandatory key (#1572): DbStoringRepoMixin.getInfo's PROPERTY_MISMATCH
+// reason for the cache's path, which RemoteRepoBase.internalGetInfo returns,
+// and the path DownloadServiceImpl.respondResourceNotFound appends.
+const matrixMismatch = "File 'remote-cache:a/file.bin' was found, but mandatory properties do not " +
+	"match.; Path: 'remote-cache:a/file.bin'"
+
 // matrixUpstream serves matrixBody at matrixPath and at that path with each
 // of params after it, as an upstream Artifactory that resolves matrix
 // parameters serves the file it finds: the fake upstream matches the
@@ -80,16 +87,22 @@ func onlyPath(paths []string, want string) bool {
 // against the cached copy without asking the upstream, as 7.x's
 // RemoteRepoBase.internalGetInfo answers from the cache: a key the copy may
 // lack is served, a mandatory key it lacks is not found
-// (DbStoringRepoMixin.getInfo's PROPERTY_MISMATCH), and one it carries is
-// served. A user without read permission is refused 403 and an anonymous
-// caller 401 before the upstream is asked (DV-057).
+// (DbStoringRepoMixin.getInfo's PROPERTY_MISMATCH, matrixMismatch), and one
+// it carries is served. A user without read permission is refused 403 and an anonymous
+// caller 401 before the upstream is asked (DV-057); the user with 7.x's
+// download answer (#1572).
 func TestAccGenericRemotePassesMatrixParametersUpstream(t *testing.T) {
 	w := newRemoteWorld(t)
 	matrixUpstream(w, ";x=1")
 	seen := 0
 	target := "/artifactory/remote" + matrixPath
-	wantMatrixError(t, w.request(http.MethodGet, target+";x=1", "denied", ""),
-		http.StatusForbidden, "Forbidden")
+	wantMatrixError(
+		t,
+		w.request(http.MethodGet, target+";x=1", "denied", ""),
+		http.StatusForbidden,
+		"Download request for repo:path 'remote-cache:a/file.bin' is forbidden "+
+			"for user: 'denied'.; Path: 'remote:a/file.bin'",
+	)
 	wantMatrixError(t, w.request(http.MethodGet, target+";x=1", "", ""),
 		http.StatusUnauthorized, "Authentication is required")
 	if got := upstreamPaths(w, &seen); len(got) != 0 {
@@ -123,7 +136,7 @@ func TestAccGenericRemotePassesMatrixParametersUpstream(t *testing.T) {
 			got := w.request(tc.method, tc.path, caller, "")
 			switch {
 			case tc.status == http.StatusNotFound && tc.method == http.MethodGet:
-				wantMatrixError(t, got, http.StatusNotFound, "Could not find resource")
+				wantMatrixError(t, got, http.StatusNotFound, matrixMismatch)
 			case got.Code != tc.status:
 				t.Errorf("%s %s as %s answered %d, want %d", tc.method, tc.path, caller,
 					got.Code, tc.status)
@@ -151,7 +164,7 @@ func TestAccGenericRemotePassesMatrixParametersUpstream(t *testing.T) {
 			got.Body)
 	}
 	wantMatrixError(t, w.request(http.MethodGet, target+";x=2", "reader", ""),
-		http.StatusNotFound, "Could not find resource")
+		http.StatusNotFound, matrixMismatch)
 	if paths := upstreamPaths(w, &seen); len(paths) != 0 {
 		t.Errorf("a cached copy asked the upstream %q", paths)
 	}
@@ -200,7 +213,7 @@ func TestAccGenericRemoteServesTheUpstreamsAnswerUnmatched(t *testing.T) {
 					return
 				}
 				wantMatrixError(t, w.request(http.MethodGet, target, "reader", ""),
-					http.StatusNotFound, "Could not find resource")
+					http.StatusNotFound, matrixMismatch)
 				if trace.Code != http.StatusOK || !strings.Contains(trace.Body.String(),
 					"Found resource in local cache, but property doesn't match.") ||
 					!strings.Contains(trace.Body.String(), "Responding with unfound resource") {

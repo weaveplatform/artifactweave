@@ -260,9 +260,14 @@ func TestAccRemoteColdChecksumOfEveryType(t *testing.T) {
 // and a Hugging Face Xet record, which their formats refuse, an index a
 // format builds itself, which a remote reads from its cache alone (Helm's
 // index.yaml, RubyGems' specs) [I], and an npm package's document path
-// [I].
+// [I]. A miss names its path as 7.x's download does (#1572): the "-cache"
+// key's DbStoringRepoMixin "File not found.", and the remote's a miss of
+// the upstream's [I].
 func TestAccRemoteColdReadKeepsRefusals(t *testing.T) {
 	const notFound = `{"errors":[{"message":"Could not find resource","status":404}]}` + "\n"
+	missed := func(reason, key, p string) string {
+		return `{"errors":[{"message":"` + reason + `; Path: '` + key + `:` + p + `'","status":404}]}` + "\n"
+	}
 	for _, tc := range []struct {
 		name   string
 		pt     repo.PackageType
@@ -283,7 +288,7 @@ func TestAccRemoteColdReadKeepsRefusals(t *testing.T) {
 		},
 		{
 			"cache key", repo.Helm, nil, "reader", "remote-cache/widget-1.0.0.tgz",
-			http.StatusNotFound, notFound,
+			http.StatusNotFound, missed("File not found.", "remote-cache", "widget-1.0.0.tgz"),
 		},
 		{
 			"nix", repo.Nix, nil, "reader", "remote/widget.narinfo", http.StatusBadRequest,
@@ -295,12 +300,21 @@ func TestAccRemoteColdReadKeepsRefusals(t *testing.T) {
 			"remote/models--acme--widget/.xet/xorbs/" + hexDigest("xet"), http.StatusNotFound,
 			notFound,
 		},
-		{"helm index", repo.Helm, nil, "reader", "remote/index.yaml", http.StatusNotFound, notFound},
-		{"gems index", repo.Gems, nil, "reader", "remote/specs.4.8.gz", http.StatusNotFound, notFound},
-		{"npm document", repo.NPM, nil, "reader", "remote/widget", http.StatusNotFound, notFound},
+		{
+			"helm index", repo.Helm, nil, "reader", "remote/index.yaml", http.StatusNotFound,
+			missed("Not Found", "remote", "index.yaml"),
+		},
+		{
+			"gems index", repo.Gems, nil, "reader", "remote/specs.4.8.gz", http.StatusNotFound,
+			missed("Not Found", "remote", "specs.4.8.gz"),
+		},
+		{
+			"npm document", repo.NPM, nil, "reader", "remote/widget", http.StatusNotFound,
+			missed("Not Found", "remote", "widget"),
+		},
 		{
 			"npm scoped document", repo.NPM, nil, "reader", "remote/@acme/widget",
-			http.StatusNotFound, notFound,
+			http.StatusNotFound, missed("Not Found", "remote", "@acme/widget"),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -327,16 +341,21 @@ func TestAccRemoteColdReadKeepsRefusals(t *testing.T) {
 
 // TestAccRemoteColdReadMissAnswersAsGeneric (#1507): a cold file that an
 // offline remote of any type reads from its cache alone (R9), or that its
-// upstream does not have, answers 404 "Not Found" as on a generic remote,
-// where every type but those answered 404 "Could not find resource".
+// upstream does not have, answers 404 as on a generic remote, where every
+// type but those answered 404 "Could not find resource": 7.x's offline
+// text, or "Not Found", with the path (#1572).
 func TestAccRemoteColdReadMissAnswersAsGeneric(t *testing.T) {
-	const notFound = `{"errors":[{"message":"Not Found","status":404}]}` + "\n"
 	for _, pt := range []repo.PackageType{repo.Generic, repo.Helm, repo.PyPI} {
 		for _, offline := range []bool{true, false} {
 			w := newRemoteWorld(t)
 			remoteOfType(t, w, pt, func(c *repo.Config) { c.Offline = new(offline) })
 			if offline {
 				w.up.Set("/pkg/file.bin", declaring([]byte("upstream bytes"), true))
+			}
+			notFound := `{"errors":[{"message":"Not Found; Path: 'remote:pkg/file.bin'","status":404}]}` + "\n"
+			if offline {
+				notFound = `{"errors":[{"message":"remote: is offline, 'remote:pkg/file.bin' is not found ` +
+					`at 'pkg/file.bin'.; Path: 'remote:pkg/file.bin'","status":404}]}` + "\n"
 			}
 			got := w.request(http.MethodGet, "/artifactory/remote/pkg/file.bin", "reader", "")
 			remoteStatus(t, got, http.StatusNotFound)

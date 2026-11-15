@@ -182,7 +182,9 @@ func TestAccCloudFrontURLsPassTheEdge(t *testing.T) {
 				if resp.StatusCode != http.StatusPartialContent || !bytes.Equal(got, body[10:20]) {
 					t.Fatalf("signed ranged GET: %d %q", resp.StatusCode, got)
 				}
-				if resp.Header.Get("Content-Disposition") != blob.Disposition("lib 1.0+beta.tgz") ||
+				if resp.Header.Get(
+					"Content-Disposition",
+				) != `attachment;filename="lib 1.0+beta.tgz"` ||
 					resp.Header.Get("Content-Type") != "application/gzip" {
 					t.Fatalf("overrides: %v", resp.Header)
 				}

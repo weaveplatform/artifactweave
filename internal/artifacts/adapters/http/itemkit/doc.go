@@ -42,9 +42,13 @@
 //     RemoteDeliveryAllowed, and ForceAuthentication, the router's
 //     middleware that challenges a request without credentials to a
 //     repository Forced reports.
+//   - File name headers: FilenameHeader, ItemDisposition,
+//     PackageDisposition, FileDisposition and Browsable, which name a
+//     downloaded file as 7.x does, by its repository's content browsing
+//     flag.
 //   - Item values and helpers: ItemRequest, ParseItemPath,
 //     ParseEscapedItemPath, Found, Download, Lookup, StatusWriter,
-//     ResolveRepo, DeployTarget, ItemCreated, ItemNotFound,
+//     ResolveRepo, DeployTarget, ItemCreated, ItemNotFound, MemberRead,
 //     OverwriteRefusal, ChecksumsJSON, DownloadURI, SplitRepoPath,
 //     NotFoundRepo, View and Forced.
 //   - Access, Target and AccessFor: the questions handlers ask the
@@ -96,6 +100,17 @@
 //     failure; once the entry's 200 is sent, a failure is only logged. An
 //     entry the archive lacks, or one of a file that is no archive or a
 //     corrupt one, answers 404.
+//   - GetItem answers a file request, a path not ending in a slash, to a
+//     local, federated, remote or cache repository that misses, that the
+//     caller may not read or whose file a matrix parameter does not match
+//     as 7.161.26's DownloadServiceImpl.respondResourceNotFound does
+//     (#1572): the repository's reason and "; Path: '<key>:<path>'", where
+//     <path> is the file an archive entry or a checksum names (missed,
+//     refused, mismatched). Read is checked on that file before a miss is
+//     answered, as checkDownloadIsAllowed checks it before getInfo. A
+//     folder request, a virtual repository and its member reads
+//     (MemberRead; P10's #1533), an overlay and an entry an archive lacks
+//     keep ItemNotFound and httpkit.Denied.
 //   - A file download, streamed, redirected or from a remote's stream,
 //     answers If-None-Match and If-Modified-Since as 7.x's download does
 //     (pkgroute.FileNotModified): one If-None-Match line at a time, less a
@@ -181,8 +196,9 @@
 // reads through the remote source (aliasRemoteMetadata); redirect_test.go the signing-failure
 // throttle, the descriptor's minimum redirect size, the request copy
 // without the preconditions a download ignores, the request the download
-// reads, ServeContent, the checksum file's answers, and that no ecosystem
-// handler but Docker's calls http.ServeContent directly; they share one
+// reads, ServeContent, the checksum file's answers, the browser and
+// content browsing rules of a download (download_headers.go), and that no
+// ecosystem handler but Docker's calls http.ServeContent directly; they share one
 // file because tools/citestselection lists this package's test files by
 // name. kittest.WantDownloadConditionals checks a package route's
 // built documents from its own package's tests. The route suites under

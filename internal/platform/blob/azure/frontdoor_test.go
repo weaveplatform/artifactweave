@@ -71,7 +71,7 @@ func TestAccFrontDoorURLs(t *testing.T) {
 	}
 	q := u.Query()
 	if q.Get("st") != "2026-10-14T12:00:00Z" || q.Get("se") != "2026-10-14T12:10:00Z" ||
-		q.Get("rscd") != blob.Disposition("fd.bin") || q.Get("rsct") != "text/plain" ||
+		q.Get("rscd") != `attachment;filename="fd.bin"` || q.Get("rsct") != "text/plain" ||
 		q.Get("rscc") != "public, max-age=300" {
 		t.Fatalf("SAS %v", q)
 	}

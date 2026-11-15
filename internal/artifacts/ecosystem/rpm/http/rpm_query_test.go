@@ -148,6 +148,51 @@ func rpmQueryWorld(t *testing.T) (*itemWorld, *rpmAsked) {
 	return w, asked
 }
 
+// rpmCheckedKey is the repository 7.161.26 checks Read on and finds a
+// file in for a download under key, for the generic item route, which
+// serves a local or remote repository's files: a remote's cache; and ""
+// for a virtual repository, whose answers the RPM routes give.
+func rpmCheckedKey(key string) string {
+	switch key {
+	case "rpm-local", "rpm-tagged":
+		return key
+	case "rpm-remote", "rpm-held":
+		return key + "-cache"
+	}
+	return ""
+}
+
+// rpmRefusal is the answer to caller, who may not read path under key: on
+// the item route, 7.161.26's download refusal (#1572), or 401
+// "Unauthorized" for an anonymous caller; on the RPM routes, "Forbidden"
+// or "Authentication is required".
+func rpmRefusal(key, path, caller string) (int, string) {
+	checked := rpmCheckedKey(key)
+	switch {
+	case checked == "" && caller == "":
+		return http.StatusUnauthorized, "Authentication is required"
+	case checked == "":
+		return http.StatusForbidden, "Forbidden"
+	case caller == "":
+		return http.StatusUnauthorized, "Unauthorized"
+	}
+	return http.StatusForbidden, "Download request for repo:path '" + checked + ":" + path +
+		"' is forbidden for user: '" + caller + "'.; Path: '" + key + ":" + path + "'"
+}
+
+// rpmMismatch is the answer to a file under key that does not match a
+// matrix parameter: on the item route, 7.161.26's PROPERTY_MISMATCH reason
+// for the repository that holds it (#1572); on the RPM routes, "Could not
+// find resource".
+func rpmMismatch(key, path string) string {
+	checked := rpmCheckedKey(key)
+	if checked == "" {
+		return "Could not find resource"
+	}
+	return "File '" + checked + ":" + path + "' was found, but mandatory properties do not match.; Path: '" +
+		checked + ":" + path + "'"
+}
+
 // TestAccRPMRoutesTakeAQueryAndMatrixParameters (#1350): a virtual RPM
 // repository's repodata and package take a query and matrix parameters as
 // any file's GET takes them, and as a local or remote repository's, which
@@ -160,7 +205,7 @@ func rpmQueryWorld(t *testing.T) (*itemWorld, *rpmAsked) {
 // Using Properties in Deployment and Resolution); neither names a package
 // type it leaves out. The read check comes first (DV-057): a user without
 // read is refused 403 and an anonymous caller 401, without asking the
-// upstream.
+// upstream, with the answers rpmRefusal gives.
 func TestAccRPMRoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 	w, asked := rpmQueryWorld(t)
 	alpha := rpmAlpha(t)
@@ -172,10 +217,9 @@ func TestAccRPMRoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 					asked.take()
 					got := w.as(http.MethodGet, target, caller)
 					switch caller {
-					case "user":
-						wantError(t, got, http.StatusForbidden, "Forbidden")
-					case "":
-						wantError(t, got, http.StatusUnauthorized, "Authentication is required")
+					case "user", "":
+						status, message := rpmRefusal(key, path, caller)
+						wantError(t, got, status, message)
 					default:
 						if got.Code != http.StatusOK {
 							t.Errorf("%s as %s answered %d %.200s, want 200", target, caller,
@@ -244,7 +288,7 @@ func TestAccRPMMandatoryMatrixParameters(t *testing.T) {
 		for _, caller := range []string{"admin", "reader"} {
 			got := w.as(http.MethodGet, target, caller)
 			if tc.status == http.StatusNotFound {
-				wantError(t, got, http.StatusNotFound, "Could not find resource")
+				wantError(t, got, http.StatusNotFound, rpmMismatch(tc.key, tc.path))
 				continue
 			}
 			if got.Code != tc.status {
@@ -254,7 +298,8 @@ func TestAccRPMMandatoryMatrixParameters(t *testing.T) {
 				t.Errorf("%s as %s changed the package", target, caller)
 			}
 		}
-		wantError(t, w.as(http.MethodGet, target, "user"), http.StatusForbidden, "Forbidden")
+		status, message := rpmRefusal(tc.key, tc.path, "user")
+		wantError(t, w.as(http.MethodGet, target, "user"), status, message)
 		// A virtual repository reads its remote member's repodata to find
 		// the package; the package itself is matched in the cache alone.
 		for _, a := range asked.take() {
@@ -264,12 +309,13 @@ func TestAccRPMMandatoryMatrixParameters(t *testing.T) {
 		}
 	}
 	// A key the file carries with another value does not match either.
-	for _, target := range []string{
-		"/artifactory/rpm-tagged/" + rpmAlphaPath + ";x=2",
-		"/artifactory/rpm-virtual/" + rpmAlphaPath + ";x+=2",
+	for _, tc := range []struct{ key, matrix string }{
+		{"rpm-tagged", ";x=2"},
+		{"rpm-virtual", ";x+=2"},
 	} {
+		target := "/artifactory/" + tc.key + "/" + rpmAlphaPath + tc.matrix
 		wantError(t, w.as(http.MethodGet, target, "admin"), http.StatusNotFound,
-			"Could not find resource")
+			rpmMismatch(tc.key, rpmAlphaPath))
 	}
 	// A key the composed repodata may lack is served.
 	target := "/artifactory/rpm-virtual/" + rpmRepomd + ";x=1"
