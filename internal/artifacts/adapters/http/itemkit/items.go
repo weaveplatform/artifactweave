@@ -24,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -330,12 +331,13 @@ func newDownload(p string, folder bool, m model.Matrix, resolve resolver) *Downl
 }
 
 // Lookup finds the item at p for a download from c: a local repository's
-// own tree, a remote repository's cache (nothing is fetched upstream until
-// P9), or the first member of a virtual repository, in order, that the
-// caller may read and that holds it. root reports the repository root, which
-// is not an item. A non-nil dl refuses what Artifactory refuses in each
-// repository it reaches, and rewrites p as each repository that holds items
-// resolves it before looking there; the storage API passes nil.
+// own tree, a remote repository's cache (GetItem asks the upstream for
+// what the cache lacks), or the first member of a virtual repository, in
+// order, that the caller may read and that holds it. root reports the
+// repository root, which is not an item. A non-nil dl refuses what
+// Artifactory refuses in each repository it reaches, and rewrites p as
+// each repository that holds items resolves it before looking there; the
+// storage API passes nil.
 func Lookup(
 	ctx context.Context,
 	st Store,
@@ -487,6 +489,9 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, map[string]bool{})
 	if errors.Is(err, kernel.ErrNotFound) {
+		if s.getColdRemoteItem(w, r, st, c, cached, req, p, acc, dl) {
+			return
+		}
 		// "<archive>!/<entry>" names an entry inside an archive file; a path
 		// that exists as an item is served as one first.
 		if archive, entry, ok := strings.Cut(req.Path, "!/"); ok {
@@ -895,6 +900,65 @@ func fileChecksumRoute(c repo.Config, cached bool, p string) bool {
 			opkg.IsIndex(file) && (name == opkg.PackagesName || name == opkg.PackagesGzipName)
 	}
 	return false
+}
+
+// coldReadType reports whether c is a remote whose item route asks the
+// upstream for a file its cache does not hold once the cache lookup has
+// not found it: every remote type but those remoteDownloadType reads
+// through its source first, and CRAN and opkg, whose overlays fetch their
+// packages and indexes. 7.161.26's RemoteRepoBase.getInfo and
+// HttpRepo.retrieveInfo ask <url>/<path> whatever the package type, and
+// JFrog's remote repositories page says a download at
+// /artifactory/<remote>/<path> "returns the remote artifact and stores it
+// in the cache if it isn't stored yet" (#1507).
+func coldReadType(c repo.Config, cached bool) bool {
+	return c.Class == repo.Remote && !cached && !remoteDownloadType(c, false) &&
+		!cran.Serves(c.PackageType) && !opkg.Serves(c.PackageType)
+}
+
+// coldReadPath reports whether the item route asks c's upstream for the
+// file at p. A path the format builds itself (format.ClassDerived, such as
+// Helm's index.yaml) is one a remote reads from its cache alone
+// (remote.Policy), so it keeps the cache lookup's 404 [I]. An npm remote
+// asks only for a tarball (<name>/-/<file>): its upstream answers
+// <url>/<name> with the package's document, and a copy of it kept as the
+// file <name> would take the place of the folder that holds the package's
+// tarballs, so a later tarball download through the npm route would fail.
+// No 7.x source says what its npm remote does with such a path [I], so it
+// keeps the cache lookup's 404 too.
+func (s *Kit) coldReadPath(c repo.Config, p string) bool {
+	if format.ClassOf(s.Format(c.PackageType), c, p) == format.ClassDerived {
+		return false
+	}
+	return !npm.Serves(c.PackageType) || strings.Contains(p, "/-/")
+}
+
+// getColdRemoteItem answers a file, or the checksum of a file, that the
+// cache lookup did not find on a remote of a coldReadType type, from the
+// upstream at <url>/<path>, through getRemoteItem. The lookup has already
+// applied the download policy and the format's own refusals, which keep
+// their answers. A checksum whose file the lookup finds keeps the cache's
+// answer (getSidecar).
+func (s *Kit) getColdRemoteItem(
+	w http.ResponseWriter, r *http.Request, st Store, c repo.Config, cached bool,
+	req ItemRequest, p kernel.Principal, acc Access, dl *Download,
+) bool {
+	if !coldReadType(c, cached) || s.RemoteSources == nil || req.Path == "" || req.IsFolder ||
+		strings.Contains(req.Path, "!/") {
+		return false
+	}
+	file := req.Path
+	if artifact, _, ok := item.Sidecar(req.Path); ok {
+		_, err := Lookup(r.Context(), st, c, cached, artifact, acc, dl, map[string]bool{})
+		if !errors.Is(err, kernel.ErrNotFound) {
+			return false
+		}
+		file = artifact
+	}
+	if !s.coldReadPath(c, file) {
+		return false
+	}
+	return s.getRemoteItem(w, r, c, req, p, acc)
 }
 
 func remoteDownloadType(c repo.Config, cached bool) bool {
