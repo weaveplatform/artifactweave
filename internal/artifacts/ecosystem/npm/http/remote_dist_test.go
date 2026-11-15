@@ -12,43 +12,62 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 )
 
+// TestUnitRemoteURLPolicy: a packument's dist.tarball resolves against the
+// remote's URL to wherever it points, in the registry, elsewhere on its host
+// or on another host, as 7.x follows a tarball's location (RTFACT-23931,
+// 7.24.1; 7.161.26's RemoteRepoBase.mayReplaceConfiguredOrigin), whatever
+// the remote's externalDependencies fields hold, which 7.x keeps for npm
+// virtual repositories alone (#1574). The safety refusals stay.
 func TestUnitRemoteURLPolicy(t *testing.T) {
 	yes := true
-	c := repo.Config{
-		URL:                          "https://registry.example/base",
-		ExternalDependenciesEnabled:  &yes,
-		ExternalDependenciesPatterns: []string{"https://cdn.example/packages/**"},
-	}
-	for _, tc := range []struct {
-		url     string
-		allowed bool
-	}{
-		{"pkg.tgz", true},
-		{"/base/pkg.tgz", true},
-		{"https://registry.example/base/pkg.tgz?signature=opaque", true},
-		{"https://cdn.example/packages/pkg.tgz", true},
-		{"https://cdn.example/other/pkg.tgz", false},
-		{"http://cdn.example/packages/pkg.tgz", false},
-		{"https://evil.example/pkg.tgz", false},
-		{"https://user:secret@registry.example/base/pkg", false},
-		{"file:///etc/passwd", false},
-		{"javascript:alert(1)", false},
-		{"https://registry.example/base/pkg#fragment", false},
-		{"https://registry.example/base/pkg\\evil", false},
-		{"http://[", false},
-		{"../../secret", false},
-		{"https://registry.example/base%2f../secret", false},
+	for _, c := range []repo.Config{
+		{URL: "https://registry.example/base"},
+		{
+			URL:                          "https://registry.example/base",
+			ExternalDependenciesEnabled:  &yes,
+			ExternalDependenciesPatterns: []string{"https://cdn.example/packages/**"},
+		},
 	} {
-		t.Run(tc.url, func(t *testing.T) {
-			_, err := remoteTarballURL(c, tc.url)
-			if (err == nil) != tc.allowed {
-				t.Fatalf("allowed %v err %v", tc.allowed, err)
-			}
-		})
+		for _, tc := range []struct {
+			url, want string
+		}{
+			{"pkg.tgz", "https://registry.example/base/pkg.tgz"},
+			{"/base/pkg.tgz", "https://registry.example/base/pkg.tgz"},
+			{
+				"https://registry.example/base/pkg.tgz?signature=opaque",
+				"https://registry.example/base/pkg.tgz?signature=opaque",
+			},
+			{"/files/pkg.tgz", "https://registry.example/files/pkg.tgz"},
+			{"../../secret", "https://registry.example/secret"},
+			{"https://registry.example/files/pkg.tgz", "https://registry.example/files/pkg.tgz"},
+			{"https://cdn.example/packages/pkg.tgz", "https://cdn.example/packages/pkg.tgz"},
+			{"https://cdn.example/other/pkg.tgz", "https://cdn.example/other/pkg.tgz"},
+			{"https://evil.example/pkg.tgz", "https://evil.example/pkg.tgz"},
+			{"http://cdn.example/packages/pkg.tgz", ""},
+			{"https://user:secret@registry.example/base/pkg", ""},
+			{"file:///etc/passwd", ""},
+			{"javascript:alert(1)", ""},
+			{"https://registry.example/base/pkg#fragment", ""},
+			{"https://registry.example/base/pkg\\evil", ""},
+			{"http://[", ""},
+			{"https://registry.example/base%2f../secret", ""},
+			{"https://cdn.example/a/%2e%2e/secret", ""},
+		} {
+			t.Run(tc.url, func(t *testing.T) {
+				got, err := remoteTarballURL(c, tc.url)
+				if got != tc.want || (err == nil) != (tc.want != "") {
+					t.Fatalf("resolved %q, %v; want %q", got, err, tc.want)
+				}
+			})
+		}
 	}
-	c.ExternalDependenciesEnabled = nil
-	if _, err := remoteTarballURL(c, "https://cdn.example/packages/pkg.tgz"); err == nil {
-		t.Fatal("disabled external allowed")
+	// An HTTP registry may name an HTTPS tarball, never the reverse.
+	got, err := remoteTarballURL(
+		repo.Config{URL: "http://registry.example"},
+		"https://cdn.example/pkg.tgz",
+	)
+	if err != nil || got != "https://cdn.example/pkg.tgz" {
+		t.Fatalf("upgrade: %q, %v", got, err)
 	}
 }
 
@@ -84,7 +103,7 @@ func TestUnitRemoteDistValidationPreservesSignatures(t *testing.T) {
 	if _, err = remoteDist(c, "pkg", "bad", good); err == nil {
 		t.Fatal("invalid version")
 	}
-	for _, dist := range []string{`{}`, `{"tarball":false}`, `{"tarball":"pkg","integrity":false}`, `{"tarball":"pkg","shasum":false}`, `{"tarball":"https://bad.example/pkg"}`} {
+	for _, dist := range []string{`{}`, `{"tarball":false}`, `{"tarball":"pkg","integrity":false}`, `{"tarball":"pkg","shasum":false}`, `{"tarball":"https://u:p@bad.example/pkg"}`} {
 		good["dist"] = json.RawMessage(dist)
 		if _, err = remoteDist(c, "pkg", "1.0.0", good); err == nil {
 			t.Fatal(dist)
