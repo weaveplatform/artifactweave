@@ -1,9 +1,6 @@
 package repo
 
-import (
-	"net/url"
-	"slices"
-)
+import "slices"
 
 // HTTPRepoDescriptorClass is the "@class" of the shared remote
 // configuration: 7.161.26's RepoBaseDescriptor carries
@@ -254,7 +251,8 @@ type DescriptorContentSync struct {
 // whose value 7.x keeps from readers, and this answer goes to every
 // signed-in user [I]. A user name and password written into the URL are
 // left out, as 7.x moves them into the username and password on save
-// (HttpRepoDescriptor.processUrl) and maskData then clears them.
+// (RemoteRepoConfig.processUrlCredentials, which repos.PrepareCreate and
+// repos.Merge follow) and maskData then clears them.
 func Descriptor(c Config) RemoteDescriptor {
 	c = Masked(c)
 	t := c.PackageType
@@ -295,7 +293,7 @@ func Descriptor(c Config) RemoteDescriptor {
 
 		StoreArtifactsLocally: boolOr(c.StoreArtifactsLocally, true),
 		ShareConfiguration:    boolOr(c.ShareConfiguration, false),
-		URL:                   WithoutCredentials(c.URL),
+		URL:                   c.URL,
 		HardFail:              boolOr(c.HardFail, false),
 		Offline:               boolOr(c.Offline, false),
 		RetrievalCachePeriodSecs: intOr(
@@ -479,24 +477,6 @@ func contentSync(cs *ContentSynchronisation) DescriptorContentSync {
 		d.Source = *cs.Source
 	}
 	return d
-}
-
-// WithoutCredentials returns the URL raw without a user name and password
-// written into it, which 7.x never keeps in a remote's URL: on every save,
-// HttpRepoDescriptor.processUrl moves them into the username and password.
-// A user name alone, or with an empty password, stays, as processUrl
-// leaves it (its split on ":" gives one part). raw comes back as it is when
-// it does not parse.
-func WithoutCredentials(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil || u.User == nil {
-		return raw
-	}
-	if p, _ := u.User.Password(); p == "" {
-		return raw
-	}
-	u.User = nil
-	return u.String()
 }
 
 func boolOr(p *bool, v bool) bool {

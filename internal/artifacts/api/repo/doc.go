@@ -47,9 +47,7 @@
 //     type flags, force flags, Debian flags and signedUrlTtl that 7.x's
 //     read model gives every repository; Relevant, the shape of the v2
 //     read and of the configurations list; and Descriptor, the shared
-//     remote configuration, 7.x's masked remote repository descriptor,
-//     with WithoutCredentials, which a remote's URL passes through wherever
-//     another caller sees it.
+//     remote configuration, 7.x's masked remote repository descriptor.
 //   - Package-type names: AllowedPackageTypes per class, AcceptsMember for
 //     virtual members, PackageTypeName as listings spell a type,
 //     PackageTypesNamed as a listing's filter names stored types (#1408)

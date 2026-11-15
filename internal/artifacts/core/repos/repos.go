@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -44,7 +45,9 @@ func Protected(key string) bool {
 }
 
 // PrepareCreate applies defaults and validates c for creation against the
-// keys already taken (stored and earlier in the same batch).
+// keys already taken (stored and earlier in the same batch). A remote's URL
+// then gives up a user name and password written into it
+// (moveURLCredentials).
 func PrepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error) {
 	repo.Defaults(&c)
 	if err := repo.Validate(&c); err != nil {
@@ -56,7 +59,43 @@ func PrepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error) {
 	) {
 		return c, badRequestf(artifactsapi.MsgKeyExists)
 	}
+	moveURLCredentials(&c)
 	return c, nil
+}
+
+// moveURLCredentials moves a user name and password written into a remote's
+// URL into its username and password, as 7.161.26's
+// RemoteRepoConfig.processUrlCredentials does on every create and update
+// (RepositoryConfigServiceImpl's insertRepoConfig, upsertRepoConfig,
+// updateRepoConfig and bulkUpsertRepoConfigs, the last of which the YAML
+// configuration patch uses). The store then seals the password as it seals
+// one sent in the password field, and the upstream still gets the pair, as
+// basic credentials, where the URL's own would have been refused
+// (remote.BaseURL). Validation runs first, as 7.x's does, so a refused URL
+// is refused as it was sent.
+//
+// The URL keeps only its scheme, host, port and path, dropping the query and
+// fragment with the credentials, as processUrlCredentials rebuilds it and
+// RemoteRepoConfigTest.provideUrlsForTesting expects. A URL with a user name
+// and no password, or an empty one, stays as sent: processUrlCredentials
+// needs two parts from splitting the user information on ":". Unlike that
+// split, which cuts a password at its own ":", the password here is all of
+// the user information after the first ":".
+func moveURLCredentials(c *repo.Config) {
+	if c.Class != repo.Remote {
+		return
+	}
+	u, err := url.Parse(c.URL)
+	if err != nil || u.User == nil {
+		return
+	}
+	password, _ := u.User.Password()
+	if password == "" {
+		return
+	}
+	c.Username, c.Password = u.User.Username(), password
+	u.User, u.RawQuery, u.ForceQuery, u.Fragment, u.RawFragment = nil, "", false, "", ""
+	c.URL = u.String()
 }
 
 // CheckMembers rejects a virtual repository whose members do not exist
@@ -219,6 +258,9 @@ func projectEnvironment(projectKey, name string) string {
 // which keeps its spelling (#492): 6.20 reads a package type without regard
 // to case (RepoType.fromType), and taking the respelling would store a type
 // no class allows, which validation then refuses as "not allowed".
+//
+// A remote's merged URL gives up a user name and password written into it,
+// as on create (moveURLCredentials).
 func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, error) {
 	for field, current := range map[string]string{
 		"key": stored.Key, "rclass": string(stored.Class), "packageType": string(stored.PackageType),
@@ -281,6 +323,7 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 	if err := repo.ValidateUpdate(&stored, &out); err != nil {
 		return stored, badRequestf("%s", err.Error())
 	}
+	moveURLCredentials(&out)
 	return out, nil
 }
 

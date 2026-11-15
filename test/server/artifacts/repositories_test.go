@@ -189,17 +189,16 @@ func TestAccListRepositories(t *testing.T) {
 	}
 }
 
-// A remote's entry carries its upstream URL, without a user name and password,
-// and, when the remote shares its configuration, where to read it; no other
-// entry has a configuration (7.161.26's
-// RepositoriesResource.addRemoteRepoDetails and
+// A remote's entry carries its upstream URL and, when the remote shares its
+// configuration, where to read it; no other entry has a configuration
+// (7.161.26's RepositoriesResource.addRemoteRepoDetails and
 // RepositoriesUtils.addNonRemoteRepoConfigDetails) (#1493). The streamed
 // and the paged list build the same entries.
 func TestAccListRemoteEntries(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(
 		repo.Config{
-			Key: "shared", Class: repo.Remote, URL: "https://u:p@up.example/m2",
+			Key: "shared", Class: repo.Remote, URL: "https://up.example/m2",
 			ShareConfiguration: new(true),
 		},
 		repo.Config{Key: "private", Class: repo.Remote, URL: "https://up.example/npm"},
@@ -237,6 +236,100 @@ func TestAccListRemoteEntries(t *testing.T) {
 		}
 		if seen != len(want) {
 			t.Errorf("%q: %d of %d entries in %v", query, seen, len(want), got)
+		}
+	}
+}
+
+// A remote created or updated with a user name and password in its URL
+// keeps them as its username and password, through the single and batch
+// create and update alike: every read gives the URL without them, and
+// without the query and fragment that go with them, the username, and no
+// password. A URL with a user name only is kept as it was sent (#1510).
+func TestAccRemoteURLCredentialsMoveOnSave(t *testing.T) {
+	w := newRepoWorld(t)
+	const plain = `{"rclass":"remote","packageType":"generic","url":"https://up.example/plain"}`
+	for _, step := range []struct{ method, path, body string }{
+		{
+			"PUT", "/artifactory/api/repositories/zz-private",
+			`{"rclass":"remote","packageType":"generic","url":"https://u:p@up.example/private"}`,
+		},
+		{
+			"PUT", "/artifactory/api/repositories/zz-user",
+			`{"rclass":"remote","packageType":"generic","url":"https://u@up.example/private"}`,
+		},
+		{
+			"PUT", "/artifactory/api/v2/repositories/batch",
+			`[{"key":"zz-batch","rclass":"remote","packageType":"generic",` +
+				`"url":"https://b:q@up.example/batch?x=1#f"}]`,
+		},
+		{"PUT", "/artifactory/api/repositories/zz-updated", plain},
+		{
+			"POST", "/artifactory/api/repositories/zz-updated",
+			`{"url":"https://c:r@up.example/updated","username":"other","password":"secret"}`,
+		},
+		{"PUT", "/artifactory/api/repositories/zz-batch-updated", plain},
+		{
+			"POST", "/artifactory/api/v2/repositories/batch",
+			`[{"key":"zz-batch-updated","url":"https://d:s@up.example/batch-updated"}]`,
+		},
+	} {
+		if rec := w.do(step.method, step.path, "admin", step.body); rec.Code/100 != 2 {
+			t.Fatalf("%s %s: %d %s", step.method, step.path, rec.Code, rec.Body)
+		}
+	}
+	type saved struct{ url, username, password string }
+	want := map[string]saved{
+		"zz-private":       {"https://up.example/private", "u", "p"},
+		"zz-user":          {"https://u@up.example/private", "", ""},
+		"zz-batch":         {"https://up.example/batch", "b", "q"},
+		"zz-updated":       {"https://up.example/updated", "c", "r"},
+		"zz-batch-updated": {"https://up.example/batch-updated", "d", "s"},
+	}
+	var configurations map[string][]map[string]any
+	jsonBody(
+		t,
+		w.do("GET", "/artifactory/api/repositories/configurations", "admin", ""),
+		&configurations,
+	)
+	var batch map[string]map[string]any
+	jsonBody(t, w.do("GET", "/artifactory/api/v2/repositories/batch?names="+
+		strings.Join(slices.Collect(maps.Keys(want)), ","), "admin", ""), &batch)
+	var list []map[string]any
+	jsonBody(t, w.do("GET", "/artifactory/api/repositories", "reader", ""), &list)
+	for key, want := range want {
+		c := w.stored(key)
+		if got := (saved{c.URL, c.Username, c.Password}); got != want {
+			t.Errorf("%s stored %+v, want %+v", key, got, want)
+		}
+		reads := map[string]map[string]any{"batch": batch[key]}
+		for name, path := range map[string]string{
+			"v1": "/artifactory/api/repositories/", "v2": "/artifactory/api/v2/repositories/",
+		} {
+			var doc map[string]any
+			jsonBody(t, w.do("GET", path+key, "admin", ""), &doc)
+			reads[name] = doc
+		}
+		for _, doc := range configurations["REMOTE"] {
+			if doc["key"] == key {
+				reads["configurations"] = doc
+			}
+		}
+		for name, doc := range reads {
+			username, _ := doc["username"].(string)
+			if doc["url"] != want.url || username != want.username {
+				t.Errorf("%s %s: url %v username %v, want %+v", key, name, doc["url"],
+					doc["username"], want)
+			}
+			if _, ok := doc["password"]; ok && want.password != "" {
+				t.Errorf("%s %s: password %v", key, name, doc["password"])
+			}
+		}
+		if len(reads) != 4 || reads["batch"] == nil {
+			t.Errorf("%s: read by %v only", key, slices.Collect(maps.Keys(reads)))
+		}
+		i := slices.IndexFunc(list, func(e map[string]any) bool { return e["key"] == key })
+		if i < 0 || list[i]["url"] != want.url {
+			t.Errorf("%s listed %v, want url %s", key, list, want.url)
 		}
 	}
 }

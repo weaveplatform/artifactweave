@@ -194,9 +194,9 @@ type repoListEntry = struct {
 // configuration is where to read it, as 7.161.26's
 // RepositoriesResource.addRemoteRepoDetails builds the entry
 // (getRepoConfigUrl); every other repository's url is its root here
-// (RepositoriesUtils.addNonRemoteRepoConfigDetails). The upstream URL loses
-// a user name and password written into it, which 7.x never keeps there
-// (HttpRepoDescriptor.processUrl).
+// (RepositoriesUtils.addNonRemoteRepoConfigDetails). The upstream URL holds
+// no user name and password: a save moves them into the username and
+// password (repos.PrepareCreate and repos.Merge), as 7.x's does.
 func repoEntry(base string, c port.RepoSummary) repoListEntry {
 	e := repoListEntry{
 		Key: c.Key, Type: strings.ToUpper(string(c.Class)),
@@ -204,7 +204,7 @@ func repoEntry(base string, c port.RepoSummary) repoListEntry {
 		Url:         base + "/artifactory/" + c.Key,
 	}
 	if c.Class == repo.Remote {
-		e.Url = repo.WithoutCredentials(c.URL)
+		e.Url = c.URL
 		if c.Shared {
 			e.Configuration = new(
 				base + "/artifactory/api/repositories/" + c.Key + "/configuration",
