@@ -7330,22 +7330,20 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getRemoteRepositoryConfiguration",
     "state": "implemented",
-    "contract": "Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated in favour of the ordinary read. Non-admin callers get the sanitised view only.",
+    "contract": "Returns the shared configuration of a remote repository whose shareConfiguration is on, to any signed-in caller, administrator or not. Deprecated in favour of the ordinary read.",
     "handler": "internal/artifacts/adapters/http/repositories.go: ArtifactoryAPI.GetRemoteRepositoryConfiguration",
     "direct_calls": [
       "apierror.New",
+      "artgen.GetRemoteRepositoryConfiguration200ApplicationVndOrgJfrogArtifactoryRepositoriesSharedRemoteRepositoryConfigurationPlusJSONResponse",
+      "artgen.GetRemoteRepositoryConfiguration200JSONResponse",
       "errors.Is",
-      "fmt.Sprintf",
+      "http.StatusText",
       "httpkit.Accepts",
       "httpkit.Denied",
       "httpkit.Principal",
-      "json.Marshal",
-      "json.Unmarshal",
-      "maps.DeleteFunc",
-      "repo.Masked",
+      "repo.Descriptor",
       "s.InternalError",
       "s.content",
-      "slices.Contains",
       "st.Repos",
       "st.Repos().Get"
     ],
@@ -7353,6 +7351,12 @@
     "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
     "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "response_collections": [
+      "200 application/json.customHttpHeader[]",
+      "200 application/json.externalDependencies.pattern[]",
+      "200 application/vnd.org.jfrog.artifactory.repositories.SharedRemoteRepositoryConfiguration+json.customHttpHeader[]",
+      "200 application/vnd.org.jfrog.artifactory.repositories.SharedRemoteRepositoryConfiguration+json.externalDependencies.pattern[]"
+    ],
     "pagination_execution": "not a collection",
     "evidence": [
       "internal/artifacts/adapters/http/repositories.go",
@@ -7367,7 +7371,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getRepositoryConfiguration",
     "state": "implemented",
-    "contract": "Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.",
+    "contract": "Returns the stored configuration with defaults filled in. Admins receive every field of the repository's class, whatever its package type, each a setting of another package type giving its default; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. A stored remote password is left out and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.",
     "handler": "internal/artifacts/adapters/http/repositories.go: ArtifactoryAPI.GetRepositoryConfiguration",
     "direct_calls": [
       "s.readOne"
@@ -9757,7 +9761,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getBatchOfRepositoriesByName",
     "state": "implemented",
-    "contract": "Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100 names per call.",
+    "contract": "Returns the configurations of the named repositories as a map keyed by repository key. Keys that do not exist are omitted. Admins receive every field of each repository's class, as the ordinary read gives them; other callers receive the public subset. At most 100 names per call.",
     "handler": "internal/artifacts/adapters/http/repositories.go: ArtifactoryAPI.GetBatchOfRepositoriesByName",
     "direct_calls": [
       "errors.Is",
@@ -9790,7 +9794,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getRepositoryConfigurationV2",
     "state": "implemented",
-    "contract": "Like the ordinary read but returns only the fields that apply to the repository's package type, so a generic repository has no Maven or Docker fields in the response. maxUniqueSnapshots applies to nuget as well as maven, gradle, ivy and sbt, and checksumPolicyType, handleReleases and handleSnapshots to local and federated npm repositories as well. Access rules are the same as the ordinary read.",
+    "contract": "Like the ordinary read but returns only the fields that apply to the repository's package type and class, so a generic repository has no Maven or Docker fields in the response and a virtual repository no blackedOut or cdnRedirect. checksumPolicyType, handleReleases and handleSnapshots apply to maven, gradle, ivy and sbt repositories only, and maxUniqueSnapshots to local and federated maven, gradle, ivy, sbt and nuget repositories and to maven and vcs remotes. Access rules are the same as the ordinary read.",
     "handler": "internal/artifacts/adapters/http/repositories.go: ArtifactoryAPI.GetRepositoryConfigurationV2",
     "direct_calls": [
       "artgen.GetRepositoryConfigurationV2200ApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONResponse",

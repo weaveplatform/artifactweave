@@ -563,9 +563,13 @@ func repositoryStatusRows() []statusCase {
 		{exists, r + "/existence", "user", "", 403},
 		{exists, r + "/existence", "", "", 401},
 
-		{shared, r + "/remote-private/configuration", "admin", "", 200},
+		// Any signed-in caller reads a shared remote's configuration, and a
+		// remote that does not share it answers 404 to everyone, as 7.161.26's
+		// RepoConfigurationResource.getRemoteDescriptor does (#1493).
+		{shared, r + "/remote-shared/configuration", "admin", "", 200},
 		{shared, r + "/remote-shared/configuration", "user", "", 200},
-		{shared, r + "/remote-private/configuration", "user", "", 403},
+		{shared, r + "/remote-private/configuration", "admin", "", 404},
+		{shared, r + "/remote-private/configuration", "user", "", 404},
 		{shared, r + "/libs-local/configuration", "admin", "", 404},
 		{shared, r + "/remote-shared/configuration", "", "", 401},
 

@@ -3,6 +3,7 @@ package repo
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -264,7 +265,15 @@ type Config struct {
 	ForceConanAuthentication        *bool                   `json:"forceConanAuthentication,omitempty"`
 	ForceMetadataNameVersion        *bool                   `json:"forceMetadataNameVersion,omitempty"`
 	ForceNonDuplicateChart          *bool                   `json:"forceNonDuplicateChart,omitempty"`
+	EnableComposerV1Indexing        *bool                   `json:"enableComposerV1Indexing,omitempty"`
 	Members                         []Member                `json:"members,omitempty"`
+
+	// Settings of 7.161.26's read model that its configuration XSD
+	// (artifactory.xsd) does not hold, so the YAML descriptor refuses them
+	// (descriptor:"-"). Each is accepted and stored; nothing acts on it.
+	EnableNormalizedVersion *bool `json:"enableNormalizedVersion,omitempty" descriptor:"-"`
+	MLRepoLayout            *bool `json:"mlRepoLayout,omitempty"            descriptor:"-"`
+	SendContext             *bool `json:"sendContext,omitempty"             descriptor:"-"`
 
 	// The legacy enable<Type>Support flags of every class. A create
 	// without packageType takes its type from them (Defaults), and the v1
@@ -371,9 +380,19 @@ type Config struct {
 	ForceMavenAuthentication                      *bool            `json:"forceMavenAuthentication,omitempty"`
 	HideUnauthorizedResources                     *bool            `json:"hideUnauthorizedResources,omitempty"`
 	ResolveDockerTagsByTimestamp                  *bool            `json:"resolveDockerTagsByTimestamp,omitempty"`
+	CachingLocalForeignLayersEnabled              *bool            `json:"cachingLocalForeignLayersEnabled,omitempty"`
 	UseNamespaces                                 *bool            `json:"useNamespaces,omitempty"`
 	DebianDefaultArchitectures                    string           `json:"debianDefaultArchitectures,omitempty"`
 	P2URLs                                        []string         `json:"p2Urls,omitempty"`
+
+	// Shown names the fields a read writes even when empty: username,
+	// password, localAddress, dockerProjectId and keyPair as "", and
+	// customHttpHeaders as []. 7.161.26's read model holds each as "" or []
+	// by default where omitempty would leave the key out; the remote
+	// credentials read as "" in every sample read of a remote repository.
+	// Only Full sets it, and Relevant takes out what it leaves out; nothing
+	// stores or decodes it.
+	Shown []string `json:"-" descriptor:"-"`
 }
 
 // UnmarshalJSON decodes a repository document. FlexBool already accepts both
@@ -390,16 +409,23 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 
 // MarshalJSON writes environments, repositories and propertySets as [] when
 // the slice is empty but not nil, which omitempty would drop: Masked relies
-// on that for API responses, and a nil slice still leaves the key out. The
-// outer fields shadow the embedded ones because encoding/json prefers the
+// on that for API responses, and a nil slice still leaves the key out. It
+// writes the fields Shown names even when empty. The outer
+// fields shadow the embedded ones because encoding/json prefers the
 // shallower field.
 func (c Config) MarshalJSON() ([]byte, error) {
 	type plain Config
 	doc := struct {
 		plain
-		Environments *[]string `json:"environments,omitempty"`
-		Repositories *[]string `json:"repositories,omitempty"`
-		PropertySets *[]string `json:"propertySets,omitempty"`
+		Environments      *[]string           `json:"environments,omitempty"`
+		Repositories      *[]string           `json:"repositories,omitempty"`
+		PropertySets      *[]string           `json:"propertySets,omitempty"`
+		Username          *string             `json:"username,omitempty"`
+		Password          *string             `json:"password,omitempty"`
+		LocalAddress      *string             `json:"localAddress,omitempty"`
+		DockerProjectID   *string             `json:"dockerProjectId,omitempty"`
+		KeyPair           *string             `json:"keyPair,omitempty"`
+		CustomHTTPHeaders *[]CustomHTTPHeader `json:"customHttpHeaders,omitempty"`
 	}{plain: plain(c)}
 	if c.Environments != nil {
 		doc.Environments = &c.Environments
@@ -409,6 +435,28 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	}
 	if c.PropertySets != nil {
 		doc.PropertySets = &c.PropertySets
+	}
+	for _, f := range []struct {
+		name string
+		to   **string
+		from *string
+	}{
+		{"username", &doc.Username, &c.Username},
+		{"password", &doc.Password, &c.Password},
+		{"localAddress", &doc.LocalAddress, &c.LocalAddress},
+		{"dockerProjectId", &doc.DockerProjectID, &c.DockerProjectID},
+		{"keyPair", &doc.KeyPair, &c.KeyPair},
+	} {
+		if *f.from != "" || slices.Contains(c.Shown, f.name) {
+			*f.to = f.from
+		}
+	}
+	if len(c.CustomHTTPHeaders) > 0 || slices.Contains(c.Shown, "customHttpHeaders") {
+		hs := c.CustomHTTPHeaders
+		if hs == nil {
+			hs = []CustomHTTPHeader{}
+		}
+		doc.CustomHTTPHeaders = &hs
 	}
 	b, err := json.Marshal(doc)
 	if err != nil {

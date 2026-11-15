@@ -1,11 +1,14 @@
 package artifacts_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -186,6 +189,58 @@ func TestAccListRepositories(t *testing.T) {
 	}
 }
 
+// A remote's entry carries its upstream URL, without a user name and password,
+// and, when the remote shares its configuration, where to read it; no other
+// entry has a configuration (7.161.26's
+// RepositoriesResource.addRemoteRepoDetails and
+// RepositoriesUtils.addNonRemoteRepoConfigDetails) (#1493). The streamed
+// and the paged list build the same entries.
+func TestAccListRemoteEntries(t *testing.T) {
+	w := newRepoWorld(t)
+	w.create(
+		repo.Config{
+			Key: "shared", Class: repo.Remote, URL: "https://u:p@up.example/m2",
+			ShareConfiguration: new(true),
+		},
+		repo.Config{Key: "private", Class: repo.Remote, URL: "https://up.example/npm"},
+		repo.Config{Key: "jars", Class: repo.Local, ShareConfiguration: new(true)},
+	)
+	want := map[string]map[string]any{
+		"shared": {
+			"key":           "shared",
+			"type":          "REMOTE",
+			"packageType":   "Generic",
+			"url":           "https://up.example/m2",
+			"configuration": "https://reg.example/artifactory/api/repositories/shared/configuration",
+		},
+		"private": {
+			"key": "private", "type": "REMOTE", "packageType": "Generic",
+			"url": "https://up.example/npm",
+		},
+		"jars": {
+			"key": "jars", "type": "LOCAL", "packageType": "Generic",
+			"url": "https://reg.example/artifactory/jars",
+		},
+	}
+	for _, query := range []string{"", "?limit=100"} {
+		var got []map[string]any
+		jsonBody(t, w.do("GET", "/artifactory/api/repositories"+query, "reader", ""), &got)
+		seen := 0
+		for _, e := range got {
+			key, _ := e["key"].(string)
+			if entry, ok := want[key]; ok {
+				seen++
+				if !reflect.DeepEqual(e, entry) {
+					t.Errorf("%q %s: %v, want %v", query, key, e, entry)
+				}
+			}
+		}
+		if seen != len(want) {
+			t.Errorf("%q: %d of %d entries in %v", query, seen, len(want), got)
+		}
+	}
+}
+
 func TestAccGetRepository(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(repo.Config{
@@ -342,39 +397,94 @@ func TestAccAllConfigurationsAndExistence(t *testing.T) {
 	}
 }
 
+// The shared remote configuration is the remote's masked descriptor, the
+// same for every signed-in caller: 7.161.26's RepositoriesResource admits
+// ROLE_ADMIN and ROLE_USER alike, and RepoConfigurationResource answers
+// the HttpRepoDescriptor with its credentials, proxy, local address and
+// property sets cleared (maskData) (#1493).
 func TestAccSharedRemoteConfiguration(t *testing.T) {
 	w := newRepoWorld(t)
-	shared := true
 	w.create(repo.Config{
 		Key: "up", Class: repo.Remote, URL: "https://up.example", Username: "u", Password: "p",
-		ShareConfiguration: &shared,
+		ShareConfiguration: new(true), Proxy: "corp", LocalAddress: "10.0.0.1",
+		PropertySets: []string{"artifactory"},
+		CustomHTTPHeaders: []repo.CustomHTTPHeader{
+			{Name: "X-Token", Value: "secret", Sensitive: true}, {Name: "X-Team", Value: "build"},
+		},
 	})
-	var got map[string]any
-	rec := w.do(
-		"GET",
-		"/artifactory/api/repositories/up/configuration",
-		"reader",
-		"",
-		"Accept",
-		mediaShared,
-	)
-	jsonBody(t, rec, &got)
-	if rec.Header().Get("Content-Type") != mediaShared || got["key"] != "up" ||
-		got["url"] != "https://up.example" || got["username"] != nil || got["packageType"] != "generic" {
-		t.Fatalf("shared view %s", rec.Body)
+	want := `{"@class": "org.artifactory.descriptor.repo.HttpRepoDescriptor", "key": "up",
+		"allowAnyHostAuth": false, "socketTimeoutMillis": 15000,
+		"enableCookieManagement": false, "enableTokenAuthentication": false,
+		"disableProxy": false, "propagateQueryParams": false,
+		"disableUrlNormalization": false, "retrieveSha256FromServer": false,
+		"customHttpHeader": [{"name": "X-Token", "value": "", "sensitive": true},
+			{"name": "X-Team", "value": "build", "sensitive": false}],
+		"type": "Generic", "includesPattern": "**/*", "dockerApiVersion": "V2",
+		"forceNugetAuthentication": false, "forceConanAuthentication": false,
+		"ddebSupported": false, "signedUrlTtl": 90, "blackedOut": false,
+		"handleReleases": true, "handleSnapshots": true, "maxUniqueSnapshots": 0,
+		"maxUniqueTags": 0, "blockPushingSchema1": true, "suppressPomConsistencyChecks": true,
+		"archiveBrowsingEnabled": false, "priorityResolution": false,
+		"storeArtifactsLocally": true, "fetchJarsEagerly": false, "fetchSourcesEagerly": false,
+		"shareConfiguration": true, "url": "https://up.example", "hardFail": false,
+		"offline": false, "retrievalCachePeriodSecs": 7200, "metadataRetrievalTimeoutSecs": 60,
+		"assumedOfflinePeriodSecs": 300, "missedRetrievalCachePeriodSecs": 1800,
+		"unusedArtifactsCleanupPeriodHours": 0, "synchronizeProperties": false,
+		"listRemoteFolderItems": false, "bypassHeadRequests": false, "rejectInvalidJars": false,
+		"blockMismatchingMimeTypes": true, "repoLayoutRef": "maven-2-default",
+		"xray": {"enabled": false, "dataTtl": 90, "xrayNotAvailableMode": null},
+		"downloadRedirect": {"enabled": false}, "cdnRedirect": {"enabled": false},
+		"remoteRepoChecksumPolicyType": "GEN_IF_ABSENT",
+		"contentSynchronisation": {"enabled": false, "statistics": {"enabled": false},
+			"properties": {"enabled": false}, "source": {"originAbsenceDetection": false}}}`
+	var compact bytes.Buffer
+	if err := json.Compact(&compact, []byte(want)); err != nil {
+		t.Fatal(err)
 	}
-	jsonBody(t, w.do("GET", "/artifactory/api/repositories/up/configuration", "admin", ""), &got)
-	if got["username"] != "u" || got["password"] != nil {
-		t.Fatalf("admin view %v", got)
+	const path = "/artifactory/api/repositories/up/configuration"
+	for _, tc := range []struct{ as, accept, media string }{
+		{"reader", mediaShared, mediaShared},
+		{"reader", "", "application/json"},
+		{"admin", "", "application/json"},
+	} {
+		rec := w.do("GET", path, tc.as, "", "Accept", tc.accept)
+		if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != tc.media ||
+			rec.Body.String() != compact.String()+"\n" {
+			t.Errorf("%s %q: %d %s\n%s", tc.as, tc.accept, rec.Code,
+				rec.Header().Get("Content-Type"), rec.Body)
+		}
 	}
 	w.fail["get"] = true
-	if rec := w.do(
-		"GET",
-		"/artifactory/api/repositories/up/configuration",
-		"admin",
-		"",
-	); rec.Code != 500 {
+	if rec := w.do("GET", path, "admin", ""); rec.Code != 500 {
 		t.Fatalf("store failure %d", rec.Code)
+	}
+}
+
+// A key that names no remote, or a remote that does not share its
+// configuration, answers 404 to every caller, administrators included:
+// getRemoteDescriptor answers Response.status(SC_NOT_FOUND) for anything but
+// a shared remote, and RestResponseFilter gives that entity-less response
+// the error envelope with the reason phrase (#1493).
+func TestAccSharedRemoteConfigurationNotFound(t *testing.T) {
+	w := newRepoWorld(t)
+	w.create(
+		repo.Config{Key: "private", Class: repo.Remote, URL: "https://up.example"},
+		repo.Config{
+			Key: "off", Class: repo.Remote, URL: "https://up.example",
+			ShareConfiguration: new(false),
+		},
+		repo.Config{Key: "local", Class: repo.Local, ShareConfiguration: new(true)},
+	)
+	for _, key := range []string{"private", "off", "local", "missing"} {
+		for _, as := range []string{"admin", "reader"} {
+			rec := w.do("GET", "/artifactory/api/repositories/"+key+"/configuration", as, "")
+			if rec.Code != http.StatusNotFound ||
+				rec.Body.String() != `{"errors":[{"message":"Not Found","status":404}]}`+"\n" ||
+				rec.Header().Get("Content-Type") != "application/json" {
+				t.Errorf("%s as %s: %d %q %s", key, as, rec.Code,
+					rec.Header().Get("Content-Type"), rec.Body)
+			}
+		}
 	}
 }
 
@@ -1076,17 +1186,21 @@ func TestAccNuGetEmptyContextsSurviveDirectAndSharedConfiguration(t *testing.T) 
 	if rec.Code != 200 {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body)
 	}
-	for _, suffix := range []string{"", "/configuration"} {
-		var doc map[string]any
-		jsonBody(t, w.do("GET", p+suffix, "admin", ""), &doc)
-		if doc["feedContextPath"] != "" || doc["downloadContextPath"] != "" {
-			t.Fatal("empty context lost", doc)
-		}
+	var doc map[string]any
+	jsonBody(t, w.do("GET", p, "admin", ""), &doc)
+	if doc["feedContextPath"] != "" || doc["downloadContextPath"] != "" {
+		t.Fatal("empty context lost", doc)
 	}
-	var shared map[string]any
-	jsonBody(t, w.do("GET", p+"/configuration", "reader", ""), &shared)
-	if _, present := shared["feedContextPath"]; present {
-		t.Fatal("shared disclosure contract broadened", shared)
+	// The shared configuration is the remote descriptor, which holds the
+	// context paths in its nuget object (#1493); a reader gets the same.
+	for _, as := range []string{"admin", "reader"} {
+		var shared struct {
+			NuGet map[string]any `json:"nuget"`
+		}
+		jsonBody(t, w.do("GET", p+"/configuration", as, ""), &shared)
+		if shared.NuGet["feedContextPath"] != "" || shared.NuGet["downloadContextPath"] != "" {
+			t.Fatal("empty context lost in the shared configuration", as, shared)
+		}
 	}
 	for _, body := range []string{`{"description":"keep empty"}`, `{"feedContextPath":"custom","downloadContextPath":"download"}`, `{"feedContextPath":"","downloadContextPath":""}`} {
 		rec = w.do("POST", p, "admin", body)
@@ -1332,5 +1446,248 @@ func TestAccCreateWithoutPackageTypeUsesTheLegacyFlags(t *testing.T) {
 		`{"rclass":"local","enableDistRepoSupport":true}`)
 	if rec.Code != 400 || !strings.Contains(rec.Body.String(), `\"distribution\" is not allowed`) {
 		t.Errorf("distribution create %d %s", rec.Code, rec.Body)
+	}
+}
+
+// readModelFields are the fields 7.161.26's RepositoryConfigurationBase
+// gives every repository's v1 read; a Docker, OCI or Helm OCI repository
+// has dockerProjectId only when it set one.
+var readModelFields = slices.Concat(legacyTypeFlags, []string{
+	"key", "rclass", "packageType", "description", "notes", "includesPattern",
+	"excludesPattern", "repoLayoutRef", "signedUrlTtl", "environments", "ddebSupported",
+	"debianTrivialLayout", "dockerApiVersion", "blockPushingSchema1", "dockerProjectId",
+	"enableNormalizedVersion", "forceNugetAuthentication", "forceP2Authentication",
+	"forceConanAuthentication", "forceNonDuplicateChart", "forceMetadataNameVersion",
+	"mlRepoLayout", "priorityResolution",
+})
+
+// localModelFields are what LocalRepositoryConfigurationImpl adds: the
+// fields of RTFACT-31100's v1 read of a Maven local repository.
+var localModelFields = []string{
+	"checksumPolicyType", "handleReleases", "handleSnapshots", "maxUniqueSnapshots",
+	"maxUniqueTags", "snapshotVersionBehavior", "suppressPomConsistencyChecks", "blackedOut",
+	"propertySets", "archiveBrowsingEnabled", "calculateYumMetadata", "enableFileListsIndexing",
+	"yumRootDepth", "dockerTagRetention", "enableComposerV1Indexing", "terraformType",
+	"encryptStates", "downloadRedirect", "cdnRedirect", "cargoInternalIndex",
+	"cargoAnonymousAccess", "xrayIndex", "xrayDataTtl",
+}
+
+// An administrator's v1 read of a generic local, an RPM remote, a Maven
+// virtual and a Docker federated repository created through the API with
+// every default has its class's 7.161.26 read model whole, with the
+// model's values for the fields main left out (#1493).
+func TestAccV1ReadIsTheClassReadModel(t *testing.T) {
+	w := newRepoWorld(t)
+	remote := []string{
+		"url", "username", "password", "localAddress", "disableProxy",
+		"remoteRepoChecksumPolicyType", "hardFail", "offline", "storeArtifactsLocally",
+		"socketTimeoutMillis", "retrievalCachePeriodSecs", "assumedOfflinePeriodSecs",
+		"missedRetrievalCachePeriodSecs", "metadataRetrievalTimeoutSecs",
+		"unusedArtifactsCleanupPeriodHours", "fetchJarsEagerly", "fetchSourcesEagerly",
+		"shareConfiguration", "synchronizeProperties", "listRemoteFolderItems",
+		"rejectInvalidJars", "allowAnyHostAuth", "enableCookieManagement",
+		"enableTokenAuthentication", "propagateQueryParams", "blockMismatchingMimeTypes",
+		"bypassHeadRequests", "disableUrlNormalization", "contentSynchronisation",
+		"externalDependenciesEnabled", "sendContext", "passThrough", "curated",
+		"retrieveSha256FromServer", "customHttpHeaders", "handleReleases", "handleSnapshots",
+		"suppressPomConsistencyChecks", "blackedOut", "maxUniqueSnapshots", "maxUniqueTags",
+		"propertySets", "archiveBrowsingEnabled", "xrayIndex", "xrayDataTtl",
+		"downloadRedirect", "cdnRedirect", "cargoAnonymousAccess", "cargoInternalIndex",
+	}
+	virtual := []string{
+		"repositories", "hideUnauthorizedResources",
+		"artifactoryRequestsCanRetrieveRemoteArtifacts", "resolveDockerTagsByTimestamp",
+		"keyPair", "pomRepositoryReferencesCleanupPolicy", "cachingLocalForeignLayersEnabled",
+		"externalDependenciesEnabled", "virtualRetrievalCachePeriodSecs",
+		"forceMavenAuthentication", "useNamespaces", "cargoInternalIndex", "cargoAnonymousAccess",
+	}
+	withoutProject := slices.DeleteFunc(
+		slices.Clone(readModelFields), func(f string) bool { return f == "dockerProjectId" },
+	)
+	for _, tc := range []struct {
+		key, body string
+		fields    []string
+		values    map[string]any
+	}{
+		{
+			"generic-local", `{"rclass":"local"}`,
+			slices.Concat(readModelFields, localModelFields),
+			map[string]any{
+				"blockPushingSchema1": true, "dockerProjectId": "", "xrayDataTtl": float64(90),
+				"calculateYumMetadata": false, "yumRootDepth": float64(0),
+				"enableComposerV1Indexing": false, "terraformType": "MODULE",
+				"encryptStates": true, "cargoInternalIndex": true, "cargoAnonymousAccess": false,
+				"enableNormalizedVersion": false, "mlRepoLayout": false,
+			},
+		},
+		{
+			"rpm-remote", `{"rclass":"remote","packageType":"rpm","url":"https://up.example"}`,
+			slices.Concat(readModelFields, remote),
+			map[string]any{
+				"username": "", "password": "", "localAddress": "", "maxUniqueTags": float64(0),
+				"archiveBrowsingEnabled": false, "propagateQueryParams": false,
+				"retrieveSha256FromServer": false, "passThrough": false, "curated": false,
+				"sendContext": false, "customHttpHeaders": []any{}, "xrayDataTtl": float64(90),
+				"blockPushingSchema1": true, "dockerApiVersion": "V2",
+			},
+		},
+		{
+			"maven-virtual", `{"rclass":"virtual","packageType":"maven"}`,
+			slices.Concat(readModelFields, virtual),
+			map[string]any{
+				"keyPair": "", "blockPushingSchema1": true, "cargoInternalIndex": true,
+				"cachingLocalForeignLayersEnabled": false,
+			},
+		},
+		{
+			"docker-federated", `{"rclass":"federated","packageType":"docker"}`,
+			slices.Concat(withoutProject, localModelFields, []string{"disableProxy"}),
+			map[string]any{
+				"blockPushingSchema1": true, "encryptStates": true, "disableProxy": false,
+				"enableDockerSupport": true,
+			},
+		},
+	} {
+		if rec := w.do(
+			"PUT",
+			"/artifactory/api/repositories/"+tc.key,
+			"admin",
+			tc.body,
+		); rec.Code != 200 {
+			t.Fatalf("create %s: %d %s", tc.key, rec.Code, rec.Body)
+		}
+		rec := w.do("GET", "/artifactory/api/repositories/"+tc.key, "admin", "")
+		var v1 map[string]any
+		jsonBody(t, rec, &v1)
+		if rec.Code != 200 {
+			t.Fatalf("%s v1 %d", tc.key, rec.Code)
+		}
+		want := slices.Compact(slices.Sorted(slices.Values(tc.fields)))
+		got := slices.Sorted(maps.Keys(v1))
+		if !slices.Equal(want, got) {
+			t.Errorf("%s v1 fields\n got %v\nwant %v", tc.key, got, want)
+		}
+		for f, v := range tc.values {
+			if !reflect.DeepEqual(v1[f], v) {
+				t.Errorf("%s v1 %s %#v, want %#v", tc.key, f, v1[f], v)
+			}
+		}
+	}
+}
+
+// A Docker repository created without blockPushingSchema1 reads true in
+// the v1 and v2 reads, the default of 7.161.26's descriptor and model and
+// what the Terraform provider expects (block_pushing_schema1 defaults to
+// true there); one that sets false keeps it (#1493).
+func TestAccDockerRepositoryBlocksSchema1ByDefault(t *testing.T) {
+	w := newRepoWorld(t)
+	for key, body := range map[string]string{
+		"docker-local":  `{"rclass":"local","packageType":"docker"}`,
+		"docker-remote": `{"rclass":"remote","packageType":"docker","url":"https://up.example"}`,
+		"docker-off":    `{"rclass":"local","packageType":"docker","blockPushingSchema1":false}`,
+	} {
+		if rec := w.do(
+			"PUT",
+			"/artifactory/api/repositories/"+key,
+			"admin",
+			body,
+		); rec.Code != 200 {
+			t.Fatalf("create %s: %d %s", key, rec.Code, rec.Body)
+		}
+		for _, path := range []string{"/artifactory/api/repositories/", "/artifactory/api/v2/repositories/"} {
+			var got map[string]any
+			jsonBody(t, w.do("GET", path+key, "admin", ""), &got)
+			if want := key != "docker-off"; got["blockPushingSchema1"] != want {
+				t.Errorf(
+					"%s%s blockPushingSchema1 %v, want %v",
+					path,
+					key,
+					got["blockPushingSchema1"],
+					want,
+				)
+			}
+		}
+	}
+}
+
+// The v2 read and the configurations list keep a field for the package
+// types and classes 7.161.26's annotation names and leave it out for the
+// others (#1494), and a generic local repository's entry has the fields of
+// JFrog's configurations sample but the project key.
+func TestAccV2ReadFollowsTheAnnotations(t *testing.T) {
+	w := newRepoWorld(t)
+	for key, body := range map[string]string{
+		"npm-local": `{"rclass":"local","packageType":"npm","checksumPolicyType":"server-generated-checksums"}`,
+		"npm-remote": `{"rclass":"remote","packageType":"npm","url":"https://up.example",` +
+			`"propagateQueryParams":true}`,
+		"maven-remote":   `{"rclass":"remote","packageType":"maven","url":"https://up.example"}`,
+		"docker-remote":  `{"rclass":"remote","packageType":"docker","url":"https://up.example"}`,
+		"gradle-virtual": `{"rclass":"virtual","packageType":"gradle"}`,
+		"npm-virtual":    `{"rclass":"virtual","packageType":"npm"}`,
+		"helm-federated": `{"rclass":"federated","packageType":"helm"}`,
+		"generic-local":  `{"rclass":"local"}`,
+	} {
+		if rec := w.do(
+			"PUT",
+			"/artifactory/api/repositories/"+key,
+			"admin",
+			body,
+		); rec.Code != 200 {
+			t.Fatalf("create %s: %d %s", key, rec.Code, rec.Body)
+		}
+	}
+	var groups map[string][]map[string]any
+	jsonBody(t, w.do("GET", "/artifactory/api/repositories/configurations", "admin", ""), &groups)
+	listed := map[string]map[string]any{}
+	for _, list := range groups {
+		for _, c := range list {
+			listed[c["key"].(string)] = c
+		}
+	}
+	for _, tc := range []struct {
+		key, field string
+		kept       bool
+	}{
+		{"npm-local", "checksumPolicyType", false},
+		{"npm-local", "handleReleases", false},
+		{"npm-remote", "propagateQueryParams", true},
+		{"npm-remote", "retrieveSha256FromServer", true},
+		{"npm-remote", "enableTokenAuthentication", false},
+		{"npm-remote", "maxUniqueSnapshots", false},
+		{"maven-remote", "maxUniqueSnapshots", true},
+		{"maven-remote", "cdnRedirect", false},
+		{"maven-remote", "username", true},
+		{"docker-remote", "enableTokenAuthentication", true},
+		{"docker-remote", "externalDependenciesEnabled", true},
+		{"docker-remote", "maxUniqueTags", false},
+		{"gradle-virtual", "forceMavenAuthentication", false},
+		{"gradle-virtual", "keyPair", true},
+		{"gradle-virtual", "virtualRetrievalCachePeriodSecs", false},
+		{"gradle-virtual", "priorityResolution", false},
+		{"gradle-virtual", "blackedOut", false},
+		{"npm-virtual", "virtualRetrievalCachePeriodSecs", true},
+		{"npm-virtual", "externalDependenciesEnabled", true},
+		{"npm-virtual", "useNamespaces", false},
+		{"helm-federated", "forceNonDuplicateChart", false},
+		{"helm-federated", "cdnRedirect", true},
+		{"generic-local", "xrayDataTtl", true},
+	} {
+		var v2 map[string]any
+		jsonBody(t, w.do("GET", "/artifactory/api/v2/repositories/"+tc.key, "admin", ""), &v2)
+		for name, read := range map[string]map[string]any{"v2": v2, "configurations": listed[tc.key]} {
+			if _, ok := read[tc.field]; ok != tc.kept {
+				t.Errorf("%s %s %s present %v, want %v", name, tc.key, tc.field, ok, tc.kept)
+			}
+		}
+	}
+	sample := []string{
+		"key", "packageType", "description", "notes", "includesPattern", "excludesPattern",
+		"repoLayoutRef", "signedUrlTtl", "priorityResolution", "environments", "blackedOut",
+		"propertySets", "archiveBrowsingEnabled", "xrayDataTtl", "downloadRedirect",
+		"cdnRedirect", "xrayIndex", "rclass",
+	}
+	slices.Sort(sample)
+	if got := slices.Sorted(maps.Keys(listed["generic-local"])); !slices.Equal(sample, got) {
+		t.Errorf("configurations generic-local\n got %v\nwant %v", got, sample)
 	}
 }

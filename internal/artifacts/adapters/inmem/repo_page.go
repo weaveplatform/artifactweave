@@ -26,9 +26,7 @@ func (r repos) Page(ctx context.Context, l port.RepoListing) (port.RepoPage, err
 			all = all[start:end]
 		}
 		for _, c := range all {
-			out.Repos = append(out.Repos, port.RepoSummary{
-				Key: c.Key, Class: c.Class, PackageType: c.PackageType, Description: c.Description,
-			})
+			out.Repos = append(out.Repos, port.SummaryOf(c))
 		}
 		return nil
 	})

@@ -725,6 +725,36 @@ func TestAccSmartDiscoveryReadsClassFromType(t *testing.T) {
 	}
 }
 
+// A peer that refuses the repository read answers the shared configuration
+// with its remote descriptor, which has no class field and whose "type" is
+// the package type; 7.x answers it for a remote repository only
+// (RepoConfigurationResource.getRemoteDescriptor), so the peer is a remote.
+func TestAccSmartDiscoveryReadsSharedDescriptorAsRemote(t *testing.T) {
+	w := smartFixture(t)
+	w.mu.Lock()
+	w.reply = func(rw http.ResponseWriter, r *http.Request) bool {
+		switch r.URL.Path {
+		case "/artifactory/api/repositories/source":
+			rw.WriteHeader(http.StatusForbidden)
+			return true
+		case "/artifactory/api/repositories/source/configuration":
+			rw.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(
+				rw,
+				`{"@class":"org.artifactory.descriptor.repo.HttpRepoDescriptor",`+
+					`"key":"source","type":"Generic","shareConfiguration":true}`,
+			)
+			return true
+		}
+		return false
+	}
+	w.mu.Unlock()
+	peer, err := w.s.Discover(w.ctx, w.smartRequest(), w.permit)
+	if err != nil || peer.Class != repo.Remote {
+		t.Fatal(peer, err)
+	}
+}
+
 // A storage path must name the item and nothing else, so one with its own
 // query is refused before anything is sent. An outage stays an error: read
 // as absence, it would mark the item gone from the origin.

@@ -92,7 +92,7 @@ func TestAccSharedConfigurationRequiresAuthenticatedUser(t *testing.T) {
 			Username:           "private",
 			Password:           "credential",
 			CustomHTTPHeaders: []repo.CustomHTTPHeader{
-				{Name: "X-Private", Value: "header-secret"},
+				{Name: "X-Private", Value: "header-secret", Sensitive: true},
 			},
 		},
 	)
@@ -100,7 +100,7 @@ func TestAccSharedConfigurationRequiresAuthenticatedUser(t *testing.T) {
 	wantStatus(t, w.do(http.MethodGet, path, "", ""), http.StatusUnauthorized)
 	rec := w.do(http.MethodGet, path, "reader", "")
 	wantStatus(t, rec, http.StatusOK)
-	for _, secret := range []string{"private", "credential", "header-secret", "customHttpHeaders"} {
+	for _, secret := range []string{"private", "credential", "header-secret"} {
 		if strings.Contains(rec.Body.String(), secret) {
 			t.Fatal("shared configuration leaked protected field", secret)
 		}

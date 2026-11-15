@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 )
@@ -16,8 +17,8 @@ import (
 // count and the window are separate statements, so a repository created or
 // removed between them can make Total disagree with the window by one; the
 // list promises no snapshot (decision 0043, "Access identity pagination").
-// Only the window's documents are decoded, for their descriptions, and no
-// secret is read.
+// Only the window's documents are decoded, for their descriptions and a
+// remote's upstream URL and shareConfiguration, and no secret is read.
 func (r repos) Page(ctx context.Context, l port.RepoListing) (port.RepoPage, error) {
 	count, window, countArgs, windowArgs := repoPageQueries(l)
 	var out port.RepoPage
@@ -33,17 +34,18 @@ func (r repos) Page(ctx context.Context, l port.RepoListing) (port.RepoPage, err
 		}
 	}
 	err := r.s.Rows(ctx, "page repositories", window, windowArgs, func(rs *sql.Rows) error {
-		var s port.RepoSummary
-		var doc string
-		if err := rs.Scan(&s.Key, &s.Class, &s.PackageType, &doc); err != nil {
+		var key, doc string
+		var class repo.Class
+		var packageType repo.PackageType
+		if err := rs.Scan(&key, &class, &packageType, &doc); err != nil {
 			return err //nolint:wrapcheck // wrapped by Rows
 		}
 		c, err := decodeRepo(doc)
 		if err != nil {
 			return err
 		}
-		s.Description = c.Description
-		out.Repos = append(out.Repos, s)
+		c.Key, c.Class, c.PackageType = key, class, packageType
+		out.Repos = append(out.Repos, port.SummaryOf(c))
 		return nil
 	})
 	if err != nil {
