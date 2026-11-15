@@ -46,9 +46,9 @@
 //   - Store and Upload, the contract every backend implements: begin,
 //     resume, append, commit and abort an upload; open a blob for ranged
 //     reads, stat, check, delete and walk. Info and Digests describe a blob.
-//   - Signer, Via (ViaStorage, ViaCDN), SignOptions and Disposition: signed
-//     download URLs for repositories that set downloadRedirect or
-//     cdnRedirect, naming the file as a streamed download does.
+//   - Signer, Via (ViaStorage, ViaCDN), SignOptions and SignedDisposition:
+//     signed download URLs for repositories that set downloadRedirect or
+//     cdnRedirect, naming the file in the form 7.x's signed URLs ask for.
 //   - PartSizer, which backends that write fixed-size parts implement, so
 //     the mirror can size its chunks to every member's parts.
 //   - UploadOption, UploadOptions, WithExpectedSHA256 and ResolveOptions,
@@ -135,6 +135,8 @@
 // presigner with the signing capability of download and CDN redirects:
 // Signer, Via, SignOptions, Disposition and ErrCannotSign (issue 119). P7
 // made SHA-512 a digest of every upload (issue 296). Moved here in P9d.
+// Disposition gave way to SignedDisposition, the form 7.x's signed URLs
+// ask for (issue 1577).
 //
 // # Testing
 //

@@ -42,6 +42,10 @@
 //     RemoteDeliveryAllowed, and ForceAuthentication, the router's
 //     middleware that challenges a request without credentials to a
 //     repository Forced reports.
+//   - File name headers: FilenameHeader, ItemDisposition,
+//     PackageDisposition, FileDisposition and Browsable, which name a
+//     downloaded file as 7.x does, by its repository's content browsing
+//     flag.
 //   - Item values and helpers: ItemRequest, ParseItemPath,
 //     ParseEscapedItemPath, Found, Download, Lookup, StatusWriter,
 //     ResolveRepo, DeployTarget, ItemCreated, ItemNotFound,
@@ -181,8 +185,9 @@
 // reads through the remote source (aliasRemoteMetadata); redirect_test.go the signing-failure
 // throttle, the descriptor's minimum redirect size, the request copy
 // without the preconditions a download ignores, the request the download
-// reads, ServeContent, the checksum file's answers, and that no ecosystem
-// handler but Docker's calls http.ServeContent directly; they share one
+// reads, ServeContent, the checksum file's answers, the browser and
+// content browsing rules of a download (download_headers.go), and that no
+// ecosystem handler but Docker's calls http.ServeContent directly; they share one
 // file because tools/citestselection lists this package's test files by
 // name. kittest.WantDownloadConditionals checks a package route's
 // built documents from its own package's tests. The route suites under

@@ -560,7 +560,7 @@ func (s *Store) SignURL(_ context.Context, sha string, o blob.SignOptions) (stri
 	}
 	so := SignedURLOptions{ContentType: o.ContentType}
 	if o.Filename != "" {
-		so.ContentDisposition = blob.Disposition(o.Filename)
+		so.ContentDisposition = blob.SignedDisposition(o.Filename)
 	}
 	return s.sign(sha, o, so)
 }

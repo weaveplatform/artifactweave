@@ -104,7 +104,7 @@ func TestUnitSignedURLNeedsNoNetwork(t *testing.T) {
 	if q.Get("X-Goog-Algorithm") != "GOOG4-RSA-SHA256" || expires < 59 || expires > 60 ||
 		!strings.HasPrefix(q.Get("X-Goog-Credential"), "signer@project.iam.gserviceaccount.com/") ||
 		q.Get("X-Goog-Signature") == "" ||
-		q.Get("response-content-disposition") != blob.Disposition("a.tgz") ||
+		q.Get("response-content-disposition") != `attachment;filename="a.tgz"` ||
 		q.Get("response-content-type") != "application/x-gzip" {
 		t.Fatalf("signed URL query: %v", q)
 	}

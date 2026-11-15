@@ -13,9 +13,10 @@ import (
 	"fmt"
 	"hash"
 	"io"
-	"net/url"
 	"regexp"
 	"time"
+
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 )
 
 // Sentinel errors. Backends wrap them, so test with errors.Is.
@@ -138,13 +139,23 @@ type Signer interface {
 	SignURL(ctx context.Context, sha256 string, o SignOptions) (string, error)
 }
 
-// Disposition is the Content-Disposition naming a downloaded file, in the
-// form Artifactory sends: a quoted name for old clients and an RFC 6266
-// UTF-8 name for the rest. A streamed download and a signed URL's override
-// use the same value.
-func Disposition(filename string) string {
-	return fmt.Sprintf("attachment; filename=%q; filename*=UTF-8''%s",
-		filename, url.PathEscape(filename))
+// SignedDisposition is the Content-Disposition a signed download URL asks
+// the object store or CDN to answer with, for every backend and route:
+// attachment;filename="<name>", with no space after the semicolon and no
+// filename* part, the name as it is. Every 7.x signed URL in a capture asks
+// for that form, on CloudFront (RTFACT-23307 on 7.4.3, sbt/sbt#6614) and
+// on S3 (RTFACT-24153, adoptium/adoptium-support#923 on 7.71.1), and a
+// store answered a '+' in the name raw (adoptium/installer#766); a streamed
+// download names the file in its own form. No capture shows a name outside
+// printable ASCII, and the signer is not in 7.x's OSS sources; such a name
+// is written as filename* alone, as 7.161.26's
+// RequestResponseHelper.setHeaderForNonAscii names it on a streamed
+// download, so that the override every store echoes stays ASCII [I].
+func SignedDisposition(filename string) string {
+	if httpkit.PrintableASCII(filename) {
+		return `attachment;filename="` + httpkit.EscapeQuoted(filename) + `"`
+	}
+	return "attachment;filename*=UTF-8''" + httpkit.EncodeUnreserved(filename)
 }
 
 // PartSizer is implemented by backends that write an upload in parts of a

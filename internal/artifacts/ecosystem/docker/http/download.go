@@ -3,7 +3,9 @@ package dockerhttp
 import (
 	"net/http"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 )
@@ -93,16 +95,25 @@ func withoutValidators(r *http.Request) *http.Request {
 // client's push of a referrers tag.
 var ignoredOnPull = []string{"Range", "If-Range", "If-Match", "If-Unmodified-Since"}
 
-// setFileHeaders sets the headers 7.x sends on a blob or manifest through
-// the Docker API to name the file: X-Artifactory-Filename and a
-// Content-Disposition with the quoted name alone. 7.x sends no filename*
-// part there, though a Maven download from the same server does (blob GETs
-// of RTFACT-29977 on 7.55.8 and RTFACT-30157 on 7.71.4, a manifest HEAD of
-// RTFACT-27199 on 7.33.12), so blob.Disposition's form, which the item route
-// sends, is not used. Every name here is sha256__<hex>, manifest.json or
-// list.manifest.json, which need no escaping.
-func setFileHeaders(h http.Header, name string) {
+// setFileHeaders sets the headers 7.x sends on a blob or manifest of the
+// repository c through the Docker API to name the file:
+// X-Artifactory-Filename and a Content-Disposition with the quoted name
+// alone. 7.x sends no filename* part there, though a Maven download from
+// the same server does (blob GETs of RTFACT-29977 on 7.55.8 and
+// RTFACT-30157 on 7.71.4, a manifest HEAD of RTFACT-27199 on 7.33.12), so
+// the item route's form (itemkit.ItemDisposition) is not used. Every name
+// here is sha256__<hex>, manifest.json or list.manifest.json, which need
+// no escaping. A repository that allows content browsing gets no
+// Content-Disposition: 7.161.26's DockerManifestResponse writes one only
+// from RequestResponseHelper.setBasicHeaders, which skips it there, as it
+// does for any download (itemkit.Browsable). No capture shows a Docker
+// repository with the flag on [I].
+func setFileHeaders(h http.Header, c repo.Config, name string) {
 	h.Set("X-Artifactory-Filename", name)
+	if itemkit.Browsable(c) {
+		h.Del("Content-Disposition")
+		return
+	}
 	h.Set("Content-Disposition", `attachment; filename="`+name+`"`)
 }
 

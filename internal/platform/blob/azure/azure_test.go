@@ -569,7 +569,7 @@ func TestUnitDeleteWalkPresignErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if q := u.Query(); q.Get("rscd") != blob.Disposition("x.bin") ||
+	if q := u.Query(); q.Get("rscd") != `attachment;filename="x.bin"` ||
 		q.Get("rsct") != "application/x-bin" {
 		t.Fatalf("overrides %v", q)
 	}

@@ -595,13 +595,31 @@ func sign(ctx context.Context, t *testing.T, s blob.Store, o Options) {
 			t.Fatalf("sign for a CDN the store lacks: %v", err)
 		}
 	}
-	url, err := sg.SignURL(ctx, info.Digests.SHA256, opts)
-	if err != nil || url == "" {
-		t.Fatalf("sign: %q %v", url, err)
+	// The store answers with the form 7.x's signed URLs ask for, the name
+	// as it is (issue 1577), and a name outside printable ASCII by filename*
+	// alone, so the override stays ASCII on every store [I].
+	for name, disposition := range map[string]string{
+		opts.Filename:   `attachment;filename="lib 1.0.tgz"`,
+		"naïve 1.0.tgz": "attachment;filename*=UTF-8''na%C3%AFve%201.0.tgz",
+	} {
+		named := opts
+		named.Filename = name
+		url, err := sg.SignURL(ctx, info.Digests.SHA256, named)
+		if err != nil || url == "" {
+			t.Fatalf("sign: %q %v", url, err)
+		}
+		if o.FetchPresigned {
+			fetchSigned(ctx, t, url, body, disposition, opts.ContentType)
+		}
 	}
-	if !o.FetchPresigned {
-		return
-	}
+}
+
+// fetchSigned GETs the signed url and fails t unless it answers 200 with
+// body and the overrides disposition and contentType.
+func fetchSigned(ctx context.Context, t *testing.T, url string, body []byte,
+	disposition, contentType string,
+) {
+	t.Helper()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -619,8 +637,8 @@ func sign(ctx context.Context, t *testing.T, s blob.Store, o Options) {
 		"Content-Disposition",
 	), resp.Header.Get(
 		"Content-Type",
-	); cd != blob.Disposition(opts.Filename) ||
-		ct != opts.ContentType {
-		t.Fatalf("signed GET overrides: Content-Disposition %q, Content-Type %q", cd, ct)
+	); cd != disposition || ct != contentType {
+		t.Fatalf("signed GET overrides: Content-Disposition %q, Content-Type %q; want %q, %q",
+			cd, ct, disposition, contentType)
 	}
 }

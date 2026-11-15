@@ -217,7 +217,12 @@ its status alone.
   7.55.8, [RTFACT-30157](https://jfrog.atlassian.net/browse/RTFACT-30157) on 7.71.4) and a
   `HEAD` since RTFACT-29977's fix (amended 2026-11-12, #1317, #1336). Neither capture shows
   `X-Artifactory-Docker-Registry` on a blob, so a blob does not send it. The item route on the
-  same file keeps its `filename*` part, as 7.55.8 sent it on a Maven download. `If-None-Match`
+  same file keeps its `filename*` part, as 7.55.8 sent it on a Maven download. A blob or a
+  manifest of a repository that allows content browsing sends no `Content-Disposition`, as
+  7.161.26's `DockerManifestResponse` writes it only from `RequestResponseHelper.setBasicHeaders`,
+  which leaves it out there; no capture shows such a repository **[I]** (amended 2026-11-15,
+  [#1579](https://github.com/weaveplatform/artifactweave/issues/1579), decision
+  [0032](0032-package-format-handlers.md)). `If-None-Match`
   takes that SHA-1 bare, quoted, weak or in a list, as on the item route. A blob's `GET` and
   `HEAD`, local or remote, answer `If-None-Match` and `If-Modified-Since` with 304, as 6.20's
   download does, and ignore `If-Match` and `If-Unmodified-Since`, which that download does

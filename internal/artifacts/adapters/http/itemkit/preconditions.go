@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
-	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
 // withoutUnevaluatedPreconditions is r without the conditional headers
@@ -64,10 +64,11 @@ func ServeContent(
 
 // serveChecksum answers a GET or HEAD of a checksum file at name whose
 // content is value, the checksum of a file whose checksums are sums (those
-// known) and which last changed at modified, as 7.x answers one on a local,
-// virtual and remote repository alike (Artifactory OSS 7.161.26 sources,
-// DownloadServiceImpl.respond and respondForChecksumRequest, and
-// RequestResponseHelper):
+// known), which last changed at modified and which file, the repository the
+// request named or the member of it that holds the file, keeps, as 7.x
+// answers one on a local, virtual and remote repository alike (Artifactory
+// OSS 7.161.26 sources, DownloadServiceImpl.respond and
+// respondForChecksumRequest, and RequestResponseHelper):
 //   - its file's isNotModified decides first (fileNotModified), and its 304
 //     is the file's: sendNotModifiedResponse is handed the file's resource,
 //     so it carries the file's headers (fileHeaders);
@@ -79,30 +80,48 @@ func ServeContent(
 //   - a GET is sendBodyResponseForChecksum's: the checksum's type and
 //     length, Last-Modified the time of the response, Range applied with
 //     any If-Range ignored ("If-Range is not supported"), none of the
-//     file's headers, Accept-Ranges included, and a 416 without a body.
+//     file's headers, Accept-Ranges included, and a 416 without a body;
+//     a browser's GET on a requested repository that allows content
+//     browsing gets browserView's policy and type, as
+//     sendBodyResponseForChecksum asks getModifiedMimeType with the
+//     requested repository's key, so through a virtual repository it gets
+//     neither.
+//
+// The 304 and the HEAD name the file by file's flag, as setBasicHeaders
+// names it for the file's resource (notModifiedDisposition,
+// FileDisposition).
 func serveChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
+	file, requested repo.Config,
 	name, value string,
 	sums kernel.Checksums,
 	modified time.Time,
 ) {
 	r = withoutUnevaluatedPreconditions(r)
 	artifact, _, _ := item.Sidecar(name)
+	fileName := path.Base(artifact)
 	h := w.Header()
 	if fileNotModified(r, sums, modified) {
-		fileHeaders(h, path.Base(artifact), sums, modified)
+		fileHeaders(
+			h,
+			fileName,
+			notModifiedDisposition(file, fileName, ItemDisposition),
+			sums,
+			modified,
+		)
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 	h.Set("Content-Type", checksumType(r, name))
 	if r.Method == http.MethodHead {
-		fileHeaders(h, path.Base(artifact), sums, modified)
+		fileHeaders(h, fileName, FileDisposition(file, fileName, ItemDisposition), sums, modified)
 		h.Set("Content-Length", strconv.Itoa(len(value)))
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 	h.Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+	browserView(h, r, requested, name)
 	// Decided above against the file, so ServeContent must not decide them
 	// again against the checksum, which has no ETag of its own.
 	r = withoutHeaders(r, "If-None-Match", "If-Modified-Since", "If-Range")
@@ -117,8 +136,14 @@ func serveChecksum(
 // Last-Modified, its SHA-1 as the ETag, bare as 7.x sends it, its
 // checksums, its name, Content-Disposition and Accept-Ranges, as this
 // server's file download sends them (serveFile). A checksum or a time that
-// is not known is left out rather than sent empty.
-func fileHeaders(h http.Header, name string, sums kernel.Checksums, modified time.Time) {
+// is not known is left out rather than sent empty, and so is disposition
+// when it is "".
+func fileHeaders(
+	h http.Header,
+	name, disposition string,
+	sums kernel.Checksums,
+	modified time.Time,
+) {
 	if !modified.IsZero() {
 		h.Set("Last-Modified", modified.UTC().Format(http.TimeFormat))
 	}
@@ -132,8 +157,8 @@ func fileHeaders(h http.Header, name string, sums kernel.Checksums, modified tim
 			h.Set(k, v)
 		}
 	}
-	h.Set("X-Artifactory-Filename", name)
-	h.Set("Content-Disposition", blob.Disposition(name))
+	h.Set("X-Artifactory-Filename", FilenameHeader(name))
+	setDisposition(h, disposition)
 	h.Set("Accept-Ranges", "bytes")
 }
 
