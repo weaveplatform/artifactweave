@@ -102,7 +102,11 @@ publishes `<tag>-<os>-<arch>` style tags (7.21.2+); image labels become properti
 
 ### Virtual and remote
 
-A virtual repository resolves by member order and pushes to `defaultDeploymentRepo`. A
+A virtual repository searches its members in six groups, local and federated members, then
+remote caches, then remote upstreams, first for members with `priorityResolution` and then
+for the rest, each group in configured order after nesting is flattened
+([decision 0008, R1](decisions/0008-virtual-repositories.md#r1-member-order)). It pushes to
+`defaultDeploymentRepo`. A
 remote to `https://registry-1.docker.io` needs `enableTokenAuthentication`, and
 `externalDependenciesEnabled` allows foreign layers. The `oci` and `helmoci` package
 types share the Docker code path; `helm`, `oras` and `cosign` log in with a username and
@@ -132,7 +136,7 @@ The registry is rooted at `<base>/api/npm/<repo>/`.
 | `GET /<pkg>/-/<pkg>-<ver>.tgz`, `GET /@scope/name/-/@scope/name-<ver>.tgz` | The tarball; also the storage layout. A scoped tarball's file name keeps the scope ([research 25](25-npm.md) section 2.1). |
 | `PUT /<pkg>` | Publish: `{_id,name,description,dist-tags,versions{v:{..dist{tarball,shasum,integrity}}},access,_attachments{"<name>-<ver>.tgz":{content_type,data:<base64>,length}}}`. One `PUT`, never retried. npm 11 and later read the packument first and refuse an existing version themselves unless `--force` is given; Artifactory answers a republish with 403 ([research 25](25-npm.md) section 2.1). |
 | `PUT /<pkg>/-rev/<rev>`, `DELETE /<pkg>/-/<pkg>-<ver>.tgz/-rev/<rev>`, `DELETE /<pkg>/-rev/<rev>` | Unpublish steps, each after a `GET /<pkg>?write=true` for `_rev`. Deprecation is a `PUT /<pkg>` of the whole packument with `deprecated` set and no `_rev` ([research 25](25-npm.md) section 2.2). |
-| `GET`, `PUT`, `DELETE /-/package/<pkg>/dist-tags[/<tag>]` | Distribution tags; the `PUT` body is a JSON string. A virtual repository merges `latest` by member order. |
+| `GET`, `PUT`, `DELETE /-/package/<pkg>/dist-tags[/<tag>]` | Distribution tags; the `PUT` body is a JSON string. A virtual repository takes `latest` as the highest version across its members, stable before pre-release from 7.120.0, and another dist-tag from the first member in resolution order that has it ([research 25](25-npm.md) section 7). |
 | `GET /-/v1/search?text=&size=&from=&quality=&popularity=&maintenance=`, legacy `GET /-/all` | Search. |
 | `PUT /-/user/org.couchdb.user:<user>` | Legacy login (`--auth-type=legacy`; the pinned npm 12 source also has a web-login fallback): `{_id,name,password,type:"user",roles,date}` to a body carrying `token` ([research 25](25-npm.md) section 4). |
 | `POST /-/v1/login`, `GET /-/v1/done/<session>` | Web login, the documented current flow: the first returns `{loginUrl,doneUrl}`, the second answers 202 until a token is issued, then `{token}`. Planned in P21 (#262). |
