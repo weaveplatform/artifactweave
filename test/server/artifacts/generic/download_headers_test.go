@@ -177,6 +177,39 @@ func TestAccBoxRouteNamedWithoutFilenameStar(t *testing.T) {
 	}
 }
 
+// TestAccBoxRouteNamesANonASCIIBoxByFilenameStar: the box file route
+// names a box whose name holds a character outside printable ASCII by an
+// attachment Content-Disposition with filename* alone, the name in UTF-8
+// percent-encoded but for RFC 3986's unreserved characters, on a GET, a
+// HEAD and a range: 7.161.26's RequestResponseHelper.setHeaderForNonAscii
+// replaces the package download service's quoted form so (#1505). A 304
+// sends the same [I].
+func TestAccBoxRouteNamesANonASCIIBoxByFilenameStar(t *testing.T) {
+	w, data, sha := downloadWorld(t)
+	const box = "/artifactory/boxes/acme/f%C3%B5cal%201+0.box"
+	harness.WantStatus(t, w.Do(http.MethodPut,
+		box+";box_name=focal;box_provider=virtualbox;box_version=1.0", "admin", string(data)),
+		http.StatusCreated)
+	const want = "attachment; filename*=UTF-8''f%C3%B5cal%201%2B0.box"
+	for _, c := range []struct {
+		method  string
+		headers []string
+		status  int
+	}{
+		{http.MethodGet, nil, http.StatusOK},
+		{http.MethodHead, nil, http.StatusOK},
+		{http.MethodGet, []string{"Range", "bytes=2-5"}, http.StatusPartialContent},
+		{http.MethodGet, []string{"If-None-Match", sha}, http.StatusNotModified},
+	} {
+		rec := w.Do(c.method, "/artifactory/api/vagrant/boxes/acme/f%C3%B5cal%201+0.box", "reader", "",
+			c.headers...)
+		harness.WantStatus(t, rec, c.status)
+		if got := rec.Header().Get("Content-Disposition"); got != want {
+			t.Errorf("%s %v: Content-Disposition %q, want %q", c.method, c.headers, got, want)
+		}
+	}
+}
+
 // TestAccFileDownloadSendsTheBareSHA1AsETag: a file's ETag is its bare
 // SHA-1, equal to X-Checksum-Sha1, as 7.x sends it (RTFACT-30785,
 // RTFACT-29977, RTFACT-27264), on the item route and on a protocol route.

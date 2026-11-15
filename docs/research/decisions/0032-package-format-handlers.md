@@ -301,10 +301,13 @@ PyPI, NuGet, Helm and Terraform) mount through one kit,
     form, while the item route sent `filename*` on 7.17.11 (RTFACT-25859). The name is written
     as it is: on 7.59.9 a saved name had `%20` for a space, which JFrog fixed as a fault
     (RTFACT-29749). A name holding a quote or a backslash, which 7.x's `PathValidator` refuses,
-    has it escaped as a quoted pair; how 7.x writes a name outside ASCII is not shown [I]
+    has it escaped as a quoted pair. A name with a character outside printable ASCII is named by
+    `attachment; filename*=UTF-8''<name>` alone, every byte but RFC 3986's unreserved characters
+    percent-encoded, as 7.161.26's `RequestResponseHelper.setHeaderForNonAscii` replaces the
+    header on a GET and a HEAD; 7.x's 304 skips that step, and sending the same there is [I]
     (#216). The item route keeps `filename*` on the same file. The other formats' native
-    downloads keep the form they had, the item route's or their own, until a source shows
-    theirs [I].
+    downloads keep the form they had, the item route's or their own, until a source shows theirs
+    [I].
 - A deploy helper with the item routes' matrix and checksum parsing exported, answering 201
   with the `X-Checksum-Sha1`, `-Sha256` and `-Md5` headers.
 - Raw-path parsing for encoded slashes (`@scope%2fname`).

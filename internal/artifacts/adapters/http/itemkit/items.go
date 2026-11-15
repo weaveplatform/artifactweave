@@ -701,17 +701,51 @@ func (s *Kit) serveTypedFile(
 var packageNameEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
 
 // PackageDisposition is the Content-Disposition 7.x's package download
-// service names a file with: JerseyArtifactoryResponse writes
+// service names a file with. JerseyArtifactoryResponse writes
 // attachment; filename="<name>" with the name as it is and no filename*
 // part (7.161.26). A space stays a space: on 7.59.9 a download's saved
 // name had %20 for it, which JFrog took as a fault and fixed
-// (RTFACT-29749). A character outside ASCII is sent as its UTF-8 bytes;
-// how 7.x's container writes one is not in the sources [I]. 7.x refuses a
-// path holding a quote or a backslash (PathValidator), so it never writes
-// either; here they are escaped as quoted pairs, so that such a name
-// cannot end the quoted string early.
+// (RTFACT-29749). 7.x refuses a path holding a quote or a backslash
+// (PathValidator), so it never writes either; here they are escaped as
+// quoted pairs, so that such a name cannot end the quoted string early.
+//
+// A name with a character outside printable ASCII is named by filename*
+// alone instead: on a GET and a HEAD, whichever response type answers,
+// RequestResponseHelper.setHeaderForNonAscii replaces the header with an
+// attachment whose only parameter is filename* in UTF-8, every byte but
+// RFC 3986's unreserved characters percent-encoded (Spring's
+// UriUtils.encode). 7.x's 304 skips that step and keeps the quoted form;
+// this sends filename* there too, as no source shows what a client reads
+// from it [I].
 func PackageDisposition(name string) string {
+	for i := range len(name) {
+		if name[i] < ' ' || name[i] > '~' {
+			return "attachment; filename*=UTF-8''" + unreservedEscape(name)
+		}
+	}
 	return `attachment; filename="` + packageNameEscaper.Replace(name) + `"`
+}
+
+// unreservedEscape percent-encodes every byte of s but RFC 3986's
+// unreserved characters, in upper-case hex, as Spring's UriUtils.encode
+// does for a URI component. url.PathEscape keeps sub-delimiters such as
+// '+' and '&', which UriUtils.encode encodes.
+func unreservedEscape(s string) string {
+	const hex = "0123456789ABCDEF"
+	var b strings.Builder
+	for i := range len(s) {
+		c := s[i]
+		switch {
+		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9',
+			c == '-', c == '.', c == '_', c == '~':
+			b.WriteByte(c)
+		default:
+			b.WriteByte('%')
+			b.WriteByte(hex[c>>4])
+			b.WriteByte(hex[c&15])
+		}
+	}
+	return b.String()
 }
 
 func (s *Kit) serveFile(
