@@ -95,6 +95,53 @@ remoteRepositories:
 	}
 }
 
+// The YAML configuration gives a Terraform remote on the default registry
+// bypassHeadRequests on at every create and update, whatever it sends, and
+// an npm remote on https://npm.pkg.github.com on create only, as 7.x's
+// interceptors do on the repository saves its YAML patch makes (#1583). A
+// remote without a URL is refused with 7.x's message, named by its entry
+// (#1584).
+func TestAccPatchConfigurationRemoteDefaults(t *testing.T) {
+	w := newRepoWorld(t)
+	for _, step := range []struct {
+		patch, key string
+		want       bool
+	}{
+		{"y-tf:\n    type: terraform\n    url: https://tf-up.example\n    bypassHeadRequests: false\n", "y-tf", true},
+		{"y-tf:\n    bypassHeadRequests: false\n", "y-tf", true},
+		{"y-tf-other:\n    type: terraform\n    url: https://tf-up.example\n" +
+			"    terraformRegistryUrl: https://tf.example\n", "y-tf-other", false},
+		{"y-npm:\n    type: npm\n    url: https://npm.pkg.github.com\n", "y-npm", true},
+		{"y-npm:\n    bypassHeadRequests: false\n", "y-npm", false},
+	} {
+		rec := w.do(http.MethodPatch, configPath, "admin", "remoteRepositories:\n  "+step.patch,
+			"Content-Type", "application/yaml")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("PATCH %q = %d: %s", step.patch, rec.Code, rec.Body)
+		}
+		got := w.stored(step.key).BypassHeadRequests
+		if got == nil {
+			t.Fatalf("PATCH %q: bypassHeadRequests unset", step.patch)
+		}
+		if *got != step.want {
+			t.Errorf("PATCH %q: bypassHeadRequests %t, want %t", step.patch, *got, step.want)
+		}
+	}
+	for key, patch := range map[string]string{
+		"y-nourl": "y-nourl:\n    type: generic\n",
+		"y-nim":   "y-nim:\n    type: nimmodel\n",
+		"y-npm":   "y-npm:\n    url: null\n",
+	} {
+		rec := w.do(http.MethodPatch, configPath, "admin", "remoteRepositories:\n  "+patch,
+			"Content-Type", "application/yaml")
+		if rec.Code != http.StatusBadRequest || strings.TrimSpace(rec.Body.String()) !=
+			`{"errors":[{"message":"descriptor: invalid configuration descriptor: remoteRepositories.`+key+
+				`: No URL defined for remote repository","status":400}]}` {
+			t.Errorf("PATCH %q = %d: %s", patch, rec.Code, rec.Body)
+		}
+	}
+}
+
 func TestAccPatchConfigurationErrors(t *testing.T) {
 	w := newRepoWorld(t)
 	for name, c := range map[string]struct {
