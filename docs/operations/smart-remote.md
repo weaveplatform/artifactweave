@@ -27,7 +27,7 @@ to its P10 virtual-routing handoff.
 | `contentSynchronisation.properties.enabled: true` | Refresh properties on a normal artifact GET after `retrievalCachePeriodSecs` expires. Default is 7200 seconds; a configured zero checks on every normal GET. |
 | `contentSynchronisation.statistics.enabled: true` | Record successful ordinary GET delivery, including warm reads, then submit a durable bounded count to the configured peer. HEAD and lookup-only operations do not add counts. |
 | `contentSynchronisation.source.originAbsenceDetection: true` | Refresh the exact upstream item's existence on the same TTL. A confirmed miss is distinct from an outage or denied request and never deletes cached bytes. Generic repositories do not perform absence detection. |
-| `shareConfiguration: true` | Permit authenticated non-admin users to read the existing sanitized remote configuration view. Anonymous callers receive 401; passwords, sensitive headers and other secret settings are omitted. |
+| `shareConfiguration: true` | Permit every caller to read the sanitized remote configuration view at `/api/repositories/{key}/configuration`: any user, administrator or not, and anonymous callers while anonymous access is on, as 7.x does. With anonymous access off, a request without credentials receives 401. Passwords, sensitive header values, the proxy, the local address and property sets are omitted. |
 
 The property snapshot is validated before artifact publication. Invalid documents,
 authorization failures and property responses marked `no-store` cannot publish a

@@ -615,15 +615,20 @@ func configResponse(
 
 // GetRemoteRepositoryConfiguration returns the shared configuration of a
 // remote repository, its masked remote descriptor (repo.Descriptor), to any
-// signed-in caller. 7.161.26's RepositoriesResource admits ROLE_ADMIN and
-// ROLE_USER alike and RepoConfigurationResource.getRemoteDescriptor checks
-// nothing more, so a caller other than an administrator gets the whole
-// descriptor. A key that names no remote, or a remote whose
-// shareConfiguration is off, answers 404 to every caller, administrators
-// included, as getRemoteDescriptor's Response.status(SC_NOT_FOUND) does.
-// That response has no entity, so 7.x's RestResponseFilter, registered for
-// every REST resource (JerseyApplication), gives it the error envelope with
-// the reason phrase as its message: {"errors":[{"status":404,"message":
+// caller, anonymous included while anonymous access is on. 7.161.26's
+// RepositoriesResource admits ROLE_ADMIN and ROLE_USER alike, and its
+// RestAuthenticationFilter gives an unauthenticated request ROLE_USER while
+// anonymous access is on; RepoConfigurationResource.getRemoteDescriptor
+// checks nothing more, so anonymous and every user get the same descriptor
+// (#1509). While anonymous access is off the authentication middleware
+// answers a request without credentials 401 before it gets here, as
+// 7.161.26's AccessFilter does through its authentication entry point. A
+// key that names no remote, or a remote whose shareConfiguration is off,
+// answers 404 to every caller, administrators included, as
+// getRemoteDescriptor's Response.status(SC_NOT_FOUND) does. That response
+// has no entity, so 7.x's RestResponseFilter, registered for every REST
+// resource (JerseyApplication), gives it the error envelope with the
+// reason phrase as its message: {"errors":[{"status":404,"message":
 // "Not Found"}]}.
 func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	ctx context.Context,
@@ -633,12 +638,11 @@ func (s ArtifactoryAPI) GetRemoteRepositoryConfiguration(
 	if err != nil {
 		return nil, err
 	}
-	p, err := httpkit.Principal(ctx)
-	if err != nil {
+	// A context without a principal is a router built without
+	// authentication, refused as unauthenticated; the principal itself
+	// gates nothing here.
+	if _, err := httpkit.Principal(ctx); err != nil {
 		return nil, err
-	}
-	if p.Anonymous {
-		return nil, httpkit.Denied(p)
 	}
 	c, err := st.Repos().Get(ctx, string(req.RemoteRepoName))
 	switch {

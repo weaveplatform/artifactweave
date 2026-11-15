@@ -10441,7 +10441,7 @@ paths:
   /api/repositories/{remoteRepoName}/configuration:
     get:
       deprecated: true
-      description: Returns the shared configuration of a remote repository whose shareConfiguration is on, to any signed-in caller, administrator or not. Deprecated in favour of the ordinary read.
+      description: Returns the shared configuration of a remote repository whose shareConfiguration is on, to any caller, administrator or not, and to anonymous while anonymous access is on. Deprecated in favour of the ordinary read.
       operationId: getRemoteRepositoryConfiguration
       parameters:
         - description: Required path parameter. Key of the remote repository.
@@ -10466,15 +10466,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is anonymous or the credentials were rejected.
+          description: Anonymous access is off and the request has no credentials, or the credentials were rejected.
         # 7.161.26 RepoConfigurationResource.getRemoteDescriptor answers
         # Response.status(SC_NOT_FOUND) with no entity, which RestResponseFilter
         # (registered in JerseyApplication) turns into the error envelope with
         # the reason phrase, Not Found. JFrog's published definition also
-        # lists a 403, which no caller gets here: the class-level
-        # @RolesAllowed admits every signed-in user, and a request without
-        # credentials answers 401. api/parity-baseline.json records the
-        # missing 403 (#1493).
+        # lists a 403, for a caller denied the configuration, which no caller
+        # gets here: the class-level @RolesAllowed admits every signed-in
+        # user, RestAuthenticationFilter gives anonymous ROLE_USER while
+        # anonymous access is on, and while it is off AccessFilter's entry
+        # point answers a request without credentials 401 before
+        # RestAuthenticationFilter could refuse it with 403.
+        # api/parity-baseline.json records the missing 403 (#1493, #1509).
         '404':
           content:
             application/json:
