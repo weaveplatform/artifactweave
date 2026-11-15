@@ -73,8 +73,11 @@ func TestAccNuGetPackageNamedWithoutFilenameStar(t *testing.T) {
 			headers := map[string]string{"X-NuGet-ApiKey": "admin:pw"}
 			var form string
 			headers["Content-Type"], form = contentTypeOf(nugetForm(pkg))
-			remoteStatus(t, do(t, h, http.MethodPut, "/artifactory/api/nuget/"+key+"/", headers, form),
-				http.StatusCreated)
+			remoteStatus(
+				t,
+				do(t, h, http.MethodPut, "/artifactory/api/nuget/"+key+"/", headers, form),
+				http.StatusCreated,
+			)
 			native := []string{
 				"/artifactory/api/nuget/" + key + "/Download/Acme.Lib/1.0.0",
 				nugetV3 + key + "/flatcontainer/acme.lib/1.0.0/acme.lib.1.0.0.nupkg",

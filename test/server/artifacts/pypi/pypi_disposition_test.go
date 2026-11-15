@@ -37,7 +37,9 @@ func wantNamed(
 			wantBody = ""
 		}
 		if got := rec.Header().Get("Content-Disposition"); got != want ||
-			rec.Header().Get("X-Artifactory-Filename") != wheelName || rec.Body.String() != wantBody {
+			rec.Header().
+				Get("X-Artifactory-Filename") !=
+				wheelName || rec.Body.String() != wantBody {
 			t.Fatalf("%s %s: Content-Disposition %q, X-Artifactory-Filename %q, %d bytes; "+
 				"want %q, %s, %d bytes", method, path, got,
 				rec.Header().Get("X-Artifactory-Filename"), rec.Body.Len(), want, wheelName,

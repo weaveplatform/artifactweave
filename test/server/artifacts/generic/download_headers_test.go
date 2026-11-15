@@ -201,7 +201,11 @@ func TestAccBoxRouteNamesANonASCIIBoxByFilenameStar(t *testing.T) {
 		{http.MethodGet, []string{"Range", "bytes=2-5"}, http.StatusPartialContent},
 		{http.MethodGet, []string{"If-None-Match", sha}, http.StatusNotModified},
 	} {
-		rec := w.Do(c.method, "/artifactory/api/vagrant/boxes/acme/f%C3%B5cal%201+0.box", "reader", "",
+		rec := w.Do(
+			c.method,
+			"/artifactory/api/vagrant/boxes/acme/f%C3%B5cal%201+0.box",
+			"reader",
+			"",
 			c.headers...)
 		harness.WantStatus(t, rec, c.status)
 		if got := rec.Header().Get("Content-Disposition"); got != want {
