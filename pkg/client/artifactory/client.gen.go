@@ -10900,7 +10900,7 @@ type ClientInterface interface {
 
 	// GetRemoteRepositoryConfiguration Shared remote repository configuration (deprecated)
 	//
-	// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any signed-in caller, administrator or not. Deprecated in favour of the ordinary read.
+	// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any caller, administrator or not, and to anonymous while anonymous access is on. Deprecated in favour of the ordinary read.
 	//
 	// Corresponds with GET /api/repositories/{remoteRepoName}/configuration (the `GetRemoteRepositoryConfiguration` operationId).
 	//
@@ -16225,7 +16225,7 @@ func (c *Client) CheckIfRepositoryExists(ctx context.Context, params *CheckIfRep
 
 // GetRemoteRepositoryConfiguration Shared remote repository configuration (deprecated)
 //
-// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any signed-in caller, administrator or not. Deprecated in favour of the ordinary read.
+// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any caller, administrator or not, and to anonymous while anonymous access is on. Deprecated in favour of the ordinary read.
 //
 // Corresponds with GET /api/repositories/{remoteRepoName}/configuration (the `GetRemoteRepositoryConfiguration` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -38331,7 +38331,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRemoteRepositoryConfigurationWithResponse Shared remote repository configuration (deprecated)
 	//
-	// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any signed-in caller, administrator or not. Deprecated in favour of the ordinary read.
+	// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any caller, administrator or not, and to anonymous while anonymous access is on. Deprecated in favour of the ordinary read.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -75998,7 +75998,7 @@ func (c *ClientWithResponses) CheckIfRepositoryExistsWithResponse(ctx context.Co
 
 // GetRemoteRepositoryConfigurationWithResponse Shared remote repository configuration (deprecated)
 //
-// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any signed-in caller, administrator or not. Deprecated in favour of the ordinary read.
+// Returns the shared configuration of a remote repository whose shareConfiguration is on, to any caller, administrator or not, and to anonymous while anonymous access is on. Deprecated in favour of the ordinary read.
 //
 // Returns a wrapper object for the known response body format(s).
 //
