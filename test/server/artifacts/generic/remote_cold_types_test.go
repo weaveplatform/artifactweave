@@ -506,7 +506,12 @@ func TestAccRemoteColdTraceFetchesAsTheDownloadDoes(t *testing.T) {
 					c.StoreArtifactsLocally = new(store)
 				})
 				w.up.Set("/"+tc.path, declaring(tc.body(t), false))
-				got := w.request(http.MethodGet, "/artifactory/remote/"+tc.path+"?trace", "reader", "")
+				got := w.request(
+					http.MethodGet,
+					"/artifactory/remote/"+tc.path+"?trace",
+					"reader",
+					"",
+				)
 				remoteStatus(t, got, http.StatusOK)
 				found := "Returning validated transient resource"
 				if store {

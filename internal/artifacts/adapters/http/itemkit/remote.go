@@ -271,7 +271,7 @@ func (s *Kit) remoteStreamAnswer(
 	ctx context.Context, c repo.Config, sidecar string, q *source.Request,
 ) (*source.Request, error) {
 	if sidecar == "" || q.CacheOnly {
-		return nil, nil
+		return nil, nil //nolint:nilnil // nil: ServeRemoteStream answers
 	}
 	if c.StoreArtifactsLocally == nil || *c.StoreArtifactsLocally {
 		held, err := remoteCopyHeld(ctx, s.Store, c, q.Resource.Path)
@@ -279,7 +279,7 @@ func (s *Kit) remoteStreamAnswer(
 		case err != nil:
 			return nil, err
 		case held:
-			return nil, nil
+			return nil, nil //nolint:nilnil // nil: the held copy answers
 		}
 	}
 	sum := upstreamChecksumRequest(*q, sidecar)
@@ -477,7 +477,7 @@ func remoteDeliveryErr(ctx context.Context, result source.Result, anonymous bool
 	if result.Stream != nil {
 		_ = result.Stream.Body.Close()
 	}
-	return pkgroute.SourceError(err, anonymous)
+	return pkgroute.SourceError(err, anonymous) //nolint:wrapcheck // the answer the route writes
 }
 
 // RemoteResource is the source resource an item request for path names,
