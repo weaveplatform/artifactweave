@@ -43,6 +43,9 @@ type ItemRequest struct {
 	// "key+=value", which a download requires the item to carry.
 	Props     model.Properties
 	Mandatory map[string]bool
+	// member is whether a virtual repository reads the file through a
+	// member's key (MemberRead), which keeps the virtual's answers.
+	member bool
 }
 
 // matrix returns the request's matrix parameters as a download matches them.
@@ -322,10 +325,8 @@ type Download struct {
 // ended in a slash; m are its matrix parameters, which a resolution filters
 // by as the download filters what it serves.
 func newDownload(p string, folder bool, m model.Matrix, resolve resolver) *Download {
-	if archive, _, ok := strings.Cut(p, "!/"); ok {
-		p, folder = archive, false
-	} else if artifact, _, ok := item.Sidecar(p); ok {
-		p, folder = artifact, false
+	if file := resourcePath(p); file != p {
+		p, folder = file, false
 	}
 	return &Download{path: p, isFolder: folder, matrix: m, resolve: resolve}
 }
@@ -428,6 +429,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
+	req.member, _ = ctx.Value(memberReadKey{}).(bool)
 	p, acc, err := s.ItemCaller(ctx, st)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -452,7 +454,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 	// answers a caller who may not read the path without telling it how
 	// the repository is configured (DV-057).
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, refused(c, req, p))
 		return
 	}
 	if s.getRemoteFolder(w, r, c, cached, req, p, acc) {
@@ -489,25 +491,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, map[string]bool{})
 	if errors.Is(err, kernel.ErrNotFound) {
-		if s.getColdRemoteItem(w, r, st, c, cached, req, p, acc, dl) {
-			return
-		}
-		// "<archive>!/<entry>" names an entry inside an archive file; a path
-		// that exists as an item is served as one first.
-		if archive, entry, ok := strings.Cut(req.Path, "!/"); ok {
-			a, err := Lookup(ctx, st, c, cached, archive, acc, dl, map[string]bool{})
-			if err != nil {
-				httpkit.WriteErr(w, r, ItemNotFound())
-				return
-			}
-			if !acc.File(a.Repo, a.Item.FullPath(), accessapi.ActionRead) {
-				httpkit.WriteErr(w, r, httpkit.Denied(p))
-				return
-			}
-			s.getArchiveEntry(w, r, st, a, entry)
-			return
-		}
-		s.getSidecar(w, r, st, c, cached, req.Path, acc, dl)
+		s.getUnfoundItem(w, r, st, c, cached, req, p, acc, dl)
 		return
 	}
 	if err != nil {
@@ -515,14 +499,14 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, refused(c, req, p))
 		return
 	}
 	if ok, err := matchesMatrix(ctx, st, f.Item, req); err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "item properties", err))
 		return
 	} else if !ok {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, mismatched(c, req))
 		return
 	}
 	if f.Item.Folder {
@@ -530,6 +514,51 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.ServeItemFile(w, r, st, f, p)
+}
+
+// getUnfoundItem answers req, a path the lookup did not find in c: a cold
+// remote file, an entry of an archive file, a checksum, or the miss.
+func (s *Kit) getUnfoundItem(
+	w http.ResponseWriter,
+	r *http.Request,
+	st Store,
+	c repo.Config,
+	cached bool,
+	req ItemRequest,
+	p kernel.Principal,
+	acc Access,
+	dl *Download,
+) {
+	// 7.161.26's checkDownloadIsAllowed checks Read on the file before
+	// getInfo looks for it, so a file the folder check let through but the
+	// caller may not read is refused whether it exists or not.
+	if fileRequest(c, req) && !acc.File(c, resourcePath(req.Path), accessapi.ActionRead) {
+		httpkit.WriteErr(w, r, refused(c, req, p))
+		return
+	}
+	if s.getColdRemoteItem(w, r, st, c, cached, req, p, acc, dl) {
+		return
+	}
+	// "<archive>!/<entry>" names an entry inside an archive file; a path
+	// that exists as an item is served as one first.
+	if archive, entry, ok := strings.Cut(req.Path, "!/"); ok {
+		a, err := Lookup(r.Context(), st, c, cached, archive, acc, dl, map[string]bool{})
+		if errors.Is(err, kernel.ErrNotFound) {
+			httpkit.WriteErr(w, r, missed(c, cached, req))
+			return
+		}
+		if err != nil {
+			httpkit.WriteErr(w, r, ItemNotFound())
+			return
+		}
+		if !acc.File(a.Repo, a.Item.FullPath(), accessapi.ActionRead) {
+			httpkit.WriteErr(w, r, refused(c, req, p))
+			return
+		}
+		s.getArchiveEntry(w, r, st, a, entry)
+		return
+	}
+	s.getSidecar(w, r, st, c, cached, req, p, acc, dl)
 }
 
 // matchesMatrix applies download matrix parameters (model.Matrix.Matches).
@@ -554,27 +583,37 @@ func matchesMatrix(
 // checksum is served is item.ServedChecksum's: under client-checksums the
 // client's, so a file deployed without one has no SHA-1 file until the
 // client sends one. It answers conditional requests and ranges as a remote
-// repository's checksum file does (serveChecksum).
+// repository's checksum file does (serveChecksum). It answers the miss of
+// req, a path the lookup did not find, when it names no checksum.
 func (s *Kit) getSidecar(
 	w http.ResponseWriter,
 	r *http.Request,
 	st Store,
 	c repo.Config,
 	cached bool,
-	p string,
+	req ItemRequest,
+	caller kernel.Principal,
 	acc Access,
 	dl *Download,
 ) {
+	p := req.Path
 	artifact, alg, ok := item.Sidecar(p)
 	if !ok {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, missed(c, cached, req))
 		return
 	}
 	f, err := Lookup(r.Context(), st, c, cached, artifact, acc, dl, map[string]bool{})
-	// A file the caller may not read has no visible checksum either.
-	if err != nil || f.Item.Folder ||
-		!acc.File(f.Repo, f.Item.FullPath(), accessapi.ActionRead) {
+	if errors.Is(err, kernel.ErrNotFound) {
+		httpkit.WriteErr(w, r, missed(c, cached, req))
+		return
+	}
+	if err != nil || f.Item.Folder {
 		httpkit.WriteErr(w, r, ItemNotFound())
+		return
+	}
+	// A file the caller may not read has no visible checksum either.
+	if !acc.File(f.Repo, f.Item.FullPath(), accessapi.ActionRead) {
+		httpkit.WriteErr(w, r, checksumRefused(c, req, caller))
 		return
 	}
 	value := item.ServedChecksum(f.Repo, f.Item, alg)

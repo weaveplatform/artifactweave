@@ -70,8 +70,9 @@ component's Release in a `binary-<arch>` or `source` folder, a
 renewed per the Retrieval Cache Period (#1375). The remote's `-cache` alias
 serves a Release, an InRelease, an installer index, a Contents index's
 by-hash copy and those files once the remote has cached them, without
-asking the upstream, and answers 404 "Could not find resource" before
-(#1382), as it serves a Packages or Sources index and its by-hash copy.
+asking the upstream, and before that answers 404 "File not found.; Path:
+'<remote>-cache:<path>'" (#1382, #1572), as it serves a Packages or Sources
+index and its by-hash copy.
 A virtual repository merges authorized package records in member order and
 signs its own view, in plain and gzip forms and the forms its own
 `optionalIndexCompressionFormats` names. It leaves out a remote member's

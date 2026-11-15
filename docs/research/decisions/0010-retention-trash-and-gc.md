@@ -208,7 +208,7 @@ that collector is the one that removes trashed items past their retention period
 6.20 agrees: `TrashServiceImpl.getGCCandidatesFromTrash` returns nothing while the trash can
 is off, and `BinaryServiceImpl` then runs only the full collection. Three details are
 inferred:
-- **[I]** The status and message. No source shows 7.x's answer, so the views answer 404 "Could not find resource", artifactweave's answer for a path that is not there, to every caller who reaches them, as for a repository that does not exist.
+- **[I]** The status and message. No source shows 7.x's answer, so the views answer 404 "Could not find resource", the storage API's answer for a path that is not there, to every caller who reaches them, as for a repository that does not exist. A download through the item routes answers its own miss, 7.x's "File not found." with the path (#1572).
 - **[I]** `restore`, `clean` and `empty` still act on what the trash can holds while it is off. 6.20's `TrashcanResource` and `RestoreArtifactService` check no setting, and no 7.x source says otherwise.
 - **[I]** Turned on again, the trash can shows what it held and applies the retention period to it, as 6.20 keeps the items in the trash repository throughout.
 

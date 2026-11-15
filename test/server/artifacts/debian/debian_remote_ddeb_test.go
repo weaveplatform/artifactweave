@@ -18,8 +18,8 @@ import (
 // which a remote does not do, and no source says 7.x refuses a remote file
 // by type [I]. A reader asks the upstream once, and an administrator, the
 // cache itself and a virtual over the remote are served the cached bytes;
-// a user without read permission is refused 403 and an anonymous caller
-// 401. A local or federated repository with ddebSupported unset still
+// a user without read permission is refused 403, with 7.x's download
+// answer (#1572), and an anonymous caller 401. A local or federated repository with ddebSupported unset still
 // refuses the .ddeb with 400, and one with it on stores it.
 func TestAccDebianRemoteCachesADebugSymbolPackage(t *testing.T) {
 	const ddeb = "pool/main/a/alpha/alpha-dbgsym_1.0_amd64.ddeb"
@@ -50,7 +50,7 @@ func TestAccDebianRemoteCachesADebugSymbolPackage(t *testing.T) {
 		r := w.Request(http.MethodGet, "/artifactory/"+tc.key+"/"+ddeb, tc.caller, "")
 		switch tc.caller {
 		case "denied":
-			queryRefusal(t, r, http.StatusForbidden, "Forbidden")
+			queryRefusal(t, r, http.StatusForbidden, remoteRefused(tc.key, ddeb, tc.caller))
 		case "":
 			queryRefusal(t, r, http.StatusUnauthorized, "Authentication is required")
 		default:

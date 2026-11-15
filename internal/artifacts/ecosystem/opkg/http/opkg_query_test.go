@@ -158,6 +158,41 @@ func opkgQueryWorld(t *testing.T) (*itemWorld, *opkgAsked, []byte) {
 	return w, asked, ipk
 }
 
+// opkgItemRoute reports whether the generic item route answers path under
+// key: an IPK in a local repository. The Opkg routes answer a feed, a
+// remote's files and a virtual repository's.
+func opkgItemRoute(key, path string) bool {
+	return path == opkgXlat && (key == "opkg-local" || key == "opkg-tagged")
+}
+
+// opkgRefusal is the answer to caller, who may not read path under key: on
+// the item route, 7.161.26's download refusal (#1572), or 401
+// "Unauthorized" for an anonymous caller; on the Opkg routes, "Forbidden"
+// or "Authentication is required".
+func opkgRefusal(key, path, caller string) (int, string) {
+	switch {
+	case !opkgItemRoute(key, path) && caller == "":
+		return http.StatusUnauthorized, "Authentication is required"
+	case !opkgItemRoute(key, path):
+		return http.StatusForbidden, "Forbidden"
+	case caller == "":
+		return http.StatusUnauthorized, "Unauthorized"
+	}
+	return http.StatusForbidden, "Download request for repo:path '" + key + ":" + path +
+		"' is forbidden for user: '" + caller + "'.; Path: '" + key + ":" + path + "'"
+}
+
+// opkgMismatch is the answer to a file under key that does not match a
+// matrix parameter: on the item route, 7.161.26's PROPERTY_MISMATCH reason
+// (#1572); on the Opkg routes, "Could not find resource".
+func opkgMismatch(key, path string) string {
+	if !opkgItemRoute(key, path) {
+		return "Could not find resource"
+	}
+	return "File '" + key + ":" + path + "' was found, but mandatory properties do not match.; Path: '" +
+		key + ":" + path + "'"
+}
+
 // TestAccOpkgRoutesTakeAQueryAndMatrixParameters (#1350): an Opkg feed
 // and IPK, of a local, remote or virtual repository, take a query and
 // matrix parameters as any file's GET takes them. Before, the Opkg routes
@@ -169,7 +204,7 @@ func opkgQueryWorld(t *testing.T) (*itemWorld, *opkgAsked, []byte) {
 // (JFrog's guide, Using Properties in Deployment and Resolution); neither
 // names a package type it leaves out. The read check comes first (DV-057):
 // a user without read is refused 403 and an anonymous caller 401, without
-// asking the upstream.
+// asking the upstream, with the answers opkgRefusal gives.
 func TestAccOpkgRoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 	w, asked, ipk := opkgQueryWorld(t)
 	for _, key := range []string{"opkg-local", "opkg-remote", "opkg-virtual"} {
@@ -180,10 +215,9 @@ func TestAccOpkgRoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 					asked.take()
 					got := w.as(http.MethodGet, target, caller)
 					switch caller {
-					case "user":
-						wantError(t, got, http.StatusForbidden, "Forbidden")
-					case "":
-						wantError(t, got, http.StatusUnauthorized, "Authentication is required")
+					case "user", "":
+						status, message := opkgRefusal(key, path, caller)
+						wantError(t, got, status, message)
 					default:
 						if got.Code != http.StatusOK {
 							t.Errorf("%s as %s answered %d %.200s, want 200", target, caller,
@@ -277,7 +311,7 @@ func TestAccOpkgMandatoryMatrixParameters(t *testing.T) {
 		for _, caller := range []string{"admin", "reader"} {
 			got := w.as(http.MethodGet, target, caller)
 			if tc.status == http.StatusNotFound {
-				wantError(t, got, http.StatusNotFound, "Could not find resource")
+				wantError(t, got, http.StatusNotFound, opkgMismatch(tc.key, tc.path))
 				continue
 			}
 			if got.Code != tc.status {
@@ -287,7 +321,8 @@ func TestAccOpkgMandatoryMatrixParameters(t *testing.T) {
 				t.Errorf("%s as %s changed the IPK", target, caller)
 			}
 		}
-		wantError(t, w.as(http.MethodGet, target, "user"), http.StatusForbidden, "Forbidden")
+		status, message := opkgRefusal(tc.key, tc.path, "user")
+		wantError(t, w.as(http.MethodGet, target, "user"), status, message)
 		// A virtual repository reads its remote member's feed to find the
 		// IPK; the file the client asked for is matched in the cache alone.
 		for _, a := range asked.take() {
@@ -297,12 +332,13 @@ func TestAccOpkgMandatoryMatrixParameters(t *testing.T) {
 		}
 	}
 	// A key the file carries with another value does not match either.
-	for _, target := range []string{
-		"/artifactory/opkg-tagged/" + opkgXlat + ";x=2",
-		"/artifactory/opkg-virtual/" + opkgXlat + ";x+=2",
+	for _, tc := range []struct{ key, matrix string }{
+		{"opkg-tagged", ";x=2"},
+		{"opkg-virtual", ";x+=2"},
 	} {
+		target := "/artifactory/" + tc.key + "/" + opkgXlat + tc.matrix
 		wantError(t, w.as(http.MethodGet, target, "admin"), http.StatusNotFound,
-			"Could not find resource")
+			opkgMismatch(tc.key, opkgXlat))
 	}
 	// A key the file may lack is served, by the composed feed and by the
 	// remote whose cached copies lack the mandatory one.

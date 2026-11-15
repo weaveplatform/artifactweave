@@ -257,9 +257,18 @@ fetch through their overlays; every other type asks the upstream once the cache 
 has not found the file, so a copy the cache holds, an overlay's answer and a format's own
 refusal keep their answers: a Nix remote's generic download (400), a Hugging Face Xet
 record, a Conda shard. A `-cache` key reads the cache alone (R8), and so does a path the
-format builds itself, such as Helm's `index.yaml` or RubyGems' `specs.4.8.gz`, which keeps
-the lookup's 404 [I]. A cold file an offline remote lacks (R9), or one its upstream does not
-have, answers 404 "Not Found", as on a generic remote. On an npm remote only a
+format builds itself, such as Helm's `index.yaml` or RubyGems' `specs.4.8.gz`, which answers
+a miss without asking the upstream [I]. A cold file an offline remote lacks (R9), or one its
+upstream does not have, answers 404 as on a generic remote, with 7.161.26's download text
+and the path `DownloadServiceImpl.respondResourceNotFound` appends (#1572): an offline
+remote's `<key>: is offline, '<key>:<path>' is not found at '<path>'.`
+(`RemoteRepoBase.internalGetInfo`), otherwise the reason phrase of the upstream's status
+line (`HttpRepo.returnUnfoundResource`), "Not Found" [I], each followed by
+`; Path: '<key>:<path>'`. A `-cache` key's miss answers `DbStoringRepoMixin.getInfo`'s
+`File not found.; Path: '<key>-cache:<path>'`, and a caller without Read is refused, before
+the upstream is asked, with `Download request for repo:path '<key>-cache:<path>' is
+forbidden for user: '<user>'.` and the path, or 401 "Unauthorized" when anonymous, as 7.x
+checks Read on the cache's key. On an npm remote only a
 tarball path (`<name>/-/<file>`) is read: the upstream answers `<url>/<name>` with the
 package's document, which kept as a file would take the place of the folder holding the
 package's tarballs, and no 7.x source says what its npm remote does with that path [I].

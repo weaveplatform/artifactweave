@@ -13,12 +13,13 @@ import (
 // <url>/<name>/-/<file>, and keeps it where the npm route finds it, so the
 // npm route then serves the same tarball and the package's document. A
 // package's own path, which the upstream answers with the package's
-// document, keeps the cache lookup's 404 without an upstream request: kept
-// as a file, the document would take the place of the folder holding the
-// package's tarballs [I]. The tarball answered 404 "Could not find
-// resource" without asking the upstream.
+// document, answers a remote's miss without an upstream request: kept as a
+// file, the document would take the place of the folder holding the
+// package's tarballs [I]. The miss names its path as 7.x's download does
+// (#1572). The tarball answered 404 "Could not find resource" without
+// asking the upstream.
 func TestAccNPMRemoteStoragePathReadsTarballsOnly(t *testing.T) {
-	const notFound = `{"errors":[{"message":"Could not find resource","status":404}]}` + "\n"
+	const notFound = `{"errors":[{"message":"Not Found; Path: 'remote:pkg'","status":404}]}` + "\n"
 	w, tarballs := remoteTarballWorld(t, true, "application/octet-stream")
 	for _, method := range []string{http.MethodGet, http.MethodHead} {
 		got := w.Request(method, "/artifactory/remote/pkg", "reader", "")

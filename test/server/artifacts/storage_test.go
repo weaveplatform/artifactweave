@@ -201,14 +201,15 @@ func TestAccStorageList(t *testing.T) {
 	for _, bad := range []string{"&deep=2", "&depth=-1", "&depth=x"} {
 		wantStatus(t, w.do(http.MethodGet, list+bad, "admin", ""), http.StatusBadRequest)
 	}
-	// Listing refuses anonymous callers even where they may read.
+	// Listing refuses anonymous callers even where they may read, with
+	// prepareFileListResponse's 403 (#1573).
 	grant(t, w, "anon-read", "anonymous", "libs-local", accessapi.ActionRead)
 	wantStatus(
 		t,
 		w.do(http.MethodGet, "/artifactory/api/storage/libs-local/top.txt", "", ""),
 		http.StatusOK,
 	)
-	wantStatus(t, w.do(http.MethodGet, list, "", ""), http.StatusUnauthorized)
+	wantStatus(t, w.do(http.MethodGet, list, "", ""), http.StatusForbidden)
 }
 
 // grant gives user actions on a repository.
