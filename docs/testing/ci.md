@@ -234,7 +234,7 @@ tests run as part of `make deploy-check`.
 | `acceptance-gradle` | `ubuntu-latest` | P9 | Runs the `@gradle` scenario independently as informational evidence, records its outcome and uploads `cover-gradle` when available. Its outcome does not gate merge |
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestAccSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes. When a family's own `llms.txt` fails, the fetch takes the family's pages from the section of its parent index that lists the pages `api/oracle-inventory.json` records for it. A family that still has no page in the cache fails `TestAccSpecParity`, which names the family and its index URL, and `make parity-baseline` and `make oracle-inventory` refuse that cache; `actions/cache` saves only after a passing job, so such a crawl is not kept for the week ([#1308](https://github.com/weaveplatform/artifactweave/issues/1308)) |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
-| `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc, cdn-repositories and remote-repositories. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
+| `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc, cdn-repositories, remote-repositories and virtual-repositories. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
 | `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
 
 The required native acceptance partitions, `oci-conformance` and `terraform` are listed in
@@ -1240,7 +1240,7 @@ for example `make oci-conformance OCI_TEST_CONTENT_MANAGEMENT=0`, runs without t
 ## Terraform scenarios
 
 `make terraform` runs `test/terraform/run.sh` over `TERRAFORM_SCENARIOS`: the repositories,
-identity, OIDC, CDN repositories and remote repositories references in `deploy/artifactweave/terraform/`. `test/terraform/` holds only
+identity, OIDC, CDN repositories, remote repositories and virtual repositories references in `deploy/artifactweave/terraform/`. `test/terraform/` holds only
 the driver.
 - It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` and
   `terraform-provider-platform_<version>_<os>_<arch>.zip` once into a filesystem mirror,
@@ -1288,7 +1288,11 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
 1. Build and start one `-cover` binary, writing its coverage to `cover/terraform`, with
    `ARTIFACTWEAVE_API_BUDGET_TIMEOUT=5s`, the maximum. Terraform deletes up to ten resources
    at once, and on SQLite the default 500ms admission deadline can refuse one of those
-   requests with a 503 that the provider does not retry (#1147). If a later step fails,
+   requests with a 503 that the provider does not retry (#1147). It also raises
+   `ARTIFACTWEAVE_API_EXPENSIVE_PRINCIPAL_PER_MINUTE` from 600 to 6000: the provider posts
+   a usage report (`POST /artifactory/api/system/usage`) for every resource operation, each
+   charged as an expensive request, and the virtual-repositories scenario's 102 resources
+   exceed 600 of them within a minute, so its destroy met 429s. If a later step fails,
    `run.sh` prints the last 300 lines of the server log.
 2. Mint an admin access token with the bootstrap admin's password
    (`POST /access/api/v1/tokens`), which the server takes because step 1 starts it with
@@ -1315,7 +1319,14 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
      plaintext fixture credentials. A remote `terraformbackend` request must fail validation.
      Upstream URLs use the fixture server; this proves management only, with native content
      evidence owned by #624 to #633. Provider `artifactory_proxy` CRUD still requires P12/#303
-     XML descriptor reads; the fixture removes its proxy through PATCH after destroy.
+     XML descriptor reads; the fixture removes its proxy through PATCH after destroy;
+   - **virtual-repositories:** make two GPG key pairs with `tools/gpgkey` and an RSA pair
+     with `openssl`, apply all 33 provider virtual resources, each over a local and a remote
+     member pointing at the fixture server and deploying to the local one, with every
+     virtual field set away from its default, require an empty refreshed plan, and read
+     each virtual through `GET /artifactory/api/repositories/{key}` to check its members'
+     order and deployment repository; then apply revision 2, which reverses every member
+     list and changes one field of each virtual, and repeat both checks (#1531).
 4. Require `terraform plan -detailed-exitcode` to exit 0.
 5. Destroy.
 
@@ -1353,6 +1364,17 @@ run of all five provider scenarios, including coverage build and destroy, comple
 in **23.92 seconds**. This is local timing; the required Linux Terraform job remains
 the CI measurement. Configuration round-trips do not prove native remote retrieval,
 which has separate format-specific acceptance scenarios.
+
+The P10 virtual-repositories fixture (#1531) adds 102 resources: a virtual of each of the
+33 types provider 12.11.14 has a virtual resource for, its local and remote members, and
+three key pairs. Every virtual field round-tripped without a server change, in the order
+written, including the fields the v2 read keeps for fewer types than the v1 read the
+provider uses: `forceMavenAuthentication` on Gradle, Ivy and SBT and the retrieval cache
+period on Alpine and Ansible, which 7.161.26's `VirtualRepositoryConfigurationImpl` also
+reads from every virtual's configuration. What it did find is the expensive budget above.
+A local Go 1.27.3 darwin/arm64 run of all six provider scenarios, including the coverage
+build and destroy, completed in 37 seconds. Configuration round-trips do not prove
+resolution through a virtual, which the P10 family scenarios cover.
 
 ## Deployment Terraform checks
 

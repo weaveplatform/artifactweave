@@ -215,6 +215,20 @@ using configuration round-trip as evidence of native package retrieval. Resource
 and fields were checked against the pinned binary's `terraform providers schema -json`
 and [pinned source](https://github.com/jfrog/terraform-provider-artifactory/tree/v12.11.14/pkg/artifactory/resource/repository/remote).
 
+P10/#1531 adds the `virtual-repositories` reference: all 33 virtual resources of the
+table above, each over a local and a remote member of its type (P2 over a P2 remote and a
+local generic repository, since no local P2 resource exists) and deploying to the local
+one, with every field the
+[pinned virtual resources](https://github.com/jfrog/terraform-provider-artifactory/tree/v12.11.14/pkg/artifactory/resource/repository/virtual)
+offer set away from its default. Thirty-one are SDKv2 resources whose virtual fields
+come from `virtual.go`'s base schema and the type's own file; Hex and Nix are framework
+resources (`NewHexVirtualRepositoryResource`, `NewNixVirtualRepositoryResource`), and
+Hex's `hex_primary_keypair_ref` is required. OCI and Helm OCI send
+`resolve_oci_tags_by_timestamp` as `resolveDockerTagsByTimestamp`. A second revision
+reverses every member list. The provider posts a usage report for each resource
+operation (`util.SendUsageResource*`), which matters at this size: see
+[CI's Terraform scenarios](../testing/ci.md#terraform-scenarios).
+
 The current roots are in `deploy/artifactweave/terraform/`; `test/terraform/run.sh`
 installs the pinned JFrog release archives into a checksum-verified filesystem mirror
 and drives the CI apply/plan/destroy checks. The separate native registry/backend
