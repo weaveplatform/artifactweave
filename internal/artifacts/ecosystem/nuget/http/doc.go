@@ -54,9 +54,11 @@
 //     read: permissions and filters apply before paging, so neither a
 //     total nor an upstream offset reveals a version the caller may not
 //     read. For a caller who may read every path of the repository, a
-//     search without terms or package type and an autocomplete by prefix
-//     count totalHits and read the page in the package index, from each
-//     version's stored metadata, with the answer the filters give (#1425).
+//     search without terms or package type, an autocomplete by prefix and
+//     a v2 Packages() or Search() without a search term, whose $filter is
+//     none or one latest flag alone, count and read the page in the
+//     package index, from each version's stored metadata, with the answer
+//     the filters give (#1425).
 //   - The download policy, after read permission: a blacked-out local or
 //     federated repository refuses what restore reads, the flat
 //     container's version list, the registration index, pages and leaves,
@@ -122,8 +124,8 @@
 //   - search_test.go: search and autocomplete as dotnet sends them,
 //     filters, paging, faults and visible counts.
 //   - search_page_test.go: over 5,000 packages, the reads a late search,
-//     autocomplete and feed page make, and the page alone for a caller who
-//     may read the whole repository.
+//     autocomplete and v2 feed page and count make, and the page alone for
+//     a caller who may read the whole repository.
 //   - push_test.go, delete_test.go and concurrency_test.go: pushes as
 //     dotnet sends them, their refusals and faults, symbols pushes,
 //     concurrent pushes, delete, relist, forced authentication, and write

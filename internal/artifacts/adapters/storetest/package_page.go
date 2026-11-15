@@ -15,9 +15,10 @@ import (
 // (port.PackagePages, and PackageVersionNames' CountVersions and
 // VersionNamesAt) on stores from newStore: Puppet's, Chef's and Ansible's
 // versions, written in random order, read back newest first in their
-// lists' order, and a repository's packages are counted, paged, tallied and
-// listed by release as those lists and npm's and NuGet's searches count
-// them. The adapters' tests call it beside Run.
+// lists' order, and a repository's packages and versions are counted,
+// paged, tallied and listed by release as those lists, npm's and NuGet's
+// searches and NuGet's V2 feeds count them. The adapters' tests call it
+// beside Run.
 func RunPackagePages(t *testing.T, newStore Factory) {
 	t.Helper()
 	t.Run("ListOrderKeys", func(t *testing.T) { listOrderKeys(t, newStore) })
@@ -129,6 +130,12 @@ func packagePages(t *testing.T, newStore Factory) {
 	seeded := seedPages(t, s)
 	count := storekit.Get[int](t)
 	page := storekit.Get[[]model.Package](t)
+	versions := func(r port.PackageRange, offset, limit int) []string {
+		t.Helper()
+		return releaseNames(
+			storekit.Get[[]port.ReleaseName](t)(s.RangeVersionsAt(ctx, r, offset, limit)),
+		)
+	}
 	all := port.PackageRange{RepoKey: "pages"}
 	storekit.Same(t, "packages with a version", 5, count(s.CountPackages(ctx, all)))
 	storekit.Same(t, "every page", []string{"a", "b", "c", "d", "f"},
@@ -157,7 +164,29 @@ func packagePages(t *testing.T, newStore Factory) {
 		if got := page(s.PackagesAt(ctx, none, 0, 5)); len(got) != 0 {
 			t.Errorf("%+v pages %q", none, packageNames(got))
 		}
+		if n := count(s.CountRangeVersions(ctx, none)); n != 0 {
+			t.Errorf("%+v counts %d versions", none, n)
+		}
+		if got := versions(none, 0, 5); len(got) != 0 {
+			t.Errorf("%+v pages versions %q", none, got)
+		}
 	}
+	storekit.Same(t, "versions", 10, count(s.CountRangeVersions(ctx, all)))
+	storekit.Same(t, "a page of versions across packages",
+		[]string{"b@2.0.0", "c@1.0.0", "c@2.0.0", "d@1.0.0"}, versions(all, 3, 4))
+	storekit.Same(t, "the last page of versions", []string{"f@2.0.0"}, versions(all, 9, 4))
+	storekit.Same(t, "a negative offset of versions", []string{"a@1.0.0"}, versions(all, -1, 1))
+	storekit.Same(t, "a prefix's versions", 2, count(s.CountRangeVersions(ctx, prefix)))
+	storekit.Same(t, "a prefix's page of versions", []string{"c@1.0.0", "c@2.0.0"},
+		versions(prefix, 0, 5))
+	for _, empty := range [][2]int{{10, 4}, {0, 0}} {
+		if got := versions(all, empty[0], empty[1]); len(got) != 0 {
+			t.Errorf("versions at offset %d limit %d: %q", empty[0], empty[1], got)
+		}
+	}
+	storekit.Same(t, "a version's package", port.ReleaseName{
+		PackageID: seeded["b"].ID, Package: "b", Version: "1.0.0",
+	}, storekit.Get[[]port.ReleaseName](t)(s.RangeVersionsAt(ctx, all, 2, 1))[0])
 	// Candidates keeps the order it is given and drops a package with no
 	// version, as a package deleted since its page was read has none.
 	got := storekit.Get[[]port.SearchCandidate](t)(s.Candidates(ctx,
@@ -198,21 +227,46 @@ func nuGetShown(t *testing.T, newStore Factory) {
 		}
 	}
 	for _, c := range []struct {
-		shown port.NuGetShown
-		want  []string
+		shown    port.NuGetShown
+		want     []string
+		versions []string
 	}{
-		{port.NuGetShown{}, []string{"nulls", "release", "two"}},
-		{port.NuGetShown{Prerelease: true}, []string{"mixed", "nulls", "prerelease", "release", "two"}},
-		{port.NuGetShown{SemVer2: true}, []string{"mixed", "nulls", "release", "semver2", "two"}},
+		{
+			port.NuGetShown{},
+			[]string{"nulls", "release", "two"},
+			[]string{"nulls@1.0.0", "release@1.0.0", "two@2.0.0"},
+		},
+		{
+			port.NuGetShown{Prerelease: true},
+			[]string{"mixed", "nulls", "prerelease", "release", "two"},
+			[]string{"mixed@1.0.0", "nulls@1.0.0", "prerelease@1.0.0", "release@1.0.0", "two@2.0.0"},
+		},
+		{
+			port.NuGetShown{SemVer2: true},
+			[]string{"mixed", "nulls", "release", "semver2", "two"},
+			[]string{"mixed@2.0.0", "nulls@1.0.0", "release@1.0.0", "semver2@1.0.0", "two@2.0.0"},
+		},
 		{
 			port.NuGetShown{Prerelease: true, SemVer2: true},
 			[]string{"mixed", "nulls", "prerelease", "release", "semver2", "two"},
+			[]string{
+				"mixed@1.0.0", "mixed@2.0.0", "nulls@1.0.0", "prerelease@1.0.0", "release@1.0.0",
+				"semver2@1.0.0", "two@2.0.0",
+			},
 		},
 	} {
 		r := port.PackageRange{RepoKey: "nuget", Shown: &c.shown}
 		storekit.Same(t, "count shown", len(c.want), count(s.CountPackages(ctx, r)))
 		storekit.Same(t, "page shown", c.want,
 			packageNames(storekit.Get[[]model.Package](t)(s.PackagesAt(ctx, r, 0, 20))))
+		storekit.Same(
+			t,
+			"count shown versions",
+			len(c.versions),
+			count(s.CountRangeVersions(ctx, r)),
+		)
+		storekit.Same(t, "page shown versions", c.versions, releaseNames(
+			storekit.Get[[]port.ReleaseName](t)(s.RangeVersionsAt(ctx, r, 0, 20))))
 	}
 	// Metadata that is not JSON fails a NuGet range's read.
 	pkg := storekit.Get[model.Package](t)(s.Ensure(ctx, model.Package{
@@ -227,6 +281,12 @@ func nuGetShown(t *testing.T, newStore Factory) {
 	}
 	if _, err := s.PackagesAt(ctx, bad, 0, 1); err == nil {
 		t.Error("a page over metadata that is not JSON did not fail")
+	}
+	if _, err := s.CountRangeVersions(ctx, bad); err == nil {
+		t.Error("a count of versions over metadata that is not JSON did not fail")
+	}
+	if _, err := s.RangeVersionsAt(ctx, bad, 0, 1); err == nil {
+		t.Error("a page of versions over metadata that is not JSON did not fail")
 	}
 	storekit.Same(t, "without Shown the metadata is not read", 1,
 		count(s.CountPackages(ctx, port.PackageRange{RepoKey: "nuget-bad"})))
@@ -263,12 +323,9 @@ func tallyAndReleases(t *testing.T, newStore Factory) {
 		tally(s.TallyVersions(ctx, "absent", 10)))
 	releases := func(offset, limit int) []string {
 		t.Helper()
-		page := storekit.Get[[]port.ReleaseName](t)(s.ReleasesAt(ctx, "forge", offset, limit))
-		out := make([]string, 0, len(page))
-		for _, r := range page {
-			out = append(out, r.Package+"@"+r.Version)
-		}
-		return out
+		return releaseNames(
+			storekit.Get[[]port.ReleaseName](t)(s.ReleasesAt(ctx, "forge", offset, limit)),
+		)
 	}
 	every := []string{
 		"a@1.10.0", "a@1.9.0", "a@1.0.0", "b@0.1.0",
@@ -288,4 +345,13 @@ func tallyAndReleases(t *testing.T, newStore Factory) {
 	storekit.Same(t, "a release's package", port.ReleaseName{
 		PackageID: a.ID, Package: "a", Version: "1.10.0",
 	}, first)
+}
+
+// releaseNames is each of page as package@version.
+func releaseNames(page []port.ReleaseName) []string {
+	out := make([]string, 0, len(page))
+	for _, r := range page {
+		out = append(out, r.Package+"@"+r.Version)
+	}
+	return out
 }

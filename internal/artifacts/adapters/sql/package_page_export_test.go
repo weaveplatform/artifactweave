@@ -14,6 +14,18 @@ func PackageRangeQueries(
 	return count, page, args, append(append([]any{}, args...), limit, offset)
 }
 
+// RangeVersionsQueries are CountRangeVersions' and RangeVersionsAt's
+// queries of r, with the arguments of the count and of the page at offset
+// of limit.
+func RangeVersionsQueries(
+	s *Store,
+	r port.PackageRange,
+	offset, limit int,
+) (count, page string, countArgs, pageArgs []any) {
+	count, page, args, _ := rangeVersionsQueries(s.Dialect(), r)
+	return count, page, args, append(append([]any{}, args...), limit, offset)
+}
+
 // TallyQuery is TallyVersions' query.
 const TallyQuery = tallyQuery
 
