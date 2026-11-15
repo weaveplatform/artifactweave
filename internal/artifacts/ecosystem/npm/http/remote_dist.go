@@ -11,7 +11,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
-	"github.com/weaveplatform/artifactweave/internal/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
@@ -70,6 +69,23 @@ func remoteDist(
 	return d, err
 }
 
+// remoteTarballURL resolves a packument's dist.tarball against the remote's
+// URL, wherever it points: under the registry, elsewhere on its host, or on
+// another host. 7.x fetches a tarball from where its metadata puts it: a
+// registry whose tarballs lie outside its own root stopped answering 404 in
+// 7.24.1 (RTFACT-23931), and 7.161.26's RemoteRepoBase lets a package
+// handler's download URL replace the configured origin because "npm tarballs
+// [come] from a CDN" (mayReplaceConfiguredOrigin), with only the outbound
+// SSRF guard applied to it (HttpRepo.resolveAlternativeUrl). No repository
+// setting gates it: externalDependencies* are a virtual repository's
+// dependency rewrite (P10), not an npm remote's.
+//
+// What is refused here are safety rules, not 7.x answers: userinfo, a
+// fragment, an opaque or non-HTTP(S) URL, a backslash, CR or LF, a dot
+// segment left after resolution, and HTTP under an HTTPS registry. The
+// transport then refuses private and metadata addresses an operator has not
+// allowed, after DNS and every redirect, and sends the remote's credentials
+// to another origin only under allowAnyHostAuth and HTTPS.
 func remoteTarballURL(c repo.Config, raw string) (string, error) {
 	base, err := url.Parse(strings.TrimRight(c.URL, "/") + "/")
 	if err != nil {
@@ -88,25 +104,6 @@ func remoteTarballURL(c repo.Config, raw string) (string, error) {
 	for _, segment := range strings.Split(u.Path, "/") {
 		if segment == "." || segment == ".." || strings.ContainsAny(segment, "\\\x00") {
 			return "", remoteProtocolError()
-		}
-	}
-	// In-base URLs are registry artifacts. Other URLs require an administrator's
-	// explicit opt-in and allow pattern; the transport still enforces SSRF and
-	// origin-bound credentials after DNS and every redirect.
-	internal := strings.EqualFold(u.Host, base.Host) && u.Scheme == base.Scheme &&
-		strings.HasPrefix(u.Path, base.Path)
-	if !internal {
-		matched := false
-		if c.ExternalDependenciesEnabled != nil && *c.ExternalDependenciesEnabled {
-			for _, pattern := range c.ExternalDependenciesPatterns {
-				if pattern != "" && antpath.CompilePattern(pattern).Match(u.String()) {
-					matched = true
-					break
-				}
-			}
-		}
-		if !matched {
-			return "", apierror.New(http.StatusBadGateway, "upstream package URL refused")
 		}
 	}
 	return u.String(), nil

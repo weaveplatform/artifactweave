@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -60,7 +60,7 @@ func wantNamed(
 // (#1505).
 func TestAccPypiFileNamedWithoutFilenameStar(t *testing.T) {
 	const file = "demo/1.0/" + wheelName
-	itemForm := blob.Disposition(wheelName)
+	itemForm := itemkit.ItemDisposition(wheelName)
 
 	t.Run("local and federated", func(t *testing.T) {
 		w := newItemWorld(t, false)

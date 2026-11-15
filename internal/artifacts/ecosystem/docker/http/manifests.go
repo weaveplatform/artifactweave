@@ -97,7 +97,7 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 	// its checksums, its name, and no-store. A redirect keeps the checksums
 	// and the name, as a blob's does, and sends its own Cache-Control.
 	pkgroute.SetChecksums(h, it.Actual)
-	setFileHeaders(h, it.Name)
+	setFileHeaders(h, q.Repo, it.Name)
 	h.Set("Cache-Control", noStore)
 	// The ETag is the manifest file's bare SHA-1, as any stored file's is:
 	// 7.5.7 answered a local manifest GET with it, equal to X-Checksum-Sha1

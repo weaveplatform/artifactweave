@@ -640,7 +640,7 @@ func (s *Store) SignURL(ctx context.Context, sha string, o blob.SignOptions) (st
 	}
 	rs := ReadSAS{TTL: o.TTL, ContentType: o.ContentType}
 	if o.Filename != "" {
-		rs.ContentDisposition = blob.Disposition(o.Filename)
+		rs.ContentDisposition = blob.SignedDisposition(o.Filename)
 	}
 	if o.Via == blob.ViaCDN {
 		return s.signFrontDoor(ctx, sha, rs)

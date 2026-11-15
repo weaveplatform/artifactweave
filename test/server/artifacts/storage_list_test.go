@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 )
 
 // tfFileList is the Terraform provider's FileListAPIModel, which the
@@ -335,4 +337,49 @@ func TestAccStorageListPropertiesTimes(t *testing.T) {
 		"/artifactory/api/trash/restore/libs-local/d/m.txt?to=libs-local", "admin", ""),
 		http.StatusAccepted)
 	since("restore", "libs-local", "/d/m.txt", start)
+}
+
+// TestAccStorageListAnonymous (#1573): with anonymous access on, an
+// anonymous file list answers 403 "This resource is available to
+// authenticated users only." on every repository class, before the
+// repository or the path is looked at, without a challenge: 7.161.26's
+// ArtifactResource.prepareFileListResponse throws an
+// AuthorizationRestException carrying that text, and Jersey returns an
+// exception's response with an entity as it is, so the mapper that turns an
+// anonymous 403 into a challenged 401 never sees it; RestResponseFilter
+// wraps the text in the error envelope. Before, it answered 401
+// "Authentication is required". With anonymous access off, a request
+// without credentials is still refused before the storage API with that
+// 401, and a user without Read still gets 403 "Forbidden".
+func TestAccStorageListAnonymous(t *testing.T) {
+	const anonymousList = `{"errors":[{"message":"This resource is available to authenticated users only.",` +
+		`"status":403}]}` + "\n"
+	const unauthenticated = `{"errors":[{"message":"Authentication is required","status":401}]}` + "\n"
+	const forbidden = `{"errors":[{"message":"Forbidden","status":403}]}` + "\n"
+	for _, anonymous := range []bool{true, false} {
+		w := storageWorld(t, anonymous)
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&repo.Config{
+			Key: "fed-local", Class: repo.Federated,
+		})); err != nil {
+			t.Fatal(err)
+		}
+		for _, key := range []string{"libs-local", "up", "up-cache", "virt", "fed-local", "missing"} {
+			for _, path := range []string{key + "?list", key + "/dir?list&deep=1"} {
+				rec := w.do(http.MethodGet, "/artifactory/api/storage/"+path, "", "")
+				status, body, challenge := 403, anonymousList, ""
+				if !anonymous {
+					status, body, challenge = 401, unauthenticated, `Basic realm="Artifactory Realm"`
+				}
+				if rec.Code != status || rec.Body.String() != body ||
+					rec.Header().Get("WWW-Authenticate") != challenge {
+					t.Fatalf("anonymous access %v, %s: %d %q %s",
+						anonymous, path, rec.Code, rec.Header().Get("WWW-Authenticate"), rec.Body)
+				}
+			}
+		}
+		rec := w.do(http.MethodGet, "/artifactory/api/storage/libs-local?list", "user", "")
+		if rec.Code != http.StatusForbidden || rec.Body.String() != forbidden {
+			t.Fatalf("user: %d %s", rec.Code, rec.Body)
+		}
+	}
 }

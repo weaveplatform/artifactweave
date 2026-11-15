@@ -24,9 +24,11 @@ import (
 // "Could not find resource", without asking the upstream: JFrog's Remote
 // Repositories page reads what is "already stored in the cache" at
 // <remote-repository-name>-cache "to avoid remote update checks". Before
-// the remote's GET the alias still answers 404 "Could not find resource"
-// and asks nothing. A user without read permission is refused 403 and an
-// anonymous caller 401.
+// the remote's GET the alias still answers 404 and asks nothing. A user
+// without read permission is refused 403 and an anonymous caller 401. The
+// miss and the user's refusal carry 7.161.26's download answers (#1572):
+// DbStoringRepoMixin.getInfo's "File not found." and RealRepoBase.
+// assertReadPermissions' reason, each with the path.
 func TestAccRPMRemoteCacheAliasServesCachedRepodata(t *testing.T) {
 	dir := repopath.Path(t, "test/acceptance/testdata/rpm-upstream/repodata")
 	entries, err := os.ReadDir(dir)
@@ -75,7 +77,7 @@ func TestAccRPMRemoteCacheAliasServesCachedRepodata(t *testing.T) {
 			w.Update()
 			alias := "/artifactory/remote-cache/" + p
 			wantRefusal(t, w.Request(http.MethodGet, alias, "admin", ""),
-				http.StatusNotFound, "Could not find resource")
+				http.StatusNotFound, "File not found.; Path: 'remote-cache:"+p+"'")
 			if got := take(); got != nil {
 				t.Errorf("the alias asked the upstream %q before anything was cached", got)
 			}
@@ -91,7 +93,8 @@ func TestAccRPMRemoteCacheAliasServesCachedRepodata(t *testing.T) {
 				r := w.Request(http.MethodGet, alias, caller, "")
 				switch caller {
 				case "denied":
-					wantRefusal(t, r, http.StatusForbidden, "Forbidden")
+					wantRefusal(t, r, http.StatusForbidden, "Download request for repo:path "+
+						"'remote-cache:"+p+"' is forbidden for user: 'denied'.; Path: 'remote-cache:"+p+"'")
 				case "":
 					wantRefusal(t, r, http.StatusUnauthorized, "Authentication is required")
 				default:

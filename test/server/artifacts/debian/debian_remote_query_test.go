@@ -152,7 +152,10 @@ func queryRemote(t *testing.T, files map[string][]byte) (*harness.RemoteWorld, *
 // so the next caller with a query is served from the cache. A reader and an
 // administrator get the upstream's bytes; a user without read permission is
 // refused 403 and an anonymous caller 401 before the upstream is asked
-// (DV-057). A virtual repository over the remote serves its Sources index
+// (DV-057): the user, on a remote's Release, InRelease or Contents by-hash
+// file, which the item route reads, with 7.x's download answer (#1572),
+// and on the files the index route serves with "Forbidden", as before. A
+// virtual repository over the remote serves its Sources index
 // and Contents by-hash file the same way, where it passed the remote over
 // before.
 func TestAccDebianRemoteIndexServesAQueryAsWithoutOne(t *testing.T) {
@@ -167,11 +170,16 @@ func TestAccDebianRemoteIndexServesAQueryAsWithoutOne(t *testing.T) {
 				t.Run(key+"/"+p+query, func(t *testing.T) {
 					w, up := queryRemote(t, files)
 					target := "/artifactory/" + key + "/" + p + query
+					refusal := "Forbidden"
+					if _, index := debian.ByHashMetadataPath(p); key == "remote" &&
+						(debian.ReleaseMetadataPath(p) || strings.Contains(p, "/by-hash/") && !index) {
+						refusal = remoteRefused(key, p, "denied")
+					}
 					for _, caller := range []string{"denied", "", "reader", "admin"} {
 						r := w.Request(http.MethodGet, target, caller, "")
 						switch caller {
 						case "denied":
-							queryRefusal(t, r, http.StatusForbidden, "Forbidden")
+							queryRefusal(t, r, http.StatusForbidden, refusal)
 						case "":
 							queryRefusal(
 								t,

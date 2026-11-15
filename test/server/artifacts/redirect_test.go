@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
@@ -348,7 +349,7 @@ func TestAccRedirectResponse(t *testing.T) {
 	}
 	// A streamed download keeps its headers.
 	rec = w.do("HEAD", p, "admin", "")
-	if rec.Header().Get("Content-Disposition") != blob.Disposition("r.bin") ||
+	if rec.Header().Get("Content-Disposition") != itemkit.ItemDisposition("r.bin") ||
 		rec.Header().Get("ETag") == "" {
 		t.Fatalf("streamed headers %v", rec.Header())
 	}

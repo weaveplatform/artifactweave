@@ -237,3 +237,24 @@ func TestUnitNewUploadID(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A signed URL asks the store for attachment;filename="<name>", the form
+// every 7.x signed URL in a capture carries: no space after the semicolon,
+// no filename* part, the name as it is, a space and a '+' included
+// (RTFACT-23307, RTFACT-24153, sbt/sbt#6614, adoptium/installer#766). A
+// quote or a backslash is a quoted pair, and a name outside printable
+// ASCII is named by filename* alone [I] (issue 1577).
+func TestUnitSignedDispositionAsks7xForm(t *testing.T) {
+	for name, want := range map[string]string{
+		"jfrog-artifactory-oss-7.4.3.deb":        `attachment;filename="jfrog-artifactory-oss-7.4.3.deb"`,
+		"temurin-21-jdk_21.0.1.0.0+12_amd64.deb": `attachment;filename="temurin-21-jdk_21.0.1.0.0+12_amd64.deb"`,
+		"lib 1.0;(x)@y.tgz":                      `attachment;filename="lib 1.0;(x)@y.tgz"`,
+		`odd"name\.bin`:                          `attachment;filename="odd\"name\\.bin"`,
+		"naïve 1.0.tgz":                          "attachment;filename*=UTF-8''na%C3%AFve%201.0.tgz",
+		"tab\tname.bin":                          "attachment;filename*=UTF-8''tab%09name.bin",
+	} {
+		if got := SignedDisposition(name); got != want {
+			t.Errorf("SignedDisposition(%q) = %q, want %q", name, got, want)
+		}
+	}
+}

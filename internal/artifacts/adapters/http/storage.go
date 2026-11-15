@@ -228,6 +228,21 @@ func (v storageView) trees(
 // or the view one mode parameter selects.
 func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	// 7.161.26's ArtifactResource takes a file list request before every
+	// other view, and prepareFileListResponse refuses an anonymous caller
+	// before it reads the repository or the path (#1573), with
+	// AuthorizationRestException's 403 and its text in the error envelope
+	// (RestResponseFilter). Jersey answers an exception that carries its
+	// response without the exception mappers (ServerRuntime.mapException,
+	// 3.1.9), so ArtifactoryRestExceptionMapperBase never turns this 403
+	// into the 401 challenge it gives an anonymous caller's other refusals.
+	if p, err := httpkit.Principal(ctx); err == nil && p.Anonymous {
+		if q, err := rawQuery(r.URL.RawQuery); err == nil && q.Has("list") {
+			httpkit.WriteErr(w, r, apierror.New(http.StatusForbidden,
+				"This resource is available to authenticated users only."))
+			return
+		}
+	}
 	v, p, q, err := s.storageRequest(r, storagePrefix)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -245,8 +260,7 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
-	case mode == "list" && p.Anonymous,
-		mode == "lastModified" && !v.acc.Folder(v.repo, v.path, api.ActionWrite),
+	case mode == "lastModified" && !v.acc.Folder(v.repo, v.path, api.ActionWrite),
 		mode == "permissions" && !p.Admin:
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return

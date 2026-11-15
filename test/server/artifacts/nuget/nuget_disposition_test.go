@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
 // packageDisposition is the Content-Disposition 7.35.2's NuGet v2
@@ -92,7 +92,7 @@ func TestAccNuGetPackageNamedWithoutFilenameStar(t *testing.T) {
 				for _, path := range native {
 					wantNamed(t, get, path, name, packageDisposition(name), contentType, pkg)
 				}
-				wantNamed(t, get, item, name, blob.Disposition(name), contentType, pkg)
+				wantNamed(t, get, item, name, itemkit.ItemDisposition(name), contentType, pkg)
 			}
 			// A resumed download and a revalidation keep the name.
 			ranged := basic("admin", "pw")
@@ -137,6 +137,6 @@ func TestAccNuGetPackageNamedWithoutFilenameStar(t *testing.T) {
 		wantNamed(t, get, nugetV3+"remote/flatcontainer/reindex.demo/1.0.0/"+name, name,
 			packageDisposition(name), "application/x-nupkg", body)
 		wantNamed(t, get, "/artifactory/remote-cache/reindex.demo/1.0.0/"+name, name,
-			blob.Disposition(name), "application/x-nupkg", body)
+			itemkit.ItemDisposition(name), "application/x-nupkg", body)
 	})
 }
