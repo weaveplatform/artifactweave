@@ -1185,7 +1185,10 @@ components:
         bypassHeadRequests:
           description: Optional within this object. When true the server skips the HEAD probe before fetching and
             issues GET directly. Defaults to false. Always true on an aieditorextensions repository, whatever is
-            sent; an update that turns it from true to false is refused with 400.
+            sent; an update that turns it from true to false is refused with 400. Always true, whatever is sent, on
+            a terraform repository whose terraformRegistryUrl is https://registry.terraform.io (the default),
+            https://registry.opentofu.org or https://tf.app.wiz.io. True when an npm repository is created with a
+            url that starts with https://npm.pkg.github.com, whatever is sent; a later update may turn it off.
           type: boolean
         cargoAnonymousAccess:
           description: Optional within this object. When true anonymous Cargo clients may download and search crates
@@ -1737,9 +1740,11 @@ components:
           type: integer
         url:
           description: Required within this object. Upstream registry URL, for example https://registry-1.docker.io
-            or https://repo1.maven.org/maven2/. Required on create and must be absolute. A user name and password
-            written into it move into username and password when the repository is saved, and the URL keeps only
-            its scheme, host, port and path; a user name without a password stays in the URL.
+            or https://repo1.maven.org/maven2/. Required on create and must be absolute; no package type has a
+            default. A create or update that leaves it empty is refused with 400 and the message `No URL defined
+            for remote repository`. A user name and password written into it move into username and password when
+            the repository is saved, and the URL keeps only its scheme, host, port and path; a user name without a
+            password stays in the URL.
           format: uri
           type: string
         username:

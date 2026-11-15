@@ -33,13 +33,15 @@
 //     ContentSynchronisation and the rest). FlexBool reads the booleans
 //     JFrog documents as strings, and Flex builds one.
 //   - Validation errors: Validate, ValidateStored and ValidateKeyPair return
-//     a ValidationError, a list of FieldError; ValidateUpdate returns a
-//     CreationOnlyError. Both wrap ErrInvalid. A malformed flexible boolean
+//     a ValidationError, a list of FieldError, and Validate and
+//     ValidateStored a NoURLError for a remote whose only fault is a missing
+//     URL; ValidateUpdate returns a CreationOnlyError. All wrap ErrInvalid. A malformed flexible boolean
 //     fails with ErrNotBoolean.
 //   - Defaults: Defaults fills what Artifactory fills on create, the
 //     package type of a create that sends none included, which it takes
-//     from the legacy enable<Type>Support flags; DefaultLayout gives the
-//     layout the JFrog Terraform provider assigns.
+//     from the legacy enable<Type>Support flags; CreateDefaults adds what
+//     7.x sets only on create; DefaultLayout gives the layout the JFrog
+//     Terraform provider assigns.
 //   - Views: Public, the subset a reader who is not an administrator gets;
 //     Masked, the configuration without its secrets, as every reader gets
 //     it, with RestoreSecrets keeping a sensitive header's stored value on
