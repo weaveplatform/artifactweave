@@ -68,7 +68,13 @@ an observed Artifactory 7.161.32 response.
 permission and each concrete member's permission, merges visible
 package/version/revision/architecture records in configured member order, and
 uses the same order for rock bytes. A duplicate exact filename resolves from
-the first authorized member. Virtual native upload uses only its configured
+the first authorized member. 7.x searches a virtual's members in six groups,
+local and federated members, then remote caches, then remote upstreams, first
+for members with `priorityResolution` and then for the rest, each group in
+configured order after nesting is flattened
+([decision 0008, R1](decisions/0008-virtual-repositories.md#r1-member-order)).
+P10 moves LuaRocks to that order; [EPIC-ADP](https://github.com/weaveplatform/artifactweave/issues/1519)
+owns the code. Virtual native upload uses only its configured
 local deployment member and requires that member's write grant.
 The handler rechecks member class/type at request time and retains remote
 metadata and artifact source authority. The native acceptance scenario uses
