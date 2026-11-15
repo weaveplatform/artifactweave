@@ -259,8 +259,11 @@ behaviour below is documented or seen in its clients; where neither shows it, th
 
 ### 2.3 Remote and virtual repositories
 
-- **[D]** A virtual Docker repository resolves by member order and pushes to
-  `defaultDeploymentRepo`. A remote to Docker Hub needs `enableTokenAuthentication`, and
+- **[D]** A virtual Docker repository searches its members in six groups, local and
+  federated members, then remote caches, then remote upstreams, first for members with
+  `priorityResolution` and then for the rest, each group in configured order after nesting
+  is flattened ([decision 0008, R1](decisions/0008-virtual-repositories.md#r1-member-order)).
+  It pushes to `defaultDeploymentRepo`. A remote to Docker Hub needs `enableTokenAuthentication`, and
   `externalDependenciesEnabled` allows foreign layers (research 04).
 - **[S]** jf reads a remote's content from `<key>-cache` and looks under `library/` for
   single-segment Docker Hub names (`ocicontainer/docker_utils.go`). For a virtual
