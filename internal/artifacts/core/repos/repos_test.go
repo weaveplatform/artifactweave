@@ -232,6 +232,78 @@ func TestUnitRemoteURLCredentialsMoveOnSave(t *testing.T) {
 	}
 }
 
+// A Terraform remote on a registry 7.x bypasses HEAD for has
+// bypassHeadRequests on after every create and update, whatever was sent.
+// An npm remote gets it on create only, from its URL once the URL has given
+// up its credentials, as 7.x's interceptors run after processUrlCredentials;
+// an update keeps what is stored or sent (#1583).
+func TestUnitRemoteBypassHeadOnSave(t *testing.T) {
+	on := func(c repo.Config) bool { return c.BypassHeadRequests != nil && *c.BypassHeadRequests }
+	tf, err := PrepareCreate(repo.Config{
+		Key: "tf", Class: repo.Remote, PackageType: repo.Terraform, URL: "https://up.example",
+		BypassHeadRequests: new(false),
+	}, nil)
+	if err != nil || !on(tf) {
+		t.Fatalf("terraform create: %v %v", on(tf), err)
+	}
+	if tf, err = update(t, tf, `{"bypassHeadRequests": false}`); err != nil || !on(tf) {
+		t.Errorf("terraform update: %v %v", on(tf), err)
+	}
+	other, err := update(
+		t,
+		tf,
+		`{"terraformRegistryUrl": "https://tf.example", "bypassHeadRequests": false}`,
+	)
+	if err != nil || on(other) {
+		t.Errorf("terraform on another registry: %v %v", on(other), err)
+	}
+	npm, err := PrepareCreate(repo.Config{
+		Key:         "npm",
+		Class:       repo.Remote,
+		PackageType: repo.NPM,
+		URL:         "https://u:p@npm.pkg.github.com/",
+	}, nil)
+	if err != nil || !on(npm) || npm.URL != "https://npm.pkg.github.com/" {
+		t.Fatalf("npm create: %s %v %v", npm.URL, on(npm), err)
+	}
+	if npm, err = update(t, npm, `{"bypassHeadRequests": false}`); err != nil || on(npm) {
+		t.Errorf("npm update: %v %v", on(npm), err)
+	}
+	public := repo.Config{
+		Key:         "npm",
+		Class:       repo.Remote,
+		PackageType: repo.NPM,
+		URL:         "https://registry.npmjs.org",
+	}
+	if moved, err := update(
+		t,
+		public,
+		`{"url": "https://npm.pkg.github.com"}`,
+	); err != nil ||
+		on(moved) {
+		t.Errorf("npm moved to GitHub on update: %v %v", on(moved), err)
+	}
+}
+
+// A remote created or updated without a URL answers 400 with 7.x's message
+// alone (#1584).
+func TestUnitRemoteWithoutURLIsRefused(t *testing.T) {
+	stored := repo.Config{Key: "r", Class: repo.Remote, URL: "https://up.example"}
+	_, created := PrepareCreate(
+		repo.Config{Key: "r", Class: repo.Remote, PackageType: repo.NIMModel},
+		nil,
+	)
+	_, emptied := update(t, stored, `{"url": ""}`)
+	_, reset := update(t, stored, `{"url": null}`)
+	for name, err := range map[string]error{"create": created, "empty": emptied, "null": reset} {
+		var e *apierror.Error
+		if !errors.As(err, &e) || e.Status != http.StatusBadRequest ||
+			e.Message != "No URL defined for remote repository" {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
 // The support bundle repository is jfrog-support-bundle, as JFrog's reserved
 // names spell it; the plural is an ordinary key (#472).
 func TestUnitProtectedKeys(t *testing.T) {
