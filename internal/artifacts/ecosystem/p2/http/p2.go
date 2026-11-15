@@ -285,8 +285,9 @@ func (s p2Items) serveP2Virtual(
 		// The clone goes to GetItem, past the router's
 		// itemkit.ForceAuthentication, so a nested P2 virtual member's own
 		// forceP2Authentication does not apply: 7.x's filter checks only the
-		// repository the request's path names [I].
-		clone := r.Clone(r.Context())
+		// repository the request's path names [I]. Its miss and refusal stay
+		// the virtual's (itemkit.MemberRead).
+		clone := r.Clone(itemkit.MemberRead(r.Context()))
 		uri := *r.URL
 		uri.RawPath = "/artifactory/" + url.PathEscape(member.Key) + "/" +
 			p2EscapePath(name) + pkgroute.UpstreamMatrix(r.URL.EscapedPath())

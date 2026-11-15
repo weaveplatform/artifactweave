@@ -159,6 +159,7 @@
     ],
     "internal/artifacts/adapters/http/itemkit": [
       "access_test.go",
+      "answers_test.go",
       "disposition_test.go",
       "items_test.go",
       "kit_test.go",
@@ -205,6 +206,7 @@
       "builds_upload_test.go",
       "cache_maintenance_test.go",
       "checksum_files_test.go",
+      "download_answers_test.go",
       "download_policy_test.go",
       "fixture_test.go",
       "folder_archive_policy_test.go",

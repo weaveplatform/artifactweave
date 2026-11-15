@@ -129,6 +129,17 @@ R1 to R14 apply it to every native protocol:
   (`RepoPathImpl`). The root is always accepted.
 - **Read permission is checked first,** where Artifactory checks it after, so a caller who may
   not read the path gets 401 or 403 and learns nothing of the repository's settings (DV-057).
+  On the item routes a file request to a local, federated, remote or cache repository is
+  refused with 7.161.26's download answer (#1572): 403 `Download request for repo:path
+  '<key>:<path>' is forbidden for user: '<user>'.; Path: '<key>:<path>'`, which names the
+  remote's `-cache` key as the checked path (`RealRepoBase.assertReadPermissions`,
+  `RemoteRepoBase.checkDownloadIsAllowed`), and 401 "Unauthorized" with the Basic challenge
+  for an anonymous caller (`HttpArtifactoryResponse.sendAuthorizationRequired`). Its miss
+  answers 404 with the repository's reason and the same `; Path:` suffix, and so does a file a
+  matrix parameter does not match, with `File '<repoPath>' was found, but mandatory properties
+  do not match.` (`DbStoringRepoMixin.getInfo`), a remote's cache path. A folder request,
+  a virtual repository and a format route keep "Forbidden", "Authentication is required"
+  and their own not-found.
 - **A virtual repository** passes over a member that refuses, as it passes over one without
   the item, and answers "Could not find resource" when none serves it
   (`VirtualRepoDownloadStrategy.processStandard`). Its own patterns rejecting the path leave

@@ -66,7 +66,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 	if artifact, alg, ok := item.Sidecar(req.Path); ok && errors.Is(err, kernel.ErrNotFound) {
 		// A checksum cannot disclose a file the caller cannot read.
 		if !acc.File(c, artifact, accessapi.ActionRead) {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, checksumRefused(c, req, p))
 			return true
 		}
 		// Every type resolves a checksum request through the file it names:
@@ -109,7 +109,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "item properties", matchErr))
 		return true
 	} else if !ok {
-		httpkit.WriteErr(w, r, ItemNotFound())
+		httpkit.WriteErr(w, r, mismatched(c, req))
 		return true
 	}
 	query := source.Request{
@@ -124,7 +124,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 	}
 	query, err = s.formatRemoteSourceRequest(ctx, query, acc)
 	if err != nil {
-		httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+		httpkit.WriteErr(w, r, sourceAnswer(c, req, p, err))
 		return true
 	}
 	resource = query.Resource
@@ -135,11 +135,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 	}
 	result, err := s.RemoteSources.Read(ctx, query)
 	if err != nil {
-		httpkit.WriteErr(
-			w,
-			r,
-			s.ItemError(ctx, "read source", pkgroute.SourceError(err, p.Anonymous)),
-		)
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "read source", sourceAnswer(c, req, p, err)))
 		return true
 	}
 	// What the source returns now is the upstream's answer to a URL that

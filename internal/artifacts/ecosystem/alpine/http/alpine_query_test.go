@@ -120,6 +120,54 @@ func alpineQueryWorld(t *testing.T) (*itemWorld, *alpineAsked) {
 	return w, asked
 }
 
+// alpineItemRoute reports whether the generic item route answers path
+// under key: a package in a local or remote repository. The Alpine index
+// route and a virtual repository answer the rest.
+func alpineItemRoute(key, path string) bool {
+	switch key {
+	case alpineLocal, "alpine-tagged", alpineRemote, "alpine-held":
+		return path == apkHelloPath
+	}
+	return false
+}
+
+// alpineRefusal is the answer to caller, who may not read path under key:
+// on the item route, 7.161.26's download refusal (#1572), which names a
+// remote's cache as the path it checks, or 401 "Unauthorized" for an
+// anonymous caller; on the Alpine routes, "Forbidden" or "Authentication
+// is required".
+func alpineRefusal(key, path, caller string) (int, string) {
+	switch {
+	case !alpineItemRoute(key, path) && caller == "":
+		return http.StatusUnauthorized, "Authentication is required"
+	case !alpineItemRoute(key, path):
+		return http.StatusForbidden, "Forbidden"
+	case caller == "":
+		return http.StatusUnauthorized, "Unauthorized"
+	}
+	checked := key
+	if key == alpineRemote || key == "alpine-held" {
+		checked += "-cache"
+	}
+	return http.StatusForbidden, "Download request for repo:path '" + checked + ":" + path +
+		"' is forbidden for user: '" + caller + "'.; Path: '" + key + ":" + path + "'"
+}
+
+// alpineMismatch is the answer to a file under key that does not match a
+// matrix parameter: on the item route, 7.161.26's PROPERTY_MISMATCH reason
+// for the repository that holds the file, a remote's cache (#1572); on the
+// Alpine routes, "Could not find resource".
+func alpineMismatch(key, path string) string {
+	if !alpineItemRoute(key, path) {
+		return "Could not find resource"
+	}
+	if key == alpineRemote || key == "alpine-held" {
+		key += "-cache"
+	}
+	return "File '" + key + ":" + path + "' was found, but mandatory properties do not match.; Path: '" +
+		key + ":" + path + "'"
+}
+
 // TestAccAlpineRoutesTakeAQueryAndMatrixParameters (#1350): an Alpine
 // index, of a local, remote or virtual repository, and a package, take a
 // query and matrix parameters as any file's GET takes them. Before, the
@@ -131,7 +179,8 @@ func alpineQueryWorld(t *testing.T) (*itemWorld, *alpineAsked) {
 // resolution conditional on properties" (JFrog's guide, Using Properties
 // in Deployment and Resolution); neither names a package type it leaves
 // out. The read check comes first (DV-057): a user without read is refused
-// 403 and an anonymous caller 401, without asking the upstream.
+// 403 and an anonymous caller 401, without asking the upstream, with the
+// answers alpineRefusal gives.
 func TestAccAlpineRoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 	w, asked := alpineQueryWorld(t)
 	for _, key := range []string{alpineLocal, alpineRemote, alpineVirtual} {
@@ -142,10 +191,9 @@ func TestAccAlpineRoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 					asked.take()
 					got := w.as(http.MethodGet, target, caller)
 					switch caller {
-					case "user":
-						wantError(t, got, http.StatusForbidden, "Forbidden")
-					case "":
-						wantError(t, got, http.StatusUnauthorized, "Authentication is required")
+					case "user", "":
+						status, message := alpineRefusal(key, path, caller)
+						wantError(t, got, status, message)
 					default:
 						if got.Code != http.StatusOK {
 							t.Errorf("%s as %s answered %d %.200s, want 200", target, caller,
@@ -239,7 +287,7 @@ func TestAccAlpineMandatoryMatrixParameters(t *testing.T) {
 		for _, caller := range []string{"admin", "reader"} {
 			got := w.as(http.MethodGet, target, caller)
 			if tc.status == http.StatusNotFound {
-				wantError(t, got, http.StatusNotFound, "Could not find resource")
+				wantError(t, got, http.StatusNotFound, alpineMismatch(tc.key, tc.path))
 				continue
 			}
 			if got.Code != tc.status {
@@ -249,7 +297,8 @@ func TestAccAlpineMandatoryMatrixParameters(t *testing.T) {
 				t.Errorf("%s as %s changed the package", target, caller)
 			}
 		}
-		wantError(t, w.as(http.MethodGet, target, "user"), http.StatusForbidden, "Forbidden")
+		status, message := alpineRefusal(tc.key, tc.path, "user")
+		wantError(t, w.as(http.MethodGet, target, "user"), status, message)
 		// A virtual repository reads its remote member's index to find the
 		// package; the file the client asked for is matched in the cache
 		// alone.
@@ -260,12 +309,13 @@ func TestAccAlpineMandatoryMatrixParameters(t *testing.T) {
 		}
 	}
 	// A key the file carries with another value does not match either.
-	for _, target := range []string{
-		"/artifactory/alpine-tagged/" + apkHelloPath + ";x=2",
-		"/artifactory/" + alpineVirtual + "/" + apkHelloPath + ";x+=2",
+	for _, tc := range []struct{ key, matrix string }{
+		{"alpine-tagged", ";x=2"},
+		{alpineVirtual, ";x+=2"},
 	} {
+		target := "/artifactory/" + tc.key + "/" + apkHelloPath + tc.matrix
 		wantError(t, w.as(http.MethodGet, target, "admin"), http.StatusNotFound,
-			"Could not find resource")
+			alpineMismatch(tc.key, apkHelloPath))
 	}
 	// A key the file may lack is served, by the composed index and by the
 	// remote whose cached copies lack the mandatory one.
