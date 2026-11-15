@@ -563,14 +563,21 @@ func repositoryStatusRows() []statusCase {
 		{exists, r + "/existence", "user", "", 403},
 		{exists, r + "/existence", "", "", 401},
 
-		// Any signed-in caller reads a shared remote's configuration, and a
-		// remote that does not share it answers 404 to everyone, as 7.161.26's
-		// RepoConfigurationResource.getRemoteDescriptor does (#1493).
+		// Any caller reads a shared remote's configuration, anonymous too
+		// while anonymous access is on, and a remote that does not share it
+		// answers 404 to everyone, as 7.161.26's
+		// RepoConfigurationResource.getRemoteDescriptor does (#1493). Its
+		// RestAuthenticationFilter gives anonymous ROLE_USER, which the
+		// resource admits; with anonymous access off, AccessFilter answers
+		// 401 (#1509).
 		{shared, r + "/remote-shared/configuration", "admin", "", 200},
 		{shared, r + "/remote-shared/configuration", "user", "", 200},
+		{shared, r + "/remote-shared/configuration", "anonymous", "", 200},
 		{shared, r + "/remote-private/configuration", "admin", "", 404},
 		{shared, r + "/remote-private/configuration", "user", "", 404},
+		{shared, r + "/remote-private/configuration", "anonymous", "", 404},
 		{shared, r + "/libs-local/configuration", "admin", "", 404},
+		{shared, r + "/libs-local/configuration", "anonymous", "", 404},
 		{shared, r + "/remote-shared/configuration", "", "", 401},
 
 		{get, r + "/libs-local", "admin", "", 200},

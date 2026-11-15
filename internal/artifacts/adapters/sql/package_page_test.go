@@ -17,12 +17,12 @@ import (
 
 // TestAccPackagePagesAtScale pages late into 5,000 packages, 5,000
 // releases across 1,000 modules and a module of 5,000 versions on each
-// engine, as a whole-repository reader's npm and NuGet search, Puppet and
-// Chef lists and Ansible and Puppet version lists do (#1425, #1426), and
-// keeps the plans: each page walks packages_name or package_versions_order
-// in its own order to the offset, sorting at most one module's versions or
-// a short prefix's names, and each count reads those indexes, a NuGet one
-// each version's metadata too.
+// engine, as a whole-repository reader's npm and NuGet search, NuGet V2
+// feeds, Puppet and Chef lists and Ansible and Puppet version lists do
+// (#1425, #1426), and keeps the plans: each page walks packages_name or
+// package_versions_order in its own order to the offset, sorting at most
+// one package's versions or a short prefix's names, and each count reads
+// those indexes, a NuGet one each version's metadata too.
 func TestAccPackagePagesAtScale(t *testing.T) {
 	sqltest.RunModule(t, mods, artsql.New,
 		func(t *testing.T, newStore func(*testing.T) *artsql.Store) {
@@ -189,6 +189,48 @@ func packagePagesAtScale(t *testing.T, s *artsql.Store) {
 		}
 		wantSeek(t, plan, "packages_name")
 	}
+	// A NuGet V2 feed's versions, one a package here, so a late page of
+	// them is the late page of their packages.
+	for _, c := range []struct {
+		what  string
+		r     port.PackageRange
+		total int
+	}{
+		{"NuGet versions, no pre-releases", port.PackageRange{RepoKey: "pages", Shown: &port.NuGetShown{}}, count - count/10},
+		{"NuGet versions", port.PackageRange{RepoKey: "pages", Shown: &port.NuGetShown{Prerelease: true}}, count},
+	} {
+		var total int
+		var page []port.ReleaseName
+		timed(c.what+" count", func() (err error) {
+			total, err = st.CountRangeVersions(ctx, c.r)
+			return err
+		})
+		timed(c.what+" late page", func() (err error) {
+			page, err = st.RangeVersionsAt(ctx, c.r, c.total-20, 20)
+			return err
+		})
+		packages, err := st.PackagesAt(ctx, c.r, c.total-20, 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, want := make([]string, 0, len(page)), make([]string, 0, len(packages))
+		for i := range page {
+			got = append(got, page[i].Package+"@"+page[i].Version)
+		}
+		for _, p := range packages {
+			want = append(want, p.Name+"@1.0.0")
+		}
+		if total != c.total || len(page) != 20 || !slices.Equal(got, want) {
+			t.Fatalf("%s: total %d, page %q, want %q", c.what, total, got, want)
+		}
+		countQ, pageQ, countArgs, pageArgs := artsql.RangeVersionsQueries(s, c.r, c.total-20, 20)
+		plan := explain(t, s, countQ, countArgs...)
+		t.Logf("%s: %s count:\n%s", engine, c.what, plan)
+		noSort(t, plan)
+		plan = explain(t, s, pageQ, pageArgs...)
+		t.Logf("%s: %s late page:\n%s", engine, c.what, plan)
+		wantVersionWalk(t, s, plan)
+	}
 	var tally port.VersionTally
 	timed("tally of 1,000 modules", func() (err error) {
 		tally, err = st.TallyVersions(ctx, "forge", 4097)
@@ -227,19 +269,7 @@ func packagePagesAtScale(t *testing.T, s *artsql.Store) {
 	}
 	plan := explain(t, s, artsql.ReleasesAtQuery(s), "forge", 20, 4980)
 	t.Logf("%s: late page of releases:\n%s", engine, plan)
-	if !strings.Contains(plan, "packages_name") ||
-		!strings.Contains(plan, "package_versions_order") {
-		t.Error("the releases are not read through packages_name and package_versions_order")
-	}
-	if s.Dialect().Dollar {
-		// PostgreSQL sorts each module's versions as they come, in name
-		// order, rather than every release.
-		if !strings.Contains(plan, "Presorted Key: p.name") {
-			t.Error("the releases are not sorted within each module alone")
-		}
-	} else {
-		noSort(t, plan)
-	}
+	wantVersionWalk(t, s, plan)
 	var versions []string
 	var n int
 	timed("count of 5,000 versions", func() (err error) {
@@ -265,6 +295,23 @@ func packagePagesAtScale(t *testing.T, s *artsql.Store) {
 	plan = explain(t, s, "SELECT COUNT(*) FROM package_versions WHERE package_id = ?", widget.ID)
 	t.Logf("%s: count of versions:\n%s", engine, plan)
 	wantSeek(t, plan, "package_versions_")
+}
+
+// wantVersionWalk fails unless plan, a page of versions across packages,
+// walks packages_name and each package's package_versions_order, sorting
+// on PostgreSQL only each package's versions, as they come in name order,
+// and on SQLite nothing.
+func wantVersionWalk(t *testing.T, s *artsql.Store, plan string) {
+	t.Helper()
+	if !strings.Contains(plan, "packages_name") ||
+		!strings.Contains(plan, "package_versions_order") {
+		t.Error("the versions are not read through packages_name and package_versions_order")
+	}
+	if !s.Dialect().Dollar {
+		noSort(t, plan)
+	} else if !strings.Contains(plan, "Presorted Key: p.name") {
+		t.Error("the versions are not sorted within each package alone")
+	}
 }
 
 // noSort fails if plan sorts.

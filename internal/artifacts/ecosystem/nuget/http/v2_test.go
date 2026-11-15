@@ -406,15 +406,31 @@ func TestAccV2RefusalsAndUnsupportedQueries(t *testing.T) {
 	wantStatus(t, f.do(http.MethodGet, legacyV2+"/Packages();=invalid", "reader"), 400)
 }
 
+// A feed fails on a failed read of the index or of a version's download
+// count, whether the store pages it (reader, without a $filter or with a
+// latest flag alone) or the handler (partial); only a page of every
+// version reads RangeVersionsAt.
 func TestAccV2StoreFailures(t *testing.T) {
-	for _, failure := range []string{"list", "versions", "metadata", "item", "stats"} {
+	for _, failure := range []string{"list", "page", "versions", "metadata", "item", "stats"} {
 		t.Run(failure, func(t *testing.T) {
 			f := newFixture(
 				t,
 				func(s pkgroute.Store) pkgroute.Store { return failingStore{Store: s, failing: failure} },
 			)
 			f.push("Acme.Mixed", "1.0", "")
-			wantStatus(t, f.do(http.MethodGet, legacyV2+"/Packages()", "reader"), 500)
+			for _, c := range []struct{ path, user string }{
+				{legacyV2 + "/Packages()", "reader"},
+				{legacyV2 + "/Packages()?$filter=IsLatestVersion", "reader"},
+				{legacyV2 + "/Search()?$filter=IsAbsoluteLatestVersion", "reader"},
+				{legacyV2 + "/Packages()", "partial"},
+			} {
+				want := http.StatusInternalServerError
+				if failure == "page" &&
+					(c.user != "reader" || strings.Contains(c.path, "$filter")) {
+					want = http.StatusOK
+				}
+				wantStatus(t, f.do(http.MethodGet, c.path, c.user), want)
+			}
 		})
 	}
 	for _, failure := range []string{"find", "versions", "metadata", "item", "stats"} {

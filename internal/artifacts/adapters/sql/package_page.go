@@ -63,20 +63,27 @@ func (p packages) VersionNamesAt(
 }
 
 // rangeWhere is the condition on packages p that selects r's packages, with
-// its arguments, and false when r selects none. The name conditions keep
-// the walk of packages_name inside the prefix, as the search's do
-// (searchQuery). A package's versions are asked after as a scalar
-// subquery rather than EXISTS: PostgreSQL turns an EXISTS into a semi join,
-// which it hashes and then sorts the whole range for a late page, where a
-// scalar subquery stays a filter on its walk of packages_name, stopping at
-// a package's first version that counts. A NuGet range reads each
-// version's metadata as JSON: json_extract on SQLite, and on PostgreSQL
-// the jsonb cast, which either fails the query on a document that is not
-// JSON, as the feed's decoding fails. PostgreSQL casts each document once,
-// in a LATERAL subquery that its OFFSET 0 keeps from being merged into the
-// conditions: merged, each of the three keys would parse the document
-// again, which took a count of 2,000 packages from 5 ms to 14 ms.
+// its arguments, and false when r selects none. A package's versions are
+// asked after as a scalar subquery rather than EXISTS: PostgreSQL turns an
+// EXISTS into a semi join, which it hashes and then sorts the whole range
+// for a late page, where a scalar subquery stays a filter on its walk of
+// packages_name, stopping at a package's first version that counts.
 func rangeWhere(d dialect.Dialect, r port.PackageRange) (string, []any, bool) {
+	where, args, ok := namesWhere(r)
+	if !ok {
+		return "", nil, false
+	}
+	lateral, cond := shownVersions(d, r.Shown)
+	where += " AND (SELECT 1 FROM package_versions v" + lateral +
+		" WHERE v.package_id = p.id" + cond
+	return where + " LIMIT 1) IS NOT NULL", args, true
+}
+
+// namesWhere is the condition on packages p that keeps r's repository and
+// prefix, with its arguments, and false when r selects none. The name
+// conditions keep the walk of packages_name inside the prefix, as the
+// search's do (searchQuery).
+func namesWhere(r port.PackageRange) (string, []any, bool) {
 	if strings.ContainsRune(r.Prefix, 0) {
 		return "", nil, false
 	}
@@ -90,26 +97,38 @@ func rangeWhere(d dialect.Dialect, r port.PackageRange) (string, []any, bool) {
 			args = append(args, end)
 		}
 	}
-	versions, cond := "package_versions v", ""
-	if s := r.Shown; s != nil {
-		key := func(k string) string { return "json_extract(v.metadata, '$." + k + "')" }
-		contains, semVer2 := "instr(%s, '-') = 0", "COALESCE("+key(port.NuGetSemVer2Key)+", 0) = 0"
-		if d.Name == "postgres" {
-			versions += " CROSS JOIN LATERAL (SELECT v.metadata::jsonb AS m OFFSET 0) j"
-			key = func(k string) string { return "(j.m ->> '" + k + "')" }
-			contains = "strpos(%s, '-') = 0"
-			semVer2 = "COALESCE(" + key(port.NuGetSemVer2Key) + ", 'false') <> 'true'"
-		}
-		cond += " AND COALESCE(" + key(port.NuGetPathKey) + ", '') <> ''"
-		if !s.Prerelease {
-			cond += " AND " + fmt.Sprintf(contains, "COALESCE("+key(port.NuGetVersionKey)+", '')")
-		}
-		if !s.SemVer2 {
-			cond += " AND " + semVer2
-		}
+	return where, args, true
+}
+
+// shownVersions is what keeps a version v of package_versions that s
+// admits: a join to follow v, and a condition, with no arguments, to
+// follow v's own, both empty without s. A NuGet range reads each version's
+// metadata as JSON: json_extract on SQLite, and on PostgreSQL the jsonb
+// cast, which either fails the query on a document that is not JSON, as
+// the feed's decoding fails. PostgreSQL casts each document once, in a
+// LATERAL subquery that its OFFSET 0 keeps from being merged into the
+// conditions: merged, each of the three keys would parse the document
+// again, which took a count of 2,000 packages from 5 ms to 14 ms.
+func shownVersions(d dialect.Dialect, s *port.NuGetShown) (lateral, cond string) {
+	if s == nil {
+		return "", ""
 	}
-	where += " AND (SELECT 1 FROM " + versions + " WHERE v.package_id = p.id" + cond
-	return where + " LIMIT 1) IS NOT NULL", args, true
+	key := func(k string) string { return "json_extract(v.metadata, '$." + k + "')" }
+	contains, semVer2 := "instr(%s, '-') = 0", "COALESCE("+key(port.NuGetSemVer2Key)+", 0) = 0"
+	if d.Name == "postgres" {
+		lateral = " CROSS JOIN LATERAL (SELECT v.metadata::jsonb AS m OFFSET 0) j"
+		key = func(k string) string { return "(j.m ->> '" + k + "')" }
+		contains = "strpos(%s, '-') = 0"
+		semVer2 = "COALESCE(" + key(port.NuGetSemVer2Key) + ", 'false') <> 'true'"
+	}
+	cond = " AND COALESCE(" + key(port.NuGetPathKey) + ", '') <> ''"
+	if !s.Prerelease {
+		cond += " AND " + fmt.Sprintf(contains, "COALESCE("+key(port.NuGetVersionKey)+", '')")
+	}
+	if !s.SemVer2 {
+		cond += " AND " + semVer2
+	}
+	return lateral, cond
 }
 
 // rangeQueries are the count of r's packages and the page of them, by
@@ -214,23 +233,91 @@ func (p packages) TallyVersions(
 	return t, p.s.Wrap("tally versions of "+repoKey, err)
 }
 
-// releasesAtQuery walks packages_name and, within each package,
-// package_versions_order backwards, reading only those indexes' columns.
-// SQLite's nested loop keeps both orders, so it sorts nothing. PostgreSQL
-// would hash the join and sort every release; the LATERAL subquery, kept
-// from being merged into a join by its OFFSET 0, makes it loop over
+// versionsAtQuery pages the versions of the packages where selects, and
+// of those the ones lateral and cond keep (shownVersions), by package name
+// and then by each package's order_key and version, backwards when
+// newestFirst, with LIMIT and OFFSET after where's arguments. It walks
+// packages_name and, within each package, package_versions_order, reading
+// only those indexes' columns beside the metadata cond reads. SQLite's
+// nested loop keeps both orders, so it sorts nothing. PostgreSQL would
+// hash the join and sort every version; the LATERAL subquery, kept from
+// being merged into a join by its OFFSET 0, makes it loop over
 // packages_name instead and sort only each package's versions, already in
 // order (an incremental sort).
-func releasesAtQuery(d dialect.Dialect) string {
+func versionsAtQuery(d dialect.Dialect, where, lateral, cond string, newestFirst bool) string {
+	order := "v.order_key, v.version"
+	if newestFirst {
+		order = "v.order_key DESC, v.version DESC"
+	}
 	if d.Name == "postgres" {
 		return "SELECT p.id, p.name, v.version FROM packages p CROSS JOIN LATERAL " +
-			"(SELECT v.version, v.order_key FROM package_versions v WHERE v.package_id = p.id " +
-			"ORDER BY v.order_key DESC, v.version DESC OFFSET 0) v WHERE p.repo_key = ? " +
-			"ORDER BY p.name, v.order_key DESC, v.version DESC LIMIT ? OFFSET ?"
+			"(SELECT v.version, v.order_key FROM package_versions v" + lateral +
+			" WHERE v.package_id = p.id" + cond + " ORDER BY " + order + " OFFSET 0) v WHERE " +
+			where + " ORDER BY p.name, " + order + " LIMIT ? OFFSET ?"
 	}
 	return "SELECT p.id, p.name, v.version FROM packages p " +
-		"JOIN package_versions v ON v.package_id = p.id WHERE p.repo_key = ? " +
-		"ORDER BY p.name, v.order_key DESC, v.version DESC LIMIT ? OFFSET ?"
+		"JOIN package_versions v ON v.package_id = p.id WHERE " + where + cond +
+		" ORDER BY p.name, " + order + " LIMIT ? OFFSET ?"
+}
+
+// releasesAtQuery is ReleasesAt's query: every version of a repository's
+// packages, newest first.
+func releasesAtQuery(d dialect.Dialect) string {
+	return versionsAtQuery(d, "p.repo_key = ?", "", "", true)
+}
+
+// rangeVersionsQueries are the count of r's versions and the page of them
+// (versionsAtQuery), with false when r selects none. The count joins every
+// version of the range, which it reads whole whichever way it is walked.
+func rangeVersionsQueries(
+	d dialect.Dialect,
+	r port.PackageRange,
+) (count, page string, args []any, ok bool) {
+	where, args, ok := namesWhere(r)
+	lateral, cond := shownVersions(d, r.Shown)
+	return "SELECT COUNT(*) FROM packages p JOIN package_versions v ON v.package_id = p.id" +
+			lateral + " WHERE " + where + cond,
+		versionsAtQuery(d, where, lateral, cond, false),
+		args, ok
+}
+
+func (p packages) CountRangeVersions(ctx context.Context, r port.PackageRange) (int, error) {
+	count, _, args, ok := rangeVersionsQueries(p.s.Dialect(), r)
+	if !ok {
+		return 0, nil
+	}
+	var n int
+	err := p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(count), args...).Scan(&n)
+	return n, p.s.Wrap("count versions of "+r.RepoKey, err)
+}
+
+func (p packages) RangeVersionsAt(
+	ctx context.Context,
+	r port.PackageRange,
+	offset, limit int,
+) ([]port.ReleaseName, error) {
+	_, page, args, ok := rangeVersionsQueries(p.s.Dialect(), r)
+	if !ok || limit <= 0 {
+		return nil, nil
+	}
+	return p.versionNames(ctx, "page versions of "+r.RepoKey, page,
+		append(args, limit, max(offset, 0)))
+}
+
+// versionNames reads the rows of a versionsAtQuery.
+func (p packages) versionNames(
+	ctx context.Context,
+	what, query string,
+	args []any,
+) ([]port.ReleaseName, error) {
+	var out []port.ReleaseName
+	err := p.s.Rows(ctx, what, query, args, func(rs *sql.Rows) error {
+		var r port.ReleaseName
+		err := rs.Scan(&r.PackageID, &r.Package, &r.Version)
+		out = append(out, r)
+		return err //nolint:wrapcheck // wrapped by Rows
+	})
+	return out, err
 }
 
 func (p packages) ReleasesAt(
@@ -241,14 +328,6 @@ func (p packages) ReleasesAt(
 	if limit <= 0 {
 		return nil, nil
 	}
-	var out []port.ReleaseName
-	err := p.s.Rows(ctx, "page releases of "+repoKey, releasesAtQuery(p.s.Dialect()),
-		[]any{repoKey, limit, max(offset, 0)},
-		func(rs *sql.Rows) error {
-			var r port.ReleaseName
-			err := rs.Scan(&r.PackageID, &r.Package, &r.Version)
-			out = append(out, r)
-			return err //nolint:wrapcheck // wrapped by Rows
-		})
-	return out, err
+	return p.versionNames(ctx, "page releases of "+repoKey, releasesAtQuery(p.s.Dialect()),
+		[]any{repoKey, limit, max(offset, 0)})
 }

@@ -7330,7 +7330,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getRemoteRepositoryConfiguration",
     "state": "implemented",
-    "contract": "Returns the shared configuration of a remote repository whose shareConfiguration is on, to any signed-in caller, administrator or not. Deprecated in favour of the ordinary read.",
+    "contract": "Returns the shared configuration of a remote repository whose shareConfiguration is on, to any caller, administrator or not, and to anonymous while anonymous access is on. Deprecated in favour of the ordinary read.",
     "handler": "internal/artifacts/adapters/http/repositories.go: ArtifactoryAPI.GetRemoteRepositoryConfiguration",
     "direct_calls": [
       "apierror.New",
@@ -7339,7 +7339,6 @@
       "errors.Is",
       "http.StatusText",
       "httpkit.Accepts",
-      "httpkit.Denied",
       "httpkit.Principal",
       "repo.Descriptor",
       "s.InternalError",
