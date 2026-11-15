@@ -35,6 +35,11 @@
 //     info, tree and Xet, directly and through a virtual repository.
 //   - huggingface_xet_native_test.go: the native Hub client's upload and
 //     download through Xet.
+//   - huggingface_resolve_headers_test.go: a resolve's Hub headers and its
+//     304, from every repository class (#1581).
+//   - huggingface_lfs_checksums_test.go: a Git LFS file keeps its upload's
+//     SHA-1 and MD5, in its item download and storage answer, and in a
+//     revision that inherits it (#1581).
 //
 // # References
 //

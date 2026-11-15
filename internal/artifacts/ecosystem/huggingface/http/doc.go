@@ -81,6 +81,11 @@
 //     X-Artifactory-Filename, Content-Disposition, X-Checksum-* or
 //     Last-Modified. An If-None-Match naming that ETag answers 304, before a
 //     remote file is fetched (#1581).
+//   - A Git LFS file a commit stores keeps the SHA-1 and MD5 its upload
+//     computed (the store's UploadDigests, written by the signed upload and
+//     read by the commit), so its item download and storage answer carry
+//     all three checksums and its SHA-1 ETag, as a 7.x deploy keeps them
+//     for every file (#1581).
 //   - Statuses and error texts stay byte-identical.
 //
 // # References

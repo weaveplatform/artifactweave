@@ -25,8 +25,8 @@
 //   - Store, from New: the platform's Settings, Leases, WorkQueue, Configs,
 //     Instance, Outbox, Uploads, Replays and RequestBudgets; the artifacts
 //     module's Repos, RemoteCache, Items, Trash, Packages, Blobs, Replicas,
-//     GitLFSLocks, BowerRegistrations, Builds, ArchivedItems, ColdBlobs and
-//     ColdReplicas; the access module's Users, Groups, Permissions, Tokens,
+//     GitLFSLocks, BowerRegistrations, UploadDigests, Builds, ArchivedItems,
+//     ColdBlobs and ColdReplicas; the access module's Users, Groups, Permissions, Tokens,
 //     Keys, Projects and APIRestrictions; Webhooks; Cleanup and Archive;
 //     Replications, Peers, Federation and Platform; Bundles and
 //     Distribution; Workers; and memtx's Tx, AfterCommit and Close.

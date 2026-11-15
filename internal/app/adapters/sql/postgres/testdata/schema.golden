@@ -933,6 +933,12 @@ constraint trusted_keys.trusted_keys_alias_key UNIQUE (alias)
 constraint trusted_keys.trusted_keys_pkey PRIMARY KEY (kid)
 index trusted_keys.trusted_keys_alias_key CREATE UNIQUE INDEX trusted_keys_alias_key ON trusted_keys USING btree (alias)
 index trusted_keys.trusted_keys_pkey CREATE UNIQUE INDEX trusted_keys_pkey ON trusted_keys USING btree (kid)
+table upload_digests
+column upload_digests.sha256 text COLLATE "C" NOT NULL
+column upload_digests.sha1 text NOT NULL
+column upload_digests.md5 text NOT NULL
+constraint upload_digests.upload_digests_pkey PRIMARY KEY (sha256)
+index upload_digests.upload_digests_pkey CREATE UNIQUE INDEX upload_digests_pkey ON upload_digests USING btree (sha256)
 table uploads
 column uploads.id text COLLATE "C" NOT NULL
 column uploads.backend text NOT NULL DEFAULT ''::text

@@ -1,7 +1,7 @@
 // Package port declares the artifacts module's store ports: repositories,
 // items, the blob and replica indexes, the trash can, the package index,
-// builds, the remote cache, Git LFS locks, Bower registrations and archived
-// items, the values their calls take and return, the checks every store
+// builds, the remote cache, Git LFS locks, Bower registrations, upload
+// digests and archived items, the values their calls take and return, the checks every store
 // applies before it writes, and Store, every store the module owns.
 //
 // # Role
@@ -19,8 +19,8 @@
 //   - Repository configurations, items with their properties and
 //     statistics, blob and replica rows, trash entries, packages and
 //     versions, build runs with their promotions and retention, remote
-//     cache keys, tokens and entries, Git LFS locks, Bower registrations
-//     and archived items, to store; keys, paths, ids and checksums to look
+//     cache keys, tokens and entries, Git LFS locks, Bower registrations,
+//     an upload's digests and archived items, to store; keys, paths, ids and checksums to look
 //     up.
 //   - A RepoFilter, GitLFSLockFilter, ArchivedFilter or the mirror's
 //     ReplicaFilter, with a kernel.Page, to narrow a listing; an AQL query
@@ -56,6 +56,8 @@
 //     DockerFold.
 //   - BuildStore with NormaliseBuild, whose DependencyPage is one keyset
 //     page of FindDependencies, which the dependency search streams (#1409); BowerRegistrationStore;
+//     UploadDigestStore, the SHA-1 and MD5 an upload computed, by the
+//     content's SHA-256 (#1581);
 //     GitLFSLockStore with GitLFSLockFilter; and ArchivedItemStore with
 //     ArchivedFilter.
 //   - CleanProperties, CheckPropertyKeys and CheckBuildPropertyKeys, how
@@ -63,9 +65,9 @@
 //   - RemoteCacheStore, with NewRemoteSource, RemoteConfigChanged,
 //     RemoteSourceConfig, RemotePolicyChanged, RemoteCacheID,
 //     ValidateRemoteKey, RemotePathMatches and ValidateRemoteEntry.
-//   - Store: tx.Runner and the 13 accessors Repos, RemoteCache, Items,
+//   - Store: tx.Runner and the 14 accessors Repos, RemoteCache, Items,
 //     Blobs, Replicas, Trash, Packages, GitLFSLocks, BowerRegistrations,
-//     Builds, ArchivedItems, ColdBlobs and ColdReplicas.
+//     UploadDigests, Builds, ArchivedItems, ColdBlobs and ColdReplicas.
 //
 // # Invariants
 //
@@ -125,6 +127,8 @@
 // request 912). Moved here in P9d, which added ArchivedItemStore and Store.
 // DockerPageStore pages the registry's tags lists and catalogs (#1402).
 // RepoStore.Page pages Get Repositories in the store (#1408).
+// UploadDigestStore keeps a Hugging Face LFS upload's SHA-1 and MD5 for its
+// commit (#1581).
 //
 // # Testing
 //
