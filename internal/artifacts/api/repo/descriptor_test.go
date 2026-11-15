@@ -165,7 +165,10 @@ func TestUnitDescriptorTypeSettings(t *testing.T) {
 		{repo.OCI, `{` + ext + `}`},
 		{repo.HelmOCI, `{` + ext + `}`},
 		{repo.Swift, `{` + ext + `}`},
-		{repo.AIEditorExtensions, `{` + ext + `}`},
+		// RemoteDefaultPackageConfigSetter turns this type's on, with the
+		// vsassets.io pattern (#1511).
+		{repo.AIEditorExtensions, `{"externalDependencies": {"enabled": true,
+			"pattern": ["**/**vsassets.io/**"]}}`},
 	} {
 		c := *repo.Defaults(&repo.Config{
 			Key: "r", Class: repo.Remote, PackageType: tc.t, URL: "https://up.example",

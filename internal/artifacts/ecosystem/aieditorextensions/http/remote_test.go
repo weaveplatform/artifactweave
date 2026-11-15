@@ -8,7 +8,9 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -49,9 +51,20 @@ type fixture struct {
 	wrongIdentity bool
 	badChecksum   bool
 	badSignature  bool
+	// cdn, when set, is the origin the gallery names for every asset: the
+	// Marketplace's CDN, which marketplaceFixture serves.
+	cdn string
 }
 
 func newFixture(t *testing.T) *fixture {
+	t.Helper()
+	return newFixtureWith(t, false)
+}
+
+// newFixtureWith is newFixture, or with marketplace the remote of the
+// Visual Studio Marketplace, whose gallery names its CDN for every asset:
+// one TLS server answers for both hosts, which the resolver maps to it.
+func newFixtureWith(t *testing.T, marketplace bool) *fixture {
 	t.Helper()
 	f := &fixture{t: t}
 	f.manifest = []byte(
@@ -79,7 +92,17 @@ func newFixture(t *testing.T) *fixture {
 		t,
 		map[string][]byte{".signature.manifest": statement, ".signature.p7s": []byte("signature")},
 	)
-	f.upstream = httptest.NewServer(http.HandlerFunc(f.serveUpstream))
+	options := upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))}
+	gallery := ""
+	if marketplace {
+		f.upstream, options = marketplaceServer(t, http.HandlerFunc(f.serveUpstream), options)
+		port := f.upstream.Listener.Addr().(*net.TCPAddr).Port
+		gallery = fmt.Sprintf("https://%s:%d/_apis/public/gallery", marketplaceHost, port)
+		f.cdn = fmt.Sprintf("https://%s:%d", cdnHost, port)
+	} else {
+		f.upstream = httptest.NewServer(http.HandlerFunc(f.serveUpstream))
+		gallery = f.upstream.URL + "/_apis/public/gallery"
+	}
 	t.Cleanup(f.upstream.Close)
 	db := inmem.New()
 	f.db = db
@@ -87,7 +110,7 @@ func newFixture(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := *repo.Defaults(&repo.Config{Key: "editor-remote", Class: repo.Remote, PackageType: repo.AIEditorExtensions, URL: f.upstream.URL + "/_apis/public/gallery"})
+	c := *repo.Defaults(&repo.Config{Key: "editor-remote", Class: repo.Remote, PackageType: repo.AIEditorExtensions, URL: gallery})
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
@@ -96,11 +119,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
-	resolver, err := upstream.NewResolver(
-		db,
-		nil,
-		upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
-	)
+	resolver, err := upstream.NewResolver(db, nil, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +192,9 @@ func zipFiles(t *testing.T, files map[string][]byte) []byte {
 
 func (f *fixture) serveUpstream(w http.ResponseWriter, r *http.Request) {
 	const prefix = "/_apis/public/gallery/"
-	if !strings.HasPrefix(r.URL.Path, prefix) {
+	// The CDN serves its files at its root.
+	if !strings.HasPrefix(r.URL.Path, prefix) &&
+		(f.cdn == "" || !strings.HasPrefix(r.URL.Path, "/extensions/")) {
 		http.NotFound(w, r)
 		return
 	}
@@ -218,6 +239,9 @@ func (f *fixture) serveUpstream(w http.ResponseWriter, r *http.Request) {
 			hash = strings.Repeat("0", 64)
 		}
 		assetBase := f.upstream.URL + prefix + "extensions/ms-vscode/" + identity + "/1.11.1/123"
+		if f.cdn != "" {
+			assetBase = f.cdn + "/extensions/ms-vscode/" + identity + "/1.11.1/123"
+		}
 		v := map[string]any{
 			"version":          "1.11.1",
 			"assetUri":         assetBase,
@@ -261,7 +285,8 @@ func (f *fixture) serveUpstream(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(body)
 		return
 	}
-	if !strings.Contains(r.URL.Path, "/extensions/ms-vscode/hexeditor/1.11.1/123/") {
+	if !strings.Contains(r.URL.Path, "/extensions/ms-vscode/hexeditor/1.11.1/123/") ||
+		f.cdn != "" && !strings.HasPrefix(r.Host, cdnHost+":") {
 		http.NotFound(w, r)
 		return
 	}

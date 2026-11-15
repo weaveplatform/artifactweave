@@ -43,6 +43,15 @@ and signature ZIP structure and size are bounded. Upstream redirects from the
 gallery POST are rejected. Caller headers and credentials are never sent
 upstream; configured remote credentials may be used for the upstream request.
 
+A new repository has `externalDependenciesEnabled` on, with the pattern
+`**/**vsassets.io/**`, and `bypassHeadRequests` on, as Artifactory 7.x gives
+this type. The Visual Studio Marketplace serves each extension's files from
+its `vsassets.io` CDN rather than the gallery host, and the remote fetches a
+file from any origin but its own URL's only while external dependencies are
+on and a pattern matches the file's URL; otherwise the asset answers 502.
+`bypassHeadRequests` cannot be turned off: such an update answers 400, and
+the remote sends each upstream request as a GET without a HEAD first.
+
 Gallery and asset entries use the shared remote cache and honor its refresh,
 offline, deletion and reindex behavior. The
 [native VS Code acceptance](../../test/acceptance/features/ai_editor_extensions.feature)

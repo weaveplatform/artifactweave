@@ -6,12 +6,15 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/kernel/antpath"
 )
 
 const (
@@ -71,7 +74,7 @@ func (h handler) asset(w http.ResponseWriter, r *http.Request) {
 				name,
 				version,
 				assetType,
-			) {
+			) || !externalAllowed(c, next) {
 				return source.ErrDenied
 			}
 			return nil
@@ -148,4 +151,27 @@ func (h handler) asset(w http.ResponseWriter, r *http.Request) {
 		return nil
 	}
 	h.k.ServeResult(w, r, result)
+}
+
+// externalAllowed reports whether the remote c may fetch the asset at u. A
+// URL on the remote's own origin is the gallery's. Any other, such as the
+// Marketplace's CDN, is an external dependency: fetched only while
+// externalDependenciesEnabled is on and one of externalDependenciesPatterns
+// matches the whole URL, as JFrog's Terraform provider (12.11.14) documents
+// the two settings of this type. The catalog's origin rules (safeAssetURL)
+// still apply; the patterns only narrow them.
+func externalAllowed(c repo.Config, u *url.URL) bool {
+	base, err := url.Parse(c.URL)
+	if err == nil && base.Scheme == u.Scheme && strings.EqualFold(base.Host, u.Host) {
+		return true
+	}
+	if c.ExternalDependenciesEnabled == nil || !*c.ExternalDependenciesEnabled {
+		return false
+	}
+	for _, pattern := range c.ExternalDependenciesPatterns {
+		if pattern != "" && antpath.CompilePattern(pattern).Match(u.String()) {
+			return true
+		}
+	}
+	return false
 }
