@@ -278,3 +278,31 @@ func TestAccTraceRefusalsAndRewrites(t *testing.T) {
 		wantSteps(t, c.path, steps, c.expected...)
 	}
 }
+
+// The trace names the proxy headers 7.161.26 prints (TraceLoggingResponse's
+// "Headers:" block, from RepoFilter.TRACE_WHITELISTED_HEADERS) between the
+// user and the time: in that order, only those not blank, each on one line.
+// Any other header is left out, and a request with none of them has no
+// block, as every other trace test's parse checks.
+func TestAccTraceNamesTheProxyHeaders(t *testing.T) {
+	w := newItemWorld(t, false)
+	w.put("/artifactory/libs-local/d/a.txt", "a")
+
+	const path = "/artifactory/libs-local/d/a.txt?trace"
+	rec := w.do(http.MethodGet, path, "admin", "",
+		"X-Forwarded-Proto", "https",
+		"X-Forwarded-Host", "proxy.example.com",
+		"X-JFrog-Override-Base-Url", "  ",
+		"X-Orig-Client-Uri", "/orig/a.txt\r\nInjected: x",
+		"X-Forwarded-For", "10.0.0.1",
+	)
+	wantStatus(t, rec, http.StatusOK)
+	const block = "User: admin\nHeaders:\n" +
+		"  X-Orig-Client-Uri: /orig/a.txt Injected: x\n" +
+		"  X-Forwarded-Host: proxy.example.com\n" +
+		"  X-Forwarded-Proto: https\n" +
+		"Time: "
+	if !strings.Contains(rec.Body.String(), block) {
+		t.Fatalf("%s: body\n%s\nwant\n%s", path, rec.Body, block)
+	}
+}

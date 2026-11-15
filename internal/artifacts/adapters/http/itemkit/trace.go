@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -53,6 +54,13 @@ func traceRepoPath(c repo.Config, cached bool, p string) string {
 		key += model.CacheSuffix
 	}
 	return key + ":" + p
+}
+
+// traceHeaders are the request headers 7.161.26's trace prints, in its
+// order (RepoFilter.TRACE_WHITELISTED_HEADERS): what a proxy in front of
+// the server says of the request, which sets the URLs a response names.
+var traceHeaders = []string{
+	"X-Orig-Client-Uri", "X-JFrog-Override-Base-Url", "X-Forwarded-Host", "X-Forwarded-Proto",
 }
 
 // traceItem answers GET or HEAD {repo}/{path}?trace. In place of the content
@@ -103,6 +111,7 @@ func (s *Kit) traceItem(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(&b, "Repo Path ID: %s:%s\n", req.Key, req.Path)
 	fmt.Fprintf(&b, "Method Name: %s\n", r.Method)
 	fmt.Fprintf(&b, "User: %s\n", p.Name)
+	writeTraceHeaders(&b, r)
 	fmt.Fprintf(&b, "Time: %s\n", start.Format(traceTime))
 	b.WriteString("Steps: \n")
 	for _, line := range t.steps {
@@ -113,6 +122,28 @@ func (s *Kit) traceItem(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if r.Method != http.MethodHead {
 		_, _ = io.WriteString(w, b.String())
+	}
+}
+
+// traceLineBreaks is TraceLoggingResponse.sanitizeHeaderValue's pattern.
+var traceLineBreaks = regexp.MustCompile(`[\r\n]+`)
+
+// writeTraceHeaders writes the "Headers:" block of 7.161.26's trace
+// (TraceLoggingResponse.sendResponse): each of traceHeaders the request
+// carries with a value that is not blank, its first value only, as
+// RepoFilter.collectWhitelistedHeaders reads it, with every run of CR and LF
+// made one space so a value cannot add a line. With none, the block is left
+// out.
+func writeTraceHeaders(b *strings.Builder, r *http.Request) {
+	head := "Headers:\n"
+	for _, name := range traceHeaders {
+		value := r.Header.Get(name)
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		b.WriteString(head)
+		head = ""
+		fmt.Fprintf(b, "  %s: %s\n", name, traceLineBreaks.ReplaceAllString(value, " "))
 	}
 }
 
