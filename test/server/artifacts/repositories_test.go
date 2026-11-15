@@ -1883,3 +1883,118 @@ func TestAccAIEditorExtensionsRemoteExternalDependencyDefaults(t *testing.T) {
 	}
 	check("vscode", true, vsassets, true)
 }
+
+// A Terraform remote on the public Terraform, OpenTofu or Wiz registry, the
+// default one included, reads bypassHeadRequests true in the v1 and v2
+// reads and the configurations list after every create and update, whatever
+// was sent, as 7.161.26's PackageRepoConfigChangeInterceptor sets it; one on
+// another registry keeps what was sent. An npm remote created on
+// https://npm.pkg.github.com reads true, as NpmGithubRegistrySettings-
+// ProviderPackage sets it on create, and an update that turns it off keeps
+// false. The batch routes follow the same rules (#1583).
+func TestAccRemoteBypassHeadDefaults(t *testing.T) {
+	w := newRepoWorld(t)
+	const p = "/artifactory/api/repositories/"
+	const batch = "/artifactory/api/v2/repositories/batch"
+	tf := `"rclass":"remote","packageType":"terraform","url":"https://tf-up.example"`
+	npm := `"rclass":"remote","packageType":"npm"`
+	for _, step := range []struct{ method, path, body string }{
+		{"PUT", p + "tf-bare", `{` + tf + `}`},
+		{"PUT", p + "tf-off", `{` + tf + `,"bypassHeadRequests":false}`},
+		{"PUT", p + "tf-tofu", `{` + tf + `,"terraformRegistryUrl":"https://registry.opentofu.org"}`},
+		{"PUT", p + "tf-wiz", `{` + tf + `,"terraformRegistryUrl":"https://tf.app.wiz.io"}`},
+		{"PUT", p + "tf-other", `{` + tf + `,"terraformRegistryUrl":"https://tf.example"}`},
+		{"PUT", p + "tf-other-on", `{` + tf + `,"terraformRegistryUrl":"https://tf.example","bypassHeadRequests":true}`},
+		{"POST", p + "tf-bare", `{"bypassHeadRequests":false}`},
+		{"PUT", batch, `[{"key":"tf-batch",` + tf + `,"bypassHeadRequests":false}]`},
+		{"POST", batch, `[{"key":"tf-batch","bypassHeadRequests":false}]`},
+		{"PUT", p + "npm-gh", `{` + npm + `,"url":"https://npm.pkg.github.com","bypassHeadRequests":false}`},
+		{"PUT", p + "npm-gh-off", `{` + npm + `,"url":"https://npm.pkg.github.com/org"}`},
+		{"POST", p + "npm-gh-off", `{"bypassHeadRequests":false}`},
+		{"PUT", p + "npm-public", `{` + npm + `,"url":"https://registry.npmjs.org"}`},
+		{"POST", p + "npm-public", `{"url":"https://npm.pkg.github.com"}`},
+		{"PUT", batch, `[{"key":"npm-batch",` + npm + `,"url":"https://npm.pkg.github.com"}]`},
+	} {
+		if rec := w.do(step.method, step.path, "admin", step.body); rec.Code/100 != 2 {
+			t.Fatalf("%s %s %s: %d %s", step.method, step.path, step.body, rec.Code, rec.Body)
+		}
+	}
+	var groups map[string][]map[string]any
+	jsonBody(t, w.do("GET", p+"configurations", "admin", "", "Accept", mediaConfigs), &groups)
+	listed := map[string]map[string]any{}
+	for _, e := range groups["REMOTE"] {
+		listed[e["key"].(string)] = e
+	}
+	for key, want := range map[string]bool{
+		"tf-bare": true, "tf-off": true, "tf-tofu": true, "tf-wiz": true, "tf-batch": true,
+		"tf-other": false, "tf-other-on": true,
+		"npm-gh": true, "npm-batch": true, "npm-gh-off": false, "npm-public": false,
+	} {
+		for _, read := range []string{p, "/artifactory/api/v2/repositories/", "configurations"} {
+			doc := listed[key]
+			if read != "configurations" {
+				jsonBody(t, w.do("GET", read+key, "admin", ""), &doc)
+			}
+			if doc["bypassHeadRequests"] != want {
+				t.Errorf(
+					"%s %s: bypassHeadRequests %v, want %v",
+					read,
+					key,
+					doc["bypassHeadRequests"],
+					want,
+				)
+			}
+		}
+	}
+}
+
+// A remote created or updated without a URL is refused with 400 and 7.x's
+// message on the v1 and v2 repository routes, whatever its package type:
+// none has a default URL over REST, NIM's included. Other faults keep their
+// own messages (#1584).
+func TestAccRemoteWithoutURLAnswersSevenXMessage(t *testing.T) {
+	w := newRepoWorld(t)
+	const p = "/artifactory/api/repositories/"
+	const batch = "/artifactory/api/v2/repositories/batch"
+	if rec := w.do(
+		"PUT",
+		p+"up",
+		"admin",
+		`{"rclass":"remote","packageType":"generic","url":"https://up.example"}`,
+	); rec.Code != http.StatusOK {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body)
+	}
+	const refused = `{"errors":[{"message":"No URL defined for remote repository","status":400}]}`
+	for _, step := range []struct{ method, path, body string }{
+		{"PUT", p + "no-url", `{"rclass":"remote","packageType":"generic"}`},
+		{"PUT", p + "no-url", `{"rclass":"remote","packageType":"nimmodel"}`},
+		{"PUT", p + "no-url", `{"rclass":"remote","packageType":"aieditorextensions"}`},
+		{"PUT", p + "no-url", `{"rclass":"remote","packageType":"jetbrainsplugins","url":""}`},
+		{"POST", p + "up", `{"url":""}`},
+		{"POST", p + "up", `{"url":null}`},
+		{"PUT", batch, `[{"key":"no-url","rclass":"remote","packageType":"terraform"}]`},
+		{"POST", batch, `[{"key":"up","url":null}]`},
+	} {
+		rec := w.do(step.method, step.path, "admin", step.body)
+		if rec.Code != http.StatusBadRequest || strings.TrimSpace(rec.Body.String()) != refused {
+			t.Errorf("%s %s %s: %d %s", step.method, step.path, step.body, rec.Code, rec.Body)
+		}
+	}
+	rec := w.do(
+		"PUT",
+		p+"short",
+		"admin",
+		`{"rclass":"remote","packageType":"generic","url":"https://up.example","retrievalCachePeriodSecs":1}`,
+	)
+	if rec.Code != http.StatusBadRequest ||
+		strings.TrimSpace(rec.Body.String()) != `{"errors":[{"message":`+
+			`"invalid repository configuration: retrievalCachePeriodSecs: must be at least 30 seconds","status":400}]}` {
+		t.Errorf("another fault: %d %s", rec.Code, rec.Body)
+	}
+	if _, err := w.db.Repos().Get(t.Context(), "no-url"); !errors.Is(err, kernel.ErrNotFound) {
+		t.Errorf("refused remote stored: %v", err)
+	}
+	if c, err := w.db.Repos().Get(t.Context(), "up"); err != nil || c.URL != "https://up.example" {
+		t.Errorf("refused update stored: %q %v", c.URL, err)
+	}
+}

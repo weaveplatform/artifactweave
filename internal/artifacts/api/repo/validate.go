@@ -45,6 +45,28 @@ func (es ValidationError) Unwrap() error {
 	return ErrInvalid
 }
 
+// MsgNoURL is 7.x's refusal of a remote repository saved without a URL, as
+// JFrog's Terraform provider (12.11.14) quotes it for the AI Editor
+// Extensions and JetBrains Plugins remotes; JFrog's create repository
+// reference makes url mandatory for every remote. The text is not in the
+// 7.161.26 OSS tree, so its status and envelope are [I].
+const MsgNoURL = "No URL defined for remote repository"
+
+// NoURLError is a remote repository whose only fault is that it has no URL.
+// Its text is MsgNoURL alone, without ErrInvalid's prefix, so a client that
+// matches 7.x's message finds it. It unwraps to ErrInvalid.
+type NoURLError struct{}
+
+// Error is MsgNoURL.
+func (NoURLError) Error() string { return MsgNoURL }
+
+// Unwrap lets errors.Is(err, ErrInvalid) work.
+func (NoURLError) Unwrap() error { return ErrInvalid }
+
+// noURL is the field error of a remote without a URL. Alone it becomes a
+// NoURLError; among other faults it keeps its place in the list.
+var noURL = FieldError{Field: "url", Message: MsgNoURL}
+
 // cacheSuffix is reserved: Artifactory exposes a remote repository's cache
 // under "<key>-cache" without it being a repository of its own, so a real
 // repository with that suffix would be unaddressable.
@@ -64,8 +86,9 @@ func ResolveKey(key string) (stored string, cached bool) {
 }
 
 // Validate checks the rules a create or full update must satisfy. It returns
-// nil or a ValidationError list; it does not apply defaults, so run Defaults first when
-// validating a document that relies on them.
+// nil, a NoURLError when that is the only fault, or a ValidationError list;
+// it does not apply defaults, so run Defaults first when validating a
+// document that relies on them.
 func Validate(c *Config) error {
 	return validate(c, true)
 }
@@ -190,8 +213,12 @@ func validate(c *Config, keyRules bool) error {
 	// write path (decision 0013).
 	switch class {
 	case Remote:
+		// No package type has a default URL over REST: 7.161.26 keeps its
+		// per-type registry URLs (RepoConfigDefaultValues.DefaultUrl) for
+		// the UI and onboarding, and the provider finds a create of two of
+		// those types without one refused.
 		if c.URL == "" {
-			add("url", "is required for a remote repository")
+			errs = append(errs, noURL)
 		}
 		validateRetrievalPeriod(c, add)
 	case Virtual:
@@ -208,8 +235,11 @@ func validate(c *Config, keyRules bool) error {
 		}
 	}
 	validateNumbers(c, add)
-	if errs == nil {
+	switch {
+	case errs == nil:
 		return nil
+	case len(errs) == 1 && errs[0] == noURL:
+		return NoURLError{}
 	}
 	return errs
 }

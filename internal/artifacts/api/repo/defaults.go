@@ -1,5 +1,10 @@
 package repo
 
+import (
+	"slices"
+	"strings"
+)
+
 // Default values documented for repository configuration fields. Each one
 // must match docs/research/03-repository-configuration-model.md, which cites
 // JFrog's configuration-json-files page; the Terraform providers compare the
@@ -26,7 +31,6 @@ const (
 	DefaultComposerRegistryURL            = "https://packagist.org"
 	DefaultTerraformRegistryURL           = "https://registry.terraform.io"
 	DefaultTerraformProvidersURL          = "https://releases.hashicorp.com"
-	DefaultNIMModelURL                    = "https://api.ngc.nvidia.com"
 	// DefaultAIEditorExtensionsPattern is the external dependency pattern an
 	// AI Editor Extensions remote takes: VSCODE_EXTERNAL_DEPENDENCIES_PATTERNS
 	// of 7.161.26's PackageTypeConfigFields, which covers the Visual Studio
@@ -50,6 +54,34 @@ const (
 	MinRetrievalCachePeriodSecs           = 30
 	MinChocolateyRetrievalCachePeriodSecs = 14400
 )
+
+// bypassHeadRegistries are the terraformRegistryUrl values whose Terraform
+// remotes 7.161.26's PackageRepoConfigChangeInterceptor always gives
+// bypassHeadRequests. It compares them as exact strings, so a trailing slash
+// does not match.
+var bypassHeadRegistries = []string{
+	DefaultTerraformRegistryURL, "https://registry.opentofu.org", "https://tf.app.wiz.io",
+}
+
+// npmGitHubRegistry is NPM_GITHUB_URL of 7.161.26's
+// NpmGithubRegistrySettingsProviderPackage, which matches it as a prefix of
+// the remote's URL (CreateDefaults).
+const npmGitHubRegistry = "https://npm.pkg.github.com"
+
+// CreateDefaults applies what 7.x sets on a repository only when it is
+// created, after Defaults and once the URL has given up a user name and
+// password written into it (repos.PrepareCreate), as 7.x's interceptors run
+// after processUrlCredentials. An npm remote whose URL starts with
+// https://npm.pkg.github.com gets bypassHeadRequests on, whatever was sent:
+// 7.161.26's NpmGithubRegistrySettingsProviderPackage sets it through
+// PackageRemoteRepoConfigurationInterceptor, which runs on create only,
+// while npm.remote.enforce.default.configuration.enabled is on, as it is by
+// default (ConstantValues). An update keeps what is stored or sent.
+func CreateDefaults(c *Config) {
+	if c.Class == Remote && c.PackageType == NPM && strings.HasPrefix(c.URL, npmGitHubRegistry) {
+		c.BypassHeadRequests = new(true)
+	}
+}
 
 // Defaults fills every field the caller left unset with the value Artifactory
 // would apply on create. It returns the config so it can be chained; the
@@ -206,9 +238,13 @@ func remoteDefaults(c *Config) {
 	case Terraform:
 		setStr(&c.TerraformRegistryURL, DefaultTerraformRegistryURL)
 		setStr(&c.TerraformProvidersURL, DefaultTerraformProvidersURL)
-	case NIMModel:
-		if c.URL == "" {
-			c.URL = DefaultNIMModelURL
+		// 7.161.26's PackageRepoConfigChangeInterceptor turns it on at every
+		// create and update of a Terraform remote on one of these
+		// registries, whatever was sent, and refuses nothing: the public
+		// registries answer HEAD 405 (RTFACT-29316). A new remote's default
+		// registry is one of them.
+		if slices.Contains(bypassHeadRegistries, c.TerraformRegistryURL) {
+			c.BypassHeadRequests = new(true)
 		}
 	}
 	// The Terraform provider's sample reads of Bower, CocoaPods, Composer,
