@@ -614,6 +614,29 @@ func TestAccRemoteColdTraceKeepsTheLookupsAnswers(t *testing.T) {
 	}
 }
 
+// TestAccRemoteTraceOfACachedFolderKeepsTheLookupsAnswer: a trace of a
+// path a generic remote's cache holds as a folder asks the upstream
+// nothing and names the folder, as the download leaves that path to the
+// cache lookup (readRemoteItem) and lists it.
+func TestAccRemoteTraceOfACachedFolderKeepsTheLookupsAnswer(t *testing.T) {
+	w := newRemoteWorld(t)
+	remoteOfType(t, w, repo.Generic, nil)
+	w.up.Set("/pkg/file.bin", declaring(payload(t), false))
+	remoteStatus(t, w.request(http.MethodGet, "/artifactory/remote/pkg/file.bin", "reader", ""),
+		http.StatusOK)
+	asked := len(w.up.Requests())
+	got := w.request(http.MethodGet, "/artifactory/remote/pkg?trace", "reader", "")
+	remoteStatus(t, got, http.StatusOK)
+	for _, step := range []string{"Identified requested resource as a folder", "Request succeeded"} {
+		if !strings.Contains(got.Body.String(), step) {
+			t.Fatal(step, got.Body)
+		}
+	}
+	if n := len(w.up.Requests()); n != asked {
+		t.Fatal("asked the upstream", w.up.Requests()[asked:])
+	}
+}
+
 // hexDigest is the hex SHA-256 of s.
 func hexDigest(s string) string {
 	sum := sha256.Sum256([]byte(s))
