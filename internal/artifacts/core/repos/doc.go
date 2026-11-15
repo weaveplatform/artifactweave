@@ -51,6 +51,10 @@
 //     over or a purge releases them.
 //   - Validation messages and artifactsapi.MsgKeyExists reach clients and
 //     stay byte-identical.
+//   - A remote's URL is never stored with a user name and password in it:
+//     PrepareCreate and Merge move them into its username and password, as
+//     7.x's RemoteRepoConfig.processUrlCredentials does on every save, so
+//     no read has to take them out.
 //
 // # References
 //
@@ -75,8 +79,9 @@
 //     repositories API creates it, as its UI does, keyed by host and port:
 //     https://jfrog.atlassian.net/browse/RTFACT-30256.
 //   - https://github.com/weaveplatform/artifactweave/issues/1013,
-//     https://github.com/weaveplatform/artifactweave/issues/1088 and
-//     https://github.com/weaveplatform/artifactweave/issues/1257
+//     https://github.com/weaveplatform/artifactweave/issues/1088,
+//     https://github.com/weaveplatform/artifactweave/issues/1257 and
+//     https://github.com/weaveplatform/artifactweave/issues/1510
 //
 // # Status
 //
@@ -85,7 +90,8 @@
 // # Testing
 //
 //   - repos_test.go: merges, protected keys, members, key pairs,
-//     environments and deletes, with their failures.
+//     environments and deletes, with their failures, and the user name and
+//     password a remote's URL gives up on create and update.
 //   - remove_test.go: deletes with the trash can on and off, restores,
 //     remote caches, a large repository and content changing during the
 //     delete.

@@ -57,6 +57,44 @@ virtualRepositories:
 	}
 }
 
+// A remote the YAML configuration creates or updates with a user name and
+// password in its URL keeps them as its username and password, as every
+// other write does, and the same patch again changes nothing (#1510).
+func TestAccPatchConfigurationMovesURLCredentials(t *testing.T) {
+	w := newRepoWorld(t)
+	w.create(repo.Config{Key: "old-remote", Class: repo.Remote, URL: "https://up.example/old"})
+	patch := `
+remoteRepositories:
+  yaml-remote:
+    type: generic
+    url: https://u:p@up.example/yaml
+  old-remote:
+    url: https://v:q@up.example/old?x=1
+`
+	want := map[string][3]string{
+		"yaml-remote": {"https://up.example/yaml", "u", "p"},
+		"old-remote":  {"https://up.example/old", "v", "q"},
+	}
+	for _, round := range []string{"first", "second"} {
+		rec := w.do(
+			http.MethodPatch,
+			configPath,
+			"admin",
+			patch,
+			"Content-Type",
+			"application/yaml",
+		)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s PATCH = %d: %q", round, rec.Code, rec.Body)
+		}
+		for key, want := range want {
+			if c := w.stored(key); [3]string{c.URL, c.Username, c.Password} != want {
+				t.Errorf("%s PATCH stored %s %s %q %q", round, key, c.URL, c.Username, c.Password)
+			}
+		}
+	}
+}
+
 func TestAccPatchConfigurationErrors(t *testing.T) {
 	w := newRepoWorld(t)
 	for name, c := range map[string]struct {

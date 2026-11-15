@@ -19,7 +19,7 @@ import (
 func TestUnitDescriptorIsTheMaskedHTTPRepoDescriptor(t *testing.T) {
 	c := *repo.Defaults(&repo.Config{
 		Key: "maven-remote", Class: repo.Remote, PackageType: repo.Maven,
-		Description: "Maven Central", URL: "https://u:p@up.example/maven2", Username: "u",
+		Description: "Maven Central", URL: "https://up.example/maven2", Username: "u",
 		Password: "p", Proxy: "corp", LocalAddress: "10.0.0.1",
 		PropertySets: []string{"artifactory"}, ShareConfiguration: ptr(true),
 		CustomHTTPHeaders: []repo.CustomHTTPHeader{
@@ -251,25 +251,6 @@ func TestUnitDescriptorTypeSettings(t *testing.T) {
 		)
 		if diff := cmp.Diff(want, got); diff != "" {
 			t.Errorf("%s (-want +got):\n%s", tc.c.PackageType, diff)
-		}
-	}
-}
-
-// A remote URL loses its user information and keeps the rest; one that
-// does not parse is left as it is.
-func TestUnitWithoutCredentials(t *testing.T) {
-	for raw, want := range map[string]string{
-		"https://u:p@up.example/a?b=c": "https://up.example/a?b=c",
-		"https://:p@up.example/a":      "https://up.example/a",
-		"https://u:p:q@up.example/a":   "https://up.example/a",
-		"https://u@up.example/a":       "https://u@up.example/a",
-		"https://u:@up.example/a":      "https://u:@up.example/a",
-		"https://up.example/a":         "https://up.example/a",
-		"://bad":                       "://bad",
-		"":                             "",
-	} {
-		if got := repo.WithoutCredentials(raw); got != want {
-			t.Errorf("%q: %q, want %q", raw, got, want)
 		}
 	}
 }
