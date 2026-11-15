@@ -641,17 +641,15 @@ func (s *Kit) ServeFile(
 	f Found,
 	p kernel.Principal,
 ) {
-	s.serveFile(w, r, st, f, p, f.Item.MimeType)
+	s.serveFile(w, r, st, f, p, f.Item.MimeType, blob.Disposition(f.Item.Name))
 }
 
 // ServeItemFile is ServeFile for a download on the item route,
 // /artifactory/<repo>/<path>, for every package type and repository
-// class, and on the native APIs whose 7.x downloads go through the same
-// service (ProtocolOptions): the file is typed by its
-// artifactory.content-type property when that is set (fileContentType).
-// 7.x answers the item route through RepoFilter and
-// DownloadServiceImpl.process, which take the type from the resource the
-// repository's getInfo returns, typed by the property in
+// class: the file is typed by its artifactory.content-type property when
+// that is set (fileContentType). 7.x answers the item route through
+// RepoFilter and DownloadServiceImpl.process, which take the type from the
+// resource the repository's getInfo returns, typed by the property in
 // DbStoringRepoMixin.setMimeType for a local or cache repository of any
 // package type, and send it on a GET and a HEAD (RequestResponseHelper).
 func (s *Kit) ServeItemFile(
@@ -661,12 +659,59 @@ func (s *Kit) ServeItemFile(
 	f Found,
 	p kernel.Principal,
 ) {
+	s.serveTypedFile(w, r, st, f, p, blob.Disposition(f.Item.Name))
+}
+
+// ServePackageFile is ServeItemFile for a native API whose 7.x downloads
+// go through the package download service (ProtocolOptions): typed by the
+// property as the item route types a file, and named by
+// PackageDisposition, without the item route's filename* part. 7.161.26's
+// PackageArtifactServiceImpl hands the request to the item route's
+// DownloadServiceImpl.process, but with a JerseyArtifactoryResponse, whose
+// setContentDispositionAttachment writes the quoted name alone where the
+// item route's HttpArtifactoryResponse adds filename* (#1505).
+func (s *Kit) ServePackageFile(
+	w http.ResponseWriter,
+	r *http.Request,
+	st Store,
+	f Found,
+	p kernel.Principal,
+) {
+	s.serveTypedFile(w, r, st, f, p, PackageDisposition(f.Item.Name))
+}
+
+func (s *Kit) serveTypedFile(
+	w http.ResponseWriter,
+	r *http.Request,
+	st Store,
+	f Found,
+	p kernel.Principal,
+	disposition string,
+) {
 	contentType, err := fileContentType(r.Context(), st, f.Item)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "item properties", err))
 		return
 	}
-	s.serveFile(w, r, st, f, p, contentType)
+	s.serveFile(w, r, st, f, p, contentType, disposition)
+}
+
+// packageNameEscaper escapes the two characters a quoted-string cannot
+// hold bare (RFC 9110 section 5.6.4).
+var packageNameEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+
+// PackageDisposition is the Content-Disposition 7.x's package download
+// service names a file with: JerseyArtifactoryResponse writes
+// attachment; filename="<name>" with the name as it is and no filename*
+// part (7.161.26). A space stays a space: on 7.59.9 a download's saved
+// name had %20 for it, which JFrog took as a fault and fixed
+// (RTFACT-29749). A character outside ASCII is sent as its UTF-8 bytes;
+// how 7.x's container writes one is not in the sources [I]. 7.x refuses a
+// path holding a quote or a backslash (PathValidator), so it never writes
+// either; here they are escaped as quoted pairs, so that such a name
+// cannot end the quoted string early.
+func PackageDisposition(name string) string {
+	return `attachment; filename="` + packageNameEscaper.Replace(name) + `"`
 }
 
 func (s *Kit) serveFile(
@@ -675,7 +720,7 @@ func (s *Kit) serveFile(
 	st Store,
 	f Found,
 	p kernel.Principal,
-	contentType string,
+	contentType, disposition string,
 ) {
 	ctx := r.Context()
 	it := f.Item
@@ -687,7 +732,7 @@ func (s *Kit) serveFile(
 	h.Set("X-Artifactory-Filename", it.Name)
 	h.Set("Content-Type", contentType)
 	if h.Get("Content-Disposition") == "" {
-		h.Set("Content-Disposition", blob.Disposition(it.Name))
+		h.Set("Content-Disposition", disposition)
 	}
 	if it.Actual.SHA1 != "" {
 		// Quoted for ServeContent's If-Range; the client receives it bare,

@@ -1,10 +1,10 @@
 package generic_test
 
-// This file holds the download header suites of #1266, #1267 and #1396: a
-// box's media type, by its path or by its artifactory.content-type
-// property, and a file's ETag and the conditional requests that echo it,
-// on the item route and on the Vagrant box file route, which serves the
-// item download (Kit.ServeItem).
+// This file holds the download header suites of #1266, #1267, #1396 and
+// #1505: a box's media type, by its path or by its artifactory.content-type
+// property, its Content-Disposition, and a file's ETag and the conditional
+// requests that echo it, on the item route and on the Vagrant box file
+// route, which serves the item download (Kit.ServeItem).
 
 import (
 	"archive/tar"
@@ -138,6 +138,40 @@ func TestAccBoxRouteTypedByContentTypeProperty(t *testing.T) {
 			if got := rec.Header().Get("Content-Type"); got != custom || rec.Body.String() != want {
 				t.Errorf("%s %s: Content-Type %q, body of %d bytes; want %q, %d bytes",
 					method, path, got, rec.Body.Len(), custom, len(want))
+			}
+		}
+	}
+}
+
+// TestAccBoxRouteNamedWithoutFilenameStar: the box file route names a box
+// by Content-Disposition: attachment; filename="<name>" with no filename*
+// part, on a GET, a HEAD, a range and a 304, as 7.37.15 named it there
+// (RTFACT-27264): the form 7.161.26's JerseyArtifactoryResponse writes for
+// the package download service. The item route on the same box keeps its
+// filename* part (HttpArtifactoryResponse). The box file route sent the
+// item route's form (#1505).
+func TestAccBoxRouteNamedWithoutFilenameStar(t *testing.T) {
+	w, _, sha := downloadWorld(t)
+	for path, want := range map[string]string{
+		"/artifactory/api/vagrant/boxes/acme/focal-1.0.box": `attachment; filename="focal-1.0.box"`,
+		"/artifactory/boxes/acme/focal-1.0.box": `attachment; filename="focal-1.0.box"; ` +
+			`filename*=UTF-8''focal-1.0.box`,
+	} {
+		for _, c := range []struct {
+			method  string
+			headers []string
+			status  int
+		}{
+			{http.MethodGet, nil, http.StatusOK},
+			{http.MethodHead, nil, http.StatusOK},
+			{http.MethodGet, []string{"Range", "bytes=2-5"}, http.StatusPartialContent},
+			{http.MethodGet, []string{"If-None-Match", sha}, http.StatusNotModified},
+		} {
+			rec := w.Do(c.method, path, "reader", "", c.headers...)
+			harness.WantStatus(t, rec, c.status)
+			if got := rec.Header().Get("Content-Disposition"); got != want {
+				t.Errorf("%s %s %v: Content-Disposition %q, want %q",
+					c.method, path, c.headers, got, want)
 			}
 		}
 	}

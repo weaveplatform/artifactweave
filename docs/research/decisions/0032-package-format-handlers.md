@@ -286,6 +286,21 @@ PyPI, NuGet, Helm and Terraform) mount through one kit,
     (RTFACT-27264) and RubyGems on 7.41.13 (RTFACT-27459). Every other native download, the
     Debian snapshot read and the agent plugins API path keep the path's type [I] (#216);
     Hugging Face's resolve answered 7.117.12 with headers of its own (RTFACT-31280).
+  - **File name** (amended 2026-11-15,
+    [#1505](https://github.com/weaveplatform/artifactweave/issues/1505)). The same formats name
+    a stored file by `Content-Disposition: attachment; filename="<name>"`, with no `filename*`
+    part, on every answer of a native download (GET, HEAD, 206 and 304), from a local,
+    federated, remote or virtual repository (`Kit.ServePackageFile`). 7.161.26's
+    `JerseyArtifactoryResponse`, which `PackageArtifactServiceImpl` hands to
+    `DownloadServiceImpl.process`, writes the quoted name alone, where the item route's
+    `HttpArtifactoryResponse` adds `filename*=UTF-8''<name>`; the captures named above show that
+    form, while the item route sent `filename*` on 7.17.11 (RTFACT-25859). The name is written
+    as it is: on 7.59.9 a saved name had `%20` for a space, which JFrog fixed as a fault
+    (RTFACT-29749). A name holding a quote or a backslash, which 7.x's `PathValidator` refuses,
+    has it escaped as a quoted pair; how 7.x writes a name outside ASCII is not shown [I]
+    (#216). The item route keeps `filename*` on the same file. The other formats' native
+    downloads keep the form they had, the item route's or their own, until a source shows
+    theirs [I].
 - A deploy helper with the item routes' matrix and checksum parsing exported, answering 201
   with the `X-Checksum-Sha1`, `-Sha256` and `-Md5` headers.
 - Raw-path parsing for encoded slashes (`@scope%2fname`).

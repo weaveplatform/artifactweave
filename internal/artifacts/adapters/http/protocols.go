@@ -55,8 +55,8 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 		ServeItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item) {
 			p, _ := kernel.FromContext(r.Context())
 			f := itemkit.Found{Repo: c, Item: it}
-			if typedByProperty(c.PackageType) {
-				s.ServeItemFile(w, r, s.cfg.Store, f, p)
+			if packageServiceDownload(c.PackageType) {
+				s.ServePackageFile(w, r, s.cfg.Store, f, p)
 				return
 			}
 			s.ServeFile(w, r, s.cfg.Store, f, p)
@@ -72,22 +72,26 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 	}
 }
 
-// typedByProperty is whether t's native API types a stored file it
-// serves by the file's artifactory.content-type property, as the item
-// route does. 7.x's package handlers download a stored file through
+// packageServiceDownload is whether t's native API serves a stored file
+// as 7.x's package download service does (ServePackageFile): typed by the
+// file's artifactory.content-type property, as the item route types it,
+// and named by a Content-Disposition without the item route's filename*
+// part. 7.x's package handlers download a stored file through
 // PackageArtifactServiceImpl, which hands the request to
 // DownloadServiceImpl.process with a JerseyArtifactoryResponse, so the
 // answer carries the type DbStoringRepoMixin.setMimeType gives the
-// resource from the property (7.161.26). Which handlers use that service
-// is not in the OSS sources. These formats' native downloads were
-// captured answering in that response's form, X-Artifactory-Filename and
-// a Content-Disposition without filename*: PyPI on 7.113.0
-// (pypa/pip#13396), Conda on 7.33.12 (mamba-org/mamba#2105), Vagrant on
-// 7.37.15 (RTFACT-27264) and RubyGems on 7.41.13 (RTFACT-27459). The
-// other formats keep the path's type until a source shows theirs [I]
-// (#1396); Hugging Face's resolve answered 7.117.12 with headers of its
+// resource from the property and the disposition that response writes
+// (7.161.26). Which handlers use that service is not in the OSS sources.
+// These formats' native downloads were captured answering in that
+// response's form, X-Artifactory-Filename and a Content-Disposition
+// without filename*: PyPI on 7.113.0 (pypa/pip#13396), Conda on 7.33.12
+// (mamba-org/mamba#2105), Vagrant on 7.37.15 (RTFACT-27264) and RubyGems
+// on 7.41.13 (RTFACT-27459), where the item route already sent filename*
+// (RTFACT-25859 on 7.17.11). The other formats keep the path's type and
+// the item route's disposition until a source shows theirs [I] (#1396,
+// #1505); Hugging Face's resolve answered 7.117.12 with headers of its
 // own, none of that response's (RTFACT-31280).
-func typedByProperty(t repo.PackageType) bool {
+func packageServiceDownload(t repo.PackageType) bool {
 	return slices.Contains([]repo.PackageType{repo.PyPI, repo.Conda, repo.Vagrant, repo.Gems}, t)
 }
 
