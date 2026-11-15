@@ -55,12 +55,18 @@ func TestAccNuGetSymbolServerLifecycle(t *testing.T) {
 				t.Fatalf("push %d %s", r.Code, r.Body)
 			}
 			url := nugetV3 + "nuget-local/APP.PDB/" + strings.ToLower(c.key) + "/App.Pdb"
+			// A symbol file is named as the NuGet API's other downloads are,
+			// without filename* (#1505); no capture shows 7.x's [I].
+			named := packageDisposition("app.pdb")
 			for _, method := range []string{http.MethodGet, http.MethodHead} {
 				r = do(t, h, method, url, basic("admin", "pw"), "")
 				if r.Code != 200 ||
 					r.Header().Get("Content-Length") != "" &&
 						r.Header().Get("Content-Length") == "0" {
 					t.Fatalf("read %s %d %s", method, r.Code, r.Body)
+				}
+				if got := r.Header().Get("Content-Disposition"); got != named {
+					t.Fatalf("read %s: Content-Disposition %q, want %q", method, got, named)
 				}
 				if method == http.MethodGet && !bytes.Equal(r.Body.Bytes(), c.body) {
 					t.Fatal("symbol bytes differ")
@@ -72,15 +78,16 @@ func TestAccNuGetSymbolServerLifecycle(t *testing.T) {
 			headers = basic("admin", "pw")
 			headers["Range"] = "bytes=0-15"
 			r = do(t, h, http.MethodGet, url, headers, "")
-			if r.Code != 206 || !bytes.Equal(r.Body.Bytes(), c.body[:16]) {
-				t.Fatalf("range %d %s", r.Code, r.Body)
+			if r.Code != 206 || !bytes.Equal(r.Body.Bytes(), c.body[:16]) ||
+				r.Header().Get("Content-Disposition") != named {
+				t.Fatalf("range %d %q %s", r.Code, r.Header().Get("Content-Disposition"), r.Body)
 			}
 			etag := r.Header().Get("ETag")
 			headers = basic("admin", "pw")
 			headers["If-None-Match"] = etag
 			r = do(t, h, http.MethodGet, url, headers, "")
-			if r.Code != 304 {
-				t.Fatalf("conditional %d", r.Code)
+			if r.Code != 304 || r.Header().Get("Content-Disposition") != named {
+				t.Fatalf("conditional %d %q", r.Code, r.Header().Get("Content-Disposition"))
 			}
 			// Reindex repairs a missing extracted item using the committed source.
 			derived := "/artifactory/nuget-local/.symbols/app.pdb/" + c.key + "/app.pdb"

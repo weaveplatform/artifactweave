@@ -746,6 +746,63 @@ func TestAccContentTypePropertyRoutes(t *testing.T) {
 	}
 }
 
+// TestAccNativeDownloadDispositionRoutes: RubyGems' and PyPI's native
+// downloads name a file by Content-Disposition: attachment;
+// filename="<name>" with no filename* part, GET and HEAD, the form
+// 7.161.26's JerseyArtifactoryResponse writes for the package download
+// service, which their 7.x downloads go through (RTFACT-27459 on 7.41.13,
+// pypa/pip#13396 on 7.113.0). The item route on the same file keeps the
+// filename* part HttpArtifactoryResponse adds. Every other format's
+// native download keeps the form it had, as no source shows theirs [I]:
+// the item route's, or Swift's own (#1505).
+func TestAccNativeDownloadDispositionRoutes(t *testing.T) {
+	packageService := map[string]bool{"gems": true, "pypi": true}
+	for _, c := range protocolDownloads() {
+		if c.archive {
+			// Bower's binary packs the file; it is not the file's download.
+			continue
+		}
+		t.Run(c.name, func(t *testing.T) {
+			w := newItemWorld(t, false)
+			c.repo.Class = repo.Local
+			if err := w.db.Repos().
+				Create(context.Background(), *repo.Defaults(&c.repo)); err != nil {
+				t.Fatal(err)
+			}
+			for _, f := range append(c.also, seeded{c.file, c.body}) {
+				if !c.deploy {
+					w.storeFile(c.repo.Key, f.path, f.body)
+					continue
+				}
+				wantStatus(t, w.do(http.MethodPut, "/artifactory/"+c.repo.Key+"/"+f.path, "admin",
+					f.body), http.StatusCreated)
+			}
+			name := path.Base(c.file)
+			native := blob.Disposition(name)
+			switch {
+			case packageService[c.name]:
+				native = `attachment; filename="` + name + `"`
+			case c.name == "swift":
+				// Swift names its source archive itself, before the item
+				// download.
+				native = `attachment; filename="` + name + `"`
+			}
+			for route, want := range map[string]string{
+				"/artifactory/api/" + c.route:               native,
+				"/artifactory/" + c.repo.Key + "/" + c.file: blob.Disposition(name),
+			} {
+				for _, m := range []string{http.MethodGet, http.MethodHead} {
+					rec := w.do(m, route, "admin", "")
+					wantStatus(t, rec, http.StatusOK)
+					if got := rec.Header().Get("Content-Disposition"); got != want {
+						t.Fatalf("%s %s: Content-Disposition %q, want %q", m, route, got, want)
+					}
+				}
+			}
+		})
+	}
+}
+
 // TestAccContentTypePropertyVirtualOverlay: a virtual repository's package,
 // served by its format's item-route overlay from a member, is typed by the
 // member file's property too, as 7.x's virtual repository answers with

@@ -81,8 +81,9 @@ func (f *fixture) configure(change func(*repo.Config)) {
 
 // The catalog lists each box at the native box file route, which serves the
 // stored box as the item download does: its bytes and checksum headers to
-// GET and HEAD, and 206 to a Range, which 7.x ignores on this route, the bug
-// RTFACT-13807 and RTFACT-27264 report. A box at the repository root is a
+// GET and HEAD, named without the item route's filename* part, and 206 to
+// a Range, which 7.x ignores on this route, the bug RTFACT-13807 and
+// RTFACT-27264 report. A box at the repository root is a
 // box file too. Box names of one segment and of two still answer the
 // catalog.
 func TestAccBoxFileRouteServesTheStoredBox(t *testing.T) {
@@ -110,8 +111,9 @@ func TestAccBoxFileRouteServesTheStoredBox(t *testing.T) {
 				"X-Checksum-Sha256":      hex.EncodeToString(sha256sum[:]),
 				"X-Checksum-Md5":         hex.EncodeToString(md5sum[:]),
 				"X-Artifactory-Filename": "release one.box",
-				"Content-Disposition": `attachment; filename="release one.box"; ` +
-					`filename*=UTF-8''release%20one.box`,
+				// The quoted name alone, its space as it is, as 7.37.15's
+				// box file route named a box (RTFACT-27264, #1505).
+				"Content-Disposition": `attachment; filename="release one.box"`,
 			}
 			for method, want := range map[string][]byte{http.MethodGet: body, http.MethodHead: nil} {
 				w := f.do(method, boxURL, "admin", nil)

@@ -159,6 +159,7 @@
     ],
     "internal/artifacts/adapters/http/itemkit": [
       "access_test.go",
+      "disposition_test.go",
       "items_test.go",
       "kit_test.go",
       "redirect_test.go",

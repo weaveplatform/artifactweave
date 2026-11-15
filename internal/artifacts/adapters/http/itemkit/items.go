@@ -646,17 +646,15 @@ func (s *Kit) ServeFile(
 	f Found,
 	p kernel.Principal,
 ) {
-	s.serveFile(w, r, st, f, p, f.Item.MimeType)
+	s.serveFile(w, r, st, f, p, f.Item.MimeType, blob.Disposition(f.Item.Name))
 }
 
 // ServeItemFile is ServeFile for a download on the item route,
 // /artifactory/<repo>/<path>, for every package type and repository
-// class, and on the native APIs whose 7.x downloads go through the same
-// service (ProtocolOptions): the file is typed by its
-// artifactory.content-type property when that is set (fileContentType).
-// 7.x answers the item route through RepoFilter and
-// DownloadServiceImpl.process, which take the type from the resource the
-// repository's getInfo returns, typed by the property in
+// class: the file is typed by its artifactory.content-type property when
+// that is set (fileContentType). 7.x answers the item route through
+// RepoFilter and DownloadServiceImpl.process, which take the type from the
+// resource the repository's getInfo returns, typed by the property in
 // DbStoringRepoMixin.setMimeType for a local or cache repository of any
 // package type, and send it on a GET and a HEAD (RequestResponseHelper).
 func (s *Kit) ServeItemFile(
@@ -666,12 +664,93 @@ func (s *Kit) ServeItemFile(
 	f Found,
 	p kernel.Principal,
 ) {
+	s.serveTypedFile(w, r, st, f, p, blob.Disposition(f.Item.Name))
+}
+
+// ServePackageFile is ServeItemFile for a native API whose 7.x downloads
+// go through the package download service (ProtocolOptions): typed by the
+// property as the item route types a file, and named by
+// PackageDisposition, without the item route's filename* part. 7.161.26's
+// PackageArtifactServiceImpl hands the request to the item route's
+// DownloadServiceImpl.process, but with a JerseyArtifactoryResponse, whose
+// setContentDispositionAttachment writes the quoted name alone where the
+// item route's HttpArtifactoryResponse adds filename* (#1505).
+func (s *Kit) ServePackageFile(
+	w http.ResponseWriter,
+	r *http.Request,
+	st Store,
+	f Found,
+	p kernel.Principal,
+) {
+	s.serveTypedFile(w, r, st, f, p, PackageDisposition(f.Item.Name))
+}
+
+func (s *Kit) serveTypedFile(
+	w http.ResponseWriter,
+	r *http.Request,
+	st Store,
+	f Found,
+	p kernel.Principal,
+	disposition string,
+) {
 	contentType, err := fileContentType(r.Context(), st, f.Item)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "item properties", err))
 		return
 	}
-	s.serveFile(w, r, st, f, p, contentType)
+	s.serveFile(w, r, st, f, p, contentType, disposition)
+}
+
+// packageNameEscaper escapes the two characters a quoted-string cannot
+// hold bare (RFC 9110 section 5.6.4).
+var packageNameEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+
+// PackageDisposition is the Content-Disposition 7.x's package download
+// service names a file with. JerseyArtifactoryResponse writes
+// attachment; filename="<name>" with the name as it is and no filename*
+// part (7.161.26). A space stays a space: on 7.59.9 a download's saved
+// name had %20 for it, which JFrog took as a fault and fixed
+// (RTFACT-29749). 7.x refuses a path holding a quote or a backslash
+// (PathValidator), so it never writes either; here they are escaped as
+// quoted pairs, so that such a name cannot end the quoted string early.
+//
+// A name with a character outside printable ASCII is named by filename*
+// alone instead: on a GET and a HEAD, whichever response type answers,
+// RequestResponseHelper.setHeaderForNonAscii replaces the header with an
+// attachment whose only parameter is filename* in UTF-8, every byte but
+// RFC 3986's unreserved characters percent-encoded (Spring's
+// UriUtils.encode). 7.x's 304 skips that step and keeps the quoted form;
+// this sends filename* there too, as no source shows what a client reads
+// from it [I].
+func PackageDisposition(name string) string {
+	for i := range len(name) {
+		if name[i] < ' ' || name[i] > '~' {
+			return "attachment; filename*=UTF-8''" + unreservedEscape(name)
+		}
+	}
+	return `attachment; filename="` + packageNameEscaper.Replace(name) + `"`
+}
+
+// unreservedEscape percent-encodes every byte of s but RFC 3986's
+// unreserved characters, in upper-case hex, as Spring's UriUtils.encode
+// does for a URI component. url.PathEscape keeps sub-delimiters such as
+// '+' and '&', which UriUtils.encode encodes.
+func unreservedEscape(s string) string {
+	const hex = "0123456789ABCDEF"
+	var b strings.Builder
+	for i := range len(s) {
+		c := s[i]
+		switch {
+		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9',
+			c == '-', c == '.', c == '_', c == '~':
+			b.WriteByte(c)
+		default:
+			b.WriteByte('%')
+			b.WriteByte(hex[c>>4])
+			b.WriteByte(hex[c&15])
+		}
+	}
+	return b.String()
 }
 
 func (s *Kit) serveFile(
@@ -680,7 +759,7 @@ func (s *Kit) serveFile(
 	st Store,
 	f Found,
 	p kernel.Principal,
-	contentType string,
+	contentType, disposition string,
 ) {
 	ctx := r.Context()
 	it := f.Item
@@ -692,7 +771,7 @@ func (s *Kit) serveFile(
 	h.Set("X-Artifactory-Filename", it.Name)
 	h.Set("Content-Type", contentType)
 	if h.Get("Content-Disposition") == "" {
-		h.Set("Content-Disposition", blob.Disposition(it.Name))
+		h.Set("Content-Disposition", disposition)
 	}
 	if it.Actual.SHA1 != "" {
 		// Quoted for ServeContent's If-Range; the client receives it bare,

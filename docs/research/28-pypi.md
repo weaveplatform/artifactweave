@@ -219,7 +219,8 @@ compatible retry for these private repositories.
 | Fact | Basis |
 |---|---|
 | `Range` requests on downloads from local, remote and virtual PyPI repositories, for uv, from 7.133.3 (SaaS 7.128.0). On 6.18.1 the `/api/pypi/` download path answered 200 with the whole file despite `Accept-Ranges: bytes`, while the plain repository path answered 206 on 7.77.6 | [RN] [7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed), [SaaS 7.128.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71280-saas); [J] RTFACT-23108, RTFACT-30389 |
-| A 6.18.1 download through `/api/pypi/` carried `ETag` equal to the SHA-1, `X-Checksum-Sha1`, `-Sha256` and `-Md5`, `Cache-Control: public, max-age=31536000`, `Accept-Ranges: bytes` and `Content-Disposition: attachment` | [J] RTFACT-23108 |
+| A 6.18.1 download through `/api/pypi/` carried `ETag` equal to the SHA-1, `X-Checksum-Sha1`, `-Sha256` and `-Md5`, `Cache-Control: public, max-age=31536000`, `Accept-Ranges: bytes`, `X-Artifactory-Filename` and `Content-Disposition: attachment; filename="<name>"; filename*=UTF-8''<name>` (corrected 2026-11-15, [#1505](https://github.com/weaveplatform/artifactweave/issues/1505): this row said `attachment` alone) | [J] RTFACT-23108 |
+| A 7.113.0 download of a wheel through `/api/pypi/` carried the same headers but `Content-Disposition: attachment; filename="<name>"`, with no `filename*` part: the form `JerseyArtifactoryResponse` writes for the package download service in 7.161.26, where the item route's `HttpArtifactoryResponse` adds `filename*`. The PyPI API's downloads send that form ([#1505](https://github.com/weaveplatform/artifactweave/issues/1505)) | [GH] [pypa/pip#13396](https://github.com/pypa/pip/issues/13396); 7.161.26 OSS sources |
 | The 7.98.7 `ETag` note is about package indexes, not downloads | [RN] 7.98.7 |
 
 ## 9. The JSON API

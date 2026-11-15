@@ -46,7 +46,9 @@ item path. Artifactory 7.x's catalogs point there
 downloads from it
 ([RTFACT-27264](https://jfrog.atlassian.net/browse/RTFACT-27264)). `GET` and
 `HEAD` of it serve the stored box as the item download does, with its checksum
-headers. A `Range` request answers 206, so an interrupted download resumes;
+headers, but name it by `Content-Disposition: attachment; filename="<name>"`
+without the item route's `filename*` part, as 7.37.15 did in RTFACT-27264
+([#1505](https://github.com/weaveplatform/artifactweave/issues/1505)). A `Range` request answers 206, so an interrupted download resumes;
 Artifactory ignores the `Range` on this route, a bug that RTFACT-27264 and
 [RTFACT-13807](https://jfrog.atlassian.net/browse/RTFACT-13807) report. The
 route checks read permission on the path first, then the repository's blackout
