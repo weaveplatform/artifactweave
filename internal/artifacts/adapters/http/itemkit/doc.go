@@ -76,6 +76,15 @@
 //     over every overlay after it, so the composition lists them in one
 //     fixed dispatch order: agent marketplace, Alpine, Conda, machine
 //     learning, Chef, CRAN, Debian, RPM, opkg, P2.
+//   - GetItem reads a file a remote's cache does not hold from the
+//     upstream, at <url>/<path>, on a remote of every type. Generic, the
+//     Maven family and P2 read through their source first, and Debian, RPM
+//     and Alpine do for a path the cache does not hold; CRAN and opkg fetch
+//     through their overlays. Every other type asks the upstream once the
+//     cache lookup has not found the file (getColdRemoteItem), so the
+//     lookup's download policy and a format's own refusal answer first. A
+//     path the format builds itself keeps the lookup's answer, and an npm
+//     remote asks only for a tarball path, <name>/-/<file> [I] (#1507).
 //   - Deps.Private names the paths whose content a checksum deploy may
 //     never reuse. Trash and transfer test the format predicates themselves,
 //     because each format relocates and archives its private paths by its

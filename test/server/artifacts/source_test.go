@@ -106,7 +106,6 @@ func TestAccRemoteSourceRoutingAndDenials(t *testing.T) {
 		{http.MethodGet, "/artifactory/up/a.pkg", "user", 403},
 		{http.MethodGet, "/artifactory/up/a.pkg", "", 401},
 		{http.MethodGet, "/artifactory/missing/a.pkg", "reader", 404},
-		{http.MethodGet, "/artifactory/pypi-remote/a.pom", "reader", 404},
 		{http.MethodGet, "/artifactory/up/a//b", "reader", 400},
 		{http.MethodGet, "/artifactory/up/a%5Cb", "reader", 400},
 		{http.MethodGet, "/artifactory/up-cache/a.pkg", "reader", 404},
@@ -123,6 +122,20 @@ func TestAccRemoteSourceRoutingAndDenials(t *testing.T) {
 	if calls != before {
 		t.Fatalf("denied/cache/virtual/write requests fetched: %d -> %d", before, calls)
 	}
+	// A remote of another type reads a file its cache lacks from the
+	// upstream too, as 7.161.26's RemoteRepoBase.getInfo does whatever the
+	// package type (#1507).
+	if res := w.do(
+		http.MethodGet,
+		"/artifactory/pypi-remote/a.pom",
+		"reader",
+		"",
+	); res.Code != 200 ||
+		res.Body.String() != "fetched" || calls != before+1 ||
+		last.Resource.Path != "a.pom" {
+		t.Fatalf("PyPI remote: %d %q, %d fetches", res.Code, res.Body, calls-before)
+	}
+	before = calls
 	for _, config := range []repo.Config{
 		{Key: "up", Class: repo.Remote, URL: "https://secret:password@up.example", BlackedOut: new(true)},
 		{Key: "up", Class: repo.Remote, URL: "https://secret:password@up.example", ExcludesPattern: new("**")},
