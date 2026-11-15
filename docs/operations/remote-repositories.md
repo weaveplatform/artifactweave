@@ -102,8 +102,10 @@ implementation inferences retained under RC-8/#216 for live Artifactory comparis
 The [version-search contract](../implementation/remote-retrieval-contract.md)
 records #213's upstream search and #672's permission-safe layout mapping.
 
-`?trace` follows ordinary generic artifact resolution, including a permitted cold
-fetch, but serves no artifact bytes, issues no signed URL and records no download.
+`?trace` follows the download on a remote of every type, including a permitted cold
+fetch, which it keeps where the download keeps it, but serves no artifact bytes, issues
+no signed URL and records no download, as 7.x's trace runs the download itself
+([#1576](https://github.com/weaveplatform/artifactweave/issues/1576)).
 Trace output omits upstream URLs and credentials. Origin metadata retains only the
 final upstream URL's scheme, authority and path, with userinfo, query and fragment
 removed. Upstream errors retain approved statuses in the established error envelope;

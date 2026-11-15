@@ -60,7 +60,9 @@ func (Handler) Inspect(
 // release path, <scope>/<name>/<name>-<version>.zip (400), with a valid
 // archive (422), which it inspects itself unless Inspect covered the same
 // path and content. A write of other content over a stored release is
-// refused (409); the same content, or a folder at the path, passes.
+// refused (409); the same content, or a folder at the path, passes. A
+// remote's copy at any other path is kept as a plain file
+// (format.RemoteCopy).
 func (h Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -75,6 +77,9 @@ func (h Handler) Admit(
 		return w, nil
 	}
 	p, ok := ParseArchivePath(w.Path)
+	if !ok && format.RemoteCopy(c, w) {
+		return w, nil
+	}
 	if !ok || p.ArchivePath() != w.Path {
 		return w, format.Rejectf(http.StatusBadRequest,
 			"Swift releases must use <scope>/<name>/<name>-<version>.zip")

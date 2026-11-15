@@ -35,8 +35,10 @@ func ObjectPath(oid string) (string, bool) {
 
 // Admit refuses (409) a checksum sidecar upload, which an object never
 // takes, and any write that is not of an object at the ObjectPath of its
-// file name with that SHA-256. Every other write then meets the generic
-// deploy policy, whose refusal it wraps.
+// file name with that SHA-256. A remote's copy at a path that is not an
+// object's is kept as a plain file (format.RemoteCopy), but one at an
+// object's path must still carry that SHA-256. Every write it admits then
+// meets the generic deploy policy, whose refusal it wraps.
 func (h Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -51,7 +53,8 @@ func (h Handler) Admit(
 	}
 	oid := w.Path[strings.LastIndexByte(w.Path, '/')+1:]
 	path, ok := ObjectPath(oid)
-	if !ok || path != w.Path || w.Checksums.SHA256 != oid {
+	object := ok && path == w.Path
+	if object && w.Checksums.SHA256 != oid || !object && !format.RemoteCopy(c, w) {
 		return w, format.Rejectf(http.StatusConflict, "invalid Git LFS object or checksum")
 	}
 	w, err := h.Handler.Admit(ctx, env, c, w)

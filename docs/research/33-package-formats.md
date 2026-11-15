@@ -146,11 +146,14 @@ Validated tag metadata is published under the documented
 `models/.../.jfrog_nim_model_info.json` path with `Nimmodel.name` and
 `Nimmodel.versionId` properties for name/version search. Other documented
 `Nimmodel.*` values depend on a target response mapping **[I]** in [#216].
-The default NIM upstream is `https://api.ngc.nvidia.com`; its blank-username
-personal key uses Bearer authentication, following NVIDIA's current key
-guidance. The exact NIM 1.3 runtime requests, Artifactory response headers,
-remaining cache layout and property projection are **[I]** until a target
-capture in [#216]. See [NVIDIA's metadata endpoints], [response fields],
+NIM's upstream is `https://api.ngc.nvidia.com`, which JFrog's UI fills in;
+it is not a REST default, so a REST create must send it as `url`
+([research 03](03-repository-configuration-model.md)'s `url` and nimmodel
+rows, [#1584]). Its blank-username personal key uses Bearer authentication,
+following NVIDIA's current key guidance. The exact NIM 1.3 runtime requests,
+Artifactory response headers, remaining cache layout and property projection
+are **[I]** until a target capture in [#216]. See
+[NVIDIA's metadata endpoints], [response fields],
 [related repository endpoints] and [model file downloads].
 
 [NVIDIA's metadata endpoints]: https://docs.nvidia.com/nim/metadata-api/reference/endpoints
@@ -438,6 +441,7 @@ general virtual work must preserve LuaRocks virtual behavior from [#686].
 [#693]: https://github.com/weaveplatform/artifactweave/issues/693
 [#1255]: https://github.com/weaveplatform/artifactweave/issues/1255
 [#1292]: https://github.com/weaveplatform/artifactweave/issues/1292
+[#1584]: https://github.com/weaveplatform/artifactweave/issues/1584
 [P13]: ../implementation/plan.md#p13-peer-trust-and-federated-repositories
 [P23]: ../implementation/plan.md#p23-evidence-and-provenance
 [P26]: ../implementation/plan.md#p26-security-scanning-and-intelligence

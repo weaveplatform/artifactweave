@@ -44,14 +44,18 @@ type inspection struct {
 
 // Inspect reads and validates the stored archive of a write to a .tar.gz
 // path before the write's transaction, and returns its metadata for Admit
-// and Deployed, so an archive is read once per write. A checksum deploy
-// and any other file inspect nothing. An archive that cannot be opened
-// fails the write, and an invalid one fails it with ErrArchive.
+// and Deployed, so an archive is read once per write. A checksum deploy,
+// a remote's copy outside the archive layout and any other file inspect
+// nothing. An archive that cannot be opened fails the write, and an
+// invalid one fails it with ErrArchive.
 func (Handler) Inspect(
-	ctx context.Context, env format.Env, _ repo.Config, w format.Write,
+	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (any, error) {
 	if w.Op == format.OpChecksum || !strings.HasSuffix(w.Path, ".tar.gz") {
 		return nil, nil //nolint:nilnil // this write has no archive to inspect
+	}
+	if _, _, ok := ParsePath(w.Path); !ok && format.RemoteCopy(c, w) {
+		return nil, nil //nolint:nilnil // Admit keeps it as a plain file
 	}
 	meta, err := readStored(ctx, env.Blobs, w.Checksums.SHA256)
 	if err != nil {
@@ -64,9 +68,10 @@ func (Handler) Inspect(
 // passes a checksum deploy and a remote's cached version document
 // (api/packages/<name>). Any other write must be at an archive path,
 // <name>/<name>-<version>.tar.gz (400), and the archive's pubspec must name
-// the package and version its path does (409). It reuses Inspect's reading
-// when it covers the same content, and reads the stored archive itself
-// otherwise; an invalid archive fails with ErrArchive.
+// the package and version its path does (409). A remote's copy at any
+// other path is kept as a plain file (format.RemoteCopy). It reuses
+// Inspect's reading when it covers the same content, and reads the stored
+// archive itself otherwise; an invalid archive fails with ErrArchive.
 func (Handler) Admit(
 	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (format.Write, error) {
@@ -82,6 +87,9 @@ func (Handler) Admit(
 	}
 	name, version, ok := ParsePath(w.Path)
 	if !ok {
+		if format.RemoteCopy(c, w) {
+			return w, nil
+		}
 		return w, format.Rejectf(http.StatusBadRequest, "invalid Dart pub archive path")
 	}
 	in, ok := env.Inspection.(inspection)
