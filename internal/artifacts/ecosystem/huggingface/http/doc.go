@@ -74,6 +74,13 @@
 //     and a virtual repository passes over a blacked-out member, local or
 //     remote, when it chooses the member that serves a revision. The
 //     patterns leave a file listed and a read token issued.
+//   - A resolve answers with the Hub's headers, as 7.117.12 answered a
+//     remote one (RTFACT-31280): X-Repo-Commit and a bare ETag, the LFS
+//     file's SHA-256 or else the Git blob id [I], with the type, the length
+//     and Accept-Ranges, and none of the item download's
+//     X-Artifactory-Filename, Content-Disposition, X-Checksum-* or
+//     Last-Modified. An If-None-Match naming that ETag answers 304, before a
+//     remote file is fetched (#1581).
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
