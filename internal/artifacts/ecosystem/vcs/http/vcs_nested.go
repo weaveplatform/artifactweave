@@ -194,7 +194,7 @@ func (s VCSAPI) VCSNested(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	body, size, err := s.vcsArchive(
+	served, err := s.vcsArchive(
 		r.Context(),
 		key,
 		owner,
@@ -208,12 +208,7 @@ func (s VCSAPI) VCSNested(w http.ResponseWriter, r *http.Request) {
 		apierror.Write(w, apierror.ProfileArtifactory, err)
 		return
 	}
-	defer body.Close()
-	w.Header().Set("Content-Type", "application/octet-stream")
-	if size > 0 {
-		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
-	}
-	if _, err := io.Copy(w, body); err != nil {
+	if err := served.write(w); err != nil {
 		httpkit.NoteCause(r.Context(), err)
 	}
 }

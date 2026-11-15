@@ -2550,12 +2550,38 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-gzip:
               schema:
-                description: Archive bytes.
+                description: The tar.gz archive's bytes.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: The zip archive's bytes.
+                format: binary
+                type: string
+          description: The archive, typed by its extension and named `<userOrg>-<branch>-<commit>.<ext>`.
+          headers:
+            Content-Disposition:
+              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The archive's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the archive, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -2637,12 +2663,38 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-gzip:
               schema:
-                description: Archive bytes.
+                description: The tar.gz archive's bytes.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: The zip archive's bytes.
+                format: binary
+                type: string
+          description: The archive, typed by its extension and named `<repo>-<branch>-<commit>.<ext>`.
+          headers:
+            Content-Disposition:
+              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The archive's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the archive, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -2729,12 +2781,38 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-gzip:
               schema:
-                description: Archive bytes.
+                description: The tar.gz archive's bytes.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: The zip archive's bytes.
+                format: binary
+                type: string
+          description: The archive, typed by its extension and named `<repo>-<branch>-<commit>.<ext>`.
+          headers:
+            Content-Disposition:
+              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The archive's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the archive, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -3036,12 +3114,38 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-gzip:
               schema:
-                description: Archive bytes.
+                description: The tar.gz archive's bytes.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: The zip archive's bytes.
+                format: binary
+                type: string
+          description: The archive, typed by its extension and named `<repo>-<commit>.<ext>`.
+          headers:
+            Content-Disposition:
+              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The archive's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the archive, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -3122,12 +3226,38 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-gzip:
               schema:
-                description: Archive bytes.
+                description: The tar.gz archive's bytes.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: The zip archive's bytes.
+                format: binary
+                type: string
+          description: The archive, typed by its extension and named `<repo>-<release>.<ext>`.
+          headers:
+            Content-Disposition:
+              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The archive's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the archive, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -3209,12 +3339,38 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-gzip:
               schema:
-                description: Archive bytes.
+                description: The tar.gz archive's bytes.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: The zip archive's bytes.
+                format: binary
+                type: string
+          description: The archive, typed by its extension and named `<repo>-<tag>.<ext>`.
+          headers:
+            Content-Disposition:
+              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The archive's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the archive, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -3295,12 +3451,38 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-gzip:
               schema:
-                description: Archive bytes.
+                description: The tar.gz archive's bytes.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: The zip archive's bytes.
+                format: binary
+                type: string
+          description: The archive, typed by its extension and named `<repo>-<tag>.<ext>`.
+          headers:
+            Content-Disposition:
+              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The archive's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the archive, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:
@@ -3374,12 +3556,38 @@ paths:
       responses:
         '200':
           content:
-            application/octet-stream:
+            application/x-gzip:
               schema:
-                description: Archive bytes.
+                description: The tar.gz archive's bytes.
                 format: binary
                 type: string
-          description: Successful VCS response.
+            application/zip:
+              schema:
+                description: The zip archive's bytes.
+                format: binary
+                type: string
+          description: The archive, typed by its extension and named `<userOrg>-<tag>.<ext>`.
+          headers:
+            Content-Disposition:
+              description: '`attachment` with the archive''s name, quoted, as X-Artifactory-Filename gives it.'
+              schema:
+                type: string
+            X-Artifactory-Filename:
+              description: The archive's name.
+              schema:
+                type: string
+            X-Checksum-Md5:
+              description: MD5 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha1:
+              description: SHA-1 of the archive, when known.
+              schema:
+                type: string
+            X-Checksum-Sha256:
+              description: SHA-256 of the archive, when known.
+              schema:
+                type: string
         '401':
           content:
             application/json:

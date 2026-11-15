@@ -110,22 +110,22 @@ func vcsArchiveURLPolicy(
 func (s VCSAPI) vcsArchive(
 	ctx context.Context,
 	key, owner, name, kind, ref, ext, propertyFilter string,
-) (io.ReadCloser, int64, error) {
+) (vcsArchiveFile, error) {
 	if !ValidExtension(ext) || kind != "tags" && kind != "heads" && kind != "commits" {
-		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS archive request")
+		return vcsArchiveFile{}, apierror.New(http.StatusBadRequest, "invalid VCS archive request")
 	}
 	a, err := s.vcsRepository(ctx, key, owner, name)
 	if err != nil {
-		return nil, 0, err
+		return vcsArchiveFile{}, err
 	}
 	if !ValidRef(ref) || kind == "commits" && !ValidCommitID(ref) {
-		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS reference")
+		return vcsArchiveFile{}, apierror.New(http.StatusBadRequest, "invalid VCS reference")
 	}
 	commit := ref
 	if kind != "commits" {
 		refs, _, err := s.vcsRefs(ctx, key, owner, name)
 		if err != nil {
-			return nil, 0, err
+			return vcsArchiveFile{}, err
 		}
 		found := false
 		for _, candidate := range refs {
@@ -136,19 +136,19 @@ func (s VCSAPI) vcsArchive(
 			}
 		}
 		if !found {
-			return nil, 0, apierror.New(http.StatusNotFound, "VCS reference not found")
+			return vcsArchiveFile{}, apierror.New(http.StatusNotFound, "VCS reference not found")
 		}
 	}
 	permissionPath := owner + "/" + name + "/refs/" + kind + "/" + ref
 	if !a.access.File(a.repo, permissionPath, api.ActionRead) {
-		return nil, 0, fmt.Errorf(
+		return vcsArchiveFile{}, fmt.Errorf(
 			"vcs archive read denied: %w",
 			pkgroute.SourceError(source.ErrDenied, a.principal.Anonymous),
 		)
 	}
 	target, err := ArchiveURL(a.repo, owner, name, commit, ext)
 	if err != nil {
-		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS archive source")
+		return vcsArchiveFile{}, apierror.New(http.StatusBadRequest, "invalid VCS archive source")
 	}
 	resource := source.Resource{
 		Kind:              source.ResourceKindArtifact,
@@ -167,7 +167,7 @@ func (s VCSAPI) vcsArchive(
 	}
 	filter, err := vcsPropertyFilter(propertyFilter)
 	if err != nil {
-		return nil, 0, err
+		return vcsArchiveFile{}, err
 	}
 	if len(filter) > 0 {
 		// A property constraint can only select an already cached artifact.
@@ -176,14 +176,22 @@ func (s VCSAPI) vcsArchive(
 	}
 	result, err := s.vcsRead(ctx, a, resource)
 	if err != nil {
-		return nil, 0, err
+		return vcsArchiveFile{}, err
 	}
 	if len(filter) > 0 {
 		if err := s.vcsMatchCachedProperties(ctx, result, filter); err != nil {
-			return nil, 0, err
+			return vcsArchiveFile{}, err
 		}
 	}
-	return s.vcsOpenResult(ctx, result)
+	sums := resultChecksums(result)
+	file, size, err := s.vcsOpenResult(ctx, result)
+	if err != nil {
+		return vcsArchiveFile{}, err
+	}
+	return vcsArchiveFile{
+		body: file, size: size, ext: ext, sums: sums,
+		name: archiveName(name, kind, ref, commit, ext),
+	}, nil
 }
 
 func (s VCSAPI) vcsMatchCachedProperties(
@@ -265,7 +273,7 @@ func (s VCSAPI) DownloadVcsTag(
 	ctx context.Context,
 	req artgen.DownloadVcsTagRequestObject,
 ) (artgen.DownloadVcsTagResponseObject, error) {
-	body, size, err := s.vcsArchive(
+	a, err := s.vcsArchive(
 		ctx,
 		req.RepoKey,
 		req.UserOrg,
@@ -278,9 +286,14 @@ func (s VCSAPI) DownloadVcsTag(
 	if err != nil {
 		return nil, err
 	}
-	return artgen.DownloadVcsTag200ApplicationoctetStreamResponse{
-		Body:          body,
-		ContentLength: size,
+	h := artgen.DownloadVcsTag200ResponseHeaders(a.headers())
+	if a.zip() {
+		return artgen.DownloadVcsTag200ApplicationzipResponse{
+			Body: a.body, Headers: h, ContentLength: a.size,
+		}, nil
+	}
+	return artgen.DownloadVcsTag200ApplicationxGzipResponse{
+		Body: a.body, Headers: h, ContentLength: a.size,
 	}, nil
 }
 
@@ -292,7 +305,7 @@ func (s VCSAPI) DownloadVcsBranch(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchRequestObject,
 ) (artgen.DownloadVcsBranchResponseObject, error) {
-	body, size, err := s.vcsArchive(
+	a, err := s.vcsArchive(
 		ctx,
 		req.RepoKey,
 		req.UserOrg,
@@ -305,9 +318,14 @@ func (s VCSAPI) DownloadVcsBranch(
 	if err != nil {
 		return nil, err
 	}
-	return artgen.DownloadVcsBranch200ApplicationoctetStreamResponse{
-		Body:          body,
-		ContentLength: size,
+	h := artgen.DownloadVcsBranch200ResponseHeaders(a.headers())
+	if a.zip() {
+		return artgen.DownloadVcsBranch200ApplicationzipResponse{
+			Body: a.body, Headers: h, ContentLength: a.size,
+		}, nil
+	}
+	return artgen.DownloadVcsBranch200ApplicationxGzipResponse{
+		Body: a.body, Headers: h, ContentLength: a.size,
 	}, nil
 }
 
@@ -317,7 +335,7 @@ func (s VCSAPI) DownloadVcsCommit(
 	ctx context.Context,
 	req artgen.DownloadVcsCommitRequestObject,
 ) (artgen.DownloadVcsCommitResponseObject, error) {
-	body, size, err := s.vcsArchive(
+	a, err := s.vcsArchive(
 		ctx,
 		req.RepoKey,
 		req.UserOrg,
@@ -330,9 +348,14 @@ func (s VCSAPI) DownloadVcsCommit(
 	if err != nil {
 		return nil, err
 	}
-	return artgen.DownloadVcsCommit200ApplicationoctetStreamResponse{
-		Body:          body,
-		ContentLength: size,
+	h := artgen.DownloadVcsCommit200ResponseHeaders(a.headers())
+	if a.zip() {
+		return artgen.DownloadVcsCommit200ApplicationzipResponse{
+			Body: a.body, Headers: h, ContentLength: a.size,
+		}, nil
+	}
+	return artgen.DownloadVcsCommit200ApplicationxGzipResponse{
+		Body: a.body, Headers: h, ContentLength: a.size,
 	}, nil
 }
 
@@ -342,7 +365,7 @@ func (s VCSAPI) DownloadVcsRelease(
 	ctx context.Context,
 	req artgen.DownloadVcsReleaseRequestObject,
 ) (artgen.DownloadVcsReleaseResponseObject, error) {
-	body, size, err := s.vcsArchive(
+	a, err := s.vcsArchive(
 		ctx,
 		req.RepoKey,
 		req.UserOrg,
@@ -355,9 +378,14 @@ func (s VCSAPI) DownloadVcsRelease(
 	if err != nil {
 		return nil, err
 	}
-	return artgen.DownloadVcsRelease200ApplicationoctetStreamResponse{
-		Body:          body,
-		ContentLength: size,
+	h := artgen.DownloadVcsRelease200ResponseHeaders(a.headers())
+	if a.zip() {
+		return artgen.DownloadVcsRelease200ApplicationzipResponse{
+			Body: a.body, Headers: h, ContentLength: a.size,
+		}, nil
+	}
+	return artgen.DownloadVcsRelease200ApplicationxGzipResponse{
+		Body: a.body, Headers: h, ContentLength: a.size,
 	}, nil
 }
 
@@ -367,7 +395,7 @@ func (s VCSAPI) DownloadVcsTagAlternative(
 	ctx context.Context,
 	req artgen.DownloadVcsTagAlternativeRequestObject,
 ) (artgen.DownloadVcsTagAlternativeResponseObject, error) {
-	body, size, err := s.vcsArchive(
+	a, err := s.vcsArchive(
 		ctx,
 		req.RepoKey,
 		req.UserOrg,
@@ -380,9 +408,14 @@ func (s VCSAPI) DownloadVcsTagAlternative(
 	if err != nil {
 		return nil, err
 	}
-	return artgen.DownloadVcsTagAlternative200ApplicationoctetStreamResponse{
-		Body:          body,
-		ContentLength: size,
+	h := artgen.DownloadVcsTagAlternative200ResponseHeaders(a.headers())
+	if a.zip() {
+		return artgen.DownloadVcsTagAlternative200ApplicationzipResponse{
+			Body: a.body, Headers: h, ContentLength: a.size,
+		}, nil
+	}
+	return artgen.DownloadVcsTagAlternative200ApplicationxGzipResponse{
+		Body: a.body, Headers: h, ContentLength: a.size,
 	}, nil
 }
 
@@ -392,7 +425,7 @@ func (s VCSAPI) DownloadVcsBranchAlternative(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchAlternativeRequestObject,
 ) (artgen.DownloadVcsBranchAlternativeResponseObject, error) {
-	body, size, err := s.vcsArchive(
+	a, err := s.vcsArchive(
 		ctx,
 		req.RepoKey,
 		req.UserOrg,
@@ -405,9 +438,14 @@ func (s VCSAPI) DownloadVcsBranchAlternative(
 	if err != nil {
 		return nil, err
 	}
-	return artgen.DownloadVcsBranchAlternative200ApplicationoctetStreamResponse{
-		Body:          body,
-		ContentLength: size,
+	h := artgen.DownloadVcsBranchAlternative200ResponseHeaders(a.headers())
+	if a.zip() {
+		return artgen.DownloadVcsBranchAlternative200ApplicationzipResponse{
+			Body: a.body, Headers: h, ContentLength: a.size,
+		}, nil
+	}
+	return artgen.DownloadVcsBranchAlternative200ApplicationxGzipResponse{
+		Body: a.body, Headers: h, ContentLength: a.size,
 	}, nil
 }
 
@@ -418,7 +456,7 @@ func (s VCSAPI) DownloadVcsTagFromSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadVcsTagFromSubgroupRepositoryRequestObject,
 ) (artgen.DownloadVcsTagFromSubgroupRepositoryResponseObject, error) {
-	body, size, err := s.vcsArchive(
+	a, err := s.vcsArchive(
 		ctx,
 		req.RepoKey,
 		req.UserOrg,
@@ -431,9 +469,14 @@ func (s VCSAPI) DownloadVcsTagFromSubgroupRepository(
 	if err != nil {
 		return nil, err
 	}
-	return artgen.DownloadVcsTagFromSubgroupRepository200ApplicationoctetStreamResponse{
-		Body:          body,
-		ContentLength: size,
+	h := artgen.DownloadVcsTagFromSubgroupRepository200ResponseHeaders(a.headers())
+	if a.zip() {
+		return artgen.DownloadVcsTagFromSubgroupRepository200ApplicationzipResponse{
+			Body: a.body, Headers: h, ContentLength: a.size,
+		}, nil
+	}
+	return artgen.DownloadVcsTagFromSubgroupRepository200ApplicationxGzipResponse{
+		Body: a.body, Headers: h, ContentLength: a.size,
 	}, nil
 }
 
@@ -444,7 +487,7 @@ func (s VCSAPI) DownloadVcsBranchFromSubgroupRepository(
 	ctx context.Context,
 	req artgen.DownloadVcsBranchFromSubgroupRepositoryRequestObject,
 ) (artgen.DownloadVcsBranchFromSubgroupRepositoryResponseObject, error) {
-	body, size, err := s.vcsArchive(
+	a, err := s.vcsArchive(
 		ctx,
 		req.RepoKey,
 		req.UserOrg,
@@ -457,9 +500,14 @@ func (s VCSAPI) DownloadVcsBranchFromSubgroupRepository(
 	if err != nil {
 		return nil, err
 	}
-	return artgen.DownloadVcsBranchFromSubgroupRepository200ApplicationoctetStreamResponse{
-		Body:          body,
-		ContentLength: size,
+	h := artgen.DownloadVcsBranchFromSubgroupRepository200ResponseHeaders(a.headers())
+	if a.zip() {
+		return artgen.DownloadVcsBranchFromSubgroupRepository200ApplicationzipResponse{
+			Body: a.body, Headers: h, ContentLength: a.size,
+		}, nil
+	}
+	return artgen.DownloadVcsBranchFromSubgroupRepository200ApplicationxGzipResponse{
+		Body: a.body, Headers: h, ContentLength: a.size,
 	}, nil
 }
 
@@ -484,12 +532,12 @@ func (s VCSAPI) vcsFile(
 	if a.repo.VCSGitProvider == repo.ArtifactoryVCS {
 		return s.vcsPeerFile(ctx, a, owner, name, kind, ref, filename)
 	}
-	body, _, err := s.vcsArchive(ctx, key, owner, name, kind, ref, "tar.gz", "")
+	tarball, err := s.vcsArchive(ctx, key, owner, name, kind, ref, "tar.gz", "")
 	if err != nil {
 		return nil, 0, err
 	}
-	archive, err := io.ReadAll(io.LimitReader(body, MaxArchiveBytes+1))
-	closeErr := body.Close()
+	archive, err := io.ReadAll(io.LimitReader(tarball.body, MaxArchiveBytes+1))
+	closeErr := tarball.body.Close()
 	if err != nil || closeErr != nil || len(archive) > MaxArchiveBytes {
 		return nil, 0, apierror.New(http.StatusBadGateway, "invalid VCS archive")
 	}

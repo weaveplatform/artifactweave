@@ -101,7 +101,7 @@ func TestUnitVCSExactRefsURLDoesNotFollowRedirects(t *testing.T) {
 func TestUnitVCSArchiveBadRequestRejectsBeforeSource(t *testing.T) {
 	s := VCSAPI{newKit(Config{})}
 	for _, tc := range []struct{ kind, ext string }{{"tags", "exe"}, {"other", "zip"}} {
-		_, _, err := s.vcsArchive(t.Context(), "r", "team", "project", tc.kind, "main", tc.ext, "")
+		_, err := s.vcsArchive(t.Context(), "r", "team", "project", tc.kind, "main", tc.ext, "")
 		var api *apierror.Error
 		if !errors.As(err, &api) || api.Status != http.StatusBadRequest {
 			t.Errorf("kind=%s ext=%s: %v", tc.kind, tc.ext, err)

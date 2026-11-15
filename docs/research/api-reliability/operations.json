@@ -10085,6 +10085,9 @@
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
     "handler": "internal/artifacts/ecosystem/vcs/http/vcs_download.go: VCSAPI.DownloadVcsBranchAlternative",
     "direct_calls": [
+      "a.headers",
+      "a.zip",
+      "artgen.DownloadVcsBranchAlternative200ResponseHeaders",
       "s.vcsArchive"
     ],
     "review_family": "native-vcs",
@@ -10110,6 +10113,9 @@
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
     "handler": "internal/artifacts/ecosystem/vcs/http/vcs_download.go: VCSAPI.DownloadVcsBranchFromSubgroupRepository",
     "direct_calls": [
+      "a.headers",
+      "a.zip",
+      "artgen.DownloadVcsBranchFromSubgroupRepository200ResponseHeaders",
       "s.vcsArchive"
     ],
     "review_family": "native-vcs",
@@ -10135,6 +10141,9 @@
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
     "handler": "internal/artifacts/ecosystem/vcs/http/vcs_download.go: VCSAPI.DownloadVcsBranch",
     "direct_calls": [
+      "a.headers",
+      "a.zip",
+      "artgen.DownloadVcsBranch200ResponseHeaders",
       "s.vcsArchive"
     ],
     "review_family": "native-vcs",
@@ -10235,6 +10244,9 @@
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
     "handler": "internal/artifacts/ecosystem/vcs/http/vcs_download.go: VCSAPI.DownloadVcsCommit",
     "direct_calls": [
+      "a.headers",
+      "a.zip",
+      "artgen.DownloadVcsCommit200ResponseHeaders",
       "s.vcsArchive"
     ],
     "review_family": "native-vcs",
@@ -10260,6 +10272,9 @@
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
     "handler": "internal/artifacts/ecosystem/vcs/http/vcs_download.go: VCSAPI.DownloadVcsRelease",
     "direct_calls": [
+      "a.headers",
+      "a.zip",
+      "artgen.DownloadVcsRelease200ResponseHeaders",
       "s.vcsArchive"
     ],
     "review_family": "native-vcs",
@@ -10285,6 +10300,9 @@
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
     "handler": "internal/artifacts/ecosystem/vcs/http/vcs_download.go: VCSAPI.DownloadVcsTagFromSubgroupRepository",
     "direct_calls": [
+      "a.headers",
+      "a.zip",
+      "artgen.DownloadVcsTagFromSubgroupRepository200ResponseHeaders",
       "s.vcsArchive"
     ],
     "review_family": "native-vcs",
@@ -10310,6 +10328,9 @@
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
     "handler": "internal/artifacts/ecosystem/vcs/http/vcs_download.go: VCSAPI.DownloadVcsTag",
     "direct_calls": [
+      "a.headers",
+      "a.zip",
+      "artgen.DownloadVcsTag200ResponseHeaders",
       "s.vcsArchive"
     ],
     "review_family": "native-vcs",
@@ -10335,6 +10356,9 @@
     "contract": "Resolves VCS references or source archives from a remote VCS repository.",
     "handler": "internal/artifacts/ecosystem/vcs/http/vcs_download.go: VCSAPI.DownloadVcsTagAlternative",
     "direct_calls": [
+      "a.headers",
+      "a.zip",
+      "artgen.DownloadVcsTagAlternative200ResponseHeaders",
       "s.vcsArchive"
     ],
     "review_family": "native-vcs",

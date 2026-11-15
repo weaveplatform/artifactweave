@@ -51,11 +51,15 @@
 // # Outputs
 //
 //   - VCSAPI: the VCS partial strict server, whose operations answer the
-//     reference listings as JFrog's JSON, and archives and selected files
-//     (a ZIP that holds the file) as application/octet-stream.
+//     reference listings as JFrog's JSON; archives as application/x-gzip or
+//     application/zip by their extension, named as 7.x's GitRef names them
+//     (<repo>-<tag>.<ext>, <repo>-<branch>-<commit>.<ext>) in
+//     X-Artifactory-Filename and Content-Disposition, with the checksums
+//     their read knows (#1580); and selected files (a ZIP that holds the
+//     file) as application/octet-stream.
 //   - VCSNested: the handler of the GitLab subgroup path forms, which
-//     answers a selected file as application/zip and a form it does not
-//     own with 404.
+//     answers an archive as VCSAPI does, a selected file as
+//     application/zip and a form it does not own with 404.
 //   - The name rules: ValidProject, ValidRef, ValidCommitID, ValidFilePath
 //     and ValidExtension.
 //   - The provider addresses: RefEndpoints, GitRefsURL, ArchiveURL and

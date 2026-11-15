@@ -71602,6 +71602,15 @@ func (r GetVcsBranchesResponse) ContentType() string {
 	return ""
 }
 
+// DownloadVcsBranchAlternativeResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsBranchAlternative
+type DownloadVcsBranchAlternativeResponse200Headers struct {
+	ContentDisposition   *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
 // DownloadVcsBranchAlternativeResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsBranchAlternative
 type DownloadVcsBranchAlternativeResponse429Headers struct {
 	RateLimit       *string
@@ -71631,6 +71640,8 @@ type DownloadVcsBranchAlternativeResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadVcsBranchAlternativeResponse200Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsBranchAlternativeResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -71696,6 +71707,15 @@ func (r DownloadVcsBranchAlternativeResponse) ContentType() string {
 	return ""
 }
 
+// DownloadVcsBranchFromSubgroupRepositoryResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsBranchFromSubgroupRepository
+type DownloadVcsBranchFromSubgroupRepositoryResponse200Headers struct {
+	ContentDisposition   *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
 // DownloadVcsBranchFromSubgroupRepositoryResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsBranchFromSubgroupRepository
 type DownloadVcsBranchFromSubgroupRepositoryResponse429Headers struct {
 	RateLimit       *string
@@ -71725,6 +71745,8 @@ type DownloadVcsBranchFromSubgroupRepositoryResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadVcsBranchFromSubgroupRepositoryResponse200Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsBranchFromSubgroupRepositoryResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -71790,6 +71812,15 @@ func (r DownloadVcsBranchFromSubgroupRepositoryResponse) ContentType() string {
 	return ""
 }
 
+// DownloadVcsBranchResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsBranch
+type DownloadVcsBranchResponse200Headers struct {
+	ContentDisposition   *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
 // DownloadVcsBranchResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsBranch
 type DownloadVcsBranchResponse429Headers struct {
 	RateLimit       *string
@@ -71819,6 +71850,8 @@ type DownloadVcsBranchResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadVcsBranchResponse200Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsBranchResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72166,6 +72199,15 @@ func (r DownloadFileWithinVcsBranchResponse) ContentType() string {
 	return ""
 }
 
+// DownloadVcsCommitResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsCommit
+type DownloadVcsCommitResponse200Headers struct {
+	ContentDisposition   *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
 // DownloadVcsCommitResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsCommit
 type DownloadVcsCommitResponse429Headers struct {
 	RateLimit       *string
@@ -72195,6 +72237,8 @@ type DownloadVcsCommitResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadVcsCommitResponse200Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsCommitResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72260,6 +72304,15 @@ func (r DownloadVcsCommitResponse) ContentType() string {
 	return ""
 }
 
+// DownloadVcsReleaseResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsRelease
+type DownloadVcsReleaseResponse200Headers struct {
+	ContentDisposition   *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
 // DownloadVcsReleaseResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsRelease
 type DownloadVcsReleaseResponse429Headers struct {
 	RateLimit       *string
@@ -72289,6 +72342,8 @@ type DownloadVcsReleaseResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadVcsReleaseResponse200Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsReleaseResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72354,6 +72409,15 @@ func (r DownloadVcsReleaseResponse) ContentType() string {
 	return ""
 }
 
+// DownloadVcsTagFromSubgroupRepositoryResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsTagFromSubgroupRepository
+type DownloadVcsTagFromSubgroupRepositoryResponse200Headers struct {
+	ContentDisposition   *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
 // DownloadVcsTagFromSubgroupRepositoryResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsTagFromSubgroupRepository
 type DownloadVcsTagFromSubgroupRepositoryResponse429Headers struct {
 	RateLimit       *string
@@ -72383,6 +72447,8 @@ type DownloadVcsTagFromSubgroupRepositoryResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadVcsTagFromSubgroupRepositoryResponse200Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsTagFromSubgroupRepositoryResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72448,6 +72514,15 @@ func (r DownloadVcsTagFromSubgroupRepositoryResponse) ContentType() string {
 	return ""
 }
 
+// DownloadVcsTagResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsTag
+type DownloadVcsTagResponse200Headers struct {
+	ContentDisposition   *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
 // DownloadVcsTagResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsTag
 type DownloadVcsTagResponse429Headers struct {
 	RateLimit       *string
@@ -72477,6 +72552,8 @@ type DownloadVcsTagResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadVcsTagResponse200Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsTagResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -72542,6 +72619,15 @@ func (r DownloadVcsTagResponse) ContentType() string {
 	return ""
 }
 
+// DownloadVcsTagAlternativeResponse200Headers the declared response headers of an HTTP 200 response for DownloadVcsTagAlternative
+type DownloadVcsTagAlternativeResponse200Headers struct {
+	ContentDisposition   *string
+	XArtifactoryFilename *string
+	XChecksumMd5         *string
+	XChecksumSha1        *string
+	XChecksumSha256      *string
+}
+
 // DownloadVcsTagAlternativeResponse429Headers the declared response headers of an HTTP 429 response for DownloadVcsTagAlternative
 type DownloadVcsTagAlternativeResponse429Headers struct {
 	RateLimit       *string
@@ -72571,6 +72657,8 @@ type DownloadVcsTagAlternativeResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadVcsTagAlternativeResponse200Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DownloadVcsTagAlternativeResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -116167,6 +116255,44 @@ func ParseDownloadVcsBranchAlternativeResponse(rsp *http.Response) (*DownloadVcs
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadVcsBranchAlternativeResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsBranchAlternativeResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -116279,6 +116405,44 @@ func ParseDownloadVcsBranchFromSubgroupRepositoryResponse(rsp *http.Response) (*
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadVcsBranchFromSubgroupRepositoryResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsBranchFromSubgroupRepositoryResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -116391,6 +116555,44 @@ func ParseDownloadVcsBranchResponse(rsp *http.Response) (*DownloadVcsBranchRespo
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadVcsBranchResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsBranchResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -116839,6 +117041,44 @@ func ParseDownloadVcsCommitResponse(rsp *http.Response) (*DownloadVcsCommitRespo
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadVcsCommitResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsCommitResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -116951,6 +117191,44 @@ func ParseDownloadVcsReleaseResponse(rsp *http.Response) (*DownloadVcsReleaseRes
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadVcsReleaseResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsReleaseResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -117063,6 +117341,44 @@ func ParseDownloadVcsTagFromSubgroupRepositoryResponse(rsp *http.Response) (*Dow
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadVcsTagFromSubgroupRepositoryResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsTagFromSubgroupRepositoryResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -117175,6 +117491,44 @@ func ParseDownloadVcsTagResponse(rsp *http.Response) (*DownloadVcsTagResponse, e
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadVcsTagResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsTagResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
@@ -117287,6 +117641,44 @@ func ParseDownloadVcsTagAlternativeResponse(rsp *http.Response) (*DownloadVcsTag
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadVcsTagAlternativeResponse200Headers
+		if values := rsp.Header.Values("Content-Disposition"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Content-Disposition", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ContentDisposition = &value
+		}
+		if values := rsp.Header.Values("X-Artifactory-Filename"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Artifactory-Filename", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XArtifactoryFilename = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Md5"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Md5", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumMd5 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha1"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha1", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha1 = &value
+		}
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 429:
 		var headers DownloadVcsTagAlternativeResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
