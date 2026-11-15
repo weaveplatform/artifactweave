@@ -43,14 +43,18 @@ type inspection struct {
 
 // Inspect reads and validates the stored archive of a write to a .tar.gz
 // path before the write's transaction, and returns its metadata for Admit
-// and Deployed, so an archive is read once per write. A checksum deploy and
-// any other file inspect nothing. An invalid archive is refused with 400;
-// an archive that cannot be opened fails the write.
+// and Deployed, so an archive is read once per write. A checksum deploy,
+// a remote's copy outside the archive layout and any other file inspect
+// nothing. An invalid archive is refused with 400; an archive that cannot
+// be opened fails the write.
 func (Handler) Inspect(
-	ctx context.Context, env format.Env, _ repo.Config, w format.Write,
+	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (any, error) {
 	if w.Op == format.OpChecksum || !strings.HasSuffix(w.Path, ".tar.gz") {
 		return nil, nil //nolint:nilnil // this write has no archive to inspect
+	}
+	if _, _, ok := ParsePath(w.Path); !ok && format.RemoteCopy(c, w) {
+		return nil, nil //nolint:nilnil // Admit keeps it as a plain file
 	}
 	meta, err := readStored(ctx, env.Blobs, w.Checksums.SHA256)
 	if err != nil {
@@ -64,8 +68,9 @@ func (Handler) Inspect(
 // (v3/releases/<module>). Any other write must go to a local or federated
 // repository or be a remote's cached content (400), at a module archive
 // path (400), and the archive's metadata.json must name the module and
-// version its path does (409). It reuses Inspect's reading when it covers
-// the same content, and reads the stored archive itself otherwise.
+// version its path does (409). A remote's copy at any other path is kept
+// as a plain file (format.RemoteCopy). It reuses Inspect's reading when it
+// covers the same content, and reads the stored archive itself otherwise.
 func (Handler) Admit(
 	ctx context.Context, env format.Env, c repo.Config, w format.Write,
 ) (format.Write, error) {
@@ -84,6 +89,9 @@ func (Handler) Admit(
 	}
 	name, version, ok := ParsePath(w.Path)
 	if !ok {
+		if format.RemoteCopy(c, w) {
+			return w, nil
+		}
 		return w, format.Rejectf(http.StatusBadRequest, "invalid Puppet module archive path")
 	}
 	in, ok := env.Inspection.(inspection)

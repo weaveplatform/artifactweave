@@ -10,11 +10,9 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -152,51 +150,31 @@ func (s *Kit) traceDownload(
 		t.stepf("Identified requested resource as a folder")
 		return nil
 	}
-	if c.Class == repo.Remote && c.PackageType == repo.Generic && !cached && !req.IsFolder &&
-		s.RemoteSources != nil &&
-		!strings.Contains(req.Path, "!/") {
-		_, _, sidecar := item.Sidecar(req.Path)
-		cachedItem, lookupErr := st.Items().Get(ctx, c.Key, true, req.Path)
-		if !sidecar && (lookupErr != nil || !cachedItem.Folder) {
-			// The trace answers as getRemoteItem does: a copy the cache
-			// already holds is matched before the upstream is asked, and
-			// the upstream's answer to a URL carrying the matrix
-			// parameters is not matched again (RemoteCopyMatches).
-			matches, matchErr := RemoteCopyMatches(ctx, st, c, req.Path, req)
-			if matchErr != nil {
-				return s.InternalError(ctx, "trace properties", matchErr)
-			}
-			if !matches {
-				t.stepf("Found resource in local cache, but property doesn't match.")
-				return ItemNotFound()
-			}
-			t.stepf("Resolving remote source with current read authorization")
-			result, readErr := s.RemoteSources.Read(ctx, source.Request{
-				Repo:         c,
-				Subject:      accessapi.SubjectOf(p),
-				Access:       acc.Decider,
-				Resource:     RemoteResource(r, req.Path),
-				Matrix:       req.matrix(),
-				MatrixParams: pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
-				Project:      c.ProjectKey,
-			})
-			if readErr != nil {
-				return s.ItemError(ctx, "trace source", pkgroute.SourceError(readErr, p.Anonymous))
-			}
-			if result.Stream != nil {
-				_ = result.Stream.Body.Close()
-				t.stepf("Returning validated transient resource")
-			} else {
-				t.stepf("Returning found resource from %s", traceRepoPath(c, true, req.Path))
-			}
-			traceResponding(method, t)
-			return nil
+	// A remote file is read from the upstream where the download reads it,
+	// before the cache lookup (GetItem's remote read) or once it has not
+	// found the file (getColdRemoteItem), on a remote of any type: 7.161.26's
+	// RepoFilter answers ?trace by running the download itself
+	// (doGetOrHeadRequest wraps its response in a TraceLoggingResponse), so
+	// the trace finds what the download finds.
+	alias, err := aliasRemoteMetadata(ctx, st, c, cached, req.Path)
+	if err != nil {
+		return s.InternalError(ctx, "cached document", err)
+	}
+	if (remoteDownloadType(c, cached) || alias || fileChecksumRoute(c, cached, req.Path)) &&
+		!req.IsFolder && s.RemoteSources != nil {
+		if handled, err := s.traceRemoteItem(r, c, req, p, acc, t); handled {
+			return err
 		}
 	}
 	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
 	dl.trace = t
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, map[string]bool{})
 	if errors.Is(err, kernel.ErrNotFound) {
+		if s.coldRemoteRead(ctx, st, c, cached, req, acc, dl) {
+			if handled, err := s.traceRemoteItem(r, c, req, p, acc, t); handled {
+				return err
+			}
+		}
 		return s.traceContained(ctx, st, method, c, cached, req.Path, p, acc, dl)
 	}
 	if err != nil {
@@ -224,6 +202,65 @@ func (s *Kit) traceDownload(
 	t.stepf("Identified requested resource as a file")
 	traceResponding(method, t)
 	return nil
+}
+
+// traceRemoteItem traces the read getRemoteItem makes of req
+// (readRemoteItem) and returns the error getRemoteItem would answer from
+// its result, or nil where it would serve a file or a checksum, without
+// serving or counting anything. It reports false where getRemoteItem
+// leaves the path to the cache lookup.
+func (s *Kit) traceRemoteItem(
+	r *http.Request,
+	c repo.Config,
+	req ItemRequest,
+	p kernel.Principal,
+	acc Access,
+	t *resolutionTrace,
+) (bool, error) {
+	read, ok := s.readRemoteItem(r, c, req, p, acc, t)
+	if !ok {
+		return false, nil
+	}
+	if read.err != nil {
+		return true, read.err
+	}
+	ctx := r.Context()
+	result, alg := read.result, item.Algorithm(read.sidecar)
+	var err error
+	switch {
+	case result.Stream != nil && read.infoSum != nil:
+		_, err = s.infoChecksum(ctx, result, c, *read.infoSum, read.resource, read.sidecar,
+			p.Anonymous)
+	case result.Stream != nil:
+		if err = remoteDeliveryErr(ctx, result, p.Anonymous); err == nil {
+			_ = result.Stream.Body.Close()
+			// ServeRemoteStream answers a HEAD for a checksum it cannot
+			// compute without a body.
+			if read.sidecar != "" && r.Method != http.MethodHead &&
+				remoteStreamChecksum(c, result.Stream, alg) == "" {
+				err = ItemNotFound()
+			}
+		}
+	default:
+		err = remoteDeliveryErr(ctx, result, p.Anonymous)
+		if err == nil && read.sidecar != "" && item.ServedChecksum(c, *result.Item, alg) == "" {
+			err = ItemNotFound()
+		}
+	}
+	if err != nil {
+		return true, err
+	}
+	if result.Stream != nil {
+		t.stepf("Returning validated transient resource")
+	} else {
+		t.stepf("Returning found resource from %s", traceRepoPath(c, true, result.Item.FullPath()))
+	}
+	if read.sidecar != "" {
+		t.stepf("Responding to checksum request")
+		return true, nil
+	}
+	traceResponding(r.Method, t)
+	return true, nil
 }
 
 // traceContained traces a path no item holds: an entry inside an archive

@@ -263,10 +263,28 @@ have, answers 404 "Not Found", as on a generic remote. On an npm remote only a
 tarball path (`<name>/-/<file>`) is read: the upstream answers `<url>/<name>` with the
 package's document, which kept as a file would take the place of the folder holding the
 package's tarballs, and no 7.x source says what its npm remote does with that path [I].
-A file the remote's cache refuses, such as one outside Cargo's, Chef's or Swift's layout,
-answers 502 as a format route's refused upstream file does [I]; 7.161.26 checks a layout
-only for a local repository's own deploys (`PackageStorageInterceptorImpl.beforeCreate`)
+A file outside its type's layout, such as `pkg/file.bin` or `docs/notes.crate` on a
+Chef, Cargo, Puppet, Swift, Pub, Hex, Bower or Git LFS remote, is kept as a plain file
+that indexes nothing, as on a generic remote, and a remote that stores nothing streams it
+(`format.RemoteCopy`). 7.161.26 checks a layout only for a local repository's own deploys
+(`PackageStorageInterceptorImpl.beforeCreate` skips a cache), and its type predicates,
+such as `CargoAddon.isCargoFile`, only choose the tabs its UI shows a file with; that no
+Pro interceptor refuses such a file is [I]
+([#1575](https://github.com/weaveplatform/artifactweave/issues/1575)). A file at a path
+the layout claims still meets the format's checks: a Chef or Cargo archive that names
+another package, or a Git LFS object whose SHA-256 is not its name, answers 502 "Bad
+Gateway" as a format route's refused upstream file does and is not kept [I]
 ([#1507](https://github.com/weaveplatform/artifactweave/issues/1507)).
+
+`?trace` on a remote follows the download, as 7.161.26's `RepoFilter.doGetOrHeadRequest`
+runs the download itself under a `TraceLoggingResponse`: a cold file the download would
+fetch is fetched, and kept where the download keeps it, and the trace names the resource
+it found ("Returning found resource from `<remote>-cache:<path>`", or "Returning
+validated transient resource" for a remote that stores nothing), a checksum request
+answers from the same source the download's does, and the download's refusals (the
+client `Accept` MIME check, the store setting, the checksum policy) end it as they end
+the download. The trace counts no download
+([#1576](https://github.com/weaveplatform/artifactweave/issues/1576)).
 
 A remote file served from a stream, the upstream's on a remote that stores nothing
 (R13) or a document the cache keeps without an item, such as a `maven-metadata.xml`,

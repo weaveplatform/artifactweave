@@ -1014,13 +1014,25 @@ func (s *Kit) coldReadPath(c repo.Config, p string) bool {
 
 // getColdRemoteItem answers a file, or the checksum of a file, that the
 // cache lookup did not find on a remote of a coldReadType type, from the
-// upstream at <url>/<path>, through getRemoteItem. The lookup has already
-// applied the download policy and the format's own refusals, which keep
-// their answers. A checksum whose file the lookup finds keeps the cache's
-// answer (getSidecar).
+// upstream at <url>/<path>, through getRemoteItem, where coldRemoteRead
+// sends it.
 func (s *Kit) getColdRemoteItem(
 	w http.ResponseWriter, r *http.Request, st Store, c repo.Config, cached bool,
 	req ItemRequest, p kernel.Principal, acc Access, dl *Download,
+) bool {
+	return s.coldRemoteRead(r.Context(), st, c, cached, req, acc, dl) &&
+		s.getRemoteItem(w, r, c, req, p, acc)
+}
+
+// coldRemoteRead reports whether the item route reads req, which the cache
+// lookup did not find, from c's upstream: on a remote of a coldReadType
+// type, at a path coldReadPath admits. The lookup has already applied the
+// download policy and the format's own refusals, which keep their answers.
+// A checksum whose file the lookup finds keeps the cache's answer
+// (getSidecar).
+func (s *Kit) coldRemoteRead(
+	ctx context.Context, st Store, c repo.Config, cached bool, req ItemRequest, acc Access,
+	dl *Download,
 ) bool {
 	if !coldReadType(c, cached) || s.RemoteSources == nil || req.Path == "" || req.IsFolder ||
 		strings.Contains(req.Path, "!/") {
@@ -1028,16 +1040,13 @@ func (s *Kit) getColdRemoteItem(
 	}
 	file := req.Path
 	if artifact, _, ok := item.Sidecar(req.Path); ok {
-		_, err := Lookup(r.Context(), st, c, cached, artifact, acc, dl, map[string]bool{})
+		_, err := Lookup(ctx, st, c, cached, artifact, acc, dl, map[string]bool{})
 		if !errors.Is(err, kernel.ErrNotFound) {
 			return false
 		}
 		file = artifact
 	}
-	if !s.coldReadPath(c, file) {
-		return false
-	}
-	return s.getRemoteItem(w, r, c, req, p, acc)
+	return s.coldReadPath(c, file)
 }
 
 func remoteDownloadType(c repo.Config, cached bool) bool {
