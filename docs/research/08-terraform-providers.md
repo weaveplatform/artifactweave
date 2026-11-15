@@ -217,7 +217,8 @@ and [pinned source](https://github.com/jfrog/terraform-provider-artifactory/tree
 
 P10/#1531 adds the `virtual-repositories` reference: all 33 virtual resources of the
 table above, each over a local and a remote member of its type (P2 over a P2 remote and a
-local generic repository, since no local P2 resource exists) and deploying to the local
+local Maven repository: no local P2 resource exists, and 7.x refuses a Generic member
+under a P2 virtual, [decision 0008](decisions/0008-virtual-repositories.md) R11) and deploying to the local
 one, with every field the
 [pinned virtual resources](https://github.com/jfrog/terraform-provider-artifactory/tree/v12.11.14/pkg/artifactory/resource/repository/virtual)
 offer set away from its default. Thirty-one are SDKv2 resources whose virtual fields

@@ -16,9 +16,9 @@ client scenarios cover.
   Bower, Conan, Debian, RPM, CocoaPods, Composer, RubyGems, Git LFS, P2, Pub, Puppet,
   Swift, Ansible, Chef, Conda, CRAN, Hex and Nix.
 - For each, a local member (`artifactory_local_<type>_repository`; Docker's is
-  `docker_v2`, Terraform's a module registry, and P2's a generic repository, since a P2
-  virtual takes local Generic or Maven members) and a remote member
-  (`artifactory_remote_<type>_repository`) whose URL is `<upstream_url>/<type>`.
+  `docker_v2`, Terraform's a module registry, and P2's a Maven repository, since there is
+  no local P2 repository and a P2 virtual aggregates only the Maven group) and a remote
+  member (`artifactory_remote_<type>_repository`) whose URL is `<upstream_url>/<type>`.
 - On every virtual: the description and notes, include and exclude patterns, a layout
   other than the provider's default for the type, remote retrieval for other Artifactory
   instances, and 404 for unauthorised resources.
@@ -152,7 +152,6 @@ No modules.
 | [artifactory_local_docker_v2_repository.docker](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_docker_v2_repository) | resource |
 | [artifactory_local_gems_repository.gems](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_gems_repository) | resource |
 | [artifactory_local_generic_repository.generic](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_generic_repository) | resource |
-| [artifactory_local_generic_repository.p2](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_generic_repository) | resource |
 | [artifactory_local_gitlfs_repository.gitlfs](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_gitlfs_repository) | resource |
 | [artifactory_local_go_repository.go](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_go_repository) | resource |
 | [artifactory_local_gradle_repository.gradle](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_gradle_repository) | resource |
@@ -161,6 +160,7 @@ No modules.
 | [artifactory_local_hex_repository.hex](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_hex_repository) | resource |
 | [artifactory_local_ivy_repository.ivy](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_ivy_repository) | resource |
 | [artifactory_local_maven_repository.maven](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_maven_repository) | resource |
+| [artifactory_local_maven_repository.p2](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_maven_repository) | resource |
 | [artifactory_local_nix_repository.nix](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_nix_repository) | resource |
 | [artifactory_local_npm_repository.npm](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_npm_repository) | resource |
 | [artifactory_local_nuget_repository.nuget](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_nuget_repository) | resource |

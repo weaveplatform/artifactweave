@@ -78,7 +78,7 @@ locals {
     composer  = [artifactory_local_composer_repository.composer.key, artifactory_remote_composer_repository.composer.key]
     gems      = [artifactory_local_gems_repository.gems.key, artifactory_remote_gems_repository.gems.key]
     gitlfs    = [artifactory_local_gitlfs_repository.gitlfs.key, artifactory_remote_gitlfs_repository.gitlfs.key]
-    p2        = [artifactory_local_generic_repository.p2.key, artifactory_remote_p2_repository.p2.key]
+    p2        = [artifactory_local_maven_repository.p2.key, artifactory_remote_p2_repository.p2.key]
     pub       = [artifactory_local_pub_repository.pub.key, artifactory_remote_pub_repository.pub.key]
     puppet    = [artifactory_local_puppet_repository.puppet.key, artifactory_remote_puppet_repository.puppet.key]
     swift     = [artifactory_local_swift_repository.swift.key, artifactory_remote_swift_repository.swift.key]
@@ -700,9 +700,12 @@ resource "artifactory_virtual_gitlfs_repository" "gitlfs" {
   hide_unauthorized_resources                        = true
 }
 
-# There is no local P2 repository: a P2 virtual aggregates P2 remotes and
-# local Generic or Maven repositories holding update sites.
-resource "artifactory_local_generic_repository" "p2" {
+# There is no local P2 repository, so the P2 virtual's local member is a
+# Maven repository holding an update site. 7.161.26 lets a P2 virtual
+# aggregate only the Maven group (Maven, Gradle, Ivy, SBT and P2) and
+# refuses a Generic member (VirtualRepoConfigChangeInterceptor; decision
+# 0008, R11).
+resource "artifactory_local_maven_repository" "p2" {
   key         = "${var.repository_prefix}-p2-local"
   description = "local member of the p2 virtual"
 }
@@ -716,7 +719,7 @@ resource "artifactory_remote_p2_repository" "p2" {
 resource "artifactory_virtual_p2_repository" "p2" {
   key                                                = "${var.repository_prefix}-p2"
   repositories                                       = local.ordered["p2"]
-  default_deployment_repo                            = artifactory_local_generic_repository.p2.key
+  default_deployment_repo                            = artifactory_local_maven_repository.p2.key
   description                                        = "p2 virtual over a local and a remote member"
   notes                                              = "managed by Terraform, revision ${var.revision}"
   includes_pattern                                   = local.includes_pattern
