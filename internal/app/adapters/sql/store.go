@@ -164,6 +164,11 @@ func (s *Store) BowerRegistrations() artport.BowerRegistrationStore {
 	return s.artifacts.BowerRegistrations()
 }
 
+// UploadDigests is the artifacts module's upload digest store.
+func (s *Store) UploadDigests() artport.UploadDigestStore {
+	return s.artifacts.UploadDigests()
+}
+
 // Builds is the artifacts module's build store.
 func (s *Store) Builds() artport.BuildStore { return s.artifacts.Builds() }
 

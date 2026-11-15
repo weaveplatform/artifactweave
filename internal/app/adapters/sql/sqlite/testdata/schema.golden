@@ -141,6 +141,7 @@ index sqlite_autoindex_topologies_1 topologies
 index sqlite_autoindex_topology_sites_1 topology_sites
 index sqlite_autoindex_trusted_keys_1 trusted_keys
 index sqlite_autoindex_trusted_keys_2 trusted_keys
+index sqlite_autoindex_upload_digests_1 upload_digests
 index sqlite_autoindex_uploads_1 uploads
 index sqlite_autoindex_user_groups_1 user_groups
 index sqlite_autoindex_users_1 users
@@ -251,6 +252,7 @@ table topologies topologies CREATE TABLE topologies(key TEXT PRIMARY KEY,name TE
 table topology_sites topology_sites CREATE TABLE topology_sites(topology_key TEXT NOT NULL REFERENCES topologies(key)ON DELETE CASCADE,site_name TEXT NOT NULL,peer TEXT NOT NULL,PRIMARY KEY(topology_key,site_name))
 table trash trash CREATE TABLE trash(id INTEGER PRIMARY KEY AUTOINCREMENT,original_repo_key TEXT NOT NULL,original_path TEXT NOT NULL,original_name TEXT NOT NULL,item_json TEXT NOT NULL,deleted_at BIGINT,deleted_by TEXT NOT NULL DEFAULT '')
 table trusted_keys trusted_keys CREATE TABLE trusted_keys(kid TEXT PRIMARY KEY,alias TEXT UNIQUE,public_key TEXT NOT NULL DEFAULT '',fingerprint TEXT NOT NULL DEFAULT '',issued_on BIGINT,issued_by TEXT NOT NULL DEFAULT '',valid_until BIGINT)
+table upload_digests upload_digests CREATE TABLE upload_digests(sha256 TEXT PRIMARY KEY,sha1 TEXT NOT NULL,md5 TEXT NOT NULL)
 table uploads uploads CREATE TABLE uploads(id TEXT PRIMARY KEY,backend TEXT NOT NULL DEFAULT '',repo_key TEXT NOT NULL DEFAULT '',path TEXT NOT NULL DEFAULT '',state BLOB,bytes BIGINT NOT NULL DEFAULT 0,started_at BIGINT,updated_at BIGINT)
 table user_groups user_groups CREATE TABLE user_groups(name TEXT PRIMARY KEY,description TEXT NOT NULL DEFAULT '',auto_join BOOLEAN NOT NULL DEFAULT FALSE,admin_privileges BOOLEAN NOT NULL DEFAULT FALSE,realm TEXT NOT NULL DEFAULT '',realm_attributes TEXT NOT NULL DEFAULT '',external_id TEXT NOT NULL DEFAULT '',roles TEXT,search_name TEXT)
 table users users CREATE TABLE users(name TEXT PRIMARY KEY,email TEXT NOT NULL DEFAULT '',password_hash BLOB,admin BOOLEAN NOT NULL DEFAULT FALSE,profile_updatable BOOLEAN NOT NULL DEFAULT FALSE,internal_password_disabled BOOLEAN NOT NULL DEFAULT FALSE,disable_ui_access BOOLEAN NOT NULL DEFAULT FALSE,realm TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT '',mfa TEXT NOT NULL DEFAULT '',last_logged_in_at BIGINT,created_at BIGINT,roles TEXT,failed_logins INTEGER NOT NULL DEFAULT 0,password_changed_at BIGINT,password_expired BOOLEAN NOT NULL DEFAULT FALSE,search_name TEXT)

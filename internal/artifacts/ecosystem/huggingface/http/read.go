@@ -468,18 +468,29 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
+	etag := resolveETag(*target)
 	w.Header().Set("X-Repo-Commit", chosen.info.SHA)
-	if target.LFS != nil {
-		w.Header().Set("ETag", `"`+target.LFS.SHA256+`"`)
-	} else if target.BlobID != "" {
-		w.Header().Set("ETag", `"`+target.BlobID+`"`)
-	}
+	w.Header().Set("ETag", etag)
 	if err := h.xetResolveHeaders(w, r, chosen, id, *target); err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
+	header, unchanged := resolveConditions(r, etag)
+	if unchanged {
+		// Decided on the resolve's own ETag, which the file's download
+		// never sends, before a remote file is fetched; a remote member's
+		// credential and read are checked as its delivery would check them.
+		if err := chosen.revalidate(r.Context(), path); err != nil {
+			p, _ := kernel.FromContext(r.Context())
+			h.k.Error(w, r, pkgroute.SourceError(err, p.Anonymous))
+			return
+		}
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w = &resolveWriter{ResponseWriter: w, etag: etag}
 	if pkgroute.RequestFrom(chosen.request).Repo.Class != repo.Remote {
-		h.k.ServeItem(w, chosen.request, path)
+		h.k.ServeItem(w, withHeader(chosen.request, header), path)
 		return
 	}
 	result, err := h.remoteFile(
@@ -487,8 +498,8 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 		chosen,
 		id,
 		*target,
-		r.Header.Get("Range"),
-		r.Header.Get("If-Range"),
+		header.Get("Range"),
+		header.Get("If-Range"),
 	)
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -497,13 +508,8 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 	if chosen.fence != nil {
 		original := result.Revalidate
 		result.Revalidate = func(ctx context.Context) error {
-			if err := chosen.fence(ctx); err != nil {
+			if err := chosen.revalidate(ctx, path); err != nil {
 				return err
-			}
-			if chosen.check != nil {
-				if err := chosen.check(ctx, path); err != nil {
-					return err
-				}
 			}
 			if original != nil {
 				return original(ctx)
@@ -511,7 +517,7 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}
 	}
-	h.k.ServeResult(w, r, result)
+	h.k.ServeResult(w, withHeader(r, header), result)
 }
 
 func (h handler) remoteFile(

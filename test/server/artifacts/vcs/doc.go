@@ -37,6 +37,10 @@
 //   - vcs_legacy_test.go and vcs_delivery_test.go: commit resolution and
 //     redirect changes, peer tag and branch bounds, rootless file precedence
 //     and peer file usage.
+//   - vcs_archive_headers_test.go: an archive's and a selected file's
+//     headers (#1580), the file itself or with ext=zip a ZIP of it, a
+//     peer's file passed through, and the validators, ranges and 416 every
+//     download answers.
 //
 // # References
 //

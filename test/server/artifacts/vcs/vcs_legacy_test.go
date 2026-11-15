@@ -104,9 +104,11 @@ func testVCSLegacyProvider(t *testing.T, provider repo.VCSGitProvider) {
 					want = "https://stash.example/context/api/vcs/downloadCommit/peer/team/project/" + vcsLegacyOID + "?ext=tar.gz"
 				}
 				if provider == repo.ArtifactoryVCS && q.Resource.Mutable {
-					want = "https://stash.example/context/api/vcs/downloadTagFile/peer/team/project/v1.0.0%21README.md?ext=zip"
+					// The peer's own selected-file answer, the file itself
+					// (RTFACT-29495), with no ext.
+					want = "https://stash.example/context/api/vcs/downloadTagFile/peer/team/project/v1.0.0%21README.md"
 					if q.Resource.Path != "team/project/refs/tags/v1.0.0/README.md" ||
-						q.Resource.Variant != "vcs-peer-file-v1" {
+						q.Resource.Variant != "vcs-peer-file-v2" {
 						t.Fatal("peer selected file lost its mutable reference cache identity")
 					}
 				}
@@ -172,13 +174,13 @@ func testVCSLegacyProvider(t *testing.T, provider repo.VCSGitProvider) {
 					t.Fatal(err)
 				}
 			} else {
-				filename := "internal/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-archive.tar.gz"
-				if q.Resource.Mutable {
-					filename = "internal/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-readme.zip"
-				}
-				data, err = os.ReadFile(repopath.Path(t, filename))
+				data, err = os.ReadFile(repopath.Path(t,
+					"internal/artifacts/ecosystem/vcs/http/testdata/legacy-vcs-archive.tar.gz"))
 				if err != nil {
 					t.Fatal(err)
+				}
+				if q.Resource.Mutable {
+					data = []byte("root readme\n")
 				}
 				if err := q.Resource.Validate(
 					ctx,
@@ -216,6 +218,9 @@ func testVCSLegacyProvider(t *testing.T, provider repo.VCSGitProvider) {
 		t.Run(path, func(t *testing.T) {
 			res := w.do(http.MethodGet, "/artifactory/api/vcs/"+path, "reader", "")
 			wantStatus(t, res, http.StatusOK)
+			if strings.Contains(path, "!") && res.Body.String() != "root readme\n" {
+				t.Fatalf("selected file %q, want the file itself", res.Body)
+			}
 		})
 	}
 	before := len(calls)

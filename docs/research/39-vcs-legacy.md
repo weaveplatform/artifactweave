@@ -18,7 +18,7 @@ in [Bitbucket 9.0](https://developer.atlassian.com/server/bitbucket/rest/v900/ap
 | --- | --- |
 | Ref discovery | `GET scm/{project}/{repository}.git/info/refs?service=git-upload-pack` |
 | Archive | `GET rest/api/1.0/projects/{project}/repos/{repository}/archive?at={commit}&format={zip\|tar.gz}` |
-| Selected file | Read the validated archive for that commit and return one repository-relative file as ZIP |
+| Selected file | Read the validated archive for that commit and return one repository-relative file itself, or with `ext=zip` a ZIP that holds it |
 
 The REST endpoint accepts commit IDs or refs; artifactweave resolves a tag or
 branch to a full object ID first. `format` chooses ZIP or gzip-compressed TAR.
@@ -84,7 +84,7 @@ artifactweave does not infer a peer repository from an arbitrary path.
 | Tags | `GET tags/source-vcs/{owner}/{repository}` |
 | Branches | `GET branches/source-vcs/{owner}/{repository}` |
 | Archive | `GET downloadCommit/source-vcs/{owner}/{repository}/{commit}?ext={zip|tar.gz}` |
-| Selected file | `GET downloadTagFile` or `downloadBranchFile` with `{ref}!{path}?ext=zip` |
+| Selected file | `GET downloadTagFile` or `downloadBranchFile` with `{ref}!{path}` |
 
 Authored [response-shape notes](evidence/vcs-legacy/response-shapes.md) retain
 [provenance](evidence/vcs-legacy/provenance.json) for the publisher OpenAPI schema
@@ -102,16 +102,17 @@ instead; it does not invent a parser for that string. Outward artifactweave
 `refs` formatting and slash-bearing ref parity remain comparison items for
 [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 
-Selected-file requests do not interpret an unknown peer archive wrapper. They
-use the documented [tag file](https://docs.jfrog.com/artifactory/reference/downloadFileWithinVcsTag)
+Selected-file requests use the documented
+[tag file](https://docs.jfrog.com/artifactory/reference/downloadFileWithinVcsTag)
 and [branch file](https://docs.jfrog.com/artifactory/reference/downloadFileWithinVcsBranch)
-APIs, validate one exact requested regular ZIP entry (plus its ancestor directory
-entries), and return the peer's bytes unchanged.
-These endpoints name mutable refs, so their cache entries use mutable-source
-freshness and a ref/file identity, not a previously resolved commit. Metadata zap
-leaves mutable binaries intact; expiry or explicit cache deletion refreshes them.
-Peers
-returning an unexpected ZIP layout are rejected rather than having a prefix guessed.
+APIs without `ext`, which a 7.x peer answers with the file itself
+([RTFACT-29495](https://jfrog.atlassian.net/browse/RTFACT-29495) shows
+`main!bazel_registry.json` answered as the raw JSON), and keep those bytes,
+within 64 MiB, unchanged. With `ext=zip` the remote zips them itself, as for
+any other provider. These endpoints name mutable refs, so their cache entries
+use mutable-source freshness and a ref/file identity, not a previously
+resolved commit. Metadata zap leaves mutable binaries intact; expiry or
+explicit cache deletion refreshes them.
 
 Stash archives have no implicit wrapper directory. Their file selection is exact:
 `sub/README.md` is never returned for `README.md`. The standard
@@ -128,10 +129,10 @@ variant changes so older entries cannot bypass this identity validation.
 current pinned Maven image's curl 8.18.0 (`8.18.0-1ubuntu2.8`). Fixtures are unmodified outputs of `git archive`, with a reproducible generator
 and version/commit/hash manifest under `internal/server/vcs/testdata`. Each provider
 has anonymous and private upstream cases, tags/branches/refs, byte-identical
-archive downloads, selected-file ZIPs, failed client authentication before
+archive downloads, selected files as ZIPs (`ext=zip`), failed client authentication before
 upstream access, changed refs after cache zap, authorized offline reads and
 cache deletion. Peer files are refreshed after explicit cache deletion and remain
-available offline. Further cases reject malformed refs/archives/files, wrong Git
+available offline. Further cases reject malformed refs/archives, oversized peer files, wrong Git
 commit metadata and unsafe redirects and preserve a sanitized upstream 503. Go server tests also cover
 invalid ref/file paths, denied identities, exact origin/path/query scope,
 immutable commit selection and aggregate metadata limits.

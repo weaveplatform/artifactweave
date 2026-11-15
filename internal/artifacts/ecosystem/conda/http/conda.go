@@ -96,7 +96,7 @@ func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafm
 		return
 	}
 	if id.Filename == "notices.json" {
-		h.serveBytes(w, r, []byte(`{"notices":[]}`), "application/json", nil)
+		h.serveBytes(w, r, []byte(`{"notices":[]}`), "application/json")
 		return
 	}
 	if id.Filename == "repodata.json.bz2" {
@@ -113,7 +113,7 @@ func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafm
 		return
 	}
 	canonical := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
-	index, finish, err := h.memberIndex(r, canonical, readPolicy{path: id.Path}, map[string]bool{})
+	index, err := h.memberIndex(r, canonical, readPolicy{path: id.Path}, map[string]bool{})
 	if err != nil {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
@@ -121,13 +121,13 @@ func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafm
 	var encoded map[string][]byte
 	if sharded {
 		encoded, err = condafmt.EncodeShards(
-			index,
+			index.records,
 			id.Channel,
 			id.Subdir,
 			baseurl.From(r.Context())+path.Dir(r.URL.Path)+"/",
 		)
 	} else {
-		encoded, err = condafmt.EncodeRepodata(index, id.Channel, id.Subdir)
+		encoded, err = condafmt.EncodeRepodata(index.records, id.Channel, id.Subdir)
 	}
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -138,14 +138,21 @@ func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafm
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Conda metadata not found"))
 		return
 	}
+	// The .zst forms keep application/zstd, which 7.x's MIME table, with no
+	// zst row, would not give a stored file; no capture shows one [I].
 	media := "application/json"
 	if strings.HasSuffix(id.Filename, ".zst") {
 		media = "application/zstd"
 	}
-	h.serveBytes(w, r, body, media, finish)
+	h.serveIndex(w, r, document{
+		name: id.Filename, media: media, body: body, modified: index.modified,
+	}, index.finish)
 }
 
-func (h handler) serveBytes(w http.ResponseWriter, r *http.Request, body []byte, media string,
+// serveIndex answers d once finish, the fence of every source it was built
+// from, passes, so no byte of it is written after a source's authority is
+// withdrawn.
+func (h handler) serveIndex(w http.ResponseWriter, r *http.Request, d document,
 	finish func(context.Context) error,
 ) {
 	if finish != nil {
@@ -154,13 +161,27 @@ func (h handler) serveBytes(w http.ResponseWriter, r *http.Request, body []byte,
 			return
 		}
 	}
+	serveDocument(w, r, d)
+}
+
+// serveBytes answers notices.json, which 7.x does not store as a channel
+// document, without a stored file's headers [I].
+func (h handler) serveBytes(w http.ResponseWriter, r *http.Request, body []byte, media string) {
 	w.Header().Set("Content-Type", media)
 	w.Header().Set("Cache-Control", "private, no-store")
-	if condafmt.IsShardFilename(path.Base(r.URL.Path)) {
-		w.Header().Set("Cache-Control", "private, max-age=0, must-revalidate, immutable")
-	}
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	itemkit.ServeContent(w, r, path.Base(r.URL.Path), time.Time{}, bytes.NewReader(body))
+}
+
+// channelIndex is the index a repository answers a channel's documents
+// from: the records the caller may read, the fence to pass before any is
+// disclosed, and when the stored or cached index they were read from last
+// changed, the latest of its members' for a virtual repository, zero when
+// there is none.
+type channelIndex struct {
+	records  condafmt.Repodata
+	finish   func(context.Context) error
+	modified time.Time
 }
 
 // readPolicy is how the download policy applies to the reads an index is
@@ -183,16 +204,14 @@ func (h handler) memberIndex(
 	indexPath string,
 	policy readPolicy,
 	seen map[string]bool,
-) (
-	condafmt.Repodata, func(context.Context) error, error,
-) {
+) (channelIndex, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	id, ok := condafmt.ParseMetadataPath(indexPath)
 	if !ok {
-		return condafmt.Repodata{}, nil, kernel.ErrNotFound
+		return channelIndex{}, kernel.ErrNotFound
 	}
 	if seen[c.Key] || len(seen) >= 8 {
-		return condafmt.Repodata{}, nil, apierror.New(
+		return channelIndex{}, apierror.New(
 			http.StatusBadRequest,
 			"Conda virtual member cycle",
 		)
@@ -204,16 +223,16 @@ func (h handler) memberIndex(
 	}
 	if !h.k.CanFolder(r, path.Dir(indexPath), api.ActionRead) ||
 		!h.k.Can(r, indexPath, api.ActionRead) {
-		return condafmt.Repodata{}, nil, apierror.New(
+		return channelIndex{}, apierror.New(
 			http.StatusForbidden,
 			"Conda index is not readable",
 		)
 	}
 	if c.Class == repo.Remote {
 		if h.settings.ShardsEnabled {
-			index, finish, err := h.remoteShardedIndex(r, id, policy)
+			index, err := h.remoteShardedIndex(r, id, policy)
 			if !errors.Is(err, errNoShardIndex) {
-				return index, finish, err
+				return index, err
 			}
 		}
 		return h.remoteIndex(r, id, policy)
@@ -221,39 +240,41 @@ func (h handler) memberIndex(
 	return h.localIndex(r, id)
 }
 
-func (h handler) localIndex(r *http.Request, id condafmt.MetadataPath) (
-	condafmt.Repodata, func(context.Context) error, error,
-) {
+func (h handler) localIndex(r *http.Request, id condafmt.MetadataPath) (channelIndex, error) {
 	f, err := h.k.ResolveStoredItem(r, id.Path)
 	if errors.Is(err, kernel.ErrNotFound) {
-		return condafmt.EmptyRepodata(id.Subdir), nil, nil
+		return channelIndex{records: condafmt.EmptyRepodata(id.Subdir)}, nil
 	}
 	if err != nil {
-		return condafmt.Repodata{}, nil, fmt.Errorf("conda: local index: %w", err)
+		return channelIndex{}, fmt.Errorf("conda: local index: %w", err)
 	}
 	if f.Item.Folder {
-		return condafmt.Repodata{}, nil, kernel.ErrNotFound
+		return channelIndex{}, kernel.ErrNotFound
 	}
 	rc, _, err := h.k.Blobs().Open(r.Context(), f.Item.Actual.SHA256)
 	if err != nil {
-		return condafmt.Repodata{}, nil, fmt.Errorf("conda: index blob: %w", err)
+		return channelIndex{}, fmt.Errorf("conda: index blob: %w", err)
 	}
 	defer func() { _ = rc.Close() }()
 	body, err := io.ReadAll(io.LimitReader(rc, 64<<20+1))
 	if err != nil {
-		return condafmt.Repodata{}, nil, fmt.Errorf("conda: index body: %w", err)
+		return channelIndex{}, fmt.Errorf("conda: index body: %w", err)
 	}
 	index, err := condafmt.DecodeRepodata(body, id)
 	if err != nil {
-		return condafmt.Repodata{}, nil, fmt.Errorf("conda: local repodata: %w", err)
+		return channelIndex{}, fmt.Errorf("conda: local repodata: %w", err)
 	}
 	filtered, err := h.filterIndex(r.Context(), r, index, id, nil)
-	return filtered, nil, err
+	// The channel's documents are calculated together, so the stored
+	// repodata.json's time is theirs.
+	return channelIndex{records: filtered, modified: f.Item.Modified}, err
 }
 
-func (h handler) remoteIndex(r *http.Request, id condafmt.MetadataPath, policy readPolicy) (
-	condafmt.Repodata, func(context.Context) error, error,
-) {
+func (h handler) remoteIndex(
+	r *http.Request,
+	id condafmt.MetadataPath,
+	policy readPolicy,
+) (channelIndex, error) {
 	resource := source.Resource{
 		Kind: source.ResourceKindMetadata, Path: id.Path, Method: http.MethodGet,
 		PermissionFolder: true, PermissionPath: path.Dir(id.Path),
@@ -279,21 +300,35 @@ func (h handler) remoteIndex(r *http.Request, id condafmt.MetadataPath, policy r
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		return condafmt.Repodata{}, nil, fmt.Errorf("conda: upstream repodata: %w", err)
+		return channelIndex{}, fmt.Errorf("conda: upstream repodata: %w", err)
 	}
 	body, err := h.resultBytes(r.Context(), result)
 	if err != nil {
-		return condafmt.Repodata{}, nil, err
+		return channelIndex{}, err
 	}
 	index, err := condafmt.DecodeRepodata(body, id)
 	if err != nil {
-		return condafmt.Repodata{}, nil, fmt.Errorf("conda: upstream repodata content: %w", err)
+		return channelIndex{}, fmt.Errorf("conda: upstream repodata content: %w", err)
 	}
 	filtered, err := h.filterIndex(r.Context(), r, index, id, result.CheckPermission)
 	if err != nil {
-		return condafmt.Repodata{}, nil, err
+		return channelIndex{}, err
 	}
-	return filtered, result.Revalidate, nil
+	return channelIndex{
+		records: filtered, finish: result.Revalidate, modified: resultModified(result),
+	}, nil
+}
+
+// resultModified is when a remote's copy of a document last changed: the
+// cached item's time, or the time the upstream's stream carries.
+func resultModified(result source.Result) time.Time {
+	if result.Item != nil {
+		return result.Item.Modified
+	}
+	if result.Stream != nil {
+		return result.Stream.Modified
+	}
+	return time.Time{}
 }
 
 func (h handler) resultBytes(ctx context.Context, result source.Result) ([]byte, error) {

@@ -16,6 +16,7 @@ type Store interface {
 	Packages() PackageStore
 	GitLFSLocks() GitLFSLockStore
 	BowerRegistrations() BowerRegistrationStore
+	UploadDigests() UploadDigestStore
 	Builds() BuildStore
 	ArchivedItems() ArchivedItemStore
 	ColdBlobs() BlobIndex

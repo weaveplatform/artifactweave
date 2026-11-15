@@ -292,6 +292,10 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
+	if storedDocument(path) {
+		serveDocument(w, r, path, media, body)
+		return
+	}
 	serveMetadata(w, r, path, media, body)
 }
 
@@ -354,6 +358,8 @@ func (h handler) sources(r *http.Request, path string) ([]*http.Request, error) 
 	return h.k.MergeMembers(r, document) //nolint:wrapcheck // the kit's own answer
 }
 
+// serveMetadata answers a JSON API document, which 7.x computes per
+// request rather than storing (storedDocument).
 func serveMetadata(w http.ResponseWriter, r *http.Request, path, media string, b []byte) {
 	sum := sha256.Sum256(b)
 	etag := gemfmt.InfoMD5(b)
@@ -371,9 +377,9 @@ func render(path string, rows []entry) ([]byte, string, error) {
 	}
 	switch path {
 	case "names":
-		return gemfmt.CompactNames(packages), "text/plain; charset=utf-8", nil
+		return gemfmt.CompactNames(packages), documentType(path), nil
 	case "versions":
-		return gemfmt.CompactVersions(packages), "text/plain; charset=utf-8", nil
+		return gemfmt.CompactVersions(packages), documentType(path), nil
 	case "specs.4.8.gz", "latest_specs.4.8.gz", "prerelease_specs.4.8.gz":
 		b, err := gemfmt.Specs(
 			packages,
@@ -383,13 +389,13 @@ func render(path string, rows []entry) ([]byte, string, error) {
 		if err != nil {
 			return nil, "", fmt.Errorf("gems: render specs: %w", err)
 		}
-		return b, "application/octet-stream", nil
+		return b, documentType(path), nil
 	}
 	if name, ok := strings.CutPrefix(path, "info/"); ok {
 		if !gemfmt.ValidName(name) {
 			return nil, "", missing()
 		}
-		return gemfmt.CompactInfo(name, packages), "text/plain; charset=utf-8", nil
+		return gemfmt.CompactInfo(name, packages), documentType(path), nil
 	}
 	if file, ok := strings.CutPrefix(path, "quick/Marshal.4.8/"); ok {
 		file = strings.TrimSuffix(file, ".gemspec.rz")
@@ -399,7 +405,7 @@ func render(path string, rows []entry) ([]byte, string, error) {
 				if err != nil {
 					return nil, "", fmt.Errorf("gems: render gemspec: %w", err)
 				}
-				return b, "application/octet-stream", nil
+				return b, documentType(path), nil
 			}
 		}
 		return nil, "", missing()

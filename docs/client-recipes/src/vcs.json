@@ -110,7 +110,7 @@
       "contains": [
         "TestUnitVCSRealGitArchivesValidateCommitAndRootlessPaths",
         "TestUnitVCSGlobalPAXMetadataCannotChangeEntryIdentity",
-        "TestUnitVCSPeerSelectedFileZIPMustMatchExactPath"
+        "TestUnitVCSPeerSelectedFileIsBounded"
       ]
     },
     {

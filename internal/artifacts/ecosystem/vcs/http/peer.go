@@ -81,8 +81,11 @@ func peerURL(raw, owner, name, action string) (*url.URL, error) {
 	return u, nil
 }
 
-// PeerFileURL addresses the peer's selected-file API. Its reference is mutable;
-// callers must not cache the response as an immutable commit archive.
+// PeerFileURL addresses the peer's selected-file API, without ext, so that
+// the peer answers the file itself, as a 7.x remote VCS repository answered
+// downloadBranchFile/.../main!bazel_registry.json (RTFACT-29495). Its
+// reference is mutable; callers must not cache the response as an
+// immutable commit archive.
 func PeerFileURL(c repo.Config, owner, name, kind, ref, filename string) (*url.URL, error) {
 	if !ValidRef(ref) || !ValidFilePath(filename) || kind != "tags" && kind != "heads" {
 		return nil, ErrInvalidPath
@@ -96,7 +99,6 @@ func PeerFileURL(c repo.Config, owner, name, kind, ref, filename string) (*url.U
 		return nil, err
 	}
 	u.Path += "/" + ref + "!" + filename
-	u.RawQuery = "ext=zip"
 	return u, nil
 }
 

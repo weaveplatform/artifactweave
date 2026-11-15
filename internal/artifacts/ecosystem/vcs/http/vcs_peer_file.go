@@ -1,21 +1,25 @@
 package vcshttp
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
+// vcsPeerFile is the file filename within the tag or branch ref of a peer
+// Artifactory VCS repository: its bytes, within MaxSelectedFileBytes, when
+// it last changed and the use to record once it is delivered.
 func (s VCSAPI) vcsPeerFile(
 	ctx context.Context, a vcsAccess, owner, name, kind, ref, filename string,
-) (io.Reader, int64, error) {
+) ([]byte, time.Time, func(context.Context) error, error) {
 	target, err := PeerFileURL(a.repo, owner, name, kind, ref, filename)
 	if err != nil {
-		return nil, 0, apierror.New(http.StatusBadRequest, "invalid VCS peer file source")
+		return nil, time.Time{}, nil,
+			apierror.New(http.StatusBadRequest, "invalid VCS peer file source")
 	}
 	permissionPath := owner + "/" + name + "/refs/" + kind + "/" + ref + "/" + filename
 	resource := source.Resource{
@@ -27,9 +31,11 @@ func (s VCSAPI) vcsPeerFile(
 		NoCrossOriginAuth: true,
 		Method:            http.MethodGet,
 		PermissionPath:    permissionPath,
-		Variant:           "vcs-peer-file-v1",
+		// v2: the peer's raw file, where v1 cached the ZIP an ext=zip
+		// request was answered with.
+		Variant: "vcs-peer-file-v2",
 		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
-			if err := ValidateFileZIP(ctx, body, size, filename); err != nil {
+			if err := ValidateFile(ctx, body, size); err != nil {
 				return source.ErrInvalidResult
 			}
 			return nil
@@ -37,13 +43,11 @@ func (s VCSAPI) vcsPeerFile(
 	}
 	result, err := s.vcsRead(ctx, a, resource)
 	if err != nil {
-		return nil, 0, err
+		return nil, time.Time{}, nil, err
 	}
-	data, err := s.vcsResultBytes(ctx, result, MaxFileZIPBytes)
+	data, err := s.vcsResultBytes(ctx, result, MaxSelectedFileBytes)
 	if err != nil {
-		return nil, 0, err
+		return nil, time.Time{}, nil, err
 	}
-	return &vcsBody{
-		ReadCloser: io.NopCloser(bytes.NewReader(data)), ctx: ctx, used: result.Used,
-	}, int64(len(data)), nil
+	return data, resultModified(result), result.Used, nil
 }

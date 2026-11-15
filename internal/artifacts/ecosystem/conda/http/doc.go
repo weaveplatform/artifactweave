@@ -62,8 +62,16 @@
 //     member order, the first member to list a file name winning. It never
 //     lends one member's rights or source permits to another, and refuses
 //     a member cycle and a chain of more than eight nested repositories.
-//   - Metadata responses are private and never stored by a shared cache; a
-//     shard is immutable but must be revalidated.
+//   - A channel document 7.x stores (repodata.json, current_repodata.json,
+//     their .zst forms, the shard index and shards) answers as a stored
+//     file in the package download service's form (serveDocument,
+//     mamba-org/mamba#2105): X-Artifactory-Filename, Content-Disposition,
+//     the X-Checksum headers of the bytes served, their SHA-1 as the
+//     ETag, Last-Modified from the stored or cached index, Accept-Ranges,
+//     and 7.x's conditional answer. The repodata documents send
+//     Cache-Control: no-store; the shard index is private and never stored
+//     by a shared cache, and a shard is immutable but must be revalidated.
+//     notices.json is private and never stored by a shared cache.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References
@@ -103,7 +111,9 @@
 //     bounds.
 //
 // The routes are also tested end to end from test/server/artifacts/conda
-// (conda_test.go, and conda_remote_test.go over the application runtime;
+// (conda_test.go; conda_index_headers_test.go, the channel documents'
+// file headers and revalidation; conda_remote_test.go over the application
+// runtime;
 // served_copy_fault_test.go, a served index whose read times out answers
 // 500, not 504).
 package condahttp

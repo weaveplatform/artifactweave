@@ -1,7 +1,7 @@
 // Package sql is the SQL implementation of the artifacts module's stores:
 // repositories with their sealed secrets, the remote cache, items, the
 // trash can, the package index, builds and their search, Git LFS locks,
-// Bower registrations and archived items, the blob and replica indexes and
+// Bower registrations, upload digests and archived items, the blob and replica indexes and
 // the cold tier's indexes, with the module's registration with the SQL
 // layer.
 //
@@ -32,8 +32,8 @@
 // # Outputs
 //
 //   - Store, from New, with Repos, RemoteCache, Items, Trash, Packages,
-//     Blobs, Replicas, GitLFSLocks, BowerRegistrations, Builds,
-//     ArchivedItems, ColdBlobs and ColdReplicas, LayoutWatch, and the
+//     Blobs, Replicas, GitLFSLocks, BowerRegistrations, UploadDigests,
+//     Builds, ArchivedItems, ColdBlobs and ColdReplicas, LayoutWatch, and the
 //     dialect store's Tx, AfterCommit and Close. Items' DockerPages reads a
 //     registry repository's image layout a page at a time from the partial
 //     indexes items_docker_tags and items_docker_images (migration 0002,
@@ -129,6 +129,8 @@
 // request 912). Moved here in P9d, which added Store, New, LayoutWatch and
 // Module. The Docker page reader and its indexes page the registry's tags
 // lists and catalogs (#1402), and Repos' Page Get Repositories (#1408).
+// UploadDigests keeps a Hugging Face LFS upload's SHA-1 and MD5 in
+// upload_digests, migration 0005 (#1581).
 //
 // # Testing
 //

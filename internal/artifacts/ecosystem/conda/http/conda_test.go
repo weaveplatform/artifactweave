@@ -36,8 +36,9 @@ func TestUnitUpstreamIndexBodyRequiresAReadableSource(t *testing.T) {
 func TestUnitIndexDeliveryRechecksSourceAuthorityBeforeWritingBytes(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/artifactory/api/conda/channel/noarch/repodata.json", nil)
-	(handler{k: &pkgroute.Kit{}}).serveBytes(w, r, []byte("private index"),
-		"application/json", func(context.Context) error { return source.ErrDenied })
+	(handler{k: &pkgroute.Kit{}}).serveIndex(w, r, document{
+		name: "repodata.json", media: "application/json", body: []byte("private index"),
+	}, func(context.Context) error { return source.ErrDenied })
 	if w.Code == 200 || strings.Contains(w.Body.String(), "private index") {
 		t.Fatalf("revoked source index leaked: status %d body %q", w.Code, w.Body.String())
 	}
@@ -67,7 +68,7 @@ func TestUnitRecordOfUsesArchiveKind(t *testing.T) {
 func TestUnitCondaRecursionAndPathGuardsBeforeAnySourceRead(t *testing.T) {
 	r := httptest.NewRequest("GET", "/artifactory/api/conda/any/noarch/repodata.json", nil)
 	h := handler{}
-	if _, _, err := h.memberIndex(
+	if _, err := h.memberIndex(
 		r,
 		"../noarch/repodata.json",
 		readPolicy{},
@@ -78,7 +79,7 @@ func TestUnitCondaRecursionAndPathGuardsBeforeAnySourceRead(t *testing.T) {
 	) {
 		t.Fatalf("unsafe index path reached a repository source: %v", err)
 	}
-	if _, _, err := h.memberIndex(
+	if _, err := h.memberIndex(
 		r,
 		"noarch/repodata.json",
 		readPolicy{},

@@ -13,6 +13,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
@@ -84,9 +85,11 @@ func readShardMetadata(body io.Reader, size int64) ([]byte, error) {
 	return data, nil
 }
 
-func (h handler) remoteShardedIndex(r *http.Request, id condafmt.MetadataPath, policy readPolicy) (
-	condafmt.Repodata, func(context.Context) error, error,
-) {
+func (h handler) remoteShardedIndex(
+	r *http.Request,
+	id condafmt.MetadataPath,
+	policy readPolicy,
+) (channelIndex, error) {
 	indexPath := condafmt.IndexPath(id.Channel, id.Subdir, condafmt.ShardIndexFilename)
 	root := pkgroute.RequestFrom(r).Repo.URL
 	resource := source.Resource{
@@ -119,30 +122,34 @@ func (h handler) remoteShardedIndex(r *http.Request, id condafmt.MetadataPath, p
 	result, err := h.k.Read(r, resource)
 	if err != nil {
 		if shardNotFound(err) {
-			return condafmt.Repodata{}, nil, errNoShardIndex
+			return channelIndex{}, errNoShardIndex
 		}
-		return condafmt.Repodata{}, nil, fmt.Errorf("conda: shard index: %w", err)
+		return channelIndex{}, fmt.Errorf("conda: shard index: %w", err)
 	}
 	body, err := h.resultBytes(r.Context(), result)
 	if err != nil {
-		return condafmt.Repodata{}, nil, err
+		return channelIndex{}, err
 	}
 	index, err := condafmt.DecodeShardIndex(body)
 	if err != nil {
-		return condafmt.Repodata{}, nil, source.ErrInvalidResult
+		return channelIndex{}, source.ErrInvalidResult
 	}
 	base, err := shardURLs(root, id, result.Metadata.BaseURL, index)
 	if err != nil {
-		return condafmt.Repodata{}, nil, err
+		return channelIndex{}, err
 	}
 	combined := condafmt.EmptyRepodata(id.Subdir)
 	fences := []func(context.Context) error{result.Revalidate}
+	modified := resultModified(result)
 	remaining := maxShardSnapshotBytes - len(body)
 	for _, name := range slices.Sorted(maps.Keys(index.Shards)) {
 		digest := hex.EncodeToString(index.Shards[name])
 		shard, finish, size, err := h.remoteShard(r, id, policy, name, digest, base)
 		if err != nil {
-			return condafmt.Repodata{}, nil, err
+			return channelIndex{}, err
+		}
+		if finish.modified.After(modified) {
+			modified = finish.modified
 		}
 		// JSON length bounds the retained records as well as compressed transfer.
 		// Repodata contains only concrete strings, integers, slices and maps.
@@ -158,25 +165,29 @@ func (h handler) remoteShardedIndex(r *http.Request, id condafmt.MetadataPath, p
 			)+len(
 				shard.PackagesConda,
 			) > 200000 {
-			return condafmt.Repodata{}, nil, source.ErrInvalidResult
+			return channelIndex{}, source.ErrInvalidResult
 		}
 		maps.Copy(combined.Packages, shard.Packages)
 		maps.Copy(combined.PackagesConda, shard.PackagesConda)
-		fences = append(fences, finish)
+		fences = append(fences, finish.fence)
 	}
 	filtered, err := h.filterIndex(r.Context(), r, combined, id, result.CheckPermission)
 	if err != nil {
-		return condafmt.Repodata{}, nil, err
+		return channelIndex{}, err
 	}
-	return filtered, func(ctx context.Context) error {
-		for _, fence := range fences {
-			if fence != nil {
-				if err := fence(ctx); err != nil {
-					return fmt.Errorf("conda: shard authority: %w", err)
+	return channelIndex{
+		records:  filtered,
+		modified: modified,
+		finish: func(ctx context.Context) error {
+			for _, fence := range fences {
+				if fence != nil {
+					if err := fence(ctx); err != nil {
+						return fmt.Errorf("conda: shard authority: %w", err)
+					}
 				}
 			}
-		}
-		return nil
+			return nil
+		},
 	}, nil
 }
 
@@ -187,13 +198,13 @@ func (h handler) remoteShard(
 	name, digest string,
 	base *url.URL,
 ) (
-	condafmt.Repodata, func(context.Context) error, int, error,
+	condafmt.Repodata, shardRead, int, error,
 ) {
 	filename := digest + ".msgpack.zst"
 	target := base.ResolveReference(&url.URL{Path: filename})
 	root, err := url.Parse(pkgroute.RequestFrom(r).Repo.URL)
 	if err != nil {
-		return condafmt.Repodata{}, nil, 0, source.ErrInvalidResult
+		return condafmt.Repodata{}, shardRead{}, 0, source.ErrInvalidResult
 	}
 	resource := source.Resource{
 		Kind:              source.ResourceKindMetadata,
@@ -233,18 +244,26 @@ func (h handler) remoteShard(
 		if shardNotFound(err) {
 			err = source.ErrInvalidResult
 		}
-		return condafmt.Repodata{}, nil, 0, fmt.Errorf("conda: package shard: %w", err)
+		return condafmt.Repodata{}, shardRead{}, 0, fmt.Errorf("conda: package shard: %w", err)
 	}
 	body, err := h.resultBytes(r.Context(), result)
 	if err != nil {
-		return condafmt.Repodata{}, nil, 0, err
+		return condafmt.Repodata{}, shardRead{}, 0, err
 	}
 	index, err := condafmt.DecodeShard(body, id, name, digest)
 	if err != nil {
-		return condafmt.Repodata{}, nil, 0, source.ErrInvalidResult
+		return condafmt.Repodata{}, shardRead{}, 0, source.ErrInvalidResult
 	}
 	filtered, err := h.filterIndex(r.Context(), r, index, id, result.CheckPermission)
-	return filtered, result.Revalidate, len(body), err
+	return filtered, shardRead{fence: result.Revalidate, modified: resultModified(result)},
+		len(body), err
+}
+
+// shardRead is what a remote shard's read leaves to its index: the fence
+// to pass before its records are disclosed, and when the copy changed.
+type shardRead struct {
+	fence    func(context.Context) error
+	modified time.Time
 }
 
 func shardNotFound(err error) bool {

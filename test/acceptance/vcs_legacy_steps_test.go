@@ -14,6 +14,7 @@ import (
 	"github.com/cucumber/godog"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	vcshttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/vcs/http"
 )
 
 func (w *world) registerVCSLegacy(sc *godog.ScenarioContext) {
@@ -42,7 +43,7 @@ func (w *world) registerVCSLegacy(sc *godog.ScenarioContext) {
 		return w.vcsLegacyContent(marker)
 	})
 	sc.Step(
-		`^the VCS "(refs|archive|file)" upstream response becomes "(malformed|unavailable|redirect|wrong-commit)"$`,
+		`^the VCS "(refs|archive|file)" upstream response becomes "(malformed|oversize|unavailable|redirect|wrong-commit)"$`,
 		w.vcsLegacyFault,
 	)
 	sc.Step(`^the VCS upstream received (\d+) reference requests$`, func(want int) error {
@@ -179,8 +180,10 @@ func (w *world) vcsLegacyContent(marker string) error {
 			if action == "downloadBranchFile" {
 				ref = "main"
 			}
-			for file, suffix := range map[string]string{"index.js": "index", "README.md": "readme", "sub/README.md": "nested-readme"} {
-				data, err := os.ReadFile(filepath.Join(root, marker+"-"+suffix+".zip"))
+			// A 7.x peer answers a selected file as the file itself
+			// (RTFACT-29495), here the file of the marker's git archive.
+			for _, file := range []string{"index.js", "README.md", "sub/README.md"} {
+				data, err := vcsArchiveEntry(filepath.Join(root, marker+"-archive.zip"), file)
 				if err != nil {
 					return err
 				}
@@ -194,10 +197,29 @@ func (w *world) vcsLegacyContent(marker string) error {
 	return nil
 }
 
+// vcsArchiveEntry is the file name within the git archive ZIP at archive.
+func vcsArchiveEntry(archive, name string) ([]byte, error) {
+	zr, err := zip.OpenReader(archive)
+	if err != nil {
+		return nil, err
+	}
+	defer zr.Close()
+	f, err := zr.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(f)
+}
+
 func (w *world) vcsLegacyFault(kind, fault string) error {
 	path := w.vars["vcs-"+kind+"-path"]
 	response := fakeupstream.Resource{Body: []byte("invalid-vcs-secret-fixture")}
 	switch fault {
+	case "oversize":
+		// A peer's file is any bytes, so the one it can get wrong is its
+		// size: one byte past the bound the remote keeps a file within.
+		response.Body = bytes.Repeat([]byte("x"), vcshttp.MaxSelectedFileBytes+1)
 	case "wrong-commit":
 		data, err := os.ReadFile(
 			filepath.Join(
