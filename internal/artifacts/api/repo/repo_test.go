@@ -535,7 +535,12 @@ func TestUnitValidate(t *testing.T) {
 			func(c *repo.Config) { c.ProjectKey = "proj"; c.Environments = []string{"DEV"} },
 			"",
 		},
-		{"remote without url", func(c *repo.Config) { c.Class = repo.Remote }, "url"},
+		// Alone it is a NoURLError (TestUnitValidateNoURL); among other
+		// faults it keeps its place in the list.
+		{"remote without url and with another fault", func(c *repo.Config) {
+			c.Class = repo.Remote
+			c.MaxUniqueSnapshots = ptr(-1)
+		}, "url"},
 		// repositories is optional in 7.x, absent or empty.
 		{"virtual without members", func(c *repo.Config) { c.Class = repo.Virtual }, ""},
 		{"virtual with an empty member list", func(c *repo.Config) {

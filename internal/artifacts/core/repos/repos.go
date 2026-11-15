@@ -47,7 +47,8 @@ func Protected(key string) bool {
 // PrepareCreate applies defaults and validates c for creation against the
 // keys already taken (stored and earlier in the same batch). A remote's URL
 // then gives up a user name and password written into it
-// (moveURLCredentials).
+// (moveURLCredentials), and the settings 7.x gives a repository only on
+// create follow from it (repo.CreateDefaults).
 func PrepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error) {
 	repo.Defaults(&c)
 	if err := repo.Validate(&c); err != nil {
@@ -60,6 +61,7 @@ func PrepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error) {
 		return c, badRequestf(artifactsapi.MsgKeyExists)
 	}
 	moveURLCredentials(&c)
+	repo.CreateDefaults(&c)
 	return c, nil
 }
 
