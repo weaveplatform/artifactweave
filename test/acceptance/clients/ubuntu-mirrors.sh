@@ -8,8 +8,11 @@
 # second mirror. apt-transport-mirror(1) tries the mirrors of a list in random
 # order unless each has a priority, hence priority:1 and priority:2. APT
 # retries a file on the first mirror (Acquire::Retries, 3 by default since APT
-# 2.3.2, so in both the 22.04 and the 26.10 images) and then fetches it from
-# the second.
+# 2.3.2) and then fetches it from the second. APT before 3.1.3, which 22.04
+# ships, can wait for good on a file it queued again after a delay
+# (LP: #2003851, open for 22.04): the Swift image's apt-get update hung with
+# archive.ubuntu.com refused until a 300 s timeout stopped it. So on such an
+# APT a file goes to the second mirror at its first failure, with no retry.
 #
 # A second mirror can serve only what Canonical signed. APT checks each
 # suite's InRelease against the Ubuntu archive key in the base image
@@ -70,4 +73,10 @@ if grep -Eq '^[^#]*https?://(archive|security|ports)\.ubuntu\.com' $sources ||
 	echo "ubuntu-mirrors: these sources name no Ubuntu host it knows, or one it left:" >&2
 	grep -H -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' $sources >&2 || true
 	exit 1
+fi
+
+apt=$(dpkg-query -W -f '${Version}' apt)
+if dpkg --compare-versions "$apt" lt 3.1.3; then
+	echo 'Acquire::Retries "0";' >/etc/apt/apt.conf.d/80ubuntu-mirrors
+	echo "ubuntu-mirrors: APT $apt moves to the second mirror without retrying (LP: #2003851)"
 fi

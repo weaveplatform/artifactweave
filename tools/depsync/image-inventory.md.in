@@ -114,7 +114,13 @@ turns each such source, in 26.10's deb822 `ubuntu.sources` or 22.04's one-line
 `sources.list`, into a `mirror+file:` list of that host and then its second
 mirror, each with a priority, since APT otherwise tries a list's mirrors in
 random order. APT retries a file on the host three times, its default since APT
-2.3.2, and then fetches it from the second mirror. A second mirror can serve
+2.3.2, and then fetches it from the second mirror. APT before 3.1.3, which
+22.04 ships, can wait for good on a file it queued again after a delay
+([LP: #2003851](https://bugs.launchpad.net/ubuntu/+source/apt/+bug/2003851),
+open for 22.04), and the Swift image's `apt-get update` hung that way with
+`archive.ubuntu.com` refused. So on such an APT the script sets
+`Acquire::Retries` to 0, and a file goes to the second mirror at its first
+failure. A second mirror can serve
 only what Canonical signed: APT checks each suite's `InRelease` against the
 Ubuntu archive key in the base image, and every index and package against the
 SHA-256 in that signed file, whichever mirror serves it, and nothing turns that
