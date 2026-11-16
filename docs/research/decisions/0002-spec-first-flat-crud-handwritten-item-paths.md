@@ -40,7 +40,7 @@ protocols, metadata PATCH) are chi handlers in `internal/artifacts/adapters/http
 for documentation with the extension `x-handwritten: true`; a test asserts that the
 generated router never claims a path marked that way.
 
-**A HEAD of a generated GET.** The strict servers mount only the methods each spec
+**A HEAD of a GET-only route.** The strict servers mount only the methods each spec
 declares, and chi routes a HEAD only to a route that registers one, so a HEAD of a
 GET-only operation answered 405. 7.x serves its REST API with Jersey, which hands a HEAD
 to the resource's `@HEAD` method or, when there is none, to its `@GET` method and leaves
@@ -52,25 +52,53 @@ GitLab subgroup forms of the generated VCS operations (`VCSAPI.VCSNested`), thro
 GET (`middleware.HeadAsGet`, [#1598](https://github.com/weaveplatform/artifactweave/issues/1598)):
 the GET's status and header fields, its `Content-Length`, and no body.
 
+The hand-written GET routes answer a HEAD the same way
+([#1613](https://github.com/weaveplatform/artifactweave/issues/1613)), as `handwrittenHeads`
+in `internal/app/head.go` lists them. 7.161.26's `web.xml` maps `/api/*` to Jersey's
+`ArtifactoryRestServlet` and to no other servlet, and `RepoFilter` passes every API path
+on to it, so each of them is a Jersey resource method too: `ArtifactResource` (the storage
+API), `PingResource`, `ConfigResource`, `ArchiveResource`, `DownloadResource`,
+`ReplicationResource` and `VersionsResources` in the open-source tree, each with a `@GET`
+alone, and the resources of the package add-ons, which are not in that tree but which
+`ShadowResponseFilter`, a Jersey response filter, shadows by package type, the Terraform
+backend's among them **[I]**. Access is a Jersey application as well (the stack trace in
+RTFACT-16596 runs `org.jfrog.access.server.rest.resource` methods through Jersey). A
+GET route that neither `handwrittenHeads` nor `headUnserved` names fails a unit test.
+
 - The request is the GET for everything ahead of routing, so the key gate, admission,
   authentication's public routes and the API restriction check decide it as they decide
-  the GET ([decision 0043](0043-api-reliability.md#cost-classes-and-how-admission-finds-them)),
-  and a HEAD again for the handler, so that a file download ignores `Range` and counts
-  no delivery, and copies no file it has declared the length of.
+  the GET ([decision 0043](0043-api-reliability.md#cost-classes-and-how-admission-finds-them)).
+  A generated handler, and a hand-written download (a folder archive, `api/download`, a
+  skill bundle), sees a HEAD again, so that a file download ignores `Range`, counts no
+  delivery, and copies no file it has declared the length of.
+- Any other hand-written handler is written for the GET alone, and runs the HEAD as the
+  GET (`HeadAsGet.RunsGet`), as Jersey runs the `@GET`: the HEAD sends the length of the
+  body the handler writes. A handler with a HEAD branch of its own, such as Pub's and
+  Cargo's JSON writers, would skip its body and send a length of 0. None of these
+  handlers counts a download.
+- A folder archive's HEAD builds no archive, since the GET streams it, and goes without a
+  `Content-Length`, which only building the archive would tell
+  (`middleware.HeadLengthUnknown`) **[I]**.
 - A HEAD route keeps the request where it matches the path as closely: a spec `HEAD`,
   or a hand-written route's. JAX-RS picks the path before the method (section 3.7.2),
   the template with the most literal characters first, where chi picks the method
   first and backtracks into a parameter to find a HEAD route. So
   `HEAD /distribution/api/v1/release_bundle/{name}/LATEST` answers through the GET of
   that path, not through the HEAD of `.../{release_bundle_name}/{release_bundle_version}`,
-  and `HEAD /artifactory/api/npm/auth` through the GET of npm's authentication, not
-  through the npm protocol's `HEAD /api/npm/{repoKey}`.
-- A HEAD of a hand-written GET-only route still answers 405; each hand-written route
-  mounts the methods it serves.
-- **[I]** No capture of a HEAD on a generated route is known, so the headers 7.x sends
-  are inferred, `Content-Length` among them where the GET's body is long enough that
-  7.x streams it without one. artifactweave sends the GET's length, as RFC 9110 section
-  8.6 allows on a HEAD.
+  `HEAD /artifactory/api/npm/auth` through the GET of npm's authentication, not
+  through the npm protocol's `HEAD /api/npm/{repoKey}`, and so do npm's `-/ping`,
+  `-/whoami`, `-/v1/search` and `-/package/` routes and LuaRocks' `api/tool_version` and
+  `check_rockspec`. The PyPI JSON API is the exception the other way: the PyPI
+  protocol's own HEAD route answers it, with the GET's status.
+- The JFrog Router's probes (`/router/api/v1/system/health`, `readiness`, `liveness`)
+  still answer a HEAD 405. The Router is a Go service built on Traefik (its `traefik`
+  settings in RTFACT-25374, Traefik's access log in RTFACT-31079), not a Jersey
+  application, and JFrog's load-balancer page documents only a GET of them **[I]**.
+- **[I]** No capture of a HEAD on any of these routes is known, so the headers 7.x sends
+  are inferred, `Content-Length` among them. 7.161.26's `JerseyApplication` sets
+  `CommonProperties.OUTBOUND_CONTENT_LENGTH_BUFFER` to -1, which turns Jersey's own
+  length buffering off, so a length 7.x sends comes from the resource or from Tomcat.
+  artifactweave sends the GET's length, as RFC 9110 section 8.6 allows on a HEAD.
 
 **Content-type normalisation.** Middleware rewrites `application/vnd.org.jfrog.artifactory.*+json`
 to `application/json` before the strict decoder, and accepts `application/yaml` on the
@@ -188,9 +216,14 @@ spec preserves one documented contract.
 - A test walks `api/*.openapi.yaml` and asserts every `x-handwritten` path is absent from
   the generated router and present in the hand-written one.
 - `TestAccHeadAnswersEveryGeneratedGet` calls every generated GET and its HEAD and holds
-  the HEAD to the GET's status and header fields, with no body; `TestAccHeadOnTheWire`
-  does the same over HTTP for a JSON list, a repository, 404, 401 and 403 refusals and a
-  public probe, and keeps 405 for a POST-only operation and a hand-written GET-only route.
+  the HEAD to the GET's status and header fields, with no body;
+  `TestAccHeadAnswersHandwrittenGets` does the same for every route `handwrittenHeads`
+  names, as admin, a user without rights and anonymously, and
+  `TestUnitHeadDecidedForEveryGet` fails a GET route with no decision about its HEAD.
+  `TestAccHeadOfADownloadReadsNothing` holds a folder archive's HEAD to opening no file
+  and a skill bundle's to counting no download. `TestAccHeadOnTheWire` does the same over
+  HTTP for a JSON list, a repository, the storage API, 404, 401 and 403 refusals and the
+  public probes, and keeps 405 for a POST-only operation and a JFrog Router probe.
 - A table-driven status-code test over the research inventory.
 - Error-response tests per profile.
 - Base-URL resolver tests over the four sources for every format that embeds URLs.

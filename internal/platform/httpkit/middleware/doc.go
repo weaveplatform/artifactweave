@@ -24,7 +24,7 @@
 //     server.
 //   - Hooks: the redactor of AccessLog and RecoverPanic, the keep predicate
 //     of NormalizeContentType, the path map of CollectionSlash and the
-//     served predicate of HeadAsGet.
+//     served and runs-the-GET predicates of HeadAsGet.
 //   - The request context: the error profile rules (httpkit.ErrorProfiles)
 //     and the slots AccessLog gives its handlers (httpkit.NoteCause and
 //     httpkit.NoteUser).
@@ -33,8 +33,8 @@
 // # Outputs
 //
 //   - RequestID and RequestIDHeader, AccessLog, RecoverPanic, BodyLimit and
-//     BodyTooLarge, NormalizeContentType, BindingError, CollectionSlash and
-//     HeadAsGet.
+//     BodyTooLarge, NormalizeContentType, BindingError, CollectionSlash,
+//     HeadAsGet and HeadLengthUnknown.
 //
 // # Invariants
 //
@@ -51,7 +51,9 @@
 //     whether its length was declared or not.
 //   - A HEAD that HeadAsGet answers sends its GET's status and header fields,
 //     with the length of the body it drops, and no body; every middleware
-//     between Enter and Route sees it as the GET, and the handler as a HEAD.
+//     between Enter and Route sees it as the GET, and the handler as a HEAD
+//     unless RunsGet names its route. A handler that sees the HEAD and skips
+//     a streamed body sends no length through HeadLengthUnknown.
 //   - It imports no module, as the platform layer must not.
 //
 // # References

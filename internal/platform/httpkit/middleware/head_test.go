@@ -186,3 +186,72 @@ func TestUnitHeadAsGetKeepsOtherRoutes(t *testing.T) {
 		t.Errorf("literals counted %d", literals("/a/{b:(?:[^/]{2})}/c*"))
 	}
 }
+
+// unwrapping is a writer a middleware between Enter and Route wraps the
+// response in, as the access log does.
+type unwrapping struct{ http.ResponseWriter }
+
+func (w unwrapping) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// TestUnitHeadAsGetRunsTheGet holds RunsGet: a handler it names runs the
+// HEAD as the GET, so that one whose own HEAD branch skips the body still
+// sends the GET's length, where seeing the HEAD it sends the 0 it wrote.
+// A handler that sees the HEAD and skips a streamed body has it go without
+// a length through HeadLengthUnknown, past the writers of the middleware
+// between.
+func TestUnitHeadAsGetRunsTheGet(t *testing.T) {
+	h := HeadAsGet{
+		Serves:  func(p string) bool { return strings.HasPrefix(p, "/served") },
+		RunsGet: func(p string) bool { return strings.HasPrefix(p, "/served/get") },
+	}
+	var handled string
+	r := chi.NewRouter()
+	r.Use(h.Enter, func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			next.ServeHTTP(unwrapping{w}, req)
+		})
+	}, h.Route)
+	document := func(w http.ResponseWriter, req *http.Request) {
+		handled = req.Method
+		w.Header().Set("Content-Type", "application/json")
+		if req.Method == http.MethodHead {
+			return
+		}
+		_, _ = io.WriteString(w, `{"ok":true}`)
+	}
+	r.Get("/served/get/document", document)
+	r.Get("/served/head/document", document)
+	r.Get("/served/head/archive", func(w http.ResponseWriter, req *http.Request) {
+		handled = req.Method
+		w.Header().Set("Content-Type", "application/zip")
+		if req.Method == http.MethodHead {
+			HeadLengthUnknown(w)
+			return
+		}
+		_, _ = io.WriteString(w, "PK\x03\x04")
+	})
+	for _, c := range []struct{ path, handled, length string }{
+		{"/served/get/document", http.MethodGet, "11"},
+		{"/served/head/document", http.MethodHead, "0"},
+		{"/served/head/archive", http.MethodHead, ""},
+	} {
+		handled = ""
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, c.path, nil))
+		_, sent := rec.Header()["Content-Length"]
+		got := []string{handled, rec.Header().Get("Content-Length")}
+		if rec.Code != http.StatusOK || rec.Body.Len() != 0 || got[0] != c.handled ||
+			got[1] != c.length || sent != (c.length != "") {
+			t.Errorf("HEAD %s: %d, %d bytes, handled as and length %q, want %q",
+				c.path, rec.Code, rec.Body.Len(), got, []string{c.handled, c.length})
+		}
+	}
+	// A GET is a GET, and a writer no HEAD passes through is left alone.
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/served/head/archive", nil))
+	HeadLengthUnknown(unwrapping{rec})
+	HeadLengthUnknown(unwrapping{})
+	if handled != http.MethodGet || rec.Body.String() != "PK\x03\x04" {
+		t.Errorf("GET: handled as %s, %q", handled, rec.Body.String())
+	}
+}

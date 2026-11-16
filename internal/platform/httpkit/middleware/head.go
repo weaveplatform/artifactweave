@@ -25,14 +25,22 @@ import (
 // would answer a status or rate header the GET does not. Route, the last
 // middleware before routing, gives the handler its HEAD back, because a
 // file download reads it: a HEAD ignores Range and is no delivery of the
-// file (the VCS downloads).
+// file (the VCS downloads). A handler RunsGet names keeps the GET instead.
 type HeadAsGet struct {
 	// Serves reports whether the GET route with this chi pattern answers a
 	// HEAD too. It is asked "" for a path no GET route serves.
 	Serves func(pattern string) bool
+	// RunsGet reports whether the handler of a GET route Serves accepts
+	// runs the HEAD as the GET, as Jersey runs a resource's @GET for one:
+	// it answers in full and HeadAsGet drops the body and sends its length.
+	// That suits a handler written for the GET alone, whose own HEAD branch,
+	// if it has one, would drop the body and with it the length the HEAD
+	// must send. Any other handler sees the HEAD. Nil names none.
+	RunsGet func(pattern string) bool
 }
 
-// headAsGetKey marks a HEAD that Enter turned into its GET.
+// headAsGetKey marks a HEAD that Enter turned into its GET. Its value is
+// whether the handler runs it as the GET (HeadAsGet.RunsGet).
 type headAsGetKey struct{}
 
 // Enter turns a HEAD whose path no HEAD route serves, and whose GET route
@@ -43,12 +51,18 @@ type headAsGetKey struct{}
 // route, and one with no GET route keeps its 404 or 405.
 func (h HeadAsGet) Enter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodHead || !h.servesGet(r) {
+		if r.Method != http.MethodHead {
 			next.ServeHTTP(w, r)
 			return
 		}
+		pattern, ok := h.servedGet(r)
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+		runsGet := h.RunsGet != nil && h.RunsGet(pattern)
 		hw := &headWriter{ResponseWriter: w}
-		get := r.WithContext(context.WithValue(r.Context(), headAsGetKey{}, true))
+		get := r.WithContext(context.WithValue(r.Context(), headAsGetKey{}, runsGet))
 		get.Method = http.MethodGet
 		next.ServeHTTP(hw, get)
 		hw.finish()
@@ -56,23 +70,28 @@ func (h HeadAsGet) Enter(next http.Handler) http.Handler {
 }
 
 // Route routes the request Enter turned into a GET on its GET route, as
-// the HEAD it is.
+// the HEAD it is unless its handler runs it as the GET.
 func (HeadAsGet) Route(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rctx := chi.RouteContext(r.Context())
-		if r.Context().Value(headAsGetKey{}) == nil || rctx == nil {
+		runsGet, ok := r.Context().Value(headAsGetKey{}).(bool)
+		if !ok || rctx == nil {
 			next.ServeHTTP(w, r)
 			return
 		}
 		rctx.RouteMethod = http.MethodGet
+		if runsGet {
+			next.ServeHTTP(w, r)
+			return
+		}
 		head := r.WithContext(r.Context())
 		head.Method = http.MethodHead
 		next.ServeHTTP(w, head)
 	})
 }
 
-// servesGet reports whether r's path, as chi will route r on it, has a GET
-// route that h.Serves accepts and no HEAD route that matches the path as
+// servedGet returns the pattern of r's GET route, as chi will route r on
+// its path, when h.Serves accepts it and no HEAD route matches the path as
 // closely.
 //
 // JAX-RS picks the resource path first and the method after it (section
@@ -85,10 +104,10 @@ func (HeadAsGet) Route(next http.Handler) http.Handler {
 // with fewer literal characters than the GET route is that backtrack; on
 // a tie, the HEAD route keeps the request, as it does when both are the
 // same template.
-func (h HeadAsGet) servesGet(r *http.Request) bool {
+func (h HeadAsGet) servedGet(r *http.Request) (string, bool) {
 	rctx := chi.RouteContext(r.Context())
 	if rctx == nil || rctx.Routes == nil {
-		return false
+		return "", false
 	}
 	path := rctx.RoutePath
 	if path == "" {
@@ -99,10 +118,10 @@ func (h HeadAsGet) servesGet(r *http.Request) bool {
 	}
 	get := rctx.Routes.Find(chi.NewRouteContext(), http.MethodGet, path)
 	if !h.Serves(get) {
-		return false
+		return "", false
 	}
 	head := rctx.Routes.Find(chi.NewRouteContext(), http.MethodHead, path)
-	return head == "" || literals(get) > literals(head)
+	return get, head == "" || literals(get) > literals(head)
 }
 
 // literals counts the characters of a chi pattern outside its parameters
@@ -136,10 +155,12 @@ const sniffLen = 512
 type headWriter struct {
 	http.ResponseWriter
 
-	status int
-	header http.Header
-	sniff  []byte
-	n      int64
+	// unknown is set by HeadLengthUnknown.
+	unknown bool
+	status  int
+	header  http.Header
+	sniff   []byte
+	n       int64
 }
 
 // WriteHeader records the status and the header as they stand.
@@ -203,7 +224,7 @@ func (w *headWriter) finish() {
 		if _, typed := h["Content-Type"]; !typed && len(w.sniff) > 0 {
 			h.Set("Content-Type", http.DetectContentType(w.sniff))
 		}
-		if h.Get("Content-Length") == "" {
+		if h.Get("Content-Length") == "" && !w.unknown {
 			h.Set("Content-Length", strconv.FormatInt(w.n, 10))
 		}
 	}
@@ -215,4 +236,24 @@ func (w *headWriter) finish() {
 func bodyAllowed(status int) bool {
 	return status >= http.StatusOK && status != http.StatusNoContent &&
 		status != http.StatusNotModified
+}
+
+// HeadLengthUnknown has the HEAD that w answers through its GET route go
+// without a Content-Length, for a handler that sees the HEAD and skips a
+// streamed body whose length it learns only by building it, such as a
+// folder archive. Without it the HEAD would send the 0 of the body it
+// skipped, where the GET sends none; RFC 9110 section 8.6 lets a HEAD omit
+// it. On any other writer it does nothing.
+func HeadLengthUnknown(w http.ResponseWriter) {
+	for w != nil {
+		if hw, ok := w.(*headWriter); ok {
+			hw.unknown = true
+			return
+		}
+		u, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return
+		}
+		w = u.Unwrap()
+	}
 }
