@@ -185,7 +185,7 @@ projections of one record; the canonical form in decision
 | `originalChecksums{md5, sha1, sha256}` | object of string | yes | FileInfo, ItemCreated | checksums the client declared (`X-Checksum-*` headers or sidecar files) |
 | `children[{uri, folder}]` | array | yes | FolderInfo | `uri` is `/name` relative |
 | `files[{uri, size, lastModified, folder, sha1, sha2, mdTimestamps{properties}}]` | array | yes | FileList | `?list` mode; `mdTimestamps.properties` is `items.props_modified_at` |
-| `lastDownloaded` (epoch ms), `downloadCount`, `lastDownloadedBy` | integer, integer, string | yes | FileStatistics | `?stats` mode; `remoteDownloads` fields exist in AQL but not here |
+| `lastDownloaded` (epoch ms), `downloadCount`, `lastDownloadedBy`, `remoteDownloadCount`, `remoteLastDownloaded` (epoch ms), `remoteLastDownloadedBy` | integer, integer, string, integer, integer, string | yes | FileStatistics | `?stats` mode; the counts and times are 0 for a folder, a root and a file never downloaded, and the names are left out until set (7.161.26 `ItemStatsInfo`) |
 | `properties{<key>: [values]}` | map of string array | | ItemProperties | `?properties`; values are always arrays |
 | `principals{users{<name>: [perms]}, groups{...}}` | map | yes | `?permissions` | effective permission letters per principal |
 | `messages[{level INFO\|WARNING\|ERROR, message}]` | array | yes | CopyOrMoveResult | copy and move report, 200 or 400 |

@@ -1397,7 +1397,7 @@ func trashStatusRows() []statusCase {
 		{list, tc + "/" + del + "?properties=absent", "admin", "", 404},
 		{list, tc + "/libs-local/fixture?properties", "admin", "", 404},
 		{list, tc + "/" + del + "?stats", "admin", "", 200},
-		{list, tc + "/libs-local/fixture?stats", "admin", "", 400},
+		{list, tc + "/libs-local/fixture?stats", "admin", "", 200},
 		{list, tc + "/" + del + "?lastModified", "admin", "", 200},
 		{list, tc + "/libs-local?lastModified", "admin", "", 200},
 		{list, tc + "/" + del + "?permissions", "admin", "", 400},

@@ -4520,7 +4520,7 @@ type FileListItem struct {
 	Uri *string `json:"uri,omitempty"`
 }
 
-// FileStatistics Download statistics of one file, returned by the `stats` mode.
+// FileStatistics Download statistics of an item, returned by the `stats` mode. A folder, a repository root and a file never downloaded answer zero counts.
 type FileStatistics struct {
 	// DownloadCount Optional within this object. Number of completed downloads since the item was created. Downloads with `skipUpdateStats=true` are not counted.
 	DownloadCount *int64 `json:"downloadCount,omitempty"`
@@ -4528,10 +4528,19 @@ type FileStatistics struct {
 	// LastDownloaded Optional within this object. Time of the last download as Unix epoch milliseconds. This is the only place the storage API uses an epoch number rather than RFC 3339; it is 0 when never downloaded.
 	LastDownloaded *int64 `json:"lastDownloaded,omitempty"`
 
-	// LastDownloadedBy Optional within this object. Username of the last download, or `anonymous`.
+	// LastDownloadedBy Optional within this object. Username of the last download, or `anonymous`. Left out until the item is downloaded.
 	LastDownloadedBy *string `json:"lastDownloadedBy,omitempty"`
 
-	// Uri Optional within this object. Absolute storage API URL of the file.
+	// RemoteDownloadCount Optional within this object. Number of downloads that remote repositories of other servers reported for this item, 0 when none did.
+	RemoteDownloadCount *int64 `json:"remoteDownloadCount,omitempty"`
+
+	// RemoteLastDownloaded Optional within this object. Time of the last reported remote download as Unix epoch milliseconds, 0 when none was reported.
+	RemoteLastDownloaded *int64 `json:"remoteLastDownloaded,omitempty"`
+
+	// RemoteLastDownloadedBy Optional within this object. Username of the last reported remote download. Left out until one is reported.
+	RemoteLastDownloadedBy *string `json:"remoteLastDownloadedBy,omitempty"`
+
+	// Uri Optional within this object. Absolute download URL of the item as the request named it, `<base>/artifactory/<repoKey>/<path>`, under the key as given (a remote repository's own key too) and with a trailing `/` when the request had one.
 	Uri *string `json:"uri,omitempty"`
 }
 

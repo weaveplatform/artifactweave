@@ -147,12 +147,13 @@ func TestAccTrashStorageViews(t *testing.T) {
 	get("/libs-local?properties", http.StatusNotFound)
 	get("?properties", http.StatusNotFound)
 
-	// Statistics are kept for files, and the trash can's copy has none.
-	stats := get("/libs-local/a/one.txt?stats", http.StatusOK)
-	if stats["downloadCount"] != float64(0) || stats["lastDownloaded"] != float64(0) {
-		t.Fatalf("stats %v", stats)
+	// The trash can's copy of a file has no statistics, nor has a folder.
+	for _, p := range []string{"/libs-local/a/one.txt", "/libs-local/a"} {
+		stats := get(p+"?stats", http.StatusOK)
+		if stats["downloadCount"] != float64(0) || stats["lastDownloaded"] != float64(0) {
+			t.Fatalf("%s stats %v", p, stats)
+		}
 	}
-	get("/libs-local/a?stats", http.StatusBadRequest)
 
 	// The file info names when and by whom the file was trashed.
 	info := w.do("GET", trashURL+"/libs-local/a/one.txt", "admin", "")

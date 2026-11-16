@@ -243,7 +243,7 @@ const (
 	mediaFileList     = "application/vnd.org.jfrog.artifactory.storage.FileList+json"
 	mediaLastModified = "application/vnd.org.jfrog.artifactory.storage.ItemLastModified+json"
 	mediaProperties   = "application/vnd.org.jfrog.artifactory.storage.ItemProperties+json"
-	mediaStats        = "application/vnd.org.jfrog.storage.StatsInfo+json"
+	mediaStats        = "application/vnd.org.jfrog.artifactory.storage.StatsInfo+json"
 )
 
 const (

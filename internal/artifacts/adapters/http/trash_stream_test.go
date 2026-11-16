@@ -89,7 +89,9 @@ func (s ArtifactoryAPI) collectedTrash(w http.ResponseWriter, r *http.Request) {
 	}
 	v := trashView{
 		svc: s.trashService(st), dir: dir, sees: sees,
-		base: baseurl.From(ctx) + storagePrefix + trash.Repository,
+		base:     baseurl.From(ctx) + storagePrefix + trash.Repository,
+		download: baseurl.From(ctx) + "/artifactory/" + trash.Repository,
+		slash:    strings.HasSuffix(r.URL.Path, "/"),
 	}
 	n, children, err := v.collectedTarget(ctx)
 	switch {

@@ -382,7 +382,9 @@ func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 	}
 	v := trashView{
 		svc: s.trashService(st), dir: dir, sees: sees,
-		base: baseurl.From(ctx) + storagePrefix + trash.Repository,
+		base:     baseurl.From(ctx) + storagePrefix + trash.Repository,
+		download: baseurl.From(ctx) + "/artifactory/" + trash.Repository,
+		slash:    strings.HasSuffix(r.URL.Path, "/"),
 	}
 	n, err := v.target(ctx)
 	switch {
@@ -459,12 +461,16 @@ func trashMiss(mode, dir string) error {
 }
 
 // trashView is one storage request on the trash can: the path asked for,
-// below the auto-trashcan key, and what the caller sees.
+// below the auto-trashcan key, and what the caller sees. base is the
+// storage API URL of the trash can, download its download URL, and slash
+// whether the request's path ended in "/".
 type trashView struct {
-	svc  *trash.Service
-	dir  string
-	sees func(model.Item) bool
-	base string
+	svc      *trash.Service
+	dir      string
+	sees     func(model.Item) bool
+	base     string
+	download string
+	slash    bool
 }
 
 // uri is the storage API URL of p, a path in the trash can ("" for its root).
@@ -533,7 +539,7 @@ func (v trashView) view(
 	case "properties":
 		return v.properties(n, q.Get("properties"))
 	case "stats":
-		return v.stats(n)
+		return v.stats()
 	case "lastModified":
 		return v.lastModified(ctx, n)
 	case "permissions":
@@ -641,16 +647,20 @@ func (v trashView) properties(n trash.Node, names string) (string, any, error) {
 	return mediaProperties, map[string]any{"uri": v.uri(v.dir), "properties": props}, nil
 }
 
-// stats is the download statistics view of a trashed file. The trash can
-// keeps none: Artifactory trashes a copy of the file, which nothing has
-// downloaded.
-func (v trashView) stats(n trash.Node) (string, any, error) {
-	if n.Folder {
-		return "", nil, httpkit.BadRequestf("/%s is a folder; statistics are kept for files", v.dir)
+// stats is the download statistics view of what the trash can holds, as
+// a repository's (storageView.stats): zero counts for a trashed file, as
+// Artifactory trashes a copy of the file, which nothing has downloaded,
+// and for a folder or the root, which keep none, under the download URL of
+// the path as the request gave it.
+func (v trashView) stats() (string, any, error) {
+	u := v.download
+	if v.dir != "" {
+		u += "/" + httpkit.EscapePath(v.dir)
 	}
-	return mediaStats, map[string]any{
-		"uri": v.uri(v.dir), "downloadCount": 0, "lastDownloaded": 0,
-	}, nil
+	if v.slash {
+		u += "/"
+	}
+	return mediaStats, statsBody(u, model.ItemStats{}), nil
 }
 
 // lastModified is the last-modified view: a trashed file's modification

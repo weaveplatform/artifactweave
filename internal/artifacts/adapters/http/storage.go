@@ -41,7 +41,10 @@ const (
 	mediaFileList     = "application/vnd.org.jfrog.artifactory.storage.FileList+json"
 	mediaLastModified = "application/vnd.org.jfrog.artifactory.storage.ItemLastModified+json"
 	mediaProperties   = "application/vnd.org.jfrog.artifactory.storage.ItemProperties+json"
-	mediaStats        = "application/vnd.org.jfrog.storage.StatsInfo+json"
+	// 7.161.26's MT_STATS_INFO (ArtifactRestConstants), which a 6.11.3
+	// capture in RTFACT-21564 shows on the wire; JFrog's reference page
+	// names it without "artifactory.".
+	mediaStats = "application/vnd.org.jfrog.artifactory.storage.StatsInfo+json"
 )
 
 // noProperties is the 404 for a properties view with nothing to show. The
@@ -206,12 +209,14 @@ func storageMode(q url.Values) (string, error) {
 }
 
 // storageView is one storage request: the repository as the client named
-// it, the resolved configuration, and what the caller may do.
+// it, the resolved configuration, and what the caller may do. slash is
+// whether the request's path ended in "/", which the statistics' URI keeps.
 type storageView struct {
 	s        ArtifactoryAPI
 	st       Store
 	key      string
 	path     string
+	slash    bool
 	repo     repo.Config
 	isCached bool
 	acc      itemkit.Access
@@ -229,6 +234,21 @@ func (v storageView) uri(ctx context.Context, p string) string {
 
 func (v storageView) downloadURI(ctx context.Context, p string) string {
 	return baseurl.From(ctx) + "/artifactory/" + v.key + "/" + httpkit.EscapePath(p)
+}
+
+// requestDownloadURI is 7.161.26's buildDownloadUri: the servlet context
+// URL and the path the request gave, its key and any trailing "/" kept, so
+// the root is "/artifactory/<key>", not the "/artifactory/<key>/" that
+// downloadURI gives it.
+func (v storageView) requestDownloadURI(ctx context.Context) string {
+	u := baseurl.From(ctx) + "/artifactory/" + v.key
+	if v.path != "" {
+		u += "/" + httpkit.EscapePath(v.path)
+	}
+	if v.slash {
+		u += "/"
+	}
+	return u
 }
 
 // target finds the item the request names, through a virtual repository's
@@ -328,6 +348,14 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
+	// 7.161.26 runs fixPathParamterIfNeededForRemoteCached before every view
+	// but the file list and the statistics (prepareResponseAccordingToType),
+	// so those views name a remote's item under its cache's key throughout:
+	// the item info's repo, uri and downloadUri, the properties' and last
+	// modified's uri, and their refusals and misses.
+	if mode != "list" && mode != "stats" {
+		v.key = v.localKey()
+	}
 	if err := v.admit(ctx, mode, p); err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
@@ -425,7 +453,9 @@ func (s ArtifactoryAPI) storageCaller(
 	if err != nil {
 		return v, p, nil, err
 	}
-	return storageView{s: s, st: st, key: req.Key, path: req.Path, acc: acc}, p, q, nil
+	return storageView{
+		s: s, st: st, key: req.Key, path: req.Path, slash: req.IsFolder, acc: acc,
+	}, p, q, nil
 }
 
 // isMissingRepo reports whether err is ResolveRepo's answer for a key that
@@ -483,8 +513,7 @@ func canRead(acc itemkit.Access, c repo.Config, path string) bool {
 // cache to turn to. Its statistics ask for read before they find nothing
 // there. Nil lets the file list, which the add-on serves, go on.
 func (v storageView) storesNothingAnswer(mode string, p kernel.Principal) error {
-	if v.repo.Class != repo.Remote || v.repo.StoreArtifactsLocally == nil ||
-		*v.repo.StoreArtifactsLocally {
+	if v.repo.Class != repo.Remote || v.storesLocally() {
 		return nil
 	}
 	switch mode {
@@ -536,12 +565,19 @@ func (v storageView) admit(ctx context.Context, mode string, p kernel.Principal)
 // localKey is the key the views other than the file list and the
 // statistics name the item by: a remote repository's cache, as
 // fixPathParamterIfNeededForRemoteCached turns a remote key into its cache's
-// before they run, and the key as given otherwise.
+// before they run, and the key as given otherwise. A remote that keeps no
+// cache has none to turn to, and storesNothingAnswer answers it first.
 func (v storageView) localKey() string {
-	if v.repo.Class == repo.Remote {
+	if v.repo.Class == repo.Remote && v.storesLocally() {
 		return v.repo.Key + model.CacheSuffix
 	}
 	return v.key
+}
+
+// storesLocally reports whether a remote repository keeps a cache, which
+// it does unless storeArtifactsLocally is set off.
+func (v storageView) storesLocally() bool {
+	return v.repo.StoreArtifactsLocally == nil || *v.repo.StoreArtifactsLocally
 }
 
 // refusal is the view's answer to a caller without the right it needs, in
@@ -554,9 +590,7 @@ func (v storageView) refusal(mode string, p kernel.Principal) error {
 		return httpkit.Denied(p)
 	}
 	switch mode {
-	case "":
-		return storageRefused(v.localKey(), v.path, p)
-	case "stats":
+	case "", "stats":
 		return storageRefused(v.key, v.path, p)
 	case "properties":
 		return noProperties()
@@ -586,7 +620,7 @@ func (v storageView) miss(mode string, p kernel.Principal) error {
 	case "properties":
 		return noProperties()
 	}
-	return addonMiss(mode, v.localKey(), v.path)
+	return addonMiss(mode, v.key, v.path)
 }
 
 // listsFolder refuses a file list of a file, with FolderExpectedException's
@@ -1093,8 +1127,60 @@ func (v storageView) properties(
 	}, nil
 }
 
-// stats renders a file's download statistics. A folder has none.
+// stats is the download statistics view, as 7.161.26's
+// prepareStatsResponse writes it: the item named by its download URL under
+// the key as given, and for a folder or the root, which keep no
+// statistics, 200 with zero counts (new ItemStatsInfo(uri, 0, 0, null)). A
+// virtual repository keeps its answers (P10).
 func (v storageView) stats(ctx context.Context, f itemkit.Found) (string, any, error) {
+	if v.repo.Class == repo.Virtual {
+		return v.virtualStats(ctx, f)
+	}
+	var st model.ItemStats
+	if !f.Item.Folder {
+		var err error
+		if st, err = v.st.Items().Stats(ctx, f.Item.ID); err != nil {
+			return "", nil, fmt.Errorf("stats: %w", err)
+		}
+	}
+	return mediaStats, statsBody(v.requestDownloadURI(ctx), st), nil
+}
+
+// statsBody is ItemStatsInfo as 7.x's JSON provider writes it, leaving out
+// nulls (JsonInclude.Include.NON_NULL): the remote download count and time
+// are longs, so they are always there, 0 for a file no smart remote has
+// reported (RTFACT-9987 and RTFACT-21564 show both at 0); who downloaded
+// is left out until someone has; and origin, which ItemStatsInfo does not
+// copy from the statistics it is built from, never appears.
+func statsBody(uri string, st model.ItemStats) map[string]any {
+	body := map[string]any{
+		"uri":                  uri,
+		"downloadCount":        st.DownloadCount,
+		"lastDownloaded":       unixMilli(st.LastDownloaded),
+		"remoteDownloadCount":  st.RemoteDownloadCount,
+		"remoteLastDownloaded": unixMilli(st.RemoteLastDownloaded),
+	}
+	if st.LastDownloadedBy != "" {
+		body["lastDownloadedBy"] = st.LastDownloadedBy
+	}
+	if st.RemoteLastDownloadedBy != "" {
+		body["remoteLastDownloadedBy"] = st.RemoteLastDownloadedBy
+	}
+	return body
+}
+
+// unixMilli is t in Unix milliseconds, 0 for never.
+func unixMilli(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.UnixMilli()
+}
+
+// virtualStats is a virtual repository's statistics view, which P10
+// rewrites (#1537): a member's file under the storage API URL, and 400 for
+// a folder.
+func (v storageView) virtualStats(ctx context.Context, f itemkit.Found) (string, any, error) {
 	if f.Item.Folder {
 		return "", nil, httpkit.BadRequestf("%s is a folder; statistics are kept for files",
 			f.Item.StoragePath())
@@ -1103,14 +1189,10 @@ func (v storageView) stats(ctx context.Context, f itemkit.Found) (string, any, e
 	if err != nil {
 		return "", nil, fmt.Errorf("stats: %w", err)
 	}
-	var last int64
-	if !st.LastDownloaded.IsZero() {
-		last = st.LastDownloaded.UnixMilli()
-	}
 	body := map[string]any{
 		"uri":            v.uri(ctx, f.Item.FullPath()),
 		"downloadCount":  st.DownloadCount,
-		"lastDownloaded": last,
+		"lastDownloaded": unixMilli(st.LastDownloaded),
 	}
 	if st.LastDownloadedBy != "" {
 		body["lastDownloadedBy"] = st.LastDownloadedBy

@@ -3,7 +3,9 @@ package artifacts_test
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
@@ -250,4 +252,122 @@ func TestAccStorageAnswersTrash(t *testing.T) {
 		}
 	}
 	wantStorageAnswers(t, w, off)
+}
+
+// storageBody is the JSON object GET /api/storage/<target> answers as as,
+// failing t unless it answers 200 with media.
+func storageBody(t *testing.T, w *itemWorld, as, target, media string) map[string]any {
+	t.Helper()
+	rec := w.do(http.MethodGet, "/artifactory/api/storage/"+target, as, "")
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != media {
+		t.Fatalf("%s as %q: %d %s %s, want 200 %s", target, as, rec.Code,
+			rec.Header().Get("Content-Type"), rec.Body, media)
+	}
+	return decodeObject(t, rec.Body.String())
+}
+
+// TestAccStorageAnswersStats: the statistics view answers a file with its
+// local and remote counts, and a file never downloaded, a folder and a root
+// with zero counts, each under its download URL as the request named it,
+// trailing "/" and a remote's own key included, in a local repository, a
+// remote's cache by either key and the trash can.
+func TestAccStorageAnswersStats(t *testing.T) {
+	w := storageAnswersWorld(t, true)
+	setTrashcan(t, w.db, true)
+	w.cacheFile("up", "pkg/f.bin", "cached")
+	w.cacheFile("up", "pkg/never.bin", "never")
+	wantStatus(t, w.do(http.MethodPut, "/artifactory/libs-local/a/never.bin", "admin", "n"),
+		http.StatusCreated)
+	wantStatus(t, w.do(http.MethodPut, "/artifactory/libs-local/t/gone.bin", "admin", "gone"),
+		http.StatusCreated)
+	wantStatus(t, w.do(http.MethodDelete, "/artifactory/libs-local/t/gone.bin", "admin", ""),
+		http.StatusNoContent)
+	const kept = `"downloadCount":3,"lastDownloaded":1700000000000,"lastDownloadedBy":"admin",` +
+		`"remoteDownloadCount":2,"remoteLastDownloaded":1700000001000,` +
+		`"remoteLastDownloadedBy":"edge"`
+	for _, p := range []string{"libs-local/a/file.bin", "up-cache/pkg/f.bin"} {
+		wantStatus(t, w.do(http.MethodPatch, "/artifactory/api/metadata/"+p, "admin",
+			`{"stats":{`+kept+`}}`), http.StatusNoContent)
+	}
+	const base = "https://reg.example/artifactory/"
+	zero := func(p string) string {
+		return `{"uri":"` + base + p + `","downloadCount":0,"lastDownloaded":0,` +
+			`"remoteDownloadCount":0,"remoteLastDownloaded":0}`
+	}
+	counted := func(p string) string { return `{"uri":"` + base + p + `",` + kept + `}` }
+	for _, c := range []struct{ target, want string }{
+		{"libs-local/a/file.bin", counted("libs-local/a/file.bin")},
+		{"libs-local/a/never.bin", zero("libs-local/a/never.bin")},
+		{"libs-local/a", zero("libs-local/a")},
+		{"libs-local/a/", zero("libs-local/a/")},
+		{"libs-local", zero("libs-local")},
+		{"libs-local/", zero("libs-local/")},
+		{"up/pkg/f.bin", counted("up/pkg/f.bin")},
+		{"up-cache/pkg/f.bin", counted("up-cache/pkg/f.bin")},
+		{"up/pkg/never.bin", zero("up/pkg/never.bin")},
+		{"up/pkg", zero("up/pkg")},
+		{"up", zero("up")},
+		{"up-cache", zero("up-cache")},
+		{"auto-trashcan/libs-local/t/gone.bin", zero("auto-trashcan/libs-local/t/gone.bin")},
+		{"auto-trashcan/libs-local/t", zero("auto-trashcan/libs-local/t")},
+		{"auto-trashcan", zero("auto-trashcan")},
+		{"auto-trashcan/", zero("auto-trashcan/")},
+	} {
+		got := storageBody(t, w, "admin", c.target+"?stats", mediaStats)
+		if want := decodeObject(t, c.want); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s?stats: %v, want %v", c.target, got, want)
+		}
+	}
+}
+
+// TestAccStorageAnswersRemoteKey: the item info, properties, last modified
+// and permissions views name a remote's item under its cache's key, by
+// either key, as fixPathParamterIfNeededForRemoteCached rewrites the path
+// before them; the file list keeps the key as given.
+func TestAccStorageAnswersRemoteKey(t *testing.T) {
+	w := storageAnswersWorld(t, true)
+	w.cacheFile("up", "pkg/f.bin", "cached")
+	// A fetch records when the file was modified, which the last modified
+	// view reports.
+	cached := w.item("up", true, "pkg/f.bin")
+	cached.Modified = time.Now()
+	if _, err := w.db.Items().Put(context.Background(), cached); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(t, w.do(http.MethodPut, "/artifactory/api/storage/up-cache/pkg/f.bin?properties=k=v",
+		"admin", ""), http.StatusNoContent)
+	const (
+		storage  = "https://reg.example/artifactory/api/storage/"
+		download = "https://reg.example/artifactory/"
+	)
+	for _, key := range []string{"up", "up-cache"} {
+		file := storageBody(t, w, "admin", key+"/pkg/f.bin", mediaFileInfo)
+		if file["repo"] != "up-cache" || file["path"] != "/pkg/f.bin" ||
+			file["uri"] != storage+"up-cache/pkg/f.bin" ||
+			file["downloadUri"] != download+"up-cache/pkg/f.bin" {
+			t.Errorf("%s file info %v", key, file)
+		}
+		folder := storageBody(t, w, "admin", key+"/pkg", mediaFolderInfo)
+		if folder["repo"] != "up-cache" || folder["uri"] != storage+"up-cache/pkg" ||
+			!reflect.DeepEqual(folder["children"], []any{
+				map[string]any{"uri": "/f.bin", "folder": false},
+			}) {
+			t.Errorf("%s folder info %v", key, folder)
+		}
+		root := storageBody(t, w, "admin", key, mediaFolderInfo)
+		if root["repo"] != "up-cache" || root["uri"] != storage+"up-cache" {
+			t.Errorf("%s root info %v", key, root)
+		}
+		for _, view := range []struct{ query, media, uri string }{
+			{"pkg/f.bin?properties", mediaProperties, "up-cache/pkg/f.bin"},
+			{"pkg?lastModified", mediaLastModified, "up-cache/pkg/f.bin"},
+			{"pkg/f.bin?permissions", "application/json", "up-cache/pkg/f.bin"},
+			{"pkg?list", mediaFileList, key + "/pkg"},
+		} {
+			if got := storageBody(t, w, "admin", key+"/"+view.query, view.media); got["uri"] !=
+				storage+view.uri {
+				t.Errorf("%s/%s uri %v, want %s", key, view.query, got["uri"], storage+view.uri)
+			}
+		}
+	}
 }

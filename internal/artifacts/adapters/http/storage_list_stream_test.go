@@ -60,6 +60,11 @@ func (s ArtifactoryAPI) collectedStorage(w http.ResponseWriter, r *http.Request)
 		httpkit.WriteErr(w, r, err)
 		return
 	}
+	// The remote key turns into its cache's as getStorage turns it, which
+	// is not what streaming changed.
+	if mode != "list" && mode != "stats" {
+		v.key = v.localKey()
+	}
 	if !v.acc.Folder(v.repo, v.path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, v.refusal(mode, p))
 		return
