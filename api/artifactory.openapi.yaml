@@ -29625,7 +29625,7 @@ components:
           description: Optional within this object. P2 repositories only. When true every request without credentials to the repository's item paths, /artifactory/<key>/..., its members' files under <member key>/ included, whatever its method or query, ?trace included, answers 401 "Unauthorized" with the Basic challenge before any member is listed or read, whatever the anonymous user may read and whether anonymous access is on or off, so that an Eclipse client sends its credentials. While anonymous access is on, the anonymous user's Basic credentials and a Bearer token that does not verify count as none. A nested P2 virtual member's own flag does not apply to reads through this repository. Defaults to false. The v1 read of a repository of another type gives false whatever was sent.
           type: boolean
         hideUnauthorizedResources:
-          description: Optional within this object. When true items in members the caller may not read are omitted from listings instead of producing 403. Defaults to false.
+          description: Optional within this object. When true, a download through this repository that a member refuses because the caller may not read it answers 404 "Resource not found" instead of 403, or 401 to an anonymous caller. Defaults to false.
           type: boolean
         includesPattern:
           description: Optional within this object. Comma-separated Ant-style patterns; only paths matching at least one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.

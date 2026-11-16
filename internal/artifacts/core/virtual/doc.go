@@ -19,9 +19,12 @@
 //   - Options: the request's path and whether it names a folder, the Order
 //     its caller walks in, and whether upstream steps and
 //     priorityResolution apply.
+//   - For Answer: a walk's Resolution, the resource path it looked for,
+//     whether the caller is anonymous, and the virtual's
+//     hideUnauthorizedResources.
 //
-// Planned: artifactoryRequestsCanRetrieveRemoteArtifacts, hideUnauthorizedResources
-// and virtualRetrievalCachePeriodSecs, and the Merger that each format
+// Planned: artifactoryRequestsCanRetrieveRemoteArtifacts and
+// virtualRetrievalCachePeriodSecs, and the Merger that each format
 // implements in its ecosystem/<type>/virtual.go (target layout, lines
 // 659-665; decision 0008).
 //
@@ -32,17 +35,22 @@
 //     Package for package handlers and Stored for the storage API; and
 //     Walk, every route from a virtual repository to each member, for the
 //     searches that judge a member by the route that reached it.
+//   - resolve.go: Resolution and Denial, what a download's walk over the
+//     members found and the first member that refused the caller Read
+//     (R3), and Answer, the item route's 404, 403 or 401 for a walk that
+//     found nothing, under the virtual's hideUnauthorizedResources (R4).
 //   - deploy.go: DeployTarget, the local or federated repository a deploy
 //     to a virtual repository lands in, or ErrNoDeployTarget, which the
 //     item routes answer with 7.x's 405 (decision 0008, R6).
 //
-// Planned (target layout, lines 659-663): hideUnauthorizedResources in
-// resolve.go; merge.go, the Merger interface a format implements to merge
-// metadata; cache.go, merged metadata cached for
-// virtualRetrievalCachePeriodSecs.
+// Planned (target layout, lines 659-663): merge.go, the Merger interface a
+// format implements to merge metadata; cache.go, merged metadata cached
+// for virtualRetrievalCachePeriodSecs.
 //
 // # Invariants
 //
+//   - Answer is the walk's answer only: the walk itself, and the Read it
+//     asks of each member, is the caller's (itemkit's lookupMember).
 //   - Members never returns a virtual repository, and returns each real
 //     member once per step: a local or federated member once, a remote
 //     member as its cache and its upstream (Resolve), its upstream alone
@@ -71,7 +79,10 @@
 // # Status
 //
 // Implemented P10: member order and nesting (Members, Walk;
-// https://github.com/weaveplatform/artifactweave/issues/1252) and the
+// https://github.com/weaveplatform/artifactweave/issues/1252); the walk's
+// fall-through and the item route's not-found, forbidden and hidden
+// answers (Resolution, Answer;
+// https://github.com/weaveplatform/artifactweave/issues/1533); and the
 // deploy target (DeployTarget;
 // https://github.com/weaveplatform/artifactweave/issues/1534). The rest of
 // the package is planned for P10's other tickets
@@ -81,8 +92,8 @@
 //
 // resolve_test.go is an external test package (virtual_test) over Configs:
 // a table of every Order over the six groups, priority, nesting, diamonds,
-// cycles, self-members, missing keys and nested pattern drops, and Walk's
-// routes, bounds and failures. deploy_test.go covers DeployTarget for each
-// class the defaultDeploymentRepo may name, unset and missing, and a read
-// that fails.
+// cycles, self-members, missing keys and nested pattern drops, Walk's
+// routes, bounds and failures, and Answer's statuses. deploy_test.go covers
+// DeployTarget for each class the defaultDeploymentRepo may name, unset and
+// missing, and a read that fails.
 package virtual

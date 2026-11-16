@@ -91,3 +91,53 @@ Feature: Generic remote retrieval through native clients
     And the server answered no request with 500 since the last command
     And the file "virtual/jf.bin" contains "local bytes"
     And the generic upstream received 1 GET requests for "/jf.bin"
+
+  Scenario: a reader of the remote alone reads through a virtual, and a member it may not read answers 7.x's statuses
+    # A virtual has no permission target of its own: its members decide a
+    # read (JFrog's Permissions page; #1533). Out of readers, whose Anything
+    # target reads every repository, reader may read the remote but not
+    # libs, which is searched first and refuses; the refusal is the answer
+    # when no other member serves the path, or 404 once the virtual hides
+    # unauthorized resources.
+    When I PATCH "/access/api/v2/users/reader/groups" as admin with JSON:
+      """
+      {"remove":["readers"]}
+      """
+    Then the response status is 200
+    When I run curl "--fail --silent --show-error --user reader:Reader-pass1 {url}/remote/jf.bin --output cached.bin"
+    Then the command succeeds
+    When I PUT "/artifactory/api/repositories/libs" as admin with body:
+      """
+      {"rclass":"local","packageType":"generic"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/member-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"generic","repositories":["remote","libs"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/libs/only.bin" as admin with body:
+      """
+      libs bytes
+      """
+    Then the response status is 201
+    When I run jf "rt direct-download member-virtual/jf.bin member/ --flat --fail-no-op --url {url} --user reader --password Reader-pass1"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the file "member/jf.bin" contains "jf remote bytes"
+    When I run curl "--silent --show-error --write-out answered=%{http_code} --user reader:Reader-pass1 {url}/member-virtual/only.bin"
+    Then the command succeeds
+    And the output contains "answered=403"
+    And the output contains "Download request for repo:path 'libs:only.bin' is forbidden for user: 'reader'.; Path: 'member-virtual:only.bin'"
+    When I POST "/artifactory/api/repositories/member-virtual" as admin with body:
+      """
+      {"hideUnauthorizedResources":true}
+      """
+    Then the response status is 200
+    When I run curl "--silent --show-error --write-out answered=%{http_code} --user reader:Reader-pass1 {url}/member-virtual/only.bin"
+    Then the command succeeds
+    And the output contains "answered=404"
+    And the output contains "Resource not found; Path: 'member-virtual:only.bin'"
+    When I run jf "rt direct-download member-virtual/jf.bin hidden/ --flat --fail-no-op --url {url} --user reader --password Reader-pass1"
+    Then the command succeeds
+    And the file "hidden/jf.bin" contains "jf remote bytes"

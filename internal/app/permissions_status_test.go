@@ -25,9 +25,15 @@ const (
 func seedPermissions(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	ctx := context.Background()
-	if err := db.Repos().
-		Create(ctx, *repo.Defaults(&repo.Config{Key: "perm-local", Class: repo.Local})); err != nil {
-		t.Fatal(err)
+	// perm-virt reads through perm-local alone, which "user" may read: its
+	// rows in itemStatusRows (#1533).
+	for _, c := range []repo.Config{
+		{Key: "perm-local", Class: repo.Local},
+		{Key: "perm-virt", Class: repo.Virtual, Repositories: []string{"perm-local"}},
+	} {
+		if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
 	}
 	libs := map[string]accesstest.Target{"perm-local": {Include: []string{"**"}}}
 	for _, name := range []string{
