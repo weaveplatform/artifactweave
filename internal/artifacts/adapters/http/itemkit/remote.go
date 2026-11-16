@@ -34,20 +34,36 @@ import (
 
 // remoteRead is getRemoteItem's read of a remote file, or of the file a
 // checksum request names, before anything is answered: the source's result
-// for resource, or err, which the route answers in its place. infoSum is
-// set for a checksum request read from the file's info alone
-// (remoteStreamAnswer): the read of the upstream's checksum file that
-// serveInfoChecksum may make.
+// for resource, or err, which the route answers in its place. cause is the
+// failure err answers, which a walk through a virtual repository judges
+// the member by (upstreamMiss), since err is already the direct route's
+// answer. infoSum is set for a checksum request read from the file's info
+// alone (remoteStreamAnswer): the read of the upstream's checksum file
+// that serveInfoChecksum may make.
 type remoteRead struct {
 	err      error
+	cause    error
 	result   source.Result
 	resource source.Resource
 	sidecar  string
 	infoSum  *source.Request
 }
 
-// getRemoteItem returns false for existing folder/archive browsing, which remains
-// cache-only. Native adapters and virtual member fetching require their own opt-in.
+// failedRead is a read that answers err in place of a result, for cause.
+func failedRead(err, cause error) remoteRead { return remoteRead{err: err, cause: cause} }
+
+// errReadFault is the cause of a read that failed here, on a store read or
+// the item service, rather than in the member: a walk through a virtual
+// repository answers it rather than pass over the member.
+var errReadFault = errors.New("itemkit: remote read failed")
+
+// getRemoteItem reads req, a file or the checksum of one, from the remote
+// repository c through its source and answers it. It returns false where
+// the route leaves the path to the cache lookup: a folder or an archive
+// entry the cache holds, and a file of a type it reads only once the
+// lookup has missed. A walk through a virtual repository makes the same
+// read of a remote member (upstreamStep) and answers what it finds the
+// same way (serveRemoteRead).
 func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Config,
 	req ItemRequest, p kernel.Principal, acc Access,
 ) bool {
@@ -55,9 +71,27 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 	if !ok {
 		return false
 	}
+	s.serveRemoteRead(w, r, c, c, req, p, read)
+	return true
+}
+
+// serveRemoteRead answers read, the remote repository c's read of req
+// (readRemoteItem), for a request to requested: c itself, or a virtual
+// repository whose walk found the file in c, which then answers as a
+// direct read of c does (7.161.26's sendBodyResponse answers from the
+// response's repository). A checksum's browser view is requested's, as
+// sendBodyResponseForChecksum reads the requested repository.
+func (s *Kit) serveRemoteRead(
+	w http.ResponseWriter,
+	r *http.Request,
+	c, requested repo.Config,
+	req ItemRequest,
+	p kernel.Principal,
+	read remoteRead,
+) {
 	if read.err != nil {
 		httpkit.WriteErr(w, r, read.err)
-		return true
+		return
 	}
 	ctx := r.Context()
 	result, resource, sidecar := read.result, read.resource, read.sidecar
@@ -69,14 +103,15 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 	// neither matched against the request's properties (7.161.26).
 	if result.Stream != nil {
 		if read.infoSum != nil {
-			s.serveInfoChecksum(w, r, result, c, *read.infoSum, req, resource, sidecar, p.Anonymous)
+			s.serveInfoChecksum(w, r, result, c, requested, *read.infoSum, req, resource, sidecar,
+				p.Anonymous)
 		} else {
-			s.ServeRemoteStream(w, r, result, c, req, resource, sidecar, p.Anonymous)
+			s.serveRemoteStream(w, r, result, c, requested, req, sidecar, p.Anonymous)
 		}
-		return true
+		return
 	}
 	if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
-		return true
+		return
 	}
 	if sidecar != "" {
 		sw := &StatusWriter{ResponseWriter: w}
@@ -84,6 +119,7 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 			sw,
 			r,
 			c,
+			requested,
 			req.Path,
 			item.ServedChecksum(c, *result.Item, item.Algorithm(sidecar)),
 			result.Item.Actual,
@@ -92,16 +128,18 @@ func (s *Kit) getRemoteItem(w http.ResponseWriter, r *http.Request, c repo.Confi
 		if sw.Complete(r) && result.Used != nil {
 			_ = result.Used(ctx)
 		}
-	} else {
-		s.ServeItemFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
+		return
 	}
-	return true
+	s.ServeItemFile(w, r, s.Store, Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }
 
 // readRemoteItem makes getRemoteItem's read, which a trace of the same
 // request makes too (traceRemoteItem), recording its steps in t when t is
 // not nil. It reports false where the route leaves the path to the cache
-// lookup.
+// lookup. A walk through a virtual repository makes it of a remote member
+// with the member's own request (memberRequest), so the member's source
+// policy, cache and credentials apply as on a direct read (decision 0008,
+// R10).
 func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
 	p kernel.Principal, acc Access, t *resolutionTrace,
 ) (remoteRead, bool) {
@@ -118,7 +156,7 @@ func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
 		return remoteRead{}, false
 	}
 	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
-		return remoteRead{err: s.ItemError(ctx, "cached item", err)}, true
+		return failedRead(s.ItemError(ctx, "cached item", err), errReadFault), true
 	}
 	if errors.Is(err, kernel.ErrNotFound) && strings.Contains(req.Path, "!/") {
 		return remoteRead{}, false
@@ -134,7 +172,7 @@ func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
 		t.stepf("Request is for a checksum")
 		// A checksum cannot disclose a file the caller cannot read.
 		if !acc.File(c, artifact, accessapi.ActionRead) {
-			return remoteRead{err: checksumRefused(c, req, p)}, true
+			return failedRead(checksumRefused(c, req, p), source.ErrDenied), true
 		}
 		// Every type resolves a checksum request through the file it names:
 		// 7.161.26's DownloadRequestContext.getResourcePath strips the
@@ -146,7 +184,7 @@ func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
 		case maven.Serves(c.PackageType), getErr == nil && !cached.Folder,
 			errors.Is(getErr, kernel.ErrNotFound):
 		default:
-			return remoteRead{err: ItemNotFound()}, true
+			return failedRead(ItemNotFound(), kernel.ErrNotFound), true
 		}
 		if cran.Serves(c.PackageType) || opkg.Serves(c.PackageType) {
 			// A CRAN or opkg copy the cache holds answers its checksum from
@@ -154,7 +192,7 @@ func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
 			// ones (fileChecksumRoute).
 			held, heldErr := remoteCopyHeld(ctx, s.Store, c, artifact)
 			if heldErr != nil {
-				return remoteRead{err: s.InternalError(ctx, "cached copy", heldErr)}, true
+				return failedRead(s.InternalError(ctx, "cached copy", heldErr), errReadFault), true
 			}
 			if held {
 				return remoteRead{}, false
@@ -171,10 +209,12 @@ func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
 	// that DbStoringRepoMixin.getInfo answers for a cached copy
 	// (shouldReturnCachedResource), in 7.161.26.
 	if ok, matchErr := RemoteCopyMatches(ctx, s.Store, c, resource.Path, req); matchErr != nil {
-		return remoteRead{err: s.InternalError(ctx, "item properties", matchErr)}, true
+		return failedRead(s.InternalError(ctx, "item properties", matchErr), errReadFault), true
 	} else if !ok {
 		t.stepf("Found resource in local cache, but property doesn't match.")
-		return remoteRead{err: mismatched(c, req)}, true
+		// A walk through a virtual repository passes over the conflict as
+		// over a miss (decision 0008, R3).
+		return failedRead(mismatched(c, req), kernel.ErrNotFound), true
 	}
 	query := source.Request{
 		Repo:         c,
@@ -189,20 +229,18 @@ func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
 	query, err = s.formatRemoteSourceRequest(ctx, query, acc)
 	if err != nil {
 		t.denied(asNamed(c, namesCache(c, req), err))
-		return remoteRead{err: sourceAnswer(c, req, p, err)}, true
+		return failedRead(sourceAnswer(c, req, p, err), err), true
 	}
 	read := remoteRead{resource: query.Resource, sidecar: sidecar}
 	read.infoSum, err = s.remoteStreamAnswer(ctx, c, sidecar, &query)
 	if err != nil {
-		return remoteRead{err: s.InternalError(ctx, "cached copy", err)}, true
+		return failedRead(s.InternalError(ctx, "cached copy", err), errReadFault), true
 	}
 	t.stepf("Resolving remote source with current read authorization")
 	read.result, err = s.RemoteSources.Read(ctx, query)
 	if err != nil {
 		t.denied(asNamed(c, namesCache(c, req), err))
-		return remoteRead{
-			err: s.ItemError(ctx, "read source", sourceAnswer(c, req, p, err)),
-		}, true
+		return failedRead(s.ItemError(ctx, "read source", sourceAnswer(c, req, p, err)), err), true
 	}
 	return read, true
 }
@@ -404,7 +442,21 @@ func (s *Kit) ServeRemoteStream(
 	result source.Result,
 	c repo.Config,
 	req ItemRequest,
-	resource source.Resource,
+	_ source.Resource,
+	sidecar string,
+	anonymous bool,
+) {
+	s.serveRemoteStream(w, r, result, c, c, req, sidecar, anonymous)
+}
+
+// serveRemoteStream is ServeRemoteStream for a request to requested, c or
+// a virtual repository whose walk found the file in c (serveRemoteRead).
+func (s *Kit) serveRemoteStream(
+	w http.ResponseWriter,
+	r *http.Request,
+	result source.Result,
+	c, requested repo.Config,
+	req ItemRequest,
 	sidecar string,
 	anonymous bool,
 ) {
@@ -424,7 +476,7 @@ func (s *Kit) ServeRemoteStream(
 			checksum = strings.Repeat("0", size)
 		}
 		sw := &StatusWriter{ResponseWriter: w}
-		s.serveRemoteChecksum(sw, r, c, req.Path, checksum, result.Stream.Checksums,
+		s.serveRemoteChecksum(sw, r, c, requested, req.Path, checksum, result.Stream.Checksums,
 			result.Stream.Modified)
 		if sw.Complete(r) && result.Used != nil {
 			_ = result.Used(ctx)
@@ -774,13 +826,15 @@ func RPMSourceIntegrity() error {
 // file at name, of a file whose checksums are sums (empty when only the
 // checksum is known) and which last changed at modified, as a local one is
 // served (serveChecksum): 7.x answers both through the same
-// DownloadServiceImpl.respond. c is the repository the request named and
-// the one whose cache holds the file, which reads c's content browsing
-// flag (LocalCacheRepoDescriptor.isArchiveBrowsingEnabled).
+// DownloadServiceImpl.respond. c is the repository whose cache holds the
+// file, which reads c's content browsing flag
+// (LocalCacheRepoDescriptor.isArchiveBrowsingEnabled), and requested the
+// one the request named: c, or a virtual repository whose walk found the
+// file in c.
 func (s *Kit) serveRemoteChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
-	c repo.Config,
+	c, requested repo.Config,
 	name, value string,
 	sums kernel.Checksums,
 	modified time.Time,
@@ -789,7 +843,7 @@ func (s *Kit) serveRemoteChecksum(
 		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	serveChecksum(w, r, c, c, name, value, sums, modified)
+	serveChecksum(w, r, c, requested, name, value, sums, modified)
 }
 
 // serveInfoChecksum answers the checksum request at req.Path for the file
@@ -822,7 +876,7 @@ func (s *Kit) serveInfoChecksum(
 	w http.ResponseWriter,
 	r *http.Request,
 	result source.Result,
-	c repo.Config,
+	c, requested repo.Config,
 	sum source.Request,
 	req ItemRequest,
 	resource source.Resource,
@@ -834,7 +888,8 @@ func (s *Kit) serveInfoChecksum(
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	s.serveRemoteChecksum(w, r, c, req.Path, value, result.Stream.Checksums, result.Stream.Modified)
+	s.serveRemoteChecksum(w, r, c, requested, req.Path, value, result.Stream.Checksums,
+		result.Stream.Modified)
 }
 
 // infoChecksum is the value serveInfoChecksum answers, or the error it
