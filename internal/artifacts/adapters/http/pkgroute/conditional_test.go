@@ -261,3 +261,60 @@ func TestUnitRangeRefusalWriterCopies(t *testing.T) {
 		t.Fatalf("416 copied %d %v %q", n, err, rec.Body)
 	}
 }
+
+// ServeNamedStream names a remote file's stream, one with a Path, through
+// names on a GET, a HEAD, a range and a 304, telling it which is a 304, so
+// that names can replace the type as a browser's view does; a 416 drops
+// the names (RangeRefusalWriter), and a document without a Path is never
+// named (#1594).
+func TestUnitServeNamedStreamNamesAFile(t *testing.T) {
+	names := func(calls *[]bool) pkgroute.FileNames {
+		return func(h http.Header, _ *http.Request, notModified bool) {
+			*calls = append(*calls, notModified)
+			h.Set("X-Artifactory-Filename", "a.jar")
+			h.Set("Content-Type", "application/xml")
+		}
+	}
+	for _, tc := range []struct {
+		name, method string
+		headers      [][2]string
+		status       int
+		named        bool
+	}{
+		{"GET", http.MethodGet, nil, http.StatusOK, true},
+		{"HEAD", http.MethodHead, nil, http.StatusOK, true},
+		{"range", http.MethodGet, [][2]string{{"Range", "bytes=1-2"}}, http.StatusPartialContent, true},
+		{"304", http.MethodGet, [][2]string{{"If-None-Match", streamSHA1}}, http.StatusNotModified, true},
+		{"416", http.MethodGet, [][2]string{{"Range", "bytes=99-"}}, http.StatusRequestedRangeNotSatisfiable, false},
+	} {
+		var calls []bool
+		r := httptest.NewRequest(tc.method, "/", nil)
+		for _, h := range tc.headers {
+			r.Header.Add(h[0], h[1])
+		}
+		w := httptest.NewRecorder()
+		s := testStream(true, true)
+		s.Path = "b/a.jar"
+		err := pkgroute.ServeNamedStream(w, r, s, names(&calls))
+		if err != nil || w.Code != tc.status {
+			t.Fatalf("%s: %d %v", tc.name, w.Code, err)
+		}
+		notModified := tc.status == http.StatusNotModified
+		if len(calls) != 1 || calls[0] != notModified {
+			t.Errorf("%s: names called %v, want once with %v", tc.name, calls, notModified)
+		}
+		if named := w.Header().Get("X-Artifactory-Filename") == "a.jar"; named != tc.named {
+			t.Errorf("%s: named %v, want %v: %v", tc.name, named, tc.named, w.Header())
+		}
+		if tc.status == http.StatusOK && w.Header().Get("Content-Type") != "application/xml" {
+			t.Errorf("%s: names' type replaced: %v", tc.name, w.Header())
+		}
+	}
+	var calls []bool
+	w := httptest.NewRecorder()
+	if err := pkgroute.ServeNamedStream(w, httptest.NewRequest(http.MethodGet, "/", nil),
+		testStream(true, true), names(&calls)); err != nil || len(calls) != 0 ||
+		w.Header().Get("X-Artifactory-Filename") != "" {
+		t.Fatalf("a stream without a Path: %v, names called %v", err, calls)
+	}
+}

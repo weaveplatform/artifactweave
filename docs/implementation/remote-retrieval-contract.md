@@ -318,6 +318,18 @@ nothing, `*` and a list included, and only `If-Modified-Since` finds it unchange
 length ([#1487](https://github.com/weaveplatform/artifactweave/issues/1487)). A route
 that chooses its own validator, as the registry does for a manifest, keeps it.
 
+A file a remote that stores nothing serves from the upstream's stream (R13) is named as
+the copy a remote that stores it serves: `X-Artifactory-Filename`, and the
+`Content-Disposition` by the remote's content browsing flag, in the form the route names
+its kept copy with (the item route's, or the package download service's on PyPI, Conda,
+Vagrant, RubyGems and NuGet), on a GET, a HEAD, a range and a 304, and a browser's GET
+with the flag gets the sandboxed view. 7.161.26 answers that `RemoteRepoResource`
+("resource will be stream directly to the user", `RemoteRepoBase`) through
+`RequestResponseHelper.sendBodyResponse` and `sendHeadResponse`, as it answers a cached
+file, and `setBasicHeaders` names both alike. No capture of such an answer is known [I]
+([#1594](https://github.com/weaveplatform/artifactweave/issues/1594)). A document a route
+builds per request names no file.
+
 `storeArtifactsLocally=false` is a repository setting, and treated as nonpersistent. An
 upstream `Cache-Control: no-store` is not: the remote keeps that answer like any other,
 under the repository's retrieval cache period, and serves it offline and as failure-time

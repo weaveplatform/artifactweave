@@ -1020,7 +1020,7 @@ paths:
       x-idempotency: natural
       x-idempotency-natural:
       - route
-      x-cost: expensive
+      x-cost: ordinary
   /api/system/verifyconnection:
     post:
       description: Performs a GET against the given endpoint from the server, using the global proxy settings and

@@ -1,7 +1,8 @@
 // Package middleware holds the HTTP middleware that no module owns: request
 // IDs, the access log, panic recovery, the management body limit, vendor
-// media type normalisation, trailing-slash collection paths, and the error
-// handler of the generated strict servers.
+// media type normalisation, trailing-slash collection paths, a HEAD answered
+// through its GET route, and the error handler of the generated strict
+// servers.
 //
 // # Role
 //
@@ -9,18 +10,21 @@
 // route. Each decision that belongs to an ecosystem or to the server's
 // configuration arrives as a hook: AccessLog and RecoverPanic log a path
 // through a redactor, NormalizeContentType leaves alone the requests a keep
-// predicate accepts, and CollectionSlash rewrites the paths of a map. Error
+// predicate accepts, CollectionSlash rewrites the paths of a map, and
+// HeadAsGet answers a HEAD through the GET routes its predicate accepts. Error
 // responses take their profile from the rules on the request context
 // (httpkit.ErrorProfile), so no middleware here names a path prefix.
 //
 // # Inputs
 //
 //   - Driving: the server's router, which installs RequestID, RecoverPanic,
-//     AccessLog, NormalizeContentType and CollectionSlash on every request,
-//     BodyLimit on its JSON management groups, and BindingError as the
-//     request and response error handler of each generated strict server.
+//     AccessLog, NormalizeContentType, CollectionSlash and HeadAsGet on every
+//     request, BodyLimit on its JSON management groups, and BindingError as
+//     the request and response error handler of each generated strict
+//     server.
 //   - Hooks: the redactor of AccessLog and RecoverPanic, the keep predicate
-//     of NormalizeContentType and the path map of CollectionSlash.
+//     of NormalizeContentType, the path map of CollectionSlash and the
+//     served predicate of HeadAsGet.
 //   - The request context: the error profile rules (httpkit.ErrorProfiles)
 //     and the slots AccessLog gives its handlers (httpkit.NoteCause and
 //     httpkit.NoteUser).
@@ -29,7 +33,8 @@
 // # Outputs
 //
 //   - RequestID and RequestIDHeader, AccessLog, RecoverPanic, BodyLimit and
-//     BodyTooLarge, NormalizeContentType, BindingError and CollectionSlash.
+//     BodyTooLarge, NormalizeContentType, BindingError, CollectionSlash and
+//     HeadAsGet.
 //
 // # Invariants
 //
@@ -44,13 +49,17 @@
 //     logged; http.ErrAbortHandler is re-raised, as net/http expects.
 //   - A body over BodyLimit's limit answers 413 with BodyTooLarge's text,
 //     whether its length was declared or not.
+//   - A HEAD that HeadAsGet answers sends its GET's status and header fields,
+//     with the length of the body it drops, and no body; every middleware
+//     between Enter and Route sees it as the GET, and the handler as a HEAD.
 //   - It imports no module, as the platform layer must not.
 //
 // # References
 //
 //   - Decision 0002:
 //     docs/research/decisions/0002-spec-first-flat-crud-handwritten-item-paths.md
-//     (the error response profiles of the strict servers' errors).
+//     (the error response profiles of the strict servers' errors, and a HEAD
+//     of a generated GET).
 //   - Decision 0016: docs/research/decisions/0016-observability-and-health.md
 //     (request IDs, and the access log line that names the user, never the
 //     credential).

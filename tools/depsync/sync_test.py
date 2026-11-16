@@ -511,5 +511,48 @@ class PythonLockTests(unittest.TestCase):
         self.assertIn("\"$RUNNER_TEMP/conan1/bin/pip\" install", conan[conan.rindex("for index", 0, build):build])
 
 
+# One row of the inventory's Download sources table: the Dockerfile it links,
+# then its Download, First source and Second source cells.
+SOURCE_ROW = re.compile(r"^\| \[`[^`]+`\]\(\.\./\.\./([^)]+)\) \| (.*) \|$", re.MULTILINE)
+
+
+def download_rows(template):
+    """Maps each Dockerfile in the Download sources table to its Second source
+    cells, one per row."""
+    section = template[template.index("| Dockerfile | Download | First source | Second source |"):]
+    section = section[:section.index("\n\n")]
+    rows = {}
+    for path, cells in SOURCE_ROW.findall(section):
+        rows.setdefault(path, []).append(cells.split(" | ")[-1])
+    return rows
+
+
+def code(path):
+    """A Dockerfile without its comment lines, which name hosts they do not fetch from."""
+    return "\n".join(line for line in path.read_text().splitlines() if not line.lstrip().startswith("#"))
+
+
+class DownloadSourceTests(unittest.TestCase):
+    """#1321 and #1322 gave every CI download a second source where one
+    exists, but nothing tied a new image to that rule, and the VS Code image
+    kept one source until #1603. Every image that fetches a file while it
+    builds has a row in the Download sources table, which names its second
+    source or says why there is none, and an image that names one fetches
+    through fetch-pinned.sh or the hashed pip loop, which try it."""
+
+    def test_every_downloading_image_names_its_sources_and_tries_them(self):
+        catalog = json.loads(sync.CATALOG.read_text())
+        rows = download_rows(sync.CATALOG.with_name("image-inventory.md.in").read_text())
+        downloading = sorted(path for path in catalog["images"] if URL.search(code(sync.ROOT / path)))
+        self.assertEqual(downloading, sorted(rows), "an image that downloads a file needs a Download sources row")
+        for path, seconds in sorted(rows.items()):
+            if all(second.startswith("None.") for second in seconds):
+                continue
+            with self.subTest(image=path):
+                text = code(sync.ROOT / path)
+                self.assertTrue("fetch-pinned" in text or LOCKED_INSTALL.search(text),
+                                "a second source that nothing tries")
+
+
 if __name__ == "__main__":
     unittest.main()

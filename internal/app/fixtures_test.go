@@ -1378,7 +1378,9 @@ func trashStatusRows() []statusCase {
 		{list, tc + "/" + del, "user", "", 403},
 		{list, tc + "/libs-local/absent", "user", "", 403},
 		{list, tc + "/gone-repo", "user", "", 403},
-		{list, tc, "anonymous", "", 401},
+		// Anonymous is refused as a user is while anonymous access is on
+		// (#1600), and told to authenticate while it is off.
+		{list, tc, "anonymous", "", 403},
 		{list, tc, "", "", 401},
 		// The storage API's views, with the same filter (#455).
 		{
@@ -1395,7 +1397,7 @@ func trashStatusRows() []statusCase {
 		{list, tc + "/" + del + "?properties=absent", "admin", "", 404},
 		{list, tc + "/libs-local/fixture?properties", "admin", "", 404},
 		{list, tc + "/" + del + "?stats", "admin", "", 200},
-		{list, tc + "/libs-local/fixture?stats", "admin", "", 400},
+		{list, tc + "/libs-local/fixture?stats", "admin", "", 200},
 		{list, tc + "/" + del + "?lastModified", "admin", "", 200},
 		{list, tc + "/libs-local?lastModified", "admin", "", 200},
 		{list, tc + "/" + del + "?permissions", "admin", "", 400},
@@ -1403,7 +1405,8 @@ func trashStatusRows() []statusCase {
 		{list, tc + "?depth=1", "admin", "", 400},
 		{list, tc + "?list&deep=1", "user", "", 200},
 		{list, tc + "/libs-local?list", "user", "", 403},
-		{list, tc + "/" + del + "?properties", "user", "", 403},
+		// The properties view answers a refusal as no properties (#1600).
+		{list, tc + "/" + del + "?properties", "user", "", 404},
 		{list, tc + "/" + del + "?stats", "user", "", 403},
 		{list, tc + "/libs-local?lastModified", "user", "", 403},
 		{list, tc + "/" + del + "?permissions", "user", "", 403},

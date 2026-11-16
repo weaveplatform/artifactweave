@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 )
@@ -159,5 +160,31 @@ func browserView(h http.Header, r *http.Request, c repo.Config, name string) {
 	h.Set("Content-Security-Policy", contentSecurityPolicy)
 	if t := browserType(name); t != "" {
 		h.Set("Content-Type", t)
+	}
+}
+
+// StreamNames names the file name of the repository c that a remote serves
+// from its upstream's stream rather than from a kept copy, as serveFile
+// names the copy, in form: X-Artifactory-Filename, the Content-Disposition
+// by c's content browsing flag (FileDisposition, and notModifiedDisposition
+// on a 304), and a browser's view of a GET with a body (browserView).
+// 7.161.26's DownloadServiceImpl answers the RemoteRepoResource of a remote
+// that stores nothing through RequestResponseHelper.sendBodyResponse and
+// sendHeadResponse, as it answers a cached file, so setBasicHeaders and
+// getModifiedMimeType name it alike. A Content-Disposition a protocol has
+// already set is kept, as serveFile keeps it.
+func StreamNames(c repo.Config, name string, form func(string) string) pkgroute.FileNames {
+	return func(h http.Header, r *http.Request, notModified bool) {
+		h.Set("X-Artifactory-Filename", FilenameHeader(name))
+		if h.Get("Content-Disposition") == "" {
+			d := FileDisposition(c, name, form)
+			if notModified {
+				d = notModifiedDisposition(c, name, form)
+			}
+			setDisposition(h, d)
+		}
+		if !notModified {
+			browserView(h, r, c, name)
+		}
 	}
 }

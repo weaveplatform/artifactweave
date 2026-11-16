@@ -29,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -428,9 +429,12 @@ func TestUnitGetItemAndTraceRefuseWhatTheyCannotServe(t *testing.T) {
 	}
 }
 
-// TestUnitArchiveEntryFailureAfterItsStatusIsLogged: a zip entry whose CRC-32
-// is wrong fails only at its end, after its 200 and its bytes are sent, so
-// the failure is logged and nothing is written after the entry.
+// TestUnitArchiveEntryFailureAfterItsStatusIsLogged: an entry is read
+// through for its checksums before anything is sent, so a zip entry whose
+// CRC-32 is wrong, which fails only at its end, answers 404 as a corrupt
+// archive does (#1593). An archive whose blob fails once the entry's 200
+// is sent, on the read that serves it, has the failure logged, nothing
+// written after it, and no download counted.
 func TestUnitArchiveEntryFailureAfterItsStatusIsLogged(t *testing.T) {
 	const content = "inside"
 	var archive bytes.Buffer
@@ -453,15 +457,74 @@ func TestUnitArchiveEntryFailureAfterItsStatusIsLogged(t *testing.T) {
 	}
 	w := kittest.New(t, inmem.New())
 	w.Put(t, w.Local, false, "bad.zip", archive.Bytes())
-	var logs bytes.Buffer
-	k := w.Kit(itemkit.Deps{Logger: slog.New(slog.NewTextHandler(&logs, nil))})
+	k := w.Kit(itemkit.Deps{})
 	rec := httptest.NewRecorder()
 	k.GetItem(rec, kittest.Request(t, http.MethodGet, "/artifactory/libs-local/bad.zip!/a.txt"))
-	if rec.Code != http.StatusOK || rec.Body.String() != content ||
-		!strings.Contains(logs.String(), zip.ErrChecksum.Error()) {
-		t.Errorf("entry failing its checksum: %d %q, logged %q", rec.Code, rec.Body, logs.String())
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("entry failing its checksum: %d %q", rec.Code, rec.Body)
+	}
+
+	sound := zip.NewWriter(&archive)
+	archive.Reset()
+	fw, err = sound.Create("a.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.WriteString(fw, content); err != nil {
+		t.Fatal(err)
+	}
+	if err := sound.Close(); err != nil {
+		t.Fatal(err)
+	}
+	good := w.Put(t, w.Local, false, "good.zip", archive.Bytes())
+	var logs bytes.Buffer
+	opens := 0
+	k = w.Kit(itemkit.Deps{
+		Logger: slog.New(slog.NewTextHandler(&logs, nil)),
+		Blobs:  droppedOnSecondOpen{Store: w.Blobs, opens: &opens},
+	})
+	rec = httptest.NewRecorder()
+	k.GetItem(rec, kittest.Request(t, http.MethodGet, "/artifactory/libs-local/good.zip!/a.txt"))
+	if rec.Code != http.StatusOK || rec.Body.String() != "" || opens != 2 ||
+		!strings.Contains(logs.String(), errDropped.Error()) {
+		t.Errorf("entry whose blob fails on the read that serves it: %d %q, %d opens, logged %q",
+			rec.Code, rec.Body, opens, logs.String())
+	}
+	stats, err := w.Store.Items().Stats(t.Context(), good.ID)
+	if err != nil || stats.DownloadCount != 0 {
+		t.Errorf("a failed entry counted as a download: %d %v", stats.DownloadCount, err)
 	}
 }
+
+var errDropped = errors.New("the store dropped the connection")
+
+// droppedOnSecondOpen opens a blob soundly once, as an entry's checksums
+// read it, and then as content whose every read fails, as a store whose
+// connection drops does.
+type droppedOnSecondOpen struct {
+	blob.Store
+	opens *int
+}
+
+func (d droppedOnSecondOpen) Open(
+	ctx context.Context,
+	sha string,
+) (io.ReadSeekCloser, blob.Info, error) {
+	r, info, err := d.Store.Open(ctx, sha)
+	*d.opens++
+	if err != nil || *d.opens < 2 {
+		return r, info, err
+	}
+	_ = r.Close()
+	return droppedContent{}, info, nil
+}
+
+type droppedContent struct{}
+
+func (droppedContent) Read([]byte) (int, error)          { return 0, errDropped }
+func (droppedContent) ReadAt([]byte, int64) (int, error) { return 0, errDropped }
+func (droppedContent) Seek(int64, int) (int64, error)    { return 0, nil }
+func (droppedContent) Close() error                      { return nil }
 
 // TestUnitStatusWriterCountsWhatItWrites: a body written before any status
 // counts as a 200, through Write or ReadFrom; it is complete when no length

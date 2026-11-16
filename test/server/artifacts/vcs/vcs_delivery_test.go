@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -82,7 +83,9 @@ func TestAccVCSPeerFileUsageRequiresSuccessfulDelivery(t *testing.T) {
 		status, used       int
 	}{
 		{name: "GET", method: http.MethodGet, user: "reader", status: http.StatusOK, used: 1},
-		{name: "HEAD", method: http.MethodHead, user: "reader", status: http.StatusMethodNotAllowed},
+		// A HEAD answers through the GET, as Jersey answers it (JAX-RS 2.1
+		// section 3.3.5, #1598), and delivers no file.
+		{name: "HEAD", method: http.MethodHead, user: "reader", status: http.StatusOK},
 		{name: "denied", method: http.MethodGet, user: "user", status: http.StatusForbidden},
 		{name: "revalidation denied", method: http.MethodGet, user: "reader", deny: true, status: http.StatusForbidden},
 		{name: "response write fails", method: http.MethodGet, user: "reader", failWrite: true},
@@ -144,7 +147,13 @@ func TestAccVCSPeerFileUsageRequiresSuccessfulDelivery(t *testing.T) {
 			} else {
 				res := w.do(tc.method, path, tc.user, "")
 				wantStatus(t, res, tc.status)
-				if tc.status == http.StatusOK && !bytes.Equal(res.Body.Bytes(), data) {
+				if tc.method == http.MethodHead && (res.Body.Len() != 0 ||
+					res.Header().Get("Content-Length") != strconv.Itoa(len(data))) {
+					t.Fatalf("HEAD: %d bytes of body, Content-Length %q",
+						res.Body.Len(), res.Header().Get("Content-Length"))
+				}
+				if tc.method == http.MethodGet && tc.status == http.StatusOK &&
+					!bytes.Equal(res.Body.Bytes(), data) {
 					t.Fatal("peer file bytes changed")
 				}
 			}

@@ -436,10 +436,12 @@ func (s *Kit) ServeRemoteStream(
 	// Whatever the stream holds, a file the upstream sent or a document
 	// the cache keeps without an item, the item route serves it as the
 	// file at the path asked for, as 7.x's download serves any resource
-	// it finds there (RemoteRepoResource, FileResource).
+	// it finds there (RemoteRepoResource, FileResource), and names it in
+	// the item route's form as it names the copy the remote keeps.
 	result.Stream.Path = req.Path
 	sw := &StatusWriter{ResponseWriter: w}
-	if err := pkgroute.ServeStream(sw, r, result.Stream); err != nil {
+	names := StreamNames(c, path.Base(req.Path), ItemDisposition)
+	if err := pkgroute.ServeNamedStream(sw, r, result.Stream, names); err != nil {
 		httpkit.NoteCause(ctx, err)
 		panic(http.ErrAbortHandler)
 	}

@@ -151,8 +151,7 @@ func TestAccVCSArchiveDownloadsNameAndTypeTheArchive(t *testing.T) {
 		for _, ext := range []string{"tar.gz", "zip"} {
 			path := base + tc.path + "?ext=" + ext
 			// The first read fetches the archive and the second serves the
-			// cached copy, which keeps the name. A HEAD answers 405, as
-			// every generated route's does (#1598).
+			// cached copy, which keeps the name.
 			for _, read := range []string{"first fetch", "cached"} {
 				rec := w.Request(http.MethodGet, path, "admin", "")
 				wantArchiveHeaders(t, "GET "+path+" "+read, rec, archives[ext], media[ext],
@@ -160,6 +159,13 @@ func TestAccVCSArchiveDownloadsNameAndTypeTheArchive(t *testing.T) {
 				if !bytes.Equal(rec.Body.Bytes(), archives[ext]) {
 					t.Errorf("GET %s %s: %d bytes of body", path, read, rec.Body.Len())
 				}
+			}
+			// A HEAD answers through the GET, as Jersey answers it (JAX-RS
+			// 2.1 section 3.3.5), with its headers and no body (#1598).
+			rec := w.Request(http.MethodHead, path, "admin", "")
+			wantArchiveHeaders(t, "HEAD "+path, rec, archives[ext], media[ext], tc.name+"."+ext)
+			if rec.Body.Len() != 0 {
+				t.Errorf("HEAD %s: %d bytes of body", path, rec.Body.Len())
 			}
 		}
 	}

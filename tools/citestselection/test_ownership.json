@@ -104,6 +104,7 @@
       "fixtures_test.go",
       "format_tables_test.go",
       "hash_test.go",
+      "head_test.go",
       "helm_fixture_test.go",
       "keyed_test.go",
       "limits_cost_test.go",
@@ -160,6 +161,7 @@
     "internal/artifacts/adapters/http/itemkit": [
       "access_test.go",
       "answers_test.go",
+      "archive_entry_test.go",
       "disposition_test.go",
       "items_test.go",
       "kit_test.go",
@@ -242,6 +244,7 @@
       "smart_status_test.go",
       "source_listing_test.go",
       "source_test.go",
+      "storage_answers_test.go",
       "storage_list_test.go",
       "storage_test.go",
       "storageinfo_test.go",

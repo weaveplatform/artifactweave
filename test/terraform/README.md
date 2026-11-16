@@ -47,7 +47,7 @@ proves management only; native content adapters have separate client acceptance 
 The virtual-repositories scenario applies all 33 provider virtual resources, each over a local
 and a remote member, with every virtual field set away from its default. It applies two
 revisions, the second reversing every member list, and after each requires an empty plan and
-reads each virtual's member order back through the repositories API. Its 102 resources make
-the provider post more usage reports a minute (`POST /artifactory/api/system/usage`, one per
-resource operation) than the default expensive budget of 600 per principal admits, so the
-apply run starts the server with `api.expensive_principal_per_minute` at 6000.
+reads each virtual's member order back through the repositories API. The provider posts a
+usage report (`POST /artifactory/api/system/usage`) for each of its 102 resources' operations;
+those are ordinary requests ([decision 0043](../../docs/research/decisions/0043-api-reliability.md#classes-moved-since)),
+so the run keeps the default request rates.

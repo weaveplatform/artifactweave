@@ -40,6 +40,38 @@ protocols, metadata PATCH) are chi handlers in `internal/artifacts/adapters/http
 for documentation with the extension `x-handwritten: true`; a test asserts that the
 generated router never claims a path marked that way.
 
+**A HEAD of a generated GET.** The strict servers mount only the methods each spec
+declares, and chi routes a HEAD only to a route that registers one, so a HEAD of a
+GET-only operation answered 405. 7.x serves its REST API with Jersey, which hands a HEAD
+to the resource's `@HEAD` method or, when there is none, to its `@GET` method and leaves
+the entity out (JAX-RS 2.1, section 3.3.5). In 7.161.26 only four resources declare a
+`@HEAD` of their own: `SecurityResourceV2`'s permission target check, which the spec
+declares as `HEAD`, `ReleaseBundleResource`, `CheckupResource` and the UI's
+`UserApiKeyResource`. So the router answers a HEAD of every generated GET, and of the
+GitLab subgroup forms of the generated VCS operations (`VCSAPI.VCSNested`), through that
+GET (`middleware.HeadAsGet`, [#1598](https://github.com/weaveplatform/artifactweave/issues/1598)):
+the GET's status and header fields, its `Content-Length`, and no body.
+
+- The request is the GET for everything ahead of routing, so the key gate, admission,
+  authentication's public routes and the API restriction check decide it as they decide
+  the GET ([decision 0043](0043-api-reliability.md#cost-classes-and-how-admission-finds-them)),
+  and a HEAD again for the handler, so that a file download ignores `Range` and counts
+  no delivery, and copies no file it has declared the length of.
+- A HEAD route keeps the request where it matches the path as closely: a spec `HEAD`,
+  or a hand-written route's. JAX-RS picks the path before the method (section 3.7.2),
+  the template with the most literal characters first, where chi picks the method
+  first and backtracks into a parameter to find a HEAD route. So
+  `HEAD /distribution/api/v1/release_bundle/{name}/LATEST` answers through the GET of
+  that path, not through the HEAD of `.../{release_bundle_name}/{release_bundle_version}`,
+  and `HEAD /artifactory/api/npm/auth` through the GET of npm's authentication, not
+  through the npm protocol's `HEAD /api/npm/{repoKey}`.
+- A HEAD of a hand-written GET-only route still answers 405; each hand-written route
+  mounts the methods it serves.
+- **[I]** No capture of a HEAD on a generated route is known, so the headers 7.x sends
+  are inferred, `Content-Length` among them where the GET's body is long enough that
+  7.x streams it without one. artifactweave sends the GET's length, as RFC 9110 section
+  8.6 allows on a HEAD.
+
 **Content-type normalisation.** Middleware rewrites `application/vnd.org.jfrog.artifactory.*+json`
 to `application/json` before the strict decoder, and accepts `application/yaml` on the
 configuration PATCH.
@@ -155,6 +187,10 @@ spec preserves one documented contract.
   drive every flat operation through `pkg/client`.
 - A test walks `api/*.openapi.yaml` and asserts every `x-handwritten` path is absent from
   the generated router and present in the hand-written one.
+- `TestAccHeadAnswersEveryGeneratedGet` calls every generated GET and its HEAD and holds
+  the HEAD to the GET's status and header fields, with no body; `TestAccHeadOnTheWire`
+  does the same over HTTP for a JSON list, a repository, 404, 401 and 403 refusals and a
+  public probe, and keeps 405 for a POST-only operation and a hand-written GET-only route.
 - A table-driven status-code test over the research inventory.
 - Error-response tests per profile.
 - Base-URL resolver tests over the four sources for every format that embeds URLs.

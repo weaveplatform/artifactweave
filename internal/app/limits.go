@@ -148,7 +148,9 @@ func (s requestLimiter) limitPrincipal(o limitOptions) func(http.Handler) http.H
 // the specs declared x-cost. Admission asks it only of a request no spec
 // operation addresses (limitOptions.cost): a hand-written alias, a native
 // protocol route, a deeper path a hand-written route's wildcard serves, and
-// a 404 or 405, a HEAD of a GET-only operation among them. The write rule,
+// a 404 or 405, a HEAD of a hand-written GET-only route among them. A HEAD
+// that the router answers through a generated GET reaches admission as that
+// GET (middleware.HeadAsGet), so the GET's operation decides it. The write rule,
 // the archive and vcs prefixes, the two suffixes and the storage list rule
 // still decide routes the router serves; the other prefixes and the three
 // exact paths now decide only requests no route serves. Those are kept so
@@ -158,6 +160,13 @@ func (s requestLimiter) limitPrincipal(o limitOptions) func(http.Handler) http.H
 // operation under a pattern of its own.
 func expensiveRequest(r *http.Request) bool {
 	p := r.URL.Path
+	// The jfconnect metrics the JFrog CLI posts after each command, which no
+	// spec declares, are read and dropped like the usage report it posts
+	// beside them, which the spec declares ordinary (decision 0043, "Classes
+	// moved since").
+	if r.Method == http.MethodPost && p == "/jfconnect/api/v1/backoffice/metrics/log" {
+		return false
+	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead && strings.Contains(p, "/api/") {
 		return true
 	}
