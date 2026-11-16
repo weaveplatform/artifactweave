@@ -2332,7 +2332,7 @@
     "spec": "grid.openapi.yaml",
     "operation_id": "deleteGridTopology",
     "state": "stub: 501",
-    "contract": "Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. Administrators only.",
+    "contract": "Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. When removing federation fails on a site, the topology is kept and the call answers 409 with it, unless force is true. Administrators only.",
     "handler": "internal/platform/gen/grid/unimplemented.gen.go",
     "review_family": "content-and-configuration",
     "effects": "no operation effect; middleware still authenticates/admit-limits",
@@ -11341,6 +11341,7 @@
     "retry": "501 is not transient; do not retry until support changes; intended safe",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "declared_page_controls": [
+      "query page_size: Optional query parameter. Entities per page, 1 to 100; larger values are capped at 100.",
       "query page_token: Optional query parameter. The next_page_token from the previous page; omitted for the first page."
     ],
     "response_collections": [
@@ -14121,7 +14122,7 @@
     "spec": "grid.openapi.yaml",
     "operation_id": "updateGridTopology",
     "state": "stub: 501",
-    "contract": "Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Disconnected rather than failing the call. Administrators only.",
+    "contract": "Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Partially Connected or Disconnected rather than failing the call, and a removed site whose removal could not be applied stays as Pending Removal. Removing a site whose instance is disconnected answers 400 unless force is true. Administrators only.",
     "handler": "internal/platform/gen/grid/unimplemented.gen.go",
     "review_family": "content-and-configuration",
     "effects": "no operation effect; middleware still authenticates/admit-limits",

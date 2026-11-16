@@ -83,7 +83,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
         '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Mission Control, which serves the Grid API, is not installed or not available.
       summary: List known instances
       tags:
         - topology
@@ -124,7 +128,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
         '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Mission Control, which serves the Grid API, is not installed or not available.
       summary: List topologies
       tags:
         - topology
@@ -173,7 +181,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: A topology with the derived key already exists.
+          description: A topology with the derived key already exists, another topology already exists, or this instance still belongs to another topology.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -183,7 +191,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
         '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Mission Control, which serves the Grid API, is not installed or not available.
       summary: Create a topology
       tags:
         - topology
@@ -195,7 +207,7 @@ paths:
       x-cost: expensive
   /api/v1/topology/{key}:
     delete:
-      description: Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. Administrators only.
+      description: Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. When removing federation fails on a site, the topology is kept and the call answers 409 with it, unless force is true. Administrators only.
       operationId: deleteGridTopology
       parameters:
         - description: Required path parameter. Key of the topology.
@@ -204,6 +216,13 @@ paths:
           required: true
           schema:
             type: string
+        - description: Optional query parameter. When true, delete the topology and answer 204 even if removing federation fails on one or more sites; what is left on those sites must be cleaned up separately.
+          in: query
+          name: force
+          required: false
+          schema:
+            default: false
+            type: boolean
       responses:
         '204':
           description: Topology deleted.
@@ -229,8 +248,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TopologyResponse'
-          description: The topology was kept because removing Access federation from one or more sites failed. The body is the stored topology; each failed site shows Disconnected with the reason in status_description. Retry the delete to finish removal.
+                description: The stored topology when removing federation failed, or the error envelope when another delete is in progress.
+                oneOf:
+                  - $ref: '#/components/schemas/TopologyResponse'
+                  - $ref: '#/components/schemas/ErrorResponse'
+          description: The topology was kept because removing Access federation from one or more sites failed; the body is the stored topology, each failed site showing why in status_description, and a retry or force=true finishes removal. Or another delete of the topology is in progress, with the error envelope.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -240,7 +262,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
         '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Mission Control, which serves the Grid API, is not installed or not available.
       summary: Delete a topology
       tags:
         - topology
@@ -293,7 +319,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
         '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Mission Control, which serves the Grid API, is not installed or not available.
       summary: Get a topology
       tags:
         - topology
@@ -301,7 +331,7 @@ paths:
       x-idempotency: safe
       x-cost: ordinary
     patch:
-      description: 'Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Disconnected rather than failing the call. Administrators only.'
+      description: 'Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Partially Connected or Disconnected rather than failing the call, and a removed site whose removal could not be applied stays as Pending Removal. Removing a site whose instance is disconnected answers 400 unless force is true. Administrators only.'
       operationId: updateGridTopology
       parameters:
         - description: Required path parameter. Key of the topology.
@@ -310,6 +340,13 @@ paths:
           required: true
           schema:
             type: string
+        - description: Optional query parameter. When true, allow removing sites whose instance is disconnected. It bypasses only that check.
+          in: query
+          name: force
+          required: false
+          schema:
+            default: false
+            type: boolean
       requestBody:
         content:
           application/json:
@@ -348,6 +385,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: No topology has this key.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A delete of the topology is in progress.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -357,7 +400,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
         '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Mission Control, which serves the Grid API, is not installed or not available.
       summary: Update a topology
       tags:
         - topology
@@ -394,7 +441,7 @@ paths:
               - projectUsers
               - projectResources
             type: string
-        - description: Optional query parameter. Return only entities with at least one target in this state; omitted means any state.
+        - description: Optional query parameter. Return only entities with at least one target in this state, matched without regard to case; omitted or all means any state.
           in: query
           name: status
           required: false
@@ -403,7 +450,49 @@ paths:
               - failure
               - success
               - in_progress
+              - all
             type: string
+        - description: Optional query parameter. Comma-separated source instance ids, each of which must belong to the topology; omitted means every source.
+          in: query
+          name: source_jpds
+          required: false
+          schema:
+            type: string
+        - description: Optional query parameter. Comma-separated target instance ids; omitted means every target.
+          in: query
+          name: target_jpds
+          required: false
+          schema:
+            type: string
+        - description: Optional query parameter. Return only entities whose id starts with this prefix.
+          in: query
+          name: search
+          required: false
+          schema:
+            type: string
+        - description: Optional query parameter. RFC 3339 time; only entities modified after it are listed. Used only together with modified_before.
+          in: query
+          name: modified_after
+          required: false
+          schema:
+            format: date-time
+            type: string
+        - description: Optional query parameter. RFC 3339 time; the upper bound of the window. Used only together with modified_after.
+          in: query
+          name: modified_before
+          required: false
+          schema:
+            format: date-time
+            type: string
+        - description: Optional query parameter. Entities per page, 1 to 100; larger values are capped at 100.
+          in: query
+          name: page_size
+          required: false
+          schema:
+            default: 50
+            maximum: 100
+            minimum: 1
+            type: integer
         - description: Optional query parameter. The next_page_token from the previous page; omitted for the first page.
           in: query
           name: page_token
@@ -422,7 +511,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Missing or unsupported entity_type, an invalid status or an invalid page_token.
+          description: Missing or unsupported entity_type, an invalid status, a source_jpds id outside the topology, an invalid page_size, an invalid time window or an invalid page_token.
         '401':
           content:
             application/json:
@@ -450,7 +539,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
         '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Mission Control, which serves the Grid API, is not installed or not available.
       summary: List monitored entities
       tags:
         - topology
@@ -460,6 +553,7 @@ paths:
       x-pagination: cursor
       x-pagination-parameters:
         position: page_token
+        size: page_size
       x-pagination-next: body:/next_page_token
   /api/v1/topology/{key}/monitoring/entities/summary:
     get:
@@ -533,7 +627,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
         '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Mission Control, which serves the Grid API, is not installed or not available.
       summary: Summarise entity sync
       tags:
         - topology
@@ -614,7 +712,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Unexpected server error.
         '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Mission Control, which serves the Grid API, is not installed or not available.
       summary: Get one entity's sync state
       tags:
         - topology
@@ -946,6 +1048,10 @@ components:
     TopologiesListResponse:
       description: Every topology on this instance.
       properties:
+        eligible_jpd_count:
+          description: Required within this object. Instances known to Mission Control with an ENTERPRISE_PLUS or ENTERPRISE_PLUS_TRIAL licence, which may join a topology.
+          format: int32
+          type: integer
         topologies:
           description: Required within this object. The topologies ordered by key.
           items:
@@ -957,6 +1063,7 @@ components:
       required:
         - topologies
         - total
+        - eligible_jpd_count
       type: object
     TopologyResponse:
       description: A stored topology.
@@ -965,6 +1072,9 @@ components:
           description: Optional within this object. Server-owned. RFC 3339 creation time.
           format: date-time
           type: string
+        delete_in_progress:
+          description: Optional within this object. Server-owned. Present and true while a delete of the topology is running; updates and further deletes answer 409 meanwhile.
+          type: boolean
         description:
           description: Optional within this object. Free text; empty when none.
           type: string
@@ -994,6 +1104,9 @@ components:
         is_current:
           description: Optional within this object. True for the instance answering the request.
           type: boolean
+        jpd_id:
+          description: Optional within this object. Service id of the instance backing the site.
+          type: string
         location:
           allOf:
             - $ref: '#/components/schemas/JPDLocation'
@@ -1002,13 +1115,15 @@ components:
           description: Optional within this object. The instance name.
           type: string
         status:
-          description: Optional within this object. Connected when Access federation between this site and the others in the topology is configured and reachable; Disconnected otherwise, with the reason in status_description. A store that succeeds can still leave a site Disconnected.
+          description: Optional within this object. Connected when Access federation between this site and the others in the topology is configured and reachable. Partially Connected or Disconnected when configuring it failed, with the reason in status_description. Pending Removal for a site an update removed whose removal could not be applied; any later update retries it. A store that succeeds can still leave a site other than Connected.
           enum:
             - Connected
+            - Partially Connected
             - Disconnected
+            - Pending Removal
           type: string
         status_description:
-          description: Optional within this object. Why a site is Disconnected; empty when Connected.
+          description: Optional within this object. Why a site is not Connected; empty when Connected.
           type: string
       type: object
     TopologyValidationError:
@@ -1051,12 +1166,18 @@ components:
           description: Optional within this object. Human readable explanation.
           type: string
         source_site:
-          description: Optional within this object. The site the check ran from.
+          description: Optional within this object. The site the check ran from, as a site name or an instance id.
+          type: string
+        source_site_name:
+          description: Optional within this object. Display name of the source site, present when source_site holds an instance id known to Mission Control.
           type: string
         status:
           description: Optional within this object. Short status of the failed check, such as unreachable or untrusted.
           type: string
         target_site:
-          description: Optional within this object. The site that failed.
+          description: Optional within this object. The site that failed, as a site name or an instance id.
+          type: string
+        target_site_name:
+          description: Optional within this object. Display name of the target site, present when target_site holds an instance id known to Mission Control.
           type: string
       type: object
