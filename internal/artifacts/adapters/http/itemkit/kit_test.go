@@ -692,11 +692,24 @@ func TestUnitSourceRequestsCheckAlpineAndPassOtherPaths(t *testing.T) {
 // naming the repository to a caller it refuses; or, where it would serve,
 // the file it found, through the kit's helpers or a body of its own,
 // without serving, redirecting or counting anything. A read it makes
-// through GetItem is decided, not traced again, and a path every overlay
-// passes keeps the generic trace.
+// through GetItem, an archive entry's included, is decided, not traced
+// again, and a path every overlay passes keeps the generic trace.
 func TestUnitTraceAsksTheOverlays(t *testing.T) {
 	w := kittest.New(t, inmem.New())
 	file := w.Put(t, w.Local, false, "a/b.txt", []byte("generic"))
+	var zipped bytes.Buffer
+	zw := zip.NewWriter(&zipped)
+	entry, err := zw.Create("x.txt")
+	if err == nil {
+		_, err = entry.Write([]byte("x"))
+	}
+	if err == nil {
+		err = zw.Close()
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := w.Put(t, w.Local, false, "z.zip", zipped.Bytes())
 	var k *itemkit.Kit
 	closed := false
 	overlay := func(
@@ -722,9 +735,12 @@ func TestUnitTraceAsksTheOverlays(t *testing.T) {
 			}
 		case "file.idx":
 			got.ServeItemFile(rw, r, st, itemkit.Found{Repo: c, Item: file}, p)
-		case "member.idx":
+		case "member.idx", "entry.idx":
 			clone := r.Clone(r.Context())
 			clone.URL.Path = "/artifactory/libs-local/a/b.txt"
+			if req.Path == "entry.idx" {
+				clone.URL.Path = "/artifactory/libs-local/z.zip!/x.txt"
+			}
 			clone.URL.RawPath = ""
 			got.GetItem(rw, clone)
 		case "cached.idx":
@@ -779,6 +795,7 @@ func TestUnitTraceAsksTheOverlays(t *testing.T) {
 		{"raw.idx", kittest.Admin, found()},
 		{"file.idx", kittest.Admin, found("Returning found resource from libs-local:a/b.txt")},
 		{"member.idx", kittest.Admin, found("Returning found resource from libs-local:a/b.txt")},
+		{"entry.idx", kittest.Admin, found("Returning found resource from libs-local:z.zip")},
 		{"cached.idx", kittest.Admin, found("Returning found resource from remote-cache:cached.idx")},
 		{"stream.idx", kittest.Admin, found("Returning validated transient resource")},
 		{"a/b.txt", kittest.Admin, found("Returning found resource from libs-local:a/b.txt")},
@@ -816,8 +833,11 @@ func TestUnitTraceAsksTheOverlays(t *testing.T) {
 	if !closed {
 		t.Error("a traced overlay's stream was left open")
 	}
-	if st, err := w.Store.Items().Stats(t.Context(), file.ID); err != nil || st.DownloadCount != 0 {
-		t.Errorf("downloads %+v, %v; a trace counts none", st, err)
+	for _, it := range []model.Item{file, archive} {
+		st, err := w.Store.Items().Stats(t.Context(), it.ID)
+		if err != nil || st.DownloadCount != 0 {
+			t.Errorf("downloads of %s %+v, %v; a trace counts none", it.Name, st, err)
+		}
 	}
 }
 

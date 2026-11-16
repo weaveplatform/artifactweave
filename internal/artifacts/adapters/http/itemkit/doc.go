@@ -128,11 +128,11 @@
 //     RepoFilter.doGetOrHeadRequest answers ?trace by running the download
 //     itself under a TraceLoggingResponse. The overlay runs against a
 //     writer that records its status and error and refuses content;
-//     ServeContent, ServeItemFile and RemoteDeliveryAllowed record what
-//     they found and serve, redirect and count nothing, and a remote
-//     stream is closed unread. A read the overlay makes through GetItem is
-//     decided, not traced again, and a path no overlay answers keeps the
-//     generic trace.
+//     ServeContent, ServeItemFile, an archive entry's download and
+//     RemoteDeliveryAllowed record what they found and serve, redirect and
+//     count nothing, and a remote stream is closed unread. A read the
+//     overlay makes through GetItem is decided, not traced again, and a
+//     path no overlay answers keeps the generic trace.
 //   - A file download, streamed, redirected or from a remote's stream,
 //     answers If-None-Match and If-Modified-Since as 7.x's download does
 //     (pkgroute.FileNotModified): one If-None-Match line at a time, less a
