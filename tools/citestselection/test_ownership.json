@@ -104,6 +104,7 @@
       "fixtures_test.go",
       "format_tables_test.go",
       "hash_test.go",
+      "head_test.go",
       "helm_fixture_test.go",
       "keyed_test.go",
       "limits_cost_test.go",

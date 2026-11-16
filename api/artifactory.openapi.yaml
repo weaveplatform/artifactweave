@@ -16178,7 +16178,7 @@ paths:
       x-idempotency: natural
       x-idempotency-natural:
         - route
-      x-cost: expensive
+      x-cost: ordinary
   /api/system/verifyconnection:
     post:
       description: Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.

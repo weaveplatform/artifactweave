@@ -10,6 +10,12 @@ baseline [#1395](https://github.com/weaveplatform/artifactweave/issues/1395):
 see [Rules for every operation](#rules-for-every-operation).
 [#1405](https://github.com/weaveplatform/artifactweave/issues/1405) to
 [#1412](https://github.com/weaveplatform/artifactweave/issues/1412) implement them.
+Amended by [#1597](https://github.com/weaveplatform/artifactweave/issues/1597)
+(2026-11-16), which moves the telemetry sinks to `ordinary`
+([Classes moved since](#classes-moved-since)), and by
+[#1598](https://github.com/weaveplatform/artifactweave/issues/1598) (2026-11-16), under
+which a HEAD that the router answers through a GET operation is admitted as that GET
+([Matching happens before routing](#cost-classes-and-how-admission-finds-them)).
 This decision describes artifactweave's implementation. It is not a live JFrog
 compatibility capture. Header support, rejection statuses and the Access page
 cap need confirmation under [#216/P19](https://github.com/weaveplatform/artifactweave/issues/216).
@@ -274,7 +280,7 @@ admission read the spec, as `expensiveRequest`, `HealthRequest` and
 `APIRecoveryRequest` decided for its method and path. So taking the class from the
 spec changes no policy name and no limit for any operation's own path.
 Moving an operation to another class later changes its answers and needs its own
-decision.
+decision, recorded under [Classes moved since](#classes-moved-since).
 
 **Matching happens before routing.** `make generate` emits a table from the bundled
 specs: method, route pattern, operation id, `x-cost`, `x-cost-expensive-query` and
@@ -283,7 +289,14 @@ tree built from that table with `chi.Mux.Find`, so the lookup applies chi's own
 precedence (a static segment beats a parameter) to the same patterns and the same
 escaped path the router uses. A request that no spec pattern matches (hand-written
 aliases, native protocol routes and unknown paths) falls back to path rules that
-`expensiveRequest` keeps for those alone. Where a hand-written route serves a spec
+`expensiveRequest` keeps for those alone. A HEAD that the router answers through a
+generated GET operation ([decision 0002](0002-spec-first-flat-crud-handwritten-item-paths.md),
+"A HEAD of a generated GET") reaches the key gate, admission, authentication and the
+restriction check as that GET, so it is admitted, headed and exempted as the GET is:
+the probes' HEAD is exempt and the recovery reads' HEAD takes the recovery reserve.
+Before [#1598](https://github.com/weaveplatform/artifactweave/issues/1598) such a HEAD
+answered 405, and the path rules decided its class. A HEAD of a hand-written GET-only
+route still answers 405 under the path rules. Where a hand-written route serves a spec
 operation under another pattern, the two must agree, and a test over every served
 operation checks that they do. The hand-written item operations are looked up under
 the pattern the router serves them with, whose repository key never matches `api`,
@@ -314,6 +327,56 @@ Charging the expensive lane after routing was rejected:
 
 The cost is a radix-tree lookup in each of the two admission steps, ingress and
 principal, and a tree built once per process.
+
+#### Classes moved since
+
+**The telemetry sinks, from `expensive` to `ordinary`**
+([#1597](https://github.com/weaveplatform/artifactweave/issues/1597), 2026-11-16):
+`POST /artifactory/api/system/usage` (`postSystemUsage`), and
+`POST /jfconnect/api/v1/backoffice/metrics/log`, which no spec declares, so the path
+rules decide it and carry the exception. Both were expensive as writes under `/api/`.
+
+- **What the clients send.** The JFrog Terraform provider posts a usage report for
+  every resource it creates, reads, updates or deletes (terraform-provider-shared
+  `util.SendUsageResourceCreate`, `...Read`, `...Update` and `...Delete`, which provider
+  12.11.14 calls in each repository operation), and the JFrog CLI posts a usage report
+  and its jfconnect metrics after each command (jfrog-cli-core
+  `commands.ReportUsage`, which sends both at once;
+  [research 06](../06-system-configuration-and-descriptor.md)). So a refresh of N
+  resources makes N reports beside its N reads. Charged as expensive, the reports of the
+  virtual-repositories Terraform scenario (102 resources applied, planned twice,
+  updated and destroyed in about fifteen seconds) took 465 of the 597 expensive
+  admissions of the minute before its first 429, and 28 of its 102 repository deletes
+  answered 429, which the provider does not retry.
+- **What 7.x does with them.** 7.161.26's `UsageResource` hands a report to
+  `IntegrationsFeature.addUsageData`, which adds it to an in-memory tally that the call
+  home job sends later, bounded at 100 products, 100 features each, 10,000 unique
+  clients and 10,000 characters of attributes. It answers 202 while call home is
+  offline and 413 past a bound; it touches no database and no storage. No 7.x source
+  limits it: no documentation page, release note or KB article describes a limit on
+  incoming requests beyond those on AQL and searches
+  ([research](../api-reliability/README.md#7x-evidence-for-the-operation-rules)), and
+  the query rate limiter, off by default (`query.rate.limiter.enabled`), names neither
+  path among its low-priority ones (`query.rate.limiter.low.priority.default.list`).
+  Public Jira's one issue on the endpoint,
+  [RTFACT-22629](https://jfrog.atlassian.net/browse/RTFACT-22629) (open), asks for it to
+  accept unauthenticated calls, not to limit them. The jfconnect service is not in the
+  open-source tree; no source documents a limit on it either.
+- **What artifactweave does with them.** `configurationhttp.SinkHandler` reads at most
+  1 MiB of either and drops it (DV-011). That is not the work the expensive allowance
+  exists to bound: management writes, searches, archives, imports and exports.
+
+So both are charged as ordinary requests: policy `api`, the principal's 6000 a minute,
+no expensive permit and no two-minute deadline. Their status and body are unchanged;
+their `RateLimit-Policy` names `api` instead of `expensive`, and a burst of them no
+longer spends the expensive allowance the provider's repository writes need.
+
+Raising the default expensive allowance was rejected: a refresh of a few hundred
+resources would need several thousand a minute, which would loosen the bound on the
+expensive work for every principal to make room for requests that do none. Leaving
+the jfconnect sink expensive was rejected too: every `jf` command posts it beside its
+usage report, so a pipeline running more than 600 commands a minute under one
+principal would spend the expensive allowance on telemetry alone.
 
 ### Rate headers and Retry-After
 

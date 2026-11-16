@@ -150,7 +150,7 @@
   "test/acceptance/vcs_steps_test.go": "6d3bb2e83a242e8ac779261e73323bfaae5f4f051a5d27053e797e216e1f845c",
   "test/server/artifacts/conan/conan_client_remote_test.go": "64828726a5f823712b4eba59851743e060398f3c1979894f460f561511c7cc75",
   "test/server/artifacts/conan/conan_client_test.go": "3c71796a0511863f83e9bc83c51c73831a908b46efa323b5d6eeb9bcaf66abc0",
-  "test/server/artifacts/vcs/vcs_delivery_test.go": "7e16c69adce63c2d51961fa74382e713888bacec37a1c3228cd021d0facfcf9c",
+  "test/server/artifacts/vcs/vcs_delivery_test.go": "5f9348d4c82bcb24b9708dd901133c780824c4502793c0ce9211c8ffc523994d",
   "test/server/artifacts/vcs/vcs_legacy_test.go": "5a46412ac476ee98d651badec4876caaa5d8fff486f6aee1394f5dd505ca794c",
   "test/server/artifacts/vcs/vcs_routes_test.go": "50f4146330500727525a6021d39c5954328759c2020472805a6dc444cc33588a"
 }

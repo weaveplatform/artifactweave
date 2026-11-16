@@ -133,16 +133,12 @@ mkdir -p "${GOCOVERDIR:-$work/cover}"
 # retry (#1147). This job tests the providers against the API, not that
 # default, so the server allows the maximum.
 #
-# The provider also posts a usage report (POST /api/system/usage) for every
-# resource it creates, reads, updates or deletes, and each is charged to the
-# admin's expensive budget, 600 a minute by default. The virtual-repositories
-# scenario's 102 resources go through create, two refreshed plans, an update
-# and a destroy in about fifteen seconds, and its destroy met 429s at that
-# budget. The per-principal budget is raised to the shared one, 6000, for the
-# same reason as the timeout.
+# The provider posts a usage report (POST /api/system/usage) for every
+# resource it creates, reads, updates or deletes. Those are ordinary
+# requests (decision 0043, "Classes moved since"), so the default budgets
+# hold the virtual-repositories scenario's 102 resources (#1597).
 GOCOVERDIR=${GOCOVERDIR:-$work/cover} \
 	ARTIFACTWEAVE_API_BUDGET_TIMEOUT=5s \
-	ARTIFACTWEAVE_API_EXPENSIVE_PRINCIPAL_PER_MINUTE=6000 \
 	ARTIFACTWEAVE_MASTER_KEY=terraform-master-key-0123456789abcdef0123456789abcdef \
 	ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD=$password \
 	ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH=true \

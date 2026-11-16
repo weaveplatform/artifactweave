@@ -71,13 +71,6 @@ in the order given. Set `revision = 2` to reverse every virtual's members and ch
 field of each (the retrieval cache period, the external dependency patterns, the POM cleanup
 policy, or the notes), then apply and plan again.
 
-The provider posts a usage report to `/artifactory/api/system/usage` for each resource it
-creates, reads, updates or deletes, and artifactweave counts each against the admin's
-expensive request budget, 600 a minute by default (`api.expensive_principal_per_minute`).
-Applying, refreshing and destroying this reference's 102 resources within a minute exceeds
-it, and a refused write fails the run with 429. Raise the budget on the server, as the test
-run does, or space the runs out.
-
 ## Security
 
 The access token and the private keys are sensitive variables, so Terraform keeps them out
@@ -103,8 +96,7 @@ with `openssl`, points the remotes at the fixture server's `/controlled-upstream
 applies revision 1, requires an empty refreshed plan, and reads every virtual through
 `GET /artifactory/api/repositories/{key}` to check its members' order and deployment
 repository. It then applies revision 2 and repeats both checks, plans once more and
-destroys. No request goes to an upstream. The server runs with
-`api.expensive_principal_per_minute` at 6000 for the reason above.
+destroys. No request goes to an upstream.
 
 See [CI documentation](../../../../docs/testing/ci.md#terraform-scenarios) for the run,
 and [provider research](../../../../docs/research/08-terraform-providers.md) for the

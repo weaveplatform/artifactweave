@@ -230,6 +230,19 @@ support; artifactweave refuses it with 400.
   ([RTFACT-23250](https://jfrog.atlassian.net/browse/RTFACT-23250)).
 - [I]: the headers and body of 7.x's AQL and NuGet 429s.
 
+**Usage reports.** The JFrog Terraform provider posts
+`POST /artifactory/api/system/usage` for every resource operation, and the JFrog CLI
+posts it and `POST /jfconnect/api/v1/backoffice/metrics/log` after each command. No
+page documents the usage endpoint. In 7.161.26, `UsageResource` (`ADMIN` or `USER`)
+adds the report to `IntegrationsFeature`'s in-memory tally for call home and answers
+200, 202 while call home is offline, or 413 past the tally's bounds; nothing limits
+its rate. The query rate limiter (`query.rate.limiter.enabled`, off by default) lists
+storage, plugin execution, Docker tag lists, copy, move, artifact actions, artifact
+properties and builds as low priority, not usage. Public Jira's
+[RTFACT-22629](https://jfrog.atlassian.net/browse/RTFACT-22629) (open) asks for an
+unauthenticated variant. So both are ordinary requests
+([decision 0043](../decisions/0043-api-reliability.md#classes-moved-since), #1597).
+
 **IETF drafts.** On 2026-11-12 the IETF datatracker lists
 `draft-ietf-httpapi-idempotency-key-header-08` (2026-10-22, expires 2027-04-25)
 and `draft-ietf-httpapi-ratelimit-headers-11` (2026-05-23, expires 2026-11-24) as

@@ -227,8 +227,10 @@ resources (`NewHexVirtualRepositoryResource`, `NewNixVirtualRepositoryResource`)
 Hex's `hex_primary_keypair_ref` is required. OCI and Helm OCI send
 `resolve_oci_tags_by_timestamp` as `resolveDockerTagsByTimestamp`. A second revision
 reverses every member list. The provider posts a usage report for each resource
-operation (`util.SendUsageResource*`), which matters at this size: see
-[CI's Terraform scenarios](../testing/ci.md#terraform-scenarios).
+operation (`util.SendUsageResource*`), so this scenario makes several hundred a
+minute; they are ordinary requests
+([decision 0043](decisions/0043-api-reliability.md#classes-moved-since)), so the
+default request budgets hold them.
 
 The current roots are in `deploy/artifactweave/terraform/`; `test/terraform/run.sh`
 installs the pinned JFrog release archives into a checksum-verified filesystem mirror

@@ -466,7 +466,7 @@ var Table = []Operation{
 	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/system/support/bundle/{bundleId}", OperationID: "getSupportBundleMetadata", Cost: "ordinary", Idempotency: "safe"},
 	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/system/support/bundle/{bundleId}/archive", OperationID: "getSupportBundle", Cost: "ordinary", Idempotency: "safe"},
 	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/system/support/bundles", OperationID: "listSupportBundles", Cost: "ordinary", Idempotency: "safe", Pagination: "complete"},
-	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/system/usage", OperationID: "postSystemUsage", Handwritten: true, Cost: "expensive", Idempotency: "natural"},
+	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/system/usage", OperationID: "postSystemUsage", Handwritten: true, Cost: "ordinary", Idempotency: "natural"},
 	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/system/verifyconnection", OperationID: "verifyConnection", Cost: "expensive", Idempotency: "safe"},
 	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/system/version", OperationID: "getSystemVersion", Cost: "ordinary", Idempotency: "safe"},
 	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/tasks", OperationID: "getBackgroundTasks", Cost: "ordinary", Idempotency: "safe", Pagination: "complete"},

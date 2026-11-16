@@ -1288,11 +1288,9 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
 1. Build and start one `-cover` binary, writing its coverage to `cover/terraform`, with
    `ARTIFACTWEAVE_API_BUDGET_TIMEOUT=5s`, the maximum. Terraform deletes up to ten resources
    at once, and on SQLite the default 500ms admission deadline can refuse one of those
-   requests with a 503 that the provider does not retry (#1147). It also raises
-   `ARTIFACTWEAVE_API_EXPENSIVE_PRINCIPAL_PER_MINUTE` from 600 to 6000: the provider posts
-   a usage report (`POST /artifactory/api/system/usage`) for every resource operation, each
-   charged as an expensive request, and the virtual-repositories scenario's 102 resources
-   exceed 600 of them within a minute, so its destroy met 429s. If a later step fails,
+   requests with a 503 that the provider does not retry (#1147). The provider's usage
+   reports (`POST /artifactory/api/system/usage`, one for every resource operation) are
+   ordinary requests, so the other budgets keep their defaults (#1597). If a later step fails,
    `run.sh` prints the last 300 lines of the server log.
 2. Mint an admin access token with the bootstrap admin's password
    (`POST /access/api/v1/tokens`), which the server takes because step 1 starts it with

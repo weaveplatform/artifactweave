@@ -18657,7 +18657,7 @@
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "natural on route: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
-    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "pagination_execution": "not a collection",
     "evidence": [
       "internal/app/router.go",
@@ -19854,7 +19854,7 @@
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",
     "retry": "no key support; reconcile ambiguous completion before retrying",
-    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
       "internal/app/router.go",
