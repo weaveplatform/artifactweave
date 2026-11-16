@@ -524,6 +524,18 @@ func TestUnitRemoteAndVirtualDoNotDiscloseForbiddenSource(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	// Deploy/Cache on the whole remote, without Read, so the spec is
+	// fetched into the cache (7.x fills it only for a caller with
+	// Deploy/Cache, #1587) and Read alone decides what is disclosed.
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "fill-cache",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"partial": api.ActionWrite}},
+			Targets: map[string]accesstest.Target{"pods-remote": {}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	for _, key := range []string{"pods-remote", "pods-virtual"} {
 		spec := f.getAs("partial", key, podfmt.SpecPath("RemotePod", "2.0.0"))
 		if spec.Code == http.StatusOK || strings.Contains(spec.Body.String(), f.up.URL) {

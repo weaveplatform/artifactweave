@@ -2,7 +2,8 @@
 Feature: VS Code installs from a native AI editor extensions remote repository
   The official VS Code 1.143.1 client queries the gallery and downloads the
   unchanged Microsoft Hex Editor 1.11.1 assets through an explicit anonymous
-  read grant. A fresh profile can install from the remote cache offline.
+  grant to read the remote and fill its cache (Deploy/Cache, #1587). A fresh
+  profile can install from the remote cache offline.
 
   Scenario: pinned VS Code installs through the permission-controlled remote cache
     Given the registry is running
@@ -21,7 +22,7 @@ Feature: VS Code installs from a native AI editor extensions remote repository
     Then the response status is 200
     When I POST "/access/api/v2/permissions" as admin with body:
       """
-      {"name":"ai-editor-anonymous-read","resources":{"artifact":{"actions":{"users":{"anonymous":["READ"]}},"targets":{"editor-remote":{"include_patterns":["extensions/ms-vscode/hexeditor/**"]}}}}}
+      {"name":"ai-editor-anonymous-read","resources":{"artifact":{"actions":{"users":{"anonymous":["READ","WRITE"]}},"targets":{"editor-remote":{"include_patterns":["extensions/ms-vscode/hexeditor/**"]}}}}}
       """
     Then the response status is 201
     When I install Hex Editor with VS Code profile "cold"

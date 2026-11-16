@@ -128,10 +128,15 @@ func (p *Policy) Acquire(ctx context.Context, repoKey string) (func(), error) {
 // read the cache alone. A HEAD fills the cache as a GET does and is answered
 // from the copy kept; a read that keeps nothing (storeArtifactsLocally
 // false, a checksum-only or transient resource) and a checksum request's
-// HEAD have an upstream exchange of their own, a HEAD for a HEAD. With an
-// Interceptor installed, a read that WithSmart has not marked goes to it
-// first. Errors: source.ErrUnavailable when the hooks a fetch needs are not
-// installed, kernel.ErrNotFound for a fresh negative entry,
+// HEAD have an upstream exchange of their own, a HEAD for a HEAD. A caller
+// who may not fill the cache (source.AuthorizeFill) is answered from the
+// upstream's info alone (withoutFill), and while the upstream is assumed
+// offline a read asks it nothing (offline). With an Interceptor installed,
+// a read that WithSmart has not marked goes to it first. Errors:
+// source.ErrUnavailable when the hooks a fetch needs are not installed,
+// a *source.CacheFillDenied for a file such a caller would fill,
+// source.ErrAssumedOffline for a miss while the upstream is assumed
+// offline, kernel.ErrNotFound for a fresh negative entry,
 // source.ErrSuperseded when the credential revision moved on, and
 // PolicyError's mapping of upstream and capacity failures. A successful
 // result's Revalidate repeats Check before disclosure.
@@ -171,16 +176,8 @@ func (p *Policy) Read(
 	key := p.CacheKey(q, opts.Revision)
 	noStore := transientResource(q)
 	if !noStore {
-		entry, readErr := p.ReadEntry(ctx, key, permit)
-		if readErr == nil {
-			if p.negativeFresh(q, entry) {
-				return source.Result{}, kernel.ErrNotFound
-			}
-			if p.fresh(q, entry) {
-				return p.resultFor(ctx, q, entry)
-			}
-		} else if !errors.Is(readErr, kernel.ErrNotFound) {
-			return source.Result{}, readErr
+		if result, done, readErr := p.cachedAnswer(ctx, q, permit, key); done {
+			return result, readErr
 		}
 	}
 	responseCtx := ctx
@@ -191,6 +188,13 @@ func (p *Policy) Read(
 		return source.Result{}, PolicyError(err)
 	}
 	defer release()
+	// Checked before the read joins a flight: 7.x checks the deploy path
+	// before it waits on another request's download of the same path
+	// (RemoteRepoBase.downloadAndSave), so a caller who may not fill the
+	// cache never takes a copy another caller is fetching.
+	if denied := fillDenied(q, noStore); denied != nil {
+		return p.withoutFill(ctx, responseCtx, q, permit, opts, key, denied)
+	}
 	if noStore || q.Resource.Method == http.MethodHead && q.Resource.ChecksumRequest {
 		// These requests own their response: a stream or a bodyless HEAD
 		// must never become the shared result of a persistent fill. A
@@ -238,6 +242,30 @@ func (p *Policy) Read(
 	result, err := p.resultFor(responseCtx, q, filled.entry)
 	result.Refused = filled.refused
 	return result, err
+}
+
+// cachedAnswer answers q from the entry the cache keeps at key where that
+// entry decides the read: a fresh negative entry is the miss, and a fresh
+// copy is served. done is false when the read goes on to the upstream.
+func (p *Policy) cachedAnswer(
+	ctx context.Context,
+	q source.Request,
+	permit source.Permit,
+	key model.RemoteCacheKey,
+) (result source.Result, done bool, err error) {
+	entry, err := p.ReadEntry(ctx, key, permit)
+	switch {
+	case errors.Is(err, kernel.ErrNotFound):
+		return source.Result{}, false, nil
+	case err != nil:
+		return source.Result{}, true, err
+	case p.negativeFresh(q, entry):
+		return source.Result{}, true, kernel.ErrNotFound
+	case p.fresh(q, entry):
+		result, err = p.resultFor(ctx, q, entry)
+		return result, true, err
+	}
+	return source.Result{}, false, nil
 }
 
 func transientResource(q source.Request) bool {

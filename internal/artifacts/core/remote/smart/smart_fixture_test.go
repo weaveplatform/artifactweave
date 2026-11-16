@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/upstreamtest"
@@ -88,6 +90,8 @@ func ptr[T any](v T) *T { return &v }
 func (w *policyWorld) request(path string, kind source.ResourceKind) source.Request {
 	return source.Request{
 		Repo:     w.c,
+		Subject:  accessapi.Subject{Name: "admin"},
+		Access:   &accessapitest.Decider{Admin: true},
 		Resource: source.Resource{Kind: kind, Path: path, Method: "GET"},
 	}
 }

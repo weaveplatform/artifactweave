@@ -19,9 +19,9 @@ import (
 // RemoteWorld is the router over an application runtime that App opened,
 // with a generic remote repository in front of a fake upstream, built by
 // NewRemoteWorld for one test. Every user's password is "pw": admin; reader,
-// which may read the remote; denied, which may not. A test that changes Repo
-// saves it with Update, and one that needs other router options replaces H
-// with a router over Runtime.
+// which may read the remote and fill its cache; denied, which may not read
+// it. A test that changes Repo saves it with Update, and one that needs
+// other router options replaces H with a router over Runtime.
 type RemoteWorld struct {
 	T        *testing.T
 	Runtime  *app.Runtime
@@ -34,9 +34,11 @@ type RemoteWorld struct {
 // "pw"; the generic remote repository "remote" over a fake upstream, with
 // repo.Defaults' settings; the users reader and denied, whose password hash
 // is support.CheapHash; the permission remote-read, which lets reader read
-// remote; and the router over the runtime's store, hot blob store,
-// authenticator, token service and keyring and the artifacts module's
-// remote sources and remote HTTP pool, with a logger that discards.
+// remote and fill its cache (Read and Deploy/Cache, since 7.x fills a
+// remote's cache only for a caller with Deploy/Cache on it, #1587); and the
+// router over the runtime's store, hot blob store, authenticator, token
+// service and keyring and the artifacts module's remote sources and remote
+// HTTP pool, with a logger that discards.
 func NewRemoteWorld(t *testing.T) *RemoteWorld {
 	t.Helper()
 	rt := App(t, func(cfg *config.Config) { cfg.Bootstrap.AdminPassword = "pw" })
@@ -56,7 +58,9 @@ func NewRemoteWorld(t *testing.T) *RemoteWorld {
 	if err := rt.Store.Permissions().
 		Create(t.Context(), accesstest.Permission{Name: "remote-read", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Actions: accesstest.Grants{
+					Users: map[string]api.Actions{"reader": api.ActionRead | api.ActionWrite},
+				},
 				Targets: map[string]accesstest.Target{"remote": {}},
 			},
 		}}); err != nil {

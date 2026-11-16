@@ -19,8 +19,11 @@ curl --fail --user admin "$REGISTRY/artifactory/api/repositories/vendor" \
 curl --fail --user reader "$REGISTRY/artifactory/vendor/tool.bin" --output tool.bin
 ```
 
-A caller needs Read on the remote and requested path; filling its cache does not
-require Deploy. Repository blackout and include/exclude rules still apply. Requests
+A caller needs Read on the remote and requested path to read what its cache holds,
+and Deploy/Cache on that path as well to fill or refresh the cache from the upstream,
+as Artifactory 7.x requires ([#1587](https://github.com/weaveplatform/artifactweave/issues/1587)).
+A caller with Read alone gets 403 on the item route, and a package client its usual
+not-found answer, for a file the cache does not hold yet. Repository blackout and include/exclude rules still apply. Requests
 recheck current user/token state, permissions, source identity, configuration and
 upstream credential revisions before publication and delivery. Uploads to remotes
 and cache aliases remain refused.

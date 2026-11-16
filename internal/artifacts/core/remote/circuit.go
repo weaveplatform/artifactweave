@@ -45,7 +45,11 @@ func (p *Policy) State(
 // Cooldown refuses an upstream exchange while state holds one off, by the
 // policy's clock: a 429 *source.HTTPError carrying the rest of a Retry-After
 // pause, or a 502 connectivity failure while the upstream is assumed
-// offline. It returns nil when the exchange may go ahead.
+// offline. It returns nil when the exchange may go ahead. The policy's
+// reads of a file answer an assumed-offline upstream before they ask it
+// (offline); the 502 is what a folder listing, a search's metadata read, a
+// POST query and Smart Remote's own exchanges, its discovery and its
+// property and statistics requests, are refused with.
 func (p *Policy) Cooldown(state model.RemoteSourceState) error {
 	now := p.now()
 	if state.RetryAfterUntil.After(now) {
@@ -59,6 +63,45 @@ func (p *Policy) Cooldown(state model.RemoteSourceState) error {
 		return &source.HTTPError{Status: 502, Kind: source.FailureKindConnectivity}
 	}
 	return nil
+}
+
+// assumedOffline reports whether state holds the upstream assumed offline,
+// by the policy's clock.
+func (p *Policy) assumedOffline(state model.RemoteSourceState) bool {
+	return state.OfflineUntil.After(p.now())
+}
+
+// AssumedOffline reports whether the upstream of q's repository is assumed
+// offline now, under the repository's current credential revision. A read
+// of the options or of the state that fails reports false, leaving the
+// read that follows to meet the same failure.
+func (p *Policy) AssumedOffline(ctx context.Context, q source.Request) bool {
+	if p.Options == nil {
+		return false
+	}
+	opts, err := p.Options(ctx, q.Repo)
+	if err != nil {
+		return false
+	}
+	state, err := p.State(ctx, q, opts.Revision)
+	return err == nil && p.assumedOffline(state)
+}
+
+// offline answers a read of key while the upstream is assumed offline,
+// without asking it: e, the copy the cache holds, however old, or
+// source.ErrAssumedOffline when it holds none. 7.161.26's
+// RemoteRepoBase.internalGetInfo asks isOffline, which covers the assumed
+// offline state, before the upstream, and returns an expired cached
+// resource ("Repository is offline but the resource exists in the local
+// cache") or "<key>: is assumed offline, '<key>:<path>' is not found at
+// '<path>'.". Neither hardFail nor the copy's Cache-Control is read there:
+// 7.x reads hardFail only for an exception of its own request
+// (handleGenericException), and never reads an upstream's Cache-Control.
+func (p *Policy) offline(key model.RemoteCacheKey, e model.RemoteCacheEntry) (fillResult, error) {
+	if e.Blob.Checksums.SHA256 != "" && e.NegativeUntil.IsZero() {
+		return fillResult{key: key, entry: e}, nil
+	}
+	return fillResult{key: key}, source.ErrAssumedOffline
 }
 
 func (p *Policy) changeState(

@@ -38,6 +38,12 @@
 //   - The safe failures (ErrDenied, ErrInvalidRequest, ErrUnsupported,
 //     ErrUnavailable, ErrSuperseded, ErrInvalidResult) and HTTPError with
 //     its FailureKind, which routers map to their own error envelopes.
+//   - The cache fill check: AuthorizeFill, which a backend asks before it
+//     keeps what it fetches, and its refusal CacheFillDenied, with
+//     MetadataPath, the paths it asks Annotate for; and ErrAssumedOffline,
+//     a remote's miss while its upstream is assumed offline. Both are
+//     kernel.ErrNotFound, which the item route words as 7.x does (#1587,
+//     #1601).
 //   - Resource.CheckPolicy, the policy rule Service.Read applies, which the
 //     application's Revalidate fences a result with too.
 //   - A Result's descendant checks: CheckRead and CheckFolder, which apply
@@ -61,7 +67,8 @@
 //     answers the policy's 404 (#1237). A failure of the server's own
 //     storage (format.ErrStorageFault) leaves as it is too, in
 //     the store's words, so a router answers it as a server fault rather
-//     than as ErrUnavailable (#1269).
+//     than as ErrUnavailable (#1269). A *CacheFillDenied and
+//     ErrAssumedOffline leave as they are, for the item route's reasons.
 //   - The package opens no store transaction and propagates none.
 //
 // # References
@@ -94,7 +101,8 @@
 //     errors, a storage fault passed on as it is, stream ownership and late
 //     fences, root metadata grants, the Smart and Git LFS contracts, and the
 //     policy path, blackout-only reads, policy refusals from CheckRead and
-//     CheckPermission's permission-only check.
+//     CheckPermission's permission-only check; fill_test.go, the cache
+//     fill check and its refusal and the assumed-offline miss passed on.
 //   - authorize_test.go and cocoapods_test.go are in-package unit tests of
 //     the path authorisation and the CocoaPods Git descriptor.
 package source

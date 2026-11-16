@@ -61,6 +61,20 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 		Create(t.Context(), accesstest.Permission{Name: "remote-read", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}, Targets: map[string]accesstest.Target{"remote": {Include: []string{"ns/name/aws/1.0.0.zip", "archives/1.0.0.zip"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
+	// Deploy/Cache on the whole remote, without Read: the reads fill the
+	// remote's cache, which 7.x allows only a caller with Deploy/Cache on it
+	// (#1587), while Read still decides what each caller is served.
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "remote-fill",
+		Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]accessapi.Actions{
+				"reader": accessapi.ActionWrite, kernel.AnonymousUser: accessapi.ActionWrite,
+			}},
+			Targets: map[string]accesstest.Target{"remote": {}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	resolver, err := upstream.NewResolver(
 		f.db,
 		nil,

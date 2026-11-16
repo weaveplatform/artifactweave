@@ -48,7 +48,11 @@ func externalTarballWorld(t *testing.T) (*harness.RemoteWorld, *fakeupstream.Ser
 	if err := rt.Store.Permissions().
 		Create(t.Context(), accesstest.Permission{Name: "remote-read", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
-				Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				// Deploy/Cache too: 7.x fills a remote's cache only for a
+				// caller with it (#1587).
+				Actions: accesstest.Grants{
+					Users: map[string]api.Actions{"reader": api.ActionRead | api.ActionWrite},
+				},
 				Targets: map[string]accesstest.Target{"remote": {}},
 			},
 		}}); err != nil {

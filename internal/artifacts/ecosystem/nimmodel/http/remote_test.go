@@ -73,8 +73,12 @@ func newFixture(t *testing.T) *fixture {
 	if err := db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "nim-read", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
+				// Deploy/Cache as well as Read: the reads fill the remote's
+				// cache, which 7.x allows only a caller with Deploy/Cache on
+				// it (#1587).
 				Actions: accesstest.Grants{Users: map[string]api.Actions{
-					"reader": api.ActionRead, "nim-only": api.ActionRead,
+					"reader":   api.ActionRead | api.ActionWrite,
+					"nim-only": api.ActionRead | api.ActionWrite,
 				}},
 				Targets: map[string]accesstest.Target{"nim-remote": {Include: []string{"**"}}},
 			},
@@ -348,8 +352,12 @@ func TestAccNIMMetadataAndPairedDockerRegistryKeepSeparateAuthority(t *testing.T
 	if err := f.store.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "nvcr-read", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
+				// Deploy/Cache as well as Read: the reads fill the remote's
+				// cache, which 7.x allows only a caller with Deploy/Cache on
+				// it (#1587).
 				Actions: accesstest.Grants{Users: map[string]api.Actions{
-					"reader": api.ActionRead, "docker-only": api.ActionRead,
+					"reader":      api.ActionRead | api.ActionWrite,
+					"docker-only": api.ActionRead | api.ActionWrite,
 				}},
 				Targets: map[string]accesstest.Target{
 					"nvcr-remote": {Include: []string{"nim/meta/llama/**"}},
