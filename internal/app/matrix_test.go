@@ -363,6 +363,45 @@ func permissionManagers(p matrixPrincipal) int {
 	return administrators(p)
 }
 
+// namedRefusal is r for the storage API's item info and statistics, which
+// refuse an anonymous caller as they refuse a user while anonymous access is
+// on: 403 naming the path and the caller (#1600).
+func namedRefusal(r rule) rule {
+	return func(p matrixPrincipal) int {
+		if s := r(p); s != http.StatusUnauthorized || !p.anonymousOn {
+			return s
+		}
+		return http.StatusForbidden
+	}
+}
+
+// propertiesRefusal is r for the storage API's properties view, which
+// answers a caller it refuses 404 "No properties could be found.", anonymous
+// too while anonymous access is on (#1600).
+func propertiesRefusal(r rule) rule {
+	return func(p matrixPrincipal) int {
+		if s := r(
+			p,
+		); s != http.StatusForbidden &&
+			(s != http.StatusUnauthorized || !p.anonymousOn) {
+			return s
+		}
+		return http.StatusNotFound
+	}
+}
+
+// listRefusal is r for the storage API's file list, which refuses an
+// anonymous caller with 403 before anything else while anonymous access is
+// on (#1573).
+func listRefusal(r rule) rule {
+	return func(p matrixPrincipal) int {
+		if p.anonymous && p.anonymousOn {
+			return http.StatusForbidden
+		}
+		return r(p)
+	}
+}
+
 // holds: a caller holding every action in want at path in repoKey.
 func holds(repoKey, path string, want api.Actions) rule {
 	return func(p matrixPrincipal) int {
@@ -864,7 +903,7 @@ func storageMatrix() []matrixRow {
 	)
 	read, annotate := api.ActionRead, api.ActionAnnotate
 	return []matrixRow{
-		row(get, file, "", holds("libs-local", "work/", read), 200),
+		row(get, file, "", namedRefusal(holds("libs-local", "work/", read)), 200),
 		// The effective permissions view is for administrators.
 		row(get, file+"?permissions", "", administrators, 200),
 		row(
@@ -933,47 +972,47 @@ func trashMatrix() []matrixRow {
 	)
 	write, manage := api.ActionWrite, api.ActionManage
 	return []matrixRow{
-		at(list, "", trashViewer, 200),
+		at(list, "", namedRefusal(trashViewer), 200),
 		// What was trashed from A shows to its deploy and manage holders,
 		// and B's to no one but administrators (#439).
 		row(
 			list, tc+"/libs-local/work", "",
-			holdsEither("libs-local", "work/", write, manage), 200,
+			namedRefusal(holdsEither("libs-local", "work/", write, manage)), 200,
 		).seeding(trashed("libs-local", "work/listed-{p}.txt")),
 		row(
 			list, tc+"/libs-local/work/listed-file-{p}.txt", "",
-			holdsEither("libs-local", "work/", write, manage), 200,
+			namedRefusal(holdsEither("libs-local", "work/", write, manage)), 200,
 		).seeding(trashed("libs-local", "work/listed-file-{p}.txt")),
 		row(
 			list, tc+"/libs-b/work", "",
-			holdsEither("libs-b", "work/", write, manage), 200,
+			namedRefusal(holdsEither("libs-b", "work/", write, manage)), 200,
 		).seeding(trashed("libs-b", "work/b-listed-{p}.txt")),
 		// Every storage view the trash can serves holds the same filter: A's
 		// trash to A's deploy and manage holders, B's to B's (#455).
-		at(list+"?list&deep=1&listFolders=1", "", trashViewer, 200),
+		at(list+"?list&deep=1&listFolders=1", "", listRefusal(trashViewer), 200),
 		row(
 			list, tc+"/libs-local/work?list&deep=1&listFolders=1&mdTimestamps=1", "",
-			holdsEither("libs-local", "work/", write, manage), 200,
+			listRefusal(holdsEither("libs-local", "work/", write, manage)), 200,
 		).seeding(trashed("libs-local", "work/view-{p}.txt")),
 		row(
 			list, tc+"/libs-b/work?list&deep=1", "",
-			holdsEither("libs-b", "work/", write, manage), 200,
+			listRefusal(holdsEither("libs-b", "work/", write, manage)), 200,
 		).seeding(trashed("libs-b", "work/b-view-{p}.txt")),
 		row(
 			list, tc+"/libs-local/work/view-{p}.txt?properties", "",
-			holdsEither("libs-local", "work/", write, manage), 200,
+			propertiesRefusal(holdsEither("libs-local", "work/", write, manage)), 200,
 		).seeding(trashed("libs-local", "work/view-{p}.txt")),
 		row(
 			list, tc+"/libs-b/work/b-view-{p}.txt?properties", "",
-			holdsEither("libs-b", "work/", write, manage), 200,
+			propertiesRefusal(holdsEither("libs-b", "work/", write, manage)), 200,
 		).seeding(trashed("libs-b", "work/b-view-{p}.txt")),
 		row(
 			list, tc+"/libs-local/work/view-{p}.txt?stats", "",
-			holdsEither("libs-local", "work/", write, manage), 200,
+			namedRefusal(holdsEither("libs-local", "work/", write, manage)), 200,
 		).seeding(trashed("libs-local", "work/view-{p}.txt")),
 		row(
 			list, tc+"/libs-b/work/b-view-{p}.txt?stats", "",
-			holdsEither("libs-b", "work/", write, manage), 200,
+			namedRefusal(holdsEither("libs-b", "work/", write, manage)), 200,
 		).seeding(trashed("libs-b", "work/b-view-{p}.txt")),
 		row(
 			list, tc+"/libs-local/work?lastModified", "",
@@ -1033,7 +1072,7 @@ func trashMatrix() []matrixRow {
 		// A deleted repository's content stays in the trash can under its
 		// key, where only administrators see, clean or restore it, into a
 		// repository that exists (#504).
-		row(list, tc+"/gone-{p}", "", administrators, 200).
+		row(list, tc+"/gone-{p}", "", namedRefusal(administrators), 200).
 			seeding(repositoryTrashed("gone-{p}")),
 		row(
 			"POST /artifactory/api/trash/restore/{fromPath}",

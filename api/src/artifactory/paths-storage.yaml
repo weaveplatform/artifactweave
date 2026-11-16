@@ -2106,7 +2106,8 @@ paths:
         item's own properties and `trash.time` (Unix milliseconds), `trash.deletedBy`, `trash.originalRepository`,
         `trash.originalRepositoryType` and `trash.originalPath`, `stats` shows no downloads, and `permissions`
         answers 400. A caller other than an admin sees only what was deleted from repositories where it holds
-        deploy or manage permission, in every view, and is refused with 403 at a path where it sees nothing.
+        deploy or manage permission, in every view, and is refused at a path where it sees nothing, as at a path
+        it may not read; anonymous is refused there even holding deploy.
         While the trash can is disabled every view under `auto-trashcan`, its root included, answers 404 to any
         caller, an admin included; the items it holds are kept and can still be restored, cleaned or emptied.
       operationId: getStorageItem
@@ -2266,25 +2267,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: More than one mode parameter was given, or a listing parameter was used without `list`.
+          description: 'More than one mode parameter was given, a listing parameter was used without `list`, `list`
+            named a file ("Expected a folder but found a file, at: <repoKey>:<path>"), or `lastModified` or `permissions`
+            named a repository that does not exist or a remote repository that stores nothing locally ("This method
+            can only be invoked on local/cached repositories.").'
         '401':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: No credentials or invalid credentials.
+          description: No credentials or invalid credentials, or an anonymous caller lacks the permission `lastModified`
+            or `permissions` needs ("Unauthorized").
         '403':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission the operation needs.
+          description: 'The caller lacks the permission the operation needs. Without a mode and with `stats` the message
+            names the path and the caller, an anonymous one too: "Request for ''<repoKey>:<path>'' is forbidden for
+            user: ''<user>''." (without a mode a remote repository''s path is named under its cache''s key); `list` refuses
+            an anonymous caller with "This resource is available to authenticated users only.".'
         '404':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The item does not exist, or the `properties` view was requested for an item that has no properties.
+          description: The item does not exist ("Unable to find item"; with `stats`, "Unable to find item path"),
+            nor does the repository or a remote repository's local store, or the `properties` view found no properties
+            ("No properties could be found."), which it also answers for a path the caller may not read.
       summary: Item information
       tags:
       - storage

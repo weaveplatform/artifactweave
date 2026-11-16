@@ -61,7 +61,7 @@ Source: <https://docs.jfrog.com/artifactory/reference/artifacts-storage-api/llms
 | PUT | same with `X-Explode-Archive: true` | Deploy from archive | 201 `text/plain` | zip, tar, tar.gz, tgz. `X-Explode-Archive-Atomic: true` for all-or-nothing. Only the extracted content is stored. Disables checksum deploy in the CLI. |
 | GET | `/{repoKey}/{archivePath}!/{entryPath}` | Archive entry download | 200; 404 | Read permission. `!` then `/` is required. |
 | DELETE | `/{repoKey}/{filePath}` | Delete item | 204; 404 | Delete permission. Folders delete recursively. Works on remote caches. |
-| GET | `/api/storage/{repoKey}/{itemPath}` | Item information | 200; 404 | Without a mode: file or folder info. `?list[&deep=0\|1&depth=N&listFolders=0\|1&mdTimestamps=0\|1&includeRootPath=0\|1]` needs a non-anonymous user. `?stats`. `?lastModified` needs deploy permission and for folders returns the newest item recursively. `?properties[=k1,k2]` (404 "No properties could be found." when none, which the JFrog CLI reads as no properties). `?permissions`. |
+| GET | `/api/storage/{repoKey}/{itemPath}` | Item information | 200; 404 | Without a mode: file or folder info. `?list[&deep=0\|1&depth=N&listFolders=0\|1&mdTimestamps=0\|1&includeRootPath=0\|1]` needs a non-anonymous user. `?stats`. `?lastModified` needs deploy permission and for folders returns the newest item recursively. `?properties[=k1,k2]` (404 "No properties could be found." when none, which the JFrog CLI reads as no properties, and for a path the caller may not read). `?permissions`. A missing path answers 404 "Unable to find item" (`?stats`: "Unable to find item path"), and the info and `?stats` refuse with 403 "Request for '<repoKey>:<path>' is forbidden for user: '<user>'.", anonymous too ([#1600](https://github.com/weaveplatform/artifactweave/issues/1600)). |
 | PUT | `/api/storage/{repoKey}/{itemPath}?properties=k1=v1[,v2]\|k2=v3[&recursive=0\|1]` | Set properties | 204 | Local and cache items only. `recursive` defaults to 1. Separate properties with `;` or `\|`, values with `,`; escape `,`, `\`, `\|` and `=` with `%5C`. An empty item path names the repository itself, which keeps properties of its own; this and the read, delete and update of properties work on it as on a folder ([setitemproperties](https://docs.jfrog.com/artifactory/reference/setitemproperties.md): "file, folder, repository, or Release Bundle v2"). |
 | DELETE | `/api/storage/{repoKey}/{itemPath}?properties=k1,k2[&recursive=0\|1]` | Delete properties | 204; 404 when the item or repository does not exist | `recursive` defaults to 1. The JFrog CLI's `delete-props` accepts only 204. It tolerates the 404 "No properties could be found" only when it reads properties (`GetItemProperties` in jfrog-client-go `artifactory/services/props.go`). |
 | PATCH | `/api/metadata/{repoKey}/{itemPath}?recursiveProperties=0\|1&atomicProperties=0\|1` | Update properties | 204; 400 when both `props` and `stats` are missing | Annotate permission. Body `{"props":{"k":"v" \| ["v1","v2"] \| null},"stats":{...}}`; `null` removes the key. `stats` sets a file's download statistics. Used by the Terraform `artifactory_item_properties` resource. 6.1.0+. |
@@ -331,10 +331,12 @@ only those, and one holding neither on any repository does not see the trash can
 Deleted Repositories"; **[J]** [RTFACT-27280](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-27280),
 describing [RTFACT-13242](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-13242), Done).
 artifactweave judges each trashed item at its original path. A signed-in caller that sees
-nothing at a path is refused with 403 before the trash is read, and folder listings leave out
-what it does not see, as for an unreadable path elsewhere in the storage API **[I]**.
-Anonymous gets 401, and only an admin sees what was trashed from a repository that no longer
-exists **[I]**.
+nothing at a path is refused before the trash is read, and folder listings leave out what it
+does not see, as for an unreadable path elsewhere in the storage API **[I]**. Anonymous is
+refused even holding deploy, and only an admin sees what was trashed from a repository that
+no longer exists **[I]**. A refusal and a miss answer in each view's words as in any local
+repository, under the `auto-trashcan` key
+([#1600](https://github.com/weaveplatform/artifactweave/issues/1600)).
 
 Deleting a repository moves its content to the trash can under the repository's key, as
 deleting its root does, and only an administrator sees, cleans or restores it there

@@ -340,7 +340,8 @@ func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	if _, err := httpkit.Principal(ctx); err != nil {
+	caller, err := httpkit.Principal(ctx)
+	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
@@ -352,6 +353,13 @@ func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
+	// The file list refuses an anonymous caller first, here as in any
+	// repository (getStorage, #1573).
+	if caller.Anonymous && q.Has("list") {
+		httpkit.WriteErr(w, r, apierror.New(http.StatusForbidden,
+			"This resource is available to authenticated users only."))
+		return
+	}
 	mode, err := storageMode(q)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -361,12 +369,15 @@ func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 		strings.TrimPrefix(r.URL.Path, storagePrefix+trash.Repository), "/"), "/")
 	key, rest := cutRepoPath(dir)
 	p, sees, err := s.trashSight(ctx, st, key, rest)
+	if errors.Is(err, errTrashRefused) {
+		err = trashRefusal(mode, dir, p)
+	}
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
 	if mode == "permissions" && !p.Admin {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, trashRefusal(mode, dir, p))
 		return
 	}
 	v := trashView{
@@ -376,7 +387,7 @@ func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 	n, err := v.target(ctx)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound):
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		httpkit.WriteErr(w, r, trashMiss(mode, dir))
 		return
 	case err != nil:
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "find trash", err))
@@ -385,7 +396,7 @@ func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 	// The folder check let the path through; an item needs the exact right,
 	// as the storage API asks once it has found the item.
 	if n.Entry != nil && sees != nil && !sees(n.Entry.Record.Item) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, trashRefusal(mode, dir, p))
 		return
 	}
 	// The file list and a folder's info are written as they are read, as
@@ -412,6 +423,39 @@ func (s ArtifactoryAPI) trashStorage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", media)
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+// errTrashRefused is trashSight's refusal, which trashStorage answers in
+// the view's words (trashRefusal).
+var errTrashRefused = errors.New("trash can refused")
+
+// trashRefusal is a trash can view's answer to a caller trashSight refuses,
+// as for any local repository: 7.x keeps the trash can in one, so its item
+// info and statistics refuse with prepareUnAuthorizedResponse's 403 under
+// the auto-trashcan key, its properties are empty, and the add-on's views
+// refuse with the mappers' answer (storageRefused, addonRefused).
+func trashRefusal(mode, dir string, p kernel.Principal) error {
+	switch mode {
+	case "", "stats":
+		return storageRefused(trash.Repository, dir, p)
+	case "properties":
+		return noProperties()
+	}
+	return addonRefused(p)
+}
+
+// trashMiss is a trash can view's answer for a path that holds nothing the
+// caller sees, as for any local repository's miss (storageView.miss).
+func trashMiss(mode, dir string) error {
+	switch mode {
+	case "":
+		return apierror.New(http.StatusNotFound, textNoItem)
+	case "stats":
+		return apierror.New(http.StatusNotFound, textNoItemPath)
+	case "properties":
+		return noProperties()
+	}
+	return addonMiss(mode, trash.Repository, dir)
 }
 
 // trashView is one storage request on the trash can: the path asked for,
@@ -543,7 +587,7 @@ func (v trashView) list(
 	q url.Values,
 ) (*httpkit.ListStream, error) {
 	if !n.Folder {
-		return nil, httpkit.BadRequestf("/%s is a file; list needs a folder", v.dir)
+		return nil, expectedFolder(trash.Repository, v.dir)
 	}
 	l, err := parseListing(q)
 	if err != nil {
@@ -662,7 +706,7 @@ func (s ArtifactoryAPI) trashSight(
 		return p, nil, err
 	}
 	if p.Anonymous {
-		return p, nil, httpkit.Denied(p)
+		return p, nil, errTrashRefused
 	}
 	var origins []repo.Config
 	if key == "" {
@@ -676,7 +720,7 @@ func (s ArtifactoryAPI) trashSight(
 		c, err := st.Repos().Get(ctx, key)
 		switch {
 		case errors.Is(err, kernel.ErrNotFound):
-			return p, nil, httpkit.Denied(p)
+			return p, nil, errTrashRefused
 		case err != nil:
 			return p, nil, s.InternalError(ctx, "get repository", err)
 		}
@@ -691,7 +735,7 @@ func (s ArtifactoryAPI) trashSight(
 		allowed = allowed || seesTrash(acc, c, rest, true)
 	}
 	if !allowed {
-		return p, nil, httpkit.Denied(p)
+		return p, nil, errTrashRefused
 	}
 	return p, func(it model.Item) bool {
 		c, ok := byKey[it.RepoKey]

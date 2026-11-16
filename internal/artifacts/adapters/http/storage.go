@@ -52,6 +52,74 @@ func noProperties() error {
 	return apierror.New(http.StatusNotFound, "No properties could be found.")
 }
 
+// The storage API's other answers in 7.161.26's words (ArtifactResource):
+// the item info's miss (prepareStorageInfoResponse), the statistics' miss
+// (prepareStatsResponse), and the last modified and permissions views'
+// refusal of a key that names no local repository or remote cache
+// (prepareLastModifiedResponse, preparePermissionsResponse).
+const (
+	textNoItem     = "Unable to find item"
+	textNoItemPath = "Unable to find item path"
+	textNotLocal   = "This method can only be invoked on local/cached repositories."
+)
+
+// storageRefused is prepareUnAuthorizedResponse's 403, which names the
+// path as a RepoPath ("<key>:<path>", "<key>:" for the root) and the
+// caller, anonymous too. The exception carries its response, so Jersey
+// answers it without the exception mappers (ServerRuntime.mapException,
+// 3.1.9) and an anonymous caller gets this 403, not the 401 challenge the
+// mappers give its other refusals (#1573). The text is the
+// RestResponseFilter's error envelope; one 7.59.16 capture shows it raw
+// (jfrog/jfrog-client-go#851), which reads as Jersey fixing the media
+// type before the filter runs, not as the intended answer.
+func storageRefused(key, path string, p kernel.Principal) error {
+	return apierror.New(http.StatusForbidden, fmt.Sprintf(
+		"Request for '%s:%s' is forbidden for user: '%s'.", key, path, p.Name))
+}
+
+// addonRefused is the refusal of the views the closed REST add-on serves
+// (the file list, last modified and permissions): an exception without a
+// response, which ArtifactoryRestExceptionMapperBase answers 403 to a user
+// and 401 "Unauthorized" with its challenge to an anonymous caller
+// (createUnauthorizedResponseWithChallenge).
+func addonRefused(p kernel.Principal) error {
+	if p.Anonymous {
+		return apierror.New(http.StatusUnauthorized, "Unauthorized")
+	}
+	return kernel.ErrForbidden
+}
+
+// addonMiss is the add-on's 404 for a last modified or permissions request
+// whose path is not there: ArtifactResource answers the
+// ItemNotFoundRuntimeException it catches with a NotFoundException of its
+// message. The add-on's source is closed; RepositoryServiceImpl
+// .getLastModified throws "Could not find item: <id>", and the exception's
+// RepoPath constructor words the rest "Item <repoPath> does not exist". The
+// file list keeps ItemNotFound, as no source shows its
+// DoesNotExistException's text.
+func addonMiss(mode, key, path string) error {
+	switch mode {
+	case "lastModified":
+		return apierror.New(
+			http.StatusNotFound,
+			fmt.Sprintf("Could not find item: %s:%s", key, path),
+		)
+	case "permissions":
+		return apierror.New(
+			http.StatusNotFound,
+			fmt.Sprintf("Item %s:%s does not exist", key, path),
+		)
+	}
+	return itemkit.ItemNotFound()
+}
+
+// expectedFolder is the file list's 400 for a file, FolderExpectedException's
+// only message, which writeStreamingFileList answers as a BadRequestException.
+func expectedFolder(key, path string) error {
+	return apierror.New(http.StatusBadRequest,
+		fmt.Sprintf("Expected a folder but found a file, at: %s:%s", key, path))
+}
+
 // RegisterStorageRoutes serves the storage API (/api/storage) and the
 // partial property update (/api/metadata) under the patterns
 // httpkit.ChiPatterns derives from the spec, so, registered before the
@@ -243,9 +311,16 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	v, p, q, err := s.storageRequest(r, storagePrefix)
+	v, p, q, err := s.storageCaller(r, storagePrefix)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
+		return
+	}
+	if v.repo, v.isCached, err = itemkit.ResolveRepo(ctx, v.st, v.key); err != nil {
+		if mode, merr := storageMode(q); merr == nil && isMissingRepo(err) {
+			err = missingRepoAnswer(mode, v, p)
+		}
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve repository", err))
 		return
 	}
 	mode, err := storageMode(q)
@@ -253,35 +328,20 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	// A folder check first, as for a download; the exact right once the
-	// item is found.
-	if !v.acc.Folder(v.repo, v.path, api.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+	if err := v.admit(ctx, mode, p); err != nil {
+		httpkit.WriteErr(w, r, err)
 		return
-	}
-	switch {
-	case mode == "lastModified" && !v.acc.Folder(v.repo, v.path, api.ActionWrite),
-		mode == "permissions" && !p.Admin:
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
-		return
-	}
-	// The file list of a blacked-out repository answers 404 with
-	// BlackedOutException's message (ArtifactResource.writeStreamingFileList).
-	// The other views describe the item regardless, as 6.20's do: its item
-	// info checks read permission alone (prepareStorageInfoResponse).
-	if mode == "list" && v.repo.Class != repo.Virtual {
-		if err := generic.CheckBlackedOut(v.repo, v.path); err != nil {
-			httpkit.WriteErr(w, r, s.ItemError(ctx, "storage list", err))
-			return
-		}
 	}
 	f, err := v.target(ctx)
+	if errors.Is(err, kernel.ErrNotFound) {
+		err = v.miss(mode, p)
+	}
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "storage item", err))
 		return
 	}
 	if !v.acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, api.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, v.refusal(mode, p))
 		return
 	}
 	// The file list and a folder's info are written as they are read.
@@ -330,6 +390,23 @@ func (s ArtifactoryAPI) storageRequest(
 	r *http.Request,
 	prefix string,
 ) (storageView, kernel.Principal, url.Values, error) {
+	v, p, q, err := s.storageCaller(r, prefix)
+	if err != nil {
+		return v, p, q, err
+	}
+	if v.repo, v.isCached, err = itemkit.ResolveRepo(r.Context(), v.st, v.key); err != nil {
+		return v, p, nil, s.ItemError(r.Context(), "resolve repository", err)
+	}
+	return v, p, q, nil
+}
+
+// storageCaller parses a storage or metadata request and resolves its
+// caller, leaving the repository to the caller, as getStorage answers a key
+// that names none in each view's own words.
+func (s ArtifactoryAPI) storageCaller(
+	r *http.Request,
+	prefix string,
+) (storageView, kernel.Principal, url.Values, error) {
 	ctx := r.Context()
 	var v storageView
 	st, err := s.content()
@@ -348,13 +425,181 @@ func (s ArtifactoryAPI) storageRequest(
 	if err != nil {
 		return v, p, nil, err
 	}
-	c, cached, err := itemkit.ResolveRepo(ctx, st, req.Key)
-	if err != nil {
-		return v, p, nil, s.ItemError(ctx, "resolve repository", err)
+	return storageView{s: s, st: st, key: req.Key, path: req.Path, acc: acc}, p, q, nil
+}
+
+// isMissingRepo reports whether err is ResolveRepo's answer for a key that
+// names no repository, or a cache of one that is not remote; any other
+// error is the store's.
+func isMissingRepo(err error) bool {
+	var e *apierror.Error
+	return errors.As(err, &e) && e.Status == http.StatusNotFound
+}
+
+// missingRepoAnswer is a view's answer for a key that names no repository,
+// as 7.161.26 gives it. The item info finds no item before it weighs any
+// right; the statistics ask for read first, and a repository of no known
+// type matches only the plain ANY target's grants, not ANY LOCAL or ANY
+// REMOTE (AuthorizationServiceImpl.createArtifactPermissionScope), so an
+// administrator or a holder of read on ANY learns the path is not there and
+// anyone else is refused; the properties service reads nothing; and the
+// last modified and permissions views take only a local repository or a
+// remote cache. The file list keeps the repository's own 404, as no source
+// shows the add-on's RepoDoesNotExistException text.
+func missingRepoAnswer(mode string, v storageView, p kernel.Principal) error {
+	switch mode {
+	case "":
+		return apierror.New(http.StatusNotFound, textNoItem)
+	case "stats":
+		// A repository with no key and no class: no permission target names
+		// it and none of its keys is a cache's, which the decider would
+		// read as the remote repository's, so only plain ANY grants match.
+		if !canRead(v.acc, repo.Config{}, v.path) {
+			return storageRefused(v.key, v.path, p)
+		}
+		return apierror.New(http.StatusNotFound, textNoItemPath)
+	case "properties":
+		return noProperties()
+	case "lastModified", "permissions":
+		return apierror.New(http.StatusBadRequest, textNotLocal)
 	}
-	return storageView{
-		s: s, st: st, key: req.Key, path: req.Path, repo: c, isCached: cached, acc: acc,
-	}, p, q, nil
+	return itemkit.NotFoundRepo(v.key)
+}
+
+// canRead is 7.x's canRead of the path a request names: the root as the
+// folder it is, any other path as given, which for a path that is not
+// there is the file it would be.
+func canRead(acc itemkit.Access, c repo.Config, path string) bool {
+	if path == "" {
+		return acc.Folder(c, path, api.ActionRead)
+	}
+	return acc.File(c, path, api.ActionRead)
+}
+
+// storesNothingAnswer answers a remote repository that keeps no cache
+// (storeArtifactsLocally off), which 7.161.26 serves as it does a key that
+// names no repository, as it has no local or cache repository to read:
+// isLocalRepo is false and fixPathParamterIfNeededForRemoteCached finds no
+// cache to turn to. Its statistics ask for read before they find nothing
+// there. Nil lets the file list, which the add-on serves, go on.
+func (v storageView) storesNothingAnswer(mode string, p kernel.Principal) error {
+	if v.repo.Class != repo.Remote || v.repo.StoreArtifactsLocally == nil ||
+		*v.repo.StoreArtifactsLocally {
+		return nil
+	}
+	switch mode {
+	case "":
+		return apierror.New(http.StatusNotFound, textNoItem)
+	case "stats":
+		if !canRead(v.acc, v.repo, v.path) {
+			return storageRefused(v.key, v.path, p)
+		}
+		return apierror.New(http.StatusNotFound, textNoItemPath)
+	case "properties":
+		return noProperties()
+	case "lastModified", "permissions":
+		return apierror.New(http.StatusBadRequest, textNotLocal)
+	}
+	return nil
+}
+
+// admit answers what getStorage refuses before it looks for the item: a
+// remote repository that keeps no cache, a caller without the right the
+// view needs, and a blacked-out repository's file list. Nil lets the view
+// go on.
+func (v storageView) admit(ctx context.Context, mode string, p kernel.Principal) error {
+	if err := v.storesNothingAnswer(mode, p); err != nil {
+		return err
+	}
+	// A folder check first, as for a download; the exact right once the
+	// item is found.
+	if !v.acc.Folder(v.repo, v.path, api.ActionRead) {
+		return v.refusal(mode, p)
+	}
+	switch {
+	case mode == "lastModified" && !v.acc.Folder(v.repo, v.path, api.ActionWrite),
+		mode == "permissions" && !p.Admin:
+		return v.refusal(mode, p)
+	}
+	// The file list of a blacked-out repository answers 404 with
+	// BlackedOutException's message (ArtifactResource.writeStreamingFileList).
+	// The other views describe the item regardless, as 6.20's do: its item
+	// info checks read permission alone (prepareStorageInfoResponse).
+	if mode == "list" && v.repo.Class != repo.Virtual {
+		if err := generic.CheckBlackedOut(v.repo, v.path); err != nil {
+			return v.s.ItemError(ctx, "storage list", err)
+		}
+	}
+	return nil
+}
+
+// localKey is the key the views other than the file list and the
+// statistics name the item by: a remote repository's cache, as
+// fixPathParamterIfNeededForRemoteCached turns a remote key into its cache's
+// before they run, and the key as given otherwise.
+func (v storageView) localKey() string {
+	if v.repo.Class == repo.Remote {
+		return v.repo.Key + model.CacheSuffix
+	}
+	return v.key
+}
+
+// refusal is the view's answer to a caller without the right it needs, in
+// 7.161.26's words: the item info's and the statistics' 403 naming the
+// path and the caller, the properties service's empty answer (it returns
+// no properties for a path the caller may not read), or the add-on's
+// refusal. A virtual repository keeps its answers (P10).
+func (v storageView) refusal(mode string, p kernel.Principal) error {
+	if v.repo.Class == repo.Virtual {
+		return httpkit.Denied(p)
+	}
+	switch mode {
+	case "":
+		return storageRefused(v.localKey(), v.path, p)
+	case "stats":
+		return storageRefused(v.key, v.path, p)
+	case "properties":
+		return noProperties()
+	}
+	return addonRefused(p)
+}
+
+// miss is the view's answer for a path that is not there, after the folder
+// check let it through. The item info and the statistics ask for read of
+// the path itself before they look (prepareStorageInfoResponse,
+// prepareStatsResponse), so a path the caller could not read as a file is
+// refused rather than reported missing. A virtual repository keeps its
+// answers (P10).
+func (v storageView) miss(mode string, p kernel.Principal) error {
+	if v.repo.Class == repo.Virtual {
+		return itemkit.ItemNotFound()
+	}
+	switch mode {
+	case "", "stats":
+		if !canRead(v.acc, v.repo, v.path) {
+			return v.refusal(mode, p)
+		}
+		if mode == "" {
+			return apierror.New(http.StatusNotFound, textNoItem)
+		}
+		return apierror.New(http.StatusNotFound, textNoItemPath)
+	case "properties":
+		return noProperties()
+	}
+	return addonMiss(mode, v.localKey(), v.path)
+}
+
+// listsFolder refuses a file list of a file, with FolderExpectedException's
+// text under the key as given for a repository (the file list runs before
+// fixPathParamterIfNeededForRemoteCached), and a virtual repository's own.
+func (v storageView) listsFolder(it model.Item) error {
+	switch {
+	case it.Folder:
+		return nil
+	case v.repo.Class == repo.Virtual:
+		return httpkit.BadRequestf("%s is a file; list needs a folder", it.StoragePath())
+	}
+	return expectedFolder(v.key, v.path)
 }
 
 // putTime sets key to t in Artifactory's form, leaving it out when t is
@@ -557,11 +802,8 @@ func (v storageView) list(
 	f itemkit.Found,
 	q url.Values,
 ) (*httpkit.ListStream, error) {
-	if !f.Item.Folder {
-		return nil, httpkit.BadRequestf(
-			"%s is a file; list needs a folder",
-			f.Item.StoragePath(),
-		)
+	if err := v.listsFolder(f.Item); err != nil {
+		return nil, err
 	}
 	l, err := parseListing(q)
 	if err != nil {

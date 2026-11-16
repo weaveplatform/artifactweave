@@ -423,21 +423,36 @@ func TestAccTrashStorageViewsFiltered(t *testing.T) {
 		http.StatusOK)
 	wantStatus(t, w.do("GET", trashURL+"/libs-local/a/one.txt?stats", "user", ""), http.StatusOK)
 	// Every view of what it does not see is refused before the trash is
-	// read, so the refusal does not tell whether anything is there.
+	// read, so the refusal does not tell whether anything is there: the
+	// item info and statistics with the 403 naming the path, the
+	// properties with no properties, the others with 403 (#1600).
 	for _, path := range []string{
 		"/other-local", "/other-local/o", "/other-local/o/three.txt", "/other-local/absent",
 		"/libs-local/a/secret", "/libs-local/a/secret/two.txt",
 	} {
-		for _, view := range []string{
-			"", "?list", "?list&deep=1&listFolders=1", "?properties", "?stats",
-			"?lastModified", "?permissions",
+		named := errorBody(t, http.StatusForbidden,
+			refusedAs("auto-trashcan:"+strings.TrimPrefix(path, "/"), "user"))
+		for view, body := range map[string]string{
+			"":                           named,
+			"?stats":                     named,
+			"?properties":                errorBody(t, http.StatusNotFound, "No properties could be found."),
+			"?list":                      errorBody(t, http.StatusForbidden, "Forbidden"),
+			"?list&deep=1&listFolders=1": errorBody(t, http.StatusForbidden, "Forbidden"),
+			"?lastModified":              errorBody(t, http.StatusForbidden, "Forbidden"),
+			"?permissions":               errorBody(t, http.StatusForbidden, "Forbidden"),
 		} {
-			wantStatus(t, w.do("GET", trashURL+path+view, "user", ""), http.StatusForbidden)
+			status := http.StatusForbidden
+			if view == "?properties" {
+				status = http.StatusNotFound
+			}
+			wantAnswer(t, http.MethodGet, w.do("GET", trashURL+path+view, "user", ""), status, body)
 		}
 	}
-	// Anonymous is told to sign in, in every view.
+	// While anonymous access is off, anonymous is told to sign in, in every
+	// view.
 	for _, view := range []string{"?list", "?properties", "?stats", "?lastModified"} {
-		wantStatus(t, w.do("GET", trashURL+"/libs-local/a/one.txt"+view, "", ""),
-			http.StatusUnauthorized)
+		wantAnswer(t, http.MethodGet, w.do("GET", trashURL+"/libs-local/a/one.txt"+view, "", ""),
+			http.StatusUnauthorized,
+			errorBody(t, http.StatusUnauthorized, "Authentication is required"))
 	}
 }

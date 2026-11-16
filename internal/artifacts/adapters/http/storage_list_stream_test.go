@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -60,14 +61,14 @@ func (s ArtifactoryAPI) collectedStorage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if !v.acc.Folder(v.repo, v.path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, v.refusal(mode, p))
 		return
 	}
 	switch {
 	case mode == "list" && p.Anonymous,
 		mode == "lastModified" && !v.acc.Folder(v.repo, v.path, accessapi.ActionWrite),
 		mode == "permissions" && !p.Admin:
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, v.refusal(mode, p))
 		return
 	}
 	if mode == "list" && v.repo.Class != repo.Virtual {
@@ -77,12 +78,15 @@ func (s ArtifactoryAPI) collectedStorage(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	f, err := v.target(ctx)
+	if errors.Is(err, kernel.ErrNotFound) {
+		err = v.miss(mode, p)
+	}
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "storage item", err))
 		return
 	}
 	if !v.acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, v.refusal(mode, p))
 		return
 	}
 	var (
@@ -130,11 +134,8 @@ func (v storageView) collectedList(
 	f itemkit.Found,
 	q url.Values,
 ) (string, any, error) {
-	if !f.Item.Folder {
-		return "", nil, httpkit.BadRequestf(
-			"%s is a file; list needs a folder",
-			f.Item.StoragePath(),
-		)
+	if err := v.listsFolder(f.Item); err != nil {
+		return "", nil, err
 	}
 	l, err := parseListing(q)
 	if err != nil {
