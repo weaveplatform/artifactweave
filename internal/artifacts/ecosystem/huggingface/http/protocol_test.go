@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -59,6 +60,28 @@ type fixture struct {
 	// server's goroutines append under faultsMu.
 	faultsMu sync.Mutex
 	faults   []error
+	// logs holds what the protocol logged, such as a virtual repository's
+	// member passed over for a fault.
+	logs lockedBuffer
+}
+
+// lockedBuffer is a bytes.Buffer that handlers on the server's goroutines
+// write while the test reads it.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
 
 // takeFaults returns the faults the router kit logged and forgets them.
@@ -111,7 +134,9 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 			if name == "" {
 				name = "admin"
 			}
-			principal := kernel.Principal{Name: name, Admin: name == "admin"}
+			principal := kernel.Principal{
+				Name: name, Admin: name == "admin", Anonymous: name == kernel.AnonymousUser,
+			}
 			if name == "admin" {
 				var e error
 				principal, e = callers.API().Authenticator.Basic(r.Context(), name, "pw")
@@ -160,6 +185,7 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 		Authenticator: api.Authenticator,
 		Authorizer:    api.Authorizer,
 		Grants:        api.Grants,
+		Logger:        slog.New(slog.NewTextHandler(&f.logs, nil)),
 	}))
 	f.server = httptest.NewServer(r)
 	t.Cleanup(f.server.Close)

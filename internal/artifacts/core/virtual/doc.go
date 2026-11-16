@@ -100,7 +100,10 @@
 // route's upstream steps, which itemkit takes in Resolve's order
 // (https://github.com/weaveplatform/artifactweave/issues/1535); and the
 // merge contract (Merger, Collect and its helpers;
-// https://github.com/weaveplatform/artifactweave/issues/1536). The rest of
+// https://github.com/weaveplatform/artifactweave/issues/1536); and Git LFS
+// and Hugging Face on Members' Package walk and DeployTarget, their tests
+// in their ecosystem/<type>/http packages
+// (https://github.com/weaveplatform/artifactweave/issues/1540). The rest of
 // the package is planned for P10's other tickets
 // (https://github.com/weaveplatform/artifactweave/issues/1521).
 //

@@ -60,6 +60,7 @@
     "test/server/artifacts/docker": "docker",
     "test/server/artifacts/gems": "gems",
     "test/server/artifacts/generic": "shared",
+    "test/server/artifacts/gitlfs": "gitlfs",
     "test/server/artifacts/golang": "golang",
     "test/server/artifacts/helm": "helm",
     "test/server/artifacts/helmoci": "helmoci",

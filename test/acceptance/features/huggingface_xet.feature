@@ -17,8 +17,17 @@ Feature: Native Xet transfer for model and dataset repositories
       | local     | hf-local |
       | federated | hf-fed   |
 
+  # The first download comes from the remote member, as the local member is
+  # empty; the publish lands in the local member, which comes first after it
+  # (decision 0008, R1 and R6).
   Scenario: Hub client resolves through a virtual member
     Given the registry is running with Hugging Face Xet
+    And a controlled Hugging Face model and dataset upstream is available
+    When I PUT "/artifactory/api/repositories/hf-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"huggingfaceml","url":"{upstream}"}
+      """
+    Then the response status is 200
     When I PUT "/artifactory/api/repositories/hf-member" as admin with body:
       """
       {"rclass":"local","packageType":"huggingfaceml"}
@@ -26,9 +35,11 @@ Feature: Native Xet transfer for model and dataset repositories
     Then the response status is 200
     When I PUT "/artifactory/api/repositories/hf-virtual" as admin with body:
       """
-      {"rclass":"virtual","packageType":"huggingfaceml","repositories":["hf-member"],"defaultDeploymentRepo":"hf-member"}
+      {"rclass":"virtual","packageType":"huggingfaceml","repositories":["hf-member","hf-remote"],"defaultDeploymentRepo":"hf-member"}
       """
     Then the response status is 200
+    When the pinned Xet client downloads model and dataset through "hf-virtual"
+    And the server answered no request with 500 since the last command
     When the pinned Xet client publishes and downloads model and dataset through "hf-virtual"
     And the server answered no request with 500 since the last command
     And the pinned Xet client downloads model and dataset through "hf-virtual"

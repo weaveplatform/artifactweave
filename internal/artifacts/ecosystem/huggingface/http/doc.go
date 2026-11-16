@@ -37,7 +37,8 @@
 // # Outputs
 //
 //   - Protocol and Options: the routes, the source of each repository class
-//     and the Artifactory error profile.
+//     and the Artifactory error profile; Options.Logger receives the warning
+//     for a virtual repository's member passed over for a fault.
 //   - Answers: Hub repository info and trees, with a mutable ref resolved to
 //     its full revision; snapshots published by a commit in one
 //     transaction; file downloads, from Git LFS, from Xet chunks or, for a
@@ -50,6 +51,21 @@
 //   - A revision is immutable once published, and a virtual repository
 //     reads a whole revision from one member, so files of different models
 //     never mix.
+//   - A virtual repository chooses that member from the package handlers'
+//     walk (pkgroute.Kit.MergeMembers): its own patterns refuse the
+//     model's folder first, an administrator's too (decision 0008, R5);
+//     nested virtual repositories are flattened, a cycle, a self-member or
+//     a repeated member skipped and a member of another type passed over
+//     (R2, R11). A member whose policy refuses the folder, one the caller
+//     may read nothing of the model in, one without the revision and one
+//     whose upstream fails pass over, the last logged (R3). With none left
+//     the answer is 404 "Hugging Face revision or file not found", and the
+//     401 challenge to an anonymous caller who may read the model in no
+//     member, unless the virtual repository hides unauthorized resources
+//     (R4). A write lands in its default deployment repository, a local or
+//     federated one (virtual.DeployTarget), with the write grant asked
+//     there alone; with none the answer is 7.x's 405 with Allow: GET and
+//     its message before any permission is asked (R6).
 //   - Xet is off unless Options.XetEnabled: its token routes then answer 501
 //     and resolve answers advertise no Xet metadata, while Git LFS stays
 //     available.
@@ -116,7 +132,8 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P32 group (issues #777 to
-// #780 and #789). Moved here in P9d.
+// #780 and #789). Moved here in P9d. P10 put virtual reads and writes on
+// the shared engine (ADP-07, #1540).
 //
 // # Testing
 //
@@ -126,7 +143,11 @@
 //     requests; TestAccPinnedClient drives the pinned Hub client (the CI
 //     acceptance job sets HF_CLIENT_PYTHON).
 //   - remote_test.go and virtual_test.go: remote caching, redirects,
-//     integrity and offline reads; virtual member selection.
+//     integrity and offline reads; virtual member selection, nested
+//     members, cycles and duplicates, a faulty member passed over and
+//     logged, a Xet read of a remote member's model through a nested
+//     virtual repository, the answers to each caller when no member serves,
+//     and the virtual repository's patterns before its members (#1540).
 //   - served_copy_fault_test.go: revision info whose served copy fails a
 //     read answers 500 and logs a storage fault.
 //   - xet_boundary_test.go, xet_cache_test.go, xet_fence_test.go and
@@ -142,5 +163,7 @@
 // The route suite test/server/artifacts/huggingface checks the download
 // policy on resolve, info, tree and Xet, directly and through a virtual
 // repository (TestAccHuggingFaceDownloadPolicy and
-// TestAccHuggingFaceVirtualDownloadPolicy).
+// TestAccHuggingFaceVirtualDownloadPolicy), and a virtual repository over
+// [remote, nested virtual -> local] with grants on its members alone
+// (TestAccHuggingFaceVirtualOverRemoteAndNestedVirtual).
 package huggingfacehttp

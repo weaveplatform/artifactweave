@@ -20,13 +20,25 @@ hf download acme/demo --repo-type model --revision main --local-dir ./downloaded
 ```
 
 Use `HF_HUB_DISABLE_XET=1` for the Git LFS compatibility path. Uploads to a virtual
-repository require its `defaultDeploymentRepo` to name an included local or
-federated member. Reads select one ordered member for the entire revision.
+repository land in its `defaultDeploymentRepo`, a local or federated repository,
+and need Deploy there alone; without one they answer 405 with `Allow: GET` and
+"No local repository was configured as local deployment repository for the
+(<key>) virtual repository." Reads select one member for the entire revision, in
+the order every package handler walks: nested virtual repositories flattened,
+cycles and repeated members skipped, local members before remote ones. The
+virtual repository's own include and exclude patterns refuse the model's folder
+first. A member the caller cannot read, one without the revision and one whose
+upstream fails are passed over, the last logged as a warning; with none left the
+answer is 404, or the 401 challenge to an anonymous caller who can read no member.
+JFrog's guide says virtual repositories resolve models with `snapshot_download`
+only and support only members on the new repository layout: a member still on the
+legacy layout holds no snapshot path and is passed over.
 
 The [Git LFS scenarios](../../test/acceptance/features/huggingface.feature) and
 [Xet scenarios](../../test/acceptance/features/huggingface_xet.feature) invoke the
 real CLI against a fresh client home for models and datasets, large files, named
-revisions and all four repository classes. The Xet proof proxy rejects ordinary
+revisions and all four repository classes, including a virtual repository over a
+local and a remote member. The Xet proof proxy rejects ordinary
 large-file resolve GETs and checks that CAS uploads and chunk downloads occurred.
 Remote scenarios repeat the downloads after the controlled upstream stops.
 Byte-range checks independently exercise resumable HTTP reads.
