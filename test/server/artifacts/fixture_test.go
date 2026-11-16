@@ -225,6 +225,9 @@ const (
 	uploadsComplete = "/artifactory/api/v1/uploads/complete"
 	uploadsStatus   = "/artifactory/api/v1/uploads/status"
 	uploadsAbort    = "/artifactory/api/v1/uploads/abort"
+	// deployForbidden is create's refusal of a caller without Deploy or a
+	// key that names no repository.
+	deployForbidden = "The user is not allowed to deploy to this location"
 )
 
 const (

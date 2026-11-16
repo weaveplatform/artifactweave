@@ -1,7 +1,9 @@
 package artifactshttp
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -100,14 +103,34 @@ func bearer(r *http.Request) string {
 	return t
 }
 
-// createMultipart answers create: the caller needs deploy rights on the
-// repository, decided as for a deploy. Through a virtual repository that is
-// Write on its default deployment repository's path, as 7.161.26's
-// MultipartUploadServiceImpl.getRepoPath (109-118) checks it. Without one,
-// 7.x checks Deploy on the virtual repository's own path and leaves R6's
-// 405 to the checksum deploy that ends the upload; artifactweave answers
-// that 405 here, before any part is sent, as no source says what 7.x's
-// permission check answers for a virtual repository's path [I].
+// deployForbidden is the text of 7.161.26's
+// MultipartUploadServiceImpl.FORBIDDEN_DEPLOY_MESSAGE (65).
+const deployForbidden = "The user is not allowed to deploy to this location"
+
+// createRefused is generateToken's ForbiddenException(FORBIDDEN_DEPLOY_MESSAGE)
+// (105) as 7.161.26's ForbiddenExceptionMapper answers it: 403 with the
+// message in the error envelope, or, through
+// ArtifactoryRestExceptionMapperBase.interceptForbiddenStatus, 401
+// "Unauthorized" with the Basic challenge to an anonymous caller, who can
+// only get here with anonymous access on.
+func createRefused(p kernel.Principal) error {
+	if p.Anonymous {
+		return apierror.New(http.StatusUnauthorized, "Unauthorized")
+	}
+	return apierror.New(http.StatusForbidden, deployForbidden)
+}
+
+// createMultipart answers create as 7.161.26's MultipartUploadResource.create
+// and MultipartUploadServiceImpl.generateToken (80-106) do: a key that names
+// no repository and a caller without Deploy get the same refusal
+// (createRefused), and no repository is refused for its class, so a remote
+// repository, its cache or a virtual repository without a deployment
+// repository hands out a token to a caller with Deploy there, an
+// administrator always (AuthorizationServiceBase.hasPermission 298). The
+// checksum deploy that ends the upload then answers that deploy's own
+// refusal (decision 0008, R6). The 400s for partSizeMB and the path are
+// artifactweave's own, kept ahead of the repository's checks: generateToken
+// makes neither check.
 func (s ArtifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	mp, err := s.multipartService()
@@ -126,9 +149,16 @@ func (s ArtifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	q := r.URL.Query()
+	// assertRepoKeyAndPathNotNull (MultipartUploadResource 92-96) refuses
+	// only an absent parameter: an empty repoKey goes on to name no
+	// repository, and is refused as one.
+	if !q.Has("repoKey") || !q.Has("repoPath") {
+		httpkit.WriteErr(w, r, httpkit.BadRequestf("Query param repoKey or repoPath is null"))
+		return
+	}
 	partSizeMB, perr := strconv.ParseInt(q.Get("partSizeMB"), 10, 64)
 	repoPath := strings.Trim(q.Get("repoPath"), "/")
-	if perr != nil || q.Get("repoKey") == "" || repoPath == "" {
+	if perr != nil || repoPath == "" {
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("repoKey, repoPath and partSizeMB are required"))
 		return
 	}
@@ -136,16 +166,17 @@ func (s ArtifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) 
 		httpkit.WriteErr(w, r, httpkit.BadRequestf("malformed path %q", repoPath))
 		return
 	}
-	c, cached, err := itemkit.ResolveRepo(ctx, st, q.Get("repoKey"))
-	if err == nil {
-		c, err = itemkit.DeployTarget(ctx, st, c, cached)
+	c, err := multipartTarget(ctx, st, q.Get("repoKey"))
+	if isMissingRepo(err) {
+		httpkit.WriteErr(w, r, createRefused(p))
+		return
 	}
 	if err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve deploy target", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve multipart target", err))
 		return
 	}
 	if !acc.File(c, repoPath, api.ActionWrite) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, createRefused(p))
 		return
 	}
 	token, err := mp.Create(ctx, c.Key, repoPath, partSizeMB, p.Name)
@@ -154,6 +185,31 @@ func (s ArtifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	httpkit.WriteJSON(w, http.StatusOK, map[string]string{"token": token})
+}
+
+// multipartTarget returns the repository on whose path create checks
+// Deploy, as MultipartUploadServiceImpl.getRepoPath (108-119) picks it: the
+// one key names, or the default deployment repository a virtual repository
+// names, whatever its class and whether or not it exists. One that does not
+// exist has no class here, so only a grant on any repository or on its key
+// covers it, as 7.x matches a key of no known type
+// (AuthorizationServiceImpl.createArtifactPermissionScope,
+// LegacyAuthorizationServiceImpl.hasMatchingRepoKey). The error is
+// ResolveRepo's for key, or the store's.
+func multipartTarget(ctx context.Context, st itemkit.Store, key string) (repo.Config, error) {
+	c, _, err := itemkit.ResolveRepo(ctx, st, key)
+	if err != nil || c.Class != repo.Virtual || c.DefaultDeploymentRepo == "" {
+		return c, err //nolint:wrapcheck // ResolveRepo's 404 is the caller's to map
+	}
+	d, err := st.Repos().Get(ctx, c.DefaultDeploymentRepo)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return repo.Config{Key: c.DefaultDeploymentRepo}, nil
+	}
+	if err != nil {
+		return c, fmt.Errorf("default deployment repository %s of %s: %w",
+			c.DefaultDeploymentRepo, c.Key, err)
+	}
+	return d, nil
 }
 
 func (s ArtifactoryAPI) multipartPartURL(w http.ResponseWriter, r *http.Request) {
