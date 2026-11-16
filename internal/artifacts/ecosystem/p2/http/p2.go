@@ -127,7 +127,8 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 	// refuse any of its files: 404 with the policy's message, after the
 	// permission check (DV-057), and before the archive is fetched.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "P2 archive download check", err))
+		httpkit.WriteErr(w, r,
+			s.ItemError(r.Context(), "P2 archive download check", itemkit.Rejected(c, req, err)))
 		return
 	}
 	if !s.p2CopyMatches(w, r, c, req) {

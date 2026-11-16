@@ -101,7 +101,7 @@ func (s DebianAPI) serveDebianIndex(
 	// remote index read's policy at its permission folder, the repository
 	// root, so only this check sees the patterns on the index's own path.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian index download", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian index download", itemkit.Rejected(c, req, err)))
 		return
 	}
 	if cached && c.Class != repo.Remote {

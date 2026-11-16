@@ -53,7 +53,7 @@
 //     ItemCreated, ItemNotFound, MemberRead, OverwriteRefusal, ChecksumsJSON,
 //     DownloadURI, SplitRepoPath, NotFoundRepo, View and Forced.
 //   - The download's answers, for an overlay to write: Missed, Refused,
-//     Mismatched, ReadAnswer, RemoteReadError, NotServed and
+//     Mismatched, Rejected, ReadAnswer, RemoteReadError, NotServed and
 //     ErrFolderAtPath.
 //   - Access, Target and AccessFor: the questions handlers ask the
 //     request's permission decider.
@@ -126,6 +126,17 @@
 //     answered, as checkDownloadIsAllowed checks it before getInfo. A
 //     folder request, a member read of a virtual repository (MemberRead)
 //     and an entry an archive lacks keep ItemNotFound and httpkit.Denied.
+//   - The download policy's refusal of such a file request
+//     (format.RejectionError.Policy: a blackout, the include and exclude
+//     patterns, Maven's release and snapshot handling) takes the same
+//     suffix, under the key the request named and for the file a checksum
+//     or an archive entry names, with the policy's own status, Maven's 409
+//     included (#1630, lookupRefusal): 7.161.26's createUnfoundRepoResource
+//     makes an unfound resource of every such refusal. The policy is
+//     checked on the file a checksum or an archive entry names, so a
+//     refused file's checksum or entry is refused with it. A folder
+//     request keeps the refusal without a suffix, as 7.x answers it
+//     through its directory listing.
 //   - A read through a virtual repository never asks Read of the virtual
 //     repository itself (Access.Admits): its members decide, and its root
 //     is readable where any member's is (#1533). The walk (lookupMember)
@@ -164,7 +175,15 @@
 //     RemoteDeliveryAllowed record what they found and serve, redirect and
 //     count nothing, and a remote stream is closed unread. A read the
 //     overlay makes through GetItem is decided, not traced again, and a
-//     path no overlay answers keeps the generic trace.
+//     path no overlay answers keeps the generic trace. A direct request's
+//     refusal by the download policy is traced in 7.161.26's words
+//     ("Download denied (<reason>) - returning un-found resource", then
+//     "Responding with unfound resource" whatever its status), a virtual
+//     repository's own refusal as getInfoFromSearchableRepositories logs
+//     it, and a file's matrix parameters as DbStoringRepoMixin.getInfo
+//     matches them, as the walk does (#1630). 7.x traces no folder
+//     request, so a folder's refusal keeps "Request is forbidden by
+//     <key>".
 //   - A file download, streamed, redirected or from a remote's stream,
 //     answers If-None-Match and If-Modified-Since as 7.x's download does
 //     (pkgroute.FileNotModified): one If-None-Match line at a time, less a
@@ -245,7 +264,9 @@
 //
 // kit_test.go tests the kit over the in-memory world of kittest, without a
 // router: the overlay order, the private-path default, the error mapping and
-// the lookup through a virtual repository. access_test.go tests AccessFor,
+// the lookup through a virtual repository. answers_test.go tests the
+// download's answers, the download policy's refusal with its path and its
+// trace step among them. access_test.go tests AccessFor,
 // and Forced, ForceAuthentication's branches and the credentials it counts
 // as none over an in-memory store, and which paths a remote's -cache alias
 // reads through the remote source (aliasRemoteMetadata); remote_fill_test.go

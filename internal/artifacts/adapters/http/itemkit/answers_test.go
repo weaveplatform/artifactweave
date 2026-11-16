@@ -289,8 +289,119 @@ func TestUnitOverlayAnswersAreTheDownloads(t *testing.T) {
 		t,
 		NotServed(dark, false, req, user, allow),
 		http.StatusNotFound,
-		"The repository 'deb-local' is blacked out and cannot serve artifact 'deb-local:dists/Packages'.",
+		"The repository 'deb-local' is blacked out and cannot serve artifact 'deb-local:dists/Packages'."+
+			"; Path: 'deb-local:dists/Packages'",
 	)
 	wantAnswer(t, NotServed(local, false, folder, user, deny), http.StatusNotFound,
 		"Could not find resource")
+}
+
+// TestUnitPolicyRefusalNamesThePath (#1630): the download policy's refusal
+// of a file request in a local or remote repository, or a remote's cache,
+// takes the path suffix under the key the request named and for the file a
+// checksum or an archive entry names, on the item route's lookup, its
+// remote read, an overlay's check and its read. A folder request, a
+// virtual repository's member, a format's other refusals and an overlay's
+// virtual repository keep their answers, and a contained file's other
+// failures answer ItemNotFound.
+func TestUnitPolicyRefusalNamesThePath(t *testing.T) {
+	local := repo.Config{Key: "libs-local", Class: repo.Local}
+	remote := repo.Config{Key: "up", Class: repo.Remote}
+	virtual := repo.Config{Key: "virt", Class: repo.Virtual}
+	user := kernel.Principal{Name: "user"}
+	policy := &format.RejectionError{Status: http.StatusConflict, Message: "refused", Policy: true}
+	other := format.Rejectf(http.StatusBadRequest, "not the policy's")
+	for _, tc := range []struct {
+		name    string
+		c       repo.Config
+		req     ItemRequest
+		message string
+	}{
+		{"file", local, ItemRequest{Key: "libs-local", Path: "a/f.jar"}, "refused; Path: 'libs-local:a/f.jar'"},
+		{"checksum", local, ItemRequest{Key: "libs-local", Path: "a/f.jar.sha1"}, "refused; Path: 'libs-local:a/f.jar'"},
+		{"archive entry", local, ItemRequest{Key: "libs-local", Path: "a/f.jar!/in.txt"}, "refused; Path: 'libs-local:a/f.jar'"},
+		{"remote", remote, ItemRequest{Key: "up", Path: "f.bin"}, "refused; Path: 'up:f.bin'"},
+		{"remote's cache", remote, ItemRequest{Key: "up-cache", Path: "f.bin"}, "refused; Path: 'up-cache:f.bin'"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wrapped := fmt.Errorf("resolve: %w", policy)
+			wantAnswer(t, lookupRefusal(tc.c, tc.req, wrapped), http.StatusConflict, tc.message)
+			wantAnswer(t, Rejected(tc.c, tc.req, wrapped), http.StatusConflict, tc.message)
+			wantAnswer(t, containedRefusal(tc.c, tc.req, wrapped), http.StatusConflict, tc.message)
+			wantAnswer(t, ReadAnswer(tc.c, false, tc.req, user, wrapped), http.StatusConflict, tc.message)
+			wantAnswer(t, sourceAnswer(tc.c, tc.req, user, errors.Join(kernel.ErrNotFound, policy)),
+				http.StatusConflict, tc.message)
+		})
+	}
+
+	file := ItemRequest{Key: "libs-local", Path: "a/f.jar"}
+	for name, kept := range map[string]struct {
+		c   repo.Config
+		req ItemRequest
+		err error
+	}{
+		"folder":       {local, ItemRequest{Key: "libs-local", Path: "a", IsFolder: true}, policy},
+		"member":       {local, ItemRequest{Key: "libs-local", Path: "a/f.jar", member: true}, policy},
+		"other":        {local, file, other},
+		"virtual read": {virtual, ItemRequest{Key: "virt", Path: "a/f.jar"}, policy},
+	} {
+		if name != "virtual read" {
+			if got := lookupRefusal(kept.c, kept.req, kept.err); got != kept.err { //nolint:errorlint // the same error
+				t.Errorf("%s: lookup answered %v, want it kept", name, got)
+			}
+		}
+		if got := Rejected(kept.c, kept.req, kept.err); got != kept.err { //nolint:errorlint // the same error
+			t.Errorf("%s: overlay answered %v, want it kept", name, got)
+		}
+	}
+	// A virtual repository's own refusal of a file takes the suffix on the
+	// item route (getInfoFromSearchableRepositories), whatever made it.
+	wantAnswer(t, lookupRefusal(virtual, ItemRequest{Key: "virt", Path: "a/f.jar"}, other),
+		http.StatusBadRequest, "not the policy's; Path: 'virt:a/f.jar'")
+	wantAnswer(t, containedRefusal(local, file, other), http.StatusNotFound, "Could not find resource")
+	wantAnswer(t, containedRefusal(local, ItemRequest{Key: "libs-local", Path: "a/f.jar", member: true},
+		policy), http.StatusNotFound, "Could not find resource")
+}
+
+// TestUnitTraceNamesTheDenial (#1630): a traced direct request's refusal is
+// logged as 7.161.26 logs it, the download policy's by
+// createUnfoundRepoResource and a virtual repository's own by
+// getInfoFromSearchableRepositories, and marks the answer unfound; a folder
+// keeps this server's step, a format's other refusals log nothing, and
+// neither a download nor a lookup without a trace logs at all.
+func TestUnitTraceNamesTheDenial(t *testing.T) {
+	local := repo.Config{Key: "libs-local", Class: repo.Local}
+	virtual := repo.Config{Key: "virt", Class: repo.Virtual}
+	policy := &format.RejectionError{Status: http.StatusConflict, Message: "refused", Policy: true}
+	for _, tc := range []struct {
+		name   string
+		c      repo.Config
+		folder bool
+		err    error
+		step   string
+	}{
+		{"policy", local, false, policy, "Download denied (refused) - returning un-found resource"},
+		{
+			"virtual", virtual, false, policy,
+			"Unable to find aggregated repositories to search within - returning unfound resource",
+		},
+		{"folder", local, true, policy, "Request is forbidden by libs-local"},
+		{"other", local, false, format.Rejectf(http.StatusBadRequest, "no"), ""},
+	} {
+		tr := &resolutionTrace{}
+		(&Download{isFolder: tc.folder, trace: tr}).denied(tc.c, tc.err)
+		switch {
+		case tc.step == "" && len(tr.steps) != 0:
+			t.Errorf("%s: steps %q", tc.name, tr.steps)
+		case tc.step != "" && (len(tr.steps) != 1 || !strings.HasSuffix(tr.steps[0], " "+tc.step)):
+			t.Errorf("%s: steps %q, want %q", tc.name, tr.steps, tc.step)
+		}
+		if tr.unfound != (tc.name == "policy") {
+			t.Errorf("%s: unfound %v", tc.name, tr.unfound)
+		}
+	}
+	var none *Download
+	none.denied(local, policy)
+	var untraced *resolutionTrace
+	untraced.denied(policy)
 }

@@ -151,9 +151,10 @@ func TestAccAlpineRefusesPathsOutsideTheLayout(t *testing.T) {
 // read, the same 403 whatever the repository holds or its settings say
 // (DV-057). Past that, a blacked-out local or remote repository's index,
 // through its -cache alias too, and one whose patterns reject the index's
-// own path answer the download policy's 404 and message, and a virtual
-// repository whose own patterns reject the index or the package answers
-// that no repository serves it.
+// own path answer the download policy's 404 and message, with the path
+// asked for after it as 7.161.26 answers the refusal of a file (#1630),
+// and a virtual repository whose own patterns reject the index or the
+// package answers that no repository serves it.
 func TestAccAlpineRefusesCallersWhoMayNotDownload(t *testing.T) {
 	w := newItemWorld(t)
 	dark := alpineRepo("alpine-dark", repo.Local)
@@ -172,9 +173,9 @@ func TestAccAlpineRefusesCallersWhoMayNotDownload(t *testing.T) {
 		w.put(key, apkIndexPath, apkIndex(t, "hello"))
 	}
 	w.put(alpineLocal, apkHelloPath, apkBody)
-	blackedOut := func(key string) string {
+	blackedOut := func(key, asked string) string {
 		return "The repository '" + key + "' is blacked out and cannot serve artifact '" +
-			key + ":" + apkIndexPath + "'."
+			key + ":" + apkIndexPath + "'.; Path: '" + asked + ":" + apkIndexPath + "'"
 	}
 	for _, tc := range []struct {
 		name, key, path, as string
@@ -208,20 +209,22 @@ func TestAccAlpineRefusesCallersWhoMayNotDownload(t *testing.T) {
 		},
 		{
 			"blacked-out index", "alpine-dark", apkIndexPath, kittest.Admin.Name,
-			http.StatusNotFound, blackedOut("alpine-dark"),
+			http.StatusNotFound, blackedOut("alpine-dark", "alpine-dark"),
 		},
 		{
 			"blacked-out remote index", "alpine-dark-remote", apkIndexPath, kittest.Admin.Name,
-			http.StatusNotFound, blackedOut("alpine-dark-remote"),
+			http.StatusNotFound, blackedOut("alpine-dark-remote", "alpine-dark-remote"),
 		},
 		{
 			"blacked-out remote's cache", "alpine-dark-remote-cache", apkIndexPath,
-			kittest.Admin.Name, http.StatusNotFound, blackedOut("alpine-dark-remote"),
+			kittest.Admin.Name, http.StatusNotFound,
+			blackedOut("alpine-dark-remote", "alpine-dark-remote-cache"),
 		},
 		{
 			"index the patterns reject", "alpine-hidden", apkIndexPath, kittest.Admin.Name,
 			http.StatusNotFound, "The repository 'alpine-hidden' rejected the artifact " +
-				"'alpine-hidden:" + apkIndexPath + "' due to its include/exclude pattern settings.",
+				"'alpine-hidden:" + apkIndexPath + "' due to its include/exclude pattern settings." +
+				"; Path: 'alpine-hidden:" + apkIndexPath + "'",
 		},
 		{
 			"virtual index its patterns reject", "alpine-closed", apkIndexPath, kittest.Admin.Name,
@@ -284,7 +287,7 @@ func TestAccAlpineIndexNeedsReadPermissionOnEveryListedPackage(t *testing.T) {
 // is served as it is, listing a package whose file the repository's
 // patterns reject, as 7.x keeps such a package in its indexes
 // (RTFACT-30830, RTFACT-30656); only that file's GET answers the policy's
-// 404.
+// 404, with the path (#1630).
 func TestAccAlpineIndexKeepsAPackageThePatternsReject(t *testing.T) {
 	index := apkIndex(t, "hello", "world")
 	w := newItemWorld(t, withSource(upstream(map[string]func() (source.Result, error){
@@ -307,7 +310,8 @@ func TestAccAlpineIndexKeepsAPackageThePatternsReject(t *testing.T) {
 			}
 			wantError(t, w.get(key, apkHelloPath), http.StatusNotFound,
 				"The repository '"+key+"' rejected the artifact '"+key+":"+apkHelloPath+
-					"' due to its include/exclude pattern settings.")
+					"' due to its include/exclude pattern settings.; Path: '"+key+":"+
+					apkHelloPath+"'")
 		})
 	}
 }
