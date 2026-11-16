@@ -460,7 +460,9 @@ func TestUnitVirtualReadGateAndWalkFailures(t *testing.T) {
 		},
 	} {
 		r := kittest.Request(t, http.MethodGet, "/artifactory/"+tc.target)
-		r = r.WithContext(accessapi.WithCaller(r.Context(), kernel.Principal{Name: "user"}, tc.decider))
+		r = r.WithContext(
+			accessapi.WithCaller(r.Context(), kernel.Principal{Name: "user"}, tc.decider),
+		)
 		rec := httptest.NewRecorder()
 		tc.kit.GetItem(rec, r)
 		if rec.Code != tc.status || !strings.Contains(rec.Body.String(), tc.body) {

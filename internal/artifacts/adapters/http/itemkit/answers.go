@@ -99,7 +99,13 @@ func missed(c repo.Config, cached bool, req ItemRequest) error {
 // https://github.com/weaveplatform/artifactweave/issues/1537's, so it keeps
 // ItemNotFound, and httpkit.Denied when every member that could hold it
 // refused the caller.
-func unfound(c repo.Config, cached bool, req ItemRequest, caller kernel.Principal, err error) error {
+func unfound(
+	c repo.Config,
+	cached bool,
+	req ItemRequest,
+	caller kernel.Principal,
+	err error,
+) error {
 	if c.Class != repo.Virtual || req.member {
 		return missed(c, cached, req)
 	}
@@ -111,6 +117,7 @@ func unfound(c repo.Config, cached bool, req ItemRequest, caller kernel.Principa
 	case req.Path != "" && !req.IsFolder:
 		// hideGlobal is false: artifactweave has no security-wide
 		// hideUnauthorizedResources yet.
+		//nolint:wrapcheck // an apierror.Error is the answer
 		return virtual.Answer(c, resourcePath(req.Path), res, caller.Anonymous, false)
 	case res.Forbidden != nil:
 		return httpkit.Denied(caller)
@@ -129,7 +136,10 @@ func virtualRefusal(c repo.Config, req ItemRequest, err error) error {
 	if c.Class != repo.Virtual || req.Path == "" || req.IsFolder || !errors.As(err, &rejected) {
 		return err
 	}
-	return apierror.New(rejected.Status, rejected.Message+pathSuffix(req.Key, resourcePath(req.Path)))
+	return apierror.New(
+		rejected.Status,
+		rejected.Message+pathSuffix(req.Key, resourcePath(req.Path)),
+	)
 }
 
 // mismatched answers req, whose file does not carry a mandatory matrix

@@ -54,7 +54,12 @@ func (a Access) Item(c repo.Config, path string, isFolder bool, want accessapi.A
 // member counting there as not found (R3). An administrator passes without
 // a member, as there, so the root of a virtual repository with none
 // answers it too.
-func (a Access) Admits(ctx context.Context, rs virtual.Repos, c repo.Config, path string) (bool, error) {
+func (a Access) Admits(
+	ctx context.Context,
+	rs virtual.Repos,
+	c repo.Config,
+	path string,
+) (bool, error) {
 	if c.Class != repo.Virtual {
 		return a.Folder(c, path, accessapi.ActionRead), nil
 	}

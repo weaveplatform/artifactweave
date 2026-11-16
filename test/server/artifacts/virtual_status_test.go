@@ -155,19 +155,31 @@ func TestAccVirtualMissAndRefusalStatuses(t *testing.T) {
 		},
 		// a-local refuses user whether or not it holds the path, as
 		// checkDownloadIsAllowed checks before getInfo looks.
-		{"virt-ab/a-only.bin", "user", http.StatusForbidden,
-			forbiddenIn("a-local", "virt-ab", "a-only.bin", "user")},
-		{"virt-ab/none.bin", "user", http.StatusForbidden,
-			forbiddenIn("a-local", "virt-ab", "none.bin", "user")},
-		{"virt-ab/a-only.bin.sha1", "user", http.StatusForbidden,
-			forbiddenIn("a-local", "virt-ab", "a-only.bin", "user")},
-		{"virt-ab/z/a.zip!/in.txt", "user", http.StatusForbidden,
-			forbiddenIn("a-local", "virt-ab", "z/a.zip", "user")},
+		{
+			"virt-ab/a-only.bin", "user", http.StatusForbidden,
+			forbiddenIn("a-local", "virt-ab", "a-only.bin", "user"),
+		},
+		{
+			"virt-ab/none.bin", "user", http.StatusForbidden,
+			forbiddenIn("a-local", "virt-ab", "none.bin", "user"),
+		},
+		{
+			"virt-ab/a-only.bin.sha1", "user", http.StatusForbidden,
+			forbiddenIn("a-local", "virt-ab", "a-only.bin", "user"),
+		},
+		{
+			"virt-ab/z/a.zip!/in.txt", "user", http.StatusForbidden,
+			forbiddenIn("a-local", "virt-ab", "z/a.zip", "user"),
+		},
 		// Neither member readable: the first refusal is named.
-		{"virt-ab/both.bin", "deployer", http.StatusForbidden,
-			forbiddenIn("a-local", "virt-ab", "both.bin", "deployer")},
-		{"virt-up/c.bin", "deployer", http.StatusForbidden,
-			forbiddenIn("up-cache", "virt-up", "c.bin", "deployer")},
+		{
+			"virt-ab/both.bin", "deployer", http.StatusForbidden,
+			forbiddenIn("a-local", "virt-ab", "both.bin", "deployer"),
+		},
+		{
+			"virt-up/c.bin", "deployer", http.StatusForbidden,
+			forbiddenIn("up-cache", "virt-up", "c.bin", "deployer"),
+		},
 	})
 }
 
