@@ -881,8 +881,10 @@ func TestAccRemoteMetadataFiltersDeniedGem(t *testing.T) {
 		Create(t.Context(), accesstest.User{Name: "remote-limited", PasswordHash: support.CheapHash}); err != nil {
 		t.Fatal(err)
 	}
+	// Deploy/Cache beside Read: the metadata reads fill the remote's cache,
+	// which 7.x allows only a caller with Deploy/Cache on it (#1587).
 	if err := w.db.Permissions().
-		Create(t.Context(), accesstest.Permission{Name: "remote-limited", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"remote-limited": api.ActionRead}}, Targets: map[string]accesstest.Target{"gems-remote": {Include: []string{"**"}, Exclude: []string{"gems/rake-12.3.1.gem"}}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "remote-limited", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"remote-limited": api.ActionRead | api.ActionWrite}}, Targets: map[string]accesstest.Target{"gems-remote": {Include: []string{"**"}, Exclude: []string{"gems/rake-12.3.1.gem"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	base := "/artifactory/api/gems/gems-remote/"

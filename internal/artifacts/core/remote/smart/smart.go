@@ -149,6 +149,24 @@ func smartPropertyPath(
 	}
 }
 
+// policyAlone reports whether Read hands q to the policy unchanged: a read
+// that may not reach the upstream (cache-only, without network permission,
+// or of an offline repository), a read of a repository with neither Smart
+// Remote nor property synchronisation on, and a file read while the
+// upstream is assumed offline. 7.x asks a remote assumed offline nothing,
+// a Smart Remote's peer included, and answers from its cache
+// (RemoteRepoBase.isOffline, internalGetInfo), which the policy does
+// without discovery (#1601).
+func (s *Smart) policyAlone(ctx context.Context, q source.Request, permit source.Permit) bool {
+	if permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed ||
+		enabled(q.Repo.Offline) ||
+		!q.Resource.RequireSmart && !smartEnabled(q.Repo) &&
+			!enabled(q.Repo.SynchronizeProperties) {
+		return true
+	}
+	return q.Resource.SmartAQL == "" && !q.Resource.NoCacheFile && s.policy.AssumedOffline(ctx, q)
+}
+
 // Read reads q in place of the shared policy, as Policy.Smart. A read that
 // may not reach the upstream (cache-only, without network permission, or of
 // an offline repository), or of a repository with neither Smart Remote nor
@@ -171,10 +189,7 @@ func (s *Smart) Read(
 		(permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed || enabled(q.Repo.Offline)) {
 		return source.Result{}, source.ErrUnavailable
 	}
-	if permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed ||
-		enabled(q.Repo.Offline) ||
-		!q.Resource.RequireSmart && !smartEnabled(q.Repo) &&
-			!enabled(q.Repo.SynchronizeProperties) {
+	if s.policyAlone(ctx, q, permit) {
 		//nolint:wrapcheck // preserves upstream error identity
 		return s.policy.Read(ctx, q, permit)
 	}

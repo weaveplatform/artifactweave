@@ -114,8 +114,10 @@ func newFixtureWith(t *testing.T, marketplace bool) *fixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
+	// Deploy/Cache as well as Read: the reads fill the remote's cache, which
+	// 7.x allows only a caller with Deploy/Cache on it (#1587).
 	if err := db.Permissions().
-		Create(t.Context(), accesstest.Permission{Name: "editor-read", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead, kernel.AnonymousUser: api.ActionRead}}, Targets: map[string]accesstest.Target{"editor-remote": {Include: []string{"extensions/ms-vscode/hexeditor/**"}}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "editor-read", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead | api.ActionWrite, kernel.AnonymousUser: api.ActionRead | api.ActionWrite}}, Targets: map[string]accesstest.Target{"editor-remote": {Include: []string{"extensions/ms-vscode/hexeditor/**"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}

@@ -1562,9 +1562,9 @@ also cover upstream version searches and permission-safe differing-layout discov
 
 `@generic_remote` runs real curl and the [pinned JFrog CLI](ci-native-client-inventory.md) against the actual
 application and controlled upstream. It proves cold `jf rt direct-download` and curl
-GETs, warm reuse during an upstream outage, cache-alias `jf rt dl`/AQL search, Read-only
-access without Deploy, exact downloaded bytes, upstream request counts and repository
-deletion. Client configuration and output directories are isolated per scenario.
+GETs, warm reuse during an upstream outage, cache-alias `jf rt dl`/AQL search, a reader
+with Read and Deploy/Cache filling the cache (#1587), exact downloaded bytes, upstream
+request counts and repository deletion. Client configuration and output directories are isolated per scenario.
 The local macOS run passed 1 scenario/44 steps in 2.12 seconds (7.10 seconds reported
 by Go including startup); this is not a Linux full-suite timing estimate. No timeout
 or matrix change is needed. Runtime race tests additionally cover HEAD/ranges/304,

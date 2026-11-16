@@ -159,8 +159,13 @@ type Resource struct {
 	// Transient forbids persistent caching of a Git LFS batch response, whose
 	// upstream transfer actions may carry expiring URLs or credentials.
 	Transient bool
-	Query     string
-	Variant   string
+	// NoCacheFile marks a read whose document 7.x keeps in the remote's
+	// memory rather than as a file of its cache, such as a folder listing
+	// (RemoteRepoBase.remoteResourceCache), so the remote policy fills it
+	// for a caller with Read alone (AuthorizeFill is not asked).
+	NoCacheFile bool
+	Query       string
+	Variant     string
 	// Accept is the adapter's own Accept for the upstream request, such as
 	// the registry's manifest types or npm's abbreviated packument, and part
 	// of the cache identity. It is never the client's header: 7.161.26's
@@ -1044,9 +1049,14 @@ func safeError(err error) error {
 	if errors.As(err, new(*format.RejectionError)) {
 		return err
 	}
+	// A refused cache fill names only the caller, the repository and the
+	// path, which the item route answers in 7.x's words.
+	if errors.As(err, new(*CacheFillDenied)) {
+		return err
+	}
 	for _, allowed := range []error{
 		ErrDenied, ErrInvalidRequest, ErrUnsupported,
-		ErrUnavailable, ErrSuperseded, ErrInvalidResult, kernel.ErrNotFound,
+		ErrUnavailable, ErrSuperseded, ErrInvalidResult, ErrAssumedOffline, kernel.ErrNotFound,
 		context.Canceled, context.DeadlineExceeded,
 	} {
 		if errors.Is(err, allowed) {

@@ -1,7 +1,8 @@
 @jf @generic_remote
 Feature: Generic remote retrieval through native clients
   The upstream fixture measures our HTTP behavior, not an observed Artifactory response.
-  A reader without Deploy can fill a remote cache. Cache aliases never contact upstream.
+  A reader fills a remote cache with Deploy/Cache beside Read, as 7.x requires (#1587).
+  Cache aliases never contact upstream.
 
   Background:
     Given the registry is running
@@ -20,7 +21,7 @@ Feature: Generic remote retrieval through native clients
     And the response status is 201
     And I POST "/access/api/v2/permissions" as admin with body:
       """
-      {"name":"remote-read","resources":{"artifact":{"actions":{"users":{"reader":["READ"]}},"targets":{"remote":{"include_patterns":["**"]}}}}}
+      {"name":"remote-read","resources":{"artifact":{"actions":{"users":{"reader":["READ","WRITE"]}},"targets":{"remote":{"include_patterns":["**"]}}}}}
       """
     And the response status is 201
 

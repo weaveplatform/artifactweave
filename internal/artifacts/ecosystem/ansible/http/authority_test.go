@@ -235,6 +235,19 @@ func TestAccGalaxyFiltersUnreadableRemoteVersions(t *testing.T) {
 	if err := f.db.Permissions().Create(t.Context(), permission); err != nil {
 		t.Fatal(err)
 	}
+	// Deploy/Cache on the whole remote, without Read: the version list fills
+	// the remote's cache, which 7.x allows only a caller with Deploy/Cache
+	// on it (#1587), while Read still picks the versions shown.
+	fill := accesstest.Permission{
+		Name: "fill-cache",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionWrite}},
+			Targets: map[string]accesstest.Target{c.Key: {}},
+		}},
+	}
+	if err := f.db.Permissions().Create(t.Context(), fill); err != nil {
+		t.Fatal(err)
+	}
 	w := f.do("GET", base+remoteList, nil, "", "reader")
 	requireStatus(t, w, 200)
 	if strings.Contains(w.Body.String(), "2.0.0") || !strings.Contains(w.Body.String(), "1.2.3") ||

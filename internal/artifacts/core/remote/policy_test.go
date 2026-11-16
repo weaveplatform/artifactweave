@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/upstreamtest"
@@ -89,9 +91,13 @@ func policyFixture(t *testing.T) *policyWorld {
 	}
 }
 
+// request reads path as an administrator, who may fill the cache
+// (source.AuthorizeFill); a test of a caller who may not sets Access.
 func (w *policyWorld) request(path string, kind source.ResourceKind) source.Request {
 	return source.Request{
 		Repo:     w.c,
+		Subject:  accessapi.Subject{Name: "admin"},
+		Access:   &accessapitest.Decider{Admin: true},
 		Resource: source.Resource{Kind: kind, Path: path, Method: "GET"},
 	}
 }

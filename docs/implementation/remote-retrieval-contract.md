@@ -104,8 +104,30 @@ packages into format code.
 
 Before cache lookup, flight joining or network access, resolve the actual repository,
 check token scope and Read, blackout, include/exclude and path policy. Recheck current
-policy before publishing/serving a completed fetch. Normal external remotes may fill
-cache on behalf of a Read-only caller; that grants no client Deploy path. Internal
+policy before publishing/serving a completed fetch. Read on a normal external remote
+serves only what its cache already holds: filling the cache with a file it does not
+hold, or refreshing a copy the upstream has changed, also needs Deploy/Cache on
+`<remote>-cache:<path>` (Annotate for a `<file>:<metadata>` path), the path 7.x keeps the
+file at, checked before the read joins a flight. JFrog's
+[Permissions](https://docs.jfrog.com/administration/docs/permissions) page says Read on
+a remote "only allows downloading from the remote cache", and 7.161.26's
+`RemoteRepoBase.downloadAndSave` calls `assertValidDeployPathAndPermissions` on the cache
+path before it downloads. For a caller without it the upstream is asked with a HEAD, as
+7.x's `getInfo` asks before any download: its 404 is the miss, a copy it has not changed
+(304, or a 200 with the copy's ETag or a Last-Modified no later than the copy's) is
+served and made fresh again, and a file it would send is refused. The item route
+answers that refusal 403 `Rejected artifact download request: User <user> is not
+permitted to deploy '<path>' into '<remote>-cache:<path>'.`
+(`DownloadServiceImpl.respondFoundResource`), or the 401 challenge for an anonymous
+caller; a format route answers its own miss, as JFrog's KB article "Why Am I Getting
+Random 404 Errors When Downloading From a Remote Repository" says package installs
+do, and a virtual repository passes over the member ([RTFACT-30824](https://jfrog.atlassian.net/browse/RTFACT-30824));
+each format's body is [I]. Delete/Overwrite is not asked: 7.x checks it only to replace a
+file it does not treat as expirable without a forced expiry check
+(`DbStoringRepoMixin.assertOverride`), and neither 7.x nor this policy refreshes such a
+file. A read that stores nothing (R13), a checksum request, a folder listing and a
+search's metadata read, which 7.x keeps no file of, need Read alone
+([#1587](https://github.com/weaveplatform/artifactweave/issues/1587)). Internal
 project sources additionally restrict network access: read-only sharing or a read-only
 consumer may traverse to producer stored bytes but cannot trigger external upstream fill.
 An explicit consumer CacheOnly request never traverses to that producer. Source/share revocation can deny
@@ -158,7 +180,7 @@ fake time. [#621](https://github.com/weaveplatform/artifactweave/issues/621) and
 | R7 | Fresh negative entry | None | 404, no item/blob/index row. Expiry permits another fetch; zero missing TTL disables negative persistence. |
 | R8 | Any `-cache` GET/HEAD; or entrypoint requires CacheOnly | None, including Smart Remote side effects | Serve retained complete bytes, even expired/zapped, or 404. No probe, eager fetch, refresh, remote listing or statistics callback. |
 | R9 | Explicit `offline=true` | None | Same cache behavior as R8, regardless of `hardFail`; offline is intentional, not a failed request. |
-| R10 | Assumed-offline cooldown | No request until cooldown expires | `hardFail=false`: usable cached bytes or 502 on miss; `hardFail=true`: 502. One permitted demand at expiry probes; peers share it. A fresh/immutable hit that needs no upstream remains a hit. |
+| R10 | Assumed-offline cooldown | No request until cooldown expires | Retained complete bytes, even expired, whatever `hardFail` or their Cache-Control says, or 404 `<key>: is assumed offline, '<key>:<path>' is not found at '<path>'.; Path: '<key>:<path>'` on the item route and each format route's own miss on a miss, as 7.161.26's `RemoteRepoBase.internalGetInfo` answers while `isOffline` holds ([#1601](https://github.com/weaveplatform/artifactweave/issues/1601)); a folder listing, a search's metadata read and a POST query, which 7.x keeps no file for, and Smart Remote's own discovery, property and statistics exchanges keep the 502 [I]. One permitted demand at expiry probes; peers share it. A fresh/immutable hit that needs no upstream remains a hit. |
 | R11 | Timeout, disconnect, 429 or 5xx while refresh is needed | One bounded attempt; no per-waiter retry | `hardFail=false` may return last usable bytes. Otherwise sanitized failure below. Never create 404 or extend freshness. |
 | R12 | Upstream 401/403; invalid checksum, MIME or destination policy | No fallback to stale bytes for this normal read, except an item-route MIME refusal | Return sanitized failure; keep prior complete bytes for an authorized explicit cache read. No negative miss, no false successful refresh. An item-route read whose label 7.x's rule refuses is served its expired cached bytes, whatever `hardFail` says, and they are made fresh again, as 7.x's `RemoteRepoBase.internalGetInfo` and `getInfo` (`unexpireIfExists`) do; the refusal answers the path's next reads ([#1376](https://github.com/weaveplatform/artifactweave/issues/1376)). |
 | R13 | `storeArtifactsLocally=false`, normal online read | Fetch every request, a HEAD with a HEAD only; bypass durable positive/negative cache | Stream transient content; do not create item, blob reference, raw metadata, package index or negative record. Existing cache is not erased; R8/R9 can still read it. |

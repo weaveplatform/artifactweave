@@ -1,7 +1,8 @@
 @recipes @p2
 Feature: Headless P2 connection uses an explicit server-side read grant
   The TLS front only adds the test certificate; it supplies no credentials.
-  Anonymous access needs both the setting and a repository-specific grant.
+  Anonymous access needs both the setting and a repository-specific grant, of
+  Read and of Deploy/Cache to fill the remote's cache (#1587).
 
   Scenario: a fresh P2 client installs only while the repository read grant exists
     Given the registry is running
@@ -27,7 +28,7 @@ Feature: Headless P2 connection uses an explicit server-side read grant
     Then the response status is 401
     When I POST "/access/api/v2/permissions" as admin with body:
       """
-      {"name":"p2-recipe-read","resources":{"artifact":{"actions":{"users":{"anonymous":["READ"]}},"targets":{"p2-recipe":{"include_patterns":["**"]}}}}}
+      {"name":"p2-recipe-read","resources":{"artifact":{"actions":{"users":{"anonymous":["READ","WRITE"]}},"targets":{"p2-recipe":{"include_patterns":["**"]}}}}}
       """
     Then the response status is 201
     Given I clear the Eclipse P2 client state

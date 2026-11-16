@@ -238,8 +238,9 @@ func TestAccDebianRemoteIndexPropagatesAQueryWhenSet(t *testing.T) {
 // are served, once fetched, to a caller who may read every package they
 // list, from the cache and its -cache alias, where every caller, an
 // administrator too, was refused 403 once the copy was fetched (found while
-// fixing #1349). A caller who may read the remote but not the packages is
-// refused the copy as the index itself, 403.
+// fixing #1349). A caller who may read the remote and fill its cache but
+// not read the packages is refused the copy as the index itself, 403; with
+// Read alone the index would be refused its fill first (#1587).
 func TestAccDebianRemoteIndexByHashCopyNeedsReadOnEveryListedPackage(t *testing.T) {
 	files, _ := queryArchive(t)
 	sources := files["dists/stable/main/source/Sources"]
@@ -258,7 +259,7 @@ func TestAccDebianRemoteIndexByHashCopyNeedsReadOnEveryListedPackage(t *testing.
 		Name: "index-only", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
 				Actions: accesstest.Grants{
-					Users: map[string]api.Actions{"indexonly": api.ActionRead},
+					Users: map[string]api.Actions{"indexonly": api.ActionRead | api.ActionWrite},
 				},
 				Targets: map[string]accesstest.Target{"remote": {
 					Include: []string{"**"}, Exclude: []string{"pool/**"},

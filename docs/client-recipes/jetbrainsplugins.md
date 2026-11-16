@@ -11,10 +11,10 @@ Endpoint: `${AW_URL}/artifactory/api/jetbrainsplugins/${AW_REPO}`
 ## Before connecting
 
 - Remote jetbrainsplugins repository with a compatible Marketplace upstream.
-- Administrator-approved anonymous read access.
+- Administrator-approved anonymous Read and Deploy/Cache access on the remote.
 - AW_PLUGIN_ID is the plugin XML ID of an upstream plugin compatible with the pinned IDEA client listed above. The controlled fixture uses com.weave.fixture; it is not a public plugin.
 
-Authentication: The tested native IDE uses a repository with explicit anonymous READ authorization. It does not send AW_TOKEN. Anonymous access must be enabled and permission granted by an administrator; the endpoint still returns 401 before that grant.
+Authentication: The tested native IDE uses a repository with explicit anonymous READ and Deploy/Cache (WRITE) authorization: on a remote, Deploy/Cache lets a read fill the cache, as Artifactory 7.x requires, and uploads to a remote stay refused. It does not send AW_TOKEN. Anonymous access must be enabled and permission granted by an administrator; the endpoint still returns 401 before that grant.
 
 Fresh client state: Set IDEA_PROPERTIES to a newly created properties file whose config, system, plugins and log paths are distinct empty directories under AW_WORK.
 
