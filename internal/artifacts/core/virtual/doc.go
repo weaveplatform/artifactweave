@@ -58,8 +58,9 @@
 //
 // # Invariants
 //
-//   - Answer is the walk's answer only: the walk itself, and the Read it
-//     asks of each member, is the caller's (itemkit's lookupMember).
+//   - Answer is the walk's answer only: the walk itself, the Read it asks
+//     of each member and each remote member's upstream read, is the
+//     caller's (itemkit's lookupMember).
 //   - Members never returns a virtual repository, and returns each real
 //     member once per step: a local or federated member once, a remote
 //     member as its cache and its upstream (Resolve), its upstream alone
@@ -93,9 +94,11 @@
 // https://github.com/weaveplatform/artifactweave/issues/1252); the walk's
 // fall-through and the item route's not-found, forbidden and hidden
 // answers (Resolution, Answer;
-// https://github.com/weaveplatform/artifactweave/issues/1533); and the
+// https://github.com/weaveplatform/artifactweave/issues/1533); the
 // deploy target (DeployTarget;
-// https://github.com/weaveplatform/artifactweave/issues/1534); and the
+// https://github.com/weaveplatform/artifactweave/issues/1534); the item
+// route's upstream steps, which itemkit takes in Resolve's order
+// (https://github.com/weaveplatform/artifactweave/issues/1535); and the
 // merge contract (Merger, Collect and its helpers;
 // https://github.com/weaveplatform/artifactweave/issues/1536). The rest of
 // the package is planned for P10's other tickets

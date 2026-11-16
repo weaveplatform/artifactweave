@@ -24,3 +24,25 @@ Feature: JFrog CLI multipart upload
     Then the command succeeds
     And the server answered no request with 500 since the last command
     And the files "large.bin" and "downloaded/large.bin" are identical
+
+  # The CLI's checksum deploy misses, so it starts a multipart upload, which
+  # 7.x's create refuses for a user without Deploy with 403 "The user is not
+  # allowed to deploy to this location" (#1627); the CLI stops there.
+  Scenario: a user without Deploy is refused when the multipart upload starts
+    Given the registry is running
+    And the JFrog CLI is available
+    And I PUT "/artifactory/api/repositories/mpu-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"generic"}
+      """
+    And I PUT "/artifactory/api/security/users/mpu-reader" as admin with body:
+      """
+      {"name": "mpu-reader", "email": "mpu-reader@example.com", "password": "Mpu-reader-1"}
+      """
+    And a file "large.bin" of 3670021 bytes
+    When I run jf "rt u large.bin mpu-local/large/ --flat --min-split=1 --chunk-size=1 --split-count=3 --url {url} --user mpu-reader --password Mpu-reader-1"
+    Then the command fails
+    And the server answered no request with 500 since the last command
+    And the server answered 403 to POST "/artifactory/api/v1/uploads/create"
+    And the output contains "The user is not allowed to deploy to this location"
+    And the server never answered 200 to PUT "/artifactory/api/v1/uploads/part"

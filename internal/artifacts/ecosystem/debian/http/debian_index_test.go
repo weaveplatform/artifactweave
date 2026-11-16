@@ -64,17 +64,18 @@ func TestAccDebianIndexRefusals(t *testing.T) {
 		{
 			"blacked-out Packages", "deb-dark", debPackages, "admin",
 			http.StatusNotFound, "The repository 'deb-dark' is blacked out and cannot serve " +
-				"artifact 'deb-dark:" + debPackages + "'.",
+				"artifact 'deb-dark:" + debPackages + "'.; Path: 'deb-dark:" + debPackages + "'",
 		},
 		{
 			"blacked-out Sources", "deb-dark", debSources, "admin",
 			http.StatusNotFound, "The repository 'deb-dark' is blacked out and cannot serve " +
-				"artifact 'deb-dark:" + debSources + "'.",
+				"artifact 'deb-dark:" + debSources + "'.; Path: 'deb-dark:" + debSources + "'",
 		},
 		{
 			"Packages the patterns reject", "deb-hidden", debPackages, "admin",
 			http.StatusNotFound, "The repository 'deb-hidden' rejected the artifact " +
-				"'deb-hidden:" + debPackages + "' due to its include/exclude pattern settings.",
+				"'deb-hidden:" + debPackages + "' due to its include/exclude pattern settings." +
+				"; Path: 'deb-hidden:" + debPackages + "'",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -113,7 +114,8 @@ func TestAccDebianIndexNeedsReadPermissionOnEveryListedPackage(t *testing.T) {
 // TestAccDebianIndexKeepsAPackageThePatternsReject: a local or remote
 // Packages index is served unchanged, listing a package whose file the
 // repository's patterns reject, as 7.x keeps such a package in its Debian
-// metadata (RTFACT-30830); only that file's GET answers the policy's 404.
+// metadata (RTFACT-30830); only that file's GET answers the policy's 404,
+// with the path (#1630).
 func TestAccDebianIndexKeepsAPackageThePatternsReject(t *testing.T) {
 	index := packagesIndex("alpha 1.0 "+debAlpha, "beta 1.0 "+debBeta)
 	w := newOverlayWorld(t, withSources(upstream(map[string]func() (source.Result, error){
@@ -135,7 +137,7 @@ func TestAccDebianIndexKeepsAPackageThePatternsReject(t *testing.T) {
 			}
 			wantError(t, w.get(key, debBeta, "admin"), http.StatusNotFound,
 				"The repository '"+key+"' rejected the artifact '"+key+":"+debBeta+
-					"' due to its include/exclude pattern settings.")
+					"' due to its include/exclude pattern settings.; Path: '"+key+":"+debBeta+"'")
 		})
 	}
 	if rec := w.get("deb-local", debAlpha, "admin"); rec.Code != http.StatusOK {
@@ -146,7 +148,8 @@ func TestAccDebianIndexKeepsAPackageThePatternsReject(t *testing.T) {
 // TestAccDebianRemoteIndexRefusedByThePolicy: a remote repository's index,
 // and the same index through its -cache alias, answers the policy's 404 and
 // message naming the remote and the index's path when the remote is blacked
-// out or its patterns reject that path, before its source is asked.
+// out or its patterns reject that path, before its source is asked, with
+// the path asked for after it (#1630).
 func TestAccDebianRemoteIndexRefusedByThePolicy(t *testing.T) {
 	w := newOverlayWorld(t, refuseSources(t))
 	w.debRepos(
@@ -164,7 +167,8 @@ func TestAccDebianRemoteIndexRefusedByThePolicy(t *testing.T) {
 		{"deb-hidden-cache", rejected},
 	} {
 		t.Run(tc.key, func(t *testing.T) {
-			wantError(t, w.get(tc.key, debPackages, "admin"), http.StatusNotFound, tc.message)
+			wantError(t, w.get(tc.key, debPackages, "admin"), http.StatusNotFound,
+				tc.message+"; Path: '"+tc.key+":"+debPackages+"'")
 		})
 	}
 }

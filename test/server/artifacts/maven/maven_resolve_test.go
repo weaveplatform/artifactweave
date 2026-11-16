@@ -3,10 +3,73 @@ package maven_test
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
+
+// wantPolicyRefusal fails t unless rec, the answer to method, is 409 and,
+// on a GET, message in Artifactory's error envelope.
+func wantPolicyRefusal(t *testing.T, rec *httptest.ResponseRecorder, method, message string) {
+	t.Helper()
+	if method == http.MethodHead {
+		wantStatus(t, rec, http.StatusConflict)
+		return
+	}
+	if status, got := support.ArtifactoryError(t, rec); rec.Code != http.StatusConflict ||
+		status != http.StatusConflict || got != message {
+		t.Fatalf("%s: %d %s, want 409 %q", method, rec.Code, rec.Body, message)
+	}
+}
+
+// policyRefusal is SnapshotPolicyException's reason for file in key, with
+// the path asked for, in key too, after it.
+func policyRefusal(key, file string) string {
+	return "The repository '" + key + "' rejected the resolution of an artifact '" + key + ":" +
+		file + "' due to conflict in the snapshot release handling policy.; Path: '" + key + ":" +
+		file + "'"
+}
+
+// A download the release and snapshot handling refuses answers 409 with
+// SnapshotPolicyException's reason and the path the download names, as
+// 7.161.26's DownloadServiceImpl.respondResourceNotFound answers the
+// unfound resource createUnfoundRepoResource makes of the refusal (#1630).
+// With maven.authentication.nonPreemptive off, its default,
+// checkDownloadIsAllowed checks the policy on the file a checksum or an
+// archive entry names (DownloadRequestContext.getResourcePath,
+// ArtifactoryRequestBase.zipResourcePath) before getInfo looks, so those
+// are refused too, and named as that file. Before, the reason came alone,
+// and a checksum or an archive entry answered 404 "Could not find
+// resource".
+func TestAccMavenPolicyRefusalNamesThePath(t *testing.T) {
+	w := newItemWorld(t, false)
+	for _, c := range []repo.Config{
+		{Key: "mvn-rel", Class: repo.Local, PackageType: repo.Maven, HandleSnapshots: new(false)},
+		{Key: "mvn-snap", Class: repo.Local, PackageType: repo.Maven, HandleReleases: new(false)},
+	} {
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const (
+		snapshot = "com/acme/app/1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar"
+		release  = "com/acme/app/1.0/app-1.0.jar"
+	)
+	for _, c := range []struct{ key, path, file string }{
+		{"mvn-rel", snapshot, snapshot},
+		{"mvn-rel", snapshot + ".sha1", snapshot},
+		{"mvn-rel", snapshot + "!/META-INF/MANIFEST.MF", snapshot},
+		{"mvn-snap", release, release},
+		{"mvn-snap", release + ".sha1", release},
+	} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			rec := w.do(method, "/artifactory/"+c.key+"/"+c.path, "reader", "")
+			wantPolicyRefusal(t, rec, method, policyRefusal(c.key, c.file))
+		}
+	}
+}
 
 // GET and HEAD of a version token or a -SNAPSHOT name serve the file the
 // Maven format resolves, with its checksums, through a virtual repository

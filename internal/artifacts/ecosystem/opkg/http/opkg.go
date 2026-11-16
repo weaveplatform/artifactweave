@@ -111,7 +111,7 @@ func (s opkgItems) serveOpkgIndex(
 	// answer that no repository serves it. A remote's -cache alias answers
 	// as the remote does.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg feed download", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg feed download", itemkit.Rejected(c, req, err)))
 		return
 	}
 	// A feed file takes a query and matrix parameters as any other file's
@@ -453,7 +453,8 @@ func (s opkgItems) serveOpkgPackage(
 	// repository root), so patterns that reject only the feed's path leave
 	// the IPK served, as a download checks only its own path.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Opkg package download", err))
+		httpkit.WriteErr(w, r,
+			s.ItemError(r.Context(), "Opkg package download", itemkit.Rejected(c, req, err)))
 		return
 	}
 	// A remote's cached copy of the IPK is matched against the matrix

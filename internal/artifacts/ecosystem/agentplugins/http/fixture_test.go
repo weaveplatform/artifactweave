@@ -139,10 +139,14 @@ var (
 // itemAnswer is the message the item route answers for name under key to
 // as, where the API path answers status and message: the download's
 // refusal and miss (#1599), 7.161.26's reason with the path, in place of
-// "Forbidden", "Authentication is required" and "Could not find resource".
-// Any other answer is both paths'.
+// "Forbidden", "Authentication is required" and "Could not find resource",
+// and the download policy's refusal with the path after it (#1630). Any
+// other answer is both paths'.
 func itemAnswer(key, name string, as *caller, status int, message string) string {
 	switch {
+	case strings.Contains(message, " is blacked out and cannot serve artifact ") ||
+		strings.HasSuffix(message, " due to its include/exclude pattern settings."):
+		return message + "; Path: '" + key + ":" + name + "'"
 	case status == http.StatusUnauthorized:
 		return "Unauthorized"
 	case status == http.StatusForbidden:

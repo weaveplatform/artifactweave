@@ -125,21 +125,62 @@ func unfound(
 	return ItemNotFound()
 }
 
-// virtualRefusal is err, a lookup's failure, with the path suffix that
-// respondResourceNotFound appends when err is a virtual repository's own
-// refusal of a file request: its patterns rejecting the path leave it no
-// member to search, which 7.161.26 answers with an unfound resource
-// (getInfoFromSearchableRepositories 158-169) and so with the suffix.
-// Its members' refusals never reach here, since the walk passes over them.
-func virtualRefusal(c repo.Config, req ItemRequest, err error) error {
+// lookupRefusal is err, a lookup's failure, with the path suffix that
+// respondResourceNotFound appends to the reason of every resource it
+// answers unfound, whatever the status (7.161.26, 1465-1497), when err is
+// a refusal of a file request that 7.x makes such a resource of:
+//   - a virtual repository's own refusal: its patterns rejecting the path
+//     leave it no member to search (getInfoFromSearchableRepositories
+//     158-169). Its members' refusals never reach here, since the walk
+//     passes over them;
+//   - the download policy of a local, federated or remote repository, or
+//     a remote's cache (format.RejectionError.Policy): a blackout, the
+//     include and exclude patterns and Maven's release and snapshot
+//     handling, which RealRepoBase.checkDownloadIsAllowed checks before
+//     getInfo looks and createUnfoundRepoResource (224-233) turns into an
+//     unfound resource with the policy's status and message, Maven's 409
+//     included.
+//
+// A format's other refusals keep their answers, and so does a folder
+// request, which 7.x answers through its directory listing
+// (RepoFilter.doDirectoryRequest), not through respondResourceNotFound.
+func lookupRefusal(c repo.Config, req ItemRequest, err error) error {
 	var rejected *format.RejectionError
-	if c.Class != repo.Virtual || req.Path == "" || req.IsFolder || !errors.As(err, &rejected) {
+	if req.Path == "" || req.IsFolder || !errors.As(err, &rejected) {
+		return err
+	}
+	if c.Class != repo.Virtual && (!fileRequest(c, req) || !rejected.Policy) {
 		return err
 	}
 	return apierror.New(
 		rejected.Status,
 		rejected.Message+pathSuffix(req.Key, resourcePath(req.Path)),
 	)
+}
+
+// policyRefusal is the download policy's refusal err holds
+// (format.RejectionError.Policy), or nil.
+func policyRefusal(err error) *format.RejectionError {
+	var rejected *format.RejectionError
+	if errors.As(err, &rejected) && rejected.Policy {
+		return rejected
+	}
+	return nil
+}
+
+// containedRefusal answers err, a lookup's failure to read the file that
+// req, a checksum or an archive entry, is read from: a file request the
+// download policy refuses takes lookupRefusal's answer, as 7.161.26 checks
+// the policy on the file such a request names
+// (DownloadRequestContext.getResourcePath,
+// ArtifactoryRequestBase.zipResourcePath), and Maven's release and snapshot
+// handling refuses that file only once it is named; any other failure
+// keeps ItemNotFound.
+func containedRefusal(c repo.Config, req ItemRequest, err error) error {
+	if policyRefusal(err) != nil && fileRequest(c, req) {
+		return lookupRefusal(c, req, err)
+	}
+	return ItemNotFound()
 }
 
 // mismatched answers req, whose file does not carry a mandatory matrix
@@ -219,6 +260,18 @@ func Refused(c repo.Config, req ItemRequest, caller kernel.Principal) error {
 // Mismatched is mismatched for the format overlays (Missed).
 func Mismatched(c repo.Config, req ItemRequest) error { return mismatched(c, req) }
 
+// Rejected is lookupRefusal for the format overlays (Missed): err, the
+// download policy's refusal of the file req names, takes the path suffix
+// (#1630). A request fileRequest leaves to the old answers, a virtual
+// repository's own refusal among them, gets err back, which the caller
+// answers as before.
+func Rejected(c repo.Config, req ItemRequest, err error) error {
+	if !fileRequest(c, req) {
+		return err
+	}
+	return lookupRefusal(c, req, err)
+}
+
 // ErrFolderAtPath is an overlay's read that found a folder where the file
 // it serves would be. 7.161.26 answers a file request that finds a folder
 // with a redirect to the folder's listing (RemoteRepoBase.getInfo, "Expected
@@ -230,14 +283,15 @@ var ErrFolderAtPath = fmt.Errorf("itemkit: a folder holds the path: %w", kernel.
 
 // ReadAnswer answers err, an overlay's failure to read the file req names,
 // as the download answers it, the way sourceAnswer answers the generic
-// route's remote read: a want of Read takes refused, and a miss takes
-// missed. err may be the source's own error or pkgroute.SourceError's answer
+// route's remote read: a want of Read takes refused, a miss takes missed,
+// and the download policy's refusal of the file lookupRefusal's answer.
+// err may be the source's own error or pkgroute.SourceError's answer
 // to it, as the overlays' shared index reads return: a want of Read is
 // source.ErrDenied, kernel.ErrForbidden or kernel.ErrUnauthenticated, and a
 // miss kernel.ErrNotFound or SourceError's 404 "Not Found" for it. cached is
 // whether req named a remote's cache. The failures sourceAnswer keeps are
-// returned as they are: a storage fault, the download policy's refusal,
-// which can be kernel.ErrNotFound too (pkgroute.IsRefusal), the upstream's
+// returned as they are: a storage fault, a format's other refusals, which
+// can be kernel.ErrNotFound too (pkgroute.IsRefusal), the upstream's
 // own status (source.HTTPError, whose SourceError answer sends no
 // challenge), an invalid or unsupported request; so are ErrFolderAtPath,
 // any other failure, and every failure of a request fileRequest leaves to
@@ -261,6 +315,8 @@ func ReadAnswer(
 	var failure *source.HTTPError
 	var answer *apierror.Error
 	switch {
+	case policyRefusal(err) != nil:
+		return lookupRefusal(c, req, err)
 	case errors.Is(err, format.ErrStorageFault),
 		pkgroute.IsRefusal(err),
 		errors.As(err, &failure),
@@ -306,20 +362,18 @@ func NotServed(
 		return refused(c, req, caller)
 	}
 	if err := generic.CheckDownload(c, p, false); err != nil {
-		var rejected *format.RejectionError
-		if errors.As(err, &rejected) {
-			return apierror.New(rejected.Status, rejected.Message)
-		}
-		return err //nolint:wrapcheck // CheckDownload answers with RejectionError alone
+		return lookupRefusal(c, req, err)
 	}
 	return missed(c, cached, req)
 }
 
 // sourceAnswer answers err, a remote source's failure to read req, as
-// pkgroute.SourceError does, except that a file request's miss and want of
-// Read take the download's answers (missed, refused). The failures
-// SourceError tests before those two keep its answers: a refusal of the
-// download policy can be kernel.ErrNotFound too (pkgroute.IsRefusal).
+// pkgroute.SourceError does, except that a file request's miss, want of
+// Read and refusal by the download policy take the download's answers
+// (missed, refused, lookupRefusal). The failures SourceError tests before
+// the first two keep its answers: a refusal of the download policy can be
+// kernel.ErrNotFound too (pkgroute.IsRefusal), and a format's other
+// refusals keep SourceError's.
 func sourceAnswer(c repo.Config, req ItemRequest, caller kernel.Principal, err error) error {
 	if answer := remoteMissAnswer(c, req, caller, err); answer != nil {
 		return answer
@@ -327,6 +381,8 @@ func sourceAnswer(c repo.Config, req ItemRequest, caller kernel.Principal, err e
 	if fileRequest(c, req) {
 		var failure *source.HTTPError
 		switch {
+		case policyRefusal(err) != nil:
+			return lookupRefusal(c, req, err)
 		case errors.Is(err, format.ErrStorageFault),
 			pkgroute.IsRefusal(err),
 			errors.As(err, &failure),

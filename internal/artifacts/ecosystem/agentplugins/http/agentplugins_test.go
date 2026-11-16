@@ -151,7 +151,8 @@ func TestAccAgentPluginsMarketplaceServesTheStoredFile(t *testing.T) {
 	}
 	wantError(t, w.do(http.MethodGet, itemPath(pluginsLocal, "alpha/2.0.0/alpha-2.0.0.zip"), admin),
 		http.StatusNotFound, "The repository 'plugins-local' rejected the artifact "+
-			"'plugins-local:alpha/2.0.0/alpha-2.0.0.zip' due to its include/exclude pattern settings.")
+			"'plugins-local:alpha/2.0.0/alpha-2.0.0.zip' due to its include/exclude pattern settings."+
+			"; Path: 'plugins-local:alpha/2.0.0/alpha-2.0.0.zip'")
 }
 
 // TestAccAgentPluginsMarketplaceFollowsTheIndex: a download owes the work a

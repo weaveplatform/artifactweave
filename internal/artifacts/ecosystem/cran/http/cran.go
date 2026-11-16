@@ -116,7 +116,7 @@ func (s CranAPI) serveCranIndex(
 	// answer that no repository serves it. A remote's -cache alias answers
 	// as the remote does.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "CRAN index download", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "CRAN index download", itemkit.Rejected(c, req, err)))
 		return
 	}
 	// An index takes a query and matrix parameters as any other file's GET
@@ -491,7 +491,8 @@ func (s CranAPI) serveCranPackage(
 	// so patterns that reject the PACKAGES file or its folder leave the
 	// package served, as a download checks only its own path.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "CRAN package download", err))
+		httpkit.WriteErr(w, r,
+			s.ItemError(r.Context(), "CRAN package download", itemkit.Rejected(c, req, err)))
 		return
 	}
 	// A remote's cached copy of the package is matched against the matrix

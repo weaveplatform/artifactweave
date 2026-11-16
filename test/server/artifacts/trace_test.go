@@ -138,15 +138,28 @@ func TestAccTraceResolution(t *testing.T) {
 			"Sending a response with the status '404' and the message " +
 				"'Repository 'missing' does not exist'",
 		}},
+		// Matrix parameters are matched as DbStoringRepoMixin.getInfo logs
+		// it (7.161.26, 516-530), as the walk through a virtual repository
+		// does (#1630): a conflict is unfound, and a key the file lacks
+		// still serves it.
 		{"/artifactory/libs-local/d/a.txt;team=other?trace", "admin", []string{
 			"Received request",
 			"Retrieving info from local repository 'libs-local' type generic",
-			"Returning found resource from libs-local:d/a.txt",
-			"Request query properties don't match those that annotate the artifact",
+			"Request query properties conflict with those that annotate the artifact - " +
+				"returning unfound resource",
 			"Responding with unfound resource",
 			"Sending a response with the status '404' and the message 'File " +
 				"'libs-local:d/a.txt' was found, but mandatory properties do not match.; " +
 				"Path: 'libs-local:d/a.txt''",
+		}},
+		{"/artifactory/libs-local/d/a.txt;other=x?trace", "admin", []string{
+			"Received request",
+			"Retrieving info from local repository 'libs-local' type generic",
+			"Request query properties don't match those that annotate the artifact",
+			"Returning found resource from libs-local:d/a.txt",
+			"Identified requested resource as a file",
+			"Responding with found resource",
+			"Request succeeded",
 		}},
 		{"/artifactory/libs-local/d?trace", "admin", []string{
 			"Received request",
@@ -248,6 +261,7 @@ func TestAccTraceRefusalsAndRewrites(t *testing.T) {
 	w.put("/artifactory/libs-local/a/f.txt", "f")
 	w.put("/artifactory/other-local/a/f.txt", "o")
 	w.put("/artifactory/libs-local/z/a.zip", string(zipBytes(t, map[string]string{"in.txt": "x"})))
+	w.put("/artifactory/other-local/z/a.zip", string(zipBytes(t, map[string]string{"in.txt": "x"})))
 	w.patchRepo("other-local", func(c *repo.Config) { c.BlackedOut = ptr(true) })
 
 	const latest = "/artifactory/virt/latest.txt?trace"
@@ -270,23 +284,119 @@ func TestAccTraceRefusalsAndRewrites(t *testing.T) {
 	rec := w.do(http.MethodHead, "/artifactory/libs-local/a/f.txt?trace", "admin", "")
 	wantStatus(t, rec, http.StatusOK)
 
+	w.patchRepo("virt", func(c *repo.Config) { c.ExcludesPattern = ptr("**/*.secret") })
+	refusal := func(artifact string) string {
+		return "The repository 'other-local' is blacked out and cannot serve artifact " +
+			"'other-local:" + artifact + "'."
+	}
 	for _, c := range []struct {
 		path, as string
 		expected []string
 	}{
-		// A blacked-out repository refuses the download outright.
+		// A blacked-out repository refuses the download outright, as
+		// RealRepoBase.createUnfoundRepoResource 224-227 logs it and with
+		// the path the download names (#1630): a checksum's and an archive
+		// entry's are the file they name.
 		{"/artifactory/other-local/a/f.txt?trace", "admin", []string{
+			"Received request",
+			"Retrieving info from local repository 'other-local' type generic",
+			"Download denied (" + refusal("a/f.txt") + ") - returning un-found resource",
+			"Responding with unfound resource",
+			"Sending a response with the status '404' and the message '" + refusal("a/f.txt") +
+				"; Path: 'other-local:a/f.txt''",
+		}},
+		{"/artifactory/other-local/a/f.txt.sha1?trace", "admin", []string{
+			"Received request",
+			"Retrieving info from local repository 'other-local' type generic",
+			"Download denied (" + refusal("a/f.txt") + ") - returning un-found resource",
+			"Responding with unfound resource",
+			"Sending a response with the status '404' and the message '" + refusal("a/f.txt") +
+				"; Path: 'other-local:a/f.txt''",
+		}},
+		{"/artifactory/other-local/z/a.zip!/in.txt?trace", "admin", []string{
+			"Received request",
+			"Retrieving info from local repository 'other-local' type generic",
+			"Download denied (" + refusal("z/a.zip") + ") - returning un-found resource",
+			"Responding with unfound resource",
+			"Sending a response with the status '404' and the message '" + refusal("z/a.zip") +
+				"; Path: 'other-local:z/a.zip''",
+		}},
+		// 7.x lists a folder without tracing it (RepoFilter.doRepoRequest),
+		// so a folder's refusal keeps this server's own step.
+		{"/artifactory/other-local/a/?trace", "admin", []string{
 			"Received request",
 			"Retrieving info from local repository 'other-local' type generic",
 			"Request is forbidden by other-local",
 			"Responding with unfound resource",
-			"Sending a response with the status '404' and the message " +
-				"'The repository 'other-local' is blacked out and cannot serve artifact " +
-				"'other-local:a/f.txt'.'",
+			"Sending a response with the status '404' and the message '" + refusal("a") + "'",
+		}},
+		// A virtual repository's own patterns leave it no member to search
+		// (getInfoFromSearchableRepositories 158-169).
+		{"/artifactory/virt/a.secret?trace", "admin", []string{
+			"Received request",
+			"Retrieving info from virtual repository 'virt' type generic",
+			"Unable to find aggregated repositories to search within - returning unfound resource",
+			"Responding with unfound resource",
+			"Sending a response with the status '404' and the message 'No repository found " +
+				"to serve the request for virt:a.secret; Path: 'virt:a.secret''",
 		}},
 	} {
 		_, steps := traceOf(t, w, http.MethodGet, c.path, c.as)
 		wantSteps(t, c.path, steps, c.expected...)
+	}
+}
+
+// Maven's release and snapshot handling refuses a download 409 as
+// 7.161.26 answers any refusal of the download policy: logged by
+// createUnfoundRepoResource and responded to as an unfound resource, with
+// the path the download names (#1630). The policy is checked on the file a
+// checksum or an archive entry names, as checkDownloadIsAllowed checks it
+// before getInfo looks.
+func TestAccTraceMavenPolicyRefusal(t *testing.T) {
+	w := newItemWorld(t, false)
+	c := repo.Config{Key: "mvn-rel", Class: repo.Local, PackageType: repo.Maven, HandleSnapshots: ptr(false)}
+	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	const jar = "com/acme/app/1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar"
+	const refusal = "The repository 'mvn-rel' rejected the resolution of an artifact " +
+		"'mvn-rel:" + jar + "' due to conflict in the snapshot release handling policy."
+	denied := "Download denied (" + refusal + ") - returning un-found resource"
+	answer := "Sending a response with the status '409' and the message '" + refusal +
+		"; Path: 'mvn-rel:" + jar + "''"
+	for _, c := range []struct {
+		path     string
+		expected []string
+	}{
+		{jar, []string{
+			"Received request",
+			"Retrieving info from local repository 'mvn-rel' type maven",
+			denied,
+			"Responding with unfound resource",
+			answer,
+		}},
+		{jar + ".sha1", []string{
+			"Received request",
+			"Retrieving info from local repository 'mvn-rel' type maven",
+			"Unable to find resource in mvn-rel:" + jar + ".sha1",
+			"Request is for a checksum",
+			denied,
+			"Responding with unfound resource",
+			answer,
+		}},
+		{jar + "!/f.txt", []string{
+			"Received request",
+			"Retrieving info from local repository 'mvn-rel' type maven",
+			"Unable to find resource in mvn-rel:" + jar + "!/f.txt",
+			"Requested resource is contained within an archive",
+			denied,
+			"Responding with unfound resource",
+			answer,
+		}},
+	} {
+		path := "/artifactory/mvn-rel/" + c.path + "?trace"
+		_, steps := traceOf(t, w, http.MethodGet, path, "admin")
+		wantSteps(t, path, steps, c.expected...)
 	}
 }
 

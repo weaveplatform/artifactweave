@@ -15,6 +15,7 @@ import (
 	accessmodule "github.com/weaveplatform/artifactweave/internal/access"
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -324,5 +325,91 @@ func TestAccMultipartChecksumToken(t *testing.T) {
 		"",
 	); got.Body.String() != data {
 		t.Fatalf("download %d, %d bytes", got.Code, got.Body.Len())
+	}
+}
+
+// TestAccMultipartCreateRefusals (#1627): create refuses a key that names
+// no repository as it refuses a caller without Deploy, with 7.x's 403 and
+// text, or 401 "Unauthorized" with a challenge to an anonymous caller. It
+// refuses no repository for its class, so an upload to a remote repository
+// or its cache fails only at the checksum deploy that ends it.
+func TestAccMultipartCreateRefusals(t *testing.T) {
+	tune := func(c *Config) {
+		c.Multipart = &multipart.Service{
+			Store: c.Store, Blobs: c.Blobs, Dir: t.TempDir(),
+			Restrictions: restrictionsOver(t, c.Store),
+		}
+	}
+	w := newItemWorld(t, false, tune)
+	create := func(w *itemWorld, q, as string) *httptest.ResponseRecorder {
+		return w.do(http.MethodPost, uploadsCreate+"?"+q, as, "")
+	}
+	for _, tc := range []struct{ q, as string }{
+		{"repoKey=missing&repoPath=f.bin&partSizeMB=1", "admin"},
+		{"repoKey=missing&repoPath=f.bin&partSizeMB=1", "deployer"},
+		{"repoKey=&repoPath=f.bin&partSizeMB=1", "admin"},
+		// Only a remote repository has a cache.
+		{"repoKey=libs-local-cache&repoPath=f.bin&partSizeMB=1", "admin"},
+		{"repoKey=libs-local&repoPath=f.bin&partSizeMB=1", "user"},
+		{"repoKey=up&repoPath=f.bin&partSizeMB=1", "deployer"},
+		{"repoKey=up-cache&repoPath=f.bin&partSizeMB=1", "user"},
+	} {
+		wantError(t, tc.as+" "+tc.q, create(w, tc.q, tc.as),
+			http.StatusForbidden, deployForbidden, "")
+	}
+	for _, q := range []string{"repoPath=f.bin&partSizeMB=1", "repoKey=libs-local&partSizeMB=1"} {
+		wantError(t, q, create(w, q, "admin"),
+			http.StatusBadRequest, "Query param repoKey or repoPath is null", "")
+	}
+	anon := newItemWorld(t, true, tune)
+	for _, key := range []string{"missing", "libs-local", "up"} {
+		rec := create(anon, "repoKey="+key+"&repoPath=f.bin&partSizeMB=1", "")
+		wantError(t, "anonymous to "+key, rec, http.StatusUnauthorized, "Unauthorized", "")
+		if got := rec.Header().Get("WWW-Authenticate"); got != `Basic realm="Artifactory Realm"` {
+			t.Errorf("anonymous to %s: challenge %q", key, got)
+		}
+	}
+	// Deploy on a remote repository, which an administrator always holds,
+	// lets the upload run to its checksum deploy, which no remote takes.
+	if err := w.db.Permissions().Create(context.Background(), accesstest.Permission{
+		Name: "user-deploys-remotes",
+		Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{
+				Users: map[string]accessapi.Actions{"user": accessapi.ActionWrite},
+			},
+			Targets: map[string]accesstest.Target{accessapi.TargetAnyRemote: {Include: []string{"**"}}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"up", "up-cache"} {
+		for _, as := range []string{"admin", "user"} {
+			data := "uploaded in parts to " + key + " by " + as
+			token := uploadInPartsTo(t, w, as, key, "big/data.bin", data)
+			wantError(t, "the checksum deploy to "+key+" by "+as,
+				w.do(http.MethodPut, "/artifactory/"+key+"/big/data.bin", as, "",
+					"X-Checksum-Deploy", "true", "X-Checksum-Sha1", sha1Hex(data),
+					"X-Checksum-Deploy-Token", token),
+				http.StatusNotFound, "Could not find a local repository named "+key+" to deploy to.", "")
+		}
+	}
+}
+
+// A failure reading the repository create checks Deploy on, or a virtual
+// repository's deployment repository, is a server error, not a refusal.
+func TestAccMultipartCreateReadFailure(t *testing.T) {
+	fail := map[string]bool{"get:libs-local": true}
+	w := newItemWorld(t, false, func(c *Config) {
+		db := c.Store.(*inmem.Store) //nolint:forcetypeassert // fixture
+		c.Store = faultyStore{Store: db, fail: fail}
+		c.Multipart = &multipart.Service{
+			Store: c.Store, Blobs: c.Blobs, Dir: t.TempDir(),
+			Restrictions: restrictionsOver(t, c.Store),
+		}
+	})
+	for _, key := range []string{"libs-local", "virt"} {
+		wantStatus(t, w.do(http.MethodPost,
+			uploadsCreate+"?repoKey="+key+"&repoPath=f.bin&partSizeMB=1", "admin", ""),
+			http.StatusInternalServerError)
 	}
 }

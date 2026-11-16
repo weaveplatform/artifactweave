@@ -32,6 +32,10 @@ const traceTime = "2006-01-02T15:04:05.000Z07:00"
 // path reports its steps whether or not it is traced.
 type resolutionTrace struct {
 	steps []string
+	// unfound is whether a direct request was refused by the download
+	// policy (denied), which 7.161.26 answers as an unfound resource
+	// whatever its status, Maven's 409 included.
+	unfound bool
 }
 
 func (t *resolutionTrace) stepf(format string, args ...any) {
@@ -41,11 +45,41 @@ func (t *resolutionTrace) stepf(format string, args ...any) {
 	t.steps = append(t.steps, time.Now().Format(traceTime)+" "+fmt.Sprintf(format, args...))
 }
 
+// denied records the download policy's refusal err holds, if any, of a
+// direct request, as RealRepoBase.createUnfoundRepoResource (224-227) logs
+// it when checkDownloadIsAllowed refuses.
+func (t *resolutionTrace) denied(err error) {
+	if refusal := policyRefusal(err); refusal != nil && t != nil {
+		t.stepf("Download denied (%s) - returning un-found resource", refusal.Message)
+		t.unfound = true
+	}
+}
+
 // stepf records a resolution step of a traced download. The storage API
 // looks items up with no download at all, so d may be nil.
 func (d *Download) stepf(format string, args ...any) {
 	if d != nil {
 		d.trace.stepf(format, args...)
+	}
+}
+
+// denied records c's refusal err of a direct request. A virtual
+// repository's own patterns leave it no member to search, which
+// getInfoFromSearchableRepositories logs (7.161.26, 166-167), as
+// lookupMembers does when no member is left; any other repository's
+// refusal is its download policy's (resolutionTrace.denied). 7.x traces
+// no folder request: RepoFilter.doRepoRequest lists the folder before it
+// reads ?trace, so a folder's refusal keeps this server's own step.
+func (d *Download) denied(c repo.Config, err error) {
+	switch {
+	case d == nil:
+	case d.isFolder:
+		d.stepf("Request is forbidden by %s", c.Key)
+	case c.Class == repo.Virtual:
+		d.stepf("Unable to find aggregated repositories to search within - returning " +
+			"unfound resource")
+	default:
+		d.trace.denied(err)
 	}
 }
 
@@ -102,7 +136,10 @@ func (s *Kit) traceItem(w http.ResponseWriter, r *http.Request) {
 			httpkit.NoteCause(ctx, err)
 			e = apierror.New(http.StatusInternalServerError, "internal error")
 		}
-		if e.Status == http.StatusNotFound {
+		// DownloadServiceImpl.respond logs this for every resource that is
+		// not found (7.161.26, 748-749): a miss, and a refusal by the
+		// download policy whatever its status.
+		if e.Status == http.StatusNotFound || t.unfound {
 			t.stepf("Responding with unfound resource")
 		}
 		t.stepf("Sending a response with the status '%d' and the message '%s'", e.Status, e.Message)
@@ -204,6 +241,7 @@ func (s *Kit) traceDownload(
 	}
 	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
 	dl.trace = t
+	dl.upstream = s.walkStep(r, req, p, acc)
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
 		// getUnfoundItem's check of Read on the file, before anything else.
@@ -215,26 +253,28 @@ func (s *Kit) traceDownload(
 				return err
 			}
 		}
-		return s.traceContained(ctx, st, method, c, cached, req, p, acc, dl, err)
+		return s.traceContained(r, st, c, cached, req, p, acc, dl, err)
 	}
 	if err != nil {
-		return s.ItemError(ctx, "lookup item", virtualRefusal(c, req, err))
+		return s.ItemError(ctx, "lookup item", lookupRefusal(c, req, err))
+	}
+	if f.remote != nil {
+		return s.traceRemoteRead(r, f.Repo, memberRequest(req, f.Repo), p, *f.remote, t)
 	}
 	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
 		return refused(c, req, p)
+	}
+	ok, err := traceMatrix(ctx, st, c, f.Item, req, t)
+	if err != nil {
+		return s.InternalError(ctx, "item properties", err)
+	}
+	if !ok {
+		return mismatched(c, req)
 	}
 	t.stepf(
 		"Returning found resource from %s",
 		traceRepoPath(f.Repo, f.Item.Cached, f.Item.FullPath()),
 	)
-	ok, err := matchesMatrix(ctx, st, f.Item, req)
-	if err != nil {
-		return s.InternalError(ctx, "item properties", err)
-	}
-	if !ok {
-		t.stepf("Request query properties don't match those that annotate the artifact")
-		return mismatched(c, req)
-	}
 	if f.Item.Folder {
 		t.stepf("Identified requested resource as a folder")
 		return nil
@@ -242,6 +282,43 @@ func (s *Kit) traceDownload(
 	t.stepf("Identified requested resource as a file")
 	traceResponding(method, t)
 	return nil
+}
+
+// traceMatrix is matchesMatrix for a traced download from c, which records
+// the match as DbStoringRepoMixin.getInfo logs it (7.161.26, 516-530), and
+// as the walk through a virtual repository does (lookupMember): a file
+// whose properties conflict with the request's, which the download answers
+// unfound, and one that lacks a key the request asks a value of, which it
+// still serves (PropertiesImpl.matchQuery's NO_MATCH). Through a virtual
+// repository the walk has recorded its members' matches already.
+func traceMatrix(
+	ctx context.Context,
+	st Store,
+	c repo.Config,
+	it model.Item,
+	req ItemRequest,
+	t *resolutionTrace,
+) (bool, error) {
+	if c.Class == repo.Virtual {
+		return matchesMatrix(ctx, st, it, req)
+	}
+	if len(req.Props) == 0 {
+		return true, nil
+	}
+	props, err := st.Items().Properties(ctx, it.ID)
+	if err != nil {
+		return false, fmt.Errorf("properties of %s: %w", it.FullPath(), err)
+	}
+	m := req.matrix()
+	switch {
+	case !m.Matches(props):
+		t.stepf("Request query properties conflict with those that annotate the artifact - " +
+			"returning unfound resource")
+		return false, nil
+	case !carriesEveryKey(m, props):
+		t.stepf("Request query properties don't match those that annotate the artifact")
+	}
+	return true, nil
 }
 
 // traceRemoteItem traces the read getRemoteItem makes of req
@@ -261,8 +338,24 @@ func (s *Kit) traceRemoteItem(
 	if !ok {
 		return false, nil
 	}
+	return true, s.traceRemoteRead(r, c, req, p, read, t)
+}
+
+// traceRemoteRead traces read, the remote repository c's read of req, as
+// serveRemoteRead would answer it, and returns the error it would answer,
+// or nil where it would serve a file or a checksum, without serving or
+// counting anything. A walk through a virtual repository that found the
+// file in c traces it so too.
+func (s *Kit) traceRemoteRead(
+	r *http.Request,
+	c repo.Config,
+	req ItemRequest,
+	p kernel.Principal,
+	read remoteRead,
+	t *resolutionTrace,
+) error {
 	if read.err != nil {
-		return true, read.err
+		return read.err
 	}
 	ctx := r.Context()
 	result, alg := read.result, item.Algorithm(read.sidecar)
@@ -288,7 +381,7 @@ func (s *Kit) traceRemoteItem(
 		}
 	}
 	if err != nil {
-		return true, err
+		return err
 	}
 	if result.Stream != nil {
 		t.stepf("Returning validated transient resource")
@@ -297,10 +390,10 @@ func (s *Kit) traceRemoteItem(
 	}
 	if read.sidecar != "" {
 		t.stepf("Responding to checksum request")
-		return true, nil
+		return nil
 	}
 	traceResponding(r.Method, t)
-	return true, nil
+	return nil
 }
 
 // traceContained traces a path no item holds: an entry inside an archive
@@ -308,9 +401,8 @@ func (s *Kit) traceRemoteItem(
 // file they name, or else the miss, which is miss, the lookup's error. It
 // answers each as getUnfoundItem and getSidecar do.
 func (s *Kit) traceContained(
-	ctx context.Context,
+	r *http.Request,
 	st Store,
-	method string,
 	c repo.Config,
 	cached bool,
 	req ItemRequest,
@@ -319,15 +411,24 @@ func (s *Kit) traceContained(
 	dl *Download,
 	miss error,
 ) error {
-	p := req.Path
+	ctx, method, p := r.Context(), r.Method, req.Path
 	if archive, entry, ok := strings.Cut(p, "!/"); ok {
 		dl.stepf("Requested resource is contained within an archive")
+		dl.upstream = s.archiveStep(r, req, archive, caller, acc)
 		a, err := Lookup(ctx, st, c, cached, archive, acc, dl, virtual.Resolve)
 		if errors.Is(err, kernel.ErrNotFound) {
-			return unfound(c, cached, req, caller, err)
+			fetched, read, answer := s.remoteArchive(r, c, cached, req, archive, entry, caller, acc,
+				dl.trace)
+			switch {
+			case !read:
+				return unfound(c, cached, req, caller, err)
+			case answer != nil:
+				return answer
+			}
+			a, err = fetched, nil
 		}
 		if err != nil {
-			return ItemNotFound()
+			return containedRefusal(c, req, err)
 		}
 		if !acc.File(a.Repo, a.Item.FullPath(), accessapi.ActionRead) {
 			return refused(c, req, caller)
@@ -359,11 +460,18 @@ func (s *Kit) traceContained(
 		return unfound(c, cached, req, caller, miss)
 	}
 	dl.stepf("Request is for a checksum")
+	dl.upstream = s.fileStep(r, req, caller, acc)
 	f, err := Lookup(ctx, st, c, cached, artifact, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
 		return unfound(c, cached, req, caller, err)
 	}
-	if err != nil || f.Item.Folder {
+	if err != nil {
+		return containedRefusal(c, req, err)
+	}
+	if f.remote != nil {
+		return s.traceRemoteRead(r, f.Repo, memberRequest(req, f.Repo), caller, *f.remote, dl.trace)
+	}
+	if f.Item.Folder {
 		return ItemNotFound()
 	}
 	// A file the caller may not read has no visible checksum either.
@@ -529,19 +637,35 @@ func (s *Kit) traceOverlays(
 	}
 	if answer != nil {
 		// The download's miss follows DbStoringRepoMixin.getInfo's step for
-		// the stored file it did not find, a remote's in its cache, as the
-		// generic lookup traces it (Lookup).
+		// the stored file it did not find, a remote's in its cache, and the
+		// download policy's refusal of the file follows
+		// createUnfoundRepoResource's, as the generic lookup traces both
+		// (Lookup).
 		var miss *apierror.Error
 		if answer.Status == http.StatusNotFound && fileRequest(c, req) &&
 			errors.As(missed(c, cached, req), &miss) && miss.Message == answer.Message {
 			t.stepf("Unable to find resource in %s",
 				traceRepoPath(c, cached || c.Class == repo.Remote, resourcePath(req.Path)))
 		}
+		if overlayRefused(c, req, answer) {
+			t.denied(generic.CheckDownload(c, resourcePath(req.Path), false))
+		}
 		return true, answer
 	}
 	t.stepf("Identified requested resource as a file")
 	traceResponding(r.Method, t)
 	return true, nil
+}
+
+// overlayRefused reports whether answer, what an overlay answered req in c,
+// is the download policy's refusal of the file req names, with the path
+// the item route adds to it (Rejected).
+func overlayRefused(c repo.Config, req ItemRequest, answer *apierror.Error) bool {
+	var refusal *apierror.Error
+	return fileRequest(c, req) &&
+		errors.As(lookupRefusal(c, req, generic.CheckDownload(c, resourcePath(req.Path), false)),
+			&refusal) &&
+		refusal.Status == answer.Status && refusal.Message == answer.Message
 }
 
 // remoteTraceStep is the step a trace records for result, a remote read an
