@@ -56,6 +56,10 @@ type Options struct {
 	// download, which applies the download redirect policy (decision 0029),
 	// sets the checksum headers and counts the download.
 	ServeItem func(w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item)
+	// NameStream names the remote file at path in c that ServeResult serves
+	// from its stream rather than from a kept copy, in the form ServeItem
+	// names the copy (ServeNamedStream). Nil names none.
+	NameStream func(c repo.Config, path string) FileNames
 	// DeployItem delegates a PUT with its escaped repository-relative path,
 	// including matrix parameters and any trailing slash.
 	DeployItem func(http.ResponseWriter, *http.Request, repo.Config, string)

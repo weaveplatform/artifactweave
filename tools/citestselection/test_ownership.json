@@ -161,6 +161,7 @@
     "internal/artifacts/adapters/http/itemkit": [
       "access_test.go",
       "answers_test.go",
+      "archive_entry_test.go",
       "disposition_test.go",
       "items_test.go",
       "kit_test.go",

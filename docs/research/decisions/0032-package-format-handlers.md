@@ -351,6 +351,21 @@ PyPI, NuGet, Helm and Terraform) mount through one kit,
     the requested repository's flag, so through a virtual repository it gets neither. The
     properties that tune these answers are not offered (DV-202). A Docker repository follows the
     same rule, which no capture shows [I] (#216).
+  - **Streamed remote files and archive entries** (amended 2026-11-16,
+    [#1593](https://github.com/weaveplatform/artifactweave/issues/1593),
+    [#1594](https://github.com/weaveplatform/artifactweave/issues/1594)). A file a remote that
+    stores nothing serves from the upstream's stream is named as the copy it would keep, in the
+    form of the route that serves it, by the remote's flag, with the browser's view; 7.161.26
+    answers that `RemoteRepoResource` through the same `RequestResponseHelper` as a cached
+    file. An archive entry (`archive.zip!/path`) is answered as a file's download: its own
+    SHA-1 as the ETag and its SHA-1, SHA-256 and MD5 in `X-Checksum-*` (which algorithms 7.x
+    computes for an entry is [I]), the archive's `Last-Modified`, ranges and `If-Range`, the
+    304, the 416, `X-Artifactory-Filename` and the item route's `Content-Disposition` by the
+    entry's name and the flag of the repository that holds the archive, and the browser's
+    view; a GET counts as a download of the archive (`ZipEntryResourceImpl`,
+    `DbStoringRepoMixin.getResourceStreamHandle`). An entry is served whatever the flag, as
+    JFrog's Archive Entry Download asks only for Read. 7.x's `setHeaderForNonAscii` names an
+    entry outside printable ASCII by the archive's name; the entry's is sent [I] (#216).
 - A deploy helper with the item routes' matrix and checksum parsing exported, answering 201
   with the `X-Checksum-Sha1`, `-Sha256` and `-Md5` headers.
 - Raw-path parsing for encoded slashes (`@scope%2fname`).

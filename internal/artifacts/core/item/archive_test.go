@@ -705,3 +705,52 @@ func TestUnitTree(t *testing.T) {
 		t.Fatalf("%v %v", names, err)
 	}
 }
+
+// An entry whose own bytes cannot be read through, one that fails its
+// CRC-32 or ends before its length, is ErrNotFound, as a corrupt archive
+// is, once serve fails on that read; a read of the blob that fails while
+// serve reads the entry stays that read's error; and serve's own failure,
+// with every read sound, is its own (#1593).
+func TestUnitArchiveEntryTooCorruptToRead(t *testing.T) {
+	ctx := context.Background()
+	readAll := func(_ int64, r io.Reader) error {
+		_, err := io.Copy(io.Discard, r)
+		return err
+	}
+	// Stored, zipOf's entry is its bytes: changing them fails the CRC-32.
+	badCRC := bytes.Replace(zipOf(t, entry{name: "in.txt", body: "inside"}),
+		[]byte("inside"), []byte("INSIDE"), 1)
+	var short bytes.Buffer
+	tw := tar.NewWriter(&short)
+	if err := tw.WriteHeader(&tar.Header{Name: "in.txt", Size: 100, Mode: 0o644}); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = tw.Write([]byte("inside"))
+	w := newWorld(t)
+	for p, body := range map[string][]byte{"crc.zip": badCRC, "short.tar": short.Bytes()} {
+		it := w.must(p, string(body))
+		if err := w.svc.ArchiveEntry(ctx, it, "in.txt", readAll); !errors.Is(err, ErrNotFound) {
+			t.Errorf("%s: %v", p, err)
+		}
+	}
+	it := w.must("sound.zip", string(zipOf(t, entry{name: "in.txt", body: "inside"})))
+	fs := w.svc.Blobs
+	failedInServe := false
+	for sound := 1; sound < 16; sound++ {
+		w.svc.Blobs = unreadable{Store: fs, sound: sound}
+		var readErr error
+		err := w.svc.ArchiveEntry(ctx, it, "in.txt", func(_ int64, r io.Reader) error {
+			_, readErr = io.Copy(io.Discard, r)
+			return readErr
+		})
+		if readErr != nil {
+			failedInServe = true
+			if !errors.Is(err, errRead) || errors.Is(err, ErrNotFound) {
+				t.Errorf("sound %d: a failed blob read while serving: %v", sound, err)
+			}
+		}
+	}
+	if !failedInServe {
+		t.Fatal("no blob read failed while the entry was served")
+	}
+}

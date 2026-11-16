@@ -262,12 +262,43 @@ func (e *sourceRefusal) Error() string { return e.rejection.Message }
 
 func (e *sourceRefusal) Unwrap() []error { return []error{e.answer, e.rejection} }
 
+// FileNames sets the headers that name the remote file a stream is, on the
+// answer ServeNamedStream gives it: notModified is set for a 304, and r is
+// the request as the answer reads it. ServeNamedStream calls it once,
+// after it has typed the file and before the answer is written, so that it
+// can replace the type as a browser's view does. The item kit's
+// StreamNames builds it.
+type FileNames func(h http.Header, r *http.Request, notModified bool)
+
 // ServeStream owns and closes the body, including HEAD/304. It writes only
 // representation headers, never cookies or upstream authentication challenges.
 // An error after headers requires the caller to abort the HTTP stream: a partial
 // unknown-length body must not look like a successfully completed artifact.
+// It names no file: a route that names its own, as the registry does,
+// serves its stream here.
 func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error {
+	return ServeNamedStream(w, r, s, nil)
+}
+
+// ServeNamedStream is ServeStream naming the file a stream with a Path is
+// by names, as its kept copy is named, on a GET, a HEAD, a range and a
+// 304. 7.161.26 answers a resource a remote does not save ("resource will
+// be stream directly to the user", RemoteRepoBase) through the same
+// RequestResponseHelper.sendBodyResponse and sendHeadResponse as a cached
+// file, whose setBasicHeaders sends X-Artifactory-Filename and the
+// Content-Disposition. A 416 sends neither, as RangeRefusalWriter drops
+// them. names may be nil, and a stream without a Path, a document a route
+// builds per request, is never named.
+func ServeNamedStream(
+	w http.ResponseWriter,
+	r *http.Request,
+	s *source.Stream,
+	names FileNames,
+) error {
 	defer func() { _ = s.Body.Close() }()
+	if s.Path == "" {
+		names = nil
+	}
 	// A stream answers If-Match and If-Unmodified-Since as the cached copy
 	// it becomes does: never with 412, since 7.x's download reads neither
 	// (UnevaluatedPreconditions). Without this a remote file served from
@@ -341,7 +372,11 @@ func ServeStream(w http.ResponseWriter, r *http.Request, s *source.Stream) error
 			// If-Modified-Since can find it unchanged, whatever its length
 			// (https://github.com/weaveplatform/artifactweave/issues/1487).
 		}
-		if FileNotModified(r, tags, s.Checksums.MD5, s.Modified) {
+		notModified := FileNotModified(r, tags, s.Checksums.MD5, s.Modified)
+		if names != nil {
+			names(h, r, notModified)
+		}
+		if notModified {
 			WriteNotModified(w)
 			return nil
 		}
@@ -450,6 +485,8 @@ func (w *streamWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 // ServeResult delivers an already resolved representation after its final
 // authority check. Callers may rewrite metadata first, preserving Revalidate
 // and Used while replacing every header that describes the upstream bytes.
+// A remote file's stream is named as ServeItem names the copy it would
+// keep, by Options.NameStream for the request's repository.
 func (k *Kit) ServeResult(w http.ResponseWriter, r *http.Request, result source.Result) {
 	if result.Revalidate != nil {
 		if err := result.Revalidate(r.Context()); err != nil {
@@ -463,7 +500,11 @@ func (k *Kit) ServeResult(w http.ResponseWriter, r *http.Request, result source.
 	}
 	tracked := &deliveryWriter{ResponseWriter: w}
 	if result.Stream != nil {
-		if err := ServeStream(tracked, r, result.Stream); err != nil {
+		var names FileNames
+		if k.o.NameStream != nil && result.Stream.Path != "" {
+			names = k.o.NameStream(RequestFrom(r).Repo, result.Stream.Path)
+		}
+		if err := ServeNamedStream(tracked, r, result.Stream, names); err != nil {
 			if k.o.Fault != nil {
 				k.o.Fault(r, err)
 			}

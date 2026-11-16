@@ -3,6 +3,7 @@ package artifactshttp
 import (
 	"net/http"
 	"net/url"
+	"path"
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
@@ -60,6 +61,15 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 				return
 			}
 			s.ServeFile(w, r, s.cfg.Store, f, p)
+		},
+		// A remote file served from its upstream's stream is named in the
+		// form ServeItem names the copy it keeps.
+		NameStream: func(c repo.Config, p string) pkgroute.FileNames {
+			form := itemkit.ItemDisposition
+			if packageServiceDownload(c.PackageType) {
+				form = itemkit.PackageDisposition
+			}
+			return itemkit.StreamNames(c, path.Base(p), form)
 		},
 		DeployItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, rest string) {
 			s.deployEscapedItem(w, r, url.PathEscape(c.Key)+"/"+rest)

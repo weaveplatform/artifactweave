@@ -398,7 +398,8 @@ func digestsOf(info blob.Info) kernel.Checksums {
 // ArchiveEntry finds the entry at entry inside the archive file it and
 // calls serve with its size and content, returning serve's error.
 // ErrNotFound when the file is not an archive, is a corrupt one or has no
-// such entry; when a read of the file's blob fails, the error is that
+// such entry, or when serve fails on a read of an entry too corrupt to
+// read through; when a read of the file's blob fails, the error is that
 // read's.
 func (s *Service) ArchiveEntry(
 	ctx context.Context,
@@ -436,7 +437,20 @@ func (s *Service) ArchiveEntry(
 		if c, ok := r.(io.Closer); ok {
 			defer func() { _ = c.Close() }()
 		}
-		served = serve(e.Size, r)
+		reads := &entryReads{r: r}
+		served = serve(e.Size, reads)
+		if served != nil && reads.err != nil {
+			// A corrupt entry is no entry, as a corrupt archive is none.
+			// RTFACT-24360 shows 7.x answering 404 for an entry whose
+			// archive stream ends before it is read; 404 for one whose own
+			// bytes cannot be read through is inferred from it [I]. A
+			// failed read of the blob stays that read's error.
+			if failed := e.Wrap(reads.err); errors.Is(failed, ErrBadArchive) {
+				served = ErrNotFound
+			} else {
+				served = failed
+			}
+		}
 		return errFound
 	})
 	switch {
@@ -446,6 +460,21 @@ func (s *Service) ArchiveEntry(
 		return ErrNotFound
 	}
 	return fmt.Errorf("item: read %s: %w", it.FullPath(), err)
+}
+
+// entryReads keeps the first failed read of an archive entry, so that
+// ArchiveEntry tells a read of a corrupt entry from serve's own failure.
+type entryReads struct {
+	r   io.Reader
+	err error
+}
+
+func (e *entryReads) Read(p []byte) (int, error) {
+	n, err := e.r.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) && e.err == nil {
+		e.err = err
+	}
+	return n, err //nolint:wrapcheck // the entry's own error, which ArchiveEntry classifies
 }
 
 // ArchiveFiles writes files to w as one archive of kind, each named by its

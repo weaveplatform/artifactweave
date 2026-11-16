@@ -57,7 +57,7 @@ func wantNamed(
 // JerseyArtifactoryResponse writes for the package download service,
 // while the item route, which keeps filename* here, adds it
 // (HttpArtifactoryResponse). The PyPI API sent the item route's form
-// (#1505).
+// (#1505), and nothing for a remote that stores nothing (#1594).
 func TestAccPypiFileNamedWithoutFilenameStar(t *testing.T) {
 	const file = "demo/1.0/" + wheelName
 	itemForm := itemkit.ItemDisposition(wheelName)
@@ -82,31 +82,7 @@ func TestAccPypiFileNamedWithoutFilenameStar(t *testing.T) {
 	})
 
 	t.Run("remote cache", func(t *testing.T) {
-		w := harness.NewRemoteWorld(t)
-		w.Repo = *repo.Defaults(&repo.Config{
-			Key: "remote", Class: repo.Remote, PackageType: repo.PyPI, URL: w.Upstream.URL,
-			PyPIRegistryURL: w.Upstream.URL,
-		})
-		w.Update()
-		data := pypiWheel(t, "demo", "1.0")
-		sum := sha256.Sum256(data)
-		w.Upstream.Set("/files/"+wheelName, fakeupstream.Resource{Body: data})
-		doc, err := json.Marshal(map[string]any{
-			"meta": map[string]string{"api-version": "1.1"}, "name": "demo",
-			"files": []map[string]any{{
-				"filename": wheelName, "url": "/files/" + wheelName,
-				"hashes": map[string]string{"sha256": hex.EncodeToString(sum[:])},
-			}},
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		w.Upstream.Set("/simple/demo/", fakeupstream.Resource{
-			Body:   doc,
-			Header: http.Header{"Content-Type": {"application/vnd.pypi.simple.v1+json"}},
-		})
-		harness.WantStatus(t, w.Request(http.MethodGet, "/artifactory/api/pypi/remote/simple/demo/",
-			"admin", "", "Accept", "application/vnd.pypi.simple.v1+json"), http.StatusOK)
+		w, data := pypiRemoteWorld(t, true)
 		// The first download fetches the wheel into the cache and serves it
 		// from there, so it is named as the cached wheel is.
 		first := w.Request(http.MethodGet, "/artifactory/api/pypi/remote/"+file, "admin", "")
@@ -120,4 +96,66 @@ func TestAccPypiFileNamedWithoutFilenameStar(t *testing.T) {
 		wantNamed(t, do, "/artifactory/api/pypi/remote/"+file, packageDisposition, string(data))
 		wantNamed(t, do, "/artifactory/remote-cache/"+file, itemForm, string(data))
 	})
+
+	// A remote that stores nothing serves the wheel from the upstream's
+	// stream, named as the copy it would keep, on a GET, a HEAD, a range
+	// and a 304 (#1594).
+	t.Run("remote that stores nothing", func(t *testing.T) {
+		w, data := pypiRemoteWorld(t, false)
+		path := "/artifactory/api/pypi/remote/" + file
+		do := func(method, path string) *httptest.ResponseRecorder {
+			return w.Request(method, path, "admin", "")
+		}
+		wantNamed(t, do, path, packageDisposition, string(data))
+		sha := w.Request(http.MethodGet, path, "admin", "").Header().Get("X-Checksum-Sha1")
+		for _, c := range []struct {
+			headers []string
+			status  int
+		}{
+			{[]string{"Range", "bytes=1-2"}, http.StatusPartialContent},
+			{[]string{"If-None-Match", sha}, http.StatusNotModified},
+		} {
+			rec := w.Request(http.MethodGet, path, "admin", "", c.headers...)
+			if rec.Code != c.status ||
+				rec.Header().Get("Content-Disposition") != packageDisposition ||
+				rec.Header().Get("X-Artifactory-Filename") != wheelName {
+				t.Errorf("%v: %d, Content-Disposition %q, X-Artifactory-Filename %q",
+					c.headers, rec.Code, rec.Header().Get("Content-Disposition"),
+					rec.Header().Get("X-Artifactory-Filename"))
+			}
+		}
+	})
+}
+
+// pypiRemoteWorld is a PyPI remote over an upstream with the demo 1.0 wheel
+// in its simple index, which it has read once, keeping its files when
+// store holds. It returns the wheel's bytes.
+func pypiRemoteWorld(t *testing.T, store bool) (*harness.RemoteWorld, []byte) {
+	t.Helper()
+	w := harness.NewRemoteWorld(t)
+	w.Repo = *repo.Defaults(&repo.Config{
+		Key: "remote", Class: repo.Remote, PackageType: repo.PyPI, URL: w.Upstream.URL,
+		PyPIRegistryURL: w.Upstream.URL, StoreArtifactsLocally: new(store),
+	})
+	w.Update()
+	data := pypiWheel(t, "demo", "1.0")
+	sum := sha256.Sum256(data)
+	w.Upstream.Set("/files/"+wheelName, fakeupstream.Resource{Body: data})
+	doc, err := json.Marshal(map[string]any{
+		"meta": map[string]string{"api-version": "1.1"}, "name": "demo",
+		"files": []map[string]any{{
+			"filename": wheelName, "url": "/files/" + wheelName,
+			"hashes": map[string]string{"sha256": hex.EncodeToString(sum[:])},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Upstream.Set("/simple/demo/", fakeupstream.Resource{
+		Body:   doc,
+		Header: http.Header{"Content-Type": {"application/vnd.pypi.simple.v1+json"}},
+	})
+	harness.WantStatus(t, w.Request(http.MethodGet, "/artifactory/api/pypi/remote/simple/demo/",
+		"admin", "", "Accept", "application/vnd.pypi.simple.v1+json"), http.StatusOK)
+	return w, data
 }

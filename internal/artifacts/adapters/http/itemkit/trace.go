@@ -320,9 +320,14 @@ func (s *Kit) traceContained(
 		if a.Item.Folder {
 			return ItemNotFound()
 		}
-		// The entry is looked for but not read: a trace serves nothing.
+		// The entry is read through and its bytes dropped, as the download
+		// reads it for its checksums before it answers (getArchiveEntry),
+		// so an entry too corrupt to read ends on the download's 404.
 		err = s.Items(st).ArchiveEntry(ctx, a.Item, entry,
-			func(int64, io.Reader) error { return nil })
+			func(_ int64, r io.Reader) error {
+				_, err := io.Copy(io.Discard, r)
+				return err //nolint:wrapcheck // ArchiveEntry classifies the entry's own error
+			})
 		if errors.Is(err, item.ErrNotFound) {
 			return ItemNotFound()
 		}

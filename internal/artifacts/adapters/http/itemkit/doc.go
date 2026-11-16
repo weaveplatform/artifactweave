@@ -45,7 +45,8 @@
 //   - File name headers: FilenameHeader, ItemDisposition,
 //     PackageDisposition, FileDisposition and Browsable, which name a
 //     downloaded file as 7.x does, by its repository's content browsing
-//     flag.
+//     flag, and StreamNames, which names a remote's streamed file so for
+//     pkgroute.ServeNamedStream.
 //   - Item values and helpers: ItemRequest, ParseItemPath,
 //     ParseEscapedItemPath, Found, Download, Lookup, StatusWriter,
 //     ResolveRepo, DeployTarget, ItemCreated, ItemNotFound, MemberRead,
@@ -98,8 +99,11 @@
 //     archive entry whose archive's blob is lost or cannot be read answers
 //     500 "internal error", as a file whose blob is lost does, and logs the
 //     failure; once the entry's 200 is sent, a failure is only logged. An
-//     entry the archive lacks, or one of a file that is no archive or a
-//     corrupt one, answers 404.
+//     entry the archive lacks, one too corrupt to read through, or one of
+//     a file that is no archive or a corrupt one, answers 404. An entry is
+//     otherwise answered as a file's download, with its own checksums and
+//     the archive's time, and counts as a download of the archive
+//     (https://github.com/weaveplatform/artifactweave/issues/1593).
 //   - GetItem answers a file request, a path not ending in a slash, to a
 //     local, federated, remote or cache repository that misses, that the
 //     caller may not read or whose file a matrix parameter does not match
