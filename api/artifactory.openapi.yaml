@@ -14239,7 +14239,7 @@ paths:
         - path:itemPath
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitemproperties.md
     get:
-      description: Reads metadata about a file or folder. Without a mode parameter the response is `FileInfo` for a file or `FolderInfo` for a folder. Exactly one of `properties`, `lastModified`, `stats`, `permissions` or `list` selects another view and changes the response shape and media type accordingly. Needs read permission; `list` additionally refuses anonymous callers, `lastModified` needs deploy permission and `permissions` needs admin. Works on local repositories, remote caches and virtual repositories, and on the trash can under the key `auto-trashcan`, whose root holds a folder per repository with deleted items and below it their original paths. There a file's information adds its `trash.*` properties, `properties` shows the item's own properties and `trash.time` (Unix milliseconds), `trash.deletedBy`, `trash.originalRepository`, `trash.originalRepositoryType` and `trash.originalPath`, `stats` shows no downloads, and `permissions` answers 400. A caller other than an admin sees only what was deleted from repositories where it holds deploy or manage permission, in every view, and is refused with 403 at a path where it sees nothing. While the trash can is disabled every view under `auto-trashcan`, its root included, answers 404 to any caller, an admin included; the items it holds are kept and can still be restored, cleaned or emptied.
+      description: Reads metadata about a file or folder. Without a mode parameter the response is `FileInfo` for a file or `FolderInfo` for a folder. Exactly one of `properties`, `lastModified`, `stats`, `permissions` or `list` selects another view and changes the response shape and media type accordingly. Needs read permission; `list` additionally refuses anonymous callers, `lastModified` needs deploy permission and `permissions` needs admin. Without a mode and with `properties`, `lastModified` and `permissions` a remote repository's item is named under its cache's key, `<key>-cache`, whichever key the request used; `list` and `stats` keep the key as given. Works on local repositories, remote caches and virtual repositories, and on the trash can under the key `auto-trashcan`, whose root holds a folder per repository with deleted items and below it their original paths. There a file's information adds its `trash.*` properties, `properties` shows the item's own properties and `trash.time` (Unix milliseconds), `trash.deletedBy`, `trash.originalRepository`, `trash.originalRepositoryType` and `trash.originalPath`, `stats` shows no downloads, and `permissions` answers 400. A caller other than an admin sees only what was deleted from repositories where it holds deploy or manage permission, in every view, and is refused at a path where it sees nothing, as at a path it may not read; anonymous is refused there even holding deploy. While the trash can is disabled every view under `auto-trashcan`, its root included, answers 404 to any caller, an admin included; the items it holds are kept and can still be restored, cleaned or emptied.
       operationId: getStorageItem
       parameters:
         - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual repository resolves through its members.
@@ -14272,12 +14272,12 @@ paths:
           schema:
             description: Selects the last-modified view, which needs deploy permission on the path and for a folder reports the newest descendant. Cannot be combined with another mode.
             type: boolean
-        - description: Optional query parameter. Selects the download statistics view for a file. Cannot be combined with another mode.
+        - description: Optional query parameter. Selects the download statistics view; a folder or the repository root answers zero counts. Cannot be combined with another mode.
           in: query
           name: stats
           required: false
           schema:
-            description: Selects the download statistics view for a file. Cannot be combined with another mode.
+            description: Selects the download statistics view; a folder or the repository root answers zero counts. Cannot be combined with another mode.
             type: boolean
         - description: Optional query parameter. Selects the permissions view, admin only. Cannot be combined with another mode.
           in: query
@@ -14368,7 +14368,7 @@ paths:
             application/vnd.org.jfrog.artifactory.storage.ItemProperties+json:
               schema:
                 $ref: '#/components/schemas/ItemProperties'
-            application/vnd.org.jfrog.storage.StatsInfo+json:
+            application/vnd.org.jfrog.artifactory.storage.StatsInfo+json:
               schema:
                 $ref: '#/components/schemas/FileStatistics'
           description: The view selected by the mode parameter. Without a mode, `FileInfo` or `FolderInfo`; the vendor media types name the shape explicitly.
@@ -14377,25 +14377,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: More than one mode parameter was given, or a listing parameter was used without `list`.
+          description: 'More than one mode parameter was given, a listing parameter was used without `list`, `list` named a file ("Expected a folder but found a file, at: <repoKey>:<path>"), or `lastModified` or `permissions` named a repository that does not exist or a remote repository that stores nothing locally ("This method can only be invoked on local/cached repositories.").'
         '401':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: No credentials or invalid credentials.
+          description: No credentials or invalid credentials, or an anonymous caller lacks the permission `lastModified` or `permissions` needs ("Unauthorized").
         '403':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission the operation needs.
+          description: 'The caller lacks the permission the operation needs. Without a mode and with `stats` the message names the path and the caller, an anonymous one too: "Request for ''<repoKey>:<path>'' is forbidden for user: ''<user>''." (without a mode a remote repository''s path is named under its cache''s key, as in the `properties`, `lastModified` and `permissions` views); `list` refuses an anonymous caller with "This resource is available to authenticated users only.".'
         '404':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The item does not exist, or the `properties` view was requested for an item that has no properties.
+          description: The item does not exist ("Unable to find item"; with `stats`, "Unable to find item path"), nor does the repository or a remote repository's local store, or the `properties` view found no properties ("No properties could be found."), which it also answers for a path the caller may not read.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
@@ -25347,7 +25347,7 @@ components:
           type: string
       type: object
     FileStatistics:
-      description: Download statistics of one file, returned by the `stats` mode.
+      description: Download statistics of an item, returned by the `stats` mode. A folder, a repository root and a file never downloaded answer zero counts.
       properties:
         downloadCount:
           description: Optional within this object. Number of completed downloads since the item was created. Downloads with `skipUpdateStats=true` are not counted.
@@ -25358,10 +25358,21 @@ components:
           format: int64
           type: integer
         lastDownloadedBy:
-          description: Optional within this object. Username of the last download, or `anonymous`.
+          description: Optional within this object. Username of the last download, or `anonymous`. Left out until the item is downloaded.
+          type: string
+        remoteDownloadCount:
+          description: Optional within this object. Number of downloads that remote repositories of other servers reported for this item, 0 when none did.
+          format: int64
+          type: integer
+        remoteLastDownloaded:
+          description: Optional within this object. Time of the last reported remote download as Unix epoch milliseconds, 0 when none was reported.
+          format: int64
+          type: integer
+        remoteLastDownloadedBy:
+          description: Optional within this object. Username of the last reported remote download. Left out until one is reported.
           type: string
         uri:
-          description: Optional within this object. Absolute storage API URL of the file.
+          description: Optional within this object. Absolute download URL of the item as the request named it, `<base>/artifactory/<repoKey>/<path>`, under the key as given (a remote repository's own key too) and with a trailing `/` when the request had one.
           type: string
       type: object
     FileStoreSummary:

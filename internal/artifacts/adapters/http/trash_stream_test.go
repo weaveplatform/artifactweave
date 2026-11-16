@@ -27,6 +27,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
 )
 
@@ -48,7 +49,8 @@ func (s ArtifactoryAPI) collectedTrash(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
-	if _, err := httpkit.Principal(ctx); err != nil {
+	caller, err := httpkit.Principal(ctx)
+	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
@@ -60,6 +62,11 @@ func (s ArtifactoryAPI) collectedTrash(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
+	if caller.Anonymous && q.Has("list") {
+		httpkit.WriteErr(w, r, apierror.New(http.StatusForbidden,
+			"This resource is available to authenticated users only."))
+		return
+	}
 	mode, err := storageMode(q)
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
@@ -69,29 +76,34 @@ func (s ArtifactoryAPI) collectedTrash(w http.ResponseWriter, r *http.Request) {
 		strings.TrimPrefix(r.URL.Path, collectedTrashPrefix), "/"), "/")
 	key, rest := cutRepoPath(dir)
 	p, sees, err := s.trashSight(ctx, st, key, rest)
+	if errors.Is(err, errTrashRefused) {
+		err = trashRefusal(mode, dir, p)
+	}
 	if err != nil {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
 	if mode == "permissions" && !p.Admin {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, trashRefusal(mode, dir, p))
 		return
 	}
 	v := trashView{
 		svc: s.trashService(st), dir: dir, sees: sees,
-		base: baseurl.From(ctx) + storagePrefix + trash.Repository,
+		base:     baseurl.From(ctx) + storagePrefix + trash.Repository,
+		download: baseurl.From(ctx) + "/artifactory/" + trash.Repository,
+		slash:    strings.HasSuffix(r.URL.Path, "/"),
 	}
 	n, children, err := v.collectedTarget(ctx)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound):
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		httpkit.WriteErr(w, r, trashMiss(mode, dir))
 		return
 	case err != nil:
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "find trash", err))
 		return
 	}
 	if n.Entry != nil && sees != nil && !sees(n.Entry.Record.Item) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, trashRefusal(mode, dir, p))
 		return
 	}
 	media, body, err := v.collectedView(ctx, mode, n, children, q)
@@ -140,7 +152,7 @@ func (v trashView) collectedView(
 	switch mode {
 	case "list":
 		if !n.Folder {
-			return "", nil, httpkit.BadRequestf("/%s is a file; list needs a folder", v.dir)
+			return "", nil, expectedFolder(trash.Repository, v.dir)
 		}
 		l, err := parseListing(q)
 		if err != nil {

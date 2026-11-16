@@ -1077,7 +1077,9 @@ func storageStatusRows() []statusCase {
 		{get, "/artifactory/api/storage/libs-local/absent", "admin", "", 404},
 		{get, "/artifactory/api/storage/missing/x", "admin", "", 404},
 		{get, file, "user", "", 403},
-		{get, file, "anonymous", "", 401},
+		// The item info refuses anonymous as a user, naming it, while
+		// anonymous access is on (#1600).
+		{get, file, "anonymous", "", 403},
 		{get, file, "", "", 401},
 
 		{put, file + "?properties=a=1;b=2,3", "admin", "", 204},

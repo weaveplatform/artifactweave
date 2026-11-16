@@ -640,10 +640,11 @@ func TestAccStorageStatsAndLastModified(t *testing.T) {
 		st["lastDownloadedBy"] != nil {
 		t.Fatalf("stats of an undownloaded file %v", st)
 	}
+	// A folder keeps no statistics and answers zero counts (TestAccStorageAnswersStats).
 	wantStatus(
 		t,
 		w.do(http.MethodGet, api+"libs-local/dir?stats", "admin", ""),
-		http.StatusBadRequest,
+		http.StatusOK,
 	)
 
 	rec = w.do(http.MethodGet, api+"libs-local/dir?lastModified", "deployer", "")

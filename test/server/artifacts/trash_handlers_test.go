@@ -184,10 +184,13 @@ func TestAccTrashListingFiltered(t *testing.T) {
 	list("deployer", "/libs-local", "/a", "/b")
 	list("admin", "", "/libs-local", "/other-local", "/server-local")
 
-	// Anonymous is told to sign in, even holding deploy.
+	// Anonymous is refused even holding deploy, with the storage API's
+	// 403 naming it (#1600).
 	grant("anon-deploy", kernel.AnonymousUser, "libs-local", api.ActionWrite, []string{"**"}, nil)
 	for _, p := range []string{"", "/libs-local", "/libs-local/b/three.txt"} {
-		wantStatus(t, w.do("GET", tc+p, "", ""), http.StatusUnauthorized)
+		wantAnswer(t, http.MethodGet, w.do("GET", tc+p, "", ""), http.StatusForbidden,
+			errorBody(t, http.StatusForbidden,
+				refusedAs("auto-trashcan:"+strings.TrimPrefix(p, "/"), kernel.AnonymousUser)))
 	}
 
 	// Once a repository is gone, only an administrator sees its trash.
