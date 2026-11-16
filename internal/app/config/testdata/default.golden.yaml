@@ -199,3 +199,7 @@ api:
     expensive_timeout: 2m0s
 xz:
     dictionary_budget: 1GiB
+virtual:
+    metadata_cache:
+        max_entries: 10000
+        max_size: 256MiB

@@ -273,6 +273,18 @@ merge built from members it cannot read (Helm's index is per permission set,
 [RTFACT-25936](https://jfrog.atlassian.net/browse/RTFACT-25936)). Coordination across nodes
 is P35's ([shared remote retrieval policy](../../implementation/remote-cache-policy.md#concurrency-and-publication)).
 
+The cache (`core/virtual/cache.go`, [#1543](https://github.com/weaveplatform/artifactweave/issues/1543))
+keys an entry by virtual repository, document, member list, the members the caller may read
+in whole, and base URL. A caller who may read only part of a member, or of the virtual
+repository through an `ANY` target, gets a merge of its own on every request. Each node holds
+at most `virtual.metadata_cache.max_entries` documents and `max_size` bytes, the least recently
+used dropped first. A rebuild that fails answers the last merge, whether its entry aged out or
+was zapped, because 7.x's zap only marks the cached file as never updated
+(`RepositoryServiceImpl.zapFileFromVirtual`), the state age expiry leaves it in. The REST and
+descriptor paths keep refusing a negative period: JFrog's Terraform provider validates
+`retrieval_cache_period_seconds` with `IntAtLeast(0)`, and no source shows 7.x storing -1
+through REST. A -1 that reaches the cache another way is always expired, as in 7.x.
+
 Sources: `repo/virtual/VirtualRepo.isCachedResourceExpired` 658-662;
 `repo/virtual/ArtifactoryVirtualDownloadStrategy.getInfoInternal` 90-136;
 `base/common/src/main/java/org/artifactory/repo/VirtualRepositoryConfigurationImpl` 93-95;

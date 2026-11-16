@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app/config"
 	artifactshttp "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/internal/platform/buildinfo"
 )
@@ -136,6 +137,11 @@ func serve(
 			RemoteSources:                  art.RemoteSources(),
 			RegistrySources:                art.RegistrySources(),
 			RemoteStatus:                   art.RemoteStatus,
+			VirtualCache: virtual.NewCache(virtual.CacheOptions{
+				MaxEntries: artifactsSettings.VirtualCacheEntries,
+				MaxBytes:   artifactsSettings.VirtualCacheBytes,
+				Log:        log,
+			}),
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return reqCtx },
