@@ -155,7 +155,7 @@ func (s ArtifactoryAPI) SearchBuildArtifacts(
 		mappings = append(mappings, re)
 	}
 	var in func(model.Item) bool
-	if refs := r.RefsOf(httpkit.Deref(body.Repos)); refs != nil {
+	if refs := r.RefsOf(ctx, httpkit.Deref(body.Repos)); refs != nil {
 		in = func(it model.Item) bool { return refs[aql.RepoRef{Key: it.RepoKey, Cached: it.Cached}] }
 	}
 	missing := noBuildArtifacts(body.BuildName, number, status)

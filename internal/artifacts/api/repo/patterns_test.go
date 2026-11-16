@@ -29,3 +29,27 @@ func TestUnitRepoPatterns(t *testing.T) {
 		}
 	}
 }
+
+// A request's path passes the patterns at the root and on a system path, as
+// 7.161.26's RepoBase.accepts lets them through.
+func TestUnitRepoPatternsAcceptsRequest(t *testing.T) {
+	p := repo.PatternsOf(
+		repo.Config{IncludesPattern: new("org/**"), ExcludesPattern: new("**/*.index")},
+	)
+	for _, c := range []struct {
+		path             string
+		folder, expected bool
+	}{
+		{path: "", expected: true},
+		{path: "releases/p2.index", expected: true},
+		{path: ".index/nexus-maven-repository-index.gz", expected: true},
+		{path: "org/a.jar", expected: true},
+		{path: "org", folder: true, expected: true},
+		{path: "com/a.jar"},
+		{path: "com/index.gz"},
+	} {
+		if got := p.AcceptsRequest(c.path, c.folder); got != c.expected {
+			t.Errorf("%+v: %v", c, got)
+		}
+	}
+}

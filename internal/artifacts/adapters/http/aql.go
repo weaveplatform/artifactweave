@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/search"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -101,7 +102,7 @@ func (s ArtifactoryAPI) searchAQL(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "aql repositories", err))
 		return
 	}
-	q.Resolve(aql.AQLRepositories(configs))
+	q.Resolve(ctx, aql.AQLRepositories(configs))
 	run, scaled := q.ForNesting(), false
 	if !p.Admin {
 		if err := q.CheckRestricted(); err != nil {
@@ -156,7 +157,7 @@ func (s ArtifactoryAPI) searchAQL(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if q.VirtualRepos() {
-		virtualRepos(configs, hits)
+		virtualRepos(ctx, configs, hits)
 	}
 	var related aql.Related
 	if q.Relates() {
@@ -336,40 +337,34 @@ func readableRows(
 
 // virtualRepos fills each hit with the virtual repositories, sorted, whose
 // members include its repository, directly or through nested virtual
-// repositories. A cached item counts under its remote, which is the key a
-// virtual repository lists.
-func virtualRepos(configs map[string]repo.Config, hits []aql.Hit) {
+// repositories (virtual.Walk). A cached item counts under its remote, which
+// is the key a virtual repository lists.
+func virtualRepos(ctx context.Context, configs map[string]repo.Config, hits []aql.Hit) {
 	in := map[string][]string{}
 	for _, c := range configs {
 		if c.Class != repo.Virtual {
 			continue
 		}
 		reached := map[string]bool{}
-		reach(configs, c.Key, reached)
-		for key := range reached {
-			if key != c.Key {
-				in[key] = append(in[key], c.Key)
-			}
-		}
+		// virtual.Configs fails no read, and the visit fails nothing.
+		_ = virtual.Walk(
+			ctx,
+			virtual.Configs(configs),
+			c,
+			func(_ []repo.Config, m repo.Config) error {
+				if m.Class != repo.Virtual && !reached[m.Key] {
+					reached[m.Key] = true
+					in[m.Key] = append(in[m.Key], c.Key)
+				}
+				return nil
+			},
+		)
 	}
 	for _, keys := range in {
 		slices.Sort(keys)
 	}
 	for n := range hits {
 		hits[n].VirtualRepos = in[hits[n].Item.RepoKey]
-	}
-}
-
-// reach marks key and every repository a virtual key leads to.
-func reach(configs map[string]repo.Config, key string, reached map[string]bool) {
-	if reached[key] {
-		return
-	}
-	reached[key] = true
-	if c := configs[key]; c.Class == repo.Virtual {
-		for _, m := range c.Repositories {
-			reach(configs, m, reached)
-		}
 	}
 }
 

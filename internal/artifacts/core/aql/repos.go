@@ -2,11 +2,14 @@ package aql
 
 import (
 	"cmp"
+	"context"
 	"math"
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // RepoClass is what a repository key stands for in a repo criterion.
@@ -31,6 +34,25 @@ type Repository struct {
 
 // Repositories are the configured repositories, by key.
 type Repositories map[string]Repository
+
+// Get is the configuration virtual.Walk reads a member from: key, its class
+// and a virtual repository's members, or kernel.ErrNotFound. It satisfies
+// virtual.Repos, so a repo criterion walks members as every other virtual
+// walk does.
+func (r Repositories) Get(_ context.Context, key string) (repo.Config, error) {
+	c, ok := r[key]
+	if !ok {
+		return repo.Config{}, kernel.ErrNotFound
+	}
+	class := repo.Local
+	switch c.Class {
+	case RepoRemote:
+		class = repo.Remote
+	case RepoVirtual:
+		class = repo.Virtual
+	}
+	return repo.Config{Key: key, Class: class, Repositories: c.Members}, nil
+}
 
 // AQLRepositories is what a repo criterion resolves keys against: remote and
 // virtual repositories stand for their caches and members, and every other
@@ -92,9 +114,9 @@ func (s RepoSet) match(it model.Item) bool {
 //
 // An items query parsed from AQL text also learns the repositories' roots
 // (Roots).
-func (q *Query) Resolve(repos Repositories) {
+func (q *Query) Resolve(ctx context.Context, repos Repositories) {
 	if q.Criteria != nil {
-		q.Criteria = q.resolve(q.Criteria, repos)
+		q.Criteria = q.resolve(ctx, q.Criteria, repos)
 	}
 	if !q.isRooted {
 		return
@@ -168,43 +190,43 @@ func (q *Query) WithRoots(
 	return window(q, o, hits), nil
 }
 
-func (q *Query) resolve(n Node, repos Repositories) Node {
+func (q *Query) resolve(ctx context.Context, n Node, repos Repositories) Node {
 	switch n := n.(type) {
 	case And:
 		out := make(And, len(n))
 		for i, c := range n {
-			out[i] = q.resolve(c, repos)
+			out[i] = q.resolve(ctx, c, repos)
 		}
 		return out
 	case Or:
 		out := make(Or, len(n))
 		for i, c := range n {
-			out[i] = q.resolve(c, repos)
+			out[i] = q.resolve(ctx, c, repos)
 		}
 		return out
 	case *Joined:
-		criteria, _ := q.resolve(n.Criteria, repos).(And)
+		criteria, _ := q.resolve(ctx, n.Criteria, repos).(And)
 		return &Joined{Criteria: criteria}
 	case *FieldCriterion:
 		if n.Field == FieldRepo {
-			return q.resolveRepo(n, repos)
+			return q.resolveRepo(ctx, n, repos)
 		}
 	}
 	return n
 }
 
-func (q *Query) resolveRepo(c *FieldCriterion, repos Repositories) Node {
+func (q *Query) resolveRepo(ctx context.Context, c *FieldCriterion, repos Repositories) Node {
 	switch c.Op {
 	case OpEq, OpNe:
 		if repos[c.Text].Class == RepoVirtual && c.Op == OpEq {
 			q.hasImpliedVirtualRepos = true
 		}
-		return RepoSet{Refs: expandRepo(c.Text, repos), Negate: c.Op == OpNe}
+		return RepoSet{Refs: expandRepo(ctx, c.Text, repos), Negate: c.Op == OpNe}
 	case OpMatch, OpNMatch:
 		var refs []RepoRef
 		for _, key := range sortedKeys(repos) {
 			if globMatch(c.Text, key) {
-				refs = append(refs, expandRepo(key, repos)...)
+				refs = append(refs, expandRepo(ctx, key, repos)...)
 			}
 		}
 		if len(refs) == 0 {
@@ -223,36 +245,49 @@ func (q *Query) resolveRepo(c *FieldCriterion, repos Repositories) Node {
 // Expand returns the stored locations key stands for, as a repo criterion's
 // $eq resolves it: a remote's cache, a virtual repository's members through
 // nested virtual repositories, or the key's own items.
-func (r Repositories) Expand(key string) []RepoRef { return expandRepo(key, r) }
+func (r Repositories) Expand(ctx context.Context, key string) []RepoRef {
+	return expandRepo(ctx, key, r)
+}
 
-// expandRepo returns the stored locations key stands for.
-func expandRepo(key string, repos Repositories) []RepoRef {
+// expandRepo returns the stored locations key stands for. A virtual key
+// stands for every real member virtual.Walk reaches: a cycle or a member
+// key no repository has adds nothing, as 7.x's resolution skips both.
+func expandRepo(ctx context.Context, key string, repos Repositories) []RepoRef {
 	var out []RepoRef
-	var walk func(key string, seen map[string]bool)
-	walk = func(key string, seen map[string]bool) {
-		r, ok := repos[key]
-		switch {
-		case !ok:
-			stored, cached := model.ResolveRepoKey(key)
-			out = append(out, RepoRef{Key: stored, Cached: cached})
-		case r.Class == RepoRemote:
+	add := func(key string, class RepoClass) {
+		switch class {
+		case RepoRemote:
 			// Only the cache holds a remote's items; the uncached form is
 			// listed too so an item stored there by other means still answers
 			// to the remote's key.
 			out = append(out, RepoRef{Key: key}, RepoRef{Key: key, Cached: true})
-		case r.Class == RepoVirtual:
-			if seen[key] {
-				return
-			}
-			seen[key] = true
-			for _, m := range r.Members {
-				walk(m, seen)
-			}
 		default:
 			out = append(out, RepoRef{Key: key})
 		}
 	}
-	walk(key, map[string]bool{})
+	r, ok := repos[key]
+	switch {
+	case !ok:
+		stored, cached := model.ResolveRepoKey(key)
+		out = append(out, RepoRef{Key: stored, Cached: cached})
+	case r.Class == RepoVirtual:
+		top, _ := repos.Get(ctx, key)
+		// Repositories.Get fails no key it holds, and Walk fails only a
+		// member read or a visit.
+		_ = virtual.Walk(
+			ctx,
+			repos,
+			top,
+			func(_ []repo.Config, m repo.Config) error {
+				if c := repos[m.Key]; c.Class != RepoVirtual {
+					add(m.Key, c.Class)
+				}
+				return nil
+			},
+		)
+	default:
+		add(key, r.Class)
+	}
 	return uniqueRefs(out)
 }
 

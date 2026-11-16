@@ -18,7 +18,7 @@ func TestUnitCases(t *testing.T) {
 			if strings.HasPrefix(c.Name, "cli/") && c.Want == nil {
 				t.Fatal("CLI fixture without expected rows in aqltest.cliWant")
 			}
-			q, err := c.Parse()
+			q, err := c.Parse(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -36,7 +36,7 @@ func TestUnitBuildCases(t *testing.T) {
 	corpus := aqltest.Corpus()
 	for _, c := range aqltest.BuildCases() {
 		t.Run(c.Name, func(t *testing.T) {
-			q, err := c.Parse()
+			q, err := c.Parse(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}
