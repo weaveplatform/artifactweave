@@ -318,6 +318,22 @@ func TestAccStorageAnswersStats(t *testing.T) {
 			t.Errorf("%s?stats: %v, want %v", c.target, got, want)
 		}
 	}
+	// A virtual repository keeps its statistics body until P10 rewrites it
+	// (#1537): a member's file under the storage API URL, 400 for a folder.
+	got := storageBody(t, w, "admin", "virt/a/file.bin?stats", mediaStats)
+	if want := decodeObject(
+		t,
+		`{"uri":"https://reg.example/artifactory/api/storage/virt/a/file.bin",`+
+			`"downloadCount":3,"lastDownloaded":1700000000000,"lastDownloadedBy":"admin"}`,
+	); !reflect.DeepEqual(
+		got,
+		want,
+	) {
+		t.Errorf("virt/a/file.bin?stats: %v, want %v", got, want)
+	}
+	wantStorageAnswers(t, w, []storageAnswer{
+		{"admin", "virt/a?stats", 400, "/a is a folder; statistics are kept for files"},
+	})
 }
 
 // TestAccStorageAnswersRemoteKey: the item info, properties, last modified
