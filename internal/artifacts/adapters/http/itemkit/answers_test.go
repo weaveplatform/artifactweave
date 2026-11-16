@@ -147,7 +147,9 @@ func TestUnitSourceAnswerKeepsTheSourcesOtherAnswers(t *testing.T) {
 // overlay writes on the item route are the download's: Missed, Refused and
 // Mismatched are missed, refused and mismatched; ReadAnswer gives a failed
 // read's miss and want of Read those answers, whether the failure is the
-// source's own or pkgroute.SourceError's answer to it, and keeps every
+// source's own or pkgroute.SourceError's answer to it, gives a cache fill
+// the caller may not make and an assumed-offline miss the generic route's
+// answers (remoteMissAnswer, #1611), and keeps every
 // other failure, ErrFolderAtPath, the upstream's own status and the
 // policy's refusal among them; NotServed refuses a caller without Read,
 // then answers the download policy, then the miss. A folder request and a
@@ -200,6 +202,17 @@ func TestUnitOverlayAnswersAreTheDownloads(t *testing.T) {
 		{"SourceError's anonymous refusal", local, req, anonymous, kernel.ErrUnauthenticated, 401, "Unauthorized"},
 		{"upstream's own 404", remote, remoteReq, user, upstream404, 404, "Not Found"},
 		{"virtual miss", virtual, ItemRequest{Key: "virt", Path: "a"}, user, notFound, 404, "Not Found"},
+		{
+			"cache fill refused", remote, remoteReq, user, &source.CacheFillDenied{User: "user", Repo: "up", Path: "dists/Packages"}, 403,
+			"Rejected artifact download request: User user is not permitted to deploy " +
+				"'dists/Packages' into 'up-cache:dists/Packages'.",
+		},
+		{"cache fill refused anonymously", remote, remoteReq, anonymous, &source.CacheFillDenied{User: "user", Repo: "up", Path: "dists/Packages"}, 401, "Unauthorized"},
+		{
+			"assumed offline", remote, remoteReq, user, source.ErrAssumedOffline, 404,
+			"up: is assumed offline, 'up:dists/Packages' is not found at 'dists/Packages'.; " +
+				"Path: 'up:dists/Packages'",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			wantAnswer(t, ReadAnswer(tc.c, false, tc.req, tc.caller, tc.err), tc.status, tc.message)

@@ -200,6 +200,12 @@ func ReadAnswer(
 	if err == nil || !fileRequest(c, req) {
 		return err
 	}
+	// An overlay path is the item route's, so a cache fill the caller may
+	// not make and an assumed-offline miss answer as sourceAnswer answers
+	// them, before the miss either one is too.
+	if answer := remoteMissAnswer(c, req, caller, err); answer != nil {
+		return answer
+	}
 	var failure *source.HTTPError
 	var answer *apierror.Error
 	switch {
