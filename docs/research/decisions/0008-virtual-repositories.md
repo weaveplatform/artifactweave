@@ -87,7 +87,9 @@ a Docker push's tag check (RTDEV-81046), and
 and Go handlers are closed code, so that they answer the same is **[I]**. Whether a member's
 5xx or transport failure stops the walk is **[I]**: `processStandard` treats every resource
 it did not find alike, so the inferred answer is that the walk passes over it and answers 404
-unless a member denied Read.
+unless a member denied Read. An upstream's own 401 or 403 refuses this server, not the caller,
+so it passes over the same way and never counts toward the 403 **[I]**
+([#1535](https://github.com/weaveplatform/artifactweave/issues/1535)).
 
 Sources: `repo/virtual/ArtifactoryVirtualDownloadStrategy.processStandard` 209-260;
 `repo/db/DbLocalRepo.checkDownloadIsAllowed` 212-219 and

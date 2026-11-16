@@ -80,9 +80,11 @@ capture obligation, not new observations of a vendor instance.
 ## Adapter gates and remaining work
 
 Direct generic item GET/HEAD can use an injected service. Other package types do
-not gain HTTP fetching from this injection; their adapters must opt in separately. Explicit `-cache` aliases, storage
-queries and recursive virtual member lookup retain their existing cache-only paths;
-installing the service cannot implicitly enable P10 fetching. Local and federated reads
+not gain HTTP fetching from this injection; their adapters must opt in separately. Explicit `-cache` aliases and storage
+queries retain their existing cache-only paths. A download through a virtual repository on
+the item routes reads a remote member's upstream with the member's own source request,
+after every member's cache, only where a direct item read of that member would
+([#1535](https://github.com/weaveplatform/artifactweave/issues/1535)). Local and federated reads
 and all client refusals to deploy to a remote/cache are unchanged. Matrix filters apply
 to stored properties; transient content has no properties and cannot satisfy a mandatory
 property filter. `Resource.ChecksumOnly` authorizes the underlying artifact while
