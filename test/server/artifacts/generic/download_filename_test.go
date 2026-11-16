@@ -3,11 +3,13 @@ package generic_test
 // This file holds the file name headers of #1578 and the content browsing
 // answers of #1579: how a download names its file in X-Artifactory-Filename
 // and Content-Disposition, and what a repository that allows content
-// browsing changes.
+// browsing changes; and #1594's file served from a remote's stream, named
+// as the copy it would keep.
 
 import (
 	"archive/zip"
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -384,4 +386,96 @@ func TestAccBrowsableRemoteNamesNoAttachment(t *testing.T) {
 		http.StatusOK,
 		named{"file.jar", ""},
 	)
+}
+
+// TestAccStreamedRemoteFileIsNamed: a remote that stores nothing serves a
+// file from the upstream's stream named as the copy a remote that stores
+// it serves, on the first download and again: X-Artifactory-Filename and
+// the item route's Content-Disposition, by the remote's content browsing
+// flag, on a GET, a HEAD, a cold HEAD, a range and a 304, a name outside
+// printable ASCII by filename* alone; a browser's GET with the flag gets
+// the sandbox and a .pom application/xml; a range it cannot satisfy names
+// nothing. 7.161.26 answers the RemoteRepoResource of a remote that does
+// not save it ("resource will be stream directly to the user",
+// RemoteRepoBase) through RequestResponseHelper.sendBodyResponse and
+// sendHeadResponse, as it answers a cached file, and setBasicHeaders names
+// both alike. Such a stream was named by nothing (#1594).
+func TestAccStreamedRemoteFileIsNamed(t *testing.T) {
+	future := "Wed, 21 Oct 2099 07:28:00 GMT"
+	for _, browse := range []bool{false, true} {
+		w := newRemoteWorld(t)
+		w.c.StoreArtifactsLocally = new(false)
+		w.c.ArchiveBrowsingEnabled = new(browse)
+		w.update()
+		for _, f := range []string{"/b/a b.jar", "/b/naïve.jar", "/b/cold.jar", "/b/lib.pom"} {
+			w.up.Set(f, fakeupstream.Resource{Body: []byte(coldJar), Header: http.Header{
+				"Content-Type": {javaArchive},
+			}})
+		}
+		spaced := named{"a%20b.jar", `attachment; filename="a b.jar"; filename*=UTF-8''a%20b.jar`}
+		naive := named{"na%C3%AFve.jar", "attachment; filename*=UTF-8''na%C3%AFve.jar"}
+		cold := named{"cold.jar", `attachment; filename="cold.jar"; filename*=UTF-8''cold.jar`}
+		naiveNotModified := naive
+		if browse {
+			spaced.disposition, cold.disposition = "", ""
+			naive.disposition = "inline; filename*=UTF-8''na%C3%AFve.jar"
+			naiveNotModified.disposition = ""
+		}
+		label := fmt.Sprintf("browse %v: ", browse)
+		ask := func(method, file string, headers ...string) *httptest.ResponseRecorder {
+			return w.request(method, "/artifactory/remote/b/"+file, "reader", "", headers...)
+		}
+		wantNamed(t, label+"cold HEAD", ask(http.MethodHead, "cold.jar"), http.StatusOK, cold)
+		first := ask(http.MethodGet, "a%20b.jar")
+		wantNamed(t, label+"first GET", first, http.StatusOK, spaced)
+		for _, q := range namedRequests(first.Header().Get("X-Checksum-Sha1")) {
+			wantNamed(t, label+q.label, ask(q.method, "a%20b.jar", q.headers...), q.status, spaced)
+		}
+		wantNamed(
+			t,
+			label+"non-ASCII GET",
+			ask(http.MethodGet, "na%C3%AFve.jar"),
+			http.StatusOK,
+			naive,
+		)
+		wantNamed(
+			t,
+			label+"non-ASCII HEAD",
+			ask(http.MethodHead, "na%C3%AFve.jar"),
+			http.StatusOK,
+			naive,
+		)
+		wantNamed(
+			t,
+			label+"non-ASCII 304",
+			ask(http.MethodGet, "na%C3%AFve.jar", "If-Modified-Since", future),
+			http.StatusNotModified,
+			naiveNotModified,
+		)
+		wantNamed(t, label+"416", ask(http.MethodGet, "a%20b.jar", "Range", "bytes=900-"),
+			http.StatusRequestedRangeNotSatisfiable, named{})
+		browser := ask(http.MethodGet, "lib.pom", "User-Agent", browserAgent)
+		csp, contentType := "", "application/x-maven-pom+xml"
+		if browse {
+			csp, contentType = "sandbox", "application/xml"
+		}
+		if h := browser.Header(); browser.Code != http.StatusOK ||
+			h.Get("Content-Security-Policy") != csp || h.Get("Content-Type") != contentType {
+			t.Errorf(
+				"%sbrowser GET: %d, Content-Security-Policy %q, Content-Type %q; want %q, %q",
+				label,
+				browser.Code,
+				h.Get("Content-Security-Policy"),
+				h.Get("Content-Type"),
+				csp,
+				contentType,
+			)
+		}
+		// Every answer came from the upstream's stream: the cache holds
+		// nothing.
+		cache := w.request(http.MethodGet, "/artifactory/remote-cache/b/a%20b.jar", "reader", "")
+		if cache.Code != http.StatusNotFound {
+			t.Errorf("%sthe cache answers %d, want 404", label, cache.Code)
+		}
+	}
 }

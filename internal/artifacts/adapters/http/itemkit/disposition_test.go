@@ -1,6 +1,8 @@
 package itemkit_test
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
@@ -123,6 +125,69 @@ func TestUnitFileDispositionFollowsContentBrowsing(t *testing.T) {
 				got,
 				c.want,
 			)
+		}
+	}
+}
+
+// StreamNames names a remote's streamed file as serveFile names the copy:
+// X-Artifactory-Filename always, the Content-Disposition by the content
+// browsing flag in the form given, the 304's form on a 304, and a
+// browser's view of a GET from a browsable repository; a
+// Content-Disposition a protocol set is kept (#1594).
+func TestUnitStreamNamesNamesAsTheKeptCopy(t *testing.T) {
+	on := true
+	browsing := repo.Config{Class: repo.Remote, ArchiveBrowsingEnabled: &on}
+	plain := repo.Config{Class: repo.Remote}
+	const browser = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0"
+	for _, c := range []struct {
+		label                 string
+		config                repo.Config
+		name                  string
+		form                  func(string) string
+		agent, own            string
+		notModified           bool
+		filename, disposition string
+		csp                   string
+	}{
+		{
+			"item form", plain, "a b.jar", itemkit.ItemDisposition, "", "", false,
+			"a%20b.jar", `attachment; filename="a b.jar"; filename*=UTF-8''a%20b.jar`, "",
+		},
+		{
+			"package form", plain, "a b.whl", itemkit.PackageDisposition, "", "", false,
+			"a%20b.whl", `attachment; filename="a b.whl"`, "",
+		},
+		{
+			"own disposition", plain, "a.jar", itemkit.ItemDisposition, "", "inline", false,
+			"a.jar", "inline", "",
+		},
+		{"browsable", browsing, "a.jar", itemkit.ItemDisposition, "", "", false, "a.jar", "", ""},
+		{
+			"browsable non-ASCII", browsing, "ï.jar", itemkit.ItemDisposition, "", "", false,
+			"%C3%AF.jar", "inline; filename*=UTF-8''%C3%AF.jar", "",
+		},
+		{
+			"browsable non-ASCII 304", browsing, "ï.jar", itemkit.ItemDisposition, "", "", true,
+			"%C3%AF.jar", "", "",
+		},
+		{"browser", browsing, "lib.pom", itemkit.ItemDisposition, browser, "", false, "lib.pom", "", "sandbox"},
+		{"browser 304", browsing, "lib.pom", itemkit.ItemDisposition, browser, "", true, "lib.pom", "", ""},
+		{
+			"browser, no flag", plain, "lib.pom", itemkit.ItemDisposition, browser, "", false,
+			"lib.pom", `attachment; filename="lib.pom"; filename*=UTF-8''lib.pom`, "",
+		},
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.Header.Set("User-Agent", c.agent)
+		h := http.Header{}
+		if c.own != "" {
+			h.Set("Content-Disposition", c.own)
+		}
+		itemkit.StreamNames(c.config, c.name, c.form)(h, r, c.notModified)
+		if h.Get("X-Artifactory-Filename") != c.filename ||
+			h.Get("Content-Disposition") != c.disposition ||
+			h.Get("Content-Security-Policy") != c.csp {
+			t.Errorf("%s: %v", c.label, h)
 		}
 	}
 }

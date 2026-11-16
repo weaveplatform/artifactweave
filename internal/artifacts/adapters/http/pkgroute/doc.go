@@ -53,8 +53,8 @@
 //     below a folder, so a list may count and page in its store (#1425,
 //     #1426).
 //   - Download helpers: DownloadItem, ResolveDownloadItem, ServeItem,
-//     ServeFound, Read, CheckDownload, ServeResult, ServeStream and
-//     SourceError; and 7.x's download's conditional answers, which the item
+//     ServeFound, Read, CheckDownload, ServeResult, ServeStream,
+//     ServeNamedStream, FileNames and SourceError; and 7.x's download's conditional answers, which the item
 //     kit shares: UnevaluatedPreconditions, WithoutUnevaluatedPreconditions,
 //     WithoutHeaders, FileNotModified, ETagValue, WriteNotModified and
 //     RangeRefusalWriter.
@@ -147,6 +147,12 @@
 //     If-Modified-Since finds it unchanged
 //     (https://github.com/weaveplatform/artifactweave/issues/1484,
 //     https://github.com/weaveplatform/artifactweave/issues/1487).
+//   - ServeNamedStream names a remote file's stream, one with a path, by
+//     the FileNames it is given, on a GET, a HEAD, a range and a 304, as
+//     its kept copy is named; ServeResult takes them from
+//     Options.NameStream, which the server builds from the item kit's
+//     StreamNames in the form ServeItem names the copy with
+//     (https://github.com/weaveplatform/artifactweave/issues/1594).
 //   - SourceError answers a failure of the server's own storage while it
 //     keeps a remote file (format.ErrStorageFault) as the router's
 //     internal fault, 500
