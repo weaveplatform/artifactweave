@@ -70,6 +70,10 @@ linters:
 
   # 3) Per-linter configuration
   settings:
+    golines:
+        # golines wraps any line longer than this, 100 by default; 180 keeps a
+        # call or signature on one line where it reads better that way.
+        max-len: 180
     nakedret:
       max-func-lines: 40
     revive:
