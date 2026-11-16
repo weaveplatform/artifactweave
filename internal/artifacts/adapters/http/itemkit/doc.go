@@ -197,7 +197,9 @@
 // the lookup through a virtual repository. access_test.go tests AccessFor,
 // and Forced, ForceAuthentication's branches and the credentials it counts
 // as none over an in-memory store, and which paths a remote's -cache alias
-// reads through the remote source (aliasRemoteMetadata); redirect_test.go the signing-failure
+// reads through the remote source (aliasRemoteMetadata); remote_fill_test.go
+// the answers to a refused cache fill and an assumed-offline miss
+// (remoteMissAnswer); redirect_test.go the signing-failure
 // throttle, the descriptor's minimum redirect size, the request copy
 // without the preconditions a download ignores, the request the download
 // reads, ServeContent, the checksum file's answers, the browser and

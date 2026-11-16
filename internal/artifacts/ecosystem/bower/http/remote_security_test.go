@@ -262,6 +262,18 @@ func TestUnitBowerGitCatalogFiltersNamesBeforeFetchingRefs(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	// Deploy/Cache on the whole remote, without Read: the catalog fills the
+	// remote's cache, which 7.x allows only a caller with Deploy/Cache on
+	// it (#1587), while Read still picks the names shown.
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "fill-cache",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"limited": api.ActionWrite}},
+			Targets: map[string]accesstest.Target{"bower-remote": {}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	r := f.get(base+"packages", "limited")
 	if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), `"visible"`) ||
 		strings.Contains(r.Body.String(), `"secret"`) {

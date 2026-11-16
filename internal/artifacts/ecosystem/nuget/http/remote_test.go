@@ -68,6 +68,20 @@ func newRemoteFixture(t *testing.T, options ...fakeupstream.Options) *remoteFixt
 			t.Fatal(err)
 		}
 	}
+	// Deploy/Cache on the whole remote, without Read: the reads fill the
+	// remote's cache, which 7.x allows only a caller with Deploy/Cache on it
+	// (#1587), while Read still decides what each user sees.
+	if err = f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "remote-fill",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
+				"reader": api.ActionWrite, "partial": api.ActionWrite,
+			}},
+			Targets: map[string]accesstest.Target{"nuget-remote": {}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	opts := upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))}
 	if cert := up.Certificate(); cert != nil {
 		opts.RootCAsPEM = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})

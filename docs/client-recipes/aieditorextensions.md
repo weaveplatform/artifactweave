@@ -11,10 +11,10 @@ Endpoint: `${AW_URL}/artifactory/api/aieditorextensions/${AW_REPO}/_apis/public/
 ## Before connecting
 
 - A remote aieditorextensions repository whose upstream is a compatible VS Code Marketplace.
-- Administrator-approved anonymous READ scope, for example extensions/ms-vscode/hexeditor/**, and reachable asset URLs.
+- Administrator-approved anonymous READ and Deploy/Cache scope, for example extensions/ms-vscode/hexeditor/**, and reachable asset URLs.
 - Set AW_CODE_ROOT to a disposable installation extracted from the pinned VS Code archive.
 
-Authentication: The tested VS Code gallery client sends no repository token. An administrator must enable anonymous access and grant anonymous READ only to approved extension paths in this remote repository. Do not embed AW_TOKEN in gallery URLs or broaden access silently. Authenticated API access does not prove token-authenticated IDE support.
+Authentication: The tested VS Code gallery client sends no repository token. An administrator must enable anonymous access and grant anonymous READ and Deploy/Cache (WRITE) only to approved extension paths in this remote repository: on a remote, Deploy/Cache lets a read fill the cache, as Artifactory 7.x requires, and uploads to a remote stay refused. Do not embed AW_TOKEN in gallery URLs or broaden access silently. Authenticated API access does not prove token-authenticated IDE support.
 
 Fresh client state: Use a disposable copy of the pinned VS Code installation and new --user-data-dir and --extensions-dir directories. Product configuration is changed only inside that disposable copy.
 
