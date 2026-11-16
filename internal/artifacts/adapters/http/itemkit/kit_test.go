@@ -349,33 +349,100 @@ func TestUnitResolveRepoNamesOnlyRemoteCaches(t *testing.T) {
 }
 
 // TestUnitDeployTargetResolvesVirtualRepositories: a deploy lands in a
-// hosted repository itself or in a virtual repository's default deployment
-// repository, and is refused by a remote repository, its cache, a virtual
-// repository without a default deployment repository and P2.
+// hosted repository itself or in a virtual repository's local or federated
+// default deployment repository. A virtual repository without one answers
+// 7.x's 405 with Allow: GET, whether the default deployment repository is
+// unset, missing, remote or virtual (decision 0008, R6). A remote
+// repository and its cache answer the native protocols' 405 through
+// DeployTarget and 7.x's 404 through ItemDeployTarget, and P2 keeps its own
+// 405 through both.
 func TestUnitDeployTargetResolvesVirtualRepositories(t *testing.T) {
 	w := kittest.New(t, inmem.New())
+	via := func(ddr string) repo.Config {
+		v := w.Virtual
+		v.Key, v.DefaultDeploymentRepo = "v", ddr
+		return v
+	}
+	const (
+		noTarget = "No local repository was configured as local deployment repository " +
+			"for the (v) virtual repository."
+		p2 = "P2 repositories are remote or virtual; publish to a local Maven or Generic member"
+	)
 	for _, tc := range []struct {
 		name   string
 		c      repo.Config
 		cached bool
 		target string
+		status int
+		msg    string
+		// itemStatus and itemMsg are ItemDeployTarget's, where they differ.
+		itemStatus int
+		itemMsg    string
 	}{
-		{"local", w.Local, false, kittest.LocalKey},
-		{"federated", w.Federated, false, kittest.FederatedKey},
-		{"virtual", w.Virtual, false, kittest.LocalKey},
-		{"remote", w.Remote, false, ""},
-		{"cache", w.Remote, true, ""},
-		{"virtual without a target", repo.Config{Key: "v", Class: repo.Virtual}, false, ""},
-		{"p2", repo.Config{Key: "p2", Class: repo.Virtual, PackageType: repo.P2}, false, ""},
+		{name: "local", c: w.Local, target: kittest.LocalKey},
+		{name: "federated", c: w.Federated, target: kittest.FederatedKey},
+		{name: "virtual", c: w.Virtual, target: kittest.LocalKey},
+		{name: "virtual to a federated repository", c: via(kittest.FederatedKey), target: kittest.FederatedKey},
+		{name: "virtual without a target", c: via(""), status: 405, msg: noTarget},
+		{name: "virtual to a missing repository", c: via("gone"), status: 405, msg: noTarget},
+		{name: "virtual to a remote repository", c: via(kittest.RemoteKey), status: 405, msg: noTarget},
+		{name: "virtual to a virtual repository", c: via(kittest.VirtualKey), status: 405, msg: noTarget},
+		{
+			name: "remote", c: w.Remote, status: 405,
+			msg:        "Cannot deploy to the remote repository 'libs-remote'",
+			itemStatus: 404, itemMsg: "Could not find a local repository named libs-remote to deploy to.",
+		},
+		{
+			name: "cache", c: w.Remote, cached: true, status: 405,
+			msg:        "Cannot deploy to the remote repository 'libs-remote'",
+			itemStatus: 404, itemMsg: "Could not find a local repository named libs-remote-cache to deploy to.",
+		},
+		{
+			name: "p2", c: repo.Config{Key: "p2", Class: repo.Virtual, PackageType: repo.P2},
+			status: 405, msg: p2,
+		},
+		{
+			name: "p2 remote", c: repo.Config{Key: "p2r", Class: repo.Remote, PackageType: repo.P2},
+			status: 405, msg: p2,
+		},
 	} {
-		got, err := itemkit.DeployTarget(t.Context(), w.Store, tc.c, tc.cached)
-		var api *apierror.Error
-		switch {
-		case tc.target != "" && (err != nil || got.Key != tc.target):
-			t.Errorf("%s: %s, %v; want %s", tc.name, got.Key, err, tc.target)
-		case tc.target == "" && (!errors.As(err, &api) || api.Status != http.StatusMethodNotAllowed):
-			t.Errorf("%s: %v; want 405", tc.name, err)
+		for _, item := range []bool{false, true} {
+			deploy, status, msg := itemkit.DeployTarget, tc.status, tc.msg
+			if item {
+				deploy = itemkit.ItemDeployTarget
+				if tc.itemStatus != 0 {
+					status, msg = tc.itemStatus, tc.itemMsg
+				}
+			}
+			got, err := deploy(t.Context(), w.Store, tc.c, tc.cached)
+			var api *apierror.Error
+			allow := ""
+			if status == http.StatusMethodNotAllowed && msg == noTarget {
+				allow = http.MethodGet
+			}
+			switch {
+			case tc.target != "" && (err != nil || got.Key != tc.target):
+				t.Errorf("%s (item %t): %s, %v; want %s", tc.name, item, got.Key, err, tc.target)
+			case tc.target == "" && (!errors.As(err, &api) || api.Status != status ||
+				api.Message != msg || api.Allow != allow):
+				t.Errorf(
+					"%s (item %t): %#v; want %d %q, Allow %q",
+					tc.name,
+					item,
+					err,
+					status,
+					msg,
+					allow,
+				)
+			}
 		}
+	}
+	// A failed read of the default deployment repository is the store's
+	// error, which the item routes answer 500.
+	if _, err := itemkit.DeployTarget(
+		t.Context(), failingRepos{inmem.New()}, w.Virtual, false,
+	); !errors.Is(err, errRepos) {
+		t.Errorf("a failed repository read: %v", err)
 	}
 }
 

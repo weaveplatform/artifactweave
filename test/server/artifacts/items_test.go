@@ -428,8 +428,8 @@ func TestAccFoldersAndListing(t *testing.T) {
 func TestAccRepositoryClasses(t *testing.T) {
 	w := newItemWorld(t, false)
 	ctx := context.Background()
-	wantStatus(t, w.do("PUT", "/artifactory/up/x", "admin", "x"), http.StatusMethodNotAllowed)
-	wantStatus(t, w.do("PUT", "/artifactory/up-cache/x", "admin", "x"), http.StatusMethodNotAllowed)
+	wantStatus(t, w.do("PUT", "/artifactory/up/x", "admin", "x"), http.StatusNotFound)
+	wantStatus(t, w.do("PUT", "/artifactory/up-cache/x", "admin", "x"), http.StatusNotFound)
 	wantStatus(
 		t,
 		w.do("PUT", "/artifactory/virt-nodeploy/x", "admin", "x"),
@@ -489,11 +489,10 @@ func TestAccRepositoryClasses(t *testing.T) {
 	}
 	wantStatus(t, w.do("GET", "/artifactory/virt/absent", "admin", ""), http.StatusNotFound)
 	wantStatus(t, w.do("GET", "/artifactory/loop/absent", "admin", ""), http.StatusNotFound)
-	wantStatus(
-		t,
-		w.do("DELETE", "/artifactory/virt/via-virtual.txt", "admin", ""),
-		http.StatusMethodNotAllowed,
-	)
+	if rec := w.do("DELETE", "/artifactory/virt/via-virtual.txt", "admin", ""); rec.Code !=
+		http.StatusNotFound || rec.Body.Len() != 0 {
+		t.Fatalf("DELETE through a virtual repository: %d %q", rec.Code, rec.Body)
+	}
 	wantStatus(t, w.do("DELETE", "/artifactory/up/cached.txt", "admin", ""), http.StatusNoContent)
 }
 

@@ -227,8 +227,14 @@ func TestAccMultipartErrors(t *testing.T) {
 // finished upload's status hands out.
 func uploadInParts(t *testing.T, w *itemWorld, as, path, data string) string {
 	t.Helper()
-	rec := w.do(http.MethodPost,
-		uploadsCreate+"?repoKey=libs-local&repoPath="+url.QueryEscape(path)+"&partSizeMB=1", as, "")
+	return uploadInPartsTo(t, w, as, "libs-local", path, data)
+}
+
+// uploadInPartsTo is uploadInParts to path in the repository key.
+func uploadInPartsTo(t *testing.T, w *itemWorld, as, key, path, data string) string {
+	t.Helper()
+	rec := w.do(http.MethodPost, uploadsCreate+"?repoKey="+url.QueryEscape(key)+
+		"&repoPath="+url.QueryEscape(path)+"&partSizeMB=1", as, "")
 	var created struct{ Token string }
 	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &created) != nil {
 		t.Fatalf("create %d %s", rec.Code, rec.Body)

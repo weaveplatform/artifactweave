@@ -20,7 +20,8 @@
 // # Inputs
 //
 //   - A handler's error: an *Error from New or NotSupported, or one built
-//     with an OCI or Access code, a Detail, NoChallenge or RetryAfterSeconds;
+//     with an OCI or Access code, a Detail, NoChallenge, RetryAfterSeconds or
+//     Allow;
 //     an error that wraps an *Error, which Write finds with errors.As; or any
 //     other error.
 //   - The Profile of the route, which the caller chooses by request path: the
@@ -45,7 +46,8 @@
 //     NoChallenge or the response has one already. So does an error that
 //     sets Challenge, such as the 403 7.x's entry point answers a refused
 //     API key with, and under ProfilePub any 403. A positive
-//     RetryAfterSeconds sets Retry-After.
+//     RetryAfterSeconds sets Retry-After, and Allow sets Allow, as a 405
+//     names the methods its resource takes.
 //   - Profile and its sixteen values; Error, with New, NotSupported and
 //     ErrNotImplemented; and BasicChallenge, Artifactory's realm.
 //
@@ -131,7 +133,9 @@
 // (P9c, #766 and #765). Moved here in P9d. New takes the code from the
 // status's name (#1236). The OCI envelope gives a 401, 403 or 429 the
 // specification's code, and a code keeps only letters and underscores
-// (#1248). A Swift registry error carries Content-Version: 1 (#1278).
+// (#1248). A Swift registry error carries Content-Version: 1 (#1278). P10
+// added Allow, for 7.x's 405 to a deploy through a virtual repository that
+// has no local deployment repository (#1534).
 //
 // # Testing
 //
@@ -156,9 +160,10 @@
 //     one with no code and one a handler gave a code, and that rendering
 //     leaves the error unchanged.
 //   - TestUnitProfileHeaders: the exact headers of every profile for a 404,
-//     and for a 401 with Retry-After: the content type, the challenge, Basic
-//     or pub's Bearer with the message, Retry-After, and Content-Version: 1 under the Swift
-//     registry profile and no other.
+//     for a 401 with Retry-After and for a 405 with Allow: the content type,
+//     the challenge, Basic or pub's Bearer with the message, Retry-After,
+//     Allow, and Content-Version: 1 under the Swift registry profile and no
+//     other.
 //
 // These tests leave the APM and Swift registry problem JSON bodies to the
 // tests of the routes that write them: the Agent Packages suite and the

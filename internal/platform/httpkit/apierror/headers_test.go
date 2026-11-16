@@ -11,7 +11,9 @@ import (
 // TestUnitProfileHeaders: the exact headers Write gives every profile, so
 // the Swift registry's Content-Version (#1278) is seen to reach that profile
 // and no other. A 404 carries only what a profile always sets; a 401 with a
-// Retry-After adds the challenge and Retry-After every profile shares.
+// Retry-After adds the challenge and Retry-After every profile shares; a 405
+// with Allow adds Allow, as 7.x's deploy through a virtual repository with
+// no local deployment repository answers (#1534).
 func TestUnitProfileHeaders(t *testing.T) {
 	const (
 		jsonType = "application/json"
@@ -50,9 +52,11 @@ func TestUnitProfileHeaders(t *testing.T) {
 			"Retry-After":      {"30"},
 			"Www-Authenticate": {challenge},
 		}
+		notAllowed := http.Header{"Content-Type": {contentTypes[p]}, "Allow": {"GET"}}
 		if p == ProfileSwiftRegistry {
 			notFound.Set("Content-Version", "1")
 			unauthorized.Set("Content-Version", "1")
+			notAllowed.Set("Content-Version", "1")
 		}
 		for _, c := range []struct {
 			err  *Error
@@ -65,6 +69,12 @@ func TestUnitProfileHeaders(t *testing.T) {
 				Message:           "Authentication is required",
 				RetryAfterSeconds: 30,
 			}, unauthorized},
+			{&Error{
+				Status:  http.StatusMethodNotAllowed,
+				Code:    "METHOD_NOT_ALLOWED",
+				Message: "No local repository was configured",
+				Allow:   "GET",
+			}, notAllowed},
 		} {
 			rec := httptest.NewRecorder()
 			Write(rec, p, c.err)

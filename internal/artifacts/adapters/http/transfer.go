@@ -137,6 +137,10 @@ func (s ArtifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bo
 	cached = cached || from.Class == repo.Remote
 	switch {
 	case from.Class == repo.Virtual:
+		// No source settles 7.x's answer to a copy or move out of a
+		// virtual repository: its copy and move resource is closed code,
+		// RTFACT-13890 asks for it, and RTFACT-17750 shows 7.11 failing it
+		// with a ClassCastException [I].
 		refuseTransfer(w, fmt.Sprintf("Cannot %s from the virtual repository '%s'", verb, from.Key))
 		return
 	case move && cached:
@@ -144,7 +148,7 @@ func (s ArtifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bo
 		return
 	}
 	toKey, toPath, into := splitTarget(to)
-	target, err := st.Repos().Get(ctx, toKey)
+	target, toCache, err := transferTarget(ctx, st, toKey)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound):
 		refuseTransfer(w, fmt.Sprintf("The target repository '%s' does not exist", toKey))
@@ -153,10 +157,7 @@ func (s ArtifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bo
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "get target repository", err))
 		return
 	case target.Class != repo.Local && target.Class != repo.Federated:
-		refuseTransfer(
-			w,
-			fmt.Sprintf("The target repository '%s' is not a local repository", toKey),
-		)
+		refuseTransfer(w, forbiddenTarget(toKey, target.Class, toCache, verb))
 		return
 	}
 	// The rights are checked where the source lands: inside the target
@@ -196,6 +197,50 @@ func (s ArtifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bo
 		return
 	}
 	writeTransfer(w, http.StatusOK, res.Messages)
+}
+
+// transferTarget returns the repository a copy or move names by key, and
+// whether key is a remote repository's cache. As 7.x's
+// RepositoryServiceImpl.repositoryByKey finds one, a cache exists only for a
+// remote repository that stores artifacts locally; any other key ending in
+// "-cache" that names no repository is kernel.ErrNotFound.
+func transferTarget(ctx context.Context, st Store, key string) (repo.Config, bool, error) {
+	stored, cached := model.ResolveRepoKey(key)
+	c, err := st.Repos().Get(ctx, stored)
+	switch {
+	case err != nil && !errors.Is(err, kernel.ErrNotFound):
+		return c, false, fmt.Errorf("get repository %s: %w", stored, err)
+	case err != nil:
+		return c, false, kernel.ErrNotFound
+	case cached && (c.Class != repo.Remote ||
+		c.StoreArtifactsLocally != nil && !*c.StoreArtifactsLocally):
+		return c, false, kernel.ErrNotFound
+	}
+	return c, cached, nil
+}
+
+// forbiddenTarget is 7.x's refusal of a copy or move (verb) into key, a
+// repository of class that holds no deployed files, or a remote
+// repository's cache: RepoPathMover.throwExceptionIfTargetRepoIsForbidden
+// (7.161.26, 121-138). Its status and envelope are [I]: the copy and move
+// resource is closed code and JFrog's copy and move pages document 400 in
+// the CopyOrMoveResult envelope only for invalid parameters and a missing
+// source (decision 0008, R6).
+func forbiddenTarget(key string, class repo.Class, cache bool, verb string) string {
+	kind := "virtual"
+	switch {
+	case cache:
+		kind = "cache"
+	case class == repo.Remote:
+		kind = "remote"
+	}
+	return fmt.Sprintf(
+		"Target repository %s is a %s repository. %s to %s repositories is not allowed.",
+		key,
+		kind,
+		verb,
+		kind,
+	)
 }
 
 // landing is where a copy or move of the item at src lands: dest in

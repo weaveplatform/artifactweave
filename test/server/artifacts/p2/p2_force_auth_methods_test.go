@@ -88,9 +88,11 @@ func TestAccP2ForceAuthenticationOnEveryMethod(t *testing.T) {
 				"admin PUT", http.MethodPut, "/artifactory/p2-forced-virtual/plugins/a.jar", "admin",
 				http.StatusMethodNotAllowed, "P2 repositories are remote or virtual",
 			},
+			// 7.x deletes nothing through a virtual repository: 404, no
+			// body (decision 0008, R6).
 			{
 				"admin DELETE", http.MethodDelete, "/artifactory/p2-forced-virtual/p2.index", "admin",
-				http.StatusMethodNotAllowed, "Cannot delete from the virtual repository 'p2-forced-virtual'",
+				http.StatusNotFound, "",
 			},
 			{
 				"anonymous trace, flag off", http.MethodGet, "/artifactory/p2-open-virtual/p2.index?trace", "",
@@ -102,7 +104,7 @@ func TestAccP2ForceAuthenticationOnEveryMethod(t *testing.T) {
 			},
 			{
 				"anonymous DELETE, flag off", http.MethodDelete, "/artifactory/p2-open-virtual/p2.index", "",
-				http.StatusMethodNotAllowed, "Cannot delete from the virtual repository 'p2-open-virtual'",
+				http.StatusNotFound, "",
 			},
 			{
 				"anonymous POST, flag off", http.MethodPost, "/artifactory/p2-open-virtual/p2.index", "",

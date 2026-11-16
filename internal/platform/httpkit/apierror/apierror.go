@@ -78,6 +78,12 @@ type Error struct {
 	// still carry one (sendErrorResponse, 7.161.26).
 	Challenge         bool
 	RetryAfterSeconds int
+	// Allow, when set, is the Allow header of the answer: the methods the
+	// resource takes, which a 405 names. 7.x's
+	// UploadServiceImpl.sendInvalidTargetRepositoryError sends "GET" with
+	// its 405 for a deploy to a virtual repository that has no local
+	// deployment repository (7.161.26, 337-352).
+	Allow string
 }
 
 // Error returns Message alone, without Status or Code, so an Error that is
@@ -125,6 +131,9 @@ func Write(w http.ResponseWriter, s Profile, err error) {
 	// another scheme (the Docker token flow's Bearer) sets its own first.
 	if e.RetryAfterSeconds > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(e.RetryAfterSeconds))
+	}
+	if e.Allow != "" {
+		w.Header().Set("Allow", e.Allow)
 	}
 	if challenged(s, e) && w.Header().Get("WWW-Authenticate") == "" {
 		challenge := BasicChallenge
