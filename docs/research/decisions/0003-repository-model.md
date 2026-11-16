@@ -25,16 +25,16 @@ fields, the enumerations, the defaults, the booleans JFrog documents as strings 
 in either spelling, written as booleans) and the provider-only keys. Validation
 (`repo.Validate`) checks the key, the class, the package types allowed for the class, the
 fields scoped to a class (`terraformType` on local and federated, `proxy`), a remote's `url`,
-that a virtual's default deployment repository is one of its members, that counts and periods
-are not negative, and a remote's minimum `retrievalCachePeriodSecs`: 30 seconds unless it is
+that counts and periods are not negative, and a remote's minimum `retrievalCachePeriodSecs`: 30 seconds unless it is
 a smart remote, 14,400 for a NuGet remote of chocolatey.org. It does not check `repoLayoutRef`
 against the known layouts, the include and exclude patterns or the enumerated values. A
 create without `repoLayoutRef` gets `sbt-default` for sbt, `ivy-default` for Ivy and
 `maven-2-default` for every other type. A virtual repository may have no members;
-`repos.CheckMembers` checks the members against the stored repositories: each must exist
-and have the virtual repository's package type unless it is generic, with the Maven
-family counted as one type ([research 03](../03-repository-configuration-model.md),
-[#394](https://github.com/weaveplatform/artifactweave/issues/394)). The struct is
+`repos.CheckMembers` checks the members and the default deployment repository against the
+stored configuration and the other repositories, with 7.x's save rules and messages
+([decision 0008, R11](0008-virtual-repositories.md#r11-package-types),
+[#394](https://github.com/weaveplatform/artifactweave/issues/394),
+[#1532](https://github.com/weaveplatform/artifactweave/issues/1532)). The struct is
 importable because other weave repositories will declare repositories as code.
 
 **Classes.** Configuration supports `local`, `remote`, `virtual` and `federated`. Local

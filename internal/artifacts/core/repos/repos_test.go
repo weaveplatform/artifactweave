@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -499,81 +501,268 @@ func TestUnitRemove(t *testing.T) {
 	}
 }
 
-func TestUnitCheckMembers(t *testing.T) {
-	known := []repo.Config{
-		{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},
-		{Key: "maven-local", Class: repo.Local, PackageType: repo.Maven},
-		{Key: "gradle-remote", Class: repo.Remote, PackageType: repo.Gradle},
-		{Key: "npm-virtual", Class: repo.Virtual, PackageType: repo.NPM},
+// checkMembersKnown is the stored repositories the CheckMembers tables
+// check against.
+var checkMembersKnown = []repo.Config{
+	{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},
+	{Key: "npm-other", Class: repo.Local, PackageType: repo.NPM},
+	{Key: "npm-fed", Class: repo.Federated, PackageType: repo.NPM},
+	{Key: "npm-remote", Class: repo.Remote, PackageType: repo.NPM},
+	{Key: "npm-virtual", Class: repo.Virtual, PackageType: repo.NPM},
+	{Key: "maven-local", Class: repo.Local, PackageType: repo.Maven},
+	{Key: "gradle-remote", Class: repo.Remote, PackageType: repo.Gradle},
+	{Key: "oci-local", Class: repo.Local, PackageType: repo.OCI},
+	{Key: "helmoci-local", Class: repo.Local, PackageType: repo.HelmOCI},
+}
+
+const (
+	missingRef = "Cannot create or update repo 'v': repo reference '%s' does not exist " +
+		"in the config descriptor."
+	notIncluded = "Cannot set repository reference '%s' as the default deployment repository " +
+		"for virtual repository 'v' since it is not included in the repository references"
+	notLocal = "Cannot set repository reference '%s' as the default deployment repository " +
+		"for virtual repository 'v' since it is not a local repository"
+	removed = "Cannot remove repository reference '%s' since it is defined as the default " +
+		"deployment repository for the virtual repository 'v'"
+	mismatched = "Virtual repository 'v' has package type '%s' but includes non-matching " +
+		"repository '%s' with package type '%s'"
+)
+
+// virtualConfig is a virtual repository "v" of package type t with
+// members and, when ddr is not empty, a deployment repository.
+func virtualConfig(t repo.PackageType, ddr string, members ...string) repo.Config {
+	return repo.Config{
+		Key: "v", Class: repo.Virtual, PackageType: t, Repositories: members,
+		DefaultDeploymentRepo: ddr,
 	}
-	virtual := func(t repo.PackageType, members ...string) repo.Config {
-		return repo.Config{Key: "v", Class: repo.Virtual, PackageType: t, Repositories: members}
+}
+
+// wantMessage fails the test unless err is nil when want is empty, or a 400
+// apierror whose message is want.
+func wantMessage(t *testing.T, name string, err error, want string) {
+	t.Helper()
+	var ae *apierror.Error
+	switch {
+	case want == "" && err != nil:
+		t.Errorf("%s: %v", name, err)
+	case want != "" && (!errors.As(err, &ae) || ae.Status != http.StatusBadRequest ||
+		ae.Message != want):
+		t.Errorf("%s: %v, want 400 %q", name, err, want)
 	}
+}
+
+func TestUnitCheckMembersCreate(t *testing.T) {
 	for name, tt := range map[string]struct {
 		c        repo.Config
 		expected string
 	}{
-		"not virtual":        {repo.Config{Key: "l", Class: repo.Local, Repositories: []string{"x"}}, ""},
-		"no members":         {virtual(repo.NPM), ""},
-		"same type":          {virtual(repo.NPM, "npm-local", "npm-virtual"), ""},
-		"generic takes any":  {virtual(repo.Generic, "npm-local", "maven-local", "npm-virtual"), ""},
-		"maven family mixes": {virtual(repo.Maven, "maven-local", "gradle-remote"), ""},
-		"unknown member": {
-			virtual(repo.NPM, "ghost"),
-			"Virtual repository member 'ghost' does not exist",
+		"not virtual": {repo.Config{Key: "l", Class: repo.Local, Repositories: []string{"x"}}, ""},
+		"no members":  {virtualConfig(repo.NPM, ""), ""},
+		"same type":   {virtualConfig(repo.NPM, "", "npm-local", "npm-virtual", "npm-remote"), ""},
+		"itself":      {virtualConfig(repo.NPM, "", "v", "npm-local"), ""},
+		"generic takes any": {
+			virtualConfig(repo.Generic, "", "npm-local", "maven-local", "npm-virtual"), "",
 		},
+		"maven group mixes": {virtualConfig(repo.Maven, "", "maven-local", "gradle-remote"), ""},
+		"oci over helm oci": {virtualConfig(repo.OCI, "", "oci-local", "helmoci-local"), ""},
+		"helm oci over oci": {virtualConfig(repo.HelmOCI, "", "helmoci-local", "oci-local"), ""},
+		"local ddr":         {virtualConfig(repo.NPM, "npm-local", "npm-remote", "npm-local"), ""},
+		"federated ddr":     {virtualConfig(repo.NPM, "npm-fed", "npm-fed"), ""},
+		"missing member": {
+			virtualConfig(repo.NPM, "", "npm-local", "ghost"), fmt.Sprintf(missingRef, "ghost"),
+		},
+		"missing ddr": {
+			virtualConfig(repo.NPM, "ghost", "npm-local"), fmt.Sprintf(missingRef, "ghost"),
+		},
+		"ddr outside the members": {
+			virtualConfig(repo.NPM, "npm-local", "npm-other"),
+			fmt.Sprintf(notIncluded, "npm-local"),
+		},
+		"ddr without members": {
+			virtualConfig(repo.NPM, "npm-local"), fmt.Sprintf(notIncluded, "npm-local"),
+		},
+		"remote ddr": {
+			virtualConfig(repo.NPM, "npm-remote", "npm-remote"),
+			fmt.Sprintf(notLocal, "npm-remote"),
+		},
+		"virtual ddr": {
+			virtualConfig(repo.NPM, "npm-virtual", "npm-virtual"),
+			fmt.Sprintf(notLocal, "npm-virtual"),
+		},
+		"itself as ddr": {virtualConfig(repo.Generic, "v", "v"), fmt.Sprintf(notLocal, "v")},
 		"local of another type": {
-			virtual(repo.NPM, "npm-local", "maven-local"),
-			"Virtual repository member 'maven-local' has package type 'maven', which does " +
-				"not match the virtual repository's package type 'npm'",
+			virtualConfig(repo.NPM, "", "npm-local", "maven-local"),
+			fmt.Sprintf(mismatched, "Npm", "maven-local", "Maven"),
+		},
+		"local ddr, another member of another type": {
+			virtualConfig(repo.NPM, "npm-local", "maven-local", "npm-local"),
+			fmt.Sprintf(mismatched, "Npm", "maven-local", "Maven"),
 		},
 		"virtual of another type": {
-			virtual(repo.Go, "npm-virtual"),
-			"Virtual repository member 'npm-virtual' has package type 'npm'",
+			virtualConfig(repo.Go, "", "npm-virtual"),
+			fmt.Sprintf(mismatched, "Go", "npm-virtual", "Npm"),
 		},
-		"outside the family": {
-			virtual(repo.Gradle, "npm-local"),
-			"package type 'gradle'",
+		"outside the group": {
+			virtualConfig(repo.Gradle, "", "npm-local"),
+			fmt.Sprintf(mismatched, "Gradle", "npm-local", "Npm"),
+		},
+		"rpm named YUM": {
+			virtualConfig(repo.RPM, "", "npm-local"),
+			fmt.Sprintf(mismatched, "YUM", "npm-local", "Npm"),
+		},
+		"helm over helm oci": {
+			virtualConfig(repo.Helm, "", "helmoci-local"),
+			fmt.Sprintf(mismatched, "Helm", "helmoci-local", "HelmOCI"),
 		},
 	} {
-		err := CheckMembers(tt.c, known)
-		switch {
-		case tt.expected == "" && err != nil:
-			t.Errorf("%s: %v", name, err)
-		case tt.expected != "" && (err == nil || !strings.Contains(err.Error(), tt.expected)):
-			t.Errorf("%s: %v, want %q", name, err, tt.expected)
+		c := tt.c
+		err := CheckMembers(&c, nil, checkMembersKnown)
+		wantMessage(t, name, err, tt.expected)
+		if err == nil && !slices.Equal(c.Repositories, tt.c.Repositories) {
+			t.Errorf("%s: a create changed the members to %v", name, c.Repositories)
 		}
 	}
 }
 
-func TestUnitP2VirtualMembersRequireLocalGenericOrMaven(t *testing.T) {
+func TestUnitCheckMembersUpdate(t *testing.T) {
+	for name, tt := range map[string]struct {
+		stored, c repo.Config
+		expected  string
+		// members and ddr are what the update keeps, when it is accepted.
+		members []string
+		ddr     string
+	}{
+		"description only, stored ddr outside the members": {
+			stored:  virtualConfig(repo.NPM, "npm-local", "npm-other"),
+			c:       virtualConfig(repo.NPM, "npm-local", "npm-other"),
+			members: []string{"npm-other"}, ddr: "npm-local",
+		},
+		"description only, stored member of another type": {
+			stored:  virtualConfig(repo.NPM, "", "maven-local"),
+			c:       virtualConfig(repo.NPM, "", "maven-local"),
+			members: []string{"maven-local"},
+		},
+		"description only, stored remote ddr": {
+			stored:  virtualConfig(repo.NPM, "npm-remote", "npm-remote"),
+			c:       virtualConfig(repo.NPM, "npm-remote", "npm-remote"),
+			members: []string{"npm-remote"}, ddr: "npm-remote",
+		},
+		"stale member and ddr dropped": {
+			stored:  virtualConfig(repo.NPM, "gone", "npm-local", "gone"),
+			c:       virtualConfig(repo.NPM, "gone", "npm-local", "gone"),
+			members: []string{"npm-local"},
+		},
+		"stale member dropped while another is added": {
+			stored:  virtualConfig(repo.NPM, "", "gone"),
+			c:       virtualConfig(repo.NPM, "", "gone", "npm-other"),
+			members: []string{"npm-other"},
+		},
+		"new missing member": {
+			stored:   virtualConfig(repo.NPM, "", "npm-local"),
+			c:        virtualConfig(repo.NPM, "", "npm-local", "ghost"),
+			expected: fmt.Sprintf(missingRef, "ghost"),
+		},
+		"new missing ddr": {
+			stored:   virtualConfig(repo.NPM, "gone", "npm-local"),
+			c:        virtualConfig(repo.NPM, "ghost", "npm-local"),
+			expected: fmt.Sprintf(missingRef, "ghost"),
+		},
+		"ddr changed outside the members": {
+			stored:   virtualConfig(repo.NPM, "npm-local", "npm-local", "npm-other"),
+			c:        virtualConfig(repo.NPM, "npm-fed", "npm-local", "npm-other"),
+			expected: fmt.Sprintf(notIncluded, "npm-fed"),
+		},
+		"ddr changed to a remote member": {
+			stored:   virtualConfig(repo.NPM, "npm-local", "npm-local", "npm-remote"),
+			c:        virtualConfig(repo.NPM, "npm-remote", "npm-local", "npm-remote"),
+			expected: fmt.Sprintf(notLocal, "npm-remote"),
+		},
+		"ddr changed to another member": {
+			stored:  virtualConfig(repo.NPM, "npm-local", "npm-local", "npm-other"),
+			c:       virtualConfig(repo.NPM, "npm-other", "npm-local", "npm-other"),
+			members: []string{"npm-local", "npm-other"}, ddr: "npm-other",
+		},
+		"ddr changed, stored member of another type": {
+			stored:  virtualConfig(repo.NPM, "", "maven-local", "npm-local"),
+			c:       virtualConfig(repo.NPM, "npm-local", "maven-local", "npm-local"),
+			members: []string{"maven-local", "npm-local"}, ddr: "npm-local",
+		},
+		"ddr changed to a member of another type": {
+			stored:   virtualConfig(repo.NPM, "", "maven-local"),
+			c:        virtualConfig(repo.NPM, "maven-local", "maven-local"),
+			expected: fmt.Sprintf(mismatched, "Npm", "maven-local", "Maven"),
+		},
+		"ddr cleared": {
+			stored:  virtualConfig(repo.NPM, "npm-local", "npm-local"),
+			c:       virtualConfig(repo.NPM, "", "npm-other"),
+			members: []string{"npm-other"},
+		},
+		"the ddr's member removed": {
+			stored:   virtualConfig(repo.NPM, "npm-local", "npm-local", "npm-other"),
+			c:        virtualConfig(repo.NPM, "npm-local", "npm-other"),
+			expected: fmt.Sprintf(removed, "npm-local"),
+		},
+		"members changed, one of another type": {
+			stored:   virtualConfig(repo.NPM, "", "npm-local"),
+			c:        virtualConfig(repo.NPM, "", "npm-local", "maven-local"),
+			expected: fmt.Sprintf(mismatched, "Npm", "maven-local", "Maven"),
+		},
+		"members reordered": {
+			stored:  virtualConfig(repo.NPM, "", "npm-local", "npm-other"),
+			c:       virtualConfig(repo.NPM, "", "npm-other", "npm-local"),
+			members: []string{"npm-other", "npm-local"},
+		},
+		"cycle": {
+			stored:  virtualConfig(repo.NPM, ""),
+			c:       virtualConfig(repo.NPM, "", "npm-virtual", "v"),
+			members: []string{"npm-virtual", "v"},
+		},
+	} {
+		stored, c := tt.stored, tt.c
+		err := CheckMembers(&c, &stored, checkMembersKnown)
+		wantMessage(t, name, err, tt.expected)
+		if err == nil && (!slices.Equal(c.Repositories, tt.members) ||
+			c.DefaultDeploymentRepo != tt.ddr) {
+			t.Errorf("%s: kept %v %q, want %v %q", name, c.Repositories,
+				c.DefaultDeploymentRepo, tt.members, tt.ddr)
+		}
+	}
+}
+
+func TestUnitP2VirtualMembers(t *testing.T) {
 	known := []repo.Config{
 		{Key: "generic-local", Class: repo.Local, PackageType: repo.Generic},
 		{Key: "generic-remote", Class: repo.Remote, PackageType: repo.Generic},
 		{Key: "maven-local", Class: repo.Local, PackageType: repo.Maven},
 		{Key: "maven-remote", Class: repo.Remote, PackageType: repo.Maven},
 		{Key: "gradle-local", Class: repo.Local, PackageType: repo.Gradle},
+		{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},
 		{Key: "p2-remote", Class: repo.Remote, PackageType: repo.P2},
 	}
-	for _, tc := range []struct {
-		member  string
-		allowed bool
-	}{
-		{"generic-local", true},
-		{"maven-local", true},
-		{"p2-remote", true},
-		{"generic-remote", false},
-		{"maven-remote", false},
-		{"gradle-local", false},
+	for _, tc := range []struct{ member, expected string }{
+		{"generic-local", ""},
+		{"maven-local", ""},
+		{"gradle-local", ""},
+		{"p2-remote", ""},
+		{
+			"generic-remote",
+			"P2 virtual repository member 'generic-remote' with package type 'generic' must be local",
+		},
+		{
+			"maven-remote",
+			"P2 virtual repository member 'maven-remote' with package type 'maven' must be local",
+		},
+		{
+			"npm-local",
+			"Virtual repository 'p2-virtual' has package type 'P2' but includes non-matching " +
+				"repository 'npm-local' with package type 'Npm'",
+		},
 	} {
 		v := repo.Config{
 			Key: "p2-virtual", Class: repo.Virtual, PackageType: repo.P2,
 			Repositories: []string{tc.member},
 		}
-		err := CheckMembers(v, known)
-		if (err == nil) != tc.allowed {
-			t.Errorf("P2 member %s allowed=%t, error=%v", tc.member, tc.allowed, err)
-		}
+		wantMessage(t, "P2 member "+tc.member, CheckMembers(&v, nil, known), tc.expected)
 	}
 }
 
@@ -594,14 +783,15 @@ func TestUnitVirtualEmptiedByRemoveStillUpdates(t *testing.T) {
 		t.Fatalf("update of an emptied virtual: %+v, %v", updated, err)
 	}
 	known, _ := db.Repos().List(ctx, port.RepoFilter{})
-	if err := CheckMembers(updated, known); err != nil {
+	if err := CheckMembers(&updated, &v, known); err != nil {
 		t.Fatal(err)
 	}
 	// Still no deployment repository to name.
-	if _, err := Merge(
-		v,
-		map[string]json.RawMessage{"defaultDeploymentRepo": []byte(`"libs"`)},
-	); err == nil {
+	updated, err = Merge(v, map[string]json.RawMessage{"defaultDeploymentRepo": []byte(`"libs"`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckMembers(&updated, &v, known); err == nil {
 		t.Fatal("a virtual without members took a deployment repository")
 	}
 }
