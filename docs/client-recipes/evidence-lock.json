@@ -55,7 +55,7 @@
   "test/acceptance/clients/r.Dockerfile": "ecf2e1657808cc519f547ebcb26ba9f1a9f742b4974b798b4d69986cdb3cd911",
   "test/acceptance/clients/ruby.Dockerfile": "3e89ed235403d5a3c79ee917429861a3c0b721eba06aac74c3332f768e138715",
   "test/acceptance/clients/sbt.Dockerfile": "ab5263207ed0d6cf33fe5662954a8218a5abe3407a7bbb4ea7038c43e4380edb",
-  "test/acceptance/clients/swift.Dockerfile": "834491010a9e2d5d2c779261b1d0789f45730be7cf4a1f0cdf0d8c341dba84da",
+  "test/acceptance/clients/swift.Dockerfile": "89107fd2c1dc4587ce3c4eb40fec454c9e946cce435ca6118845c9a68d73c9c6",
   "test/acceptance/clients/vagrant.Dockerfile": "8d6061d142be8a35552af1a9bf3edbe0e29a421ff8f430b7b6b901f72bcd574d",
   "test/acceptance/clients/vscode-install.sh": "1a2d9c839a0d5f76507ac3c9e2753eb1813d8fb6c811787a1e7c775ae46649b8",
   "test/acceptance/clients/vscode.Dockerfile": "cd5b110c9c938e369d793d321de151df294ae7965780a1c7a4958b88be38e6b9",
