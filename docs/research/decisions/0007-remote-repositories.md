@@ -108,6 +108,44 @@ cross-origin realms remain anonymous unless explicitly enabled. These controlled
 registry proofs do not activate native remote pulls (#624) or change this ADR status.
 The strict realm, project-prefix, retry/expiry and cookie policies remain [I] for #216/P19.
 
+## Cache fill permission and the assumed-offline miss (2026-11-16)
+
+**Filling the cache needs Deploy/Cache ([#1587](https://github.com/weaveplatform/artifactweave/issues/1587)).**
+Read on a remote serves only what its cache holds. Fetching a file the cache does not
+hold, or a copy the upstream has changed since it expired, also needs Deploy/Cache on
+`<remote>-cache:<path>`, at the path 7.x keeps the file (an npm package document's
+`.npm/<name>/package.json`, a PyPI page's `.pypi/<name>.html`), or Annotate for a
+`<file>:<metadata>` path. JFrog's
+[Permissions](https://docs.jfrog.com/administration/docs/permissions) page: Read on a
+remote "only allows downloading from the remote cache", and "the Deploy/ Cache Permission
+allows caching artifacts from the upstream". In 7.161.26, `RemoteRepoBase.getInfo` asks
+the upstream for the file's info first, and `downloadAndSave` calls
+`RepositoryServiceImpl.assertValidDeployPathAndPermissions` (2817-2870) on the cache path
+before it downloads (846-855); a KB article shows the reason for a PyPI page, "User
+developer is not permitted to deploy '.pypi/npm.html' into
+'pypi-nexus-remote-cache:.pypi/npm.html'." The policy therefore asks the upstream with a
+HEAD for such a caller, answers its miss, serves and refreshes a copy it has not changed,
+and refuses a file it would send. The item route answers the refusal as
+`DownloadServiceImpl.respondFoundResource` does (1006-1022): 403 `Rejected artifact
+download request: User <user> is not permitted to deploy '<path>' into
+'<remote>-cache:<path>'.`, or the 401 challenge for an anonymous caller. A format route
+answers its own miss, since JFrog's KB says installing packages without Deploy "will
+result in a 404 error - even if the artifact exists in the upstream repository", and a
+virtual repository passes over the member, as
+[RTFACT-30824](https://jfrog.atlassian.net/browse/RTFACT-30824) shows for PyPI; the
+bodies are [I]. A remote that stores nothing, a checksum request, a folder listing and a
+search's metadata read keep Read alone, since 7.x saves nothing for them. The seeded
+**Anything** permission gives the readers group Read only, and **Any Remote** grants no
+one anything, as 7.x has shipped them since 7.84.3, so a new user or anonymous fills no
+remote cache until an administrator grants Deploy/Cache.
+
+**An assumed-offline remote answers its miss 404 ([#1601](https://github.com/weaveplatform/artifactweave/issues/1601)).**
+While the circuit holds the upstream assumed offline, a read asks it nothing and serves
+the copy the cache holds, however old, whatever `hardFail` or its Cache-Control says, as
+`RemoteRepoBase.internalGetInfo` does while `isOffline` holds. Without a copy the item
+route answers 404 `<key>: is assumed offline, '<key>:<path>' is not found at '<path>'.;
+Path: '<key>:<path>'` and a format route its own miss [I], where both answered 502.
+
 ## Rationale
 
 A decision table makes the cache semantics testable one row at a time and gives the

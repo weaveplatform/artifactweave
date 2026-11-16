@@ -78,8 +78,10 @@ func smartFixture(t *testing.T) *smartWorld {
 		Create(t.Context(), accesstest.User{Name: "reader", PasswordHash: hash}); err != nil {
 		t.Fatal(err)
 	}
+	// Deploy/Cache as well as Read: the reads fill the remote's cache,
+	// which 7.x allows only a caller with Deploy/Cache on it (#1587).
 	if err := w.db.Permissions().
-		Create(t.Context(), accesstest.Permission{Name: "read", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {Targets: map[string]accesstest.Target{w.c.Key: {}}, Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "read", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {Targets: map[string]accesstest.Target{w.c.Key: {}}, Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"reader": accessapi.ActionRead | accessapi.ActionWrite}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	kit := accesstest.Over(t, w.db, accesstest.WithNow(w.clock.Now))

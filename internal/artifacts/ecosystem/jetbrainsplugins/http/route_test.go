@@ -71,8 +71,11 @@ func newRouteFixture(t *testing.T) *routeFixture {
 	if err := db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "jetbrains-read", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
+				// Deploy/Cache as well as Read: the reads fill the remote's
+				// cache, which 7.x allows only a caller with Deploy/Cache on
+				// it (#1587).
 				Actions: accesstest.Grants{Users: map[string]api.Actions{
-					"reader": api.ActionRead,
+					"reader": api.ActionRead | api.ActionWrite,
 				}},
 				Targets: map[string]accesstest.Target{
 					"jetbrains-remote": {Include: []string{"**"}},
@@ -477,8 +480,11 @@ func TestAccPinnedIDEInstallsThroughNativeMarketplaceHost(t *testing.T) {
 	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
 		Name: "jetbrains-anonymous", Resources: map[api.ResourceType]accesstest.Resource{
 			api.ResourceArtifact: {
+				// Deploy/Cache as well as Read: the reads fill the remote's
+				// cache, which 7.x allows only a caller with Deploy/Cache on
+				// it (#1587).
 				Actions: accesstest.Grants{Users: map[string]api.Actions{
-					"anonymous": api.ActionRead,
+					"anonymous": api.ActionRead | api.ActionWrite,
 				}},
 				Targets: map[string]accesstest.Target{
 					"jetbrains-remote": {Include: []string{"**"}},

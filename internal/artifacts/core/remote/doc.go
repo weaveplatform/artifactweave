@@ -56,7 +56,15 @@
 //     (CheckCurrent) before it publishes.
 //   - Core imports neither the transport (artifacts/adapters/upstream) nor
 //     Smart Remote; both import it.
-//   - Cache aliases and explicit offline mode make no upstream call.
+//   - Cache aliases and explicit offline mode make no upstream call, and
+//     nor does a read while the upstream is assumed offline, which serves
+//     the copy the cache holds, however old, or misses with
+//     source.ErrAssumedOffline
+//     (https://github.com/weaveplatform/artifactweave/issues/1601).
+//   - Only a caller with Deploy/Cache on the cache path fills the cache
+//     (source.AuthorizeFill); one with Read alone is answered from the
+//     upstream's info, and nothing the upstream sends it is kept
+//     (https://github.com/weaveplatform/artifactweave/issues/1587).
 //   - A HEAD on a resource the cache keeps fills it as a GET does, in the
 //     GET's flight, and is answered from the kept copy; only a read that
 //     keeps nothing and a checksum request's HEAD send the upstream a
@@ -102,7 +110,8 @@
 //     holds the policy fixture, with policy_fault_test.go,
 //     policy_format_test.go, cache_maintenance_test.go,
 //     metadata_response_test.go, module_location_test.go,
-//     cold_head_test.go, a HEAD that fills the cache, and
+//     cold_head_test.go, a HEAD that fills the cache, fill_test.go, a
+//     caller who may not fill the cache and an upstream assumed offline,
 //     storage_fault_test.go, a failed read, write or publication of the
 //     cache's own copy, a Hex tarball's Deployed hook among them,
 //     state_fault_test.go, a failed read or write of the availability

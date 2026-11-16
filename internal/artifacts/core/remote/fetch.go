@@ -38,6 +38,9 @@ func (p *Policy) fill(
 	if err != nil {
 		return fillResult{key: key}, stateFault(ctx, err)
 	}
+	if fileRead(q) && p.assumedOffline(state) {
+		return p.offline(key, e)
+	}
 	if failure := p.Cooldown(state); failure != nil {
 		return p.fallback(q, key, e, failure)
 	}
@@ -63,6 +66,10 @@ func (p *Policy) fill(
 		if stateErr != nil {
 			return fillResult{key: key}, stateFault(ctx, stateErr)
 		}
+		// A read that shared the recovery probe answers the probe's failure,
+		// as the 7.x request that meets a connection failure answers it;
+		// only a read that finds the upstream already assumed offline
+		// answers offline's miss.
 		if failure := p.Cooldown(latest); failure != nil {
 			return p.fallback(q, key, e, failure)
 		}
@@ -197,6 +204,16 @@ func (p *Policy) direct(
 		}
 		return p.resultFor(ctx, q, filled.entry)
 	}
+	offline := func() (source.Result, error) {
+		filled, e := p.offline(key, old)
+		if e != nil {
+			return source.Result{}, e
+		}
+		return p.resultFor(ctx, q, filled.entry)
+	}
+	if fileRead(q) && p.assumedOffline(state) {
+		return offline()
+	}
 	if failure := p.Cooldown(state); failure != nil {
 		return fallback(failure)
 	}
@@ -229,6 +246,7 @@ func (p *Policy) direct(
 		if stateErr != nil {
 			return source.Result{}, stateFault(ctx, stateErr)
 		}
+		// As in fill, a read that shared the probe answers its failure.
 		if failure := p.Cooldown(latest); failure != nil {
 			return fallback(failure)
 		}
@@ -539,6 +557,23 @@ func (p *Policy) refuse(
 	if !errors.As(refused, &refusal) || e.Blob.Checksums.SHA256 == "" || !e.NegativeUntil.IsZero() {
 		return fillResult{key: token.Key}, refused
 	}
+	updated, err := p.unexpire(ctx, q, permit, revision, token, e)
+	if err != nil {
+		return fillResult{key: token.Key}, err
+	}
+	return fillResult{key: token.Key, entry: updated, refused: refusal}, nil
+}
+
+// unexpire makes e, the complete copy the cache holds, fresh again without
+// fetching it, as 7.x's DbCacheRepo.unexpire resets a cached file's age.
+func (p *Policy) unexpire(
+	ctx context.Context,
+	q source.Request,
+	permit source.Permit,
+	revision string,
+	token model.RemoteCacheToken,
+	e model.RemoteCacheEntry,
+) (model.RemoteCacheEntry, error) {
 	e.ValidatedAt = p.now()
 	var updated model.RemoteCacheEntry
 	err := p.Store.Tx(ctx, func(tx context.Context) error {
@@ -553,9 +588,9 @@ func (p *Policy) refuse(
 		return nil
 	})
 	if err != nil {
-		return fillResult{key: token.Key}, PolicyError(err)
+		return model.RemoteCacheEntry{}, PolicyError(err)
 	}
-	return fillResult{key: token.Key, entry: updated, refused: refusal}, nil
+	return updated, nil
 }
 
 // requestURL is the URL 7.x names in a refusal: the one it asked for,

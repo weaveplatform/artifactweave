@@ -2,7 +2,7 @@
 Feature: JetBrains IDE installs from a native remote Marketplace repository
   The pinned IntelliJ IDEA client uses the documented Marketplace host setting and
   installs a compatible plugin without credentials, through an explicit
-  anonymous read grant.
+  anonymous grant to read the remote and fill its cache (Deploy/Cache, #1587).
 
   Scenario: the pinned IDE resolves and installs a plugin through a remote cache
     Given the registry is running
@@ -24,7 +24,7 @@ Feature: JetBrains IDE installs from a native remote Marketplace repository
     Then the response status is 401
     When I POST "/access/api/v2/permissions" as admin with body:
       """
-      {"name":"jetbrains-anonymous-read","resources":{"artifact":{"actions":{"users":{"anonymous":["READ"]}},"targets":{"jetbrains-remote":{"include_patterns":["**"]}}}}}
+      {"name":"jetbrains-anonymous-read","resources":{"artifact":{"actions":{"users":{"anonymous":["READ","WRITE"]}},"targets":{"jetbrains-remote":{"include_patterns":["**"]}}}}}
       """
     Then the response status is 201
     When I GET "/artifactory/api/jetbrainsplugins/jetbrains-remote/api/search/updates/compatible?build=IC-252.28238.7&pluginXmlId=com.weave.fixture"
@@ -58,7 +58,7 @@ Feature: JetBrains IDE installs from a native remote Marketplace repository
     Then the response status is 200
     When I POST "/access/api/v2/permissions" as admin with body:
       """
-      {"name":"jetbrains-anonymous-read","resources":{"artifact":{"actions":{"users":{"anonymous":["READ"]}},"targets":{"jetbrains-remote":{"include_patterns":["**"]}}}}}
+      {"name":"jetbrains-anonymous-read","resources":{"artifact":{"actions":{"users":{"anonymous":["READ","WRITE"]}},"targets":{"jetbrains-remote":{"include_patterns":["**"]}}}}}
       """
     Then the response status is 201
     When I GET "/artifactory/api/jetbrainsplugins/jetbrains-remote/pluginManager?id=com.weave.fixture&build=IC-252.28238.7"

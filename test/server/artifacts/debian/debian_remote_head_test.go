@@ -81,7 +81,9 @@ func TestAccDebianRemoteIndexHeadAnswersItsLength(t *testing.T) {
 // listed package; its HEAD, cold and once cached, answers 200 with the
 // index's length and no body. The HEAD is answered from the index's info,
 // as 7.x reads a remote index by its own path's permission, and sends no
-// package list (#1478).
+// package list (#1478). The caller may also fill the cache at the index's
+// path (Deploy/Cache), which 7.x asks of a HEAD on a remote that stores
+// what it fetches, since that HEAD downloads the file (#1587).
 func TestAccDebianRemoteIndexHeadReadsByItsOwnPath(t *testing.T) {
 	files, _ := queryArchive(t)
 	const p = "dists/stable/main/binary-amd64/Packages"
@@ -101,7 +103,9 @@ func TestAccDebianRemoteIndexHeadReadsByItsOwnPath(t *testing.T) {
 				Name: "index-only", Resources: map[api.ResourceType]accesstest.Resource{
 					api.ResourceArtifact: {
 						Actions: accesstest.Grants{
-							Users: map[string]api.Actions{"indexonly": api.ActionRead},
+							Users: map[string]api.Actions{
+								"indexonly": api.ActionRead | api.ActionWrite,
+							},
 						},
 						Targets: map[string]accesstest.Target{"remote": {
 							Include: []string{"**"}, Exclude: []string{"pool/**"},

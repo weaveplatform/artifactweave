@@ -148,6 +148,17 @@ func TestAccCacheMaintenanceHTTPNegativeRediscovery(t *testing.T) {
 	if err = w.db.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
+	// Deploy/Cache, without Delete: the reader's last read fills the cache,
+	// which 7.x allows only a caller with Deploy/Cache on it (#1587).
+	if err = w.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "fill-up",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionWrite}},
+			Targets: map[string]accesstest.Target{"up": {}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	target := "/artifactory/up/new.bin"
 	wantStatus(t, w.do(http.MethodGet, target, "reader", ""), http.StatusNotFound)
 	up.Set("/new.bin", fakeupstream.Resource{Body: []byte("newly available")})

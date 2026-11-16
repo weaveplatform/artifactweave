@@ -352,6 +352,19 @@ func TestAccSwiftPMRemoteVirtualAndOffline(t *testing.T) {
 		}}); err != nil {
 		t.Fatal(err)
 	}
+	// Deploy/Cache on the remote alone: the client's cold reads fill its
+	// cache, which 7.x allows only a caller with Deploy/Cache on it (#1587).
+	if err := f.db.Permissions().
+		Create(t.Context(), accesstest.Permission{Name: "swiftpm-remote-fill", Resources: map[api.ResourceType]accesstest.Resource{
+			api.ResourceArtifact: {
+				Actions: accesstest.Grants{
+					Users: map[string]api.Actions{"swift-client": api.ActionWrite},
+				},
+				Targets: map[string]accesstest.Target{"packages": {Include: []string{"**"}}},
+			},
+		}}); err != nil {
+		t.Fatal(err)
+	}
 	srv := httptest.NewServer(swiftCredentialHandler(t, f.fixture, "swift-client"))
 	defer srv.Close()
 	root := t.TempDir()

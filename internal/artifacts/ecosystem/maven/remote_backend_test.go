@@ -130,8 +130,11 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 				Create(t.Context(), accesstest.User{Name: "reader", PasswordHash: hash}); err != nil {
 				t.Fatal(err)
 			}
+			// Deploy/Cache as well as Read: the companions fill the remote's
+			// cache, which 7.x allows only a caller with Deploy/Cache on it
+			// (#1587).
 			if err := w.db.Permissions().
-				Create(t.Context(), accesstest.Permission{Name: "read", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Targets: map[string]accesstest.Target{w.c.Key: {}}, Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}}}}); err != nil {
+				Create(t.Context(), accesstest.Permission{Name: "read", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Targets: map[string]accesstest.Target{w.c.Key: {}}, Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead | api.ActionWrite}}}}}); err != nil {
 				t.Fatal(err)
 			}
 			api := accesstest.Over(t, w.db, accesstest.WithNow(w.clock.Now)).API()
@@ -140,7 +143,7 @@ func TestAccMavenDurableCompanionAuthorityAndRetries(t *testing.T) {
 				t.Fatal(err)
 			}
 			if strings.HasPrefix(change, "token") {
-				scope, parseErr := kernel.ParseScope("artifact:remote:r")
+				scope, parseErr := kernel.ParseScope("artifact:remote:r,w")
 				if parseErr != nil {
 					t.Fatal(parseErr)
 				}

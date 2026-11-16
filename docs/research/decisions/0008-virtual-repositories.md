@@ -181,7 +181,9 @@ resolution) shows a package handler's answer: a read-only user got 404
 deploying user could read. On the item routes the walk finds the file from the upstream's
 answer and the fetch is then refused, so the inferred answer is 403
 `Rejected artifact download request: User <user> is not permitted to deploy '<path>' into '<remote>-cache:<path>'.`
-(the 401 challenge for an anonymous caller).
+(the 401 challenge for an anonymous caller). The remote policy checks the deploy path
+since [#1587](https://github.com/weaveplatform/artifactweave/issues/1587), and a package
+route's merge passes over a member whose fill is refused as over one that misses.
 
 Sources: `repo/db/DbLocalRepo.checkDownloadIsAllowed` 212-219;
 `repo/RemoteRepoBase.checkDownloadIsAllowed` 744-758 and its fetch, which calls

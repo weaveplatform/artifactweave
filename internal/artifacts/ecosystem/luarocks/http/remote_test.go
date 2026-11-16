@@ -61,6 +61,21 @@ func newRemoteFixture(t *testing.T, tune ...func(*pkgroute.Options, *item.Servic
 			}); err != nil {
 				t.Fatal(err)
 			}
+			// Deploy/Cache on the whole remote, without Read: the reads fill
+			// the remote's cache, which 7.x allows only a caller with
+			// Deploy/Cache on it (#1587), while Read still decides what
+			// partial sees.
+			if err = db.Permissions().Create(t.Context(), accesstest.Permission{
+				Name: "fill-cache",
+				Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+					Actions: accesstest.Grants{
+						Users: map[string]api.Actions{"partial": api.ActionWrite},
+					},
+					Targets: map[string]accesstest.Target{"rocks": {}},
+				}},
+			}); err != nil {
+				t.Fatal(err)
+			}
 			key := []byte(strings.Repeat("k", 32))
 			resolver, err := upstream.NewResolver(
 				db,

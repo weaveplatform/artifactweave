@@ -283,6 +283,9 @@ func (u *UpstreamSearch) readMaven(
 		}
 	}
 	q.Resource.ExpectedContentType = "application/xml"
+	// A search reads the upstream's metadata for its answer, which 7.x
+	// keeps no file of in the remote's cache, so Read alone suffices [I].
+	q.Resource.NoCacheFile = true
 	q.Resource.ValidateMetadata = func(_ context.Context, body io.ReadSeeker, _ int64, _ source.MetadataResponse) error {
 		metadata, err := readSearchMaven(body, g, a, version)
 		if err == nil {

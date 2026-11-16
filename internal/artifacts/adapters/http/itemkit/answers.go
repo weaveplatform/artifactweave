@@ -263,6 +263,9 @@ func NotServed(
 // SourceError tests before those two keep its answers: a refusal of the
 // download policy can be kernel.ErrNotFound too (pkgroute.IsRefusal).
 func sourceAnswer(c repo.Config, req ItemRequest, caller kernel.Principal, err error) error {
+	if answer := remoteMissAnswer(c, req, caller, err); answer != nil {
+		return answer
+	}
 	if fileRequest(c, req) {
 		var failure *source.HTTPError
 		switch {
