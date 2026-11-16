@@ -19130,7 +19130,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "createMultipartUpload",
     "state": "partial: native dispatch; supported modes follow the contract",
-    "contract": "Starts a multipart upload of one file and returns its upload token. The caller needs deploy rights on the repository, as for a deploy. Once the parts are complete, a checksum deploy of the file creates the item.",
+    "contract": "Starts a multipart upload of one file and returns its upload token. The caller needs deploy rights on the repository's path, or, through a virtual repository with a default deployment repository, on that repository's path. Any existing repository may be named, a remote or virtual one included; once the parts are complete, a checksum deploy of the file creates the item, and refuses a repository that takes no deploys.",
     "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",

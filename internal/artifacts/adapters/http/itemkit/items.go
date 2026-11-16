@@ -403,14 +403,20 @@ func Lookup(
 ) (Found, error) {
 	if dl != nil {
 		if err := generic.CheckDownload(c, dl.path, dl.isFolder); err != nil {
-			dl.stepf("Request is forbidden by %s", c.Key)
+			dl.denied(c, err)
 			return Found{}, err //nolint:wrapcheck // a RejectionError is the answer
 		}
 	}
 	if c.Class == repo.Virtual {
 		return lookupMembers(ctx, st, c, p, acc, dl, order)
 	}
-	return lookupStored(ctx, st, c, cached, p, acc, dl)
+	f, err := lookupStored(ctx, st, c, cached, p, acc, dl)
+	if policyRefusal(err) != nil {
+		// Maven's release and snapshot handling, which the format checks
+		// on the path it resolves.
+		dl.denied(c, err)
+	}
+	return f, err
 }
 
 // lookupStored is Lookup in c, a repository that holds items: a local or
@@ -796,7 +802,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "lookup item", virtualRefusal(c, req, err)))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "lookup item", lookupRefusal(c, req, err)))
 		return
 	}
 	if f.remote != nil {
@@ -867,7 +873,7 @@ func (s *Kit) getUnfoundItem(
 			a, err = fetched, nil
 		}
 		if err != nil {
-			httpkit.WriteErr(w, r, ItemNotFound())
+			httpkit.WriteErr(w, r, containedRefusal(c, req, err))
 			return
 		}
 		if !acc.File(a.Repo, a.Item.FullPath(), accessapi.ActionRead) {
@@ -931,11 +937,15 @@ func (s *Kit) getSidecar(
 		httpkit.WriteErr(w, r, unfound(c, cached, req, caller, err))
 		return
 	}
-	if err == nil && f.remote != nil {
+	if err != nil {
+		httpkit.WriteErr(w, r, containedRefusal(c, req, err))
+		return
+	}
+	if f.remote != nil {
 		s.serveRemoteRead(w, r, f.Repo, c, memberRequest(req, f.Repo), caller, *f.remote)
 		return
 	}
-	if err != nil || f.Item.Folder {
+	if f.Item.Folder {
 		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}

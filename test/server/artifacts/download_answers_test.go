@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
@@ -292,6 +293,67 @@ func TestAccFormatOverlayDownloadAnswers(t *testing.T) {
 					if a.status == 401 && challenge != `Basic realm="Artifactory Realm"` ||
 						a.status != 401 && challenge != "" {
 						t.Errorf("%s %s as %q: challenge %q", method, a.path, a.user, challenge)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestAccFormatOverlayPolicyRefusalNamesThePath (#1630): a file a format
+// overlay serves on the item route, refused by the download policy of a
+// local repository, a remote or its cache, answers as 7.161.26 answers
+// every such refusal of a file: RealRepoBase.assertValidPath's reason with
+// the path the download names after it (DownloadServiceImpl.
+// respondResourceNotFound), traced as createUnfoundRepoResource logs it.
+// A cache's refusal names the remote in its reason, as it did before.
+// Before, the reason came alone and the trace named no refusal.
+func TestAccFormatOverlayPolicyRefusalNamesThePath(t *testing.T) {
+	for _, tc := range []struct {
+		pt    repo.PackageType
+		paths []string
+	}{
+		{repo.Alpine, []string{"v3.20/main/x86_64/APKINDEX.tar.gz", "hello-1.0-r0.apk"}},
+		{repo.Debian, []string{"dists/stable/main/binary-amd64/Packages"}},
+		{repo.Opkg, []string{"feed/Packages", "feed/464xlat_13_x86_64.ipk"}},
+		{repo.Cran, []string{"src/contrib/PACKAGES", "src/contrib/PACKAGES.rds", "src/contrib/assertthat_0.2.1.tar.gz"}},
+		{repo.P2, []string{"readme.txt"}},
+		{repo.Chef, []string{"api/v1/cookbooks"}},
+		{repo.Conda, []string{"noarch/repodata_shards.msgpack.zst"}},
+		{repo.MachineLearning, []string{"models/widget/1.0/model-manifest.json"}},
+	} {
+		t.Run(string(tc.pt), func(t *testing.T) {
+			w := overlayAnswersWorld(t, tc.pt)
+			c, err := w.Runtime.Store.Repos().Get(t.Context(), "fmt-local")
+			if err != nil {
+				t.Fatal(err)
+			}
+			c.BlackedOut = ptr(true)
+			if err := w.Runtime.Store.Repos().Update(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			w.Repo.BlackedOut = ptr(true)
+			w.Update()
+			for _, p := range tc.paths {
+				for key, refuser := range map[string]string{
+					"fmt-local": "fmt-local", "remote": "remote", "remote-cache": "remote",
+				} {
+					message := "The repository '" + refuser + "' is blacked out and cannot serve " +
+						"artifact '" + refuser + ":" + p + "'."
+					answer := message + "; Path: '" + key + ":" + p + "'"
+					path := "/artifactory/" + key + "/" + p
+					for _, method := range []string{http.MethodGet, http.MethodHead} {
+						wantAnswer(t, method, w.Request(method, path, "reader", ""),
+							http.StatusNotFound, errorBody(t, http.StatusNotFound, answer))
+					}
+					rec := w.Request(http.MethodGet, path+"?trace", "reader", "")
+					for _, step := range []string{
+						" Download denied (" + message + ") - returning un-found resource\n",
+						" Sending a response with the status '404' and the message '" + answer + "'\n",
+					} {
+						if !strings.Contains(rec.Body.String(), step) {
+							t.Errorf("%s?trace: %s, want %q", path, rec.Body, step)
+						}
 					}
 				}
 			}

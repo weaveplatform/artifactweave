@@ -766,8 +766,8 @@ func cranUpstream(t *testing.T) *source.Service {
 // refusal (#1599). Past that, a blacked-out local or remote
 // repository, its -cache alias, or patterns that reject the requested path
 // answer the download policy's 404 and message before the source is asked,
-// and a virtual repository whose own patterns reject the path answers that
-// no repository serves it.
+// with the path asked for after it (#1630), and a virtual repository whose
+// own patterns reject the path answers that no repository serves it.
 func TestAccCRANRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 	w := newItemWorld(t, false)
 	body := string(cranFixtureBytes(t, "assertthat_0.2.1.tar.gz"))
@@ -790,13 +790,15 @@ func TestAccCRANRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 	} {
 		cranRepo(t, w, c)
 	}
-	blackedOut := func(key, path string) string {
+	// The download policy's refusal by key, of path asked for in asked
+	// (#1630).
+	blackedOut := func(key, asked, path string) string {
 		return "The repository '" + key + "' is blacked out and cannot serve artifact '" +
-			key + ":" + path + "'."
+			key + ":" + path + "'.; Path: '" + asked + ":" + path + "'"
 	}
 	rejected := func(key, path string) string {
 		return "The repository '" + key + "' rejected the artifact '" + key + ":" + path +
-			"' due to its include/exclude pattern settings."
+			"' due to its include/exclude pattern settings.; Path: '" + key + ":" + path + "'"
 	}
 	// The download's refusal (#1599): 7.161.26's reason for checked, a
 	// remote's cache, with the path the request named.
@@ -824,11 +826,11 @@ func TestAccCRANRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 		},
 		{
 			"blacked-out index", "cran-dark", cranIndex, "admin",
-			http.StatusNotFound, blackedOut("cran-dark", cranIndex),
+			http.StatusNotFound, blackedOut("cran-dark", "cran-dark", cranIndex),
 		},
 		{
 			"blacked-out compressed index", "cran-dark", cranIndex + ".gz", "admin",
-			http.StatusNotFound, blackedOut("cran-dark", cranIndex+".gz"),
+			http.StatusNotFound, blackedOut("cran-dark", "cran-dark", cranIndex+".gz"),
 		},
 		{
 			"index the patterns reject", "cran-hidden", cranIndex, "admin",
@@ -836,15 +838,17 @@ func TestAccCRANRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 		},
 		{
 			"blacked-out remote index", "cran-dark-remote", cranIndex, "admin",
-			http.StatusNotFound, blackedOut("cran-dark-remote", cranIndex),
+			http.StatusNotFound, blackedOut("cran-dark-remote", "cran-dark-remote", cranIndex),
 		},
 		{
 			"blacked-out remote's cache", "cran-dark-remote-cache", cranIndex, "admin",
-			http.StatusNotFound, blackedOut("cran-dark-remote", cranIndex),
+			http.StatusNotFound,
+			blackedOut("cran-dark-remote", "cran-dark-remote-cache", cranIndex),
 		},
 		{
 			"blacked-out remote's package", "cran-dark-remote", cranAssertthat, "admin",
-			http.StatusNotFound, blackedOut("cran-dark-remote", cranAssertthat),
+			http.StatusNotFound,
+			blackedOut("cran-dark-remote", "cran-dark-remote", cranAssertthat),
 		},
 		{
 			"remote package the patterns reject", "cran-picky-remote", cranAssertthat, "admin",
@@ -876,10 +880,10 @@ func TestAccCRANRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 // TestAccCRANIndexKeepsAPackageThePatternsReject: a local or remote index
 // lists a package whose archive the repository's patterns reject, as 7.x
 // keeps such a package in its indexes (RTFACT-30830, RTFACT-30656); only
-// that archive's GET answers the policy's 404. A remote whose patterns
-// reject only the PACKAGES file still serves the archive, which a download
-// checks at its own path: the index read that pins its MD5 is a lookup that
-// checks only the remote's blackout.
+// that archive's GET answers the policy's 404, with the path (#1630). A
+// remote whose patterns reject only the PACKAGES file still serves the
+// archive, which a download checks at its own path: the index read that
+// pins its MD5 is a lookup that checks only the remote's blackout.
 func TestAccCRANIndexKeepsAPackageThePatternsReject(t *testing.T) {
 	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = cranUpstream(t) })
 	archive := cranFixtureBytes(t, "assertthat_0.2.1.tar.gz")
@@ -915,7 +919,8 @@ func TestAccCRANIndexKeepsAPackageThePatternsReject(t *testing.T) {
 			wantCRANError(t,
 				w.do(http.MethodGet, "/artifactory/"+tc.key+"/"+cranAssertthat, "admin", ""),
 				http.StatusNotFound, "The repository '"+tc.key+"' rejected the artifact '"+
-					tc.key+":"+cranAssertthat+"' due to its include/exclude pattern settings.")
+					tc.key+":"+cranAssertthat+"' due to its include/exclude pattern settings."+
+					"; Path: '"+tc.key+":"+cranAssertthat+"'")
 		})
 	}
 	got := w.do(http.MethodGet, "/artifactory/cran-indexless/"+cranAssertthat, "admin", "")
@@ -1104,11 +1109,12 @@ func TestAccCRANRemoteChecksItsIndexAtTheDocumentsPath(t *testing.T) {
 	wantCRANError(t,
 		w.do(http.MethodGet, "/artifactory/cran-indexless-remote/"+cranIndex, "admin", ""),
 		http.StatusNotFound, "The repository 'cran-indexless-remote' rejected the artifact "+
-			"'cran-indexless-remote:"+cranIndex+"' due to its include/exclude pattern settings.")
+			"'cran-indexless-remote:"+cranIndex+"' due to its include/exclude pattern settings."+
+			"; Path: 'cran-indexless-remote:"+cranIndex+"'")
 	for _, path := range []string{cranIndex, cranAssertthat} {
 		wantCRANError(t,
 			w.do(http.MethodGet, "/artifactory/cran-dark-remote/"+path, "admin", ""),
 			http.StatusNotFound, "The repository 'cran-dark-remote' is blacked out and cannot "+
-				"serve artifact 'cran-dark-remote:"+path+"'.")
+				"serve artifact 'cran-dark-remote:"+path+"'.; Path: 'cran-dark-remote:"+path+"'")
 	}
 }

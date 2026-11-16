@@ -458,6 +458,13 @@ func TestUnitVirtualReadGateAndWalkFailures(t *testing.T) {
 			"a property read", "libs/a.txt;k=v", w.Kit(itemkit.Deps{Store: failingItems{w.Store}}),
 			kittest.AdminAccess().Decider, http.StatusInternalServerError, "",
 		},
+		{
+			// A direct trace reads the properties itself to record the
+			// match (traceMatrix), outside the walk.
+			"a property read, traced", kittest.LocalKey + "/a.txt;k=v?trace",
+			w.Kit(itemkit.Deps{Store: failingItems{w.Store}}),
+			kittest.AdminAccess().Decider, http.StatusOK, "Sending a response with the status '500'",
+		},
 	} {
 		r := kittest.Request(t, http.MethodGet, "/artifactory/"+tc.target)
 		r = r.WithContext(

@@ -943,9 +943,9 @@ func feedOf(t *testing.T, index, ipk []byte) sourceBackend {
 // else (DV-057), outside a virtual repository with the download's refusal
 // (#1599). Past that, a blacked-out local or remote repository, its
 // -cache alias, or patterns that reject the requested path answer the
-// download policy's 404 and message before the source is asked, and a
-// virtual repository whose own patterns reject the path answers that no
-// repository serves it.
+// download policy's 404 and message before the source is asked, with the
+// path asked for after it (#1630), and a virtual repository whose own
+// patterns reject the path answers that no repository serves it.
 func TestAccOpkgRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 	index, _ := opkgUpstreamFixture(t)
 	w := newItemWorld(t)
@@ -963,13 +963,15 @@ func TestAccOpkgRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 	for _, key := range []string{"opkg-local", "opkg-dark", "opkg-hidden"} {
 		w.put(key, opkgFeed, index)
 	}
-	blackedOut := func(key, path string) string {
+	// The download policy's refusal by key, of path asked for in asked
+	// (#1630).
+	blackedOut := func(key, asked, path string) string {
 		return "The repository '" + key + "' is blacked out and cannot serve artifact '" +
-			key + ":" + path + "'."
+			key + ":" + path + "'.; Path: '" + asked + ":" + path + "'"
 	}
 	rejected := func(key, path string) string {
 		return "The repository '" + key + "' rejected the artifact '" + key + ":" + path +
-			"' due to its include/exclude pattern settings."
+			"' due to its include/exclude pattern settings.; Path: '" + key + ":" + path + "'"
 	}
 	// The download's refusal (#1599): 7.161.26's reason for checked, a
 	// remote's cache, with the path the request named.
@@ -1001,11 +1003,11 @@ func TestAccOpkgRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 		},
 		{
 			"blacked-out feed", "opkg-dark", opkgFeed, "admin",
-			http.StatusNotFound, blackedOut("opkg-dark", opkgFeed),
+			http.StatusNotFound, blackedOut("opkg-dark", "opkg-dark", opkgFeed),
 		},
 		{
 			"blacked-out compressed feed", "opkg-dark", opkgFeed + ".gz", "admin",
-			http.StatusNotFound, blackedOut("opkg-dark", opkgFeed+".gz"),
+			http.StatusNotFound, blackedOut("opkg-dark", "opkg-dark", opkgFeed+".gz"),
 		},
 		{
 			"feed the patterns reject", "opkg-hidden", opkgFeed, "admin",
@@ -1013,15 +1015,16 @@ func TestAccOpkgRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 		},
 		{
 			"blacked-out remote feed", "opkg-dark-remote", opkgFeed, "admin",
-			http.StatusNotFound, blackedOut("opkg-dark-remote", opkgFeed),
+			http.StatusNotFound, blackedOut("opkg-dark-remote", "opkg-dark-remote", opkgFeed),
 		},
 		{
 			"blacked-out remote's cache", "opkg-dark-remote-cache", opkgFeed, "admin",
-			http.StatusNotFound, blackedOut("opkg-dark-remote", opkgFeed),
+			http.StatusNotFound,
+			blackedOut("opkg-dark-remote", "opkg-dark-remote-cache", opkgFeed),
 		},
 		{
 			"blacked-out remote's IPK", "opkg-dark-remote", opkgXlat, "admin",
-			http.StatusNotFound, blackedOut("opkg-dark-remote", opkgXlat),
+			http.StatusNotFound, blackedOut("opkg-dark-remote", "opkg-dark-remote", opkgXlat),
 		},
 		{
 			"remote IPK the patterns reject", "opkg-picky-remote", opkgXlat, "admin",
@@ -1052,10 +1055,10 @@ func TestAccOpkgRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 // TestAccOpkgFeedKeepsAPackageThePatternsReject: a local or remote feed is
 // served as it is, listing a package whose IPK the repository's patterns
 // reject, as 7.x keeps such a package in its indexes (RTFACT-30830,
-// RTFACT-30656); only that IPK's GET answers the policy's 404. A remote
-// whose patterns reject only the feed's path still serves the IPK, which a
-// download checks at its own path: the feed read that pins its SHA-256
-// checks the remote's blackout alone.
+// RTFACT-30656); only that IPK's GET answers the policy's 404, with the
+// path (#1630). A remote whose patterns reject only the feed's path still
+// serves the IPK, which a download checks at its own path: the feed read
+// that pins its SHA-256 checks the remote's blackout alone.
 func TestAccOpkgFeedKeepsAPackageThePatternsReject(t *testing.T) {
 	index, ipk := opkgUpstreamFixture(t)
 	w := newItemWorld(t, withSource(feedOf(t, index, ipk)))
@@ -1077,7 +1080,8 @@ func TestAccOpkgFeedKeepsAPackageThePatternsReject(t *testing.T) {
 			}
 			wantError(t, w.do(http.MethodGet, "/artifactory/"+key+"/"+opkgXlat, "admin", ""),
 				http.StatusNotFound, "The repository '"+key+"' rejected the artifact '"+key+":"+
-					opkgXlat+"' due to its include/exclude pattern settings.")
+					opkgXlat+"' due to its include/exclude pattern settings.; Path: '"+key+":"+
+					opkgXlat+"'")
 		})
 	}
 	rec := w.do(http.MethodGet, "/artifactory/opkg-feedless/"+opkgXlat, "admin", "")
