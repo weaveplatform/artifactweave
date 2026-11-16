@@ -48,9 +48,13 @@ func PlanP2Virtual(c repo.Config, known []repo.Config) (repo.Config, []repo.Conf
 			)
 		}
 		if site.Local() {
+			// Generic and Maven alone, the two JFrog's P2 page names, though
+			// repositories may also list a local Gradle, Ivy or SBT member
+			// (repo.AcceptsMember): what 7.x's closed P2Addon takes in a
+			// local:// URL is [I].
 			i := slices.IndexFunc(all, func(k repo.Config) bool { return k.Key == site.Key })
 			if i < 0 || all[i].Class != repo.Local ||
-				!repo.AcceptsMember(repo.P2, all[i].PackageType) {
+				all[i].PackageType != repo.Generic && all[i].PackageType != repo.Maven {
 				return c, nil, badRequestf(
 					"P2 URL '%s' names no local Generic or Maven repository", raw)
 			}
