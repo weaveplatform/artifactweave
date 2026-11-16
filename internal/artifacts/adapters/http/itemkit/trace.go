@@ -241,6 +241,7 @@ func (s *Kit) traceDownload(
 	}
 	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
 	dl.trace = t
+	dl.upstream = s.walkStep(r, req, p, acc)
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
 		// getUnfoundItem's check of Read on the file, before anything else.
@@ -252,10 +253,13 @@ func (s *Kit) traceDownload(
 				return err
 			}
 		}
-		return s.traceContained(ctx, st, method, c, cached, req, p, acc, dl, err)
+		return s.traceContained(r, st, c, cached, req, p, acc, dl, err)
 	}
 	if err != nil {
 		return s.ItemError(ctx, "lookup item", lookupRefusal(c, req, err))
+	}
+	if f.remote != nil {
+		return s.traceRemoteRead(r, f.Repo, memberRequest(req, f.Repo), p, *f.remote, t)
 	}
 	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
 		return refused(c, req, p)
@@ -334,8 +338,24 @@ func (s *Kit) traceRemoteItem(
 	if !ok {
 		return false, nil
 	}
+	return true, s.traceRemoteRead(r, c, req, p, read, t)
+}
+
+// traceRemoteRead traces read, the remote repository c's read of req, as
+// serveRemoteRead would answer it, and returns the error it would answer,
+// or nil where it would serve a file or a checksum, without serving or
+// counting anything. A walk through a virtual repository that found the
+// file in c traces it so too.
+func (s *Kit) traceRemoteRead(
+	r *http.Request,
+	c repo.Config,
+	req ItemRequest,
+	p kernel.Principal,
+	read remoteRead,
+	t *resolutionTrace,
+) error {
 	if read.err != nil {
-		return true, read.err
+		return read.err
 	}
 	ctx := r.Context()
 	result, alg := read.result, item.Algorithm(read.sidecar)
@@ -361,7 +381,7 @@ func (s *Kit) traceRemoteItem(
 		}
 	}
 	if err != nil {
-		return true, err
+		return err
 	}
 	if result.Stream != nil {
 		t.stepf("Returning validated transient resource")
@@ -370,10 +390,10 @@ func (s *Kit) traceRemoteItem(
 	}
 	if read.sidecar != "" {
 		t.stepf("Responding to checksum request")
-		return true, nil
+		return nil
 	}
 	traceResponding(r.Method, t)
-	return true, nil
+	return nil
 }
 
 // traceContained traces a path no item holds: an entry inside an archive
@@ -381,9 +401,8 @@ func (s *Kit) traceRemoteItem(
 // file they name, or else the miss, which is miss, the lookup's error. It
 // answers each as getUnfoundItem and getSidecar do.
 func (s *Kit) traceContained(
-	ctx context.Context,
+	r *http.Request,
 	st Store,
-	method string,
 	c repo.Config,
 	cached bool,
 	req ItemRequest,
@@ -392,12 +411,21 @@ func (s *Kit) traceContained(
 	dl *Download,
 	miss error,
 ) error {
-	p := req.Path
+	ctx, method, p := r.Context(), r.Method, req.Path
 	if archive, entry, ok := strings.Cut(p, "!/"); ok {
 		dl.stepf("Requested resource is contained within an archive")
+		dl.upstream = s.archiveStep(r, req, archive, caller, acc)
 		a, err := Lookup(ctx, st, c, cached, archive, acc, dl, virtual.Resolve)
 		if errors.Is(err, kernel.ErrNotFound) {
-			return unfound(c, cached, req, caller, err)
+			fetched, read, answer := s.remoteArchive(r, c, cached, req, archive, entry, caller, acc,
+				dl.trace)
+			switch {
+			case !read:
+				return unfound(c, cached, req, caller, err)
+			case answer != nil:
+				return answer
+			}
+			a, err = fetched, nil
 		}
 		if err != nil {
 			return containedRefusal(c, req, err)
@@ -432,12 +460,16 @@ func (s *Kit) traceContained(
 		return unfound(c, cached, req, caller, miss)
 	}
 	dl.stepf("Request is for a checksum")
+	dl.upstream = s.fileStep(r, req, caller, acc)
 	f, err := Lookup(ctx, st, c, cached, artifact, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
 		return unfound(c, cached, req, caller, err)
 	}
 	if err != nil {
 		return containedRefusal(c, req, err)
+	}
+	if f.remote != nil {
+		return s.traceRemoteRead(r, f.Repo, memberRequest(req, f.Repo), caller, *f.remote, dl.trace)
 	}
 	if f.Item.Folder {
 		return ItemNotFound()

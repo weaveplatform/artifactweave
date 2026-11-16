@@ -93,6 +93,12 @@
 //     lookup's download policy and a format's own refusal answer first. A
 //     path the format builds itself keeps the lookup's answer, and an npm
 //     remote asks only for a tarball path, <name>/-/<file> [I] (#1507).
+//     An archive entry a remote's cache lacks has its archive fetched
+//     first, with none of the request's query, matrix parameters or
+//     headers, as 7.161.26's RemoteRepoBase.getRemoteZipRepoResource
+//     downloads it; a caller who may not fill the cache gets 404 "Could
+//     not download '<entry>' from main zip resource", and a remote that
+//     stores nothing keeps the lookup's answer [I] (remoteArchive, #1535).
 //   - Deps.Private names the paths whose content a checksum deploy may
 //     never reuse. Trash and transfer test the format predicates themselves,
 //     because each format relocates and archives its private paths by its
@@ -145,7 +151,16 @@
 //     the path and keeping the first Read refusal; a file that lacks a
 //     matrix parameter the request names serves it only when no later
 //     local member, or remote one that synchronizes properties, holds one
-//     that carries it (processStandard's closest match). A file request
+//     that carries it (processStandard's closest match). After every
+//     member's own copy, a remote member's upstream step reads it as
+//     getRemoteItem reads that remote directly, with its own source
+//     request, and the route answers what it finds as that read
+//     (readRemoteItem, serveRemoteRead): a checksum and an archive entry
+//     through the file they name. An upstream miss or failure, an offline
+//     or blacked-out remote and the remote's policy pass over it, a Read
+//     refusal is kept as any member's, and a refused cache fill or a
+//     failure of this server's own reads is answered (upstreamMiss,
+//     #1535). A file request
 //     it finds nowhere answers 7.161.26's respondResourceNotFound
 //     (virtual.Answer): 404 "Could not find resource", the first
 //     refusal's 403, 404 "Resource not found" under
@@ -258,7 +273,9 @@
 // Implemented P1 to P9c as the server root's item routes and helpers;
 // split out as the item kit in P9d (WEB-06), which also narrowed its store
 // to Store (ART-22). P10 gave DeployTarget 7.x's answers for a virtual
-// repository and the item routes' PUT its own for a remote one (#1534).
+// repository and the item routes' PUT its own for a remote one (#1534),
+// and the walk through a virtual repository its remote members' upstream
+// steps (#1535).
 //
 // # Testing
 //
@@ -271,7 +288,10 @@
 // as none over an in-memory store, and which paths a remote's -cache alias
 // reads through the remote source (aliasRemoteMetadata); remote_fill_test.go
 // the answers to a refused cache fill and an assumed-offline miss
-// (remoteMissAnswer); redirect_test.go the signing-failure
+// (remoteMissAnswer); remote_member_test.go a walk's upstream steps over
+// a fake remote source: each failure it passes over or answers, a found
+// file, a checksum and an archive (upstreamMiss, fileStep, archiveStep,
+// remoteArchive); redirect_test.go the signing-failure
 // throttle, the descriptor's minimum redirect size, the request copy
 // without the preconditions a download ignores, the request the download
 // reads, ServeContent, the checksum file's answers, the browser and

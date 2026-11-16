@@ -339,6 +339,11 @@ type Found struct {
 	Repo repo.Config
 	Item model.Item
 	Used func(context.Context) error
+	// remote is set when a walk through a virtual repository found the
+	// file through the remote member Repo's upstream step: Repo's read,
+	// which the route answers as a direct read of Repo would
+	// (serveRemoteRead), in place of Item.
+	remote *remoteRead
 }
 
 // resolver rewrites a download's path in a repository that holds items,
@@ -357,6 +362,10 @@ type Download struct {
 	// trace records the steps of a ?trace request (traceItem); nil for a
 	// download.
 	trace *resolutionTrace
+	// upstream reads a remote member's upstream in a walk through a
+	// virtual repository (lookupMember); nil passes over every upstream
+	// step, as a walk that is not the request's own file does (walkStep).
+	upstream upstreamStep
 }
 
 // newDownload checks p as Artifactory does: its request parsing splits an
@@ -495,13 +504,21 @@ func lookupMembers(
 	var res virtual.Resolution
 	var closest *Found
 	for _, m := range members {
-		// The item routes read a remote member from its cache alone: they
-		// fetch nothing upstream through a virtual repository yet
-		// (https://github.com/weaveplatform/artifactweave/issues/1535).
-		if m.Upstream {
+		// A remote member's upstream step reads it as a direct read would
+		// (dl.upstream): only a file request takes one, and only the walk
+		// for the file the request names, since 7.x's walk looks for that
+		// resource alone (DownloadRequestContext.getResourcePath).
+		if m.Upstream && (dl.upstream == nil || dl.isFolder) {
 			continue
 		}
-		dl.stepf("Searching for the resource within %s", m.Repo.Key)
+		// 7.x names each step by the repository it asks: a remote's cache
+		// is the repository "<key>-cache" (DbCacheRepo's descriptor), and
+		// its upstream step the remote itself.
+		key := m.Repo.Key
+		if m.Repo.Class == repo.Remote && !m.Upstream {
+			key += model.CacheSuffix
+		}
+		dl.stepf("Searching for the resource within %s", key)
 		// Once a file lacks a matrix parameter the request names, the walk
 		// looks on for one that carries it only where its properties may
 		// differ: a local member, or a remote one that synchronizes them
@@ -510,7 +527,7 @@ func lookupMembers(
 			(m.Repo.SynchronizeProperties == nil || !*m.Repo.SynchronizeProperties) {
 			continue
 		}
-		f, served, err := lookupMember(ctx, st, m.Repo, p, acc, dl, &res)
+		f, served, err := lookupMember(ctx, st, m, p, acc, dl, &res)
 		switch {
 		case err != nil:
 			return f, err
@@ -566,11 +583,13 @@ func lookupReadable(
 }
 
 // lookupMember is one step of a download's walk through a virtual
-// repository: m, a real member, in the order 7.161.26's member answers it
-// (DbLocalRepo.checkDownloadIsAllowed 212-219,
+// repository: step's member m, a real member, in the order 7.161.26's
+// member answers it (DbLocalRepo.checkDownloadIsAllowed 212-219,
 // RemoteRepoBase.checkDownloadIsAllowed 744-758, then getInfo), each
 // refusal traced as RealRepoBase.createUnfoundRepoResource 224-227 logs it.
-// When m does not serve the download, the walk goes on.
+// When m does not serve the download, the walk goes on. A remote member's
+// upstream step makes the same checks, Read on the file included, before
+// dl.upstream asks the upstream anything.
 //
 //   - The download policy first: a refusal passes over silently, since 7.x
 //     answers it 404 and only a 403 counts toward the walk's answer. A
@@ -586,12 +605,13 @@ func lookupReadable(
 func lookupMember(
 	ctx context.Context,
 	st Store,
-	m repo.Config,
+	step virtual.Member,
 	p string,
 	acc Access,
 	dl *Download,
 	res *virtual.Resolution,
 ) (Found, memberAnswer, error) {
+	m := step.Repo
 	if err := generic.CheckDownload(m, dl.path, dl.isFolder); err != nil {
 		dl.stepf("Download denied (%s) - returning un-found resource", err)
 		return Found{}, passedOver, nil
@@ -600,6 +620,13 @@ func lookupMember(
 	if !acc.Folder(m, file, accessapi.ActionRead) {
 		deny(ctx, dl, res, m, file)
 		return Found{}, passedOver, nil
+	}
+	if step.Upstream {
+		if !acc.File(m, file, accessapi.ActionRead) {
+			deny(ctx, dl, res, m, file)
+			return Found{}, passedOver, nil
+		}
+		return dl.upstream(ctx, dl, m, res)
 	}
 	f, err := lookupStored(ctx, st, m, false, p, acc, dl)
 	var rejected *format.RejectionError
@@ -753,6 +780,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
+	dl.upstream = s.walkStep(r, req, p, acc)
 	if req.Path == "" {
 		if err := generic.CheckDownload(c, "", true); err != nil {
 			httpkit.WriteErr(w, r, s.ItemError(ctx, "download check", err))
@@ -775,6 +803,10 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "lookup item", lookupRefusal(c, req, err)))
+		return
+	}
+	if f.remote != nil {
+		s.serveRemoteRead(w, r, f.Repo, c, memberRequest(req, f.Repo), p, *f.remote)
 		return
 	}
 	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
@@ -821,12 +853,24 @@ func (s *Kit) getUnfoundItem(
 		return
 	}
 	// "<archive>!/<entry>" names an entry inside an archive file; a path
-	// that exists as an item is served as one first.
+	// that exists as an item is served as one first. The archive is looked
+	// for as a download of it: through a virtual repository a remote
+	// member's upstream step fetches it, and a remote fetches what its
+	// cache lacks (remoteArchive).
 	if archive, entry, ok := strings.Cut(req.Path, "!/"); ok {
+		dl.upstream = s.archiveStep(r, req, archive, p, acc)
 		a, err := Lookup(r.Context(), st, c, cached, archive, acc, dl, virtual.Resolve)
 		if errors.Is(err, kernel.ErrNotFound) {
-			httpkit.WriteErr(w, r, unfound(c, cached, req, p, err))
-			return
+			fetched, read, answer := s.remoteArchive(r, c, cached, req, archive, entry, p, acc, nil)
+			switch {
+			case !read:
+				httpkit.WriteErr(w, r, unfound(c, cached, req, p, err))
+				return
+			case answer != nil:
+				httpkit.WriteErr(w, r, answer)
+				return
+			}
+			a, err = fetched, nil
 		}
 		if err != nil {
 			httpkit.WriteErr(w, r, containedRefusal(c, req, err))
@@ -884,6 +928,10 @@ func (s *Kit) getSidecar(
 		httpkit.WriteErr(w, r, unfound(c, cached, req, caller, miss))
 		return
 	}
+	// The file the checksum names is looked for as the file itself is:
+	// through a virtual repository, a remote member's upstream step reads
+	// the checksum as a direct read of the member would (#1535).
+	dl.upstream = s.fileStep(r, req, caller, acc)
 	f, err := Lookup(r.Context(), st, c, cached, artifact, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
 		httpkit.WriteErr(w, r, unfound(c, cached, req, caller, err))
@@ -891,6 +939,10 @@ func (s *Kit) getSidecar(
 	}
 	if err != nil {
 		httpkit.WriteErr(w, r, containedRefusal(c, req, err))
+		return
+	}
+	if f.remote != nil {
+		s.serveRemoteRead(w, r, f.Repo, c, memberRequest(req, f.Repo), caller, *f.remote)
 		return
 	}
 	if f.Item.Folder {
