@@ -56,9 +56,12 @@ type alpineItems struct{ *itemkit.Kit }
 
 // TryAlpineItem is the overlay (itemkit.Overlay) that serves an Alpine
 // repository's APKINDEX.tar.gz files and a virtual repository's .apk
-// packages, answering 404 for a package path the format refuses. It
-// reports whether it answered; every other request, a folder among them,
-// it leaves to the overlays after it and the generic lookup.
+// packages, answering a package path the format refuses as a file the
+// repository does not hold (itemkit.NotServed). Outside a virtual
+// repository it answers a miss, a refusal and a matrix mismatch as the
+// download does (itemkit.Missed, #1599). It reports whether it answered;
+// every other request, a folder among them, it leaves to the overlays after
+// it and the generic lookup.
 func TryAlpineItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
@@ -73,7 +76,7 @@ func TryAlpineItem(
 	}
 	if strings.HasSuffix(req.Path, ".apk") {
 		if _, _, _, _, ok := alpine.ParsePath(req.Path); !ok {
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 			return true
 		}
 		if c.Class == repo.Virtual {
@@ -90,12 +93,12 @@ func (s alpineItems) serveAlpineIndex(
 ) {
 	ctx := r.Context()
 	if _, _, _, ok := alpine.ParseIndexPath(req.Path); !ok {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 		return
 	}
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
 		!acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
 	}
 	// 7.x calculates and stores a local index, caches a remote's and
@@ -109,7 +112,7 @@ func (s alpineItems) serveAlpineIndex(
 		return
 	}
 	if cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.Missed(c, cached, req))
 		return
 	}
 	// An index takes a query and matrix parameters as any other file's GET
@@ -133,7 +136,7 @@ func (s alpineItems) serveAlpineIndex(
 			return
 		}
 		if !matches {
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.Mismatched(c, req))
 			return
 		}
 	}
@@ -165,7 +168,8 @@ func (s alpineItems) serveAlpineIndex(
 			itemkit.RemoteResource(r, req.Path).Query, pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
 			p, acc)
 		if err != nil {
-			httpkit.WriteErr(w, r, s.ItemError(ctx, "Alpine index", err))
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "Alpine index",
+				itemkit.ReadAnswer(c, cached, req, p, err)))
 			return
 		}
 		if view.stored != nil {
@@ -175,7 +179,7 @@ func (s alpineItems) serveAlpineIndex(
 				return
 			}
 			if !matches {
-				httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+				httpkit.WriteErr(w, r, itemkit.Mismatched(c, req))
 				return
 			}
 		}
@@ -191,8 +195,11 @@ func (s alpineItems) serveAlpineIndex(
 				httpkit.WriteErr(w, r, s.ItemError(ctx, "Alpine index permission", err))
 				return
 			}
+			// The index is refused as its own file is: 7.x serves it by
+			// its path's permission alone, so no 7.x text names this
+			// refusal, which is artifactweave's [I].
 			if !allowed {
-				httpkit.WriteErr(w, r, httpkit.Denied(p))
+				httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 				return
 			}
 		}
@@ -295,7 +302,7 @@ func (s alpineItems) alpineIndexRead(
 			return view, err //nolint:wrapcheck // ErrNotFound is the answer.
 		}
 		if it.Folder {
-			return view, kernel.ErrNotFound
+			return view, itemkit.ErrFolderAtPath
 		}
 		view.stored = &it
 		view.raw, err = s.readAlpineBlob(ctx, it.Actual.SHA256)

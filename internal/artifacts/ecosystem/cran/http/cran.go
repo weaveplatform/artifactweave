@@ -61,10 +61,13 @@ type CranAPI struct {
 // caller has Read permission on, a package whose file the include and
 // exclude patterns reject among them, and a virtual or remote repository's
 // packages, only as an index the caller can see lists them, each under the
-// download policy at its own path. It answers 404 for PACKAGES.rds,
-// which sends R to PACKAGES.gz. It reports whether it answered; every other
-// request, a folder or a local repository's package among them, it leaves
-// to the overlays after it and the generic lookup.
+// download policy at its own path. It answers PACKAGES.rds as a file the
+// repository does not hold (itemkit.NotServed), which sends R to
+// PACKAGES.gz. Outside a virtual repository it answers a miss, a refusal
+// and a matrix mismatch as the download does (itemkit.Missed, #1599). It
+// reports whether it answered; every other request, a folder or a local
+// repository's package among them, it leaves to the overlays after it and
+// the generic lookup.
 func TryCranItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
@@ -74,7 +77,8 @@ func TryCranItem(
 		return false
 	}
 	if strings.HasSuffix(req.Path, "/PACKAGES.rds") {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound()) // R falls back to PACKAGES.gz.
+		// R falls back to PACKAGES.gz on any failure.
+		httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 		return true
 	}
 	if _, _, ok := cran.IndexPath(req.Path); ok {
@@ -98,11 +102,11 @@ func (s CranAPI) serveCranIndex(
 	ctx := r.Context()
 	feed, name, ok := cran.IndexPath(req.Path)
 	if !ok || cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 		return
 	}
 	if !acc.Folder(c, feed, accessapi.ActionRead) || !acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
 	}
 	// 7.x calculates and stores a local repository's PACKAGES and caches a
@@ -136,7 +140,7 @@ func (s CranAPI) serveCranIndex(
 			return
 		}
 		if !matches {
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.Mismatched(c, req))
 			return
 		}
 	}
@@ -155,7 +159,7 @@ func (s CranAPI) serveCranIndex(
 			var matches bool
 			matches, err = itemkit.MatchesMatrix(ctx, st, *view.stored, req)
 			if err == nil && !matches {
-				err = itemkit.ItemNotFound()
+				err = itemkit.Mismatched(c, req)
 			}
 		}
 		if err == nil && view.revalidate != nil {
@@ -177,11 +181,8 @@ func (s CranAPI) serveCranIndex(
 		used = view.used
 	}
 	if err != nil {
-		httpkit.WriteErr(
-			w,
-			r,
-			s.ItemError(ctx, "CRAN index", pkgroute.SourceError(err, p.Anonymous)),
-		)
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "CRAN index",
+			pkgroute.SourceError(itemkit.ReadAnswer(c, cached, req, p, err), p.Anonymous)))
 		return
 	}
 	packages := make([]cran.Package, 0, len(candidates))
@@ -318,7 +319,7 @@ func (s CranAPI) cranIndexRead(
 			return view, getErr //nolint:wrapcheck // ErrNotFound is the answer.
 		}
 		if it.Folder {
-			return view, kernel.ErrNotFound
+			return view, itemkit.ErrFolderAtPath
 		}
 		view.stored = &it
 		body, err = s.readCranBlob(ctx, it.Actual.SHA256)
@@ -475,11 +476,11 @@ func (s CranAPI) serveCranPackage(
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.Missed(c, cached, req))
 		return
 	}
 	if !acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
 	}
 	// The package's own path decides, as a download does: a blacked-out
@@ -503,7 +504,7 @@ func (s CranAPI) serveCranPackage(
 			return
 		}
 		if !matches {
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.Mismatched(c, req))
 			return
 		}
 	}
@@ -526,9 +527,11 @@ func (s CranAPI) serveCranPackage(
 			}
 		}
 	}
+	// A remote's index that cannot be read leaves the package unserved,
+	// and so answers as the package's own miss or refusal would [I].
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "CRAN package index",
-			pkgroute.SourceError(err, p.Anonymous)))
+			pkgroute.SourceError(itemkit.ReadAnswer(c, cached, req, p, err), p.Anonymous)))
 		return
 	}
 	// A member's file that the matrix parameters do not match does not
@@ -554,7 +557,7 @@ func (s CranAPI) serveCranPackage(
 					continue
 				}
 			}
-			s.serveRemoteCranPackage(w, r, candidate.repo, cached, req, candidate.pkg, p, acc)
+			s.serveRemoteCranPackage(w, r, c, candidate.repo, cached, req, candidate.pkg, p, acc)
 			return
 		}
 		it, getErr := st.Items().Get(r.Context(), candidate.repo.Key, false, req.Path)
@@ -578,11 +581,15 @@ func (s CranAPI) serveCranPackage(
 		s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
-	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+	// A remote's index that does not list the package leaves it unserved [I].
+	httpkit.WriteErr(w, r, itemkit.Missed(c, cached, req))
 }
 
+// serveRemoteCranPackage serves req's package from c, a remote repository:
+// asked itself, or a member of asked, the virtual repository the request
+// named, whose answers the source's failure takes.
 func (s CranAPI) serveRemoteCranPackage(
-	w http.ResponseWriter, r *http.Request, c repo.Config, cached bool,
+	w http.ResponseWriter, r *http.Request, asked, c repo.Config, cached bool,
 	req itemkit.ItemRequest, expected cran.Package, p kernel.Principal, acc itemkit.Access,
 ) {
 	// The route reads the remote's index first, which already answers 500
@@ -610,11 +617,8 @@ func (s CranAPI) serveRemoteCranPackage(
 	}
 	result, err := s.RemoteSources.Read(r.Context(), query)
 	if err != nil {
-		httpkit.WriteErr(
-			w,
-			r,
-			s.ItemError(r.Context(), "CRAN source", pkgroute.SourceError(err, p.Anonymous)),
-		)
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "CRAN source",
+			pkgroute.SourceError(itemkit.ReadAnswer(asked, cached, req, p, err), p.Anonymous)))
 		return
 	}
 	if result.Stream != nil {

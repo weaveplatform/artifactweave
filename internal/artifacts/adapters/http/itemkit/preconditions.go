@@ -59,6 +59,9 @@ func ServeContent(
 	modified time.Time,
 	content io.ReadSeeker,
 ) {
+	if traceServed(r, "") {
+		return
+	}
 	http.ServeContent(w, downloadRequest(r), name, modified, content)
 }
 

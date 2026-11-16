@@ -38,18 +38,21 @@ const p2ExternalPrefix = "__p2_ext"
 // not well formed keeps the answer it gets before any read.
 var errNoRemoteSources = fmt.Errorf("p2: no remote source service: %w", source.ErrUnavailable)
 
-// writeP2SourceError writes SourceError's answer for err, except that a
-// missing service answers 500 "internal error", as Alpine's and opkg's
-// remote reads do: the fault is this server's own, so it is not the
-// upstream's 502.
+// writeP2SourceError writes SourceError's answer for err, a failure to
+// read the file req names from the remote c, with the download's miss and
+// refusal (itemkit.ReadAnswer), except that a missing service answers 500
+// "internal error", as Alpine's and opkg's remote reads do: the fault is
+// this server's own, so it is not the upstream's 502.
 func (s p2Items) writeP2SourceError(
-	w http.ResponseWriter, r *http.Request, err error, p kernel.Principal,
+	w http.ResponseWriter, r *http.Request, c repo.Config, cached bool, req itemkit.ItemRequest,
+	err error, p kernel.Principal,
 ) {
 	if errors.Is(err, errNoRemoteSources) {
 		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "P2 source", err))
 		return
 	}
-	httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+	httpkit.WriteErr(w, r, pkgroute.SourceError(
+		itemkit.ReadAnswer(c, cached, req, p, err), p.Anonymous))
 }
 
 func p2CompositeName(name string) bool {
@@ -520,7 +523,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 	c repo.Config, cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if !acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
 	}
 	if !s.p2CopyMatches(w, r, c, req) {
@@ -532,7 +535,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 	if strings.HasPrefix(name, p2ExternalPrefix+"/") {
 		target, err = s.p2ResolveExternal(r, c, cached, name, p, acc)
 		if err != nil {
-			s.writeP2SourceError(w, r, err, p)
+			s.writeP2SourceError(w, r, c, cached, req, err, p)
 			return
 		}
 	}
@@ -540,7 +543,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 	if target != nil {
 		_, filename, err = p2ExternalParts(name)
 		if err != nil {
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.Missed(c, cached, req))
 			return
 		}
 	}
@@ -550,7 +553,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 		var err error
 		external, archiveEntry, err = p2ChildResourceURL(target, filename)
 		if err != nil {
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.Missed(c, cached, req))
 			return
 		}
 	}
@@ -558,7 +561,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 	if target != nil && p2.Classify(filename) == p2.KindArtifact {
 		expected, err = s.p2ArtifactChecksums(r, c, cached, name, target, filename, p, acc)
 		if err != nil {
-			s.writeP2SourceError(w, r, err, p)
+			s.writeP2SourceError(w, r, c, cached, req, err, p)
 			return
 		}
 	}
@@ -566,7 +569,7 @@ func (s p2Items) serveP2CompositeChild(w http.ResponseWriter, r *http.Request,
 		itemkit.RemoteResource(r, req.Path).Query, pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
 		p, acc, expected)
 	if err != nil {
-		s.writeP2SourceError(w, r, err, p)
+		s.writeP2SourceError(w, r, c, cached, req, err, p)
 		return
 	}
 	body := result.body

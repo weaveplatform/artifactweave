@@ -54,9 +54,12 @@ type opkgItems struct{ *itemkit.Kit }
 // TryOpkgItem is the overlay (itemkit.Overlay) that serves an Opkg
 // repository's feed: its Packages and Packages.gz, every feed file of a
 // virtual repository, and the IPKs of a virtual or remote repository,
-// answering 404 for an IPK path the format refuses. It reports whether it
-// answered; every other request, a folder among them, it leaves to the
-// overlays after it and the generic lookup.
+// answering an IPK path the format refuses as a file the repository does
+// not hold (itemkit.NotServed). Outside a virtual repository it answers a
+// miss, a refusal and a matrix mismatch as the download does
+// (itemkit.Missed, #1599). It reports whether it answered; every other
+// request, a folder among them, it leaves to the overlays after it and the
+// generic lookup.
 func TryOpkgItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
@@ -75,7 +78,7 @@ func TryOpkgItem(
 	}
 	if strings.HasSuffix(req.Path, ".ipk") {
 		if !opkg.ValidPath(req.Path) {
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 			return true
 		}
 		if c.Class == repo.Virtual || c.Class == repo.Remote {
@@ -93,12 +96,12 @@ func (s opkgItems) serveOpkgIndex(
 	ctx := r.Context()
 	feed, ok := opkg.FeedPath(req.Path)
 	if !ok || cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 		return
 	}
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
 		!acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
 	}
 	// 7.x calculates and stores a local feed's Packages and caches a
@@ -158,7 +161,7 @@ func (s opkgItems) serveOpkgIndex(
 				return
 			}
 			if !matches {
-				httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+				httpkit.WriteErr(w, r, itemkit.Mismatched(c, req))
 				return
 			}
 		}
@@ -166,7 +169,8 @@ func (s opkgItems) serveOpkgIndex(
 			itemkit.RemoteResource(r, req.Path).Query, pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
 			p, acc)
 		if err != nil {
-			httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg feed", err))
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg feed",
+				itemkit.ReadAnswer(c, cached, req, p, err)))
 			return
 		}
 		if view.stored != nil {
@@ -176,7 +180,7 @@ func (s opkgItems) serveOpkgIndex(
 				return
 			}
 			if !matches {
-				httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+				httpkit.WriteErr(w, r, itemkit.Mismatched(c, req))
 				return
 			}
 		}
@@ -192,8 +196,10 @@ func (s opkgItems) serveOpkgIndex(
 				httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg package read authority", err))
 				return
 			}
+			// The feed is refused as its own file is; 7.x serves it by its
+			// path's permission alone, so no 7.x text names this refusal [I].
 			if !allowed {
-				httpkit.WriteErr(w, r, httpkit.Denied(p))
+				httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 				return
 			}
 		}
@@ -294,7 +300,7 @@ func (s opkgItems) opkgIndexRead(
 			return view, err //nolint:wrapcheck
 		}
 		if it.Folder {
-			return view, kernel.ErrNotFound
+			return view, itemkit.ErrFolderAtPath
 		}
 		view.stored = &it
 		view.raw, err = s.readOpkgBlob(ctx, it.Actual.SHA256)
@@ -432,11 +438,11 @@ func (s opkgItems) serveOpkgPackage(
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
 	if cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.Missed(c, cached, req))
 		return
 	}
 	if !acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
 	}
 	// The IPK's own path decides, as a download does: a blacked-out remote
@@ -460,7 +466,7 @@ func (s opkgItems) serveOpkgPackage(
 			return
 		}
 		if !matches {
-			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+			httpkit.WriteErr(w, r, itemkit.Mismatched(c, req))
 			return
 		}
 	}
@@ -482,8 +488,11 @@ func (s opkgItems) serveOpkgPackage(
 			}
 		}
 	}
+	// A remote's feed that cannot be read leaves the IPK unserved, and so
+	// answers as the IPK's own miss or refusal would [I].
 	if err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Opkg package index", err))
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Opkg package index",
+			itemkit.ReadAnswer(c, cached, req, p, err)))
 		return
 	}
 	// A member's file that the matrix parameters do not match does not
@@ -509,7 +518,7 @@ func (s opkgItems) serveOpkgPackage(
 					continue
 				}
 			}
-			s.serveRemoteOpkgPackage(w, r, candidate.repo, cached, req, candidate.pkg, p, acc)
+			s.serveRemoteOpkgPackage(w, r, c, candidate.repo, cached, req, candidate.pkg, p, acc)
 			return
 		}
 		it, err := st.Items().Get(r.Context(), candidate.repo.Key, false, req.Path)
@@ -533,11 +542,15 @@ func (s opkgItems) serveOpkgPackage(
 		s.ServeItemFile(w, r, st, itemkit.Found{Repo: candidate.repo, Item: it}, p)
 		return
 	}
-	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+	// A remote's feed that does not list the IPK leaves it unserved [I].
+	httpkit.WriteErr(w, r, itemkit.Missed(c, cached, req))
 }
 
+// serveRemoteOpkgPackage serves req's IPK from c, a remote repository:
+// asked itself, or a member of asked, the virtual repository the request
+// named, whose answers the source's failure takes.
 func (s opkgItems) serveRemoteOpkgPackage(
-	w http.ResponseWriter, r *http.Request, c repo.Config, cached bool,
+	w http.ResponseWriter, r *http.Request, asked, c repo.Config, cached bool,
 	req itemkit.ItemRequest, expected opkg.Package, p kernel.Principal, acc itemkit.Access,
 ) {
 	// The missing service is this server's fault, not the upstream's, so it
@@ -564,11 +577,8 @@ func (s opkgItems) serveRemoteOpkgPackage(
 	}
 	result, err := s.RemoteSources.Read(r.Context(), query)
 	if err != nil {
-		httpkit.WriteErr(
-			w,
-			r,
-			s.ItemError(r.Context(), "Opkg source", pkgroute.SourceError(err, p.Anonymous)),
-		)
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Opkg source",
+			pkgroute.SourceError(itemkit.ReadAnswer(asked, cached, req, p, err), p.Anonymous)))
 		return
 	}
 	if result.Stream != nil {

@@ -169,6 +169,15 @@ func remoteRefused(key, p, user string) string {
 		user + "'.; Path: '" + key + ":" + p + "'"
 }
 
+// remoteMismatch is the reason 7.161.26's download answers a remote's file
+// p whose cached copy does not match a matrix parameter with (#1599):
+// DbStoringRepoMixin.getInfo's PROPERTY_MISMATCH for the cache, which
+// RemoteRepoBase.internalGetInfo returns, and the path under the cache.
+func remoteMismatch(p string) string {
+	return "File 'remote-cache:" + p + "' was found, but mandatory properties do not match.; " +
+		"Path: 'remote-cache:" + p + "'"
+}
+
 // queryDenied fails the test unless rec refused caller as one without read
 // permission is refused: 403, or 401 to an anonymous caller.
 func queryDenied(t *testing.T, rec *httptest.ResponseRecorder, caller queryCaller) {
@@ -180,6 +189,45 @@ func queryDenied(t *testing.T, rec *httptest.ResponseRecorder, caller queryCalle
 	queryRefusal(t, rec, http.StatusForbidden, "Forbidden")
 }
 
+// storedDenied fails the test unless rec refused caller target, a file of
+// key, a local or federated repository, as the download refuses one
+// (#1599): 7.161.26's RealRepoBase.assertReadPermissions reason with the
+// path, for the path without its query or matrix parameters, or 401
+// "Unauthorized" to an anonymous caller.
+func storedDenied(
+	t *testing.T,
+	rec *httptest.ResponseRecorder,
+	key, target string,
+	caller queryCaller,
+) {
+	t.Helper()
+	if caller.as == "" {
+		queryRefusal(t, rec, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	p := plainPath(target)
+	queryRefusal(t, rec, http.StatusForbidden, "Download request for repo:path '"+key+":"+p+
+		"' is forbidden for user: '"+caller.as+"'.; Path: '"+key+":"+p+"'")
+}
+
+// storedMismatch is the download's answer to target, a file of key, a local
+// or federated repository, that does not match a matrix parameter (#1599):
+// 7.161.26's DbStoringRepoMixin.getInfo PROPERTY_MISMATCH reason with the
+// path.
+func storedMismatch(key, target string) string {
+	p := plainPath(target)
+	return "File '" + key + ":" + p + "' was found, but mandatory properties do not match.; " +
+		"Path: '" + key + ":" + p + "'"
+}
+
+// plainPath is target less its query and matrix parameters.
+func plainPath(target string) string {
+	if i := strings.IndexAny(target, "?;"); i >= 0 {
+		return target[:i]
+	}
+	return target
+}
+
 // dated matches the Date line a composed Release carries, which two
 // compositions a second apart do not share.
 var dated = regexp.MustCompile(`(?m)^Date: .*\n`)
@@ -189,10 +237,11 @@ var dated = regexp.MustCompile(`(?m)^Date: .*\n`)
 // Sources index, asked for with a query or a matrix parameter, answer as
 // without one: the index to an administrator and a reader, and the
 // refusal of a caller without read permission, 403, or 401 to an
-// anonymous caller (DV-057). Before, every one of them answered 404. A
-// matrix parameter is matched against the index's own properties, as on
-// any other file: a mandatory key it lacks, or a value it does not carry,
-// is not found.
+// anonymous caller (DV-057), with the download's text (storedDenied,
+// #1599). Before, every one of them answered 404. A matrix parameter is
+// matched against the index's own properties, as on any other file: a
+// mandatory key it lacks, or a value it does not carry, is not found, with
+// the download's text (storedMismatch).
 func TestAccDebianStoredIndexWithQueryOrMatrixParameters(t *testing.T) {
 	w := newQueryWorld(t)
 	gz := queryGzip(t, queryIndex)
@@ -221,7 +270,7 @@ func TestAccDebianStoredIndexWithQueryOrMatrixParameters(t *testing.T) {
 						}
 						return
 					}
-					queryDenied(t, rec, caller)
+					storedDenied(t, rec, key, tc.target, caller)
 				})
 			}
 		}
@@ -233,18 +282,18 @@ func TestAccDebianStoredIndexWithQueryOrMatrixParameters(t *testing.T) {
 				t.Run(key+"/"+target+"/"+caller.name, func(t *testing.T) {
 					rec := w.do(http.MethodGet, "/artifactory/"+key+"/"+target, caller.as, "")
 					if caller.as == "admin" || caller.as == "reader" {
-						queryRefusal(t, rec, http.StatusNotFound, "Could not find resource")
+						queryRefusal(t, rec, http.StatusNotFound, storedMismatch(key, target))
 						return
 					}
-					queryDenied(t, rec, caller)
+					storedDenied(t, rec, key, target, caller)
 				})
 			}
 		}
 		// The same path without a query, as it answered before.
 		for _, caller := range queryCallers[2:] {
 			t.Run(key+"/plain/"+caller.name, func(t *testing.T) {
-				queryDenied(t, w.do(http.MethodGet, "/artifactory/"+key+"/"+queryPackages,
-					caller.as, ""), caller)
+				storedDenied(t, w.do(http.MethodGet, "/artifactory/"+key+"/"+queryPackages,
+					caller.as, ""), key, queryPackages, caller)
 			})
 		}
 	}

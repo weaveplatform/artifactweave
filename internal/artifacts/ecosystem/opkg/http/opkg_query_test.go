@@ -158,37 +158,53 @@ func opkgQueryWorld(t *testing.T) (*itemWorld, *opkgAsked, []byte) {
 	return w, asked, ipk
 }
 
-// opkgItemRoute reports whether the generic item route answers path under
-// key: an IPK in a local repository. The Opkg routes answer a feed, a
-// remote's files and a virtual repository's.
-func opkgItemRoute(key, path string) bool {
-	return path == opkgXlat && (key == "opkg-local" || key == "opkg-tagged")
+// opkgDownloadAnswers reports whether key answers as the download does
+// (#1572): a local or remote repository, whose feeds and remote IPKs the
+// Opkg overlay serves with the download's answers too (#1599). A virtual
+// repository's answers are P10's (#1533).
+func opkgDownloadAnswers(key string) bool {
+	switch key {
+	case "opkg-local", "opkg-tagged", "opkg-remote", "opkg-held":
+		return true
+	}
+	return false
 }
 
-// opkgRefusal is the answer to caller, who may not read path under key: on
-// the item route, 7.161.26's download refusal (#1572), or 401
-// "Unauthorized" for an anonymous caller; on the Opkg routes, "Forbidden"
-// or "Authentication is required".
+// opkgChecked is the repository whose path 7.161.26's download checks and
+// matches for key: a remote's cache.
+func opkgChecked(key string) string {
+	if key == "opkg-remote" || key == "opkg-held" {
+		return key + "-cache"
+	}
+	return key
+}
+
+// opkgRefusal is the answer to caller, who may not read path under key:
+// 7.161.26's download refusal, or 401 "Unauthorized" for an anonymous
+// caller; in a virtual repository, "Forbidden" or "Authentication is
+// required".
 func opkgRefusal(key, path, caller string) (int, string) {
 	switch {
-	case !opkgItemRoute(key, path) && caller == "":
+	case !opkgDownloadAnswers(key) && caller == "":
 		return http.StatusUnauthorized, "Authentication is required"
-	case !opkgItemRoute(key, path):
+	case !opkgDownloadAnswers(key):
 		return http.StatusForbidden, "Forbidden"
 	case caller == "":
 		return http.StatusUnauthorized, "Unauthorized"
 	}
-	return http.StatusForbidden, "Download request for repo:path '" + key + ":" + path +
-		"' is forbidden for user: '" + caller + "'.; Path: '" + key + ":" + path + "'"
+	return http.StatusForbidden, "Download request for repo:path '" + opkgChecked(key) + ":" +
+		path + "' is forbidden for user: '" + caller + "'.; Path: '" + key + ":" + path + "'"
 }
 
 // opkgMismatch is the answer to a file under key that does not match a
-// matrix parameter: on the item route, 7.161.26's PROPERTY_MISMATCH reason
-// (#1572); on the Opkg routes, "Could not find resource".
+// matrix parameter: 7.161.26's PROPERTY_MISMATCH reason for the repository
+// that holds it, a remote's cache (#1572); in a virtual repository, "Could
+// not find resource".
 func opkgMismatch(key, path string) string {
-	if !opkgItemRoute(key, path) {
+	if !opkgDownloadAnswers(key) {
 		return "Could not find resource"
 	}
+	key = opkgChecked(key)
 	return "File '" + key + ":" + path + "' was found, but mandatory properties do not match.; Path: '" +
 		key + ":" + path + "'"
 }
@@ -352,5 +368,120 @@ func TestAccOpkgMandatoryMatrixParameters(t *testing.T) {
 			!strings.Contains(got.Body.String(), "464xlat") {
 			t.Errorf("%s answered %d %.200s, want 200", target, got.Code, got.Body)
 		}
+	}
+}
+
+// traceSteps returns the steps of rec, a ?trace answer, without their
+// times, failing the test unless it is one.
+func traceSteps(t *testing.T, rec *httptest.ResponseRecorder) []string {
+	t.Helper()
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "text/plain" {
+		t.Fatalf("trace answered %d %q %s", rec.Code, rec.Header().Get("Content-Type"), rec.Body)
+	}
+	_, steps, ok := strings.Cut(rec.Body.String(), "Steps: \n")
+	if !ok {
+		t.Fatalf("no steps in %q", rec.Body)
+	}
+	var out []string
+	for _, line := range strings.Split(strings.TrimSuffix(steps, "\n"), "\n") {
+		_, step, _ := strings.Cut(line, " ")
+		out = append(out, step)
+	}
+	return out
+}
+
+// TestAccOpkgTraceFollowsTheOverlay (#1595): ?trace on an Opkg feed or IPK
+// traces what the Opkg overlay would answer, as 7.161.26's
+// RepoFilter.doGetOrHeadRequest answers ?trace by running the download
+// itself under a TraceLoggingResponse. A cold remote IPK is fetched, as the
+// download fetches it, and traced as found, but nothing is served or
+// counted as a download (the source's Used is never called); a local feed
+// the repository does not hold, and a caller who may not read one, end
+// with the download's own answer (#1599). Before, the trace skipped the
+// overlay and answered the generic route's lookup instead.
+func TestAccOpkgTraceFollowsTheOverlay(t *testing.T) {
+	index, ipk := opkgUpstreamFixture(t)
+	asked := &opkgAsked{}
+	var used int
+	var mu sync.Mutex
+	counted := func(backend sourceBackend) sourceBackend {
+		return func(ctx context.Context, q source.Request, p source.Permit) (source.Result, error) {
+			result, err := backend(ctx, q, p)
+			result.Used = func(context.Context) error {
+				mu.Lock()
+				defer mu.Unlock()
+				used++
+				return nil
+			}
+			return result, err
+		}
+	}
+	w := newItemWorld(t, withSource(asked.over(counted(feedOf(t, index, ipk)))))
+	w.opkgRepos(
+		repo.Config{Key: "opkg-local", Class: repo.Local},
+		repo.Config{Key: "opkg-remote", Class: repo.Remote},
+	)
+	for _, tc := range []struct {
+		target, caller string
+		steps          []string
+		asked          []opkgAsk
+	}{
+		{
+			"/artifactory/opkg-remote/" + opkgXlat + "?trace", "admin",
+			[]string{
+				"Received request",
+				"Retrieving info from remote repository 'opkg-remote' type opkg",
+				"Returning validated transient resource",
+				"Identified requested resource as a file",
+				"Responding with found resource",
+				"Request succeeded",
+			},
+			[]opkgAsk{{opkgFeed, "", ""}, {opkgXlat, "", ""}},
+		},
+		{
+			"/artifactory/opkg-local/" + opkgFeed + "?trace", "admin",
+			[]string{
+				"Received request",
+				"Retrieving info from local repository 'opkg-local' type opkg",
+				"Unable to find resource in opkg-local:" + opkgFeed,
+				"Responding with unfound resource",
+				"Sending a response with the status '404' and the message " +
+					"'File not found.; Path: 'opkg-local:" + opkgFeed + "''",
+			},
+			nil,
+		},
+		{
+			"/artifactory/opkg-remote/" + opkgFeed + "?trace", "user",
+			[]string{
+				"Received request",
+				"Sending a response with the status '403' and the message 'Download request " +
+					"for repo:path 'opkg-remote-cache:" + opkgFeed + "' is forbidden for user: " +
+					"'user'.; Path: 'opkg-remote:" + opkgFeed + "''",
+			},
+			nil,
+		},
+	} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			rec := w.as(method, tc.target, tc.caller)
+			if method == http.MethodHead {
+				if rec.Code != http.StatusOK || rec.Body.Len() != 0 {
+					t.Errorf("HEAD %s: %d %q, want 200 and no body", tc.target, rec.Code, rec.Body)
+				}
+				asked.take()
+				continue
+			}
+			if got := traceSteps(t, rec); !slices.Equal(got, tc.steps) {
+				t.Errorf("%s: steps\n%s\nwant\n%s", tc.target, strings.Join(got, "\n"),
+					strings.Join(tc.steps, "\n"))
+			}
+			if got := asked.take(); !slices.Equal(got, tc.asked) {
+				t.Errorf("%s asked the upstream %v, want %v", tc.target, got, tc.asked)
+			}
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if used != 0 {
+		t.Errorf("a trace recorded %d downloads, want none", used)
 	}
 }

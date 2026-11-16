@@ -11,6 +11,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // errorBody is the Artifactory envelope of status and message.
@@ -158,5 +160,135 @@ func TestAccItemDownloadRefusalNamesTheUser(t *testing.T) {
 				t.Fatalf("%s %s: challenge %q", method, tc.path, challenge)
 			}
 		}
+	}
+}
+
+// overlayAnswersWorld is a harness.RemoteWorld whose remote, over an
+// upstream that holds nothing, is of type pt, beside the local repository
+// fmt-local of pt, with anonymous access on and reader's read on both.
+func overlayAnswersWorld(t *testing.T, pt repo.PackageType) *harness.RemoteWorld {
+	t.Helper()
+	w := harness.NewRemoteWorld(t)
+	w.Repo.PackageType = pt
+	w.Update()
+	ctx := t.Context()
+	if err := w.Runtime.Store.Repos().Create(ctx, *repo.Defaults(&repo.Config{
+		Key: "fmt-local", Class: repo.Local, PackageType: pt,
+	})); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Runtime.Store.Permissions().Create(ctx, accesstest.Permission{
+		Name: "fmt-local-read", Resources: map[api.ResourceType]accesstest.Resource{
+			api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}},
+				Targets: map[string]accesstest.Target{"fmt-local": {}},
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Runtime.Store.Settings().
+		Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
+		t.Fatal(err)
+	}
+	return w
+}
+
+// TestAccFormatOverlayDownloadAnswers (#1599): a file a format overlay
+// serves on the item route, an index, a remote's package or a path the
+// format keeps from the item route, misses and is refused as any file on
+// that route is (#1572), since 7.161.26's RepoFilter.doDownload hands every
+// GET and HEAD of /artifactory/<key>/<path> to DownloadServiceImpl,
+// whatever the package type. A miss takes DbStoringRepoMixin.getInfo's
+// "File not found." in a local repository and a remote's cache, and the
+// upstream's reason phrase, "Not Found", in a remote (HttpRepo.
+// returnUnfoundResource), with respondResourceNotFound's path; a caller
+// without read takes RealRepoBase.assertReadPermissions' reason for the
+// path the download checks, a remote's cache, and an anonymous one 401
+// "Unauthorized" with the Basic challenge. Before, each answered 404
+// "Could not find resource" or "Not Found", 403 "Forbidden" and 401
+// "Authentication is required". A path a format keeps from the item route
+// (Chef's api/v1 documents, Conda's shards, Machine Learning's manifests,
+// a CRAN PACKAGES.rds, a path outside a format's layout) holds no file the
+// download serves on 7.x, so it answers the miss; on a remote, whose
+// upstream 7.x would ask, that is [I].
+func TestAccFormatOverlayDownloadAnswers(t *testing.T) {
+	refused := func(key, checked, p, user string) string {
+		return "Download request for repo:path '" + checked + ":" + p +
+			"' is forbidden for user: '" + user + "'.; Path: '" + key + ":" + p + "'"
+	}
+	type answer struct {
+		path, user string
+		status     int
+		message    string
+	}
+	// file answers p, a file the overlay serves in fmt-local and remote,
+	// missed by both and refused to denied and anonymous.
+	file := func(p string) []answer {
+		return []answer{
+			{"fmt-local/" + p, "reader", 404, "File not found.; Path: 'fmt-local:" + p + "'"},
+			{"remote/" + p, "reader", 404, "Not Found; Path: 'remote:" + p + "'"},
+			{"remote-cache/" + p, "reader", 404, "File not found.; Path: 'remote-cache:" + p + "'"},
+			{"fmt-local/" + p, "denied", 403, refused("fmt-local", "fmt-local", p, "denied")},
+			{"remote/" + p, "denied", 403, refused("remote", "remote-cache", p, "denied")},
+			{"fmt-local/" + p, "", 401, "Unauthorized"},
+			{"remote/" + p, "", 401, "Unauthorized"},
+		}
+	}
+	// kept answers p, a path the overlay keeps from the item route in a
+	// local repository, as file does there.
+	kept := func(p string) []answer {
+		return []answer{
+			{"fmt-local/" + p, "reader", 404, "File not found.; Path: 'fmt-local:" + p + "'"},
+			{"fmt-local/" + p, "denied", 403, refused("fmt-local", "fmt-local", p, "denied")},
+			{"fmt-local/" + p, "", 401, "Unauthorized"},
+		}
+	}
+	// remoteMiss answers p, a remote's file whose upstream read misses.
+	remoteMiss := func(p string) answer {
+		return answer{"remote/" + p, "reader", 404, "Not Found; Path: 'remote:" + p + "'"}
+	}
+	for _, tc := range []struct {
+		pt      repo.PackageType
+		answers []answer
+	}{
+		{repo.Alpine, append(file("v3.20/main/x86_64/APKINDEX.tar.gz"),
+			append(kept("hello-1.0-r0.apk"), remoteMiss("v3.20/main/APKINDEX.tar.gz"))...)},
+		{repo.Debian, file("dists/stable/main/binary-amd64/Packages")},
+		{repo.Opkg, append(file("feed/Packages"),
+			remoteMiss("feed/464xlat_13_x86_64.ipk"),
+			answer{
+				"remote/feed/464xlat_13_x86_64.ipk", "denied", 403,
+				refused("remote", "remote-cache", "feed/464xlat_13_x86_64.ipk", "denied"),
+			})},
+		{repo.Cran, append(append(file("src/contrib/PACKAGES"), kept("src/contrib/PACKAGES.rds")...),
+			remoteMiss("src/contrib/assertthat_0.2.1.tar.gz"))},
+		{repo.P2, []answer{
+			remoteMiss("readme.txt"),
+			{"remote/readme.txt", "denied", 403, refused("remote", "remote-cache", "readme.txt", "denied")},
+			{"remote/readme.txt", "", 401, "Unauthorized"},
+		}},
+		{repo.Chef, append(kept("api/v1/cookbooks"), remoteMiss("api/v1/cookbooks"))},
+		{repo.Conda, kept("noarch/repodata_shards.msgpack.zst")},
+		{repo.MachineLearning, kept("models/widget/1.0/model-manifest.json")},
+	} {
+		t.Run(string(tc.pt), func(t *testing.T) {
+			w := overlayAnswersWorld(t, tc.pt)
+			for _, a := range tc.answers {
+				for _, method := range []string{http.MethodGet, http.MethodHead} {
+					rec := w.Request(method, "/artifactory/"+a.path, a.user, "")
+					if rec.Code != a.status || method == http.MethodGet &&
+						rec.Body.String() != errorBody(t, a.status, a.message) {
+						t.Errorf("%s %s as %q: %d %s, want %d %s", method, a.path, a.user,
+							rec.Code, rec.Body, a.status, a.message)
+					}
+					challenge := rec.Header().Get("WWW-Authenticate")
+					if a.status == 401 && challenge != `Basic realm="Artifactory Realm"` ||
+						a.status != 401 && challenge != "" {
+						t.Errorf("%s %s as %q: challenge %q", method, a.path, a.user, challenge)
+					}
+				}
+			}
+		})
 	}
 }

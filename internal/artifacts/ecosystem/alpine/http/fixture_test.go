@@ -223,6 +223,19 @@ func wantError(t *testing.T, rec *httptest.ResponseRecorder, status int, message
 	}
 }
 
+// wantAnswer is wantError for a GET, and for a HEAD, which carries the
+// status alone, the status.
+func wantAnswer(
+	t *testing.T, rec *httptest.ResponseRecorder, method string, status int, message string,
+) {
+	t.Helper()
+	if method == http.MethodGet {
+		wantError(t, rec, status, message)
+	} else if rec.Code != status {
+		t.Errorf("%s answered %d, want %d", method, rec.Code, status)
+	}
+}
+
 // sourceBackend is a remote source transport made of one function.
 type sourceBackend func(context.Context, source.Request, source.Permit) (source.Result, error)
 

@@ -54,6 +54,18 @@ the package. A remote repository passes the matrix parameters to its upstream
 after the path, and the query only when its Propagate Query Params is set; a
 copy its cache already holds is matched first.
 
+A local, remote or cache repository answers a GET or HEAD of an `APKINDEX.tar.gz` or a package as 7.x's
+download answers any file (#1599): a file it does not hold with 404
+`File not found.; Path: '<key>:<path>'`, a caller without Read with 403
+`Download request for repo:path '<key>:<path>' is forbidden for user:
+'<user>'.; Path: '<key>:<path>'`, naming a remote's `-cache` key as the
+checked path, or 401 `Unauthorized` with the Basic challenge when anonymous,
+and a file the matrix parameters do not match with 404 `File '<key>:<path>'
+was found, but mandatory properties do not match.; Path: '<key>:<path>'`. A
+remote's upstream miss answers 404 `Not Found; Path: '<key>:<path>'`. A
+virtual repository answers 404 `Could not find resource`. `?trace` traces
+that resolution, a cold fetch from the upstream included (#1595).
+
 ## Evidence
 
 [`@alpine` acceptance](../../test/acceptance/features/alpine.feature) uses a

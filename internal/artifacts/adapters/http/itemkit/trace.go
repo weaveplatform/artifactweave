@@ -2,6 +2,7 @@ package itemkit
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -166,14 +168,14 @@ func (s *Kit) traceDownload(
 	if err != nil {
 		return s.ItemError(ctx, "resolve repository", err)
 	}
+	// The format overlays decide first, as in GetItem (#1595).
+	if handled, err := s.traceOverlays(r, st, c, cached, req, p, acc, t); handled {
+		return err
+	}
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) {
-		return httpkit.Denied(p)
+		return refused(c, req, p)
 	}
-	kind := string(c.Class)
-	if cached {
-		kind = "cache"
-	}
-	t.stepf("Retrieving info from %s repository '%s' type %s", kind, req.Key, c.PackageType)
+	traceRetrieving(t, c, cached, req)
 	if req.Path == "" {
 		if err := generic.CheckDownload(c, "", true); err != nil {
 			return s.ItemError(ctx, "download check", err)
@@ -201,18 +203,22 @@ func (s *Kit) traceDownload(
 	dl.trace = t
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, map[string]bool{})
 	if errors.Is(err, kernel.ErrNotFound) {
+		// getUnfoundItem's check of Read on the file, before anything else.
+		if fileRequest(c, req) && !acc.File(c, resourcePath(req.Path), accessapi.ActionRead) {
+			return refused(c, req, p)
+		}
 		if s.coldRemoteRead(ctx, st, c, cached, req, acc, dl) {
 			if handled, err := s.traceRemoteItem(r, c, req, p, acc, t); handled {
 				return err
 			}
 		}
-		return s.traceContained(ctx, st, method, c, cached, req.Path, p, acc, dl)
+		return s.traceContained(ctx, st, method, c, cached, req, p, acc, dl)
 	}
 	if err != nil {
 		return s.ItemError(ctx, "lookup item", err)
 	}
 	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
-		return httpkit.Denied(p)
+		return refused(c, req, p)
 	}
 	t.stepf(
 		"Returning found resource from %s",
@@ -224,7 +230,7 @@ func (s *Kit) traceDownload(
 	}
 	if !ok {
 		t.stepf("Request query properties don't match those that annotate the artifact")
-		return ItemNotFound()
+		return mismatched(c, req)
 	}
 	if f.Item.Folder {
 		t.stepf("Identified requested resource as a folder")
@@ -296,26 +302,31 @@ func (s *Kit) traceRemoteItem(
 
 // traceContained traces a path no item holds: an entry inside an archive
 // ("<archive>!/<entry>") or a checksum file, which getItem serves from the
-// file they name, or else a 404.
+// file they name, or else the miss. It answers each as getUnfoundItem and
+// getSidecar do.
 func (s *Kit) traceContained(
 	ctx context.Context,
 	st Store,
 	method string,
 	c repo.Config,
 	cached bool,
-	p string,
+	req ItemRequest,
 	caller kernel.Principal,
 	acc Access,
 	dl *Download,
 ) error {
+	p := req.Path
 	if archive, entry, ok := strings.Cut(p, "!/"); ok {
 		dl.stepf("Requested resource is contained within an archive")
 		a, err := Lookup(ctx, st, c, cached, archive, acc, dl, map[string]bool{})
+		if errors.Is(err, kernel.ErrNotFound) {
+			return missed(c, cached, req)
+		}
 		if err != nil {
 			return ItemNotFound()
 		}
 		if !acc.File(a.Repo, a.Item.FullPath(), accessapi.ActionRead) {
-			return httpkit.Denied(caller)
+			return refused(c, req, caller)
 		}
 		if a.Item.Folder {
 			return ItemNotFound()
@@ -336,14 +347,22 @@ func (s *Kit) traceContained(
 	}
 	artifact, alg, ok := item.Sidecar(p)
 	if !ok {
-		return ItemNotFound()
+		return missed(c, cached, req)
 	}
 	dl.stepf("Request is for a checksum")
 	f, err := Lookup(ctx, st, c, cached, artifact, acc, dl, map[string]bool{})
-	// A file the caller may not read has no visible checksum either.
-	if err != nil || f.Item.Folder || alg.Of(f.Item.Actual) == "" ||
-		!acc.File(f.Repo, f.Item.FullPath(), accessapi.ActionRead) {
+	if errors.Is(err, kernel.ErrNotFound) {
+		return missed(c, cached, req)
+	}
+	if err != nil || f.Item.Folder {
 		return ItemNotFound()
+	}
+	// A file the caller may not read has no visible checksum either.
+	if !acc.File(f.Repo, f.Item.FullPath(), accessapi.ActionRead) {
+		return checksumRefused(c, req, caller)
+	}
+	if item.ServedChecksum(f.Repo, f.Item, alg) == "" {
+		return apierror.New(http.StatusNotFound, "Checksum not found for "+f.Item.FullPath())
 	}
 	dl.stepf(
 		"Returning found resource from %s",
@@ -360,4 +379,171 @@ func traceResponding(method string, t *resolutionTrace) {
 		return
 	}
 	t.stepf("Responding with found resource")
+}
+
+// traceRetrieving records the step that names the repository c, which a
+// trace writes only once the caller may read the path.
+func traceRetrieving(t *resolutionTrace, c repo.Config, cached bool, req ItemRequest) {
+	kind := string(c.Class)
+	if cached {
+		kind = "cache"
+	}
+	t.stepf("Retrieving info from %s repository '%s' type %s", kind, req.Key, c.PackageType)
+}
+
+// overlayTraceKey marks the context of a request that the overlays decide
+// under a trace (traceOverlays).
+type overlayTraceKey struct{}
+
+// overlayTrace is what an overlay records while it decides a traced
+// request: the steps of what it would serve.
+type overlayTrace struct{ steps resolutionTrace }
+
+// overlayTraceOf is r's overlay trace, or nil when r is not traced.
+func overlayTraceOf(r *http.Request) *overlayTrace {
+	t, _ := r.Context().Value(overlayTraceKey{}).(*overlayTrace)
+	return t
+}
+
+// traceServed reports whether r is decided under a trace and, if so,
+// records that it would be served here, with step when it is not empty.
+// The helpers an overlay serves through ask it first (serveFile,
+// ServeContent, RemoteDeliveryAllowed), so a traced decision serves,
+// redirects and counts nothing, as 7.161.26's TraceLoggingResponse sends
+// no stream and no redirect.
+func traceServed(r *http.Request, step string) bool {
+	t := overlayTraceOf(r)
+	if t == nil {
+		return false
+	}
+	if step != "" {
+		t.steps.stepf("%s", step)
+	}
+	return true
+}
+
+// errTraceSendsNothing is a traced overlay's failure to write content: a
+// trace sends none.
+var errTraceSendsNothing = errors.New("itemkit: a trace sends no content")
+
+// traceBodyLimit bounds the error body a traced overlay's writer keeps,
+// which apierror writes in a few hundred bytes.
+const traceBodyLimit = 64 << 10
+
+// traceWriter is the writer an overlay answers a traced request on. It
+// keeps the status and an error's body, which name the answer, and refuses
+// any other body, so nothing reaches the client and a StatusWriter over it
+// never counts a response complete.
+type traceWriter struct {
+	header http.Header
+	status int
+	body   strings.Builder
+}
+
+func (w *traceWriter) Header() http.Header { return w.header }
+
+func (w *traceWriter) WriteHeader(code int) {
+	if w.status == 0 {
+		w.status = code
+	}
+}
+
+func (w *traceWriter) Write(b []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	if w.status < http.StatusBadRequest || w.body.Len()+len(b) > traceBodyLimit {
+		return 0, errTraceSendsNothing
+	}
+	return w.body.Write(b) //nolint:wrapcheck // strings.Builder never fails
+}
+
+// answer is the error the overlay wrote, or nil where it would serve: the
+// status, and the message of apierror's envelope, or the status text for a
+// body that is not one.
+func (w *traceWriter) answer() *apierror.Error {
+	if w.status < http.StatusBadRequest {
+		return nil
+	}
+	var envelope struct {
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	message := http.StatusText(w.status)
+	if json.Unmarshal([]byte(w.body.String()), &envelope) == nil && len(envelope.Errors) > 0 {
+		message = envelope.Errors[0].Message
+	}
+	return apierror.New(w.status, message)
+}
+
+// traceOverlays lets the format overlays decide req under a trace, as
+// GetItem lets them before its own lookup: each runs on a traceWriter, with
+// the request marked so that the helpers it serves through record the
+// decision in place of serving it (traceServed). 7.161.26's
+// RepoFilter.doGetOrHeadRequest answers ?trace by running the download
+// itself under a TraceLoggingResponse, so its trace follows a type's own
+// handling too (#1595). It reports false when every overlay passes,
+// leaving req to the generic trace. Otherwise it returns what the overlay
+// answered, or nil where it would serve, after the step that names the
+// repository, which a caller the overlay refused does not get.
+func (s *Kit) traceOverlays(
+	r *http.Request,
+	st Store,
+	c repo.Config,
+	cached bool,
+	req ItemRequest,
+	p kernel.Principal,
+	acc Access,
+	t *resolutionTrace,
+) (bool, error) {
+	ot := &overlayTrace{}
+	tw := &traceWriter{header: http.Header{}}
+	traced := r.WithContext(context.WithValue(r.Context(), overlayTraceKey{}, ot))
+	handled := false
+	for _, o := range s.Overlays {
+		if handled = o(s, tw, traced, st, c, cached, req, p, acc); handled {
+			break
+		}
+	}
+	if !handled {
+		return false, nil
+	}
+	answer := tw.answer()
+	if answer != nil &&
+		(answer.Status == http.StatusUnauthorized || answer.Status == http.StatusForbidden) {
+		return true, answer
+	}
+	traceRetrieving(t, c, cached, req)
+	if t != nil {
+		t.steps = append(t.steps, ot.steps.steps...)
+	}
+	if answer != nil {
+		// The download's miss follows DbStoringRepoMixin.getInfo's step for
+		// the stored file it did not find, a remote's in its cache, as the
+		// generic lookup traces it (Lookup).
+		var miss *apierror.Error
+		if answer.Status == http.StatusNotFound && fileRequest(c, req) &&
+			errors.As(missed(c, cached, req), &miss) && miss.Message == answer.Message {
+			t.stepf("Unable to find resource in %s",
+				traceRepoPath(c, cached || c.Class == repo.Remote, resourcePath(req.Path)))
+		}
+		return true, answer
+	}
+	t.stepf("Identified requested resource as a file")
+	traceResponding(r.Method, t)
+	return true, nil
+}
+
+// remoteTraceStep is the step a trace records for result, a remote read an
+// overlay would deliver, in traceRemoteItem's words.
+func remoteTraceStep(result source.Result) string {
+	if result.Stream != nil || result.Item == nil {
+		return "Returning validated transient resource"
+	}
+	key := result.Item.RepoKey
+	if result.Item.Cached {
+		key += model.CacheSuffix
+	}
+	return "Returning found resource from " + key + ":" + result.Item.FullPath()
 }

@@ -29,9 +29,11 @@ func (zeros) Read(p []byte) (int, error) {
 
 // TestAccDebianIndexRefusals: a Packages or Sources index asked for by a
 // caller who may not read it is refused first, whatever the repository's
-// settings (DV-057); and one in a blacked-out repository, or whose own path
-// the patterns reject, answers the download policy's 404 and message before
-// it is read, an administrator included.
+// settings (DV-057), with the download's refusal (#1599): 7.161.26's
+// RealRepoBase.assertReadPermissions reason and the path, or 401
+// "Unauthorized" to an anonymous caller. One in a blacked-out repository,
+// or whose own path the patterns reject, answers the download policy's 404
+// and message before it is read, an administrator included.
 func TestAccDebianIndexRefusals(t *testing.T) {
 	w := newOverlayWorld(t)
 	w.debRepos(
@@ -49,11 +51,15 @@ func TestAccDebianIndexRefusals(t *testing.T) {
 	}{
 		{
 			"caller who may not read", "deb-local", debPackages, "user",
-			http.StatusForbidden, "Forbidden",
+			http.StatusForbidden, debRefusal("deb-local", "deb-local", debPackages, "user"),
+		},
+		{
+			"anonymous caller who may not read", "deb-local", debSources, "",
+			http.StatusUnauthorized, "Unauthorized",
 		},
 		{
 			"caller who may not read a blacked-out index", "deb-dark", debPackages, "user",
-			http.StatusForbidden, "Forbidden",
+			http.StatusForbidden, debRefusal("deb-dark", "deb-dark", debPackages, "user"),
 		},
 		{
 			"blacked-out Packages", "deb-dark", debPackages, "admin",
@@ -72,14 +78,19 @@ func TestAccDebianIndexRefusals(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			wantError(t, w.get(tc.key, tc.path, tc.as), tc.status, tc.message)
+			for _, method := range []string{http.MethodGet, http.MethodHead} {
+				rec := httptest.NewRecorder()
+				w.kit.GetItem(rec, w.requestBy(method, tc.key, tc.path, tc.as))
+				wantAnswer(t, rec, method, tc.status, tc.message)
+			}
 		})
 	}
 }
 
 // TestAccDebianIndexNeedsReadPermissionOnEveryListedPackage: a caller who
 // may read an index but not a package it lists is refused the index, the
-// permission rule the generic item route cannot apply.
+// permission rule the generic item route cannot apply, as its own file is
+// refused (#1599); 7.x makes no such refusal, so no 7.x text names it [I].
 func TestAccDebianIndexNeedsReadPermissionOnEveryListedPackage(t *testing.T) {
 	w := newOverlayWorld(t)
 	w.debRepos(repo.Config{Key: "deb-local", Class: repo.Local})
@@ -95,7 +106,8 @@ func TestAccDebianIndexNeedsReadPermissionOnEveryListedPackage(t *testing.T) {
 	)
 	rec := httptest.NewRecorder()
 	w.kit.GetItem(rec, r)
-	wantError(t, rec, http.StatusForbidden, "Forbidden")
+	wantError(t, rec, http.StatusForbidden,
+		debRefusal("deb-local", "deb-local", debPackages, "reader"))
 }
 
 // TestAccDebianIndexKeepsAPackageThePatternsReject: a local or remote
@@ -161,7 +173,9 @@ func TestAccDebianRemoteIndexRefusedByThePolicy(t *testing.T) {
 // found, without asking the source, for a local repository's cache, for a
 // virtual repository, whose indexes the virtual view serves, and for a
 // remote index path the source cannot name. The item route and the overlay
-// never pass these, so only a direct call reaches the refusals.
+// never pass these, so only a direct call reaches the refusals. Outside the
+// virtual repository each is the download's miss (#1599): "File not found."
+// for a cache, the upstream's "Not Found" for a remote.
 func TestUnitDebianIndexOfARepositoryWithoutOne(t *testing.T) {
 	w := newOverlayWorld(t, withSources(func(
 		context.Context, source.Request, source.Permit,
@@ -179,26 +193,38 @@ func TestUnitDebianIndexOfARepositoryWithoutOne(t *testing.T) {
 		name, key string
 		cached    bool
 		path      string
+		message   string
 	}{
-		{"local repository's cache", "deb-local", true, debPackages},
-		{"virtual repository", "deb-virtual", false, debPackages},
-		{"remote index the source cannot name", "deb-remote", false, debPackages + ".lz4"},
+		{
+			"local repository's cache", "deb-local", true, debPackages,
+			"File not found.; Path: 'deb-local-cache:" + debPackages + "'",
+		},
+		{"virtual repository", "deb-virtual", false, debPackages, "Could not find resource"},
+		{
+			"remote index the source cannot name", "deb-remote", false, debPackages + ".lz4",
+			"Not Found; Path: 'deb-remote:" + debPackages + ".lz4'",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			req := itemkit.ItemRequest{Key: tc.key, Path: tc.path}
-			DebianAPI{w.kit}.serveDebianIndex(rec, w.request(tc.key, tc.path, "admin"), w.db,
+			key := tc.key
+			if tc.cached {
+				key += "-cache"
+			}
+			req := itemkit.ItemRequest{Key: key, Path: tc.path}
+			DebianAPI{w.kit}.serveDebianIndex(rec, w.request(key, tc.path, "admin"), w.db,
 				w.debRepo(tc.key), tc.cached, req, kittest.Admin, kittest.AdminAccess())
-			wantError(t, rec, http.StatusNotFound, "Could not find resource")
+			wantError(t, rec, http.StatusNotFound, tc.message)
 		})
 	}
 }
 
 // TestAccDebianLocalIndexFailsClosed: a local index is served only from a
 // file whose stored content parses as the index its path names. A folder at
-// the path is not found; content that cannot be read, or a Packages or
-// Sources index that does not parse, is a server fault, so apt is never
-// handed an index whose packages were not checked.
+// the path is not found, as before #1599 (7.161.26 would redirect to the
+// folder's listing, which the overlay does not make); content that cannot
+// be read, or a Packages or Sources index that does not parse, is a server
+// fault, so apt is never handed an index whose packages were not checked.
 func TestAccDebianLocalIndexFailsClosed(t *testing.T) {
 	index := packagesIndex("alpha 1.0 " + debAlpha)
 	t.Run("parsed index", func(t *testing.T) {
@@ -301,7 +327,9 @@ func TestAccDebianRemoteIndex(t *testing.T) {
 			answer: func(*overlayWorld) (source.Result, error) {
 				return streamed(index, checkFails(source.ErrDenied))()
 			},
-			status: http.StatusForbidden, message: "Forbidden",
+			status: http.StatusForbidden,
+			message: debRefusal("deb-remote", "deb-remote-cache", debPackages,
+				kittest.Admin.Name),
 		},
 		{
 			name: "listed package cannot be checked", sources: true,

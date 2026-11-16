@@ -137,8 +137,12 @@ R1 to R14 apply it to every native protocol:
   for an anonymous caller (`HttpArtifactoryResponse.sendAuthorizationRequired`). Its miss
   answers 404 with the repository's reason and the same `; Path:` suffix, and so does a file a
   matrix parameter does not match, with `File '<repoPath>' was found, but mandatory properties
-  do not match.` (`DbStoringRepoMixin.getInfo`), a remote's cache path. A folder request,
-  a virtual repository and a format route keep "Forbidden", "Authentication is required"
+  do not match.` (`DbStoringRepoMixin.getInfo`), a remote's cache path. A format's overlay
+  on the item route, such as an Alpine, Debian, opkg or CRAN index, a CRAN or opkg package,
+  a P2 archive or a Chef, Conda or machine learning item, answers the same (#1599), as
+  7.161.26's `RepoFilter` sends every GET and HEAD through `DownloadServiceImpl` whatever
+  the package type. A folder request, a virtual repository, a format's API route and a
+  folder where an overlay wants a file [I] keep "Forbidden", "Authentication is required"
   and their own not-found.
 - **A virtual repository** passes over a member that refuses, as it passes over one without
   the item, and answers "Could not find resource" when none serves it

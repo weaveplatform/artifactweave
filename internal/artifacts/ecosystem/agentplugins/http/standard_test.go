@@ -168,12 +168,14 @@ func TestAccAgentPluginsVSCodeMarketplaceRefusesAsTheOthersDo(t *testing.T) {
 			http.StatusUnauthorized, "Authentication is required",
 		},
 	} {
-		for _, target := range []string{
-			apiPath(tc.key, "vscode-marketplace.json"), itemPath(tc.key, "vscode-marketplace.json"),
-		} {
-			t.Run(tc.name+" at "+target, func(t *testing.T) {
-				wantError(t, w.do(http.MethodGet, target, tc.as), tc.status, tc.message)
-			})
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			wantError(t, w.do(http.MethodGet, apiPath(tc.key, "vscode-marketplace.json"), tc.as),
+				tc.status, tc.message)
+			for _, method := range []string{http.MethodGet, http.MethodHead} {
+				rec := w.do(method, itemPath(tc.key, "vscode-marketplace.json"), tc.as)
+				wantAnswer(t, rec, method, tc.status,
+					itemAnswer(tc.key, "vscode-marketplace.json", tc.as, tc.status, tc.message))
+			}
+		})
 	}
 }

@@ -762,7 +762,8 @@ func cranUpstream(t *testing.T) *source.Service {
 
 // TestAccCRANRefusalsAnswerTheDownloadPolicy: an index, and a remote or
 // virtual package, is refused to a caller who may not read it before
-// anything else (DV-057). Past that, a blacked-out local or remote
+// anything else (DV-057), outside a virtual repository with the download's
+// refusal (#1599). Past that, a blacked-out local or remote
 // repository, its -cache alias, or patterns that reject the requested path
 // answer the download policy's 404 and message before the source is asked,
 // and a virtual repository whose own patterns reject the path answers that
@@ -797,19 +798,29 @@ func TestAccCRANRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 		return "The repository '" + key + "' rejected the artifact '" + key + ":" + path +
 			"' due to its include/exclude pattern settings."
 	}
+	// The download's refusal (#1599): 7.161.26's reason for checked, a
+	// remote's cache, with the path the request named.
+	forbidden := func(key, checked, path string) string {
+		return "Download request for repo:path '" + checked + ":" + path +
+			"' is forbidden for user: 'user'.; Path: '" + key + ":" + path + "'"
+	}
 	for _, tc := range []struct {
 		name, key, path, as string
 		status              int
 		message             string
 	}{
-		{"user reads an index", "cran-local", cranIndex, "user", http.StatusForbidden, "Forbidden"},
+		{
+			"user reads an index", "cran-local", cranIndex, "user", http.StatusForbidden,
+			forbidden("cran-local", "cran-local", cranIndex),
+		},
 		{
 			"user reads a blacked-out index", "cran-dark", cranIndex, "user",
-			http.StatusForbidden, "Forbidden",
+			http.StatusForbidden, forbidden("cran-dark", "cran-dark", cranIndex),
 		},
 		{
 			"user reads a package a remote's patterns reject", "cran-picky-remote",
-			cranAssertthat, "user", http.StatusForbidden, "Forbidden",
+			cranAssertthat, "user", http.StatusForbidden,
+			forbidden("cran-picky-remote", "cran-picky-remote-cache", cranAssertthat),
 		},
 		{
 			"blacked-out index", "cran-dark", cranIndex, "admin",
@@ -850,8 +861,14 @@ func TestAccCRANRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rec := w.do(http.MethodGet, "/artifactory/"+tc.key+"/"+tc.path, tc.as, "")
-			wantCRANError(t, rec, tc.status, tc.message)
+			for _, method := range []string{http.MethodGet, http.MethodHead} {
+				rec := w.do(method, "/artifactory/"+tc.key+"/"+tc.path, tc.as, "")
+				if method == http.MethodGet {
+					wantCRANError(t, rec, tc.status, tc.message)
+				} else if rec.Code != tc.status {
+					t.Errorf("HEAD answered %d, want %d", rec.Code, tc.status)
+				}
+			}
 		})
 	}
 }

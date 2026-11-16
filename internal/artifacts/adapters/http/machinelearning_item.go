@@ -24,16 +24,17 @@ func machineLearningPrivate(c repo.Config, p string) bool {
 }
 
 // TryMachineLearningItem is the item overlay (itemkit.Overlay) that answers
-// 404 for the Machine Learning formats' private records, which only their
-// own protocol serves. It writes nothing and returns false for every other
-// path.
+// the Machine Learning formats' private records, which only their own
+// protocol serves, as files the repository does not hold
+// (itemkit.NotServed, #1599). It writes nothing and returns false for
+// every other path.
 func TryMachineLearningItem(
 	_ *itemkit.Kit, w http.ResponseWriter, r *http.Request, _ itemkit.Store, c repo.Config,
-	_ bool, req itemkit.ItemRequest, _ kernel.Principal, _ itemkit.Access,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	if !machineLearningPrivate(c, req.Path) {
 		return false
 	}
-	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+	httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 	return true
 }

@@ -128,8 +128,10 @@ func TestAccDebianRemoteIndexHeadReadsByItsOwnPath(t *testing.T) {
 					)
 				}
 			}
+			// The index is refused as its own file is (#1599); 7.x makes
+			// no such refusal, so no 7.x text names it [I].
 			queryRefusal(t, w.Request(http.MethodGet, target, "indexonly", ""),
-				http.StatusForbidden, "Forbidden")
+				http.StatusForbidden, remoteRefused("remote", p, "indexonly"))
 		})
 	}
 }

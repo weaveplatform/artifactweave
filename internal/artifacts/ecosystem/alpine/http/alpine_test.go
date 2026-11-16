@@ -93,9 +93,12 @@ func rsaKeyPEM(t *testing.T) string {
 }
 
 // TestAccAlpineRefusesPathsOutsideTheLayout: an index or package path
-// outside apk's branch/component/architecture layout is not found, as
-// Artifactory answers a path its Alpine layout does not name. A query or
-// matrix parameters are taken as any file's GET takes them
+// outside apk's branch/component/architecture layout holds no file the
+// download serves, so it answers as the download answers a file the
+// repository does not hold (#1599): 7.161.26's "File not found." with the
+// path, to a caller who may read it, and the download's refusal, before
+// that, to one who may not. A virtual repository keeps its answer (#1533).
+// A query or matrix parameters are taken as any file's GET takes them
 // (alpine_query_test.go).
 func TestAccAlpineRefusesPathsOutsideTheLayout(t *testing.T) {
 	w := newItemWorld(t)
@@ -105,13 +108,40 @@ func TestAccAlpineRefusesPathsOutsideTheLayout(t *testing.T) {
 	)
 	w.put(alpineLocal, apkIndexPath, apkIndex(t, "hello"))
 	w.put(alpineLocal, apkHelloPath, apkBody)
-	for _, target := range []string{
-		"/artifactory/alpine-local/hello-1.0-r0.apk",
-		"/artifactory/alpine-local/v3.20/main/APKINDEX.tar.gz",
+	for _, tc := range []struct {
+		key, path, as string
+		status        int
+		message       string
+	}{
+		{
+			alpineLocal, "hello-1.0-r0.apk", kittest.Admin.Name, http.StatusNotFound,
+			"File not found.; Path: 'alpine-local:hello-1.0-r0.apk'",
+		},
+		{
+			alpineLocal, "v3.20/main/APKINDEX.tar.gz", kittest.Admin.Name, http.StatusNotFound,
+			"File not found.; Path: 'alpine-local:v3.20/main/APKINDEX.tar.gz'",
+		},
+		{
+			alpineLocal, "hello-1.0-r0.apk", "user", http.StatusForbidden,
+			"Download request for repo:path 'alpine-local:hello-1.0-r0.apk' is forbidden for " +
+				"user: 'user'.; Path: 'alpine-local:hello-1.0-r0.apk'",
+		},
+		{alpineLocal, "v3.20/main/APKINDEX.tar.gz", "", http.StatusUnauthorized, "Unauthorized"},
+		{
+			alpineVirtual, "hello-1.0-r0.apk", kittest.Admin.Name, http.StatusNotFound,
+			"Could not find resource",
+		},
+		{
+			alpineVirtual, "v3.20/main/APKINDEX.tar.gz", kittest.Admin.Name, http.StatusNotFound,
+			"Could not find resource",
+		},
 	} {
-		t.Run(target, func(t *testing.T) {
-			rec := w.do(http.MethodGet, target, kittest.Admin.Name)
-			wantError(t, rec, http.StatusNotFound, "Could not find resource")
+		target := "/artifactory/" + tc.key + "/" + tc.path
+		t.Run(target+" as "+tc.as, func(t *testing.T) {
+			for _, method := range []string{http.MethodGet, http.MethodHead} {
+				rec := w.as(method, target, tc.as)
+				wantAnswer(t, rec, method, tc.status, tc.message)
+			}
 		})
 	}
 }
@@ -153,11 +183,20 @@ func TestAccAlpineRefusesCallersWhoMayNotDownload(t *testing.T) {
 	}{
 		{
 			"user reads an index", alpineLocal, apkIndexPath, "user",
-			http.StatusForbidden, "Forbidden",
+			http.StatusForbidden, alpineIndexRefusal(alpineLocal, alpineLocal, "user"),
+		},
+		{
+			"anonymous user reads an index", alpineLocal, apkIndexPath, "",
+			http.StatusUnauthorized, "Unauthorized",
 		},
 		{
 			"user reads a blacked-out index", "alpine-dark", apkIndexPath, "user",
-			http.StatusForbidden, "Forbidden",
+			http.StatusForbidden, alpineIndexRefusal("alpine-dark", "alpine-dark", "user"),
+		},
+		{
+			"user reads a remote's index", "alpine-dark-remote", apkIndexPath, "user",
+			http.StatusForbidden,
+			alpineIndexRefusal("alpine-dark-remote", "alpine-dark-remote-cache", "user"),
 		},
 		{
 			"user reads a virtual package", alpineVirtual, apkHelloPath, "user",
@@ -196,8 +235,10 @@ func TestAccAlpineRefusesCallersWhoMayNotDownload(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rec := w.do(http.MethodGet, "/artifactory/"+tc.key+"/"+tc.path, tc.as)
-			wantError(t, rec, tc.status, tc.message)
+			for _, method := range []string{http.MethodGet, http.MethodHead} {
+				rec := w.as(method, "/artifactory/"+tc.key+"/"+tc.path, tc.as)
+				wantAnswer(t, rec, method, tc.status, tc.message)
+			}
 		})
 	}
 }
@@ -226,7 +267,10 @@ func TestAccAlpineIndexNeedsReadPermissionOnEveryListedPackage(t *testing.T) {
 		w.kit.GetItem(rec, r)
 		return rec
 	}
-	wantError(t, get(alpineLocal), http.StatusForbidden, "Forbidden")
+	// The index is refused as its own file is: no 7.x text names this
+	// refusal, which 7.x does not make [I].
+	wantError(t, get(alpineLocal), http.StatusForbidden,
+		alpineIndexRefusal(alpineLocal, alpineLocal, "reader"))
 	rec := get(alpineVirtual)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("virtual index answered %d %s, want 200", rec.Code, rec.Body)
@@ -375,9 +419,11 @@ func TestAccAlpineVirtualPackageChecksAMemberAtThePackagesPath(t *testing.T) {
 }
 
 // TestUnitAlpineCacheAliasOfALocalRepositoryHasNoIndex: only a remote
-// repository has a cache, so the overlay answers 404 for an index in any
-// other repository's cache. The item route already refuses such an alias
-// before the overlays run, so only a direct call reaches this refusal.
+// repository has a cache, so the overlay answers an index in any other
+// repository's cache as the download answers a file a cache does not hold,
+// 7.161.26's "File not found." for the key asked (#1599). The item route
+// already refuses such an alias before the overlays run, so only a direct
+// call reaches this refusal.
 func TestUnitAlpineCacheAliasOfALocalRepositoryHasNoIndex(t *testing.T) {
 	w := newItemWorld(t)
 	local := w.repos(alpineRepo(alpineLocal, repo.Local))[0]
@@ -388,13 +434,16 @@ func TestUnitAlpineCacheAliasOfALocalRepositoryHasNoIndex(t *testing.T) {
 	if !TryAlpineItem(w.kit, rec, r, w.db, local, true, req, kittest.Admin, kittest.AdminAccess()) {
 		t.Fatal("the overlay left an index request to the generic lookup")
 	}
-	wantError(t, rec, http.StatusNotFound, "Could not find resource")
+	wantError(t, rec, http.StatusNotFound,
+		"File not found.; Path: 'alpine-local-cache:"+apkIndexPath+"'")
 }
 
 // TestAccAlpineLocalIndexFailsClosed: a local index is served only from a
 // file whose stored content decodes as an index. A folder at the path is
-// not found; content that is lost, empty, unreadable or malformed is a
-// server fault, never an index apk would be handed.
+// not found, as before #1599 (7.161.26 would redirect to the folder's
+// listing, which the overlay does not make); content that is lost, empty,
+// unreadable or malformed is a server fault, never an index apk would be
+// handed.
 func TestAccAlpineLocalIndexFailsClosed(t *testing.T) {
 	brokenStore := func(c *Config) { c.Blobs = brokenBlobs{c.Blobs} }
 	for _, tc := range []struct {
@@ -442,9 +491,10 @@ func TestAccAlpineLocalIndexFailsClosed(t *testing.T) {
 
 // TestAccAlpineRemoteIndexRechecksAuthority: a remote index is served only
 // once the source has rechecked its authority for the index and for each
-// package the index lists. A refusal answers 403 as the source's own does,
-// and a check that cannot be made is a server fault, so the index is never
-// served past a revoked or unknown grant.
+// package the index lists. A refusal at delivery answers 403 as the source's
+// own does on any route; a listed package refused refuses the index as its
+// own file is refused (#1599). A check that cannot be made is a server
+// fault, so the index is never served past a revoked or unknown grant.
 func TestAccAlpineRemoteIndexRechecksAuthority(t *testing.T) {
 	index := apkIndex(t, "hello")
 	for _, tc := range []struct {
@@ -461,7 +511,9 @@ func TestAccAlpineRemoteIndexRechecksAuthority(t *testing.T) {
 		{
 			name:   "listed package refused",
 			check:  func() func(context.Context) error { return failsOnCall(3, source.ErrDenied) },
-			status: http.StatusForbidden, message: "Forbidden",
+			status: http.StatusForbidden,
+			message: alpineIndexRefusal(alpineRemote, alpineRemote+"-cache",
+				kittest.Admin.Name),
 		},
 		{
 			name: "listed package cannot be checked",
@@ -875,4 +927,12 @@ func TestUnitAlpineRemoteReadsWithoutRemoteSources(t *testing.T) {
 			wantError(t, tc.serve(), http.StatusInternalServerError, "internal error")
 		})
 	}
+}
+
+// alpineIndexRefusal is the download's refusal of the index under key to
+// caller (#1599): 7.161.26's reason for checked, the path it checks, a
+// remote's cache, with the path the request named.
+func alpineIndexRefusal(key, checked, caller string) string {
+	return "Download request for repo:path '" + checked + ":" + apkIndexPath +
+		"' is forbidden for user: '" + caller + "'.; Path: '" + key + ":" + apkIndexPath + "'"
 }
