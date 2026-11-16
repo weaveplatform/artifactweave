@@ -70,8 +70,10 @@ func (e TargetSyncStatusStatus) Valid() bool {
 
 // Defines values for TopologySiteResponseStatus.
 const (
-	Connected    TopologySiteResponseStatus = "Connected"
-	Disconnected TopologySiteResponseStatus = "Disconnected"
+	Connected          TopologySiteResponseStatus = "Connected"
+	Disconnected       TopologySiteResponseStatus = "Disconnected"
+	PartiallyConnected TopologySiteResponseStatus = "Partially Connected"
+	PendingRemoval     TopologySiteResponseStatus = "Pending Removal"
 )
 
 // Valid indicates whether the value is a known member of the TopologySiteResponseStatus enum.
@@ -80,6 +82,10 @@ func (e TopologySiteResponseStatus) Valid() bool {
 	case Connected:
 		return true
 	case Disconnected:
+		return true
+	case PartiallyConnected:
+		return true
+	case PendingRemoval:
 		return true
 	default:
 		return false
@@ -154,6 +160,7 @@ func (e GetMonitoringEntityListParamsEntityType) Valid() bool {
 
 // Defines values for GetMonitoringEntityListParamsStatus.
 const (
+	GetMonitoringEntityListParamsStatusAll        GetMonitoringEntityListParamsStatus = "all"
 	GetMonitoringEntityListParamsStatusFailure    GetMonitoringEntityListParamsStatus = "failure"
 	GetMonitoringEntityListParamsStatusInProgress GetMonitoringEntityListParamsStatus = "in_progress"
 	GetMonitoringEntityListParamsStatusSuccess    GetMonitoringEntityListParamsStatus = "success"
@@ -162,6 +169,8 @@ const (
 // Valid indicates whether the value is a known member of the GetMonitoringEntityListParamsStatus enum.
 func (e GetMonitoringEntityListParamsStatus) Valid() bool {
 	switch e {
+	case GetMonitoringEntityListParamsStatusAll:
+		return true
 	case GetMonitoringEntityListParamsStatusFailure:
 		return true
 	case GetMonitoringEntityListParamsStatusInProgress:
@@ -394,6 +403,9 @@ type TargetSyncStatusStatus string
 
 // TopologiesListResponse Every topology on this instance.
 type TopologiesListResponse struct {
+	// EligibleJpdCount Required within this object. Instances known to Mission Control with an ENTERPRISE_PLUS or ENTERPRISE_PLUS_TRIAL licence, which may join a topology.
+	EligibleJpdCount int32 `json:"eligible_jpd_count"`
+
 	// Topologies Required within this object. The topologies ordered by key.
 	Topologies []TopologyResponse `json:"topologies"`
 
@@ -405,6 +417,9 @@ type TopologiesListResponse struct {
 type TopologyResponse struct {
 	// Created Optional within this object. Server-owned. RFC 3339 creation time.
 	Created *time.Time `json:"created,omitempty"`
+
+	// DeleteInProgress Optional within this object. Server-owned. Present and true while a delete of the topology is running; updates and further deletes answer 409 meanwhile.
+	DeleteInProgress *bool `json:"delete_in_progress,omitempty"`
 
 	// Description Optional within this object. Free text; empty when none.
 	Description *string `json:"description,omitempty"`
@@ -427,20 +442,23 @@ type TopologySiteResponse struct {
 	// IsCurrent Optional within this object. True for the instance answering the request.
 	IsCurrent *bool `json:"is_current,omitempty"`
 
+	// JpdId Optional within this object. Service id of the instance backing the site.
+	JpdId *string `json:"jpd_id,omitempty"`
+
 	// Location Optional within this object. Configured location of the site.
 	Location *JPDLocation `json:"location,omitempty"`
 
 	// SiteName Optional within this object. The instance name.
 	SiteName *string `json:"site_name,omitempty"`
 
-	// Status Optional within this object. Connected when Access federation between this site and the others in the topology is configured and reachable; Disconnected otherwise, with the reason in status_description. A store that succeeds can still leave a site Disconnected.
+	// Status Optional within this object. Connected when Access federation between this site and the others in the topology is configured and reachable. Partially Connected or Disconnected when configuring it failed, with the reason in status_description. Pending Removal for a site an update removed whose removal could not be applied; any later update retries it. A store that succeeds can still leave a site other than Connected.
 	Status *TopologySiteResponseStatus `json:"status,omitempty"`
 
-	// StatusDescription Optional within this object. Why a site is Disconnected; empty when Connected.
+	// StatusDescription Optional within this object. Why a site is not Connected; empty when Connected.
 	StatusDescription *string `json:"status_description,omitempty"`
 }
 
-// TopologySiteResponseStatus Optional within this object. Connected when Access federation between this site and the others in the topology is configured and reachable; Disconnected otherwise, with the reason in status_description. A store that succeeds can still leave a site Disconnected.
+// TopologySiteResponseStatus Optional within this object. Connected when Access federation between this site and the others in the topology is configured and reachable. Partially Connected or Disconnected when configuring it failed, with the reason in status_description. Pending Removal for a site an update removed whose removal could not be applied; any later update retries it. A store that succeeds can still leave a site other than Connected.
 type TopologySiteResponseStatus string
 
 // TopologyValidationError The /grid error envelope with per-site validation details; nothing was stored.
@@ -472,14 +490,20 @@ type ValidationDetail struct {
 	// Description Optional within this object. Human readable explanation.
 	Description *string `json:"description,omitempty"`
 
-	// SourceSite Optional within this object. The site the check ran from.
+	// SourceSite Optional within this object. The site the check ran from, as a site name or an instance id.
 	SourceSite *string `json:"source_site,omitempty"`
+
+	// SourceSiteName Optional within this object. Display name of the source site, present when source_site holds an instance id known to Mission Control.
+	SourceSiteName *string `json:"source_site_name,omitempty"`
 
 	// Status Optional within this object. Short status of the failed check, such as unreachable or untrusted.
 	Status *string `json:"status,omitempty"`
 
-	// TargetSite Optional within this object. The site that failed.
+	// TargetSite Optional within this object. The site that failed, as a site name or an instance id.
 	TargetSite *string `json:"target_site,omitempty"`
+
+	// TargetSiteName Optional within this object. Display name of the target site, present when target_site holds an instance id known to Mission Control.
+	TargetSiteName *string `json:"target_site_name,omitempty"`
 }
 
 // IdempotencyKey defines model for IdempotencyKey.
@@ -509,13 +533,48 @@ type ListJPDsParams struct {
 // ListJPDsParamsStatus defines parameters for ListJPDs.
 type ListJPDsParamsStatus string
 
+// DeleteGridTopologyParams defines parameters for DeleteGridTopology.
+type DeleteGridTopologyParams struct {
+	// Force Optional query parameter. When true, delete the topology and answer 204 even if removing federation fails on one or more sites; what is left on those sites must be cleaned up separately.
+	Force *bool `form:"force,omitempty" json:"force,omitempty"`
+}
+
+// DeleteGridTopology409JSONResponseBody defines parameters for DeleteGridTopology.
+type DeleteGridTopology409JSONResponseBody struct {
+	union json.RawMessage
+}
+
+// UpdateGridTopologyParams defines parameters for UpdateGridTopology.
+type UpdateGridTopologyParams struct {
+	// Force Optional query parameter. When true, allow removing sites whose instance is disconnected. It bypasses only that check.
+	Force *bool `form:"force,omitempty" json:"force,omitempty"`
+}
+
 // GetMonitoringEntityListParams defines parameters for GetMonitoringEntityList.
 type GetMonitoringEntityListParams struct {
 	// EntityType Required query parameter. Entity type public key: users, groups, permissions, tokens, projects, environments, roles, projectGroups, projectUsers and projectResources. Users, groups, permissions and tokens are replicated through Access federation; the other types report zero counts.
 	EntityType GetMonitoringEntityListParamsEntityType `form:"entity_type" json:"entity_type"`
 
-	// Status Optional query parameter. Return only entities with at least one target in this state; omitted means any state.
+	// Status Optional query parameter. Return only entities with at least one target in this state, matched without regard to case; omitted or all means any state.
 	Status *GetMonitoringEntityListParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// SourceJpds Optional query parameter. Comma-separated source instance ids, each of which must belong to the topology; omitted means every source.
+	SourceJpds *string `form:"source_jpds,omitempty" json:"source_jpds,omitempty"`
+
+	// TargetJpds Optional query parameter. Comma-separated target instance ids; omitted means every target.
+	TargetJpds *string `form:"target_jpds,omitempty" json:"target_jpds,omitempty"`
+
+	// Search Optional query parameter. Return only entities whose id starts with this prefix.
+	Search *string `form:"search,omitempty" json:"search,omitempty"`
+
+	// ModifiedAfter Optional query parameter. RFC 3339 time; only entities modified after it are listed. Used only together with modified_before.
+	ModifiedAfter *time.Time `form:"modified_after,omitempty" json:"modified_after,omitempty"`
+
+	// ModifiedBefore Optional query parameter. RFC 3339 time; the upper bound of the window. Used only together with modified_after.
+	ModifiedBefore *time.Time `form:"modified_before,omitempty" json:"modified_before,omitempty"`
+
+	// PageSize Optional query parameter. Entities per page, 1 to 100; larger values are capped at 100.
+	PageSize *int `form:"page_size,omitempty" json:"page_size,omitempty"`
 
 	// PageToken Optional query parameter. The next_page_token from the previous page; omitted for the first page.
 	PageToken *string `form:"page_token,omitempty" json:"page_token,omitempty"`
@@ -547,6 +606,68 @@ type CreateGridTopologyJSONRequestBody = CreateTopologyRequest
 
 // UpdateGridTopologyJSONRequestBody defines body for UpdateGridTopology for application/json ContentType.
 type UpdateGridTopologyJSONRequestBody = UpdateTopologyRequest
+
+// AsTopologyResponse returns the union data inside the DeleteGridTopology409JSONResponseBody as a TopologyResponse
+func (t DeleteGridTopology409JSONResponseBody) AsTopologyResponse() (TopologyResponse, error) {
+	var body TopologyResponse
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTopologyResponse overwrites any union data inside the DeleteGridTopology409JSONResponseBody as the provided TopologyResponse
+func (t *DeleteGridTopology409JSONResponseBody) FromTopologyResponse(v TopologyResponse) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTopologyResponse performs a merge with any union data inside the DeleteGridTopology409JSONResponseBody, using the provided TopologyResponse
+func (t *DeleteGridTopology409JSONResponseBody) MergeTopologyResponse(v TopologyResponse) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsErrorResponse returns the union data inside the DeleteGridTopology409JSONResponseBody as a ErrorResponse
+func (t DeleteGridTopology409JSONResponseBody) AsErrorResponse() (ErrorResponse, error) {
+	var body ErrorResponse
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromErrorResponse overwrites any union data inside the DeleteGridTopology409JSONResponseBody as the provided ErrorResponse
+func (t *DeleteGridTopology409JSONResponseBody) FromErrorResponse(v ErrorResponse) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeErrorResponse performs a merge with any union data inside the DeleteGridTopology409JSONResponseBody, using the provided ErrorResponse
+func (t *DeleteGridTopology409JSONResponseBody) MergeErrorResponse(v ErrorResponse) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t DeleteGridTopology409JSONResponseBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *DeleteGridTopology409JSONResponseBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -656,10 +777,10 @@ type ClientInterface interface {
 
 	// DeleteGridTopology Delete a topology
 	//
-	// Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. Administrators only.
+	// Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. When removing federation fails on a site, the topology is kept and the call answers 409 with it, unless force is true. Administrators only.
 	//
 	// Corresponds with DELETE /api/v1/topology/{key} (the `DeleteGridTopology` operationId).
-	DeleteGridTopology(ctx context.Context, key string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteGridTopology(ctx context.Context, key string, params *DeleteGridTopologyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetGridTopology Get a topology
 	//
@@ -670,21 +791,21 @@ type ClientInterface interface {
 
 	// UpdateGridTopologyWithBody Update a topology
 	//
-	// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Disconnected rather than failing the call. Administrators only.
+	// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Partially Connected or Disconnected rather than failing the call, and a removed site whose removal could not be applied stays as Pending Removal. Removing a site whose instance is disconnected answers 400 unless force is true. Administrators only.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /api/v1/topology/{key} (the `UpdateGridTopology` operationId).
-	UpdateGridTopologyWithBody(ctx context.Context, key string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateGridTopologyWithBody(ctx context.Context, key string, params *UpdateGridTopologyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateGridTopology Update a topology
 	//
-	// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Disconnected rather than failing the call. Administrators only.
+	// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Partially Connected or Disconnected rather than failing the call, and a removed site whose removal could not be applied stays as Pending Removal. Removing a site whose instance is disconnected answers 400 unless force is true. Administrators only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PATCH /api/v1/topology/{key} (the `UpdateGridTopology` operationId).
-	UpdateGridTopology(ctx context.Context, key string, body UpdateGridTopologyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateGridTopology(ctx context.Context, key string, params *UpdateGridTopologyParams, body UpdateGridTopologyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetMonitoringEntityList List monitored entities
 	//
@@ -782,11 +903,11 @@ func (c *Client) CreateGridTopology(ctx context.Context, body CreateGridTopology
 
 // DeleteGridTopology Delete a topology
 //
-// Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. Administrators only.
+// Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. When removing federation fails on a site, the topology is kept and the call answers 409 with it, unless force is true. Administrators only.
 //
 // Corresponds with DELETE /api/v1/topology/{key} (the `DeleteGridTopology` operationId).
-func (c *Client) DeleteGridTopology(ctx context.Context, key string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteGridTopologyRequest(c.Server, key)
+func (c *Client) DeleteGridTopology(ctx context.Context, key string, params *DeleteGridTopologyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteGridTopologyRequest(c.Server, key, params)
 	if err != nil {
 		return nil, err
 	}
@@ -816,13 +937,13 @@ func (c *Client) GetGridTopology(ctx context.Context, key string, reqEditors ...
 
 // UpdateGridTopologyWithBody Update a topology
 //
-// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Disconnected rather than failing the call. Administrators only.
+// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Partially Connected or Disconnected rather than failing the call, and a removed site whose removal could not be applied stays as Pending Removal. Removing a site whose instance is disconnected answers 400 unless force is true. Administrators only.
 //
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PATCH /api/v1/topology/{key} (the `UpdateGridTopology` operationId).
-func (c *Client) UpdateGridTopologyWithBody(ctx context.Context, key string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateGridTopologyRequestWithBody(c.Server, key, contentType, body)
+func (c *Client) UpdateGridTopologyWithBody(ctx context.Context, key string, params *UpdateGridTopologyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateGridTopologyRequestWithBody(c.Server, key, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -835,13 +956,13 @@ func (c *Client) UpdateGridTopologyWithBody(ctx context.Context, key string, con
 
 // UpdateGridTopology Update a topology
 //
-// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Disconnected rather than failing the call. Administrators only.
+// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Partially Connected or Disconnected rather than failing the call, and a removed site whose removal could not be applied stays as Pending Removal. Removing a site whose instance is disconnected answers 400 unless force is true. Administrators only.
 //
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PATCH /api/v1/topology/{key} (the `UpdateGridTopology` operationId).
-func (c *Client) UpdateGridTopology(ctx context.Context, key string, body UpdateGridTopologyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateGridTopologyRequest(c.Server, key, body)
+func (c *Client) UpdateGridTopology(ctx context.Context, key string, params *UpdateGridTopologyParams, body UpdateGridTopologyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateGridTopologyRequest(c.Server, key, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1061,7 +1182,7 @@ func NewCreateGridTopologyRequestWithBody(server string, contentType string, bod
 }
 
 // NewDeleteGridTopologyRequest constructs an http.Request for the DeleteGridTopology method
-func NewDeleteGridTopologyRequest(server string, key string) (*http.Request, error) {
+func NewDeleteGridTopologyRequest(server string, key string, params *DeleteGridTopologyParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1084,6 +1205,33 @@ func NewDeleteGridTopologyRequest(server string, key string) (*http.Request, err
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Force != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "force", *params.Force, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
@@ -1129,18 +1277,18 @@ func NewGetGridTopologyRequest(server string, key string) (*http.Request, error)
 }
 
 // NewUpdateGridTopologyRequest calls the generic UpdateGridTopology builder with application/json body
-func NewUpdateGridTopologyRequest(server string, key string, body UpdateGridTopologyJSONRequestBody) (*http.Request, error) {
+func NewUpdateGridTopologyRequest(server string, key string, params *UpdateGridTopologyParams, body UpdateGridTopologyJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpdateGridTopologyRequestWithBody(server, key, "application/json", bodyReader)
+	return NewUpdateGridTopologyRequestWithBody(server, key, params, "application/json", bodyReader)
 }
 
 // NewUpdateGridTopologyRequestWithBody constructs an http.Request for the UpdateGridTopology method, with any body, and a specified content type
-func NewUpdateGridTopologyRequestWithBody(server string, key string, contentType string, body io.Reader) (*http.Request, error) {
+func NewUpdateGridTopologyRequestWithBody(server string, key string, params *UpdateGridTopologyParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1163,6 +1311,33 @@ func NewUpdateGridTopologyRequestWithBody(server string, key string, contentType
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Force != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "force", *params.Force, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
@@ -1221,6 +1396,78 @@ func NewGetMonitoringEntityListRequest(server string, key string, params *GetMon
 		if params.Status != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.SourceJpds != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "source_jpds", *params.SourceJpds, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.TargetJpds != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "target_jpds", *params.TargetJpds, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Search != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "search", *params.Search, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ModifiedAfter != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "modified_after", *params.ModifiedAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ModifiedBefore != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "modified_before", *params.ModifiedBefore, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PageSize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page_size", *params.PageSize, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -1471,12 +1718,12 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteGridTopologyWithResponse Delete a topology
 	//
-	// Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. Administrators only.
+	// Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. When removing federation fails on a site, the topology is kept and the call answers 409 with it, unless force is true. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /api/v1/topology/{key} (the `DeleteGridTopology` operationId).
-	DeleteGridTopologyWithResponse(ctx context.Context, key string, reqEditors ...RequestEditorFn) (*DeleteGridTopologyResponse, error)
+	DeleteGridTopologyWithResponse(ctx context.Context, key string, params *DeleteGridTopologyParams, reqEditors ...RequestEditorFn) (*DeleteGridTopologyResponse, error)
 
 	// GetGridTopologyWithResponse Get a topology
 	//
@@ -1489,21 +1736,21 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateGridTopologyWithBodyWithResponse Update a topology
 	//
-	// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Disconnected rather than failing the call. Administrators only.
+	// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Partially Connected or Disconnected rather than failing the call, and a removed site whose removal could not be applied stays as Pending Removal. Removing a site whose instance is disconnected answers 400 unless force is true. Administrators only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /api/v1/topology/{key} (the `UpdateGridTopology` operationId).
-	UpdateGridTopologyWithBodyWithResponse(ctx context.Context, key string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateGridTopologyResponse, error)
+	UpdateGridTopologyWithBodyWithResponse(ctx context.Context, key string, params *UpdateGridTopologyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateGridTopologyResponse, error)
 
 	// UpdateGridTopologyWithResponse Update a topology
 	//
-	// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Disconnected rather than failing the call. Administrators only.
+	// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Partially Connected or Disconnected rather than failing the call, and a removed site whose removal could not be applied stays as Pending Removal. Removing a site whose instance is disconnected answers 400 unless force is true. Administrators only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /api/v1/topology/{key} (the `UpdateGridTopology` operationId).
-	UpdateGridTopologyWithResponse(ctx context.Context, key string, body UpdateGridTopologyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateGridTopologyResponse, error)
+	UpdateGridTopologyWithResponse(ctx context.Context, key string, params *UpdateGridTopologyParams, body UpdateGridTopologyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateGridTopologyResponse, error)
 
 	// GetMonitoringEntityListWithResponse List monitored entities
 	//
@@ -1540,13 +1787,6 @@ type ListJPDsResponse429Headers struct {
 	RetryAfter      int
 }
 
-// ListJPDsResponse503Headers the declared response headers of an HTTP 503 response for ListJPDs
-type ListJPDsResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
 type ListJPDsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1563,11 +1803,9 @@ type ListJPDsResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
+	JSON503 *ErrorResponse
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *ListJPDsResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *ListJPDsResponse503Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -1601,7 +1839,7 @@ func (r ListJPDsResponse) GetJSON500() *ErrorResponse {
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r ListJPDsResponse) GetJSON503() *ServiceUnavailable {
+func (r ListJPDsResponse) GetJSON503() *ErrorResponse {
 	return r.JSON503
 }
 
@@ -1641,13 +1879,6 @@ type ListGridTopologiesResponse429Headers struct {
 	RetryAfter      int
 }
 
-// ListGridTopologiesResponse503Headers the declared response headers of an HTTP 503 response for ListGridTopologies
-type ListGridTopologiesResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
 type ListGridTopologiesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1662,11 +1893,9 @@ type ListGridTopologiesResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
+	JSON503 *ErrorResponse
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *ListGridTopologiesResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *ListGridTopologiesResponse503Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -1695,7 +1924,7 @@ func (r ListGridTopologiesResponse) GetJSON500() *ErrorResponse {
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r ListGridTopologiesResponse) GetJSON503() *ServiceUnavailable {
+func (r ListGridTopologiesResponse) GetJSON503() *ErrorResponse {
 	return r.JSON503
 }
 
@@ -1735,13 +1964,6 @@ type CreateGridTopologyResponse429Headers struct {
 	RetryAfter      int
 }
 
-// CreateGridTopologyResponse503Headers the declared response headers of an HTTP 503 response for CreateGridTopology
-type CreateGridTopologyResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
 type CreateGridTopologyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1760,11 +1982,9 @@ type CreateGridTopologyResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
+	JSON503 *ErrorResponse
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *CreateGridTopologyResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *CreateGridTopologyResponse503Headers
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -1803,7 +2023,7 @@ func (r CreateGridTopologyResponse) GetJSON500() *ErrorResponse {
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r CreateGridTopologyResponse) GetJSON503() *ServiceUnavailable {
+func (r CreateGridTopologyResponse) GetJSON503() *ErrorResponse {
 	return r.JSON503
 }
 
@@ -1843,13 +2063,6 @@ type DeleteGridTopologyResponse429Headers struct {
 	RetryAfter      int
 }
 
-// DeleteGridTopologyResponse503Headers the declared response headers of an HTTP 503 response for DeleteGridTopology
-type DeleteGridTopologyResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
 type DeleteGridTopologyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1860,17 +2073,15 @@ type DeleteGridTopologyResponse struct {
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *ErrorResponse
 	// JSON409 the response for an HTTP 409 `application/json` response
-	JSON409 *TopologyResponse
+	JSON409 *DeleteGridTopology409JSONResponseBody
 	// JSON429 the response for an HTTP 429 `application/json` response
 	JSON429 *TooManyRequests
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
+	JSON503 *ErrorResponse
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *DeleteGridTopologyResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *DeleteGridTopologyResponse503Headers
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -1889,7 +2100,7 @@ func (r DeleteGridTopologyResponse) GetJSON404() *ErrorResponse {
 }
 
 // GetJSON409 returns the response for an HTTP 409 `application/json` response
-func (r DeleteGridTopologyResponse) GetJSON409() *TopologyResponse {
+func (r DeleteGridTopologyResponse) GetJSON409() *DeleteGridTopology409JSONResponseBody {
 	return r.JSON409
 }
 
@@ -1904,7 +2115,7 @@ func (r DeleteGridTopologyResponse) GetJSON500() *ErrorResponse {
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r DeleteGridTopologyResponse) GetJSON503() *ServiceUnavailable {
+func (r DeleteGridTopologyResponse) GetJSON503() *ErrorResponse {
 	return r.JSON503
 }
 
@@ -1944,13 +2155,6 @@ type GetGridTopologyResponse429Headers struct {
 	RetryAfter      int
 }
 
-// GetGridTopologyResponse503Headers the declared response headers of an HTTP 503 response for GetGridTopology
-type GetGridTopologyResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
 type GetGridTopologyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1967,11 +2171,9 @@ type GetGridTopologyResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
+	JSON503 *ErrorResponse
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *GetGridTopologyResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *GetGridTopologyResponse503Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -2005,7 +2207,7 @@ func (r GetGridTopologyResponse) GetJSON500() *ErrorResponse {
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r GetGridTopologyResponse) GetJSON503() *ServiceUnavailable {
+func (r GetGridTopologyResponse) GetJSON503() *ErrorResponse {
 	return r.JSON503
 }
 
@@ -2045,13 +2247,6 @@ type UpdateGridTopologyResponse429Headers struct {
 	RetryAfter      int
 }
 
-// UpdateGridTopologyResponse503Headers the declared response headers of an HTTP 503 response for UpdateGridTopology
-type UpdateGridTopologyResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
 type UpdateGridTopologyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2065,16 +2260,16 @@ type UpdateGridTopologyResponse struct {
 	JSON403 *ErrorResponse
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *ErrorResponse
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *ErrorResponse
 	// JSON429 the response for an HTTP 429 `application/json` response
 	JSON429 *TooManyRequests
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
+	JSON503 *ErrorResponse
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *UpdateGridTopologyResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *UpdateGridTopologyResponse503Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -2102,6 +2297,11 @@ func (r UpdateGridTopologyResponse) GetJSON404() *ErrorResponse {
 	return r.JSON404
 }
 
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r UpdateGridTopologyResponse) GetJSON409() *ErrorResponse {
+	return r.JSON409
+}
+
 // GetJSON429 returns the response for an HTTP 429 `application/json` response
 func (r UpdateGridTopologyResponse) GetJSON429() *TooManyRequests {
 	return r.JSON429
@@ -2113,7 +2313,7 @@ func (r UpdateGridTopologyResponse) GetJSON500() *ErrorResponse {
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r UpdateGridTopologyResponse) GetJSON503() *ServiceUnavailable {
+func (r UpdateGridTopologyResponse) GetJSON503() *ErrorResponse {
 	return r.JSON503
 }
 
@@ -2153,13 +2353,6 @@ type GetMonitoringEntityListResponse429Headers struct {
 	RetryAfter      int
 }
 
-// GetMonitoringEntityListResponse503Headers the declared response headers of an HTTP 503 response for GetMonitoringEntityList
-type GetMonitoringEntityListResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
 type GetMonitoringEntityListResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2178,11 +2371,9 @@ type GetMonitoringEntityListResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
+	JSON503 *ErrorResponse
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *GetMonitoringEntityListResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *GetMonitoringEntityListResponse503Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -2221,7 +2412,7 @@ func (r GetMonitoringEntityListResponse) GetJSON500() *ErrorResponse {
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r GetMonitoringEntityListResponse) GetJSON503() *ServiceUnavailable {
+func (r GetMonitoringEntityListResponse) GetJSON503() *ErrorResponse {
 	return r.JSON503
 }
 
@@ -2261,13 +2452,6 @@ type GetMonitoringSummaryResponse429Headers struct {
 	RetryAfter      int
 }
 
-// GetMonitoringSummaryResponse503Headers the declared response headers of an HTTP 503 response for GetMonitoringSummary
-type GetMonitoringSummaryResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
 type GetMonitoringSummaryResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2286,11 +2470,9 @@ type GetMonitoringSummaryResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
+	JSON503 *ErrorResponse
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *GetMonitoringSummaryResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *GetMonitoringSummaryResponse503Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -2329,7 +2511,7 @@ func (r GetMonitoringSummaryResponse) GetJSON500() *ErrorResponse {
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r GetMonitoringSummaryResponse) GetJSON503() *ServiceUnavailable {
+func (r GetMonitoringSummaryResponse) GetJSON503() *ErrorResponse {
 	return r.JSON503
 }
 
@@ -2369,13 +2551,6 @@ type GetMonitoringEntityDetailResponse429Headers struct {
 	RetryAfter      int
 }
 
-// GetMonitoringEntityDetailResponse503Headers the declared response headers of an HTTP 503 response for GetMonitoringEntityDetail
-type GetMonitoringEntityDetailResponse503Headers struct {
-	RateLimit       *string
-	RateLimitPolicy *string
-	RetryAfter      int
-}
-
 type GetMonitoringEntityDetailResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2394,11 +2569,9 @@ type GetMonitoringEntityDetailResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *ServiceUnavailable
+	JSON503 *ErrorResponse
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *GetMonitoringEntityDetailResponse429Headers
-	// Headers503 the parsed response headers for an HTTP 503 response
-	Headers503 *GetMonitoringEntityDetailResponse503Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -2437,7 +2610,7 @@ func (r GetMonitoringEntityDetailResponse) GetJSON500() *ErrorResponse {
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r GetMonitoringEntityDetailResponse) GetJSON503() *ServiceUnavailable {
+func (r GetMonitoringEntityDetailResponse) GetJSON503() *ErrorResponse {
 	return r.JSON503
 }
 
@@ -2532,13 +2705,13 @@ func (c *ClientWithResponses) CreateGridTopologyWithResponse(ctx context.Context
 
 // DeleteGridTopologyWithResponse Delete a topology
 //
-// Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. Administrators only.
+// Removes a topology and the Access federation it configured between its sites. Identities already replicated stay on each site. When removing federation fails on a site, the topology is kept and the call answers 409 with it, unless force is true. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with DELETE /api/v1/topology/{key} (the `DeleteGridTopology` operationId).
-func (c *ClientWithResponses) DeleteGridTopologyWithResponse(ctx context.Context, key string, reqEditors ...RequestEditorFn) (*DeleteGridTopologyResponse, error) {
-	rsp, err := c.DeleteGridTopology(ctx, key, reqEditors...)
+func (c *ClientWithResponses) DeleteGridTopologyWithResponse(ctx context.Context, key string, params *DeleteGridTopologyParams, reqEditors ...RequestEditorFn) (*DeleteGridTopologyResponse, error) {
+	rsp, err := c.DeleteGridTopology(ctx, key, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2562,13 +2735,13 @@ func (c *ClientWithResponses) GetGridTopologyWithResponse(ctx context.Context, k
 
 // UpdateGridTopologyWithBodyWithResponse Update a topology
 //
-// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Disconnected rather than failing the call. Administrators only.
+// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Partially Connected or Disconnected rather than failing the call, and a removed site whose removal could not be applied stays as Pending Removal. Removing a site whose instance is disconnected answers 400 unless force is true. Administrators only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /api/v1/topology/{key} (the `UpdateGridTopology` operationId).
-func (c *ClientWithResponses) UpdateGridTopologyWithBodyWithResponse(ctx context.Context, key string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateGridTopologyResponse, error) {
-	rsp, err := c.UpdateGridTopologyWithBody(ctx, key, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UpdateGridTopologyWithBodyWithResponse(ctx context.Context, key string, params *UpdateGridTopologyParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateGridTopologyResponse, error) {
+	rsp, err := c.UpdateGridTopologyWithBody(ctx, key, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2577,13 +2750,13 @@ func (c *ClientWithResponses) UpdateGridTopologyWithBodyWithResponse(ctx context
 
 // UpdateGridTopologyWithResponse Update a topology
 //
-// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Disconnected rather than failing the call. Administrators only.
+// Changes the name, description or site list. A new site list is applied as a whole: added sites are federated with the others and removed sites are disconnected. As with creation, a site whose federation fails after the store is reported Partially Connected or Disconnected rather than failing the call, and a removed site whose removal could not be applied stays as Pending Removal. Removing a site whose instance is disconnected answers 400 unless force is true. Administrators only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /api/v1/topology/{key} (the `UpdateGridTopology` operationId).
-func (c *ClientWithResponses) UpdateGridTopologyWithResponse(ctx context.Context, key string, body UpdateGridTopologyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateGridTopologyResponse, error) {
-	rsp, err := c.UpdateGridTopology(ctx, key, body, reqEditors...)
+func (c *ClientWithResponses) UpdateGridTopologyWithResponse(ctx context.Context, key string, params *UpdateGridTopologyParams, body UpdateGridTopologyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateGridTopologyResponse, error) {
+	rsp, err := c.UpdateGridTopology(ctx, key, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2692,7 +2865,7 @@ func ParseListJPDsResponse(rsp *http.Response) (*ListJPDsResponse, error) {
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2725,30 +2898,6 @@ func ParseListJPDsResponse(rsp *http.Response) (*ListJPDsResponse, error) {
 			headers.RetryAfter = value
 		}
 		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers ListJPDsResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -2804,7 +2953,7 @@ func ParseListGridTopologiesResponse(rsp *http.Response) (*ListGridTopologiesRes
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2837,30 +2986,6 @@ func ParseListGridTopologiesResponse(rsp *http.Response) (*ListGridTopologiesRes
 			headers.RetryAfter = value
 		}
 		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers ListGridTopologiesResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -2930,7 +3055,7 @@ func ParseCreateGridTopologyResponse(rsp *http.Response) (*CreateGridTopologyRes
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2963,30 +3088,6 @@ func ParseCreateGridTopologyResponse(rsp *http.Response) (*CreateGridTopologyRes
 			headers.RetryAfter = value
 		}
 		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers CreateGridTopologyResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -3031,7 +3132,7 @@ func ParseDeleteGridTopologyResponse(rsp *http.Response) (*DeleteGridTopologyRes
 		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest TopologyResponse
+		var dest DeleteGridTopology409JSONResponseBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -3052,7 +3153,7 @@ func ParseDeleteGridTopologyResponse(rsp *http.Response) (*DeleteGridTopologyRes
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -3085,30 +3186,6 @@ func ParseDeleteGridTopologyResponse(rsp *http.Response) (*DeleteGridTopologyRes
 			headers.RetryAfter = value
 		}
 		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers DeleteGridTopologyResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -3171,7 +3248,7 @@ func ParseGetGridTopologyResponse(rsp *http.Response) (*GetGridTopologyResponse,
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -3204,30 +3281,6 @@ func ParseGetGridTopologyResponse(rsp *http.Response) (*GetGridTopologyResponse,
 			headers.RetryAfter = value
 		}
 		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers GetGridTopologyResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -3282,6 +3335,13 @@ func ParseUpdateGridTopologyResponse(rsp *http.Response) (*UpdateGridTopologyRes
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -3297,7 +3357,7 @@ func ParseUpdateGridTopologyResponse(rsp *http.Response) (*UpdateGridTopologyRes
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -3330,30 +3390,6 @@ func ParseUpdateGridTopologyResponse(rsp *http.Response) (*UpdateGridTopologyRes
 			headers.RetryAfter = value
 		}
 		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers UpdateGridTopologyResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -3423,7 +3459,7 @@ func ParseGetMonitoringEntityListResponse(rsp *http.Response) (*GetMonitoringEnt
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -3456,30 +3492,6 @@ func ParseGetMonitoringEntityListResponse(rsp *http.Response) (*GetMonitoringEnt
 			headers.RetryAfter = value
 		}
 		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers GetMonitoringEntityListResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -3549,7 +3561,7 @@ func ParseGetMonitoringSummaryResponse(rsp *http.Response) (*GetMonitoringSummar
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -3582,30 +3594,6 @@ func ParseGetMonitoringSummaryResponse(rsp *http.Response) (*GetMonitoringSummar
 			headers.RetryAfter = value
 		}
 		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers GetMonitoringSummaryResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -3675,7 +3663,7 @@ func ParseGetMonitoringEntityDetailResponse(rsp *http.Response) (*GetMonitoringE
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest ServiceUnavailable
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -3708,30 +3696,6 @@ func ParseGetMonitoringEntityDetailResponse(rsp *http.Response) (*GetMonitoringE
 			headers.RetryAfter = value
 		}
 		response.Headers429 = &headers
-	case rsp.StatusCode == 503:
-		var headers GetMonitoringEntityDetailResponse503Headers
-		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimit = &value
-		}
-		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
-			var value string
-			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RateLimitPolicy = &value
-		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
-				return nil, err
-			}
-			headers.RetryAfter = value
-		}
-		response.Headers503 = &headers
 	}
 
 	return response, nil
