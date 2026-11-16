@@ -51,6 +51,10 @@
 //     over or a purge releases them.
 //   - Validation messages and artifactsapi.MsgKeyExists reach clients and
 //     stay byte-identical.
+//   - A virtual repository's membership is checked only for what a save
+//     adds or changes (CheckMembers), as 7.x's configuration interceptors
+//     check it, so an update that leaves the members and the deployment
+//     repository alone is accepted however they stand.
 //   - A remote's URL is never stored with a user name and password in it:
 //     PrepareCreate and Merge move them into its username and password, as
 //     7.x's RemoteRepoConfig.processUrlCredentials does on every save, so

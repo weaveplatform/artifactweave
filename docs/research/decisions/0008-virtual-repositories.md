@@ -126,6 +126,15 @@ member. With none set, it answers 405 with `Allow: GET` and
 `No local repository was configured as local deployment repository for the (<key>) virtual repository.`
 A virtual cannot be another virtual's `defaultDeploymentRepo`
 ([RTFACT-31328](https://jfrog.atlassian.net/browse/RTFACT-31328) is an open request for it).
+A save that sets a remote or virtual repository, the virtual itself included, as the
+`defaultDeploymentRepo` answers 400
+`Cannot set repository reference '<ddr>' as the default deployment repository for virtual repository '<key>' since it is not a local repository`
+**[I]**: 7.161.26 fails that save on a remote with a `ClassCastException` and drops a virtual
+silently (`base/config/.../descriptor/repo/VirtualRepoDescriptor` 357-361), neither of which
+is meant, while its UI keeps only a local or federated one (`RepoConfigDescriptorBuilder`)
+and JFrog's deploy page says to "set one of the local repositories aggregated by the virtual
+repository as the default deployment target". The other save rules for the
+`defaultDeploymentRepo` are R11's.
 DELETE through a virtual answers 404 with an empty body, since 7.x deletes only in local,
 federated and cache repositories
 ([RTFACT-26096](https://jfrog.atlassian.net/browse/RTFACT-26096) is an open request to
@@ -286,15 +295,48 @@ lines 420, 485-493, 550 and `prepareStorageInfoResponse` 569;
 A virtual repository may have no members. Each member has the virtual's package type, with
 three exceptions: a generic virtual takes members of any type; Maven, Gradle, Ivy, SBT and
 P2 count as one type; OCI and Helm OCI count as one type. So Helm and Helm OCI cannot share a
-virtual, and neither can Docker and OCI. 7.x refuses a mismatch when a save changes the
-members or the `defaultDeploymentRepo`; its create API does from
-[7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed)
-(RTDEV-62756; [research 03](../03-repository-configuration-model.md),
-[#394](https://github.com/weaveplatform/artifactweave/issues/394)).
+virtual, and neither can Docker and OCI. A P2 virtual also takes a local Generic member,
+which JFrog's [P2 Repositories](https://docs.jfrog.com/artifactory/docs/p2-repositories) page
+names ("local Maven or Generic repositories") and 7.x's UI validator allows
+(`RepoConfigValidator.filterByType`); whether the REST save refuses one, as the interceptor's
+code would, is **[I]**. A P2 virtual's members of another type than P2 must be local.
 
-Sources: `repo/interceptor/config/VirtualRepoConfigChangeInterceptor` 56-156;
-`base/config/src/main/java/org/artifactory/descriptor/repo/RepoType.java` line 124
-(`MAVEN_GROUP`); JFrog's
+7.x checks membership whenever the repositories API or the YAML configuration patch saves a
+virtual, with these answers, each a 400:
+
+- A member or `defaultDeploymentRepo` that does not exist, when the save adds it:
+  `Cannot create or update repo '<key>': repo reference '<ref>' does not exist in the config descriptor.`
+  A key the same request saves counts as existing, so a virtual may list itself (R2 skips it).
+  A stored member that no longer exists is dropped, and a stored `defaultDeploymentRepo` the
+  update keeps is cleared.
+- A create, or a change of the `defaultDeploymentRepo`, naming one that is not a member:
+  `Cannot set repository reference '<ddr>' as the default deployment repository for virtual repository '<key>' since it is not included in the repository references`.
+  An update that takes the `defaultDeploymentRepo`'s member away and keeps it:
+  `Cannot remove repository reference '<ddr>' since it is defined as the default deployment repository for the virtual repository '<key>'`.
+  An update that changes neither is accepted.
+- A member of a type the virtual does not take, checked only when the save changes the
+  members or the `defaultDeploymentRepo`:
+  `Virtual repository '<key>' has package type '<V>' but includes non-matching repository '<m>' with package type '<M>'`,
+  where the types are `RepoType`'s names (`Npm`, `Maven`, `HelmOCI`, `YUM`). The create API
+  refuses a mismatch from
+  [7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed)
+  (RTDEV-62756; [research 03](../03-repository-configuration-model.md),
+  [#394](https://github.com/weaveplatform/artifactweave/issues/394)).
+- A remote or virtual `defaultDeploymentRepo`: R6's answer.
+
+No cycle is refused (R2). The interceptors run in no set order, so which message a save with
+several faults gets is **[I]**; artifactweave checks in the order above. That each refusal
+answers 400 is **[I]** too, from the exception mappers below, since the repositories
+resource is closed code. artifactweave applies these rules from
+[#1532](https://github.com/weaveplatform/artifactweave/issues/1532) (`repos.CheckMembers`).
+
+Sources: `repo/interceptor/config/VirtualRepoConfigChangeInterceptor` 56-156, gated by
+`artifactory.virtual.block.package.type.mismatch` (default true);
+`repo/interceptor/config/RepoConfigReferencesInterceptor` `handleNonFederatedRepositoryRefs`
+and `handleDefaultDeploymentRepoRef`; `repo/interceptor/config/DefaultDeploymentRepoInterceptor`
+44-89; `base/config/src/main/java/org/artifactory/descriptor/repo/RepoType.java` line 124
+(`MAVEN_GROUP`); `web/rest/.../exception/mapper/ConfigurationExceptionMapper` and
+`web/rest-common/.../exception/mapper/IllegalArgumentExceptionMapper`; JFrog's
 [Kubernetes Helm Chart Repositories](https://docs.jfrog.com/artifactory/docs/kubernetes-helm-chart-repositories)
 page.
 

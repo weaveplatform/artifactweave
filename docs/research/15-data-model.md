@@ -138,7 +138,7 @@ Virtual:
 | Field | Type | Notes |
 |---|---|---|
 | `repositories` | array of string | required; ordered member keys |
-| `defaultDeploymentRepo` | string | must be a member |
+| `defaultDeploymentRepo` | string | a local or federated member when a save sets it |
 | `artifactoryRequestsCanRetrieveRemoteArtifacts`, `forceMavenAuthentication`, `externalDependenciesEnabled`, `debianTrivialLayout` | boolean | |
 | `externalDependenciesPatterns` | array of string | |
 | `externalDependenciesRemoteRepo`, `keyPair`, `debianDefaultArchitectures` | string | |

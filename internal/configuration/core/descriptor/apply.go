@@ -133,8 +133,9 @@ func Apply(
 }
 
 // planRepos works out the repository changes against the state the patch
-// leaves behind: a virtual repository may list members created, and must not
-// list members deleted, by the same patch.
+// leaves behind: a virtual repository may list members created by the same
+// patch, and a member it deletes is dropped from a virtual repository the
+// patch updates (repos.CheckMembers) as from every other (Remove).
 func planRepos(
 	ctx context.Context,
 	repos artifactsapi.Repositories,
@@ -211,8 +212,16 @@ func planRepos(
 	for _, c := range final {
 		known = append(known, c)
 	}
-	for _, op := range writes {
-		if err := repos.CheckMembers(op.cfg, known); err != nil {
+	for i := range writes {
+		op := &writes[i]
+		var before *repo.Config
+		if cur, ok := stored[op.cfg.Key]; ok && !op.shouldCreate {
+			before = &cur
+		}
+		// A member the patch deletes and the update still lists was stored
+		// before, so it is dropped from the update rather than refused, as
+		// 7.x's RepoConfigReferencesInterceptor drops it.
+		if err := repos.CheckMembers(&op.cfg, before, known); err != nil {
 			return nil, nil, entryError(op.name, err)
 		}
 		if err := repos.CheckKeypairs(ctx, op.cfg); err != nil {
