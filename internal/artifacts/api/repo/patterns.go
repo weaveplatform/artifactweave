@@ -52,3 +52,24 @@ func (p RepoPatterns) Accepts(path string, folder bool) bool {
 	}
 	return false
 }
+
+// AcceptsRequest reports whether the patterns admit a request for path, as
+// Artifactory decides it before it looks for the item (7.161.26
+// RepoBase.accepts): the root ("") and a system path (systemPath) whatever
+// the patterns say, any other path as Accepts does. path is the one
+// Artifactory checks: the archive of an archive entry and the file a
+// checksum sidecar describes.
+func (p RepoPatterns) AcceptsRequest(path string, folder bool) bool {
+	return path == "" || systemPath(path) || p.Accepts(path, folder)
+}
+
+// systemPath reports a path Artifactory's include and exclude patterns do
+// not apply to: a Maven index file, whose name starts
+// nexus-maven-repository-index, and any path ending .index, such as P2's
+// p2.index (NamingUtils.isSystem, which RepoBase.accepts passes before the
+// patterns, in Artifactory OSS 6.20). 7.x documents nothing either way, so
+// this follows 6.20 until a capture shows otherwise (#216).
+func systemPath(p string) bool {
+	name := p[strings.LastIndexByte(p, '/')+1:]
+	return strings.HasPrefix(name, "nexus-maven-repository-index") || strings.HasSuffix(p, ".index")
+}

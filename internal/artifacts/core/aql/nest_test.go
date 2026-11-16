@@ -36,7 +36,7 @@ func nestItems(t *testing.T, src string, opt aql.Nesting) (string, error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	q.Resolve(aqltest.Repositories())
+	q.Resolve(t.Context(), aqltest.Repositories())
 	corpus := aqltest.Corpus()
 	// The server reads the hits with every property and statistic, which
 	// the relation-path criteria may need.
@@ -371,7 +371,7 @@ func TestUnitNest(t *testing.T) {
 func TestUnitRelatedCases(t *testing.T) {
 	for _, c := range aqltest.RelatedCases() {
 		t.Run(c.Name, func(t *testing.T) {
-			q, err := c.Parse()
+			q, err := c.Parse(t.Context())
 			if err != nil {
 				t.Fatal(err)
 			}

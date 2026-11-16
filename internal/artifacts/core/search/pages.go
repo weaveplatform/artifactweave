@@ -28,7 +28,7 @@ func (r *SearchRun) Pages(
 			Criteria: criteria, Include: include,
 			Offset: offset, HasOffset: true, Limit: SearchPage, HasLimit: true,
 		}
-		q.Resolve(r.Repos)
+		q.Resolve(ctx, r.Repos)
 		hits, err := r.st.Items().Search(ctx, q, aql.Options{Now: r.Now})
 		if err != nil {
 			return nil, "", r.internal(ctx, "search", err)

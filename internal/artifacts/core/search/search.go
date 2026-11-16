@@ -221,7 +221,7 @@ func (r *SearchRun) RepoScope(repos *string, virtual bool) (scope aql.Node, miss
 
 // RefsOf is the stored locations the repository keys stand for, as a repo
 // criterion's $eq resolves them; nil for no keys.
-func (r *SearchRun) RefsOf(keys []string) map[aql.RepoRef]bool {
+func (r *SearchRun) RefsOf(ctx context.Context, keys []string) map[aql.RepoRef]bool {
 	var out map[aql.RepoRef]bool
 	for _, key := range keys {
 		if key = strings.TrimSpace(key); key == "" {
@@ -230,7 +230,7 @@ func (r *SearchRun) RefsOf(keys []string) map[aql.RepoRef]bool {
 		if out == nil {
 			out = map[aql.RepoRef]bool{}
 		}
-		for _, ref := range r.Repos.Expand(key) {
+		for _, ref := range r.Repos.Expand(ctx, key) {
 			out[ref] = true
 		}
 	}

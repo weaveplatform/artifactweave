@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/reindexauth"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/alpine"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cran"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
@@ -332,12 +333,11 @@ func newDownload(p string, folder bool, m model.Matrix, resolve resolver) *Downl
 
 // Lookup finds the item at p for a download from c: a local repository's
 // own tree, a remote repository's cache (GetItem asks the upstream for
-// what the cache lacks), or the first member of a virtual repository, in
-// order, that the caller may read and that holds it. root reports the
-// repository root, which is not an item. A non-nil dl refuses what
-// Artifactory refuses in each repository it reaches, and rewrites p as
-// each repository that holds items resolves it before looking there; the
-// storage API passes nil.
+// what the cache lacks), or, for a virtual repository, the first of its
+// members, in order (virtual.Members), that the caller may read and that
+// holds it. A non-nil dl refuses what Artifactory refuses in each repository it
+// reaches, and rewrites p as each repository that holds items resolves it
+// before looking there; the storage API passes nil, with virtual.Stored.
 func Lookup(
 	ctx context.Context,
 	st Store,
@@ -346,59 +346,76 @@ func Lookup(
 	p string,
 	acc Access,
 	dl *Download,
-	seen map[string]bool,
+	order virtual.Order,
 ) (Found, error) {
-	if seen[c.Key] {
-		return Found{}, kernel.ErrNotFound
-	}
-	seen[c.Key] = true
 	if dl != nil {
 		if err := generic.CheckDownload(c, dl.path, dl.isFolder); err != nil {
 			dl.stepf("Request is forbidden by %s", c.Key)
 			return Found{}, err //nolint:wrapcheck // a RejectionError is the answer
 		}
 	}
-	if c.Class != repo.Virtual {
-		cached = cached || c.Class == repo.Remote
-		if dl != nil && dl.resolve != nil {
-			var err error
-			asked := p
-			if p, err = dl.resolve(ctx, c, format.Download{
-				Path:   p,
-				Cached: cached,
-				Matrix: dl.matrix,
-				Readable: func(fullPath string) bool {
-					return acc.File(c, fullPath, accessapi.ActionRead)
-				},
-			}); err != nil {
-				return Found{}, err
-			}
-			if p != asked {
-				dl.stepf("Request path was translated to %s", p)
-			}
-		}
-		it, err := st.Items().Get(ctx, c.Key, cached, p)
-		if err != nil {
-			if errors.Is(err, kernel.ErrNotFound) {
-				dl.stepf("Unable to find resource in %s", traceRepoPath(c, cached, p))
-			}
-			return Found{}, err //nolint:wrapcheck // ErrNotFound is the answer
-		}
-		return Found{Repo: c, Item: it}, nil
+	if c.Class == repo.Virtual {
+		return lookupMembers(ctx, st, c, p, acc, dl, order)
 	}
-	for _, key := range c.Repositories {
-		m, err := st.Repos().Get(ctx, key)
+	cached = cached || c.Class == repo.Remote
+	if dl != nil && dl.resolve != nil {
+		var err error
+		asked := p
+		if p, err = dl.resolve(ctx, c, format.Download{
+			Path:   p,
+			Cached: cached,
+			Matrix: dl.matrix,
+			Readable: func(fullPath string) bool {
+				return acc.File(c, fullPath, accessapi.ActionRead)
+			},
+		}); err != nil {
+			return Found{}, err
+		}
+		if p != asked {
+			dl.stepf("Request path was translated to %s", p)
+		}
+	}
+	it, err := st.Items().Get(ctx, c.Key, cached, p)
+	if err != nil {
 		if errors.Is(err, kernel.ErrNotFound) {
+			dl.stepf("Unable to find resource in %s", traceRepoPath(c, cached, p))
+		}
+		return Found{}, err //nolint:wrapcheck // ErrNotFound is the answer
+	}
+	return Found{Repo: c, Item: it}, nil
+}
+
+// lookupMembers is Lookup through the virtual repository c: its real
+// members in order, nested virtual repositories flattened, as 7.161.26's
+// processStandard walks the list assembleSearchRepositoriesList gives it.
+// A nested virtual repository whose patterns reject the download's path is
+// left out by Members, as it filters them.
+func lookupMembers(
+	ctx context.Context,
+	st Store,
+	c repo.Config,
+	p string,
+	acc Access,
+	dl *Download,
+	order virtual.Order,
+) (Found, error) {
+	o := virtual.Options{Order: order}
+	if dl != nil {
+		o.Path, o.Folder = dl.path, dl.isFolder
+	}
+	members, err := virtual.Members(ctx, st.Repos(), c, o)
+	if err != nil {
+		return Found{}, fmt.Errorf("members of %s: %w", c.Key, err)
+	}
+	for _, m := range members {
+		// The item routes read a remote member from its cache alone: they
+		// fetch nothing upstream through a virtual repository yet
+		// (https://github.com/weaveplatform/artifactweave/issues/1535).
+		if m.Upstream || !acc.Folder(m.Repo, p, accessapi.ActionRead) {
 			continue
 		}
-		if err != nil {
-			return Found{}, fmt.Errorf("member %s of %s: %w", key, c.Key, err)
-		}
-		if !acc.Folder(m, p, accessapi.ActionRead) {
-			continue
-		}
-		dl.stepf("Searching for the resource within %s", m.Key)
-		f, err := Lookup(ctx, st, m, false, p, acc, dl, seen)
+		dl.stepf("Searching for the resource within %s", m.Repo.Key)
+		f, err := Lookup(ctx, st, m.Repo, false, p, acc, dl, order)
 		// A member that refuses the download is passed over like one that
 		// lacks the item, as Artifactory's search goes on past every member
 		// that does not serve it (VirtualRepoDownloadStrategy.processStandard).
@@ -490,7 +507,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, map[string]bool{})
+	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
 		s.getUnfoundItem(w, r, st, c, cached, req, p, acc, dl)
 		return
@@ -543,7 +560,7 @@ func (s *Kit) getUnfoundItem(
 	// "<archive>!/<entry>" names an entry inside an archive file; a path
 	// that exists as an item is served as one first.
 	if archive, entry, ok := strings.Cut(req.Path, "!/"); ok {
-		a, err := Lookup(r.Context(), st, c, cached, archive, acc, dl, map[string]bool{})
+		a, err := Lookup(r.Context(), st, c, cached, archive, acc, dl, virtual.Resolve)
 		if errors.Is(err, kernel.ErrNotFound) {
 			httpkit.WriteErr(w, r, missed(c, cached, req))
 			return
@@ -603,7 +620,7 @@ func (s *Kit) getSidecar(
 		httpkit.WriteErr(w, r, missed(c, cached, req))
 		return
 	}
-	f, err := Lookup(r.Context(), st, c, cached, artifact, acc, dl, map[string]bool{})
+	f, err := Lookup(r.Context(), st, c, cached, artifact, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
 		httpkit.WriteErr(w, r, missed(c, cached, req))
 		return
@@ -1069,7 +1086,7 @@ func (s *Kit) coldRemoteRead(
 	}
 	file := req.Path
 	if artifact, _, ok := item.Sidecar(req.Path); ok {
-		_, err := Lookup(ctx, st, c, cached, artifact, acc, dl, map[string]bool{})
+		_, err := Lookup(ctx, st, c, cached, artifact, acc, dl, virtual.Resolve)
 		if !errors.Is(err, kernel.ErrNotFound) {
 			return false
 		}
