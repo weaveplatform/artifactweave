@@ -141,9 +141,11 @@ func unfound(
 //     unfound resource with the policy's status and message, Maven's 409
 //     included.
 //
-// A format's other refusals keep their answers, and so does a folder
-// request, which 7.x answers through its directory listing
-// (RepoFilter.doDirectoryRequest), not through respondResourceNotFound.
+// A request that named a remote's cache takes the policy's reason in the
+// cache's words (asNamed). A format's other refusals keep their answers,
+// and so does a folder request, which 7.x answers through its directory
+// listing (RepoFilter.doDirectoryRequest), not through
+// respondResourceNotFound.
 func lookupRefusal(c repo.Config, req ItemRequest, err error) error {
 	var rejected *format.RejectionError
 	if req.Path == "" || req.IsFolder || !errors.As(err, &rejected) {
@@ -152,10 +154,33 @@ func lookupRefusal(c repo.Config, req ItemRequest, err error) error {
 	if c.Class != repo.Virtual && (!fileRequest(c, req) || !rejected.Policy) {
 		return err
 	}
+	if namesCache(c, req) {
+		rejected = rejected.Named(req.Key)
+	}
 	return apierror.New(
 		rejected.Status,
 		rejected.Message+pathSuffix(req.Key, resourcePath(req.Path)),
 	)
+}
+
+// namesCache reports whether req names the cache of c, a remote
+// repository, by its "-cache" key, which ResolveRepo resolves to c.
+func namesCache(c repo.Config, req ItemRequest) bool {
+	return c.Class == repo.Remote && req.Key == c.Key+model.CacheSuffix
+}
+
+// asNamed is err, a refusal by the download policy of c, in the words of
+// the repository a request named: when cached, the cache of c, a remote
+// repository, which 7.161.26 checks with the remote's settings under the
+// cache's own key (format.RejectionError.Named). The checks run on c, so
+// they name the remote until a request's answer or trace names the cache.
+// Any other error, and any other request's refusal, is err itself.
+func asNamed(c repo.Config, cached bool, err error) error {
+	refusal := policyRefusal(err)
+	if refusal == nil || !cached || c.Class != repo.Remote {
+		return err
+	}
+	return refusal.Named(c.Key + model.CacheSuffix) //nolint:wrapcheck // a RejectionError is the answer
 }
 
 // policyRefusal is the download policy's refusal err holds

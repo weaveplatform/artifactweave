@@ -97,7 +97,8 @@ func (s DebianAPI) serveDebianIndex(
 	// reads it through the download path, so a blacked-out repository, or
 	// patterns that reject the index's own path, answer the policy's 404
 	// and message once read permission is settled (DV-057). A remote's
-	// -cache alias answers as the remote does. The source boundary checks a
+	// -cache alias is checked with the remote's settings and named as the
+	// cache (itemkit.Rejected). The source boundary checks a
 	// remote index read's policy at its permission folder, the repository
 	// root, so only this check sees the patterns on the index's own path.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {

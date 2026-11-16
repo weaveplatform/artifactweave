@@ -306,8 +306,9 @@ func TestAccFormatOverlayDownloadAnswers(t *testing.T) {
 // every such refusal of a file: RealRepoBase.assertValidPath's reason with
 // the path the download names after it (DownloadServiceImpl.
 // respondResourceNotFound), traced as createUnfoundRepoResource logs it.
-// A cache's refusal names the remote in its reason, as it did before.
-// Before, the reason came alone and the trace named no refusal.
+// A cache's reason names the cache, as 7.x's cache repository checks the
+// remote's settings under its own key. Before, the reason came alone, a
+// cache's named the remote, and the trace named no refusal.
 func TestAccFormatOverlayPolicyRefusalNamesThePath(t *testing.T) {
 	for _, tc := range []struct {
 		pt    repo.PackageType
@@ -335,11 +336,9 @@ func TestAccFormatOverlayPolicyRefusalNamesThePath(t *testing.T) {
 			w.Repo.BlackedOut = ptr(true)
 			w.Update()
 			for _, p := range tc.paths {
-				for key, refuser := range map[string]string{
-					"fmt-local": "fmt-local", "remote": "remote", "remote-cache": "remote",
-				} {
-					message := "The repository '" + refuser + "' is blacked out and cannot serve " +
-						"artifact '" + refuser + ":" + p + "'."
+				for _, key := range []string{"fmt-local", "remote", "remote-cache"} {
+					message := "The repository '" + key + "' is blacked out and cannot serve " +
+						"artifact '" + key + ":" + p + "'."
 					answer := message + "; Path: '" + key + ":" + p + "'"
 					path := "/artifactory/" + key + "/" + p
 					for _, method := range []string{http.MethodGet, http.MethodHead} {
@@ -358,6 +357,67 @@ func TestAccFormatOverlayPolicyRefusalNamesThePath(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestAccCachePolicyRefusalNamesTheCache (#1630): a download through a
+// remote repository's -cache alias that the remote's download policy
+// refuses names the cache in its reason, as 7.161.26's cache repository
+// checks the remote's settings under its own key, "<remote>-cache"
+// (LocalCacheRepoConfig 40), and its policy exceptions name that key and
+// its repo path (RepoBase.getRepoPath 122-123). A file, its checksum and an
+// archive entry all answer so, with the path after the reason and the
+// reason in the trace; the remote's own key keeps naming the remote, and
+// the upstream is not asked. Before, a cache's reason named the remote.
+func TestAccCachePolicyRefusalNamesTheCache(t *testing.T) {
+	w := harness.NewRemoteWorld(t)
+	for _, tc := range []struct {
+		name   string
+		tune   func(*repo.Config)
+		reason func(key, file string) string
+	}{
+		{
+			"blacked out",
+			func(c *repo.Config) { c.BlackedOut = ptr(true) },
+			func(key, file string) string {
+				return "The repository '" + key + "' is blacked out and cannot serve artifact '" +
+					key + ":" + file + "'."
+			},
+		},
+		{
+			"excluded",
+			func(c *repo.Config) { c.BlackedOut, c.ExcludesPattern = ptr(false), ptr("**/*.txt, **/*.zip") },
+			func(key, file string) string {
+				return "The repository '" + key + "' rejected the artifact '" + key + ":" + file +
+					"' due to its include/exclude pattern settings."
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.tune(&w.Repo)
+			w.Update()
+			for _, key := range []string{"remote", "remote-cache"} {
+				for asked, file := range map[string]string{
+					"x.txt": "x.txt", "x.txt.sha1": "x.txt", "a.zip!/f.txt": "a.zip",
+				} {
+					reason := tc.reason(key, file)
+					answer := reason + "; Path: '" + key + ":" + file + "'"
+					path := "/artifactory/" + key + "/" + asked
+					for _, method := range []string{http.MethodGet, http.MethodHead} {
+						wantAnswer(t, method, w.Request(method, path, "reader", ""),
+							http.StatusNotFound, errorBody(t, http.StatusNotFound, answer))
+					}
+					rec := w.Request(http.MethodGet, path+"?trace", "reader", "")
+					step := " Download denied (" + reason + ") - returning un-found resource\n"
+					if !strings.Contains(rec.Body.String(), step) {
+						t.Errorf("%s?trace: %s, want %q", path, rec.Body, step)
+					}
+				}
+			}
+		})
+	}
+	if n := len(w.Upstream.Requests()); n != 0 {
+		t.Errorf("the refused downloads asked the upstream %d times", n)
 	}
 }
 

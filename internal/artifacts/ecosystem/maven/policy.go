@@ -58,11 +58,9 @@ func checkPolicy(c repo.Config, r reader, p string) error {
 	if snapshot && handles(c.HandleSnapshots) || !snapshot && handles(c.HandleReleases) {
 		return nil
 	}
-	refusal := format.Rejectf(http.StatusConflict,
-		"The repository '%s' rejected the resolution of an artifact '%s:%s' due to conflict in "+
-			"the snapshot release handling policy.", c.Key, c.Key, p)
-	refusal.Policy = true
-	return refusal
+	return format.PolicyRefusal(http.StatusConflict,
+		"The repository '%[1]s' rejected the resolution of an artifact '%[1]s:%[2]s' due to "+
+			"conflict in the snapshot release handling policy.", c.Key, p)
 }
 
 // handles reads handleReleases or handleSnapshots, both on unless set off.

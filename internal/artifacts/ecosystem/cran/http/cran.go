@@ -113,8 +113,9 @@ func (s CranAPI) serveCranIndex(
 	// remote's at this path, so a blacked-out repository or patterns that
 	// reject the file's own path answer the policy's 404 and message once
 	// Read permission is settled (DV-057); a virtual repository's patterns
-	// answer that no repository serves it. A remote's -cache alias answers
-	// as the remote does.
+	// answer that no repository serves it. A remote's -cache alias is
+	// checked with the remote's settings and named as the cache
+	// (itemkit.Rejected).
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "CRAN index download", itemkit.Rejected(c, req, err)))
 		return
