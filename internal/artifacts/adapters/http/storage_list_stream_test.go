@@ -189,7 +189,7 @@ func (v storageView) collectedLastModified(
 // members hold is reported once, from the first member the caller may read
 // it in.
 func (v storageView) below(ctx context.Context, folder string, deep bool) ([]model.Item, error) {
-	trees, err := v.trees(ctx, v.repo, map[string]bool{})
+	trees, err := v.trees(ctx)
 	if err != nil {
 		return nil, err
 	}

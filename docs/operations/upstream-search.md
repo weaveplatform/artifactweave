@@ -62,7 +62,10 @@ parity.
 One search permits at most 100 listing pages / 10,000 listing entries across all
 repositories, 32 path levels, and 100 Maven metadata documents / 10,000 metadata
 version records. Virtual expansion is bounded to 1,000 visited nodes and 32
-ancestors; cycles fail explicitly before upstream acquisition. Exhaustion, malformed metadata, unavailable listing capabilities,
+ancestors, which fail before upstream acquisition. A virtual repeated on its own route
+is skipped, as 7.x's member resolution skips a virtual it has already visited
+([decision 0008](../research/decisions/0008-virtual-repositories.md), R2). Exhaustion,
+malformed metadata, unavailable listing capabilities,
 authentication and security refusals are explicit errors. Ordinary upstream
 availability failures may leave a partial local/cached answer when `hardFail=false`;
 `hardFail=true` propagates them. Explicit offline and assumed-offline use the common

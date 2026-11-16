@@ -9,6 +9,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -73,6 +74,26 @@ func TestUnitStoragePermissionsRenderGrants(t *testing.T) {
 	if _, _, err := v.permissions(t.Context(), f); !errors.Is(err, errBoom) ||
 		err.Error() != errBoom.Error() {
 		t.Errorf("a Grants error: %v, want it as Grants gave it", err)
+	}
+}
+
+// A member the store cannot read fails a virtual repository's folder view
+// with the store's error, which answers 500, rather than a list that leaves
+// the member's items out.
+func TestUnitStorageTreesMemberReadFails(t *testing.T) {
+	db := inmem.New()
+	virt := *repo.Defaults(&repo.Config{
+		Key: "virt", Class: repo.Virtual, Repositories: []string{"libs-local"},
+	})
+	if err := db.Repos().Create(t.Context(), virt); err != nil {
+		t.Fatal(err)
+	}
+	v := storageView{
+		st:   faultyStore{Store: db, fail: map[string]bool{"get:libs-local": true}},
+		repo: virt,
+	}
+	if _, err := v.trees(t.Context()); !errors.Is(err, errBoom) {
+		t.Fatalf("trees: %v, want the store's error", err)
 	}
 }
 

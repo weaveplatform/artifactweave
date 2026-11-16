@@ -9,6 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
@@ -64,8 +65,9 @@ func TestAccTransitiveVirtualTraversalBounds(t *testing.T) {
 			}
 			configs["v0"] = repo.Config{Key: "v0", Class: repo.Virtual, Repositories: members}
 		}
-		if _, err := transitiveMembers(configs, "v0"); err == nil {
-			t.Fatal("unbounded virtual traversal", depth)
+		_, err := transitiveMembers(t.Context(), configs, "v0")
+		if !errors.Is(err, aql.ErrInvalid) {
+			t.Fatal("unbounded virtual traversal", depth, err)
 		}
 	}
 }

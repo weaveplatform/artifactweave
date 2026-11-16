@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/search"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 )
 
@@ -48,6 +49,7 @@ type searchRoutes struct {
 // enabled and the server reads remote sources, with its routes from the keys
 // in repos; both are nil otherwise.
 func (r *searchRun) upstreamSearch(
+	ctx context.Context,
 	ls search.LayoutScope,
 	repos, g, a *string,
 	enabled bool,
@@ -56,7 +58,7 @@ func (r *searchRun) upstreamSearch(
 		return nil, nil
 	}
 	routes := &searchRoutes{r: r, ls: ls}
-	routes.prepareRoutes(repos)
+	routes.prepareRoutes(ctx, repos)
 	return search.NewUpstreamSearch(r.SearchRun, ls, g, a, search.UpstreamDeps{
 		Sources: r.s.cfg.RemoteSources,
 		Items:   &item.Service{Store: r.st},
@@ -117,8 +119,9 @@ func gavcRemote(ctx context.Context, specific bool, g, a *string) (bool, error) 
 }
 
 // A physical member may have several permitted routes. A global visited set
-// would discard a later allowed route after encountering a restricted one.
-func (u *searchRoutes) prepareRoutes(requested *string) {
+// would discard a later allowed route after encountering a restricted one,
+// so the routes come from virtual.Walk, which keeps every route.
+func (u *searchRoutes) prepareRoutes(ctx context.Context, requested *string) {
 	u.routes = map[string][]searchRoute{}
 	u.virtuals = map[string]repo.Config{}
 	keys := strings.Split(httpkit.Deref(requested), ",")
@@ -133,16 +136,22 @@ func (u *searchRoutes) prepareRoutes(requested *string) {
 	}
 	nodes := 0
 	for _, key := range keys {
-		key = strings.TrimSpace(key)
-		u.visitRoute(key, searchRoute{name: key}, &nodes)
+		u.visitRoute(ctx, strings.TrimSpace(key), &nodes)
+		if u.routeErr != nil {
+			break
+		}
 	}
 	slices.Sort(u.keys)
 }
 
-func (u *searchRoutes) visitRoute(key string, route searchRoute, nodes *int) {
+// visitRoute adds the routes from key, a key the search named, to the
+// remote repositories it reaches. A cycle ends the route that repeats a
+// virtual repository, as 7.x's resolution skips a virtual it has visited
+// (decision 0008, R2); more than 1,000 keys and members or 32 nested
+// virtual repositories fail the search.
+func (u *searchRoutes) visitRoute(ctx context.Context, key string, nodes *int) {
 	*nodes++
-	if *nodes > 1000 || len(route.virtuals) > 32 ||
-		slices.ContainsFunc(route.virtuals, func(c repo.Config) bool { return c.Key == key }) {
+	if *nodes > 1000 {
 		u.routeErr = search.InvalidSearchMetadata()
 		return
 	}
@@ -154,28 +163,46 @@ func (u *searchRoutes) visitRoute(key string, route searchRoute, nodes *int) {
 			"-cache",
 		); alias &&
 			u.r.Configs[base].Class == repo.Remote {
-			route.isCacheOnly = true
-			u.routes[base] = append(u.routes[base], route)
+			u.routes[base] = append(u.routes[base], searchRoute{name: key, isCacheOnly: true})
 		}
 		return
 	}
-	if c.Class == repo.Virtual {
-		u.virtuals[key] = c
-		route.virtuals = append(slices.Clone(route.virtuals), c)
-		for _, child := range c.Repositories {
-			u.visitRoute(child, route, nodes)
-			if u.routeErr != nil {
-				return
+	if c.Class != repo.Virtual {
+		u.addRoute(c, searchRoute{name: key})
+		return
+	}
+	u.virtuals[key] = c
+	err := virtual.Walk(
+		ctx,
+		virtual.Configs(u.r.Configs),
+		c,
+		func(chain []repo.Config, m repo.Config) error {
+			*nodes++
+			if *nodes > 1000 || len(chain) > 32 {
+				return search.InvalidSearchMetadata()
 			}
-		}
+			if m.Class == repo.Virtual {
+				u.virtuals[m.Key] = m
+				return nil
+			}
+			u.addRoute(m, searchRoute{name: key, virtuals: slices.Clone(chain)})
+			return nil
+		},
+	)
+	if err != nil {
+		u.routeErr = err
+	}
+}
+
+// addRoute adds route to c, a repository that holds items, when the search
+// has a layout for it and the caller may see it.
+func (u *searchRoutes) addRoute(c repo.Config, route searchRoute) {
+	if u.ls.Layouts[c.Key] == nil || !u.r.acc.Visible(c) {
 		return
 	}
-	if u.ls.Layouts[key] == nil || !u.r.acc.Visible(c) {
-		return
-	}
-	u.routes[key] = append(u.routes[key], route)
-	if c.Class == repo.Remote && !slices.Contains(u.keys, key) {
-		u.keys = append(u.keys, key)
+	u.routes[c.Key] = append(u.routes[c.Key], route)
+	if c.Class == repo.Remote && !slices.Contains(u.keys, c.Key) {
+		u.keys = append(u.keys, c.Key)
 	}
 }
 

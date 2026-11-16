@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/search"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -98,7 +99,7 @@ func (s ArtifactoryAPI) transitiveAQL(
 	if !exists || targetConfig.Class != repo.Remote && targetConfig.Class != repo.Virtual {
 		return transitiveSearch{}, aql.ErrInvalid
 	}
-	members, err := transitiveMembers(configs, key)
+	members, err := transitiveMembers(ctx, configs, key)
 	if err != nil {
 		return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
 	}
@@ -116,7 +117,7 @@ func (s ArtifactoryAPI) transitiveAQL(
 		}
 	}
 	original := *q
-	q.Resolve(aql.AQLRepositories(configs))
+	q.Resolve(ctx, aql.AQLRepositories(configs))
 	if budget == 0 {
 		return transitiveSearch{hits: []aql.Hit{}}, nil
 	}
@@ -152,7 +153,7 @@ func (s ArtifactoryAPI) transitiveAQL(
 		hits = hits[:q.Limit]
 	}
 	if q.VirtualRepos() {
-		virtualRepos(configs, hits)
+		virtualRepos(ctx, configs, hits)
 	}
 	if err = ctx.Err(); err != nil {
 		return transitiveSearch{}, fmt.Errorf("transitive aql: %w", err)
@@ -254,52 +255,59 @@ func deduplicateTransitive(hits []aql.Hit) []aql.Hit {
 	return out
 }
 
-// Walk configured virtual membership in declaration order, retaining alternative
-// routes for pattern checks. Only the first five distinct remote members search.
-func transitiveMembers(configs map[string]repo.Config, key string) ([]transitiveMember, error) {
+// transitiveMembers are the members of key, a remote repository or a
+// virtual one, through every route (virtual.Walk): configured order, depth
+// first, each route kept for the pattern checks that decide what a member
+// may show. Only the first five distinct remote members search. A cycle
+// ends the route that repeats a virtual, as 7.x's resolution skips it (R2);
+// the walk fails beyond 256 members and virtuals or eight virtual levels.
+func transitiveMembers(
+	ctx context.Context,
+	configs map[string]repo.Config,
+	key string,
+) ([]transitiveMember, error) {
 	var out []transitiveMember
 	indexes := map[string]int{}
-	remoteCount, nodes := 0, 0
-	var visit func(string, []repo.Config, map[string]bool) error
-	visit = func(key string, route []repo.Config, stack map[string]bool) error {
-		nodes++
-		if nodes > 256 || len(route) > 8 || stack[key] {
-			return aql.ErrInvalid
-		}
-		c, ok := configs[key]
-		if !ok {
-			return aql.ErrInvalid
-		}
-		if c.Class == repo.Virtual {
-			stack[key] = true
-			defer delete(stack, key)
-			for _, child := range c.Repositories {
-				if err := visit(child, append(slices.Clone(route), c), stack); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-		if i, ok := indexes[key]; ok {
+	remoteCount := 0
+	add := func(route []repo.Config, c repo.Config) {
+		if i, ok := indexes[c.Key]; ok {
 			out[i].routes = append(out[i].routes, slices.Clone(route))
-			return nil
+			return
 		}
 		if c.Class == repo.Remote {
 			remoteCount++
 		}
-		indexes[key] = len(out)
-		out = append(
-			out,
-			transitiveMember{
-				config:    c,
-				routes:    [][]repo.Config{slices.Clone(route)},
-				canSearch: c.Class == repo.Remote && remoteCount <= 5,
-			},
-		)
-		return nil
+		indexes[c.Key] = len(out)
+		out = append(out, transitiveMember{
+			config:    c,
+			routes:    [][]repo.Config{slices.Clone(route)},
+			canSearch: c.Class == repo.Remote && remoteCount <= 5,
+		})
 	}
-	if err := visit(key, nil, map[string]bool{}); err != nil {
-		return nil, err
+	top := configs[key]
+	if top.Class != repo.Virtual {
+		add(nil, top)
+		return out, nil
+	}
+	// The top virtual counts as the first node.
+	nodes := 1
+	err := virtual.Walk(
+		ctx,
+		virtual.Configs(configs),
+		top,
+		func(chain []repo.Config, m repo.Config) error {
+			nodes++
+			if nodes > 256 || len(chain) > 8 {
+				return aql.ErrInvalid
+			}
+			if m.Class != repo.Virtual {
+				add(chain, m)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("transitive members of %s: %w", key, err)
 	}
 	return out, nil
 }
