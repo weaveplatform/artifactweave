@@ -84,7 +84,9 @@ not gain HTTP fetching from this injection; their adapters must opt in separatel
 queries retain their existing cache-only paths. A download through a virtual repository on
 the item routes reads a remote member's upstream with the member's own source request,
 after every member's cache, only where a direct item read of that member would
-([#1535](https://github.com/weaveplatform/artifactweave/issues/1535)). Local and federated reads
+([#1535](https://github.com/weaveplatform/artifactweave/issues/1535)). A member's cached
+copy that has expired by `remote.Fresh`, the rule a direct read revalidates it by, is passed
+over to that upstream read ([#1641](https://github.com/weaveplatform/artifactweave/issues/1641)). Local and federated reads
 and all client refusals to deploy to a remote/cache are unchanged. Matrix filters apply
 to stored properties; transient content has no properties and cannot satisfy a mandatory
 property filter. `Resource.ChecksumOnly` authorizes the underlying artifact while

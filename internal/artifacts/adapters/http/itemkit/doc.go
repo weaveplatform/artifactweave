@@ -160,7 +160,11 @@
 //     or blacked-out remote and the remote's policy pass over it, a Read
 //     refusal is kept as any member's, and a refused cache fill or a
 //     failure of this server's own reads is answered (upstreamMiss,
-//     #1535). A file request
+//     #1535). A remote member's cache step passes over a copy that has
+//     expired by the rule a direct read revalidates it by (copyExpired,
+//     remote.Fresh), where the member's upstream step would read it, and
+//     that step serves the expired copy when it finds nothing (fallBack,
+//     #1641). A file request
 //     it finds nowhere answers 7.161.26's respondResourceNotFound
 //     (virtual.Answer): 404 "Could not find resource", the first
 //     refusal's 403, 404 "Resource not found" under
@@ -275,7 +279,7 @@
 // to Store (ART-22). P10 gave DeployTarget 7.x's answers for a virtual
 // repository and the item routes' PUT its own for a remote one (#1534),
 // and the walk through a virtual repository its remote members' upstream
-// steps (#1535).
+// steps (#1535) and their caches' expiry (#1641).
 //
 // # Testing
 //
