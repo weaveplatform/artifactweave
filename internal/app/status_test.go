@@ -493,6 +493,21 @@ func itemStatusRows() []statusCase {
 		{head, lib + "/fixture/get.txt", "", "", 401},
 		{head, lib + "/fixture/get.txt?trace", "admin", "", 200},
 
+		// A read through a virtual repository is decided by its members
+		// (#1533): virt over libs-local, which refuses "user", and perm-virt
+		// over perm-local, which "user" reads.
+		{get, "/artifactory/virt/fixture/get.txt", "admin", "", 200},
+		{get, "/artifactory/virt/fixture/absent", "admin", "", 404},
+		{get, "/artifactory/virt/fixture/get.txt", "user", "", 403},
+		{get, "/artifactory/virt/fixture/get.txt.sha1", "user", "", 403},
+		{get, "/artifactory/virt/fixture/get.txt", "anonymous", "", 401},
+		{head, "/artifactory/virt/fixture/get.txt", "user", "", 403},
+		{head, "/artifactory/virt/fixture/get.txt", "anonymous", "", 401},
+		{get, "/artifactory/virt/", "user", "", 403},
+		{get, "/artifactory/perm-virt/", "user", "", 200},
+		{get, "/artifactory/perm-virt/absent", "user", "", 404},
+		{head, "/artifactory/perm-virt/absent", "user", "", 404},
+
 		{remove, lib + "/fixture/del.txt", "admin", "", 204},
 		{remove, lib + "/fixture/absent", "admin", "", 404},
 		{remove, "/artifactory/virt/x", "admin", "", 404},

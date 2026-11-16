@@ -3,6 +3,7 @@ package artifactshttp
 import (
 	"context"
 	"errors"
+	"net/http"
 	"reflect"
 	"slices"
 	"testing"
@@ -13,6 +14,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
 // The permissions view renders what Grants answers in the legacy letters,
@@ -94,6 +97,31 @@ func TestUnitStorageTreesMemberReadFails(t *testing.T) {
 	}
 	if _, err := v.trees(t.Context()); !errors.Is(err, errBoom) {
 		t.Fatalf("trees: %v, want the store's error", err)
+	}
+}
+
+// A member the store cannot read fails the read gate of a virtual
+// repository's root, which asks the members (Admits; #1533), with 500
+// rather than a refusal.
+func TestUnitStorageVirtualRootGateFails(t *testing.T) {
+	db := inmem.New()
+	virt := *repo.Defaults(&repo.Config{
+		Key: "virt", Class: repo.Virtual, Repositories: []string{"libs-local"},
+	})
+	if err := db.Repos().Create(t.Context(), virt); err != nil {
+		t.Fatal(err)
+	}
+	v := storageView{
+		s:    newArtifactoryAPI(Config{}),
+		st:   faultyStore{Store: db, fail: map[string]bool{"get:libs-local": true}},
+		key:  "virt",
+		repo: virt,
+		acc:  itemkit.Access{Decider: &accessapitest.Decider{}},
+	}
+	var e *apierror.Error
+	if err := v.admit(t.Context(), "", kernel.Principal{Name: "user"}); !errors.As(err, &e) ||
+		e.Status != http.StatusInternalServerError {
+		t.Fatalf("admit: %v, want 500", err)
 	}
 }
 

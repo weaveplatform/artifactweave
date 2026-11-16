@@ -166,10 +166,12 @@ func TestAccStorageAnswersMissAndRefusal(t *testing.T) {
 		{"admin", "missing/x?list", 404, "Repository 'missing' does not exist"},
 		{"admin", "nostore/pkg/x?list", 404, "Could not find resource"},
 		{"", "missing/x?list", 403, "This resource is available to authenticated users only."},
-		// A virtual repository keeps its answers, which P10 settles.
+		// A virtual repository is never asked itself: its members decide
+		// (#1533), so deployer, who reads libs-local, gets its item, and
+		// anonymous, who reads only the remote, is answered the miss. The
+		// answers themselves are #1537's.
 		{"reader", "virt/a/missing.bin", 404, "Could not find resource"},
-		{"deployer", "virt/a/file.bin", 403, "Forbidden"},
-		{"", "virt/a/file.bin", 401, "Authentication is required"},
+		{"", "virt/a/file.bin", 404, "Could not find resource"},
 		{"admin", "virt/a/file.bin?list", 400, "/a/file.bin is a file; list needs a folder"},
 	})
 }

@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
 // Repos is where Members and Walk read a member's configuration by key. A
@@ -253,4 +255,76 @@ func Walk(
 		return nil
 	}
 	return walk()
+}
+
+// Resolution is what a download's walk over a virtual repository's members
+// found: whether a member served the path, and, when none did, the first
+// member that refused the caller Read. 7.x's walk passes over every member
+// that does not serve the path, a Read refusal included, and keeps only the
+// first refusal for the answer (R3; ArtifactoryVirtualDownloadStrategy.
+// processStandard 209-260, checkIfForbidden 436-442).
+type Resolution struct {
+	Found     bool
+	Forbidden *Denial
+}
+
+// Deny records d as the walk's refusal unless an earlier member refused, as
+// processStandard keeps the first, and reports whether d is the one kept.
+func (r *Resolution) Deny(d Denial) bool {
+	if r.Forbidden != nil {
+		return false
+	}
+	r.Forbidden = &d
+	return true
+}
+
+// Denial is a member's refusal of Read in a walk, in the words of
+// RealRepoBase.assertReadPermissions 145-153: the member and path it checked
+// (a remote member's "<key>-cache", where 7.x keeps a remote's permissions)
+// and the caller's name.
+type Denial struct {
+	Member, Path, User string
+}
+
+// Message is the refusal's text, which the 403 answers and a trace logs.
+func (d Denial) Message() string {
+	return fmt.Sprintf("Download request for repo:path '%s:%s' is forbidden for user: '%s'.",
+		d.Member, d.Path, d.User)
+}
+
+// Answer is the item route's answer to a file download through the virtual
+// repository v of path that the walk r found nowhere, or nil when r found
+// it. path is the resource path the walk looked for: the archive of an
+// archive entry and the file of a checksum, as 7.x's request names them
+// (DownloadRequestContext.getResourcePath). hideGlobal is the security
+// configuration's hideUnauthorizedResources, which artifactweave does not
+// have yet, so callers pass false.
+//
+// The answers are DownloadServiceImpl.respondResourceNotFound's (1465-1497)
+// for the unfound resource processStandard returns (newUnfoundResource
+// 468-475), each with the virtual's path appended:
+//   - no member refused: 404 "Could not find resource";
+//   - a member refused: 403 with that member's refusal, the first one;
+//   - a refusal while v's hideUnauthorizedResources or hideGlobal is on:
+//     404 "Resource not found" (shouldHideUnauthorisedResponse 1499-1518;
+//     R4), to an anonymous caller too, since the 404 sends no challenge;
+//   - a refusal to an anonymous caller, not hidden: the 401 challenge
+//     (shouldSendAuthRequired 1460-1463). sendAuthorizationRequired writes
+//     "Unauthorized" in place of the reason in 6.20's
+//     HttpArtifactoryResponse; 7.x's is closed code [I].
+func Answer(v repo.Config, path string, r Resolution, anonymous, hideGlobal bool) error {
+	if r.Found {
+		return nil
+	}
+	suffix := "; Path: '" + v.Key + ":" + path + "'"
+	d := r.Forbidden
+	switch {
+	case d == nil:
+		return apierror.New(http.StatusNotFound, "Could not find resource"+suffix)
+	case hideGlobal || v.HideUnauthorizedResources != nil && *v.HideUnauthorizedResources:
+		return apierror.New(http.StatusNotFound, "Resource not found"+suffix)
+	case anonymous:
+		return apierror.New(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+	}
+	return apierror.New(http.StatusForbidden, d.Message()+suffix)
 }

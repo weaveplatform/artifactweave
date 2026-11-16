@@ -84,9 +84,10 @@ func downloadWorld(t *testing.T, anonymous bool) *itemWorld {
 // respondResourceNotFound appends. A checksum and an archive entry name the
 // file they are read from (DownloadRequestContext.getResourcePath,
 // ArtifactoryRequestBase.zipResourcePath). Before, every one answered
-// "Could not find resource", which a virtual repository's miss keeps
-// (P10's #1533 owns it). A file that lacks a mandatory matrix key
-// ("key+=value") answers DbStoringRepoMixin.getInfo's PROPERTY_MISMATCH text.
+// "Could not find resource", which a virtual repository's miss keeps with
+// the virtual's path (#1533; virtual_status_test.go). A file that lacks a
+// mandatory matrix key ("key+=value") answers DbStoringRepoMixin.getInfo's
+// PROPERTY_MISMATCH text.
 func TestAccItemDownloadMissNamesThePath(t *testing.T) {
 	w := downloadWorld(t, false)
 	for _, tc := range []struct{ path, message string }{
@@ -100,7 +101,7 @@ func TestAccItemDownloadMissNamesThePath(t *testing.T) {
 			"File 'libs-local:a/file.bin' was found, but mandatory properties do not match.; " +
 				"Path: 'libs-local:a/file.bin'",
 		},
-		{"virt/a/missing.bin", "Could not find resource"},
+		{"virt/a/missing.bin", "Could not find resource; Path: 'virt:a/missing.bin'"},
 	} {
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
 			rec := w.do(method, "/artifactory/"+tc.path, "reader", "")
@@ -124,7 +125,9 @@ func TestAccItemDownloadMissNamesThePath(t *testing.T) {
 // sendAuthorizationRequired, which writes that text in place of the reason.
 // Before, they answered 403 "Forbidden" and 401 "Authentication is
 // required". A folder request, which 7.x answers with its directory
-// listing, and a virtual repository keep their answers.
+// listing, keeps its answers. Through a virtual repository the members
+// decide, and an anonymous caller refused by one gets the same 401
+// (#1533; before, "Authentication is required").
 func TestAccItemDownloadRefusalNamesTheUser(t *testing.T) {
 	w := downloadWorld(t, true)
 	forbidden := func(key, p, user string) string {
@@ -152,7 +155,7 @@ func TestAccItemDownloadRefusalNamesTheUser(t *testing.T) {
 		{"fed-local/a/file.bin", "", 401, "Unauthorized"},
 		{"libs-local/a/", "user", 403, "Forbidden"},
 		{"libs-local/a/", "", 401, "Authentication is required"},
-		{"virt/a/file.bin", "", 401, "Authentication is required"},
+		{"virt/a/file.bin", "", 401, "Unauthorized"},
 	} {
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
 			rec := w.do(method, "/artifactory/"+tc.path, tc.user, "")

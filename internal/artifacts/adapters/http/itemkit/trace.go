@@ -173,7 +173,9 @@ func (s *Kit) traceDownload(
 	if handled, err := s.traceOverlays(r, st, c, cached, req, p, acc, t); handled {
 		return err
 	}
-	if !acc.Folder(c, req.Path, accessapi.ActionRead) {
+	if ok, err := acc.Admits(ctx, st.Repos(), c, req.Path); err != nil {
+		return s.InternalError(ctx, "read gate", err)
+	} else if !ok {
 		return refused(c, req, p)
 	}
 	traceRetrieving(t, c, cached, req)
@@ -213,10 +215,10 @@ func (s *Kit) traceDownload(
 				return err
 			}
 		}
-		return s.traceContained(ctx, st, method, c, cached, req, p, acc, dl)
+		return s.traceContained(ctx, st, method, c, cached, req, p, acc, dl, err)
 	}
 	if err != nil {
-		return s.ItemError(ctx, "lookup item", err)
+		return s.ItemError(ctx, "lookup item", virtualRefusal(c, req, err))
 	}
 	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
 		return refused(c, req, p)
@@ -303,8 +305,8 @@ func (s *Kit) traceRemoteItem(
 
 // traceContained traces a path no item holds: an entry inside an archive
 // ("<archive>!/<entry>") or a checksum file, which getItem serves from the
-// file they name, or else the miss. It answers each as getUnfoundItem and
-// getSidecar do.
+// file they name, or else the miss, which is miss, the lookup's error. It
+// answers each as getUnfoundItem and getSidecar do.
 func (s *Kit) traceContained(
 	ctx context.Context,
 	st Store,
@@ -315,13 +317,14 @@ func (s *Kit) traceContained(
 	caller kernel.Principal,
 	acc Access,
 	dl *Download,
+	miss error,
 ) error {
 	p := req.Path
 	if archive, entry, ok := strings.Cut(p, "!/"); ok {
 		dl.stepf("Requested resource is contained within an archive")
 		a, err := Lookup(ctx, st, c, cached, archive, acc, dl, virtual.Resolve)
 		if errors.Is(err, kernel.ErrNotFound) {
-			return missed(c, cached, req)
+			return unfound(c, cached, req, caller, err)
 		}
 		if err != nil {
 			return ItemNotFound()
@@ -353,12 +356,12 @@ func (s *Kit) traceContained(
 	}
 	artifact, alg, ok := item.Sidecar(p)
 	if !ok {
-		return missed(c, cached, req)
+		return unfound(c, cached, req, caller, miss)
 	}
 	dl.stepf("Request is for a checksum")
 	f, err := Lookup(ctx, st, c, cached, artifact, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
-		return missed(c, cached, req)
+		return unfound(c, cached, req, caller, err)
 	}
 	if err != nil || f.Item.Folder {
 		return ItemNotFound()

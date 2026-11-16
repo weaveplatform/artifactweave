@@ -240,8 +240,9 @@ func TestAccTraceResolution(t *testing.T) {
 	wantStatus(t, w.do(http.MethodGet, local, "", ""), http.StatusUnauthorized)
 }
 
-// A member that refuses the download is named and passed over, and a path
-// the format rewrites is named as rewritten.
+// A member that refuses the download is passed over with its reason, as
+// RealRepoBase.createUnfoundRepoResource 224-227 logs it (#1533), and a
+// path the format rewrites is named as rewritten.
 func TestAccTraceRefusalsAndRewrites(t *testing.T) {
 	w, _ := followingWorld(t)
 	w.put("/artifactory/libs-local/a/f.txt", "f")
@@ -255,7 +256,8 @@ func TestAccTraceRefusalsAndRewrites(t *testing.T) {
 		"Received request",
 		"Retrieving info from virtual repository 'virt' type generic",
 		"Searching for the resource within other-local",
-		"Request is forbidden by other-local",
+		"Download denied (The repository 'other-local' is blacked out and cannot serve artifact "+
+			"'other-local:latest.txt'.) - returning un-found resource",
 		"Searching for the resource within libs-local",
 		"Request path was translated to a/f.txt",
 		"Returning found resource from libs-local:a/f.txt",
