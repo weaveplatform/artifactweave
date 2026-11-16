@@ -28,12 +28,13 @@
 // parsed query and works on the package's unexported join plan, which the
 // reference evaluator shares, so a separate package would have to export
 // that plan for a single caller (decision 0044, "Artifacts and remote").
-// The package imports only the standard library and the shared item and
-// build values. It never reaches the module's adapters or an ecosystem http
-// package (decision 0044, dependency rule 8), and never the store, which
-// imports this package for the signatures of its searches: that is why
-// AQLSource takes the two lookups it reads, BuildRuns and ItemSearch,
-// rather than a store.
+// The package imports only the standard library, the shared item and
+// build values, and the virtual member walk (core/virtual), through which a
+// virtual repository's key stands for its members. It never reaches the
+// module's adapters or an ecosystem http package (decision 0044, dependency
+// rule 8), and never the store, which imports this package for the
+// signatures of its searches: that is why AQLSource takes the two lookups
+// it reads, BuildRuns and ItemSearch, rather than a store.
 //
 // # Inputs
 //
@@ -41,7 +42,9 @@
 //     endpoint, which Parse reads into a Query. The GET searches and the
 //     format handlers build a Query in code instead.
 //   - The configured repositories (Repositories), which Resolve applies to a
-//     query's repo criteria before it runs.
+//     query's repo criteria before it runs. A virtual key reaches its
+//     members through virtual.Walk, so a cycle or a missing member adds
+//     nothing (decision 0008, R2).
 //   - Options: the clock that resolves $before and $last, and the most rows
 //     any query returns, the search hard limit.
 //   - For the reference evaluator, a Corpus: items with their properties and

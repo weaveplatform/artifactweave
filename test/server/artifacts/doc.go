@@ -70,6 +70,9 @@
 //   - repositories_test.go, repositories_format_class_test.go,
 //     repo_environments_test.go and virtual_members_test.go: the repository
 //     configuration API.
+//   - virtual_order_test.go: the order a virtual repository's members
+//     answer in, on downloads, the storage API, transitive AQL and the
+//     remote=1 searches (decision 0008, R1 and R2).
 //   - streamed_lists_test.go: Get Repositories without limit and the
 //     dependency search, written from store pages (#1409), against the
 //     bytes they collected, on the in-memory store, SQLite and PostgreSQL,

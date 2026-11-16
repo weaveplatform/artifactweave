@@ -48,7 +48,7 @@ func (r *SearchRun) LayoutScope(
 		}
 	} else {
 		for _, k := range scopeKeys(scope) {
-			for _, ref := range r.Repos.Expand(k) {
+			for _, ref := range r.Repos.Expand(ctx, k) {
 				keys = append(keys, ref.Key)
 			}
 		}
@@ -196,10 +196,10 @@ func Matches(re *regexp.Regexp, s string) bool { return re == nil || re.MatchStr
 
 // NamedKeys maps each stored location a RepoScope criterion reaches to the
 // first key of the criterion that reaches it.
-func (r *SearchRun) NamedKeys(scope aql.Node) map[aql.RepoRef]string {
+func (r *SearchRun) NamedKeys(ctx context.Context, scope aql.Node) map[aql.RepoRef]string {
 	out := map[aql.RepoRef]string{}
 	for _, k := range scopeKeys(scope) {
-		for _, ref := range r.Repos.Expand(k) {
+		for _, ref := range r.Repos.Expand(ctx, k) {
 			if _, ok := out[ref]; !ok {
 				out[ref] = k
 			}

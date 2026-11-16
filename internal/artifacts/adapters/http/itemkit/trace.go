@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -201,7 +202,7 @@ func (s *Kit) traceDownload(
 	}
 	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
 	dl.trace = t
-	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, map[string]bool{})
+	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
 		// getUnfoundItem's check of Read on the file, before anything else.
 		if fileRequest(c, req) && !acc.File(c, resourcePath(req.Path), accessapi.ActionRead) {
@@ -318,7 +319,7 @@ func (s *Kit) traceContained(
 	p := req.Path
 	if archive, entry, ok := strings.Cut(p, "!/"); ok {
 		dl.stepf("Requested resource is contained within an archive")
-		a, err := Lookup(ctx, st, c, cached, archive, acc, dl, map[string]bool{})
+		a, err := Lookup(ctx, st, c, cached, archive, acc, dl, virtual.Resolve)
 		if errors.Is(err, kernel.ErrNotFound) {
 			return missed(c, cached, req)
 		}
@@ -355,7 +356,7 @@ func (s *Kit) traceContained(
 		return missed(c, cached, req)
 	}
 	dl.stepf("Request is for a checksum")
-	f, err := Lookup(ctx, st, c, cached, artifact, acc, dl, map[string]bool{})
+	f, err := Lookup(ctx, st, c, cached, artifact, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
 		return missed(c, cached, req)
 	}
