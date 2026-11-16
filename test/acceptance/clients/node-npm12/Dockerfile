@@ -1,4 +1,4 @@
-# Client pins: Node 24.22.2, npm 12.2.1.
+# Client pins: Node 24.22.3, npm 12.2.1.
 # The second npm client (decision 0034, #294): npm 12 on Node 24 LTS, which
 # keeps the prior Node line beside the newest Node that node.Dockerfile
 # tracks. The base is pinned by digest and moved by Dependabot's docker
