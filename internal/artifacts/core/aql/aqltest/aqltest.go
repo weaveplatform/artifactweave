@@ -1,6 +1,7 @@
 package aqltest
 
 import (
+	"context"
 	"embed"
 	"path"
 	"strings"
@@ -198,7 +199,7 @@ type Case struct {
 
 // Parse returns the case's query, Built or Query parsed, resolved against
 // Repositories.
-func (c Case) Parse() (*aql.Query, error) {
+func (c Case) Parse(ctx context.Context) (*aql.Query, error) {
 	q := c.Built
 	if q == nil {
 		var err error
@@ -206,7 +207,7 @@ func (c Case) Parse() (*aql.Query, error) {
 			return nil, err //nolint:wrapcheck // a case that does not parse fails with the parser's own error
 		}
 	}
-	q.Resolve(Repositories())
+	q.Resolve(ctx, Repositories())
 	return q, nil
 }
 

@@ -44,7 +44,10 @@ no-store`); static errors never reflect a peer URL, body or credential.
 Implementation safety limits are one minute per query, 8 MiB per peer JSON response,
 10,000 returned rows narrowed by existing AQL settings, and one extra row
 per source for detecting trimming. There are at most five peer searches; traversal
-is limited to eight virtual levels and 256 nodes. Malformed ranges, conflicting
+is limited to eight virtual levels and 256 nodes. A virtual repeated on its own route
+and a member key no repository has are skipped, as 7.x's member resolution skips them
+([decision 0008](../research/decisions/0008-virtual-repositories.md), R2). Malformed
+ranges, conflicting
 row duplicates and partial-result notifications fail closed. Unsupported query or
 source shapes return 400, changed/revoked authority 403, timeout 408 and remaining
 source failures 502. Exact statuses, limits and nested ordering remain [I]/#216.

@@ -47,7 +47,7 @@ func testItemSearch(t *testing.T, st port.Store) {
 	seedBuilds(t, st.Builds())
 	for _, c := range aqltest.Cases() {
 		t.Run(c.Name, func(t *testing.T) {
-			q, err := c.Parse()
+			q, err := c.Parse(ctx)
 			storekit.Must(t, err)
 			hits, err := s.Search(ctx, q, c.Options)
 			storekit.Must(t, err)
@@ -96,7 +96,7 @@ func testRelatedSearch(t *testing.T, st port.Store) {
 	}
 	for _, c := range aqltest.RelatedCases() {
 		t.Run("related/"+c.Name, func(t *testing.T) {
-			q, err := c.Parse()
+			q, err := c.Parse(ctx)
 			storekit.Must(t, err)
 			var got, want string
 			if q.Domain == aql.DomainItems {
@@ -173,7 +173,7 @@ func testBuildSearch(t *testing.T, s port.BuildStore) {
 	corpus := aqltest.Corpus()
 	for _, c := range aqltest.BuildCases() {
 		t.Run(c.Name, func(t *testing.T) {
-			q, err := c.Parse()
+			q, err := c.Parse(ctx)
 			storekit.Must(t, err)
 			hits, err := s.Search(ctx, q, c.Options)
 			storekit.Must(t, err)

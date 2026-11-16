@@ -80,7 +80,7 @@ func (s ArtifactoryAPI) SearchGavc(
 	if err != nil {
 		return nil, err
 	}
-	upstream, routes := r.upstreamSearch(ls, p.Repos, p.G, p.A, remote)
+	upstream, routes := r.upstreamSearch(ctx, ls, p.Repos, p.G, p.A, remote)
 	if upstream != nil {
 		additional, err := upstream.Gavc(ctx, p.V, p.C)
 		if err != nil {
@@ -113,7 +113,7 @@ func (s ArtifactoryAPI) SearchGavc(
 		}
 		return answer(ctx, mediaGavcSearch, results(entries)), nil
 	}
-	named := r.NamedKeys(scope)
+	named := r.NamedKeys(ctx, scope)
 	// The scope's cache references also name the upstream files it discovers.
 	for ref, key := range named {
 		if ref.Cached {
@@ -189,7 +189,7 @@ func (s ArtifactoryAPI) SearchVersions(
 		return nil, err
 	}
 	v := httpkit.Deref(p.V)
-	upstream, _ := r.upstreamSearch(ls, p.Repos, p.G, p.A, httpkit.Deref(p.Remote) == 1)
+	upstream, _ := r.upstreamSearch(ctx, ls, p.Repos, p.G, p.A, httpkit.Deref(p.Remote) == 1)
 	versions, err := search.ModuleVersions(
 		ctx, r.SearchRun, ls, p.G, p.A, v, false, moduleUpstream(upstream),
 	)
@@ -236,7 +236,7 @@ func (s ArtifactoryAPI) SearchLatestVersion(
 		return nil, err
 	}
 	v := httpkit.Deref(p.V)
-	upstream, _ := r.upstreamSearch(ls, p.Repos, p.G, p.A, httpkit.Deref(p.Remote) == 1)
+	upstream, _ := r.upstreamSearch(ctx, ls, p.Repos, p.G, p.A, httpkit.Deref(p.Remote) == 1)
 	versions, err := search.ModuleVersions(
 		ctx, r.SearchRun, ls, p.G, p.A, v, true, moduleUpstream(upstream),
 	)
