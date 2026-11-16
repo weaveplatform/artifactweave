@@ -41,6 +41,10 @@
 //     server's authentication middleware put there.
 //   - Remote: a protocol's opt-in to the common remote source boundary,
 //     over the source service, which Kit.Read reads through.
+//   - Options.NoUpstream: whether a package handler's walk through a
+//     virtual repository reads its remote members' caches alone (decision
+//     0008, R7), which
+//     https://github.com/weaveplatform/artifactweave/issues/1542 sets.
 //
 // # Outputs
 //
@@ -62,6 +66,12 @@
 //     ServeFoundMetadata, ReadMetadata, CheckDocument, CheckBlackedOut,
 //     MergeMembers and IsRefusal; and ReadServed and ServedReadFault, a
 //     protocol's read of the copy the source service served it.
+//   - Virtual helpers: MergeMembers, the member requests of the package
+//     handlers' walk through a virtual repository (virtual.Members,
+//     virtual.Package); Collect, each member's document for a format's
+//     virtual.Merger; PassedOver, whether a member read's error passes over
+//     that member; and Virtual, the Source that serves a virtual
+//     repository's file from the first member that holds it.
 //   - Deploy helpers: Store, StoreOnce, StoreNew, StoreResolved, Upload,
 //     Deploy, DeployItem, Created, Annotate, Delete and DeleteTree.
 //   - Multipart helpers: ReadForm, ReadFormLimited and ReadFormWith; path
@@ -114,6 +124,17 @@
 //     protocol builds a virtual repository's merged document from the
 //     members MergeMembers returns, which leave out a member that is
 //     blacked out or would refuse the document's path.
+//   - The package handlers' walk through a virtual repository (MergeMembers,
+//     Collect, Virtual) flattens nested virtual repositories with one
+//     visited set and asks each real member once, in 7.x's order (decision
+//     0008, R1 and R2). It passes over silently a member of another type,
+//     of a class with no Source, one whose download policy refuses the
+//     path, and one the caller may read nothing in, never answering 403 for
+//     it (R3), and asks the virtual repository itself for no Read. Only a
+//     read PassedOver reports leaves a member out of a merge; any other
+//     error fails the merge, so it never answers short. MemberRequest keeps
+//     its 400 for a nested virtual member, for a protocol that walks a
+//     virtual repository's own list.
 //   - Remote.Read holds every format route's remote read without a format
 //     hint to 7.x's block list of upstream labels as the item route is held
 //     (source.ClientMIME, with no Accept, so the type of the URL asked for
@@ -194,7 +215,9 @@
 // request 580) for PyPI, NuGet, Helm and Terraform; P9 the remote source
 // boundary (pull requests 644 and 654); P9b and P9c the protocols that
 // followed. Moved here in P9d, which narrowed the kit's store to Store
-// (https://github.com/weaveplatform/artifactweave/issues/1089).
+// (https://github.com/weaveplatform/artifactweave/issues/1089). P10 added
+// the virtual walk and the merge contract's kit side
+// (https://github.com/weaveplatform/artifactweave/issues/1536).
 //
 // # Testing
 //
@@ -206,7 +229,9 @@
 // download_test.go, which covers the download policy at each helper, and
 // document_test.go, which covers CheckDocument and CheckBlackedOut, a
 // read's policy path and a remote member's refusal against a fake source
-// boundary; source_result_test.go tests ServeResult from inside the
+// boundary; virtual_test.go covers the virtual walk (MergeMembers'
+// nesting, pass-overs and cache-only steps, Collect with a test merge,
+// PassedOver and Virtual); source_result_test.go tests ServeResult from inside the
 // package; conditional_test.go covers ServeStream's conditional answers and
 // FileNotModified, and etag_test.go a file stream's SHA-1 ETag. Every
 // native protocol's route suite under test/server/artifacts reaches it

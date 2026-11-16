@@ -240,7 +240,9 @@ Sources: `repo/db/DbLocalRepo.checkDownloadIsAllowed` 212-219;
 
 ### Per-format merges
 
-Each format handler implements a merge for its non-unique metadata:
+Each format handler implements a merge for its non-unique metadata, as a `virtual.Merger`
+over the members' documents that `pkgroute.Collect` reads in the package handlers' walk
+(R1 to R3, R5, R11), so a format's `virtual.go` holds its merge alone:
 
 | Format | Merged artefact |
 |---|---|

@@ -75,7 +75,10 @@ func Protocol(o Options) pkgroute.Protocol {
 		Types:        []repo.PackageType{repo.Gems},
 		ErrorProfile: apierror.ProfileArtifactory,
 		Sources:      sources,
-		Reserved:     []string{"{repoKey}/reindex", "{repoKey}/updateIndex"},
+		// JFrog's RubyGems page: "Priority resolution is currently not
+		// supported for RubyGems virtual repositories".
+		NoPriority: true,
+		Reserved:   []string{"{repoKey}/reindex", "{repoKey}/updateIndex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k}
 			r.Get("/*", h.read)

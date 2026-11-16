@@ -322,9 +322,16 @@ func TestUnitDownloadPolicyOfARemoteRepository(t *testing.T) {
 		t.Errorf("blacked-out remote member: archive %d %s", rec.Code, rec.Body)
 	}
 	v.patch("pub-remote", func(c *repo.Config) { c.BlackedOut = &off })
+	// A local member is searched before a remote one listed ahead of it,
+	// unless only the remote has priorityResolution (decision 0008, R1).
+	rec = v.do(http.MethodGet, base+"/packages/visible_pub/versions/1.0.0.tar.gz", "admin", "", nil)
+	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), fromB) {
+		t.Errorf("remote member back, after the local: archive %d %s", rec.Code, rec.Body)
+	}
+	v.patch("pub-remote", func(c *repo.Config) { c.PriorityResolution = repo.Flex(true) })
 	rec = v.do(http.MethodGet, base+"/packages/visible_pub/versions/1.0.0.tar.gz", "admin", "", nil)
 	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), data) {
-		t.Errorf("remote member back: archive %d %s", rec.Code, rec.Body)
+		t.Errorf("remote member back with priority: archive %d %s", rec.Code, rec.Body)
 	}
 	excluded = archivePath
 	v.patch("pub-remote", func(c *repo.Config) { c.ExcludesPattern = &excluded })
