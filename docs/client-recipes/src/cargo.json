@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "cargo",
   "name": "Cargo sparse registry",
-  "client": "Cargo/Rust 1.99.1",
+  "client": "Cargo/Rust 1.100.0",
   "version_sources": [
     "test/acceptance/clients/cargo.Dockerfile"
   ],
