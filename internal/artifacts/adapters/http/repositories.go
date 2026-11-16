@@ -768,7 +768,7 @@ func (s ArtifactoryAPI) CreateRepository(
 	if c, err = repos.PrepareCreate(c, existing); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	if err := repos.CheckMembers(c, existing); err != nil {
+	if err := repos.CheckMembers(&c, nil, existing); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
 	var created []repo.Config
@@ -846,7 +846,7 @@ func (s ArtifactoryAPI) CreateMultipleRepositories(
 	}
 	var created []repo.Config
 	for i := range prepared {
-		if err := repos.CheckMembers(prepared[i], known); err != nil {
+		if err := repos.CheckMembers(&prepared[i], nil, known); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
 		// known grows by each plan's remotes, so a later virtual repository
@@ -966,7 +966,7 @@ func (s ArtifactoryAPI) UpdateRepositoryConfiguration(
 	if err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	created, err := s.checkReferences(ctx, st, &updated, sendsP2URLs(patch), nil)
+	created, err := s.checkReferences(ctx, st, &updated, &stored, sendsP2URLs(patch), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1023,8 +1023,9 @@ func (s ArtifactoryAPI) writeUpdates(
 	return nil
 }
 
-// checkReferences rejects an updated configuration whose signing key
-// pairs, environments or (for a virtual repository) members do not exist,
+// checkReferences rejects c, an update of stored, whose signing key pairs
+// or environments do not exist, or (for a virtual repository) whose members
+// and deployment repository break 7.x's save rules (repos.CheckMembers),
 // and rewrites its environments to their stored spelling. With planP2 it
 // then gives a P2 virtual repository the members its p2Urls need
 // (repos.PlanP2Virtual) and returns the P2 remote repositories to create
@@ -1033,7 +1034,7 @@ func (s ArtifactoryAPI) writeUpdates(
 func (s ArtifactoryAPI) checkReferences(
 	ctx context.Context,
 	st Store,
-	c *repo.Config,
+	c, stored *repo.Config,
 	planP2 bool,
 	pending []repo.Config,
 ) ([]repo.Config, error) {
@@ -1051,7 +1052,7 @@ func (s ArtifactoryAPI) checkReferences(
 		return nil, s.InternalError(ctx, "list repositories", err)
 	}
 	known = append(known, pending...)
-	if err := repos.CheckMembers(*c, known); err != nil {
+	if err := repos.CheckMembers(c, stored, known); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
 	if !planP2 {
@@ -1128,7 +1129,7 @@ func (s ArtifactoryAPI) UpdateMultipleRepositories(
 		if err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
-		made, err := s.checkReferences(ctx, st, &c, sendsP2URLs(patch), created)
+		made, err := s.checkReferences(ctx, st, &c, &stored, sendsP2URLs(patch), created)
 		if err != nil {
 			return nil, err
 		}

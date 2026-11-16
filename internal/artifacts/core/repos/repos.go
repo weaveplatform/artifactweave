@@ -100,40 +100,174 @@ func moveURLCredentials(c *repo.Config) {
 	c.URL = u.String()
 }
 
-// CheckMembers rejects a virtual repository whose members do not exist
-// among known, or have a package type the virtual repository cannot
-// aggregate (repo.AcceptsMember). The default deployment repository is a
-// member (repo.Validate), so it is covered too.
+// CheckMembers applies 7.x's save rules for a virtual repository's members
+// (repositories) and defaultDeploymentRepo to c, a create when stored is
+// nil and otherwise an update of stored. known holds every repository the
+// save may name: those stored and those the same request creates. c's own
+// key counts as existing, as 7.x counts every key a request saves, so a
+// virtual repository may list itself; resolution skips it (decision 0008,
+// R2), and no cycle is refused. Other classes pass.
 //
-// The type check holds afterwards without a re-check: a repository's package
-// type cannot change (Merge), and Remove takes a deleted repository out of
-// every virtual repository, so a repository created again under its key
-// joins none until a write names it, which this check sees.
-func CheckMembers(c repo.Config, known []repo.Config) error {
+// The rules are 7.161.26's configuration interceptors, which run on every
+// save through the repositories API and the YAML configuration patch:
+//
+//   - RepoConfigReferencesInterceptor: a member or deployment repository
+//     that does not exist is refused with "Cannot create or update repo
+//     '<key>': repo reference '<ref>' does not exist in the config
+//     descriptor." when the save adds it. A stored member that no longer
+//     exists is dropped from c instead, and a stored deployment repository
+//     the update keeps is cleared.
+//   - DefaultDeploymentRepoInterceptor: a create or a change of the
+//     deployment repository naming one that is not a member is refused, and
+//     so is an update that takes the deployment repository's member away.
+//     An update that changes neither is accepted, however the stored
+//     configuration stands.
+//   - VirtualRepoConfigChangeInterceptor: when the save changes the members,
+//     each must have a package type the virtual repository aggregates
+//     (repo.AcceptsMember), and when it changes the deployment repository,
+//     so must it. The message names the types as 7.x's RepoType does
+//     (repo.PackageTypeName).
+//
+// A deployment repository must also be local or federated (decision 0008,
+// R6); a remote one fails 7.161.26's save with a ClassCastException
+// (VirtualRepoDescriptor) and a virtual one is dropped silently, neither of
+// which is meant, so both are refused with a message of the interceptor's
+// form [I]. A P2 virtual repository's members of another type than P2 must
+// be local, as the P2 format serves only those.
+//
+// Every refusal is a 400 apierror, as 7.x's ConfigurationExceptionMapper
+// and IllegalArgumentExceptionMapper answer the interceptors' exceptions.
+// 7.x runs its interceptors in no set order, so which message a save with
+// several faults gets is [I]; this order follows the list above.
+func CheckMembers(c *repo.Config, stored *repo.Config, known []repo.Config) error {
 	if c.Class != repo.Virtual {
 		return nil
 	}
-	for _, m := range c.Repositories {
-		i := slices.IndexFunc(known, func(k repo.Config) bool { return k.Key == m })
+	find := func(key string) (repo.Config, bool) {
+		if key == c.Key {
+			return *c, true
+		}
+		i := slices.IndexFunc(known, func(k repo.Config) bool { return k.Key == key })
 		if i < 0 {
-			return badRequestf("Virtual repository member '%s' does not exist", m)
+			return repo.Config{}, false
 		}
-		if t := known[i].PackageType; !repo.AcceptsMember(c.PackageType, t) {
-			return badRequestf(
-				"Virtual repository member '%s' has package type '%s', which does not match "+
-					"the virtual repository's package type '%s'",
-				m, t, c.PackageType)
+		return known[i], true
+	}
+	// What the request changed, judged before stale references are dropped,
+	// so an update that sends neither field checks neither.
+	membersChanged := len(c.Repositories) > 0
+	ddrChanged := c.DefaultDeploymentRepo != ""
+	if stored != nil {
+		membersChanged = !slices.Equal(stored.Repositories, c.Repositories)
+		ddrChanged = stored.DefaultDeploymentRepo != c.DefaultDeploymentRepo
+	}
+	if err := checkReferences(c, stored, find); err != nil {
+		return err
+	}
+	ddr := c.DefaultDeploymentRepo
+	if ddr == "" {
+		return checkMemberTypes(c, membersChanged, find)
+	}
+	if ddrChanged && !slices.Contains(c.Repositories, ddr) {
+		return badRequestf("Cannot set repository reference '%s' as the default deployment "+
+			"repository for virtual repository '%s' since it is not included in the "+
+			"repository references", ddr, c.Key)
+	}
+	if stored != nil && slices.Contains(stored.Repositories, ddr) &&
+		!slices.Contains(c.Repositories, ddr) {
+		return badRequestf("Cannot remove repository reference '%s' since it is defined as "+
+			"the default deployment repository for the virtual repository '%s'", ddr, c.Key)
+	}
+	if !ddrChanged {
+		return checkMemberTypes(c, membersChanged, find)
+	}
+	target, _ := find(ddr)
+	if target.Class != repo.Local && target.Class != repo.Federated {
+		return badRequestf("Cannot set repository reference '%s' as the default deployment "+
+			"repository for virtual repository '%s' since it is not a local repository",
+			ddr, c.Key)
+	}
+	if err := checkMemberTypes(c, membersChanged, find); err != nil {
+		return err
+	}
+	return checkMemberType(c, target)
+}
+
+// checkReferences refuses a member or deployment repository of c that does
+// not exist and that the save adds, and drops from c those stored before,
+// as RepoConfigReferencesInterceptor's handleNonFederatedRepositoryRefs and
+// handleDefaultDeploymentRepoRef do. In artifactweave a stored reference
+// can outlive its repository only within one YAML configuration patch,
+// which deletes it before the update is written, since Remove takes a
+// deleted repository out of every virtual repository.
+func checkReferences(
+	c *repo.Config,
+	stored *repo.Config,
+	find func(string) (repo.Config, bool),
+) error {
+	missing := func(ref string) error {
+		return badRequestf("Cannot create or update repo '%s': repo reference '%s' does not "+
+			"exist in the config descriptor.", c.Key, ref)
+	}
+	var kept []string
+	dropped := false
+	for _, m := range c.Repositories {
+		if _, ok := find(m); ok {
+			kept = append(kept, m)
+			continue
 		}
-		if c.PackageType == repo.P2 && known[i].PackageType != repo.P2 &&
-			known[i].Class != repo.Local {
+		if stored == nil || !slices.Contains(stored.Repositories, m) {
+			return missing(m)
+		}
+		dropped = true
+	}
+	if dropped {
+		c.Repositories = kept
+	}
+	ddr := c.DefaultDeploymentRepo
+	if _, ok := find(ddr); ddr == "" || ok {
+		return nil
+	}
+	if stored == nil || stored.DefaultDeploymentRepo != ddr {
+		return missing(ddr)
+	}
+	c.DefaultDeploymentRepo = ""
+	return nil
+}
+
+// checkMemberTypes checks the type of each member of c when the save
+// changed the members, and that a P2 virtual repository's members of
+// another type are local.
+func checkMemberTypes(c *repo.Config, changed bool, find func(string) (repo.Config, bool)) error {
+	if !changed {
+		return nil
+	}
+	for _, key := range c.Repositories {
+		m, _ := find(key)
+		if err := checkMemberType(c, m); err != nil {
+			return err
+		}
+		if c.PackageType == repo.P2 && m.PackageType != repo.P2 && m.Class != repo.Local {
 			return badRequestf(
 				"P2 virtual repository member '%s' with package type '%s' must be local",
-				m,
-				known[i].PackageType,
-			)
+				m.Key, m.PackageType)
 		}
 	}
 	return nil
+}
+
+// checkMemberType refuses m as a member or deployment repository of c when
+// c cannot aggregate its package type, with
+// VirtualRepoConfigChangeInterceptor.validatePackageTypeCompatibility's
+// message.
+func checkMemberType(c *repo.Config, m repo.Config) error {
+	if repo.AcceptsMember(c.PackageType, m.PackageType) {
+		return nil
+	}
+	return badRequestf("Virtual repository '%s' has package type '%s' but includes "+
+		"non-matching repository '%s' with package type '%s'",
+		c.Key, repo.PackageTypeName(string(c.PackageType)),
+		m.Key, repo.PackageTypeName(string(m.PackageType)))
 }
 
 // CheckKeypairs rejects signing key references (primaryKeyPairRef,
