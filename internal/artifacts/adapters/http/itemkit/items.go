@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -334,10 +335,13 @@ func newDownload(p string, folder bool, m model.Matrix, resolve resolver) *Downl
 // Lookup finds the item at p for a download from c: a local repository's
 // own tree, a remote repository's cache (GetItem asks the upstream for
 // what the cache lacks), or, for a virtual repository, the first of its
-// members, in order (virtual.Members), that the caller may read and that
-// holds it. A non-nil dl refuses what Artifactory refuses in each repository it
-// reaches, and rewrites p as each repository that holds items resolves it
-// before looking there; the storage API passes nil, with virtual.Stored.
+// members, in order (virtual.Members), that serves it. A non-nil dl
+// refuses what Artifactory refuses in each repository it reaches, and
+// rewrites p as each repository that holds items resolves it before
+// looking there; through a virtual repository it walks the members as a
+// download does (lookupMember), and a miss carries the walk's Resolution
+// for the answer (unfound). The storage API passes nil, with
+// virtual.Stored, and reads the members the caller may read.
 func Lookup(
 	ctx context.Context,
 	st Store,
@@ -357,6 +361,20 @@ func Lookup(
 	if c.Class == repo.Virtual {
 		return lookupMembers(ctx, st, c, p, acc, dl, order)
 	}
+	return lookupStored(ctx, st, c, cached, p, acc, dl)
+}
+
+// lookupStored is Lookup in c, a repository that holds items: a local or
+// federated repository, or a remote repository's cache.
+func lookupStored(
+	ctx context.Context,
+	st Store,
+	c repo.Config,
+	cached bool,
+	p string,
+	acc Access,
+	dl *Download,
+) (Found, error) {
 	cached = cached || c.Class == repo.Remote
 	if dl != nil && dl.resolve != nil {
 		var err error
@@ -390,6 +408,11 @@ func Lookup(
 // processStandard walks the list assembleSearchRepositoriesList gives it.
 // A nested virtual repository whose patterns reject the download's path is
 // left out by Members, as it filters them.
+//
+// c itself is never asked for Read: no permission target can name a
+// virtual repository (decision 0006), and 7.x asks each member in the walk
+// instead (RealRepoBase.checkDownloadIsAllowed), so what the caller may
+// read through c is what it may read in the members.
 func lookupMembers(
 	ctx context.Context,
 	st Store,
@@ -407,25 +430,214 @@ func lookupMembers(
 	if err != nil {
 		return Found{}, fmt.Errorf("members of %s: %w", c.Key, err)
 	}
+	if dl == nil {
+		return lookupReadable(ctx, st, members, p, acc)
+	}
+	if len(members) == 0 && !dl.isFolder {
+		// No real member is left to search: none is configured, each is
+		// c itself or a virtual repository reached already, or a nested
+		// virtual repository's patterns reject the path. 7.161.26 answers
+		// a file as it answers c's own patterns rejecting the path
+		// (getInfoFromSearchableRepositories 158-169), and so does this; a
+		// folder request is the directory listing's, which keeps its miss
+		// (unfound).
+		dl.stepf("Unable to find aggregated repositories to search within - returning " +
+			"unfound resource")
+		return Found{}, format.Rejectf(http.StatusNotFound,
+			"No repository found to serve the request for %s:%s", c.Key, dl.path)
+	}
+	var res virtual.Resolution
+	var closest *Found
 	for _, m := range members {
 		// The item routes read a remote member from its cache alone: they
 		// fetch nothing upstream through a virtual repository yet
 		// (https://github.com/weaveplatform/artifactweave/issues/1535).
-		if m.Upstream || !acc.Folder(m.Repo, p, accessapi.ActionRead) {
+		if m.Upstream {
 			continue
 		}
 		dl.stepf("Searching for the resource within %s", m.Repo.Key)
-		f, err := Lookup(ctx, st, m.Repo, false, p, acc, dl, order)
-		// A member that refuses the download is passed over like one that
-		// lacks the item, as Artifactory's search goes on past every member
-		// that does not serve it (VirtualRepoDownloadStrategy.processStandard).
-		var refused *format.RejectionError
-		if err == nil || (!errors.Is(err, kernel.ErrNotFound) && !errors.As(err, &refused)) {
+		// Once a file lacks a matrix parameter the request names, the walk
+		// looks on for one that carries it only where its properties may
+		// differ: a local member, or a remote one that synchronizes them
+		// (processStandard, isNotSynchronizeProperties 479-481).
+		if closest != nil && m.Repo.Class == repo.Remote &&
+			(m.Repo.SynchronizeProperties == nil || !*m.Repo.SynchronizeProperties) {
+			continue
+		}
+		f, served, err := lookupMember(ctx, st, m.Repo, p, acc, dl, &res)
+		switch {
+		case err != nil:
+			return f, err
+		case served == exactMatch:
+			return f, nil
+		case served == closestMatch && closest == nil:
+			// processStandard says it returns the first such file; its
+			// loop keeps the last, which this takes for a slip.
+			dl.stepf("Resource is not an exact match - keeping as closest match")
+			closest = &f
+		}
+	}
+	if closest != nil {
+		dl.stepf("Unable to find an exact matching resource - returning closest match")
+		return *closest, nil
+	}
+	return Found{}, &memberMiss{res: res}
+}
+
+// memberAnswer is how a member answers one step of a download's walk.
+type memberAnswer int
+
+const (
+	// passedOver: the member does not serve the path.
+	passedOver memberAnswer = iota
+	// exactMatch: the member serves the path, carrying every matrix
+	// parameter the request names, if any.
+	exactMatch
+	// closestMatch: the member serves the path but lacks a matrix
+	// parameter the request names (PropertiesImpl.matchQuery's NO_MATCH).
+	closestMatch
+)
+
+// lookupReadable is the storage API's walk of members: the first that the
+// caller may read at p and that holds the item.
+func lookupReadable(
+	ctx context.Context,
+	st Store,
+	members []virtual.Member,
+	p string,
+	acc Access,
+) (Found, error) {
+	for _, m := range members {
+		if m.Upstream || !acc.Folder(m.Repo, p, accessapi.ActionRead) {
+			continue
+		}
+		f, err := lookupStored(ctx, st, m.Repo, false, p, acc, nil)
+		if !errors.Is(err, kernel.ErrNotFound) {
 			return f, err
 		}
 	}
 	return Found{}, kernel.ErrNotFound
 }
+
+// lookupMember is one step of a download's walk through a virtual
+// repository: m, a real member, in the order 7.161.26's member answers it
+// (DbLocalRepo.checkDownloadIsAllowed 212-219,
+// RemoteRepoBase.checkDownloadIsAllowed 744-758, then getInfo), each
+// refusal traced as RealRepoBase.createUnfoundRepoResource 224-227 logs it.
+// When m does not serve the download, the walk goes on.
+//
+//   - The download policy first: a refusal passes over silently, since 7.x
+//     answers it 404 and only a 403 counts toward the walk's answer. A
+//     request to the member itself checks Read first instead (DV-057), so
+//     that a caller learns nothing of a repository it may not read; in a
+//     walk the pass-over tells it nothing either.
+//   - Then Read on the path, which res keeps when it is refused (R3), the
+//     path a file request names whether m holds it or not, as
+//     checkDownloadIsAllowed checks it before getInfo looks.
+//   - Then the item. Matrix parameters it conflicts with pass over too, as
+//     DbStoringRepoMixin.getInfo answers that unfound; one it lacks makes
+//     it the closest match.
+func lookupMember(
+	ctx context.Context,
+	st Store,
+	m repo.Config,
+	p string,
+	acc Access,
+	dl *Download,
+	res *virtual.Resolution,
+) (Found, memberAnswer, error) {
+	if err := generic.CheckDownload(m, dl.path, dl.isFolder); err != nil {
+		dl.stepf("Download denied (%s) - returning un-found resource", err)
+		return Found{}, passedOver, nil
+	}
+	file := resourcePath(p)
+	if !acc.Folder(m, file, accessapi.ActionRead) {
+		deny(ctx, dl, res, m, file)
+		return Found{}, passedOver, nil
+	}
+	f, err := lookupStored(ctx, st, m, false, p, acc, dl)
+	var rejected *format.RejectionError
+	switch {
+	case errors.Is(err, kernel.ErrNotFound):
+		if !dl.isFolder && !acc.File(m, file, accessapi.ActionRead) {
+			deny(ctx, dl, res, m, file)
+		}
+		return Found{}, passedOver, nil
+	case errors.As(err, &rejected):
+		// The format's refusal of the path in m, such as Maven's release
+		// and snapshot policy, which assertValidPath checks with the
+		// patterns.
+		dl.stepf("Download denied (%s) - returning un-found resource", rejected)
+		return Found{}, passedOver, nil
+	case err != nil:
+		return Found{}, passedOver, err
+	}
+	if !acc.Item(m, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
+		deny(ctx, dl, res, m, f.Item.FullPath())
+		return Found{}, passedOver, nil
+	}
+	served := exactMatch
+	if len(dl.matrix.Props) > 0 {
+		props, err := st.Items().Properties(ctx, f.Item.ID)
+		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
+			return Found{}, passedOver, fmt.Errorf("properties of %s: %w", f.Item.FullPath(), err)
+		}
+		if !dl.matrix.Matches(props) {
+			dl.stepf("Request query properties conflict with those that annotate the artifact - " +
+				"returning unfound resource")
+			return Found{}, passedOver, nil
+		}
+		if !carriesEveryKey(dl.matrix, props) {
+			dl.stepf("Request query properties don't match those that annotate the artifact")
+			served = closestMatch
+		}
+	}
+	res.Found = true
+	return f, served, nil
+}
+
+// carriesEveryKey reports whether props carry every key m asks a value of.
+// A file that lacks one still serves the request (Matches), but
+// PropertiesImpl.matchQuery calls it NO_MATCH, not an exact match, and a
+// walk prefers a later member's file that carries it; a blank value asks
+// for nothing (clearBlankAndReturnPropertyValues).
+func carriesEveryKey(m model.Matrix, props model.Properties) bool {
+	for k, want := range m.Props {
+		if _, ok := props[k]; ok {
+			continue
+		}
+		if slices.ContainsFunc(want, func(v string) bool { return strings.TrimSpace(v) != "" }) {
+			return false
+		}
+	}
+	return true
+}
+
+// deny keeps m's refusal of Read on p in res, under the key 7.161.26's
+// refusal names: a remote member's cache, where it keeps a remote's
+// permissions (RemoteRepoBase.checkDownloadIsAllowed). Each refusal is
+// traced, and the one kept is named as processStandard names it.
+func deny(ctx context.Context, dl *Download, res *virtual.Resolution, m repo.Config, p string) {
+	key := m.Key
+	if m.Class == repo.Remote {
+		key += model.CacheSuffix
+	}
+	caller, _ := kernel.FromContext(ctx)
+	d := virtual.Denial{Member: key, Path: p, User: caller.Name}
+	dl.stepf("Download denied (%s) - returning un-found resource", d.Message())
+	if res.Deny(d) {
+		dl.stepf("Request is forbidden by %s", m.Key)
+	}
+}
+
+// memberMiss is a download's walk through a virtual repository that no
+// member served. It is kernel.ErrNotFound to every caller, as the miss it
+// is, and keeps the walk's Resolution for the answer (unfound).
+type memberMiss struct{ res virtual.Resolution }
+
+func (e *memberMiss) Error() string { return kernel.ErrNotFound.Error() }
+
+func (e *memberMiss) Unwrap() error { return kernel.ErrNotFound }
 
 // GetItem answers GET and HEAD on an item path: file content, a checksum
 // sidecar, or a folder listing; with ?trace, the resolution instead.
@@ -465,13 +677,16 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// A folder check first: the path may be a file or a folder, and in a
-	// virtual repository the item lives in a member. The exact right is
-	// checked once the item is found. Artifactory refuses a blacked-out
-	// repository or an excluded path before it checks permissions; this
-	// answers a caller who may not read the path without telling it how
-	// the repository is configured (DV-057).
-	if !acc.Folder(c, req.Path, accessapi.ActionRead) {
+	// A folder check first: the path may be a file or a folder. The exact
+	// right is checked once the item is found, and in a virtual repository,
+	// whose members decide, in each member (Admits). Artifactory refuses a
+	// blacked-out repository or an excluded path before it checks
+	// permissions; this answers a caller who may not read the path without
+	// telling it how the repository is configured (DV-057).
+	if ok, err := acc.Admits(ctx, st.Repos(), c, req.Path); err != nil {
+		httpkit.WriteErr(w, r, s.InternalError(ctx, "read gate", err))
+		return
+	} else if !ok {
 		httpkit.WriteErr(w, r, refused(c, req, p))
 		return
 	}
@@ -509,11 +724,11 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
-		s.getUnfoundItem(w, r, st, c, cached, req, p, acc, dl)
+		s.getUnfoundItem(w, r, st, c, cached, req, p, acc, dl, err)
 		return
 	}
 	if err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "lookup item", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "lookup item", virtualRefusal(c, req, err)))
 		return
 	}
 	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
@@ -535,7 +750,8 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 }
 
 // getUnfoundItem answers req, a path the lookup did not find in c: a cold
-// remote file, an entry of an archive file, a checksum, or the miss.
+// remote file, an entry of an archive file, a checksum, or the miss, which
+// is miss, the lookup's error.
 func (s *Kit) getUnfoundItem(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -546,6 +762,7 @@ func (s *Kit) getUnfoundItem(
 	p kernel.Principal,
 	acc Access,
 	dl *Download,
+	miss error,
 ) {
 	// 7.161.26's checkDownloadIsAllowed checks Read on the file before
 	// getInfo looks for it, so a file the folder check let through but the
@@ -562,7 +779,7 @@ func (s *Kit) getUnfoundItem(
 	if archive, entry, ok := strings.Cut(req.Path, "!/"); ok {
 		a, err := Lookup(r.Context(), st, c, cached, archive, acc, dl, virtual.Resolve)
 		if errors.Is(err, kernel.ErrNotFound) {
-			httpkit.WriteErr(w, r, missed(c, cached, req))
+			httpkit.WriteErr(w, r, unfound(c, cached, req, p, err))
 			return
 		}
 		if err != nil {
@@ -576,7 +793,7 @@ func (s *Kit) getUnfoundItem(
 		s.getArchiveEntry(w, r, st, a, entry)
 		return
 	}
-	s.getSidecar(w, r, st, c, cached, req, p, acc, dl)
+	s.getSidecar(w, r, st, c, cached, req, p, acc, dl, miss)
 }
 
 // matchesMatrix applies download matrix parameters (model.Matrix.Matches).
@@ -601,8 +818,8 @@ func matchesMatrix(
 // checksum is served is item.ServedChecksum's: under client-checksums the
 // client's, so a file deployed without one has no SHA-1 file until the
 // client sends one. It answers conditional requests and ranges as a remote
-// repository's checksum file does (serveChecksum). It answers the miss of
-// req, a path the lookup did not find, when it names no checksum.
+// repository's checksum file does (serveChecksum). It answers miss, the
+// lookup's failure to find req, when req names no checksum.
 func (s *Kit) getSidecar(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -613,16 +830,17 @@ func (s *Kit) getSidecar(
 	caller kernel.Principal,
 	acc Access,
 	dl *Download,
+	miss error,
 ) {
 	p := req.Path
 	artifact, alg, ok := item.Sidecar(p)
 	if !ok {
-		httpkit.WriteErr(w, r, missed(c, cached, req))
+		httpkit.WriteErr(w, r, unfound(c, cached, req, caller, miss))
 		return
 	}
 	f, err := Lookup(r.Context(), st, c, cached, artifact, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
-		httpkit.WriteErr(w, r, missed(c, cached, req))
+		httpkit.WriteErr(w, r, unfound(c, cached, req, caller, err))
 		return
 	}
 	if err != nil || f.Item.Folder {

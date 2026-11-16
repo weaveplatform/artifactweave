@@ -2,9 +2,11 @@ package itemkit
 
 import (
 	"context"
+	"fmt"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
@@ -35,6 +37,40 @@ func (a Access) Item(c repo.Config, path string, isFolder bool, want accessapi.A
 		return a.Folder(c, path, want)
 	}
 	return a.File(c, path, want)
+}
+
+// Admits reports whether the caller passes the read gate of a request for
+// path in c, asked before anything is looked up: Read on the path in c at
+// folder level, the exact right being asked once the item is found.
+//
+// A virtual repository is never asked itself. No permission target can
+// name one (decision 0006), and 7.x decides a read through it by the
+// member that serves it (R3; ArtifactoryVirtualDownloadStrategy.
+// processStandard), so a path in it passes here and the walk asks each
+// member (lookupMember). Its root passes when the root of any member,
+// nested virtual repositories flattened, does
+// (AuthorizationServiceBase.computeUserHasPermissionsOnRepositoryRoot
+// 1047-1078, 7.161.26). Package handlers apply the same rule, an unreadable
+// member counting there as not found (R3). An administrator passes without
+// a member, as there, so the root of a virtual repository with none
+// answers it too.
+func (a Access) Admits(ctx context.Context, rs virtual.Repos, c repo.Config, path string) (bool, error) {
+	if c.Class != repo.Virtual {
+		return a.Folder(c, path, accessapi.ActionRead), nil
+	}
+	if path != "" || a.Decider.IsAdmin() {
+		return true, nil
+	}
+	members, err := virtual.Members(ctx, rs, c, virtual.Options{Order: virtual.Stored})
+	if err != nil {
+		return false, fmt.Errorf("members of %s: %w", c.Key, err)
+	}
+	for _, m := range members {
+		if a.Folder(m.Repo, "", accessapi.ActionRead) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // Visible reports whether the caller sees a repository in a listing and may

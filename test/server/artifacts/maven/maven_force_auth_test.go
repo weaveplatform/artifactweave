@@ -161,7 +161,13 @@ func TestAccMavenForceAuthenticationOnAVirtual(t *testing.T) {
 			"admin DELETE", http.MethodDelete, forcedJar, "admin", http.StatusMethodNotAllowed,
 			"Cannot delete from the virtual repository 'mvn-forced'",
 		},
-		{"user without read", http.MethodGet, forcedJar, "user", http.StatusForbidden, `"message":"Forbidden"`},
+		// The member that refused user is named, with the virtual's path
+		// (#1533).
+		{
+			"user without read", http.MethodGet, forcedJar, "user", http.StatusForbidden,
+			`"message":"Download request for repo:path 'mvn-local:org/a/1.0/a-1.0.jar' is forbidden ` +
+				`for user: 'user'.; Path: 'mvn-forced:org/a/1.0/a-1.0.jar'"`,
+		},
 		{"anonymous GET, flag off", http.MethodGet, "/artifactory/mvn-open/org/a/1.0/a-1.0.jar", "", http.StatusOK, "jar"},
 		{
 			"anonymous trace, flag off", http.MethodGet, "/artifactory/mvn-open/org/a/1.0/a-1.0.jar?trace", "",

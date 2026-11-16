@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
 // The store is what the item routes and the storage API read members from.
@@ -245,5 +246,58 @@ func TestUnitWalk(t *testing.T) {
 	})
 	if !errors.Is(err, stop) || visits != 3 {
 		t.Fatalf("nested stop after %d: %v", visits, err)
+	}
+}
+
+// TestUnitAnswer: a walk that found nothing answers as 7.161.26's
+// DownloadServiceImpl.respondResourceNotFound answers the unfound resource
+// processStandard returns: 404 without a refusal, the first refusal's 403,
+// 404 "Resource not found" when the virtual or the security configuration
+// hides refusals, and the 401 challenge to anonymous when nothing hides
+// them; each with the virtual's path. A walk that found the item has no
+// answer.
+func TestUnitAnswer(t *testing.T) {
+	open := virt("virt")
+	hiding := virt("virt")
+	hiding.HideUnauthorizedResources = new(bool)
+	*hiding.HideUnauthorizedResources = true
+	unhiding := virt("virt")
+	unhiding.HideUnauthorizedResources = new(bool)
+	var refused virtual.Resolution
+	if !refused.Deny(virtual.Denial{Member: "a-local", Path: "d/x.bin", User: "bob"}) ||
+		refused.Deny(virtual.Denial{Member: "b-local", Path: "d/x.bin", User: "bob"}) {
+		t.Fatal("Deny keeps the first refusal alone")
+	}
+	const (
+		suffix    = "; Path: 'virt:d/x.bin'"
+		forbidden = "Download request for repo:path 'a-local:d/x.bin' is forbidden for user: 'bob'."
+	)
+	for _, tc := range []struct {
+		name       string
+		v          repo.Config
+		r          virtual.Resolution
+		anonymous  bool
+		hideGlobal bool
+		status     int
+		message    string
+	}{
+		{"found", open, virtual.Resolution{Found: true}, false, false, 0, ""},
+		{"miss", open, virtual.Resolution{}, false, false, 404, "Could not find resource" + suffix},
+		{"miss, hidden", hiding, virtual.Resolution{}, true, true, 404, "Could not find resource" + suffix},
+		{"refused", open, refused, false, false, 403, forbidden + suffix},
+		{"refused, flag off", unhiding, refused, false, false, 403, forbidden + suffix},
+		{"refused, hidden", hiding, refused, false, false, 404, "Resource not found" + suffix},
+		{"refused, hidden globally", open, refused, false, true, 404, "Resource not found" + suffix},
+		{"anonymous refused, hidden", hiding, refused, true, false, 404, "Resource not found" + suffix},
+		{"anonymous refused", open, refused, true, false, 401, "Unauthorized"},
+	} {
+		err := virtual.Answer(tc.v, "d/x.bin", tc.r, tc.anonymous, tc.hideGlobal)
+		var e *apierror.Error
+		switch {
+		case tc.status == 0 && err != nil:
+			t.Errorf("%s: %v, want none", tc.name, err)
+		case tc.status != 0 && (!errors.As(err, &e) || e.Status != tc.status || e.Message != tc.message):
+			t.Errorf("%s: %v, want %d %q", tc.name, err, tc.status, tc.message)
+		}
 	}
 }

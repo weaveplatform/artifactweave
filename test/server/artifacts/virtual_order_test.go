@@ -73,14 +73,15 @@ func TestAccVirtualNestingAndCycles(t *testing.T) {
 	wantBody(t, w, "/artifactory/a/both.txt", "other")
 	wantBody(t, w, "/artifactory/a/libs.txt", "libs")
 	wantBody(t, w, "/artifactory/b/both.txt", "libs")
-	// A virtual over itself alone has nothing to serve.
+	// A virtual over itself alone has no member to search, which 7.x
+	// answers as it answers its own patterns rejecting the path (#1533).
 	wantRefusal(
 		t,
 		w,
 		http.MethodGet,
 		"/artifactory/loop/both.txt",
 		"admin",
-		"Could not find resource",
+		"No repository found to serve the request for loop:both.txt; Path: 'loop:both.txt'",
 	)
 	// Nested members are grouped with the top virtual's own: a local member
 	// of a nested virtual comes before a remote cache listed ahead of it.

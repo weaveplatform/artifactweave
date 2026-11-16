@@ -370,7 +370,10 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "storage item", err))
 		return
 	}
-	if !v.acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, api.ActionRead) {
+	// A virtual repository's root is the virtual repository itself, which
+	// admit has decided by its members; any other item is a member's.
+	if f.Repo.Class != repo.Virtual &&
+		!v.acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, api.ActionRead) {
 		httpkit.WriteErr(w, r, v.refusal(mode, p))
 		return
 	}
@@ -543,8 +546,11 @@ func (v storageView) admit(ctx context.Context, mode string, p kernel.Principal)
 		return err
 	}
 	// A folder check first, as for a download; the exact right once the
-	// item is found.
-	if !v.acc.Folder(v.repo, v.path, api.ActionRead) {
+	// item is found. A virtual repository is never asked itself: its
+	// members decide, its root passing when any member's does (Admits).
+	if ok, err := v.acc.Admits(ctx, v.st.Repos(), v.repo, v.path); err != nil {
+		return v.s.InternalError(ctx, "read gate", err)
+	} else if !ok {
 		return v.refusal(mode, p)
 	}
 	switch {

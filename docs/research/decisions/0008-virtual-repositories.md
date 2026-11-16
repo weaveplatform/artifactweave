@@ -71,7 +71,12 @@ Sources: `repo/virtual/VirtualRepositoryConfigResolverImpl.VirtualConfigResolver
 
 Every member miss passes over to the next member: not found, a member's blackout or pattern
 refusal, an offline remote and a Read denial alike. The first member that has the item
-answers. On the item routes, and on the Maven routes, a walk that finds nothing answers 403
+answers. A file whose properties conflict with a matrix parameter of the request passes over
+like a miss (`PropertiesImpl.matchQuery`'s `CONFLICT`); one that lacks a parameter the
+request names (`NO_MATCH`) is only the closest match: the walk looks on in local members, and
+in remote members that synchronize properties, for a file that carries it, and answers the
+closest match when none does (`processStandard`'s `closestMatch` and
+`isNotSynchronizeProperties` 479-481). On the item routes, and on the Maven routes, a walk that finds nothing answers 403
 only if a member denied Read, and otherwise 404 `Could not find resource`. Package handlers
 count a member the caller cannot read as not found, so they answer their own not-found and
 never 403: [7.146.25](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-714625-self-managed)
@@ -94,7 +99,9 @@ When the virtual's `hideUnauthorizedResources` (default false) or the global sec
 of that name is on, a 401 or 403 that the walk would answer becomes 404
 `Resource not found; Path: '<repoPath>'`. Otherwise an anonymous caller who would get 403
 gets the 401 challenge; the challenge's body is **[I]**, since `sendAuthorizationRequired`
-is closed code.
+is closed code: artifactweave writes `Unauthorized`, as 6.20's
+`HttpArtifactoryResponse.sendAuthorizationRequired` does and as a direct request's challenge
+does ([0032](0032-package-format-handlers.md#decision)).
 
 Sources: `engine/DownloadServiceImpl.respondResourceNotFound` 1465-1497,
 `shouldHideUnauthorisedResponse` 1499-1518 and `shouldSendAuthRequired` 1460-1463;

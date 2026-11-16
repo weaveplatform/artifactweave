@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -88,6 +89,47 @@ func missed(c repo.Config, cached bool, req ItemRequest) error {
 		}
 	}
 	return apierror.New(http.StatusNotFound, reason+pathSuffix(req.Key, p))
+}
+
+// unfound answers req, a request c does not hold, which the lookup err
+// did not find: missed, or, for a file request through a virtual
+// repository, the answer of err's walk over the members (virtual.Answer).
+// A virtual repository's folder request is 7.x's directory listing
+// (RepoFilter.doDirectoryRequest), whose answers are
+// https://github.com/weaveplatform/artifactweave/issues/1537's, so it keeps
+// ItemNotFound, and httpkit.Denied when every member that could hold it
+// refused the caller.
+func unfound(c repo.Config, cached bool, req ItemRequest, caller kernel.Principal, err error) error {
+	if c.Class != repo.Virtual || req.member {
+		return missed(c, cached, req)
+	}
+	var res virtual.Resolution
+	if miss := new(memberMiss); errors.As(err, &miss) {
+		res = miss.res
+	}
+	switch {
+	case req.Path != "" && !req.IsFolder:
+		// hideGlobal is false: artifactweave has no security-wide
+		// hideUnauthorizedResources yet.
+		return virtual.Answer(c, resourcePath(req.Path), res, caller.Anonymous, false)
+	case res.Forbidden != nil:
+		return httpkit.Denied(caller)
+	}
+	return ItemNotFound()
+}
+
+// virtualRefusal is err, a lookup's failure, with the path suffix that
+// respondResourceNotFound appends when err is a virtual repository's own
+// refusal of a file request: its patterns rejecting the path leave it no
+// member to search, which 7.161.26 answers with an unfound resource
+// (getInfoFromSearchableRepositories 158-169) and so with the suffix.
+// Its members' refusals never reach here, since the walk passes over them.
+func virtualRefusal(c repo.Config, req ItemRequest, err error) error {
+	var rejected *format.RejectionError
+	if c.Class != repo.Virtual || req.Path == "" || req.IsFolder || !errors.As(err, &rejected) {
+		return err
+	}
+	return apierror.New(rejected.Status, rejected.Message+pathSuffix(req.Key, resourcePath(req.Path)))
 }
 
 // mismatched answers req, whose file does not carry a mandatory matrix

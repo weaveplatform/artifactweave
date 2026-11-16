@@ -145,7 +145,8 @@ func TestAccVirtualDownloadPolicy(t *testing.T) {
 	if got := body("/artifactory/virt/same.jar"); got != "libs" {
 		t.Fatalf("blacked-out member %q", got)
 	}
-	wantRefusal(t, w, "GET", "/artifactory/virt/only.jar", "admin", "Could not find resource")
+	wantRefusal(t, w, "GET", "/artifactory/virt/only.jar", "admin",
+		"Could not find resource; Path: 'virt:only.jar'")
 	w.patchRepo("other-local", func(c *repo.Config) { c.BlackedOut = ptr(false) })
 
 	w.patchRepo("other-local", func(c *repo.Config) { c.ExcludesPattern = ptr("same.jar") })
@@ -163,7 +164,7 @@ func TestAccVirtualDownloadPolicy(t *testing.T) {
 		t.Fatalf("blacked-out virtual %q", got)
 	}
 	wantRefusal(t, w, "GET", "/artifactory/virt/x.secret", "admin",
-		"No repository found to serve the request for virt:x.secret")
+		"No repository found to serve the request for virt:x.secret; Path: 'virt:x.secret'")
 
 	// A folder found in a member lists what both sets of patterns accept.
 	for _, p := range []string{"dir/a.secret", "dir/b.jar"} {

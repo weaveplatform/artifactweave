@@ -321,6 +321,154 @@ func TestUnitLookupSearchesVirtualMembersInOrder(t *testing.T) {
 	}
 }
 
+// failingMembers is a store whose reads of every repository but the
+// virtual one fail, so that a virtual repository resolves and its members
+// do not.
+type failingMembers struct{ *inmem.Store }
+
+func (s failingMembers) Repos() port.RepoStore { return failedMemberReads{s.Store.Repos()} }
+
+type failedMemberReads struct{ port.RepoStore }
+
+func (r failedMemberReads) Get(ctx context.Context, key string) (repo.Config, error) {
+	if key != kittest.VirtualKey {
+		return repo.Config{}, errRepos
+	}
+	return r.RepoStore.Get(ctx, key) //nolint:wrapcheck // the store's own answer
+}
+
+// failingItems is a store whose read of broken.txt and of any item's
+// properties fail.
+type failingItems struct{ *inmem.Store }
+
+func (s failingItems) Items() port.ItemStore { return failedItemReads{s.Store.Items()} }
+
+type failedItemReads struct{ port.ItemStore }
+
+func (r failedItemReads) Get(
+	ctx context.Context,
+	key string,
+	cached bool,
+	fullPath string,
+) (model.Item, error) {
+	if fullPath == "broken.txt" {
+		return model.Item{}, errFault
+	}
+	return r.ItemStore.Get(ctx, key, cached, fullPath) //nolint:wrapcheck // the store's own answer
+}
+
+func (failedItemReads) Properties(context.Context, int64) (model.Properties, error) {
+	return nil, errFault
+}
+
+// localRefusing is a format that refuses every download from the local
+// member, as Maven's release and snapshot policy refuses a path.
+type localRefusing struct{ format.Handler }
+
+func (localRefusing) Resolve(
+	_ context.Context,
+	_ format.Env,
+	c repo.Config,
+	d format.Download,
+) (string, error) {
+	if c.Key == kittest.LocalKey {
+		return "", format.Rejectf(http.StatusConflict, "refused by %s", c.Key)
+	}
+	return d.Path, nil
+}
+
+// TestUnitVirtualReadGateAndWalkFailures: Admits asks Read of a real
+// repository itself, never of a virtual repository's path, and of a
+// virtual repository's root asks its members, an administrator passing
+// without one (#1533). A walk passes over a member whose format refuses the
+// path, as 7.x's processStandard passes over any refusal that is not a
+// 403; a member, item or property read that fails answers 500, at the
+// root's gate and in the walk alike.
+func TestUnitVirtualReadGateAndWalkFailures(t *testing.T) {
+	w := kittest.New(t, inmem.New())
+	ctx := t.Context()
+	w.Put(t, w.Local, false, "a.txt", []byte("local"))
+	w.Put(t, w.Remote, true, "a.txt", []byte("cached"))
+	w.Put(t, w.Local, false, "broken.txt", []byte("local"))
+	remoteOnly := itemkit.Access{Decider: &accessapitest.Decider{AllowsFolderFunc: func(
+		_ accessapi.ResourceType, r accessapi.Repo, _ string, _ accessapi.Actions,
+	) bool {
+		return r.Key == kittest.RemoteKey
+	}}}
+	nothing := itemkit.Access{Decider: &accessapitest.Decider{}}
+	for _, tc := range []struct {
+		name string
+		acc  itemkit.Access
+		c    repo.Config
+		path string
+		want bool
+	}{
+		{"local, readable", remoteOnly, w.Remote, "a.txt", true},
+		{"local, unreadable", remoteOnly, w.Local, "a.txt", false},
+		{"virtual path", nothing, w.Virtual, "a.txt", true},
+		{"virtual root, a member readable", remoteOnly, w.Virtual, "", true},
+		{"virtual root, none readable", nothing, w.Virtual, "", false},
+		{"virtual root, admin", kittest.AdminAccess(), w.Virtual, "", true},
+	} {
+		got, err := tc.acc.Admits(ctx, w.Store.Repos(), tc.c, tc.path)
+		if err != nil || got != tc.want {
+			t.Errorf("%s: %v %v, want %v", tc.name, got, err, tc.want)
+		}
+	}
+	if _, err := remoteOnly.Admits(
+		ctx, failedMemberReads{w.Store.Repos()}, w.Virtual, "",
+	); !errors.Is(err, errRepos) {
+		t.Errorf("a failed member read: %v; want errRepos", err)
+	}
+	user := &accessapitest.Decider{AllowsFolderFunc: func(
+		accessapi.ResourceType, accessapi.Repo, string, accessapi.Actions,
+	) bool {
+		return true
+	}}
+	for _, tc := range []struct {
+		name, target string
+		kit          *itemkit.Kit
+		decider      accessapi.Decider
+		status       int
+		// body is a part of the answer's body.
+		body string
+	}{
+		{
+			"a member's format refusal", "libs/a.txt",
+			w.Kit(itemkit.Deps{Formats: func(repo.PackageType) format.Handler {
+				return localRefusing{}
+			}}),
+			kittest.AdminAccess().Decider, http.StatusOK, "cached",
+		},
+		{
+			"the root's gate", "libs/", w.Kit(itemkit.Deps{Store: failingMembers{w.Store}}),
+			user, http.StatusInternalServerError, "",
+		},
+		{
+			// A trace answers 200 with the status inside.
+			"the root's gate, traced", "libs/?trace",
+			w.Kit(itemkit.Deps{Store: failingMembers{w.Store}}),
+			user, http.StatusOK, "Sending a response with the status '500'",
+		},
+		{
+			"an item read", "libs/broken.txt", w.Kit(itemkit.Deps{Store: failingItems{w.Store}}),
+			kittest.AdminAccess().Decider, http.StatusInternalServerError, "",
+		},
+		{
+			"a property read", "libs/a.txt;k=v", w.Kit(itemkit.Deps{Store: failingItems{w.Store}}),
+			kittest.AdminAccess().Decider, http.StatusInternalServerError, "",
+		},
+	} {
+		r := kittest.Request(t, http.MethodGet, "/artifactory/"+tc.target)
+		r = r.WithContext(accessapi.WithCaller(r.Context(), kernel.Principal{Name: "user"}, tc.decider))
+		rec := httptest.NewRecorder()
+		tc.kit.GetItem(rec, r)
+		if rec.Code != tc.status || !strings.Contains(rec.Body.String(), tc.body) {
+			t.Errorf("%s: %d %s, want %d with %q", tc.name, rec.Code, rec.Body, tc.status, tc.body)
+		}
+	}
+}
+
 // TestUnitResolveRepoNamesOnlyRemoteCaches: a key resolves to the repository
 // it names, and a cache alias only to a remote repository's cache.
 func TestUnitResolveRepoNamesOnlyRemoteCaches(t *testing.T) {
@@ -876,8 +1024,10 @@ func (c closer) Close() error {
 // TestUnitTraceRefusesAsGetItemDoes: a caller who may read a file's folder
 // but not the file is refused by ?trace as GetItem refuses them, with the
 // download's refusal of a local file, missing or stored, and of the file a
-// checksum names (#1572), and with a virtual repository's own answers for
-// its checksum and archive entry (P10's #1533). 7.161.26's
+// checksum names (#1572), and, through a virtual repository, with the
+// refusal of the first member that holds the path it walks, whose file the
+// checksum or archive entry names, under the virtual's path (#1533; before,
+// 404 "Could not find resource" and 403 "Forbidden"). 7.161.26's
 // RepoFilter.doGetOrHeadRequest traces the download itself, so the trace's
 // last step is the download's answer. Before, the trace answered the
 // missing file and the checksum 404 "Could not find resource", which GET
@@ -924,8 +1074,10 @@ func TestUnitTraceRefusesAsGetItemDoes(t *testing.T) {
 			"'libs-local:a/b.txt' is forbidden for user: 'user'.; Path: 'libs-local:a/b.txt'"},
 		{"libs-local/a/b.txt.sha1", http.StatusForbidden, "Download request for repo:path " +
 			"'libs-local:a/b.txt' is forbidden for user: 'user'.; Path: 'libs-local:a/b.txt'"},
-		{"libs/a/b.txt.sha1", http.StatusNotFound, "Could not find resource"},
-		{"libs/z.zip!/x.txt", http.StatusForbidden, "Forbidden"},
+		{"libs/a/b.txt.sha1", http.StatusForbidden, "Download request for repo:path " +
+			"'libs-local:a/b.txt' is forbidden for user: 'user'.; Path: 'libs:a/b.txt'"},
+		{"libs/z.zip!/x.txt", http.StatusForbidden, "Download request for repo:path " +
+			"'libs-local:z.zip' is forbidden for user: 'user'.; Path: 'libs:z.zip'"},
 	} {
 		got := serve(tc.target)
 		if got.Code != tc.status || got.Body.String() != errorEnvelope(tc.status, tc.message) {

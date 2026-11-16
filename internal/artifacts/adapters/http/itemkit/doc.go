@@ -115,9 +115,26 @@
 //     <path> is the file an archive entry or a checksum names (missed,
 //     refused, mismatched). Read is checked on that file before a miss is
 //     answered, as checkDownloadIsAllowed checks it before getInfo. A
-//     folder request, a virtual repository and its member reads
-//     (MemberRead; P10's #1533) and an entry an archive lacks keep
-//     ItemNotFound and httpkit.Denied.
+//     folder request, a member read of a virtual repository (MemberRead)
+//     and an entry an archive lacks keep ItemNotFound and httpkit.Denied.
+//   - A read through a virtual repository never asks Read of the virtual
+//     repository itself (Access.Admits): its members decide, and its root
+//     is readable where any member's is (#1533). The walk (lookupMember)
+//     checks each member's download policy, then Read, then the item and
+//     its matrix parameters, passing over each member that does not serve
+//     the path and keeping the first Read refusal; a file that lacks a
+//     matrix parameter the request names serves it only when no later
+//     local member, or remote one that synchronizes properties, holds one
+//     that carries it (processStandard's closest match). A file request
+//     it finds nowhere answers 7.161.26's respondResourceNotFound
+//     (virtual.Answer): 404 "Could not find resource", the first
+//     refusal's 403, 404 "Resource not found" under
+//     hideUnauthorizedResources, or the 401 challenge to anonymous, each
+//     with "; Path: '<virtual>:<path>'"; a virtual repository with no
+//     member to search, or whose patterns reject the path, answers "No
+//     repository found to serve the request for <virtual>:<path>" with
+//     the same suffix. A folder request through it keeps ItemNotFound and
+//     httpkit.Denied.
 //   - An overlay answers the same miss, refusal and mismatch on the item
 //     route (#1599), since 7.161.26's RepoFilter sends every GET and HEAD
 //     through DownloadServiceImpl whatever the package type: Missed,
