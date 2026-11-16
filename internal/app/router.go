@@ -67,6 +67,7 @@ import (
 	distributiongen "github.com/weaveplatform/artifactweave/internal/platform/gen/distribution"
 	eventgen "github.com/weaveplatform/artifactweave/internal/platform/gen/event"
 	gridgen "github.com/weaveplatform/artifactweave/internal/platform/gen/grid"
+	"github.com/weaveplatform/artifactweave/internal/platform/gen/operations"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/platform/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/platform/gen/worker"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -474,6 +475,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	maps.Copy(slashes, accesshttp.SlashCollections())
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, kit)
+	head := middleware.HeadAsGet{Serves: headServed()}
 	r.Use(
 		httpkit.ErrorProfiles(errorProfileRules),
 		middleware.RequestID,
@@ -486,6 +488,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		middleware.NormalizeContentType(keepContentType),
 		middleware.CollectionSlash(slashes),
 		accesshttp.PlusAsSpace,
+		// After the path rewrites above, whose result it routes, and ahead
+		// of everything that reads the method.
+		head.Enter,
 		keyGate(),
 		accesshttp.APIRecoveryContext,
 		xzRequests,
@@ -524,6 +529,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		r.Use(limiter.limitPrincipal(limits))
 	}
 	r.Use(artAPI.HelmPartialReindex)
+	r.Use(head.Route)
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)
 
@@ -565,7 +571,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	mavenhttp.MavenAPI{Kit: kit}.RegisterMavenRoutes(r)
 	// GitLab subgroup owners span path segments; the generated VCS routes
 	// handle the ordinary one-segment forms.
-	r.Get("/artifactory/api/vcs/*", vcsOps.VCSNested)
+	r.Get(vcsNestedPattern, vcsOps.VCSNested)
 	registry.Register(r)
 	terraformbackendhttp.Register(
 		r,
@@ -863,6 +869,26 @@ func registerHandwrittenStubs(r chi.Router, logger *slog.Logger) {
 			logger.Debug("hand-written operation stubbed", "method", op.method, "path", op.path)
 		}
 	}
+}
+
+// vcsNestedPattern is the route of the GitLab subgroup forms of the
+// generated VCS operations (VCSAPI.VCSNested).
+const vcsNestedPattern = "/artifactory/api/vcs/*"
+
+// headServed reports the GET routes that answer a HEAD as their GET does
+// (middleware.HeadAsGet): every operation of the generated servers that
+// the spec declares as a GET, and the subgroup forms of the generated VCS
+// operations, which answer as the one-segment forms do. A path whose spec
+// declares a HEAD of its own keeps that route, because HeadAsGet passes a
+// HEAD that a route serves. The hand-written routes keep what they mount.
+func headServed() func(pattern string) bool {
+	served := map[string]bool{vcsNestedPattern: true}
+	for _, op := range operations.Table {
+		if op.Method == http.MethodGet && !op.Handwritten {
+			served[op.Pattern] = true
+		}
+	}
+	return func(pattern string) bool { return served[pattern] }
 }
 
 // handwrittenOp is a hand-written operation: its method and its full path

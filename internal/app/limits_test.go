@@ -257,3 +257,72 @@ func TestAccAPILimitEnvelopes(t *testing.T) {
 		}
 	}
 }
+
+// TestAccAPITelemetryIsOrdinary (#1597): the JFrog Terraform provider posts
+// a usage report for every resource it creates, reads, updates or deletes,
+// and the JFrog CLI posts one and its jfconnect metrics after each command.
+// 7.161.26's UsageResource adds a report to an in-memory tally that the
+// call home job sends later, and no 7.x source limits it, so admission
+// charges the reports and the metrics as ordinary requests (decision 0043,
+// "Classes moved since"). A thousand of them within a minute, more than the
+// default expensive allowance of 600, answer 200 with the ordinary policy,
+// and leave that allowance whole for the repository create after them.
+func TestAccAPITelemetryIsOrdinary(t *testing.T) {
+	w := newItemWorld(t, false, fixedClockLimits(t))
+	const report = `{"productId":"terraform-provider-artifactory/12.11.14",` +
+		`"features":[{"featureId":"Partner/ACC-007450"}]}`
+	sinks := []string{"/artifactory/api/system/usage", "/jfconnect/api/v1/backoffice/metrics/log"}
+	for i := range 1000 {
+		path := sinks[i%2]
+		rec := w.do(http.MethodPost, path, "admin", report)
+		policy := rec.Header().Get("RateLimit-Policy")
+		if rec.Code != http.StatusOK || policy != `"api";q=6000;w=60` {
+			t.Fatalf("report %d to %s: %d, RateLimit-Policy %q", i+1, path, rec.Code, policy)
+		}
+	}
+	rec := w.do(http.MethodPut, "/artifactory/api/repositories/after-reports", "admin",
+		`{"rclass":"local","packageType":"generic"}`, "Content-Type", "application/json")
+	wantStatus(t, rec, http.StatusOK)
+	if rec.Header().Get("RateLimit-Policy") != `"expensive";q=600;w=60` ||
+		!strings.HasPrefix(rec.Header().Get("RateLimit"), `"expensive";r=599;`) {
+		t.Fatalf("repository create after the reports: %v", rec.Header())
+	}
+}
+
+// TestAccAPIHeadIsAdmittedAsItsGet (#1598): a HEAD that the router answers
+// through a generated GET is admitted as that GET, so it answers the GET's
+// rate headers too. The Artifactory readiness probe is exempt, where the
+// path rules would charge a HEAD of it as an ordinary request; the system
+// version is ordinary.
+func TestAccAPIHeadIsAdmittedAsItsGet(t *testing.T) {
+	w := newItemWorld(t, false, fixedClockLimits(t))
+	for _, c := range []struct{ path, policy string }{
+		{"/artifactory/api/v1/system/readiness", ""},
+		{"/artifactory/api/system/version", `"api";q=6000;w=60`},
+	} {
+		get := w.do(http.MethodGet, c.path, "admin", "")
+		head := w.do(http.MethodHead, c.path, "admin", "")
+		if head.Code != get.Code || get.Code != http.StatusOK ||
+			head.Header().Get("RateLimit-Policy") != c.policy ||
+			get.Header().Get("RateLimit-Policy") != c.policy {
+			t.Errorf("%s: GET %d %v, HEAD %d %v",
+				c.path, get.Code, get.Header(), head.Code, head.Header())
+		}
+	}
+}
+
+// fixedClockLimits gives a server the default request limits on a clock
+// that stands still one second into a minute, so that no window turns over
+// while a test spends a budget.
+func fixedClockLimits(t *testing.T) func(*RouterConfig) {
+	t.Helper()
+	now := time.Date(2026, 11, 16, 12, 0, 1, 0, time.UTC)
+	clock := func() time.Time { return now }
+	return func(c *RouterConfig) {
+		var err error
+		c.RequestLimits, err = apilimit.New(budgets(c), apilimit.Default(), clock)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
