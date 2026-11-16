@@ -108,7 +108,7 @@ func (s alpineItems) serveAlpineIndex(
 	// (DV-057); a virtual repository's patterns answer that no repository
 	// serves it. A remote's -cache alias answers as the remote does.
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "Alpine index download", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "Alpine index download", itemkit.Rejected(c, req, err)))
 		return
 	}
 	if cached && c.Class != repo.Remote {

@@ -568,10 +568,13 @@ func TestAccP2DownloadPolicy(t *testing.T) {
 			t.Errorf("%s as user: %d", path, res.Code)
 		}
 	}
+	// A direct refusal of the download policy names the path asked for
+	// after its reason (#1630).
 	const (
-		blackedOut = "The repository '%[1]s' is blacked out and cannot serve artifact '%[1]s:%[2]s'."
-		excluded   = "The repository '%[1]s' rejected the artifact '%[1]s:%[2]s' due to its " +
-			"include/exclude pattern settings."
+		blackedOut = "The repository '%[1]s' is blacked out and cannot serve artifact " +
+			"'%[1]s:%[2]s'.; Path: '%[1]s:%[2]s'"
+		excluded = "The repository '%[1]s' rejected the artifact '%[1]s:%[2]s' due to its " +
+			"include/exclude pattern settings.; Path: '%[1]s:%[2]s'"
 		virtual = "No repository found to serve the request for p2-virtual:%s"
 	)
 

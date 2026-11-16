@@ -75,7 +75,7 @@ drives, at the commit the pinned `jf` 2.126.0 uses (`0646d7b50f9a`). artifactwea
 |---|---|---|
 | Version gate | `GET api/system/version` | ≥ 7.82.2, or a single-request upload |
 | Config | `GET api/v1/uploads/config` | 200 `{"supported":true}` |
-| Create | `POST api/v1/uploads/create?repoKey=&repoPath=&partSizeMB=`, with the caller's credentials | 200 `{"token"}` |
+| Create | `POST api/v1/uploads/create?repoKey=&repoPath=&partSizeMB=`, with the caller's credentials | 200 `{"token"}`. A repository that does not exist, or a caller without Deploy, gets 403 `The user is not allowed to deploy to this location` (401 `Unauthorized` with a challenge for anonymous), which the CLI reports as the upload's failure |
 | Part URL | `POST api/v1/uploads/urlPart?partNumber=n` (from 1), with `Authorization: Bearer <token>` | 200 `{"url"}` |
 | Part | `PUT <url>` with the part's bytes and **no credentials**, up to `--split-count` (5) at once, in any order. A failed part is retried | 200 |
 | Complete | `POST api/v1/uploads/complete?sha1=<file sha1>`, Bearer | **202** |
@@ -107,7 +107,13 @@ uploads never use multipart, and files over 5 TiB don't either.
   for the user who made the upload and its content only. The id alone is not enough, because
   it travels in the part URLs, which carry no credentials.
 - **The upload token** is distinct from an Access token. Create authenticates the caller
-  and checks Deploy permission; subsequent upload-session routes and the signed part
+  and checks Deploy on the path, as 7.161.26's `MultipartUploadServiceImpl.generateToken`
+  does, on the default deployment repository's path through a virtual that names one. It
+  refuses no repository for its class, so an upload to a remote repository, or through a
+  virtual without a local deployment repository, fails only at the closing checksum deploy
+  ([decision 0008](decisions/0008-virtual-repositories.md#r6-writes), R6;
+  [#1627](https://github.com/weaveplatform/artifactweave/issues/1627)). Subsequent
+  upload-session routes and the signed part
   `PUT` authenticate through the multipart service. P4's Access tokens authenticate
   ordinary API calls without replacing this session-specific credential.
 - **Clean-up.** GC hands stale sessions to the service's reaper, which removes the staged

@@ -109,6 +109,9 @@ func (s AgentPluginItems) serveAgentMarketplace(
 		return
 	}
 	if err := generic.CheckDownload(c, name, false); err != nil {
+		if itemRoute {
+			err = itemkit.Rejected(c, req, err)
+		}
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "download check", err))
 		return
 	}

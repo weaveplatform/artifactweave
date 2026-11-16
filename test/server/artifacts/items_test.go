@@ -445,7 +445,10 @@ func TestAccRepositoryClasses(t *testing.T) {
 		t.Fatalf("virtual deploy reported %s", rec.Body)
 	}
 
-	// A remote repository serves its cache; nothing is fetched upstream yet.
+	// A remote repository serves what its cache holds, directly, through
+	// its -cache alias and through a virtual repository; this world has no
+	// remote source, so nothing here is fetched upstream (a virtual's
+	// upstream steps are virtual_remote_test.go's).
 	if _, err := w.db.Items().Put(ctx, artmodel.Item{
 		RepoKey: "up",
 		Cached:  true,

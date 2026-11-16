@@ -92,6 +92,52 @@ Feature: Generic remote retrieval through native clients
     And the file "virtual/jf.bin" contains "local bytes"
     And the generic upstream received 1 GET requests for "/jf.bin"
 
+  Scenario: curl and JFrog CLI fetch a cold file through a virtual and reuse the remote's cache through an outage
+    # A virtual asks a remote member's upstream once no member's own copy
+    # holds the file, and the remote keeps what it fetches in its cache; a
+    # local member that holds the path wins over every upstream, whatever
+    # the configured order (decision 0008, R1; #1535).
+    When I PUT "/artifactory/api/repositories/fetch-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"generic"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/fetch-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"generic","repositories":["remote","fetch-local"]}
+      """
+    Then the response status is 200
+    Given a generic upstream serves "/held.bin" with content "upstream held bytes"
+    When I PUT "/artifactory/fetch-local/held.bin" as admin with body:
+      """
+      local held bytes
+      """
+    Then the response status is 201
+    When I run curl "--fail --silent --show-error --user reader:Reader-pass1 {url}/fetch-virtual/curl.bin --output curl-cold.bin"
+    Then the command succeeds
+    And the generic upstream received 1 GET requests for "/curl.bin"
+    When I run jf "rt direct-download fetch-virtual/jf.bin jf-cold/ --flat --fail-no-op --url {url} --user reader --password Reader-pass1"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the file "jf-cold/jf.bin" contains "jf remote bytes"
+    And the generic upstream received 1 GET requests for "/jf.bin"
+    When I GET "/artifactory/api/storage/remote-cache/jf.bin" as "reader" with password "Reader-pass1"
+    Then the response status is 200
+    When I run jf "rt direct-download fetch-virtual/held.bin held/ --flat --fail-no-op --url {url} --user reader --password Reader-pass1"
+    Then the command succeeds
+    And the file "held/held.bin" contains "local held bytes"
+    And the generic upstream received 0 GET requests for "/held.bin"
+    Given the generic upstream stops
+    When I run curl "--fail --silent --show-error --user reader:Reader-pass1 {url}/fetch-virtual/curl.bin --output curl-warm.bin"
+    Then the command succeeds
+    And the files "curl-cold.bin" and "curl-warm.bin" are identical
+    When I run jf "rt direct-download fetch-virtual/jf.bin jf-warm/ --flat --fail-no-op --url {url} --user reader --password Reader-pass1"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the files "jf-cold/jf.bin" and "jf-warm/jf.bin" are identical
+    And the generic upstream received 1 GET requests for "/curl.bin"
+    And the generic upstream received 1 GET requests for "/jf.bin"
+
   Scenario: a reader of the remote alone reads through a virtual, and a member it may not read answers 7.x's statuses
     # A virtual has no permission target of its own: its members decide a
     # read (JFrog's Permissions page; #1533). Out of readers, whose Anything

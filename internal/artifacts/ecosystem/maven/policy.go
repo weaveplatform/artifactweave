@@ -43,7 +43,9 @@ func (Handler) Resolve(
 // (RealRepoBase.handlesReleaseSnapshot). A path is a snapshot's when the
 // layout reads an integration revision from it or it names
 // [INTEGRATION]; metadata, checksums and paths the layout does not read are
-// exempt.
+// exempt. The refusal is the repository's own policy
+// (format.RejectionError.Policy), which assertValidPath checks with the
+// blackout and the patterns.
 func checkPolicy(c repo.Config, r reader, p string) error {
 	if handles(c.HandleReleases) && handles(c.HandleSnapshots) {
 		return nil
@@ -56,9 +58,11 @@ func checkPolicy(c repo.Config, r reader, p string) error {
 	if snapshot && handles(c.HandleSnapshots) || !snapshot && handles(c.HandleReleases) {
 		return nil
 	}
-	return format.Rejectf(http.StatusConflict,
+	refusal := format.Rejectf(http.StatusConflict,
 		"The repository '%s' rejected the resolution of an artifact '%s:%s' due to conflict in "+
 			"the snapshot release handling policy.", c.Key, c.Key, p)
+	refusal.Policy = true
+	return refusal
 }
 
 // handles reads handleReleases or handleSnapshots, both on unless set off.

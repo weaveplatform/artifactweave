@@ -217,10 +217,14 @@ func TestUnitReleaseSnapshotPolicy(t *testing.T) {
 			}
 			h := maven.Handler{}
 			env := format.Env{Store: w.db, Layouts: layouts{}}
+			// The download's refusal is the repository's own policy, which
+			// the item route names the path for (#1630).
+			var refused *format.RejectionError
 			if _, err := h.Resolve(w.ctx, env, w.c, format.Download{Path: tc.refused}); err == nil {
 				t.Fatal("the download was not refused")
-			} else if s, m := refusal(err); s != http.StatusConflict || m != policy(tc.refused) {
-				t.Fatalf("download: %d %q", s, m)
+			} else if s, m := refusal(err); s != http.StatusConflict || m != policy(tc.refused) ||
+				!errors.As(err, &refused) || !refused.Policy {
+				t.Fatalf("download: %d %q %v", s, m, err)
 			}
 			for _, p := range []string{tc.allowed, tc.refused + ".sha1", "readme.txt"} {
 				if got, err := h.Resolve(w.ctx, env, w.c, format.Download{Path: p}); err != nil ||

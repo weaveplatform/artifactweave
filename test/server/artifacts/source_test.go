@@ -110,7 +110,6 @@ func TestAccRemoteSourceRoutingAndDenials(t *testing.T) {
 		{http.MethodGet, "/artifactory/up/a%5Cb", "reader", 400},
 		{http.MethodGet, "/artifactory/up-cache/a.pkg", "reader", 404},
 		{http.MethodHead, "/artifactory/up-cache/a.pkg", "reader", 404},
-		{http.MethodGet, "/artifactory/virt/a.pkg", "reader", 404},
 		{http.MethodPut, "/artifactory/up/a.pkg", "admin", 404},
 		{http.MethodPut, "/artifactory/up-cache/a.pkg", "admin", 404},
 	} {
@@ -120,8 +119,16 @@ func TestAccRemoteSourceRoutingAndDenials(t *testing.T) {
 		}
 	}
 	if calls != before {
-		t.Fatalf("denied/cache/virtual/write requests fetched: %d -> %d", before, calls)
+		t.Fatalf("denied/cache/write requests fetched: %d -> %d", before, calls)
 	}
+	// A virtual repository reads its remote member as the remote itself
+	// is read, once no earlier member holds the file (#1535).
+	if res := w.do(http.MethodGet, "/artifactory/virt/a.pkg", "reader", ""); res.Code != 200 ||
+		res.Body.String() != "fetched" || calls != before+1 || last.Repo.Key != "up" {
+		t.Fatalf("virtual read: %d %q calls %d -> %d repo %q", res.Code, res.Body, before, calls,
+			last.Repo.Key)
+	}
+	before = calls
 	// A remote of another type reads a file its cache lacks from the
 	// upstream too, as 7.161.26's RemoteRepoBase.getInfo does whatever the
 	// package type (#1507).
