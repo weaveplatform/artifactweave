@@ -239,7 +239,10 @@ func (v storageView) downloadURI(ctx context.Context, p string) string {
 // requestDownloadURI is 7.161.26's buildDownloadUri: the servlet context
 // URL and the path the request gave, its key and any trailing "/" kept, so
 // the root is "/artifactory/<key>", not the "/artifactory/<key>/" that
-// downloadURI gives it.
+// downloadURI gives it. The path is percent-escaped, as downloadURI's is:
+// 7.x appends the decoded path as it is, which leaves a space or "#" in a
+// URI that is then not valid, so that is taken for a bug until a live 7.x
+// shows clients rely on it (#216).
 func (v storageView) requestDownloadURI(ctx context.Context) string {
 	u := baseurl.From(ctx) + "/artifactory/" + v.key
 	if v.path != "" {
