@@ -82,8 +82,8 @@ func TestUnitAdmit(t *testing.T) {
 			case tc.status == 0 && (got.Path != w.Path || !got.Properties.Has("k", "v")):
 				t.Fatalf("admitted %+v", got)
 			case tc.status != 0 && (!errors.As(err, &refused) || refused.Status != tc.status ||
-				refused.Message != tc.msg):
-				t.Fatalf("refusal %v, want %d %q", err, tc.status, tc.msg)
+				refused.Message != tc.msg || !refused.Policy):
+				t.Fatalf("refusal %v, want the policy's %d %q", err, tc.status, tc.msg)
 			}
 		})
 	}
@@ -205,8 +205,9 @@ func TestUnitCheckDownload(t *testing.T) {
 			case tc.msg == "" && err != nil:
 				t.Fatalf("refused: %v", err)
 			case tc.msg != "" && (!errors.As(err, &refused) ||
-				refused.Status != http.StatusNotFound || refused.Message != tc.msg):
-				t.Fatalf("refusal %v, want 404 %q", err, tc.msg)
+				refused.Status != http.StatusNotFound || refused.Message != tc.msg ||
+				!refused.Policy):
+				t.Fatalf("refusal %v, want the policy's 404 %q", err, tc.msg)
 			}
 		})
 	}

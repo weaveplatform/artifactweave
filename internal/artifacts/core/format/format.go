@@ -448,6 +448,14 @@ func (a *AcceptedError) Error() string {
 type RejectionError struct {
 	Status  int
 	Message string
+	// Policy marks a refusal by the repository's own policy for the path:
+	// its blackout, its include and exclude patterns, or a format's release
+	// and snapshot handling, the checks 7.x's RealRepoBase.assertValidPath
+	// makes. A download on the item route answers it as 7.161.26's download
+	// service answers the unfound resource it makes of one, with the path
+	// it was asked for after the message (itemkit's lookupRefusal); every
+	// other surface answers Status and Message alone, as for any refusal.
+	Policy bool
 }
 
 // Rejectf returns a RejectionError with a formatted message.

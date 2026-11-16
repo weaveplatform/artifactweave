@@ -275,6 +275,31 @@ func TestAccMavenRemoteDenialsAndAdmission(t *testing.T) {
 	}
 }
 
+// A remote's release and snapshot handling refuses a download from the
+// remote or its cache, a checksum's too, as a local repository's does: 409
+// with the path asked for after the reason (#1630), and without asking the
+// upstream. A cache's refusal names the remote in its reason, as it did
+// before.
+func TestAccMavenRemotePolicyRefusalNamesThePath(t *testing.T) {
+	w := newMavenRemoteWorld(t)
+	w.c.HandleSnapshots = new(false)
+	w.update()
+	const p = "org/acme/app/1.1-SNAPSHOT/app-1.1-SNAPSHOT.jar"
+	reason := "The repository '" + w.c.Key + "' rejected the resolution of an artifact '" +
+		w.c.Key + ":" + p + "' due to conflict in the snapshot release handling policy."
+	for _, key := range []string{w.c.Key, w.c.Key + "-cache"} {
+		for _, asked := range []string{p, p + ".sha1"} {
+			for _, method := range []string{http.MethodGet, http.MethodHead} {
+				rec := w.request(method, "/artifactory/"+key+"/"+asked, "reader", "")
+				wantPolicyRefusal(t, rec, method, reason+"; Path: '"+key+":"+p+"'")
+			}
+		}
+	}
+	if w.up.Count("", "") != 0 {
+		t.Fatal("policy refusal reached upstream", w.up.Requests())
+	}
+}
+
 // Metadata a remote's patterns refuse counts as absent when it would resolve
 // a path: a non-unique snapshot and a version token are fetched as asked, as
 // 6.20's RemoteLatestMavenVersionResolver does ([I], #216), and the metadata

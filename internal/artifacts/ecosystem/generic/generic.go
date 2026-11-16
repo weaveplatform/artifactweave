@@ -49,7 +49,7 @@ func CheckBlackedOut(c repo.Config, path string) error {
 	if c.BlackedOut == nil || !*c.BlackedOut {
 		return nil
 	}
-	return format.Rejectf(http.StatusNotFound,
+	return refuse(http.StatusNotFound,
 		"The repository '%s' is blacked out and cannot serve artifact '%s:%s'.", c.Key, c.Key, path)
 }
 
@@ -60,7 +60,15 @@ func CheckPatterns(c repo.Config, path string) error {
 	if repo.PatternsOf(c).Accepts(path, false) {
 		return nil
 	}
-	return format.Rejectf(http.StatusConflict, rejectedByPatterns, c.Key, c.Key, path)
+	return refuse(http.StatusConflict, rejectedByPatterns, c.Key, c.Key, path)
+}
+
+// refuse is the refusal of c's own policy for a path, marked as one
+// (format.RejectionError.Policy).
+func refuse(status int, message string, args ...any) error {
+	refusal := format.Rejectf(status, message, args...)
+	refusal.Policy = true
+	return refusal
 }
 
 // rejectedByPatterns is IncludeExcludeException's message.
@@ -96,10 +104,10 @@ func CheckDownload(c repo.Config, path string, folder bool) error {
 		return nil
 	}
 	if c.Class == repo.Virtual {
-		return format.Rejectf(http.StatusNotFound,
+		return refuse(http.StatusNotFound,
 			"No repository found to serve the request for %s:%s", c.Key, path)
 	}
-	return format.Rejectf(http.StatusNotFound, rejectedByPatterns, c.Key, c.Key, path)
+	return refuse(http.StatusNotFound, rejectedByPatterns, c.Key, c.Key, path)
 }
 
 // Classify reports every generic file as unique content.
