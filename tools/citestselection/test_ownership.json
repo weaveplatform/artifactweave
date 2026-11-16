@@ -259,7 +259,8 @@
       "virtual_config_test.go",
       "virtual_members_test.go",
       "virtual_order_test.go",
-      "virtual_status_test.go"
+      "virtual_status_test.go",
+      "virtual_write_test.go"
     ],
     "test/server/configuration": [
       "descriptor_test.go",

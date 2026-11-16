@@ -1385,6 +1385,10 @@ func (s ArtifactoryAPI) editProperties(
 	}
 	switch {
 	case v.repo.Class == repo.Virtual:
+		// 7.x's answer is [I]: its properties resource is closed code,
+		// JFrog's property pages name local and cache repositories only,
+		// RTFACT-17097 saw a 6.0 set through a virtual answer success and
+		// change nothing, and RTFACT-29704 asked 7.x to refuse it.
 		httpkit.WriteErr(
 			w,
 			r,

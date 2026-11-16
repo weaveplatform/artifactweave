@@ -101,7 +101,13 @@ func bearer(r *http.Request) string {
 }
 
 // createMultipart answers create: the caller needs deploy rights on the
-// repository, decided as for a deploy.
+// repository, decided as for a deploy. Through a virtual repository that is
+// Write on its default deployment repository's path, as 7.161.26's
+// MultipartUploadServiceImpl.getRepoPath (109-118) checks it. Without one,
+// 7.x checks Deploy on the virtual repository's own path and leaves R6's
+// 405 to the checksum deploy that ends the upload; artifactweave answers
+// that 405 here, before any part is sent, as no source says what 7.x's
+// permission check answers for a virtual repository's path [I].
 func (s ArtifactoryAPI) createMultipart(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	mp, err := s.multipartService()

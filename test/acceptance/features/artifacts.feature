@@ -56,6 +56,69 @@ Feature: Deploy and download generic artifacts
     When I GET "/artifactory/api/v1/uploads/config" as admin
     Then the JSON field "supported" equals "true"
 
+  # A virtual repository deploys into its default deployment repository,
+  # refuses a deploy without one with 405 and Allow: GET, and deletes
+  # nothing, answering 404 with no body (decision 0008, R6; #1534).
+  Scenario: Deploy and delete through a virtual repository over HTTP
+    Given I PUT "/artifactory/api/repositories/generic-virtual" as admin with body:
+      """
+      {"rclass": "virtual", "packageType": "generic", "repositories": ["generic-local"],
+       "defaultDeploymentRepo": "generic-local"}
+      """
+    And I PUT "/artifactory/api/repositories/generic-nodeploy" as admin with body:
+      """
+      {"rclass": "virtual", "packageType": "generic", "repositories": ["generic-local"]}
+      """
+    When I PUT "/artifactory/generic-virtual/via/hello.txt" as admin with body:
+      """
+      through the virtual
+      """
+    Then the response status is 201
+    And the JSON field "repo" equals "generic-local"
+    When I GET "/artifactory/generic-local/via/hello.txt" as admin
+    Then the response body is "through the virtual"
+    When I PUT "/artifactory/generic-nodeploy/via/hello.txt" as admin with body:
+      """
+      refused
+      """
+    Then the response status is 405
+    And the response header "Allow" contains "GET"
+    And the response body contains "No local repository was configured as local deployment repository for the (generic-nodeploy) virtual repository."
+    When I DELETE "/artifactory/generic-virtual/via/hello.txt" as admin
+    Then the response status is 404
+    And the response body is ""
+    When I GET "/artifactory/generic-local/via/hello.txt" as admin
+    Then the response status is 200
+
+  # The CLI's upload through a virtual repository lands in its default
+  # deployment repository; without one the CLI reports the 405 (#1534).
+  @jf
+  Scenario: jf rt u through a virtual repository
+    Given the JFrog CLI is available
+    And I PUT "/artifactory/api/repositories/generic-virtual" as admin with body:
+      """
+      {"rclass": "virtual", "packageType": "generic", "repositories": ["generic-local"],
+       "defaultDeploymentRepo": "generic-local"}
+      """
+    And I PUT "/artifactory/api/repositories/generic-nodeploy" as admin with body:
+      """
+      {"rclass": "virtual", "packageType": "generic", "repositories": ["generic-local"]}
+      """
+    And a file "via.txt" with content:
+      """
+      through the virtual
+      """
+    When I run jf "rt u {dir}/via.txt generic-virtual/jf/ --flat --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the server answered 201 to PUT "/artifactory/generic-virtual/jf/via.txt"
+    When I GET "/artifactory/generic-local/jf/via.txt" as admin
+    Then the response body is "through the virtual"
+    When I run jf "rt u {dir}/via.txt generic-nodeploy/jf/ --flat --url {url} --user admin --password {password}"
+    Then the command fails
+    And the server answered no request with 500 since the last command
+    And the server answered 405 to PUT "/artifactory/generic-nodeploy/jf/via.txt"
+
   @jf
   Scenario: jf rt u with a checksum deploy, jf rt s, and a split jf rt dl
     Given the JFrog CLI is available

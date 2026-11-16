@@ -129,8 +129,15 @@ page ("Include and Exclude Patterns apply to all users, including admin users");
 ### R6. Writes
 
 An upload to a virtual goes to its `defaultDeploymentRepo`, which is a local or federated
-member. With none set, it answers 405 with `Allow: GET` and
+member, and needs Deploy on that repository's path, not on the virtual's. With none set, or
+with one that names no local or federated repository, it answers 405 with `Allow: GET` and
 `No local repository was configured as local deployment repository for the (<key>) virtual repository.`
+before any permission is checked. This holds for a plain, checksum, archive or folder deploy
+and for the CLI's multipart upload: the create of a multipart upload through a virtual
+without one answers the same 405 **[I]** (7.x checks Deploy on the virtual's own path there
+and refuses the closing checksum deploy with this 405; `MultipartUploadServiceImpl` 109-118).
+An upload to a remote repository's key, or its cache's, answers 404
+`Could not find a local repository named <key> to deploy to.`, the key as the request gave it.
 A virtual cannot be another virtual's `defaultDeploymentRepo`
 ([RTFACT-31328](https://jfrog.atlassian.net/browse/RTFACT-31328) is an open request for it).
 A save that sets a remote or virtual repository, the virtual itself included, as the
@@ -146,13 +153,26 @@ DELETE through a virtual answers 404 with an empty body, since 7.x deletes only 
 federated and cache repositories
 ([RTFACT-26096](https://jfrog.atlassian.net/browse/RTFACT-26096) is an open request to
 forward it). Copy or move into a virtual is refused with
-`Target repository <key> is a virtual repository. <copy|move> to virtual repositories is not allowed.`;
-its status is **[I]**, inferred 400 from the `IllegalArgumentException` it throws.
+`Target repository <key> is a virtual repository. <copy|move> to virtual repositories is not allowed.`,
+into a remote with `... is a remote repository. <copy|move> to remote repositories is not allowed.`
+and into a cache with `... is a cache repository. <copy|move> to cache repositories is not allowed.`
+Only a remote that stores artifacts locally has a cache, so another `<key>-cache` does not
+exist. The status is **[I]**, inferred 400 from the `IllegalArgumentException` these throw,
+and so is the envelope: artifactweave keeps the copy and move routes' `messages` report,
+which JFrog's Copy Item and Move Item pages document for their 400s
+([RTFACT-17750](https://jfrog.atlassian.net/browse/RTFACT-17750) saw a 409 on 7.11).
+Copy or move out of a virtual, and properties set through one, keep their 400 **[I]**: 7.x's
+code for them is closed, and its documentation names local and local-cached repositories
+alone ([RTFACT-29704](https://jfrog.atlassian.net/browse/RTFACT-29704)).
 
 Sources: `util/UploadServiceUtils.getTargetRepository` 248-261;
-`engine/UploadServiceImpl.sendInvalidTargetRepositoryError` 337-352;
+`engine/UploadServiceImpl.sendInvalidTargetRepositoryError` 337-352 and
+`assertValidDeployPathAndPermissions`;
 `repo/webdav/methods/DeleteMethod.handle` 75-83;
-`repo/service/mover/RepoPathMover.throwExceptionIfTargetRepoIsForbidden` 121-138; JFrog's
+`repo/service/mover/RepoPathMover.throwExceptionIfTargetRepoIsForbidden` 121-138;
+`repo/service/RepositoryServiceImpl` (a cache registered only for a remote that stores
+artifacts locally); `MultipartUploadResource` and `MultipartUploadServiceImpl.generateToken`;
+JFrog's
 [Configure Virtual Repositories for Deployment](https://docs.jfrog.com/artifactory/docs/deploy-artifacts#configure-virtual-repositories-for-deployment).
 
 ### R7. Requests from another Artifactory

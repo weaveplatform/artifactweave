@@ -96,12 +96,18 @@ func (s ArtifactoryAPI) deployEscapedItem(
 	}
 	c, cached, err := itemkit.ResolveRepo(ctx, st, req.Key)
 	if err == nil {
-		c, err = itemkit.DeployTarget(ctx, st, c, cached)
+		c, err = itemkit.ItemDeployTarget(ctx, st, c, cached)
 	}
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve deploy target", err))
 		return
 	}
+	// c is now where the file lands, a virtual repository's default
+	// deployment repository included, and Write, as Delete for an
+	// overwrite below, is checked on its path: 7.x checks the deploy path
+	// on the target repository (UploadServiceImpl.validateRequestAndUpload,
+	// assertValidDeployPathAndPermissions), and a virtual repository has
+	// no permission target of its own.
 	if !acc.Item(c, req.Path, req.IsFolder, api.ActionWrite) {
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
@@ -357,8 +363,10 @@ func (s ArtifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if c.Class == repo.Virtual {
-		httpkit.WriteErr(w, r, apierror.New(http.StatusMethodNotAllowed,
-			fmt.Sprintf("Cannot delete from the virtual repository '%s'", c.Key)))
+		// 7.x deletes only in local, federated and cache repositories:
+		// DeleteMethod.handle (7.161.26, 75-83) answers any other key 404
+		// with no body, before any permission check (decision 0008, R6).
+		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 	if !acc.File(c, req.Path, api.ActionDelete) {

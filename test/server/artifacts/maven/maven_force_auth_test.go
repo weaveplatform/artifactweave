@@ -157,10 +157,9 @@ func TestAccMavenForceAuthenticationOnAVirtual(t *testing.T) {
 		{"admin GET", http.MethodGet, forcedJar, "admin", http.StatusOK, "jar"},
 		{"admin trace", http.MethodGet, forcedJar + "?trace", "admin", http.StatusOK, "User: admin"},
 		{"admin PUT", http.MethodPut, "/artifactory/mvn-forced/org/c/1.0/c-1.0.jar", "admin", http.StatusCreated, `"repo":"mvn-local"`},
-		{
-			"admin DELETE", http.MethodDelete, forcedJar, "admin", http.StatusMethodNotAllowed,
-			"Cannot delete from the virtual repository 'mvn-forced'",
-		},
+		// 7.x deletes nothing through a virtual repository: 404, no body
+		// (decision 0008, R6).
+		{"admin DELETE", http.MethodDelete, forcedJar, "admin", http.StatusNotFound, ""},
 		// The member that refused user is named, with the virtual's path
 		// (#1533).
 		{
@@ -179,7 +178,7 @@ func TestAccMavenForceAuthenticationOnAVirtual(t *testing.T) {
 		},
 		{
 			"anonymous DELETE, flag off", http.MethodDelete, "/artifactory/mvn-open/org/a/1.0/a-1.0.jar", "",
-			http.StatusMethodNotAllowed, "Cannot delete from the virtual repository 'mvn-open'",
+			http.StatusNotFound, "",
 		},
 		{
 			"anonymous POST, flag off", http.MethodPost, "/artifactory/mvn-open/org/a/1.0/a-1.0.jar", "",

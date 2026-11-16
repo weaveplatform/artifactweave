@@ -70,10 +70,6 @@ linters:
 
   # 3) Per-linter configuration
   settings:
-    golines:
-        # golines wraps any line longer than this, 100 by default; 180 keeps a
-        # call or signature on one line where it reads better that way.
-        max-len: 180
     nakedret:
       max-func-lines: 40
     revive:
@@ -276,6 +272,13 @@ formatters:
 
   # Per‐formatter settings (optional—only if you need to tweak defaults)
   settings:
+    # golines is a formatter in golangci-lint v2, so its settings live here;
+    # under linters.settings `config verify` rejects the whole file and the
+    # Lint job fails before it runs.
+    golines:
+      # golines wraps any line longer than this, 100 by default; 180 keeps a
+      # call or signature on one line where it reads better that way.
+      max-len: 180
     gci:
       # customize your import sections order: standard, external, project
       sections:

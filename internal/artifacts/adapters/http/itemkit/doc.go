@@ -49,9 +49,9 @@
 //     pkgroute.ServeNamedStream.
 //   - Item values and helpers: ItemRequest, ParseItemPath,
 //     ParseEscapedItemPath, Found, Download, Lookup, StatusWriter,
-//     ResolveRepo, DeployTarget, ItemCreated, ItemNotFound, MemberRead,
-//     OverwriteRefusal, ChecksumsJSON, DownloadURI, SplitRepoPath,
-//     NotFoundRepo, View and Forced.
+//     ResolveRepo, DeployTarget, ItemDeployTarget, NoDeployTarget,
+//     ItemCreated, ItemNotFound, MemberRead, OverwriteRefusal, ChecksumsJSON,
+//     DownloadURI, SplitRepoPath, NotFoundRepo, View and Forced.
 //   - The download's answers, for an overlay to write: Missed, Refused,
 //     Mismatched, ReadAnswer, RemoteReadError, NotServed and
 //     ErrFolderAtPath.
@@ -107,6 +107,15 @@
 //     otherwise answered as a file's download, with its own checksums and
 //     the archive's time, and counts as a download of the archive
 //     (https://github.com/weaveplatform/artifactweave/issues/1593).
+//   - DeployTarget is where every route that publishes a file through a
+//     virtual repository writes: its local or federated default deployment
+//     repository (core/virtual.DeployTarget), and Write is then checked on
+//     that repository's path, never the virtual's. Without one it answers
+//     7.x's 405 with Allow: GET (NoDeployTarget; decision 0008, R6). The
+//     item routes' PUT answers a remote repository or its cache 404
+//     (ItemDeployTarget), while the native protocols that call
+//     DeployTarget keep their 405 for one (P10's
+//     https://github.com/weaveplatform/artifactweave/issues/1534).
 //   - GetItem answers a file request, a path not ending in a slash, to a
 //     local, federated, remote or cache repository that misses, that the
 //     caller may not read or whose file a matrix parameter does not match
@@ -229,7 +238,8 @@
 //
 // Implemented P1 to P9c as the server root's item routes and helpers;
 // split out as the item kit in P9d (WEB-06), which also narrowed its store
-// to Store (ART-22).
+// to Store (ART-22). P10 gave DeployTarget 7.x's answers for a virtual
+// repository and the item routes' PUT its own for a remote one (#1534).
 //
 // # Testing
 //

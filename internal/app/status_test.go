@@ -449,7 +449,7 @@ func itemStatusRows() []statusCase {
 		{put, lib + "/new/dir/", "admin", "", 201},
 		{put, lib + "/", "admin", "a", 400},
 		{put, lib + "/fixture/get.txt/below", "admin", "a", 409},
-		{put, "/artifactory/remote-private/a.txt", "admin", "a", 405},
+		{put, "/artifactory/remote-private/a.txt", "admin", "a", 404},
 		{put, "/artifactory/missing/a.txt", "admin", "a", 404},
 		{put, lib + "/new/b.txt", "user", "a", 403},
 		{put, lib + "/new/b.txt", "anonymous", "a", 401},
@@ -510,7 +510,7 @@ func itemStatusRows() []statusCase {
 
 		{remove, lib + "/fixture/del.txt", "admin", "", 204},
 		{remove, lib + "/fixture/absent", "admin", "", 404},
-		{remove, "/artifactory/virt/x", "admin", "", 405},
+		{remove, "/artifactory/virt/x", "admin", "", 404},
 		{remove, lib + "/fixture/get.txt", "user", "", 403},
 		{remove, lib + "/fixture/get.txt", "anonymous", "", 401},
 		{remove, lib + "/fixture/get.txt", "", "", 401},
