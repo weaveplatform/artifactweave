@@ -475,7 +475,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	maps.Copy(slashes, accesshttp.SlashCollections())
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, kit)
-	head := middleware.HeadAsGet{Serves: headServed()}
+	head := middleware.HeadAsGet{Serves: headServed(), RunsGet: headRunsGetRoute}
 	r.Use(
 		httpkit.ErrorProfiles(errorProfileRules),
 		middleware.RequestID,
@@ -877,10 +877,11 @@ const vcsNestedPattern = "/artifactory/api/vcs/*"
 
 // headServed reports the GET routes that answer a HEAD as their GET does
 // (middleware.HeadAsGet): every operation of the generated servers that
-// the spec declares as a GET, and the subgroup forms of the generated VCS
-// operations, which answer as the one-segment forms do. A path whose spec
-// declares a HEAD of its own keeps that route, because HeadAsGet passes a
-// HEAD that a route serves. The hand-written routes keep what they mount.
+// the spec declares as a GET, the subgroup forms of the generated VCS
+// operations, which answer as the one-segment forms do, and the
+// hand-written routes of handwrittenHeads. A path whose spec declares a
+// HEAD of its own keeps that route, because HeadAsGet passes a HEAD that a
+// route serves.
 func headServed() func(pattern string) bool {
 	served := map[string]bool{vcsNestedPattern: true}
 	for _, op := range operations.Table {
@@ -888,8 +889,17 @@ func headServed() func(pattern string) bool {
 			served[op.Pattern] = true
 		}
 	}
+	for pattern := range handwrittenHeads {
+		served[pattern] = true
+	}
 	return func(pattern string) bool { return served[pattern] }
 }
+
+// headRunsGetRoute reports the served GET routes whose handler runs a HEAD
+// as the GET (middleware.HeadAsGet.RunsGet): the hand-written routes that
+// handwrittenHeads marks so. The generated operations' handlers see the
+// HEAD, and the VCS downloads among them read it.
+func headRunsGetRoute(pattern string) bool { return handwrittenHeads[pattern] == headRunsGet }
 
 // handwrittenOp is a hand-written operation: its method and its full path
 // template, the spec's server prefix included.

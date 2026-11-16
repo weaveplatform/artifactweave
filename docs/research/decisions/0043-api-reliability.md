@@ -15,7 +15,9 @@ Amended by [#1597](https://github.com/weaveplatform/artifactweave/issues/1597)
 ([Classes moved since](#classes-moved-since)), and by
 [#1598](https://github.com/weaveplatform/artifactweave/issues/1598) (2026-11-16), under
 which a HEAD that the router answers through a GET operation is admitted as that GET
-([Matching happens before routing](#cost-classes-and-how-admission-finds-them)).
+([Matching happens before routing](#cost-classes-and-how-admission-finds-them)), and by
+[#1613](https://github.com/weaveplatform/artifactweave/issues/1613) (2026-11-16), which
+extends that to the hand-written GET routes.
 This decision describes artifactweave's implementation. It is not a live JFrog
 compatibility capture. Header support, rejection statuses and the Access page
 cap need confirmation under [#216/P19](https://github.com/weaveplatform/artifactweave/issues/216).
@@ -290,13 +292,15 @@ precedence (a static segment beats a parameter) to the same patterns and the sam
 escaped path the router uses. A request that no spec pattern matches (hand-written
 aliases, native protocol routes and unknown paths) falls back to path rules that
 `expensiveRequest` keeps for those alone. A HEAD that the router answers through a
-generated GET operation ([decision 0002](0002-spec-first-flat-crud-handwritten-item-paths.md),
-"A HEAD of a generated GET") reaches the key gate, admission, authentication and the
+GET route ([decision 0002](0002-spec-first-flat-crud-handwritten-item-paths.md),
+"A HEAD of a GET-only route") reaches the key gate, admission, authentication and the
 restriction check as that GET, so it is admitted, headed and exempted as the GET is:
 the probes' HEAD is exempt and the recovery reads' HEAD takes the recovery reserve.
 Before [#1598](https://github.com/weaveplatform/artifactweave/issues/1598) such a HEAD
-answered 405, and the path rules decided its class. A HEAD of a hand-written GET-only
-route still answers 405 under the path rules. Where a hand-written route serves a spec
+of a generated GET answered 405, and the path rules decided its class, as they did a
+HEAD of a hand-written GET route until
+[#1613](https://github.com/weaveplatform/artifactweave/issues/1613). A HEAD of a JFrog
+Router probe still answers 405 under the path rules. Where a hand-written route serves a spec
 operation under another pattern, the two must agree, and a test over every served
 operation checks that they do. The hand-written item operations are looked up under
 the pattern the router serves them with, whose repository key never matches `api`,

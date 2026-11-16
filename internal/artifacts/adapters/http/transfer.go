@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/middleware"
 )
 
 // copyOrMoveType is the media type of a copy or move report.
@@ -281,8 +282,9 @@ func writeTransfer(w http.ResponseWriter, status int, msgs []item.Message) {
 // default (folderDownloadConfig.maxConcurrentRequests).
 const defaultFolderSlots = 10
 
-// downloadFolderArchive answers GET /api/archive/download/{repo}/{path}: a
-// folder, or a whole repository with an empty path, streamed as one archive.
+// downloadFolderArchive answers GET and HEAD
+// /api/archive/download/{repo}/{path}: a folder, or a whole repository with
+// an empty path, streamed as one archive.
 // Like Artifactory it is off until the folder download setting enables it,
 // bounded by that setting's file count and size, and refused with 400 while
 // the most folder downloads that may run at once are running, after every
@@ -375,6 +377,15 @@ func (s ArtifactoryAPI) downloadFolderArchive(w http.ResponseWriter, r *http.Req
 	}
 	w.Header().Set("Content-Type", kind.ContentType())
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name+kind.Ext()))
+	// A HEAD answers the GET's status and header (7.161.26's
+	// ArchiveResource has a @GET alone, which Jersey runs for a HEAD) but
+	// reads no file to build an archive it would drop. The GET streams the
+	// archive without a length, and so the HEAD goes without one.
+	if r.Method == http.MethodHead {
+		middleware.HeadLengthUnknown(w)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	if err := s.Items(st).ArchiveFiles(ctx, files, p, kind, sums, w); err != nil {
 		// The status is sent; the client sees a truncated archive.
