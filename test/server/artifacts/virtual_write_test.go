@@ -180,17 +180,34 @@ func TestAccVirtualMultipartCreate(t *testing.T) {
 	if w.item("libs-local", false, "big/data.bin").Size != int64(len(data)) {
 		t.Fatal("the multipart upload through virt stored nothing in libs-local")
 	}
-	wantStatus(t, w.do(http.MethodPost,
-		uploadsCreate+"?repoKey=virt&repoPath=big%2Fother.bin&partSizeMB=1", "user", ""),
-		http.StatusForbidden)
-	wantError(t, "create through virt-nodeploy",
-		w.do(
-			http.MethodPost,
-			uploadsCreate+"?repoKey=virt-nodeploy&repoPath=big%2Fdata.bin&partSizeMB=1",
-			"admin",
-			"",
-		),
+	wantError(t, "create through virt as user",
+		w.do(http.MethodPost,
+			uploadsCreate+"?repoKey=virt&repoPath=big%2Fother.bin&partSizeMB=1", "user", ""),
+		http.StatusForbidden, deployForbidden, "")
+	// Without a deployment repository, 7.x's create checks Deploy on the
+	// virtual repository's own path (MultipartUploadServiceImpl.getRepoPath),
+	// which a grant on libs-local does not cover and an administrator
+	// always holds. The administrator's upload then fails at the checksum
+	// deploy that ends it, with R6's 405.
+	nodeploy := uploadsCreate + "?repoKey=virt-nodeploy&repoPath=big%2Fdata.bin&partSizeMB=1"
+	wantError(t, "create through virt-nodeploy as deployer",
+		w.do(http.MethodPost, nodeploy, "deployer", ""),
+		http.StatusForbidden, deployForbidden, "")
+	data = "uploaded through a virtual repository without a deployment repository"
+	token = uploadInPartsTo(t, w, "admin", "virt-nodeploy", "big/data.bin", data)
+	wantError(t, "the checksum deploy through virt-nodeploy",
+		w.do(http.MethodPut, "/artifactory/virt-nodeploy/big/data.bin", "admin", "",
+			"X-Checksum-Deploy", "true", "X-Checksum-Sha1", sha1Hex(data),
+			"X-Checksum-Deploy-Token", token),
 		http.StatusMethodNotAllowed, noTarget("virt-nodeploy"), http.MethodGet)
+	// A deployment repository no repository has, stored without the save's
+	// checks, is still where create checks Deploy: a key of no known type,
+	// which a grant on libs-local does not cover.
+	w.virtualDeploying("virt-gone", "gone")
+	gone := uploadsCreate + "?repoKey=virt-gone&repoPath=big%2Fdata.bin&partSizeMB=1"
+	wantStatus(t, w.do(http.MethodPost, gone, "admin", ""), http.StatusOK)
+	wantError(t, "create through virt-gone as deployer", w.do(http.MethodPost, gone, "deployer", ""),
+		http.StatusForbidden, deployForbidden, "")
 }
 
 func TestAccDeleteThroughVirtual(t *testing.T) {

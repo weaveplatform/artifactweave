@@ -2742,7 +2742,7 @@ paths:
       x-idempotency: safe
   /api/v1/uploads/create:
     post:
-      description: Starts a multipart upload of one file and returns its upload token. The caller needs deploy rights on the repository, as for a deploy. Once the parts are complete, a checksum deploy of the file creates the item.
+      description: Starts a multipart upload of one file and returns its upload token. The caller needs deploy rights on the repository's path, or, through a virtual repository with a default deployment repository, on that repository's path. Any existing repository may be named, a remote or virtual one included; once the parts are complete, a checksum deploy of the file creates the item, and refuses a repository that takes no deploys.
       operationId: createMultipartUpload
       parameters:
       - description: Required query parameter. Repository to deploy to.
@@ -2784,25 +2784,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: No credentials or invalid credentials.
+          description: No credentials or invalid credentials, or an anonymous caller refused as the 403 refuses a user ("Unauthorized", with a Basic challenge).
         '403':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller may not deploy to the repository.
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: The repository does not exist.
-        '405':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: The repository is remote, or virtual without a default deployment repository, as for a deploy.
+          description: The repository does not exist, or the caller may not deploy to its path ("The user is not allowed to deploy to this location").
       summary: Start a multipart upload
       tags:
       - storage
