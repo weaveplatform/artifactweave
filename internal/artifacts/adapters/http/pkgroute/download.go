@@ -1,12 +1,15 @@
 package pkgroute
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -71,39 +74,170 @@ func (k *Kit) wrap(err error) error {
 // from. For a repository that is not virtual it is the request itself,
 // unless CheckDocument refuses path. For a virtual repository, its own
 // include and exclude patterns rejecting path refuse the document;
-// otherwise there is a member request (MemberRequest) for each member in
-// the virtual repository's order, leaving out a member that no longer
-// exists, one that is blacked out, which 7.x ignores when it resolves, and
-// one whose include and exclude patterns reject path, remote members
-// included, so no member that would refuse the document adds to it. An
-// empty path checks blackout alone, for a document whose 7.x storage path
-// is not documented, after the caller's CheckBlackedOut.
+// otherwise there is a member request for each step of the package
+// handlers' walk (members), in 7.x's effective order. An empty path checks
+// blackout alone, for a document whose 7.x storage path is not documented,
+// after the caller's CheckBlackedOut.
 func (k *Kit) MergeMembers(r *http.Request, path string) ([]*http.Request, error) {
+	if err := k.CheckDocument(r, path); err != nil {
+		return nil, err
+	}
+	if RequestFrom(r).Repo.Class != repo.Virtual {
+		return []*http.Request{r}, nil
+	}
+	_, out, err := k.members(r, path)
+	return out, err
+}
+
+// Collect reads the document at path from each request MergeMembers
+// returns, in order, with read, and returns what read for a format's
+// virtual.Merger, each part with the real member it came from. Through a
+// virtual repository a member whose read PassedOver reports is left out
+// (virtual.Collect), so the format answers its own not-found when no part
+// is left (decision 0008, R3). For a repository that is not virtual the one
+// part is the request's own, and read's error is returned as it is, so a
+// direct request keeps its own refusal and miss.
+func Collect[T any](
+	k *Kit,
+	r *http.Request,
+	path string,
+	read func(*http.Request) (T, error),
+) ([]virtual.Part[T], error) {
 	if err := k.CheckDocument(r, path); err != nil {
 		return nil, err
 	}
 	q := RequestFrom(r)
 	if q.Repo.Class != repo.Virtual {
-		return []*http.Request{r}, nil
-	}
-	var out []*http.Request
-	for _, key := range q.Repo.Repositories {
-		member, err := k.o.Store.Repos().Get(r.Context(), key)
-		switch {
-		case errors.Is(err, kernel.ErrNotFound):
-			continue
-		case err != nil:
-			return nil, fmt.Errorf("%s: member %s: %w", k.p.Name, key, err)
-		case generic.CheckDownload(member, path, false) != nil:
-			continue
-		}
-		mr, err := k.MemberRequest(r, member)
+		doc, err := read(r)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, mr)
+		return []virtual.Part[T]{{Member: q.Repo, Doc: doc}}, nil
 	}
-	return out, nil
+	members, requests, err := k.members(r, path)
+	if err != nil {
+		return nil, err
+	}
+	// The package walk asks each real member once (virtual.Package), so a
+	// member's key names its one request.
+	byKey := make(map[string]*http.Request, len(members))
+	for i, m := range members {
+		byKey[m.Repo.Key] = requests[i]
+	}
+	parts, err := virtual.Collect(r.Context(), members,
+		func(_ context.Context, m virtual.Member) (T, error) {
+			doc, err := read(byKey[m.Repo.Key])
+			if err != nil && PassedOver(err) {
+				return doc, fmt.Errorf("%w: %w", virtual.ErrPassOver, err)
+			}
+			return doc, err
+		})
+	if err != nil {
+		return nil, fmt.Errorf("%s: merge %s: %w", k.p.Name, q.Repo.Key, err)
+	}
+	return parts, nil
+}
+
+// members is the package handlers' walk through the virtual repository of
+// r's request for the document at path: the steps virtual.Members gives in
+// virtual.Package order, each with its member request. Nested virtual
+// repositories are flattened with one visited set, so a cycle or a diamond
+// is skipped silently, and a nested one whose patterns reject path is
+// dropped (R2); 7.161.26's PackageRepoServiceImpl.getSubRepositories
+// (318-339) hands package handlers this list. Each member then passes over
+// silently, as 7.x's walk ignores every member that does not serve the
+// request (R3):
+//   - one of another package type, which only data saved before the save
+//     checks can hold (R11, repos.CheckMembers), and one of a class the
+//     protocol has no Source for;
+//   - one whose download policy refuses path: blacked out, or its patterns
+//     reject it (generic.CheckDownload; R5);
+//   - one the caller may read nothing in. A package handler counts an
+//     unreadable member as not found and never answers 403 for it
+//     (RTDEV-88743, RTDEV-81046, RTFACT-30175), unlike the item routes'
+//     walk, which keeps a member's Read refusal for its answer. Read is
+//     asked at the member's root: a format reads the rows of a merged
+//     document from below other folders than the document's own (Pub's
+//     .pub/<name>.json lists <name>/), and filters each row by the
+//     caller's Read on it, so a narrower folder would drop rows the member
+//     serves the caller directly (R10).
+//
+// A remote member's request is cache-only when the walk takes no upstream
+// step (Options.NoUpstream, R7), so its source serves only what its cache
+// holds.
+func (k *Kit) members(r *http.Request, path string) ([]virtual.Member, []*http.Request, error) {
+	v := RequestFrom(r).Repo
+	o := virtual.Options{Order: virtual.Package, Path: path, NoPriority: k.p.NoPriority}
+	if k.o.NoUpstream != nil {
+		o.NoUpstream = k.o.NoUpstream(r, v)
+	}
+	steps, err := virtual.Members(r.Context(), k.o.Store.Repos(), v, o)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s: %w", k.p.Name, err)
+	}
+	members := make([]virtual.Member, 0, len(steps))
+	requests := make([]*http.Request, 0, len(steps))
+	for _, m := range steps {
+		if src, ok := k.walkSource(r.Context(), v, m.Repo, path, ""); ok {
+			members = append(members, m)
+			requests = append(requests, memberRequest(r, v, m, src))
+		}
+	}
+	return members, requests, nil
+}
+
+// walkSource is the Source the package handlers' walk through the virtual
+// repository v reads its member m with, or false when the walk passes m
+// over silently (members): m is of a type v does not take or of a class
+// with no Source, its download policy refuses path, or the caller may read
+// nothing at or below readAt in it.
+func (k *Kit) walkSource(ctx context.Context, v, m repo.Config, path, readAt string) (Source, bool) {
+	src, ok := k.p.Sources[m.Class]
+	if !ok || !repo.AcceptsMember(v.PackageType, m.PackageType) ||
+		generic.CheckDownload(m, path, false) != nil || !readable(ctx, m, readAt, true) {
+		return nil, false
+	}
+	return src, true
+}
+
+// PassedOver reports whether err, from a read of one member of a virtual
+// repository, passes over that member as 7.x's walk passes over every
+// member that does not serve the request (decision 0008, R3), so the
+// format's merge leaves it out and its single-file read tries the next:
+//   - a miss (kernel.ErrNotFound, or a 404 the kit or the source boundary
+//     answers), an offline remote included, whose cache misses;
+//   - the download policy's refusal, the kit's or the source boundary's,
+//     a blacked-out remote included (IsRefusal);
+//   - a Read refusal of the member, which a package handler counts as not
+//     found (RTDEV-88743, RTDEV-81046, RTFACT-30175);
+//   - an upstream's 5xx or a failure to reach it. 7.x's
+//     processStandard ignores every member resource it did not find, and
+//     answers 403 only for a Read refusal, so a remote that fails passes
+//     over too [I].
+//
+// A fault of artifactweave's own storage (format.ErrStorageFault) never
+// passes over: a merge that dropped it would answer short without a sign.
+func PassedOver(err error) bool {
+	var answer *apierror.Error
+	var upstream *source.HTTPError
+	switch {
+	case err == nil, errors.Is(err, format.ErrStorageFault):
+		return false
+	case errors.Is(err, kernel.ErrNotFound), IsRefusal(err), errors.Is(err, source.ErrDenied),
+		errors.Is(err, kernel.ErrForbidden), errors.Is(err, kernel.ErrUnauthenticated),
+		errors.Is(err, source.ErrUnavailable), errors.Is(err, context.DeadlineExceeded):
+		return true
+	case errors.As(err, &upstream):
+		return upstream.Status >= http.StatusInternalServerError
+	case errors.As(err, &answer):
+		// SourceError's answers: a miss, an unreachable or timed-out
+		// upstream, and an upstream's own 5xx, which it relays without the
+		// challenge.
+		return answer.Status == http.StatusNotFound || answer.Status == http.StatusBadGateway ||
+			answer.Status == http.StatusGatewayTimeout ||
+			answer.NoChallenge && answer.Status >= http.StatusInternalServerError
+	}
+	return false
 }
 
 // IsRefusal reports whether err is the download policy's refusal of the path

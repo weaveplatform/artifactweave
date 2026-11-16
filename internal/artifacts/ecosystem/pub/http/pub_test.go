@@ -1007,8 +1007,10 @@ func TestUnitVirtualMergesReadableMemberVersions(t *testing.T) {
 
 // TestUnitVirtualRemoteMembers: through a virtual repository a remote member
 // that does not hold the package is passed over, another remote member's
-// version is listed and its archive fetched through that member, and a
-// member of another package type or one whose source fails fails the
+// version is listed and its archive fetched through that member, a nested
+// virtual repository's members are listed as the outer one's, a member of
+// another package type is passed over as 7.x's save would never have kept
+// it (decision 0008, R11), and a member whose source fails fails the
 // listing.
 func TestUnitVirtualRemoteMembers(t *testing.T) {
 	data := archive(t, "visible_pub", "1.0.0")
@@ -1031,6 +1033,8 @@ func TestUnitVirtualRemoteMembers(t *testing.T) {
 	for key, members := range map[string][]string{
 		"pub-mixed":   {"generic-local"},
 		"pub-failing": {"pub-absent", "pub-down"},
+		"pub-inner":   {"pub-remote", "pub-outer"},
+		"pub-outer":   {"pub-inner"},
 	} {
 		f.createRepo(repo.Config{
 			Key: key, Class: repo.Virtual, PackageType: repo.Pub, Repositories: members,
@@ -1052,11 +1056,18 @@ func TestUnitVirtualRemoteMembers(t *testing.T) {
 	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), data) {
 		t.Fatalf("remote member's archive: %d %s", rec.Code, rec.Body)
 	}
+	// The outer virtual repository reaches pub-remote through pub-inner,
+	// which lists the outer one back: the cycle is skipped (R2).
+	if _, listed := f.versionsOf("pub-outer", "visible_pub", "admin"); !slices.Equal(
+		listed, []string{"1.0.0"},
+	) {
+		t.Fatalf("nested virtual member's versions: %v", listed)
+	}
 	for key, want := range map[string]struct {
 		status  int
 		message string
 	}{
-		"pub-mixed":   {http.StatusBadRequest, "invalid virtual repository member"},
+		"pub-mixed":   {http.StatusNotFound, "package not found"},
 		"pub-failing": {http.StatusBadGateway, "Bad Gateway"},
 	} {
 		rec := f.do(http.MethodGet, "/artifactory/api/pub/"+key+"/api/packages/visible_pub",

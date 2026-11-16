@@ -11,6 +11,8 @@ var pkgtestMatrixPart = matrixPart{
 		return []matrixRow{
 			row(pkgtestGet, file, "", holds("libs-local", "work/get.txt", api.ActionRead), 200),
 			row(pkgtestHead, file, "", holds("libs-local", "work/get.txt", api.ActionRead), 200),
+			row(pkgtestMerged, pkgtestBase+"libs-local/merged/work/get.txt", "",
+				holds("libs-local", "work/get.txt", api.ActionRead), 200),
 			row(pkgtestPut, pkgtestBase+"libs-local/files/work/pkgtest-{p}.txt", "pkgtest",
 				holds("libs-local", "work/pkgtest.txt", api.ActionWrite), 201),
 		}

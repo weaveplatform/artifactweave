@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -18,6 +19,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
@@ -71,6 +74,14 @@ type Options struct {
 	Created func(w http.ResponseWriter, r *http.Request, it model.Item)
 	// Fault records an unexpected error for the access log; nil drops it.
 	Fault func(*http.Request, error)
+	// NoUpstream reports whether a package handler's walk through the
+	// virtual repository v leaves out its remote members' upstreams and
+	// reads their caches alone, as 7.x does for a request from another
+	// Artifactory while v's artifactoryRequestsCanRetrieveRemoteArtifacts
+	// is off (decision 0008, R7;
+	// https://github.com/weaveplatform/artifactweave/issues/1542). Nil
+	// takes every upstream step.
+	NoUpstream func(r *http.Request, v repo.Config) bool
 }
 
 // Protocol is one format's protocol.
@@ -130,8 +141,14 @@ type Protocol struct {
 	// Sources serves each repository class the protocol reads, the seam
 	// remote (P9, decision 0007) and virtual (P10, decision 0008) classes
 	// plug into. Nil serves local and federated repositories from their own
-	// items. Any other class answers 501 naming it (decision 0032).
+	// items. Any other class answers 501 naming it (decision 0032). A
+	// protocol serves a virtual repository's files through its members by
+	// registering Virtual for repo.Virtual.
 	Sources map[repo.Class]Source
+	// NoPriority leaves the members' priorityResolution out of the order a
+	// virtual repository's members are walked in (virtual.Options), for a
+	// package type whose 7.x virtual repository ignores it.
+	NoPriority bool
 	// Routes registers the protocol's handlers on the router for one
 	// repository, with paths relative to /artifactory/api/<name>/{repoKey},
 	// or to the Rest of the Key that Resolve found. chi matches them
@@ -264,6 +281,57 @@ func (Local) Item(ctx context.Context, st Store, c repo.Config, path string) (Fo
 	return Found{Repo: c, Item: it}, nil
 }
 
+// Virtual is a virtual repository's Source for single-file reads: the
+// first real member, in the package handlers' walk (virtual.Package, with
+// MergeMembers' pass-overs), whose own Source finds the path. A member
+// that is of another type, of a class the protocol has no Source for,
+// blacked out or whose patterns reject the path, or that the caller may not
+// read at it, is passed over silently, and so is a read PassedOver
+// reports; nothing found is kernel.ErrNotFound, which the kit answers
+// "Could not find resource". A remote member's Remote has no single-item
+// lookup, since its reads stream (Read), so the walk passes it over; a
+// protocol reads a remote member's file through its member request.
+//
+// The virtual repository is never asked for Read itself: no permission
+// target can name one (decision 0006), and 7.x decides a read through it by
+// each member's (decision 0008, R3). Mount binds the zero value a protocol
+// registers to its kit, whose Sources it reads the members through; an
+// unbound one supports no lookup.
+type Virtual struct{ k *Kit }
+
+// Item returns the file or folder at path in the first member of the
+// virtual repository c that holds it and that the caller may read.
+func (v Virtual) Item(ctx context.Context, st Store, c repo.Config, path string) (Found, error) {
+	if v.k == nil {
+		return Found{}, source.ErrUnsupported
+	}
+	steps, err := virtual.Members(ctx, st.Repos(), c, virtual.Options{
+		Order: virtual.Package, Path: path, NoPriority: v.k.p.NoPriority,
+	})
+	if err != nil {
+		return Found{}, fmt.Errorf("%s: %w", v.k.p.Name, err)
+	}
+	for _, m := range steps {
+		src, ok := v.k.walkSource(ctx, c, m.Repo, path, path)
+		if !ok {
+			continue
+		}
+		f, err := src.Item(ctx, st, m.Repo, path)
+		switch {
+		case errors.Is(err, source.ErrUnsupported), PassedOver(err):
+			continue
+		case err != nil:
+			return Found{}, fmt.Errorf("%s: member %s: %w", v.k.p.Name, m.Repo.Key, err)
+		case !readable(ctx, f.Repo, f.Item.FullPath(), f.Item.Folder):
+			// The folder check above admits a caller who may read only
+			// below path; a file needs Read on itself.
+			continue
+		}
+		return f, nil
+	}
+	return Found{}, fmt.Errorf("%s: %s:%s: %w", v.k.p.Name, c.Key, path, kernel.ErrNotFound)
+}
+
 // Kit is one protocol mounted on a router. Its handlers call its helpers,
 // which answer in the protocol's envelope.
 type Kit struct {
@@ -281,6 +349,12 @@ func Mount(r chi.Router, o Options, p Protocol) *Kit {
 	k := &Kit{o: o, p: p, prefix: "/artifactory/api/" + p.Name}
 	if k.p.Sources == nil {
 		k.p.Sources = map[repo.Class]Source{repo.Local: Local{}, repo.Federated: Local{}}
+	}
+	if _, ok := k.p.Sources[repo.Virtual].(Virtual); ok {
+		// A copy, so binding never reaches into a map the protocol mounts
+		// elsewhere too.
+		k.p.Sources = maps.Clone(k.p.Sources)
+		k.p.Sources[repo.Virtual] = Virtual{k: k}
 	}
 	for _, path := range p.Reserved {
 		k.reserved = append(k.reserved, strings.Split(path, "/"))
@@ -378,7 +452,11 @@ func RequestFrom(r *http.Request) Request {
 // virtual repository request against one concrete member. Protocol handlers
 // still check both the virtual path and the member path before disclosure.
 // The class and type gate is repeated here because virtual membership can
-// change after the virtual repository was configured.
+// change after the virtual repository was configured. It answers 400 for a
+// virtual member, one of another type and one of a class the protocol has
+// no Source for, for a protocol that walks a virtual repository's own
+// list; MergeMembers' walk flattens nested virtual repositories and passes
+// over the others instead.
 func (k *Kit) MemberRequest(r *http.Request, member repo.Config) (*http.Request, error) {
 	q := RequestFrom(r)
 	if q.Repo.Class != repo.Virtual || member.Class == repo.Virtual ||
@@ -389,9 +467,18 @@ func (k *Kit) MemberRequest(r *http.Request, member repo.Config) (*http.Request,
 	if !ok {
 		return nil, apierror.New(http.StatusBadRequest, "unsupported virtual repository member")
 	}
-	virtual := q.Repo
-	q.Repo, q.Source, q.virtual = member, src, &virtual
-	return r.WithContext(context.WithValue(r.Context(), requestKey{}, q)), nil
+	return memberRequest(r, q.Repo, virtual.Member{Repo: member, Upstream: true}, src), nil
+}
+
+// memberRequest is r resolved against m, a real member of the virtual
+// repository v that src reads. A remote member's step without its upstream
+// reads the cache alone (Request.CacheOnly), as the walk asks of it
+// (virtual.Options.NoUpstream).
+func memberRequest(r *http.Request, v repo.Config, m virtual.Member, src Source) *http.Request {
+	q := RequestFrom(r)
+	q.Repo, q.Source, q.virtual = m.Repo, src, &v
+	q.CacheOnly = m.Repo.Class == repo.Remote && !m.Upstream
+	return r.WithContext(context.WithValue(r.Context(), requestKey{}, q))
 }
 
 // resolve answers a reserved operation's other methods, resolves the
@@ -571,6 +658,20 @@ func can(r *http.Request, c repo.Config, path string, want accessapi.Actions) bo
 	return d.Allows(accessapi.ResourceArtifact, accessapi.Repo{
 		Key: c.Key, Class: string(c.Class),
 	}, path, want)
+}
+
+// readable reports whether the caller of ctx may read path in c, or, for a
+// folder, a path at or below it.
+func readable(ctx context.Context, c repo.Config, path string, folder bool) bool {
+	d, ok := accessapi.DeciderFrom(ctx)
+	if !ok {
+		return false
+	}
+	at := accessapi.Repo{Key: c.Key, Class: string(c.Class)}
+	if folder {
+		return d.AllowsFolder(accessapi.ResourceArtifact, at, path, accessapi.ActionRead)
+	}
+	return d.Allows(accessapi.ResourceArtifact, at, path, accessapi.ActionRead)
 }
 
 // Require is Can, answering the refusal when it fails: 401 to an anonymous
@@ -814,7 +915,11 @@ func (k *Kit) ServeMetadata(w http.ResponseWriter, r *http.Request, path string)
 }
 
 func (k *Kit) serveItem(w http.ResponseWriter, r *http.Request, path string, download bool) {
-	if !k.Require(w, r, path, accessapi.ActionRead) {
+	// Through Virtual each member decides Read in the walk, so a caller
+	// who may read only a member is served, and one who may read none gets
+	// the walk's not-found (decision 0008, R3).
+	if _, walk := RequestFrom(r).Source.(Virtual); !walk &&
+		!k.Require(w, r, path, accessapi.ActionRead) {
 		return
 	}
 	read, lookup := k.ReadMetadata, k.StoredItem
