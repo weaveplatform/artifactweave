@@ -111,8 +111,8 @@ func TestAccRemoteSourceRoutingAndDenials(t *testing.T) {
 		{http.MethodGet, "/artifactory/up-cache/a.pkg", "reader", 404},
 		{http.MethodHead, "/artifactory/up-cache/a.pkg", "reader", 404},
 		{http.MethodGet, "/artifactory/virt/a.pkg", "reader", 404},
-		{http.MethodPut, "/artifactory/up/a.pkg", "admin", 405},
-		{http.MethodPut, "/artifactory/up-cache/a.pkg", "admin", 405},
+		{http.MethodPut, "/artifactory/up/a.pkg", "admin", 404},
+		{http.MethodPut, "/artifactory/up-cache/a.pkg", "admin", 404},
 	} {
 		res := w.do(tc.method, tc.path, tc.user, "body")
 		if res.Code != tc.status {

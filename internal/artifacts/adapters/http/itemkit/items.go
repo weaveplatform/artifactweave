@@ -204,9 +204,13 @@ func (s *Kit) Format(t repo.PackageType) format.Handler {
 	return s.FormatSettings.For(t)
 }
 
-// DeployTarget resolves where a deploy to c lands: a local or federated
-// repository itself, or a virtual repository's default deployment
-// repository. Remote repositories and their caches take no deploys.
+// DeployTarget resolves where a deploy to c lands, for every route that
+// publishes a file: a local or federated repository itself, or a virtual
+// repository's default deployment repository (virtual.DeployTarget), on
+// whose path the caller then checks Write. A virtual repository without a
+// local one answers NoDeployTarget. Remote repositories and their caches
+// take no deploys; this is the native protocols' refusal of them, and the
+// item routes' PUT answers 7.x's own (ItemDeployTarget).
 func DeployTarget(
 	ctx context.Context,
 	st Store,
@@ -220,17 +224,53 @@ func DeployTarget(
 	case cached || c.Class == repo.Remote:
 		return c, apierror.New(http.StatusMethodNotAllowed,
 			fmt.Sprintf("Cannot deploy to the remote repository '%s'", c.Key))
-	case c.Class == repo.Virtual && c.DefaultDeploymentRepo == "":
-		return c, apierror.New(http.StatusMethodNotAllowed, fmt.Sprintf(
-			"Virtual repository '%s' has no default deployment repository", c.Key))
 	case c.Class == repo.Virtual:
-		target, err := st.Repos().Get(ctx, c.DefaultDeploymentRepo)
+		target, err := virtual.DeployTarget(ctx, st.Repos(), c)
+		if errors.Is(err, virtual.ErrNoDeployTarget) {
+			return c, NoDeployTarget(c.Key)
+		}
 		if err != nil {
-			return c, fmt.Errorf("default deployment repository of %s: %w", c.Key, err)
+			return c, fmt.Errorf("deploy target: %w", err)
 		}
 		return target, nil
 	}
 	return c, nil
+}
+
+// ItemDeployTarget is DeployTarget for a PUT on the item routes, which
+// answers a remote repository, or its cache, 404 "Could not find a local
+// repository named <key> to deploy to.", naming the key as sent: 7.x's
+// upload looks a key that names no virtual repository up among local and
+// federated repositories alone (UploadServiceUtils.getTargetRepository
+// 248-261), which hold neither, and then answers
+// UploadServiceImpl.sendInvalidTargetRepositoryError's 404 (337-352). A P2
+// repository keeps DeployTarget's refusal.
+func ItemDeployTarget(
+	ctx context.Context,
+	st Store,
+	c repo.Config,
+	cached bool,
+) (repo.Config, error) {
+	if c.PackageType != repo.P2 && (cached || c.Class == repo.Remote) {
+		key := c.Key
+		if cached {
+			key += model.CacheSuffix
+		}
+		return c, apierror.New(http.StatusNotFound,
+			"Could not find a local repository named "+key+" to deploy to.")
+	}
+	return DeployTarget(ctx, st, c, cached)
+}
+
+// NoDeployTarget is 7.x's answer to a deploy to the virtual repository key
+// when it has no local deployment repository: 405 with Allow: GET and
+// UploadServiceImpl.sendInvalidTargetRepositoryError's message (7.161.26,
+// 337-352; decision 0008, R6).
+func NoDeployTarget(key string) error {
+	e := apierror.New(http.StatusMethodNotAllowed, "No local repository was configured as "+
+		"local deployment repository for the ("+key+") virtual repository.")
+	e.Allow = http.MethodGet
+	return e
 }
 
 // MayBeIdentical reports whether a deploy over a file the caller may not

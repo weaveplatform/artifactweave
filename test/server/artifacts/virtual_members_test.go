@@ -53,7 +53,7 @@ func TestAccVirtualWithoutMembers(t *testing.T) {
 		{"GET", "/artifactory/gen-empty/", "", 200, "<pre></pre>"},
 		{"GET", "/artifactory/gen-empty/a.txt", "", 404, ""},
 		{"HEAD", "/artifactory/gen-empty/a.txt", "", 404, ""},
-		{"PUT", "/artifactory/gen-empty/a.txt", "x", 405, "no default deployment repository"},
+		{"PUT", "/artifactory/gen-empty/a.txt", "x", 405, "No local repository was configured as local deployment repository for the (gen-empty) virtual repository."},
 		{"GET", "/artifactory/api/storage/gen-empty", "", 200, `"children":[]`},
 		{"GET", "/artifactory/api/storage/gen-empty/a", "", 404, ""},
 		{"GET", "/artifactory/api/storage/gen-empty?list&deep=1", "", 200, `"files":[]`},

@@ -276,7 +276,9 @@ func TestAccGenericRemoteAuthorizationAndRevocation(t *testing.T) {
 	for _, method := range []string{"GET", "HEAD"} {
 		remoteStatus(t, w.request(method, "/artifactory/remote/file.bin", "denied", ""), 403)
 	}
-	remoteStatus(t, w.request("PUT", "/artifactory/remote/file.bin", "admin", "upload"), 405)
+	// 7.x's upload finds no local repository under a remote's key
+	// (decision 0008, R6).
+	remoteStatus(t, w.request("PUT", "/artifactory/remote/file.bin", "admin", "upload"), 404)
 	w.c.ExcludesPattern = new("**")
 	w.update()
 	remoteStatus(t, w.request("GET", "/artifactory/remote/file.bin", "reader", ""), 404)
