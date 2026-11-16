@@ -341,8 +341,9 @@ func TestAccArchiveEntryCountsAsADownloadOfTheArchive(t *testing.T) {
 // corrupt archive does, its neighbours still served. The entry is read for
 // its checksums before anything is sent, as 7.x computes them
 // (ZipEntryResourceImpl), and RTFACT-24360 shows 7.x answering 404 for an
-// entry its archive's stream ends before [I]. It was answered 200 and a
-// body that failed part way (#1593).
+// entry its archive's stream ends before [I]. Its request trace ends on the
+// same 404, a sound neighbour's on its success. It was answered 200
+// and a body that failed part way, and its trace found it (#1593).
 func TestAccArchiveEntryTooCorruptToReadIsNotFound(t *testing.T) {
 	w := entryWorld(t)
 	var b bytes.Buffer
@@ -378,5 +379,19 @@ func TestAccArchiveEntryTooCorruptToReadIsNotFound(t *testing.T) {
 			w.Do(method, "/artifactory/libs-local/z/bad.zip!/good.txt", "reader", ""),
 			http.StatusOK,
 		)
+	}
+	for entry, last := range map[string]string{
+		"bad.txt":  "Sending a response with the status '404' and the message 'Could not find resource'",
+		"good.txt": "Request succeeded",
+	} {
+		trace := w.Do(
+			http.MethodGet,
+			"/artifactory/libs-local/z/bad.zip!/"+entry+"?trace",
+			"reader",
+			"",
+		)
+		if trace.Code != http.StatusOK || !strings.HasSuffix(trace.Body.String(), " "+last+"\n") {
+			t.Errorf("trace of %s: %d %q, want it to end %q", entry, trace.Code, trace.Body, last)
+		}
 	}
 }
