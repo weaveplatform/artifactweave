@@ -363,9 +363,22 @@ type Download struct {
 	// download.
 	trace *resolutionTrace
 	// upstream reads a remote member's upstream in a walk through a
-	// virtual repository (lookupMember); nil passes over every upstream
-	// step, as a walk that is not the request's own file does (walkStep).
-	upstream upstreamStep
+	// virtual repository (lookupMember), and judges whether a copy its
+	// cache holds has expired; nil passes over every upstream step, as a
+	// walk that is not the request's own file does (walkStep), and serves
+	// every cached copy.
+	upstream *upstreamStep
+	// expired holds, by member key, the copy a remote member's cache step
+	// passed over as expired, with how it matched, for the member's
+	// upstream step to fall back on (expiredCopy).
+	expired map[string]expiredCopy
+}
+
+// expiredCopy is a copy a remote member's cache step passed over as
+// expired, and how it matched the request.
+type expiredCopy struct {
+	found  Found
+	served memberAnswer
 }
 
 // newDownload checks p as Artifactory does: its request parsing splits an
@@ -626,7 +639,7 @@ func lookupMember(
 			deny(ctx, dl, res, m, file)
 			return Found{}, passedOver, nil
 		}
-		return dl.upstream(ctx, dl, m, res)
+		return dl.upstream.read(ctx, dl, m, res)
 	}
 	f, err := lookupStored(ctx, st, m, false, p, acc, dl)
 	var rejected *format.RejectionError
@@ -664,6 +677,27 @@ func lookupMember(
 			dl.stepf("Request query properties don't match those that annotate the artifact")
 			served = closestMatch
 		}
+	}
+	// A remote's cache step checks its copy for expiry once it has found
+	// it (DbCacheRepo.getInfo, 7.161.26): an expired copy is passed over to
+	// the remote's upstream step, which revalidates it as a direct read of
+	// the remote does, or serves it when the upstream does not find the
+	// file (fallBack).
+	if m.Class == repo.Remote && !f.Item.Folder && dl.upstream != nil {
+		dl.stepf("Found the resource in the cache - checking for expiry")
+		expired, err := dl.upstream.expired(ctx, m, f.Item)
+		if err != nil {
+			return Found{}, passedOver, err
+		}
+		if expired {
+			dl.stepf("Returning resource as expired")
+			if dl.expired == nil {
+				dl.expired = map[string]expiredCopy{}
+			}
+			dl.expired[m.Key] = expiredCopy{found: f, served: served}
+			return Found{}, passedOver, nil
+		}
+		dl.stepf("Returning cached resource")
 	}
 	res.Found = true
 	return f, served, nil
