@@ -19,20 +19,31 @@ func TestUnitAcceptsMember(t *testing.T) {
 		// A generic virtual repository aggregates every type.
 		{repo.Generic, repo.NPM, true},
 		{repo.Generic, repo.Docker, true},
-		// The Maven family mixes, both ways.
+		// The Maven group mixes, both ways, P2 included
+		// (VirtualRepoConfigChangeInterceptor, RepoType.MAVEN_GROUP).
 		{repo.Maven, repo.Gradle, true},
 		{repo.Gradle, repo.Maven, true},
 		{repo.Ivy, repo.SBT, true},
 		{repo.SBT, repo.P2, true},
-		{repo.P2, repo.Generic, true},
 		{repo.P2, repo.Maven, true},
-		{repo.P2, repo.Gradle, false},
+		{repo.P2, repo.Gradle, true},
+		{repo.P2, repo.Ivy, true},
+		{repo.P2, repo.SBT, true},
 		{repo.Maven, repo.NPM, false},
 		{repo.Maven, repo.Generic, false},
+		// A P2 virtual repository takes a Generic member, as JFrog's P2 page
+		// says, but nothing else outside the group.
+		{repo.P2, repo.Generic, true},
+		{repo.P2, repo.NPM, false},
+		// OCI and Helm OCI mix, both ways (isHelmOciGroup).
+		{repo.OCI, repo.HelmOCI, true},
+		{repo.HelmOCI, repo.OCI, true},
 		// Helm and Helm OCI cannot share a virtual repository, nor Docker and OCI.
 		{repo.Helm, repo.HelmOCI, false},
+		{repo.HelmOCI, repo.Helm, false},
 		{repo.Docker, repo.OCI, false},
 		{repo.OCI, repo.Docker, false},
+		{repo.HelmOCI, repo.Docker, false},
 	}
 	for _, tt := range tests {
 		if got := repo.AcceptsMember(tt.virtual, tt.member); got != tt.want {

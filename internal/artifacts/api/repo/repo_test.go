@@ -547,16 +547,14 @@ func TestUnitValidate(t *testing.T) {
 			c.Class = repo.Virtual
 			c.Repositories = []string{}
 		}, ""},
-		// With no members there is nothing a deployment repository can name.
-		{"deployment repo without members", func(c *repo.Config) {
-			c.Class = repo.Virtual
-			c.DefaultDeploymentRepo = "a"
-		}, "defaultDeploymentRepo"},
+		// repos.CheckMembers checks the deployment repository against the
+		// members, and only when a save sets it (DefaultDeploymentRepoInterceptor),
+		// so an update that leaves it alone is valid here.
 		{"deployment repo not a member", func(c *repo.Config) {
 			c.Class = repo.Virtual
 			c.Repositories = []string{"a"}
 			c.DefaultDeploymentRepo = "b"
-		}, "defaultDeploymentRepo"},
+		}, ""},
 		{
 			"negative snapshots",
 			func(c *repo.Config) { c.MaxUniqueSnapshots = ptr(-1) },
@@ -656,11 +654,11 @@ func TestUnitValidate(t *testing.T) {
 
 func TestUnitValidateCollectsEveryError(t *testing.T) {
 	c := repo.Config{
-		Key:                   "",
-		Class:                 repo.Virtual,
-		PackageType:           repo.Cargo,
-		DefaultDeploymentRepo: "absent",
-		MaxUniqueTags:         ptr(-1),
+		Key:           "",
+		Class:         repo.Virtual,
+		PackageType:   repo.Cargo,
+		TerraformType: repo.TerraformModule,
+		MaxUniqueTags: ptr(-1),
 	}
 	err := repo.Validate(&c)
 	var errs repo.ValidationError

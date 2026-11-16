@@ -309,7 +309,9 @@ func TestUnitRepositoriesCheckMembers(t *testing.T) {
 		},
 		"not virtual": {Key: "l", Class: repo.Local, Repositories: []string{"ghost"}},
 	} {
-		sameAnswer(t, name, nil, nil, r.CheckMembers(c, known), CheckMembers(c, known))
+		got, want := c, c
+		sameAnswer(t, name, got, want,
+			r.CheckMembers(&got, nil, known), CheckMembers(&want, nil, known))
 	}
 }
 
