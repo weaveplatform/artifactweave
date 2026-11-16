@@ -27,7 +27,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -234,16 +236,38 @@ func TestUnitItemErrorStatuses(t *testing.T) {
 	}
 }
 
+var errRepos = errors.New("repositories unavailable")
+
+// failingRepos is a store whose repository reads fail.
+type failingRepos struct{ *inmem.Store }
+
+func (s failingRepos) Repos() port.RepoStore { return failedRepoReads{s.Store.Repos()} }
+
+type failedRepoReads struct{ port.RepoStore }
+
+func (failedRepoReads) Get(context.Context, string) (repo.Config, error) {
+	return repo.Config{}, errRepos
+}
+
 // TestUnitLookupSearchesVirtualMembersInOrder: a virtual repository's lookup
-// tries its members in order, finds a remote member's file in its cache,
-// passes over a member the caller may not read, and never searches a
-// repository twice, which ends a virtual repository that includes itself.
+// tries its members in 7.x's order, local members before remote members'
+// caches whatever the configured order (decision 0008, R1), finds a remote
+// member's file in its cache, passes over a member the caller may not read,
+// and skips a virtual repository it has reached already, such as itself.
 func TestUnitLookupSearchesVirtualMembersInOrder(t *testing.T) {
 	w := kittest.New(t, inmem.New())
 	ctx := t.Context()
 	w.Put(t, w.Local, false, "a.txt", []byte("local"))
 	w.Put(t, w.Remote, true, "a.txt", []byte("cached"))
 	w.Put(t, w.Remote, true, "b.txt", []byte("cached"))
+	remoteFirst := repo.Config{
+		Key:          "remote-first",
+		Class:        repo.Virtual,
+		Repositories: []string{"remote-first", kittest.RemoteKey, kittest.LocalKey},
+	}
+	if err := w.Store.Repos().Create(ctx, *repo.Defaults(&remoteFirst)); err != nil {
+		t.Fatal(err)
+	}
 	admin := kittest.AdminAccess()
 	remoteOnly := itemkit.Access{Decider: &accessapitest.Decider{
 		AllowsFolderFunc: func(
@@ -256,46 +280,44 @@ func TestUnitLookupSearchesVirtualMembersInOrder(t *testing.T) {
 		},
 	}}
 	for _, tc := range []struct {
-		path   string
-		acc    itemkit.Access
-		repo   string
-		cached bool
+		virtual repo.Config
+		path    string
+		acc     itemkit.Access
+		repo    string
+		cached  bool
 	}{
-		{"a.txt", admin, kittest.LocalKey, false},
-		{"b.txt", admin, kittest.RemoteKey, true},
-		{"a.txt", remoteOnly, kittest.RemoteKey, true},
+		{w.Virtual, "a.txt", admin, kittest.LocalKey, false},
+		{w.Virtual, "b.txt", admin, kittest.RemoteKey, true},
+		{w.Virtual, "a.txt", remoteOnly, kittest.RemoteKey, true},
+		{remoteFirst, "a.txt", admin, kittest.LocalKey, false},
+		{remoteFirst, "b.txt", admin, kittest.RemoteKey, true},
 	} {
 		f, err := itemkit.Lookup(
 			ctx,
 			w.Store,
-			w.Virtual,
+			tc.virtual,
 			false,
 			tc.path,
 			tc.acc,
 			nil,
-			map[string]bool{},
+			virtual.Resolve,
 		)
 		if err != nil || f.Repo.Key != tc.repo || f.Item.RepoKey != tc.repo ||
 			f.Item.Cached != tc.cached || f.Item.FullPath() != tc.path {
-			t.Errorf("%s: %s %+v, %v; want %s", tc.path, f.Repo.Key, f.Item, err, tc.repo)
+			t.Errorf("%s/%s: %s %+v, %v; want %s",
+				tc.virtual.Key, tc.path, f.Repo.Key, f.Item, err, tc.repo)
 		}
 	}
 	if _, err := itemkit.Lookup(
-		ctx, w.Store, w.Virtual, false, "c.txt", admin, nil, map[string]bool{},
+		ctx, w.Store, w.Virtual, false, "c.txt", admin, nil, virtual.Resolve,
 	); !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("a file no member holds: %v; want ErrNotFound", err)
 	}
+	// A member the store cannot read fails the lookup.
 	if _, err := itemkit.Lookup(
-		ctx,
-		w.Store,
-		w.Virtual,
-		false,
-		"a.txt",
-		admin,
-		nil,
-		map[string]bool{kittest.VirtualKey: true},
-	); !errors.Is(err, kernel.ErrNotFound) {
-		t.Errorf("a repository searched already: %v; want ErrNotFound", err)
+		ctx, failingRepos{w.Store}, w.Virtual, false, "a.txt", admin, nil, virtual.Resolve,
+	); !errors.Is(err, errRepos) {
+		t.Errorf("a failed member read: %v; want errRepos", err)
 	}
 }
 

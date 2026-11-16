@@ -308,9 +308,6 @@ func TestAccTransitiveAQLVirtualOrderLimitPatternsAndPermissions(t *testing.T) {
 	) != 5 {
 		t.Fatal("admin pattern exemption", hits)
 	}
-	for _, q := range []string{`items.find({"repo":"loop"}).transitive()`, `items.find({"repo":"virt"}).transitive()`} {
-		wantStatus(t, w.do("POST", transitiveEndpoint, "admin", q), 400)
-	}
 }
 
 func TestAccTransitiveAQLBoundsFailuresAndCurrentFences(t *testing.T) {

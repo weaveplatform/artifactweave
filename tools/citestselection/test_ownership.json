@@ -257,7 +257,8 @@
       "trash_test.go",
       "trash_views_test.go",
       "virtual_config_test.go",
-      "virtual_members_test.go"
+      "virtual_members_test.go",
+      "virtual_order_test.go"
     ],
     "test/server/configuration": [
       "descriptor_test.go",

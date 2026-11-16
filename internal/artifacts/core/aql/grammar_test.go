@@ -291,14 +291,14 @@ func TestUnitRoots(t *testing.T) {
 		"virtual": {Class: RepoVirtual, Members: []string{"local"}},
 	}
 	q := mustParse(t, `items.find({"type":"folder"}).sort({"$asc":["name"]}).offset(1).limit(2)`)
-	q.Resolve(repos)
+	q.Resolve(t.Context(), repos)
 	if want := []RepoRef{{Key: "local"}, {Key: "remote", Cached: true}}; !slices.Equal(
 		q.Roots(), want) {
 		t.Fatalf("roots %v", q.Roots())
 	}
 	// A query built in code lists none.
 	built := &Query{Criteria: And{}}
-	built.Resolve(repos)
+	built.Resolve(t.Context(), repos)
 	if built.Roots() != nil {
 		t.Fatalf("built roots %v", built.Roots())
 	}
@@ -341,7 +341,7 @@ func TestUnitRoots(t *testing.T) {
 	// No limit, or one too large to add the offset to, asks for every row.
 	for _, l := range []string{"", ".limit(9223372036854775807)"} {
 		q := mustParse(t, `items.find({"type":"folder"}).offset(1)`+l)
-		q.Resolve(repos)
+		q.Resolve(t.Context(), repos)
 		if _, err := q.WithRoots(Options{}, roots, func(w *Query, _ Options) ([]Hit, error) {
 			if w.HasLimit {
 				t.Errorf("limit %d", w.Limit)

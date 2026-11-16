@@ -97,8 +97,10 @@ resolve against the configured repositories before the query runs, on every engi
   limit and no transitive suffix, preventing recursive search amplification.
 - **Virtual transitive search** walks configured membership in declaration order,
   depth first, and searches the first five distinct remote members. All members'
-  actual caches and local items remain eligible. Cycles, missing members, traversal
-  beyond eight virtual levels or 256 nodes fail closed. Configurable
+  actual caches and local items remain eligible. A virtual repeated on its own route
+  and a member key no repository has are skipped, as 7.x's member resolution skips
+  them (decision 0008, R2; #1252); traversal beyond eight virtual levels or 256 nodes
+  fails closed. Configurable
   `artifactory.aql.transitive.remote.repos.limit` remains P12. Default five and the
   query restrictions are documented; nested ordering/bounds remain [I]/#216.
 - **Transient identity and precedence [I].** An actual cached result reports
