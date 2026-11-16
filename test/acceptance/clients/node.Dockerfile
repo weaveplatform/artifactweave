@@ -1,4 +1,4 @@
-# Client pins: Node 26.13.0, bundled npm.
+# Client pins: Node 26.13.1, bundled npm.
 # The current npm client for the acceptance features (decision 0015): the
 # newest Node with its bundled npm. Pinned by digest; Dependabot's docker
 # entry moves it. The job builds it as artifactweave-accept-node and runs it
