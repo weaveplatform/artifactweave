@@ -297,7 +297,13 @@ func TestUnitSwiftRemoteRefusesBadRegistryRepresentations(t *testing.T) {
 	})
 }
 
-func TestUnitSwiftVirtualRejectsInvalidMembersAndUpstreamFailure(t *testing.T) {
+// A virtual repository takes its members from the shared walk: a
+// duplicate member, a nested virtual repository and a key no repository
+// has resolve without a 400 (decision 0008, R2), and a remote member whose
+// upstream fails or answers what the registry cannot use is passed over,
+// so with no other member the answer is the registry's 404, never 502 (R3,
+// [I]). A caller who may read no member gets the same 404, never 403.
+func TestUnitSwiftVirtualPassesOverInvalidMembersAndUpstreamFailure(t *testing.T) {
 	const prefix = "/artifactory/api/swift/virtual/acme/Widget"
 	for _, tc := range []struct {
 		name        string
@@ -305,10 +311,10 @@ func TestUnitSwiftVirtualRejectsInvalidMembersAndUpstreamFailure(t *testing.T) {
 		breakSource bool
 		status      int
 	}{
-		{"duplicate member", []string{"packages", "packages"}, false, http.StatusBadRequest},
+		{"duplicate member", []string{"packages", "packages"}, false, http.StatusOK},
 		{"missing member", []string{"missing"}, false, http.StatusNotFound},
-		{"nested virtual member", []string{"nested"}, false, http.StatusBadRequest},
-		{"failed remote member", []string{"packages"}, true, http.StatusBadGateway},
+		{"nested virtual member", []string{"nested", "virtual"}, false, http.StatusOK},
+		{"failed remote member", []string{"packages"}, true, http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newRemoteFixture(t)
@@ -316,7 +322,7 @@ func TestUnitSwiftVirtualRejectsInvalidMembersAndUpstreamFailure(t *testing.T) {
 			if tc.name == "nested virtual member" {
 				nested := *repo.Defaults(&repo.Config{
 					Key: "nested", Class: repo.Virtual, PackageType: repo.Swift,
-					Repositories: []string{"packages"},
+					Repositories: []string{"packages", "virtual"},
 				})
 				if err := f.db.Repos().Create(t.Context(), nested); err != nil {
 					t.Fatal(err)
@@ -336,20 +342,19 @@ func TestUnitSwiftVirtualRejectsInvalidMembersAndUpstreamFailure(t *testing.T) {
 				)
 			}
 			rec := f.do(http.MethodGet, prefix, nil, "", "admin")
-			if rec.Code != tc.status {
-				t.Fatalf("virtual list: %d %s", rec.Code, rec.Body)
+			if tc.status == http.StatusOK {
+				wantReleases(t, rec, "1.0.0", "2.0.0")
+				wantOK(t, f.do(http.MethodGet, prefix+"/1.0.0", nil, "", "admin"), `"checksum":"`)
+				return
 			}
+			wantProblem(t, rec, http.StatusNotFound, "Swift package not found")
 			if tc.name == "missing member" {
-				rec = f.do(http.MethodGet, prefix+"/1.0.0.zip", nil, "", "admin")
-				if rec.Code != http.StatusNotFound {
-					t.Fatalf("missing virtual archive: %d %s", rec.Code, rec.Body)
-				}
+				wantProblem(t, f.do(http.MethodGet, prefix+"/1.0.0.zip", nil, "", "admin"),
+					http.StatusNotFound, "Swift release not found")
 			}
 			if tc.name == "failed remote member" {
-				rec = f.do(http.MethodGet, prefix, nil, "", "reader")
-				if rec.Code != http.StatusForbidden {
-					t.Fatalf("unprivileged virtual read: %d %s", rec.Code, rec.Body)
-				}
+				wantProblem(t, f.do(http.MethodGet, prefix, nil, "", "reader"),
+					http.StatusNotFound, "Swift package not found")
 			}
 		})
 	}
@@ -367,11 +372,9 @@ func TestUnitSwiftVirtualRejectsInvalidMembersAndUpstreamFailure(t *testing.T) {
 			"/swift/acme/Widget/1.0.0",
 			upstreamResource("application/json", []byte(`{"broken":`)),
 		)
-		rec := f.do(http.MethodGet,
-			"/artifactory/api/swift/virtual/acme/Widget/1.0.0", nil, "", "admin")
-		if rec.Code != http.StatusBadGateway {
-			t.Fatalf("failed virtual member metadata: %d %s", rec.Code, rec.Body)
-		}
+		wantProblem(t, f.do(http.MethodGet,
+			"/artifactory/api/swift/virtual/acme/Widget/1.0.0", nil, "", "admin"),
+			http.StatusNotFound, "Swift release not found")
 	})
 }
 

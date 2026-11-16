@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -291,8 +292,15 @@ func TestAccComposerRefusalsAndVirtualAuthority(t *testing.T) {
 			t.Errorf("unexpected success %s", path)
 		}
 	}
-	if got := f.requestAs("GET", base+"/p2/acme/widget.json", "ungranted"); got.Code != 403 {
-		t.Fatalf("denied p2 %d", got.Code)
+	// A caller who may read no member finds nothing: a package handler
+	// counts an unreadable member as not found and never answers 403
+	// (decision 0008, R3).
+	for _, path := range []string{"/packages.json", "/p2/acme/widget.json",
+		"/dist/acme/widget/1.0.0.zip"} {
+		if got := f.requestAs("GET", base+path, "ungranted"); got.Code != 404 ||
+			!strings.Contains(got.Body.String(), "Composer package not found") {
+			t.Fatalf("denied %s %d %s", path, got.Code, got.Body)
+		}
 	}
 	if err := f.db.Permissions().
 		Create(context.Background(), accesstest.Permission{Name: "composer-second-only", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accesstest.Target{"all": {}, "second": {}}}}}); err != nil {
@@ -316,12 +324,15 @@ func TestAccComposerRefusalsAndVirtualAuthority(t *testing.T) {
 	); got.Code != 403 {
 		t.Fatalf("manage denial %d", got.Code)
 	}
-	v.Repositories = []string{"first", "first"}
+	// A repeated member and the virtual repository as its own member are
+	// skipped (decision 0008, R2).
+	v.Repositories = []string{"first", "all", "first"}
 	if err := f.db.Repos().Update(context.Background(), v); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.request("GET", base+"/p2/acme/widget.json"); got.Code != 400 {
-		t.Fatalf("cycle %d", got.Code)
+	if got := f.request("GET", base+"/p2/acme/widget.json"); got.Code != 200 ||
+		strings.Count(got.Body.String(), `"version":"1.0.0"`) != 1 {
+		t.Fatalf("repeated member %d %s", got.Code, got.Body)
 	}
 }
 
@@ -465,5 +476,86 @@ func TestUnitComposerRouteParsingRejectsAmbiguousNames(t *testing.T) {
 		source.ErrUnsupported,
 	) {
 		t.Fatalf("virtual source item: %v", err)
+	}
+}
+
+// A virtual repository takes its members from the shared walk (decision
+// 0008, R1 to R3): a local member reached through a nested virtual
+// repository resolves, a cycle and a repeated member are skipped, a remote
+// member whose upstream fails is passed over, the p2 metadata is the union
+// of both members' versions with a version only the remote holds served
+// from it, and a caller who may read only the local member resolves
+// through the virtual repository, with the unreadable remote passed over.
+func TestAccComposerVirtualResolvesThroughTheSharedWalk(t *testing.T) {
+	fromRemote := makeZIP(t, "2.0.0", "remote")
+	b := &sourceBackend{
+		content: map[string][]byte{
+			"packages.json": []byte(`{"packages":{},"metadata-url":"/p2/%package%.json"}`),
+			"p2/acme/widget.json": []byte(fmt.Sprintf(`{"packages":{"acme/widget":[`+
+				`{"name":"acme/widget","version":"2.0.0","dist":{"type":"zip","url":"https://up.example/b.zip","shasum":"%s"}}]}}`,
+				sha1Hex(fromRemote))),
+			"acme/widget/2.0.0.zip": fromRemote,
+		},
+		readError: map[string]error{"p2/acme/widget.json": source.ErrUnavailable},
+	}
+	f := newFixtureWithSource(t, &source.Service{
+		HTTP: b, Cache: b,
+		Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
+			return artmodel.SourceIdentity{
+				Kind: artmodel.ExternalHTTP, Repository: "remote", ID: "source", Generation: "1",
+			}, nil
+		},
+	})
+	rc := f.create("remote", repo.Remote)
+	rc.URL, rc.ComposerRegistryURL = "https://up.example", "https://up.example"
+	if err := f.db.Repos().Update(context.Background(), rc); err != nil {
+		t.Fatal(err)
+	}
+	fromLocal := f.deploy(f.create("local", repo.Local), "1.0.0", "local")
+	f.create("nested", repo.Virtual, "local", "all")
+	f.create("all", repo.Virtual, "remote", "nested", "all", "remote")
+	if err := f.db.Permissions().Create(context.Background(), accesstest.Permission{
+		Name: "local-only",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"member": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"local": {}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const base = "/artifactory/api/composer/all"
+	p2 := func(user string, want ...[]byte) {
+		t.Helper()
+		got := f.requestAs("GET", base+"/p2/acme/widget.json", user)
+		if got.Code != 200 || strings.Count(got.Body.String(), `"shasum"`) != len(want) {
+			t.Fatalf("%s p2: %d %s", user, got.Code, got.Body)
+		}
+		for _, w := range want {
+			if !strings.Contains(got.Body.String(), sha1Hex(w)) {
+				t.Fatalf("%s p2 lacks %s: %s", user, sha1Hex(w), got.Body)
+			}
+		}
+	}
+	dist := func(user, version string, want []byte) {
+		t.Helper()
+		got := f.requestAs("GET", base+"/dist/acme/widget/"+version+".zip", user)
+		if got.Code != 200 || !bytes.Equal(got.Body.Bytes(), want) {
+			t.Fatalf("%s dist %s: %d %s", user, version, got.Code, got.Body)
+		}
+	}
+	p2("admin", fromLocal)
+	dist("admin", "1.0.0", fromLocal)
+	b.readError = nil
+	p2("admin", fromLocal, fromRemote)
+	dist("admin", "2.0.0", fromRemote)
+	if got := f.requestAs("GET", base+"/packages.json", "member"); got.Code != 200 ||
+		!strings.Contains(got.Body.String(), "/artifactory/api/composer/all/p2/%package%.json") {
+		t.Fatalf("member packages.json: %d %s", got.Code, got.Body)
+	}
+	p2("member", fromLocal)
+	dist("member", "1.0.0", fromLocal)
+	if got := f.requestAs("GET", base+"/dist/acme/widget/2.0.0.zip", "member"); got.Code != 404 ||
+		!strings.Contains(got.Body.String(), "Composer package not found") {
+		t.Fatalf("member dist of the unreadable remote's version: %d %s", got.Code, got.Body)
 	}
 }

@@ -40,6 +40,10 @@
 //   - The rules the protocol shares: Manifest, DecodeManifest,
 //     DecodeGitManifest, ValidName, ValidVersion, ParsePath, ManifestPath
 //     and MaxManifestBytes.
+//   - Names and Versions, the virtual.Merger of a virtual repository's
+//     package list and of a package's versions: their union, the names
+//     sorted and the versions in the walk's order (decision 0008,
+//     "Per-format merges").
 //
 // # Invariants
 //
@@ -83,4 +87,6 @@
 //   - security_test.go: ambiguous, unsafe and interrupted manifests,
 //     admission from the stored manifest, corrupt stored manifests, and
 //     reindex order, validation and cancellation.
+//   - virtual_test.go: the merges of a virtual repository's package list
+//     and versions.
 package bower

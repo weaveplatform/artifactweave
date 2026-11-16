@@ -50,16 +50,23 @@
 //   - A dist URL names this repository under its trusted base URL, so the
 //     client downloads through it and its permissions; a hosted archive
 //     carries its SHA-1 as the shasum.
-//   - A virtual repository's members are distinct and read in order; the
-//     first readable member that holds a package supplies all its versions.
+//   - A virtual repository reads its members through the package
+//     handlers' walk (pkgroute.Collect, decision 0008): nested virtual
+//     repositories flattened, cycles and duplicates skipped, in 7.x's
+//     effective order. Its p2 metadata is the union of the members'
+//     releases (composer.Releases), each version from the first member that
+//     lists it, and its dist comes from that member. Each member decides
+//     Read on what it serves; a member that misses, refuses, may not be
+//     read or whose upstream fails is passed over.
 //   - The download policy (decision 0032): a blacked-out repository, a
 //     remote's included, refuses packages.json and p2 metadata with the
 //     blackout's 404 naming the request path, after read permission; 7.x
 //     does not document where it keeps them, so the patterns do not refuse
 //     them. An archive answers its own path's policy, and a pattern on it
 //     leaves the release listed. A virtual repository resolves a package
-//     past a blacked-out member, passes an archive the resolved member
-//     refuses on to the next member that holds the version, and answers
+//     past a blacked-out member, passes an archive the first member that
+//     lists the version refuses on to the next member that holds it, and
+//     answers
 //     its own patterns on an archive with "No repository found to serve
 //     the request".
 //   - A remote accepts an upstream metadata-url only on the upstream's own

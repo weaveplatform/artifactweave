@@ -423,13 +423,26 @@ func TestUnitLocalCDNListsOnlyIndexedPodVersions(t *testing.T) {
 	}
 }
 
-func TestUnitVirtualRejectsInvalidMembersBeforeServingIndex(t *testing.T) {
+// A duplicate member, the virtual repository as its own member and a cycle
+// through a nested virtual repository are skipped by the shared walk, and
+// the index lists each pod once rather than answering 400 (decision 0008,
+// R2).
+func TestUnitVirtualSkipsDuplicateSelfAndCycleMembers(t *testing.T) {
 	for _, members := range [][]string{
 		{"pods-local", "pods-local"},
-		{"pods-virtual"},
+		{"pods-virtual", "pods-local"},
+		{"pods-nested", "pods-local"},
 	} {
 		t.Run(strings.Join(members, ","), func(t *testing.T) {
 			f := newRouteFixture(t)
+			f.seedLocal("LocalPod", "1.0.0")
+			nested := repo.Config{
+				Key: "pods-nested", Class: repo.Virtual, PackageType: repo.CocoaPods,
+				Repositories: []string{"pods-virtual"},
+			}
+			if err := f.db.Repos().Create(t.Context(), *repo.Defaults(&nested)); err != nil {
+				t.Fatal(err)
+			}
 			c, err := f.db.Repos().Get(t.Context(), "pods-virtual")
 			if err != nil {
 				t.Fatal(err)
@@ -439,8 +452,8 @@ func TestUnitVirtualRejectsInvalidMembersBeforeServingIndex(t *testing.T) {
 				t.Fatal(err)
 			}
 			resp := f.get("pods-virtual", "all_pods.txt")
-			if resp.Code != http.StatusBadRequest {
-				t.Errorf("virtual member cycle/duplicate returned %d: %s", resp.Code, resp.Body)
+			if resp.Code != http.StatusOK || resp.Body.String() != "LocalPod\n" {
+				t.Errorf("virtual index over %v = %d %q", members, resp.Code, resp.Body)
 			}
 		})
 	}
@@ -483,13 +496,16 @@ func TestUnitVirtualSourceSelectsMemberWithMatchingArchive(t *testing.T) {
 	}
 }
 
-func TestUnitVirtualStopsOnInvalidUpstreamMetadata(t *testing.T) {
+// A remote member whose upstream answers an invalid index or a 5xx is
+// passed over, as 7.x's walk passes over every member that does not serve
+// the request [I] (decision 0008, R3): the hosted member answers.
+func TestUnitVirtualPassesOverFailingRemoteMember(t *testing.T) {
 	f := newRouteFixture(t)
 	f.seedLocal("LocalPod", "1.0.0")
 	f.up.Set("/all_pods.txt", fakeupstream.Resource{Body: []byte("../escape\n")})
 	resp := f.get("pods-virtual", "all_pods.txt")
-	if resp.Code == http.StatusOK || strings.Contains(resp.Body.String(), "LocalPod") {
-		t.Fatalf("invalid upstream index was silently skipped: %d %s", resp.Code, resp.Body)
+	if resp.Code != http.StatusOK || resp.Body.String() != "LocalPod\n" {
+		t.Fatalf("index over an invalid upstream index = %d %q", resp.Code, resp.Body)
 	}
 	f.up.Set(
 		"/"+podfmt.SpecPath("LocalPod", "1.0.0"),
@@ -504,8 +520,9 @@ func TestUnitVirtualStopsOnInvalidUpstreamMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	resp = f.get("pods-virtual", podfmt.SpecPath("LocalPod", "1.0.0"))
-	if resp.Code == http.StatusOK {
-		t.Fatal("upstream outage was treated as an absent member")
+	if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(),
+		"/artifactory/api/pods/pods-virtual/packages/LocalPod/1.0.0/") {
+		t.Fatalf("spec over a failing remote member = %d %s", resp.Code, resp.Body)
 	}
 }
 
@@ -605,7 +622,9 @@ func TestUnitLocalRefusesCorruptIndexedPodspec(t *testing.T) {
 	}
 }
 
-func TestUnitVirtualSkipsMissingMemberButRejectsWrongFormat(t *testing.T) {
+// A member no repository has and a member of another package type are
+// passed over by the shared walk (decision 0008, R2, R11).
+func TestUnitVirtualSkipsMissingAndWrongFormatMembers(t *testing.T) {
 	f := newRouteFixture(t)
 	f.seedLocal("LocalPod", "1.0.0")
 	c, err := f.db.Repos().Get(t.Context(), "pods-virtual")
@@ -629,8 +648,8 @@ func TestUnitVirtualSkipsMissingMemberButRejectsWrongFormat(t *testing.T) {
 		t.Fatal(err)
 	}
 	resp = f.get("pods-virtual", "all_pods.txt")
-	if resp.Code != http.StatusBadRequest || strings.Contains(resp.Body.String(), "LocalPod") {
-		t.Fatalf("wrong-format virtual member served: %d %s", resp.Code, resp.Body)
+	if resp.Code != http.StatusOK || resp.Body.String() != "LocalPod\n" {
+		t.Fatalf("wrong-format virtual member = %d %q", resp.Code, resp.Body)
 	}
 }
 
@@ -862,7 +881,7 @@ func TestUnitCDNHandlersRejectPostFetchCorruption(t *testing.T) {
 		t.Fatalf("broken CDN stream was published as an index: %s", failed.Body.String())
 	}
 	failed = httptest.NewRecorder()
-	h.remoteSpec(failed, r, r, source.Result{Stream: &source.Stream{
+	h.remoteSpec(failed, r, source.Result{Stream: &source.Stream{
 		Body: io.NopCloser(brokenCDNBody{}),
 	}}, "RemotePod", "2.0.0", "pods-remote")
 	if failed.Code == http.StatusOK {
@@ -874,7 +893,7 @@ func TestUnitCDNHandlersRejectPostFetchCorruption(t *testing.T) {
 		serve func(http.ResponseWriter, *http.Request, source.Result)
 	}{
 		{"spec", "not JSON", func(w http.ResponseWriter, r *http.Request, result source.Result) {
-			h.remoteSpec(w, r, r, result, "RemotePod", "2.0.0", "pods-remote")
+			h.remoteSpec(w, r, result, "RemotePod", "2.0.0", "pods-remote")
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -887,5 +906,67 @@ func TestUnitCDNHandlersRejectPostFetchCorruption(t *testing.T) {
 				t.Fatalf("corrupt post-fetch %s disclosed: %d %s", tc.name, w.Code, w.Body.String())
 			}
 		})
+	}
+}
+
+// A virtual repository takes its members from the shared walk (decision
+// 0008, R1 to R3): a local member reached through a nested virtual
+// repository resolves, a cycle and a repeated member are skipped, a remote
+// member whose upstream fails is passed over, and a caller who may read
+// only the local member resolves through the virtual repository, with the
+// unreadable remote member passed over.
+func TestUnitVirtualResolvesThroughTheSharedWalk(t *testing.T) {
+	f := newRouteFixture(t)
+	f.seedLocal("LocalPod", "1.0.0")
+	shard := podfmt.ShardFile("LocalPod")
+	spec := podfmt.SpecPath("LocalPod", "1.0.0")
+	for _, path := range []string{"all_pods.txt", shard, spec} {
+		f.up.Set("/"+path, fakeupstream.Resource{Status: http.StatusServiceUnavailable})
+	}
+	nested := repo.Config{
+		Key: "pods-nested", Class: repo.Virtual, PackageType: repo.CocoaPods,
+		Repositories: []string{"pods-local", "pods-virtual"},
+	}
+	if err := f.db.Repos().Create(t.Context(), *repo.Defaults(&nested)); err != nil {
+		t.Fatal(err)
+	}
+	c, err := f.db.Repos().Get(t.Context(), "pods-virtual")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Repositories = []string{"pods-remote", "pods-nested", "pods-virtual", "pods-remote"}
+	if err := f.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "local-only",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"member": api.ActionRead}},
+			Targets: map[string]accesstest.Target{"pods-local": {}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, user := range []string{"admin", "member"} {
+		for path, want := range map[string]string{
+			"all_pods.txt":          "LocalPod\n",
+			shard:                   "LocalPod/1.0.0\n",
+			"CocoaPods-version.yml": "prefix_lengths",
+		} {
+			if rec := f.getAs(user, "pods-virtual", path); rec.Code != http.StatusOK ||
+				!strings.Contains(rec.Body.String(), want) {
+				t.Fatalf("%s %s: %d %q", user, path, rec.Code, rec.Body)
+			}
+		}
+		rec := f.getAs(user, "pods-virtual", spec)
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(),
+			"/artifactory/api/pods/pods-virtual/packages/LocalPod/1.0.0/LocalPod-1.0.0.tar.gz") {
+			t.Fatalf("%s spec: %d %s", user, rec.Code, rec.Body)
+		}
+		rec = f.getAs(user, "pods-virtual", podfmt.SpecPath("LocalPod", "9.0.0"))
+		if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(),
+			"CocoaPods resource not found") {
+			t.Fatalf("%s missing spec: %d %s", user, rec.Code, rec.Body)
+		}
 	}
 }

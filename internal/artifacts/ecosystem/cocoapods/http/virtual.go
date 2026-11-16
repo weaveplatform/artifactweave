@@ -1,10 +1,7 @@
 package cocoapodshttp
 
 import (
-	"errors"
-	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
@@ -12,49 +9,18 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	podfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cocoapods"
-	"github.com/weaveplatform/artifactweave/internal/kernel"
-	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
 )
 
-// The source adapter renders confirmed upstream absence as a protocol 404.
-// Virtual lookup still needs to try the next member after that mapping.
-func missingMember(err error) bool {
-	if errors.Is(err, kernel.ErrNotFound) {
-		return true
-	}
-	var apiErr *apierror.Error
-	return errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound
-}
-
-func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
-	c := pkgroute.RequestFrom(r).Repo
-	seen := map[string]bool{c.Key: true}
-	members := make([]*http.Request, 0, len(c.Repositories))
-	for _, key := range c.Repositories {
-		if seen[key] {
-			return nil, apierror.New(http.StatusBadRequest, "invalid CocoaPods virtual member")
-		}
-		seen[key] = true
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if missingMember(err) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("cocoapods: virtual member: %w", err)
-		}
-		if member.PackageType != repo.CocoaPods ||
-			(member.Class != repo.Local && member.Class != repo.Federated && member.Class != repo.Remote) {
-			return nil, apierror.New(http.StatusBadRequest, "unsupported CocoaPods virtual member")
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return nil, fmt.Errorf("cocoapods: virtual member request: %w", err)
-		}
-		members = append(members, mr)
-	}
-	return members, nil
-}
+// A virtual repository's CDN is built from its members through the package
+// handlers' walk (pkgroute.MergeMembers and pkgroute.Collect): nested
+// virtual repositories flattened, cycles and duplicates skipped, each
+// member in 7.x's effective order. A member that is blacked out or whose
+// patterns reject the CDN document, that the caller may read nothing in,
+// whose read misses or is refused, or whose upstream fails is passed over
+// (decision 0008, R1 to R3). Each member decides Read on the pods and
+// versions it serves: a virtual repository has no permission target of its
+// own (R10), and a caller who may read no member gets the CDN's not-found.
 
 func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string) {
 	if !validCDNPath(path) {
@@ -65,173 +31,129 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string
 			}
 		}
 	}
-	members, err := h.virtualMembers(r)
-	if err != nil {
-		h.k.Error(w, r, err)
-		return
-	}
-	if validCDNPath(path) {
+	switch {
+	case path == "CocoaPods-version.yml" || path == "deprecated_podspecs.txt":
 		// The virtual repository's own patterns refuse a CDN document they
-		// reject at its 7.x path ([I], R5), and a member that would refuse
-		// the document adds nothing to it: 7.x ignores a blacked-out member
-		// when it resolves.
-		if err := h.k.CheckDocument(r, cdnDocument(path)); err != nil {
+		// reject at its 7.x path ([I], R5). These documents name no pod, so
+		// a caller who may read the virtual repository or any member gets
+		// them, and one who may read neither gets the CDN's not-found.
+		members, err := h.k.MergeMembers(r, cdnDocument(path))
+		if err != nil {
 			h.k.Error(w, r, err)
 			return
 		}
-		members = h.serving(members, cdnDocument(path))
-	}
-	if path == "CocoaPods-version.yml" {
+		if len(members) == 0 && !h.k.CanFolder(r, "", api.ActionRead) {
+			h.k.Error(w, r, notFound())
+			return
+		}
+		if path == "deprecated_podspecs.txt" {
+			serveBytes(w, r, "text/plain; charset=utf-8", nil)
+			return
+		}
 		serveBytes(
 			w,
 			r,
 			"application/x-yaml",
 			[]byte("---\nmin: 1.0.0\nlast: 1.17.0\nprefix_lengths:\n- 1\n- 1\n- 1\n"),
 		)
-		return
-	}
-	if path == "deprecated_podspecs.txt" {
-		serveBytes(w, r, "text/plain; charset=utf-8", nil)
-		return
-	}
-	if path == "all_pods.txt" || strings.HasPrefix(path, "all_pods_versions_") {
-		h.virtualIndex(w, r, members, path)
-		return
-	}
-	if name, version, ok := parseSpecPath(path); ok {
-		h.virtualSpec(w, r, members, path, name, version)
-		return
-	}
-	if name, version, ext, ok := parseSourcePath(path); ok {
-		h.virtualSourceArchive(w, r, members, name, version, ext)
-		return
-	}
-	if strings.HasPrefix(path, "packages/") {
-		h.virtualLocalArchive(w, r, members, strings.TrimPrefix(path, "packages/"))
-		return
-	}
-	h.k.Error(w, r, notFound())
-}
-
-// serving returns the members that do not refuse path, in order: a
-// member's refusal is the member passed over.
-func (h handler) serving(members []*http.Request, path string) []*http.Request {
-	out := make([]*http.Request, 0, len(members))
-	for _, mr := range members {
-		if h.k.CheckDocument(mr, path) == nil {
-			out = append(out, mr)
-		}
-	}
-	return out
-}
-
-func (h handler) virtualIndex(
-	w http.ResponseWriter,
-	r *http.Request,
-	members []*http.Request,
-	path string,
-) {
-	names := map[string]bool{}
-	versions := map[string]map[string]bool{}
-	for _, mr := range members {
-		c := pkgroute.RequestFrom(mr).Repo
-		if c.Class == repo.Remote {
-			result, err := h.remoteResult(mr, path, false)
-			if missingMember(err) {
-				continue
-			}
-			if err != nil {
-				h.k.Error(w, r, err)
-				return
-			}
-			if result.Stream == nil {
-				h.k.Error(w, r, pkgroute.SourceError(source.ErrInvalidResult, false))
-				return
-			}
-			rows, err := h.remoteIndexRows(mr, result, path)
-			if err != nil {
-				h.k.Error(w, r, pkgroute.SourceError(err, false))
-				return
-			}
-			for _, row := range rows {
-				if path == "all_pods.txt" {
-					if h.k.CanFolder(r, row, api.ActionRead) {
-						names[row] = true
-					}
-					continue
-				}
-				parts := strings.Split(row, "/")
-				for _, v := range parts[1:] {
-					if h.k.CanFolder(r, parts[0]+"/"+v, api.ActionRead) {
-						if versions[parts[0]] == nil {
-							versions[parts[0]] = map[string]bool{}
-						}
-						versions[parts[0]][v] = true
-					}
-				}
-			}
-			continue
-		}
-		packages, err := h.localPackages(mr)
-		if err != nil {
-			h.k.Error(w, r, err)
-			return
-		}
-		for name, entries := range packages {
-			if path == "all_pods.txt" {
-				if h.k.CanFolder(r, name, api.ActionRead) {
-					names[name] = true
-				}
-				continue
-			}
-			if podfmt.ShardFile(name) != path {
-				continue
-			}
-			for v := range entries {
-				if h.k.Can(r, podfmt.Path(name, v), api.ActionRead) {
-					if versions[name] == nil {
-						versions[name] = map[string]bool{}
-					}
-					versions[name][v] = true
-				}
-			}
-		}
-	}
-	rows := make([]string, 0, len(names)+len(versions))
-	if path == "all_pods.txt" {
-		for name := range names {
-			rows = append(rows, name)
-		}
-	} else {
-		for name, entries := range versions {
-			v := make([]string, 0, len(entries))
-			for one := range entries {
-				v = append(v, one)
-			}
-			slices.Sort(v)
-			rows = append(rows, name+"/"+strings.Join(v, "/"))
-		}
-		if len(rows) == 0 {
+	case path == "all_pods.txt" || strings.HasPrefix(path, "all_pods_versions_"):
+		h.virtualIndex(w, r, path)
+	case strings.HasPrefix(path, "Specs/"):
+		name, version, ok := parseSpecPath(path)
+		if !ok {
 			h.k.Error(w, r, notFound())
 			return
 		}
+		h.virtualSpec(w, r, path, name, version)
+	case strings.HasPrefix(path, "packages/"):
+		h.virtualLocalArchive(w, r, strings.TrimPrefix(path, "packages/"))
+	default:
+		name, version, ext, ok := parseSourcePath(path)
+		if !ok {
+			h.k.Error(w, r, notFound())
+			return
+		}
+		h.virtualSourceArchive(w, r, name, version, ext)
 	}
-	slices.Sort(rows)
+}
+
+// virtualIndex merges the members' CDN index at path, all_pods.txt or one
+// shard, with podfmt.Index. A remote member contributes the rows of its
+// upstream's index, a hosted member those of its package index; each keeps
+// only the pods and versions the caller may read in that member.
+func (h handler) virtualIndex(w http.ResponseWriter, r *http.Request, path string) {
+	parts, err := pkgroute.Collect(h.k, r, cdnDocument(path), func(mr *http.Request) (podfmt.Pods, error) {
+		return h.memberIndex(mr, path)
+	})
+	if err != nil {
+		h.k.Error(w, r, pkgroute.SourceError(err, false))
+		return
+	}
+	merged, _ := podfmt.Index{}.Merge(r.Context(), parts)
+	shard := path != "all_pods.txt"
+	rows := merged.Lines(shard)
+	if shard && len(rows) == 0 {
+		h.k.Error(w, r, notFound())
+		return
+	}
 	serveBytes(w, r, "text/plain; charset=utf-8", lines(rows))
 }
 
-func (h handler) virtualSpec(
-	w http.ResponseWriter,
-	r *http.Request,
-	members []*http.Request,
-	path, name, version string,
-) {
+// memberIndex is the part of one member of a virtual repository in the
+// CDN index at path.
+func (h handler) memberIndex(mr *http.Request, path string) (podfmt.Pods, error) {
+	out := podfmt.Pods{}
+	if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
+		result, err := h.remoteResult(mr, path, false)
+		if err != nil {
+			return nil, err
+		}
+		if result.Stream == nil {
+			return nil, source.ErrInvalidResult
+		}
+		rows, err := h.remoteIndexRows(mr, result, path)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			parts := strings.Split(row, "/")
+			out[parts[0]] = append(out[parts[0]], parts[1:]...)
+		}
+		return out, nil
+	}
+	packages, err := h.localPackages(mr)
+	if err != nil {
+		return nil, err
+	}
+	for name, entries := range packages {
+		switch {
+		case path == "all_pods.txt":
+			if h.k.CanFolder(mr, name, api.ActionRead) {
+				out[name] = nil
+			}
+		case podfmt.ShardFile(name) == path:
+			for v := range entries {
+				out[name] = append(out[name], v)
+			}
+		}
+	}
+	return out, nil
+}
+
+// virtualSpec serves the podspec at path from the first member in the walk
+// that has it, rewritten to fetch its archive through the virtual
+// repository.
+func (h handler) virtualSpec(w http.ResponseWriter, r *http.Request, path, name, version string) {
+	members, err := h.k.MergeMembers(r, cdnDocument(path))
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	key := pkgroute.RequestFrom(r).Repo.Key
 	for _, mr := range members {
-		c := pkgroute.RequestFrom(mr).Repo
-		if c.Class == repo.Remote {
+		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
 			result, err := h.remoteResult(mr, path, false)
-			if missingMember(err) {
+			if pkgroute.PassedOver(err) {
 				continue
 			}
 			if err != nil {
@@ -242,7 +164,7 @@ func (h handler) virtualSpec(
 				h.k.Error(w, r, pkgroute.SourceError(source.ErrInvalidResult, false))
 				return
 			}
-			h.remoteSpec(w, mr, r, result, name, version, key)
+			h.remoteSpec(w, mr, result, name, version, key)
 			return
 		}
 		packages, err := h.localPackages(mr)
@@ -251,7 +173,7 @@ func (h handler) virtualSpec(
 			return
 		}
 		v, ok := packages[name][version]
-		if !ok || !h.k.Can(r, podfmt.Path(name, version), api.ActionRead) {
+		if !ok {
 			continue
 		}
 		data, err := specFor(baseurl.From(r.Context()), key, v.archive)
@@ -265,22 +187,15 @@ func (h handler) virtualSpec(
 	h.k.Error(w, r, notFound())
 }
 
-func (h handler) virtualLocalArchive(
-	w http.ResponseWriter,
-	r *http.Request,
-	members []*http.Request,
-	path string,
-) {
-	name, version, ok := podfmt.ParsePath(path)
-	if !ok || !h.k.Can(r, path, api.ActionRead) {
-		h.k.Error(w, r, notFound())
-		return
-	}
-	// The virtual repository's own patterns leave it no member to search
-	// (6.20 VirtualRepoDownloadStrategy), and a member that refuses the
-	// archive is passed over for the next one that lists it, as 7.x
-	// ignores a blacked-out member when it resolves (R5).
-	if err := h.k.CheckDownload(r, path); err != nil {
+// virtualLocalArchive serves a hosted pod's archive from the first hosted
+// member that holds it and lets the caller read it. The virtual
+// repository's own patterns refusing the archive leave it no member to
+// search (6.20 VirtualRepoDownloadStrategy), and a member that refuses it
+// is passed over for the next one that lists it (R5).
+func (h handler) virtualLocalArchive(w http.ResponseWriter, r *http.Request, path string) {
+	name, version, _ := podfmt.ParsePath(path)
+	members, err := h.k.MergeMembers(r, path)
+	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
@@ -293,37 +208,35 @@ func (h handler) virtualLocalArchive(
 			h.k.Error(w, r, err)
 			return
 		}
-		if v, found := packages[name][version]; found && h.k.CheckDownload(v.request, path) == nil {
-			h.k.ServeItem(w, v.request, path)
+		if _, found := packages[name][version]; found {
+			h.k.ServeItem(w, mr, path)
 			return
 		}
 	}
 	h.k.Error(w, r, notFound())
 }
 
+// virtualSourceArchive serves a remote pod's source archive from the first
+// remote member whose spec names it with this extension and that lets the
+// caller read it. A remote member whose own policy refuses the archive is
+// passed over, as a hosted member is (R5).
 func (h handler) virtualSourceArchive(
 	w http.ResponseWriter,
 	r *http.Request,
-	members []*http.Request,
 	name, version, ext string,
 ) {
 	p := sourcePath(name, version, ext)
-	if !h.k.Can(r, p, api.ActionRead) {
-		h.k.Error(w, r, notFound())
-		return
-	}
-	if err := h.k.CheckDownload(r, p); err != nil {
+	members, err := h.k.MergeMembers(r, p)
+	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
 	for _, mr := range members {
-		// A remote member whose own policy refuses the archive is passed
-		// over, as a local member is (R5).
-		if pkgroute.RequestFrom(mr).Repo.Class != repo.Remote || h.k.CheckDocument(mr, p) != nil {
+		if pkgroute.RequestFrom(mr).Repo.Class != repo.Remote || !h.k.Can(mr, p, api.ActionRead) {
 			continue
 		}
 		result, err := h.remoteResult(mr, podfmt.SpecPath(name, version), true)
-		if missingMember(err) {
+		if pkgroute.PassedOver(err) {
 			continue
 		}
 		if err != nil {

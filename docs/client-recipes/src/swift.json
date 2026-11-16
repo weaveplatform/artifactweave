@@ -22,8 +22,8 @@
     }
   ],
   "publish": {
-    "classes": "LF",
-    "note": "Native publication is proven on local and one-node federated repositories. No publication command is offered for remote or virtual repositories.",
+    "classes": "LVF",
+    "note": "Native publication is proven on local and one-node federated repositories, and through a virtual repository, which stores the release in its default deployment repository and answers 405 without one. No publication command is offered for remote repositories.",
     "steps": [
       {
         "language": "sh",
@@ -66,7 +66,9 @@
         "TestAccSwiftPMRemoteVirtualAndOffline",
         "swiftpm-authenticated-reader",
         "swiftCredentialHandler",
-        "Offline-cache"
+        "Offline-cache",
+        "TestAccSwiftPMVirtualLocalRemoteAndPublish",
+        "--replace-scm-with-registry"
       ]
     },
     {

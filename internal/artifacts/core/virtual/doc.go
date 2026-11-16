@@ -104,6 +104,11 @@
 // the package is planned for P10's other tickets
 // (https://github.com/weaveplatform/artifactweave/issues/1521).
 //
+// Formats that implement Merger: Bower (Names, Versions), CocoaPods
+// (Index), Composer (Releases) and Swift (Releases), each in its
+// ecosystem/<type>/virtual.go
+// (https://github.com/weaveplatform/artifactweave/issues/1539).
+//
 // # Testing
 //
 // resolve_test.go is an external test package (virtual_test) over Configs:

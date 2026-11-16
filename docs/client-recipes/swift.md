@@ -41,7 +41,7 @@ swift package-registry --package-path consumer --config-path "$AW_SWIFT_WORK/con
 
 ## Publish
 
-Classes: **local, federated**. Native publication is proven on local and one-node federated repositories. No publication command is offered for remote or virtual repositories.
+Classes: **local, virtual, federated**. Native publication is proven on local and one-node federated repositories, and through a virtual repository, which stores the release in its default deployment repository and answers 405 without one. No publication command is offered for remote repositories.
 
 Replace package identity/version with your producer. zip must be installed; SwiftPM builds the source archive itself.
 

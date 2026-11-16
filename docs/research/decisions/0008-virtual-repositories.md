@@ -249,6 +249,10 @@ over the members' documents that `pkgroute.Collect` reads in the package handler
 | Maven, Gradle, Ivy, SBT | `maven-metadata.xml` at artifact and snapshot level: union of versions, newest `lastUpdated`, newest snapshot |
 | npm | packument `versions` union, `dist-tags` by member order, tarball URLs rewritten to the virtual |
 | PyPI | simple index and project pages, union of files; JSON only when every member can |
+| Bower | package list and search, union of names; a package's refs, union of versions, each archive from the first member that holds it |
+| CocoaPods | `all_pods.txt` and the `all_pods_versions_*` shards, union of pods and versions; a podspec from the first member that has it, its source rewritten to the virtual |
+| Composer | `p2` metadata, union of releases, each version and its dist from the first member that lists it; the order 7.x gives a merged list is **[I]** ([RTFACT-30366](https://jfrog.atlassian.net/browse/RTFACT-30366)) |
+| Swift | release list, union of versions; release metadata, `Package.swift` and the archive from the first member that has the release; a publish lands in the default deployment repository (R6) |
 | NuGet | registration pages, flat-container version lists and search results |
 | Helm | `index.yaml` entries union, chart URLs rewritten; Helm and Helm OCI cannot share a virtual |
 | Go | `@v/list` union; remote Go members are only reachable this way |

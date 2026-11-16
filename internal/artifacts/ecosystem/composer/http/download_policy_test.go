@@ -132,11 +132,11 @@ func TestAccDownloadPolicyOfAHostedRepository(t *testing.T) {
 
 // TestAccDownloadPolicyThroughAVirtualRepository: a virtual repository
 // resolves a package past a blacked-out member to the next member that
-// holds it; an archive the resolved member refuses is passed over to the
-// next member that holds the version, while one the resolved member lacks
-// stays not found; and the virtual repository's own patterns refuse an
-// archive with "No repository found to serve the request" but leave its
-// p2 metadata alone (#1237).
+// holds it; an archive the first member that lists the version refuses is
+// passed over to the next member that holds the version, and a version
+// only a later member holds is served from it (#1539); and the virtual
+// repository's own patterns refuse an archive with "No repository found to
+// serve the request" but leave its p2 metadata alone (#1237).
 func TestAccDownloadPolicyThroughAVirtualRepository(t *testing.T) {
 	f := newFixture(t)
 	la, lb := f.create("la", repo.Local), f.create("lb", repo.Local)
@@ -162,11 +162,9 @@ func TestAccDownloadPolicyThroughAVirtualRepository(t *testing.T) {
 		}
 	}
 	p2("both members", fromA)
+	p2("version only the second member holds", onlyB)
 	dist("both members", "1.0.0", fromA)
-	if got := f.request("GET", base+"/dist/acme/widget/2.0.0.zip"); got.Code != 404 ||
-		!strings.Contains(got.Body.String(), "Composer package not found") {
-		t.Errorf("version the resolved member lacks: %d %s", got.Code, got.Body)
-	}
+	dist("version only the second member holds", "2.0.0", onlyB)
 	on, off := true, false
 	f.patch("la", func(c *repo.Config) { c.BlackedOut = &on })
 	p2("first member blacked out", fromB)
@@ -201,10 +199,10 @@ func TestAccDownloadPolicyThroughAVirtualRepository(t *testing.T) {
 	excluded = "acme/widget/1.0.0.zip"
 	f.patch("la", func(c *repo.Config) { c.ExcludesPattern = &excluded })
 	dist("past a member without the version", "1.0.0", fromB)
+	// A repeated member is read once (decision 0008, R2).
 	f.patch("v", func(c *repo.Config) { c.Repositories = []string{"la", "la"} })
-	if got := f.request("GET", base+"/dist/acme/widget/1.0.0.zip"); got.Code != 400 {
-		t.Errorf("repeated member: %d %s", got.Code, got.Body)
-	}
+	f.patch("la", func(c *repo.Config) { c.ExcludesPattern = new(string) })
+	dist("repeated member", "1.0.0", fromA)
 }
 
 // TestAccDownloadPolicyOfARemoteRepository: a blacked-out remote refuses
@@ -286,8 +284,11 @@ func TestAccDownloadPolicyOfARemoteRepository(t *testing.T) {
 
 // TestAccDownloadPolicyRefusalOfARemoteRevalidation: a remote's policy
 // refusal that the revalidation of its metadata returns answers its own
-// 404 and message, not a fault (R4); other failures keep their answers,
-// through a virtual repository too (#1237).
+// 404 and message, not a fault (R4); other failures keep their answers
+// (#1237). A virtual repository passes over a member whose upstream fails,
+// as 7.x's walk passes over every member that does not serve the request
+// [I], and answers the protocol's not-found when no member is left
+// (decision 0008, R3; #1539).
 func TestAccDownloadPolicyRefusalOfARemoteRevalidation(t *testing.T) {
 	archive := makeZIP(t, "1.0.0", "remote")
 	b := &sourceBackend{content: map[string][]byte{
@@ -319,12 +320,16 @@ func TestAccDownloadPolicyRefusalOfARemoteRevalidation(t *testing.T) {
 	wantRefusal(t, "dist", f.request("GET", base+"/dist/acme/widget/1.0.0.zip"), message)
 	b.revalidateErr = nil
 	b.readError = map[string]error{"p2/acme/widget.json": source.ErrUnavailable}
+	if got := f.request("GET", base+"/dist/acme/widget/1.0.0.zip"); got.Code !=
+		http.StatusBadGateway {
+		t.Errorf("failing source, direct dist: %d %s", got.Code, got.Body)
+	}
 	for _, path := range []string{
-		base + "/dist/acme/widget/1.0.0.zip",
 		"/artifactory/api/composer/all/p2/acme/widget.json",
 		"/artifactory/api/composer/all/dist/acme/widget/1.0.0.zip",
 	} {
-		if got := f.request("GET", path); got.Code != http.StatusBadGateway {
+		if got := f.request("GET", path); got.Code != http.StatusNotFound ||
+			!strings.Contains(got.Body.String(), "Composer package not found") {
 			t.Errorf("failing source, %s: %d %s", path, got.Code, got.Body)
 		}
 	}

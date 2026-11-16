@@ -123,7 +123,11 @@ func TestUnitBowerSourceBackendErrorDoesNotExposeMetadata(t *testing.T) {
 	}
 }
 
-func TestUnitBowerVirtualDoesNotHideMemberSourceFailure(t *testing.T) {
+// A virtual repository passes over a remote member whose upstream cannot
+// be reached, as 7.x's walk ignores a member that does not serve the
+// request [I] (decision 0008, R3; pkgroute.PassedOver): its package list
+// answers without it and its refs answer the protocol's not-found.
+func TestUnitBowerVirtualPassesOverMemberSourceFailure(t *testing.T) {
 	f := newFixture(t)
 	c := f.repo("bower-remote", repo.Remote)
 	c.URL = "https://upstream.example/api/bower"
@@ -143,13 +147,13 @@ func TestUnitBowerVirtualDoesNotHideMemberSourceFailure(t *testing.T) {
 			return f.db.RemoteCache().Source(ctx, c.Key)
 		},
 	})
-	for _, path := range []string{"packages", "refs/bower-virtual/hello"} {
-		if r := f.get(
-			"/artifactory/api/bower/bower-virtual/"+path,
-			"admin",
-		); r.Code == http.StatusOK {
-			t.Fatalf("virtual repository hid a failed member source for %s", path)
-		}
+	if r := f.get("/artifactory/api/bower/bower-virtual/packages", "admin"); r.Code !=
+		http.StatusOK || r.Body.String() != "[]\n" {
+		t.Fatalf("package list over a failed member = %d %s", r.Code, r.Body)
+	}
+	if r := f.get("/artifactory/api/bower/bower-virtual/refs/bower-virtual/hello", "admin"); r.Code !=
+		http.StatusNotFound || bowerMessage(t, r) != "Bower package not found" {
+		t.Fatalf("refs over a failed member = %d %s", r.Code, r.Body)
 	}
 }
 

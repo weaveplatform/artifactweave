@@ -45,6 +45,9 @@
 //   - The identity and archive rules: Package with ID, ArchivePath and
 //     IsValid, ValidScope, ValidName, ValidVersion, ParseArchivePath,
 //     InspectArchive, Archive and MaxArchiveBytes.
+//   - Releases, the virtual.Merger of a virtual repository's release list:
+//     the union of its members' versions (decision 0008, "Per-format
+//     merges").
 //
 // # Invariants
 //
@@ -93,4 +96,5 @@
 //   - coverage_test.go: unsafe members and cancelled inspection, the bounds
 //     and every member's checks, admission of corrupt and changed archives,
 //     and a reindex that restores only valid stored archives.
+//   - virtual_test.go: the merge of a virtual repository's release list.
 package swift

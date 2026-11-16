@@ -57,9 +57,11 @@ destination also needs an operator-approved private origin in the source
 transport; a URL pattern alone does not permit private-network access. A
 cross-origin HTTP archive is denied if `allowAnyHostAuth` or cookie management
 could forward upstream credentials. An offline remote serves previously cached
-metadata and source bytes to a fresh client. A virtual repository lists
-members in priority order and keeps a selected package's metadata and bytes
-with that member. Federation here is one-node behavior; cross-peer
+metadata and source bytes to a fresh client. A virtual repository merges
+its members' CDN indexes, local members before remote ones and nested
+virtual repositories included, and keeps a selected package's metadata and
+bytes with the first member that has it; a member that misses, fails or
+that the caller may not read is passed over. Federation here is one-node behavior; cross-peer
 convergence is [P13](../implementation/plan.md).
 
 ## Git sources and submodules
@@ -118,7 +120,8 @@ installs `cocoapods` 1.17.0 with Ruby 4.0.9. The
 exercise actual `pod repo add-cdn` and `pod install` with a fresh home across
 local JSON, local static Ruby, HTTP-source and Git-source remote cache/offline and
 pinned submodules, same-origin redirects, local-backed
-virtual, remote-backed virtual, and one-node federated repositories. The
+virtual, remote-backed virtual, a virtual over a remote member and a nested
+local member, and one-node federated repositories. The
 controlled upstream fixture is authored independently of the server's CDN
 encoder. Negative unit and server checks cover path identity, unsafe archive
 members, dynamic Ruby, malformed source metadata and denied source paths. A

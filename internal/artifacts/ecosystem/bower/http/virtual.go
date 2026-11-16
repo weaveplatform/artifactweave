@@ -1,7 +1,6 @@
 package bowerhttp
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -15,87 +14,40 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
-func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
-	virtual := pkgroute.RequestFrom(r).Repo
-	seen := map[string]bool{virtual.Key: true}
-	var out []*http.Request
-	for _, key := range virtual.Repositories {
-		if seen[key] {
-			return nil, apierror.New(http.StatusBadRequest, "invalid Bower virtual member")
-		}
-		seen[key] = true
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("bower virtual member: %w", err)
-		}
-		if member.Class != repo.Local && member.Class != repo.Federated &&
-			member.Class != repo.Remote {
-			return nil, apierror.New(http.StatusBadRequest, "unsupported Bower virtual member")
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return nil, fmt.Errorf("bower virtual member request: %w", err)
-		}
-		out = append(out, mr)
+// A virtual repository's package list, lookup and refs merge what its
+// members hold through the package handlers' walk (pkgroute.Collect): nested
+// virtual repositories flattened, cycles and duplicates skipped, each member
+// in 7.x's effective order, and a member that is blacked out, that the
+// caller may read nothing in, or whose read misses or whose upstream fails
+// passed over (decision 0008, R1 to R3). Bower keeps none of this metadata
+// at a documented path, so no path of it takes the members' patterns.
+// Each member decides Read on its own rows: a virtual repository has no
+// permission target of its own (decision 0008, R10).
+
+// virtualListed is the names a virtual repository's package list and search
+// answer: each name a member lists with a version the caller may read in
+// that member.
+func (h handler) virtualListed(r *http.Request, query string) ([]string, error) {
+	parts, err := pkgroute.Collect(h.k, r, "", func(mr *http.Request) ([]string, error) {
+		return h.listed(mr, query, false)
+	})
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the kit's answer or a member's fault, as it is
 	}
-	return out, nil
+	return bowerfmt.Names{}.Merge(r.Context(), parts) //nolint:wrapcheck // a pure merge never fails
 }
 
-func (h handler) virtualPackageNames(r *http.Request, query string) ([]string, error) {
-	members, err := h.virtualMembers(r)
+// virtualVersions is the versions a virtual repository resolves name to:
+// the union of the versions each member holds that the caller may read
+// there, in the walk's order.
+func (h handler) virtualVersions(r *http.Request, name string) ([]string, error) {
+	parts, err := pkgroute.Collect(h.k, r, "", func(mr *http.Request) ([]string, error) {
+		return h.versions(mr, name)
+	})
 	if err != nil {
-		return nil, err
+		return nil, err //nolint:wrapcheck // the kit's answer or a member's fault, as it is
 	}
-	seen := map[string]bool{}
-	var out []string
-	for _, mr := range members {
-		if !h.k.CanFolder(mr, "", api.ActionRead) {
-			continue
-		}
-		names, err := h.packageNames(mr, query)
-		if err != nil {
-			return nil, err
-		}
-		for _, name := range names {
-			if !seen[name] {
-				seen[name] = true
-				out = append(out, name)
-			}
-		}
-	}
-	slices.Sort(out)
-	return out, nil
-}
-
-func (h handler) virtualVersions(r *http.Request, name string, resolving bool) ([]string, error) {
-	members, err := h.virtualMembers(r)
-	if err != nil {
-		return nil, err
-	}
-	seen := map[string]bool{}
-	var out []string
-	for _, mr := range members {
-		// 7.x ignores a blacked-out member when it resolves (R5). A hosted
-		// member's versions come from its package index, which the
-		// blackout does not touch, so it is left out here.
-		if resolving && generic.CheckBlackedOut(pkgroute.RequestFrom(mr).Repo, "") != nil {
-			continue
-		}
-		vs, err := h.readableVersions(mr, name, resolving)
-		if err != nil {
-			return nil, err
-		}
-		for _, version := range vs {
-			if !seen[version] {
-				seen[version] = true
-				out = append(out, version)
-			}
-		}
-	}
-	return out, nil
+	return bowerfmt.Versions{}.Merge(r.Context(), parts) //nolint:wrapcheck // a pure merge never fails
 }
 
 func (h handler) serveBinary(w http.ResponseWriter, r *http.Request, name, version, tag string) {
@@ -103,42 +55,55 @@ func (h handler) serveBinary(w http.ResponseWriter, r *http.Request, name, versi
 	case repo.Remote:
 		h.remoteBinary(w, r, name, version, tag)
 	case repo.Virtual:
-		// binary has checked the virtual repository's own patterns
-		// (archivePolicy). A member whose own policy refuses the archive is
-		// passed over, as one without the version is (decision 0032, R5).
-		members, err := h.virtualMembers(r)
+		h.virtualBinary(w, r, name, version, tag)
+	default:
+		h.localBinary(w, r, name, version)
+	}
+}
+
+// virtualBinary serves version's archive from the first member in the walk
+// that holds it and serves it: binary has checked the virtual repository's
+// own patterns (archivePolicy). A member the caller may not read the
+// version's manifest in, one whose own policy refuses the archive, one
+// without the version and one whose read misses or whose upstream fails is
+// passed over, as 7.x's walk passes over every member that does not serve
+// the file (decision 0008, R3; decision 0032, R5).
+func (h handler) virtualBinary(w http.ResponseWriter, r *http.Request, name, version, tag string) {
+	members, err := h.k.MergeMembers(r, "")
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	for _, mr := range members {
+		if !h.k.Can(mr, bowerfmt.ManifestPath(name, version), api.ActionRead) {
+			continue
+		}
+		refuses, err := h.memberRefuses(mr, name, version)
 		if err != nil {
 			h.k.Error(w, r, err)
 			return
 		}
-		for _, mr := range members {
-			refuses, err := h.memberRefuses(mr, name, version)
-			if err != nil {
-				h.k.Error(w, r, err)
-				return
-			}
-			if refuses {
-				continue
-			}
-			vs, err := h.versions(mr, name)
-			if err != nil {
-				h.k.Error(w, r, pkgroute.SourceError(err, false))
-				return
-			}
-			if !slices.Contains(vs, version) {
-				continue
-			}
-			if dependencyRewrite(pkgroute.RequestFrom(r).Repo) {
-				h.rewrittenMember(w, r, mr, name, version, tag)
-			} else {
-				h.serveBinary(w, mr, name, version, tag)
-			}
-			return
+		if refuses {
+			continue
 		}
-		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Bower version not found"))
-	default:
-		h.localBinary(w, r, name, version)
+		vs, err := h.versions(mr, name)
+		switch {
+		case err != nil && pkgroute.PassedOver(err):
+			continue
+		case err != nil:
+			h.k.Error(w, r, pkgroute.SourceError(err, false))
+			return
+		case !slices.Contains(vs, version):
+			continue
+		}
+		if dependencyRewrite(pkgroute.RequestFrom(r).Repo) {
+			h.rewrittenMember(w, r, mr, name, version, tag)
+		} else {
+			h.serveBinary(w, mr, name, version, tag)
+		}
+		return
 	}
+	h.k.Error(w, r, apierror.New(http.StatusNotFound, "Bower version not found"))
 }
 
 // memberRefuses reports whether a virtual repository's member refuses the

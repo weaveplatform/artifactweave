@@ -29,6 +29,10 @@ func (w *world) registerCocoaPods(sc *godog.ScenarioContext) {
 		w.cocoaPodsGitUpstream,
 	)
 	sc.Step(`^a CocoaPods project for repository "([^"]*)"$`, w.cocoaPodsProject)
+	sc.Step(
+		`^a CocoaPods project for repository "([^"]*)" with the pods "([^"]*)"$`,
+		w.cocoaPodsProjectWith,
+	)
 	sc.Step(`^a CocoaPods archive named "([^"]*)" version "([^"]*)"$`, w.cocoaPodsArchive)
 	sc.Step(`^a CocoaPods ZIP source named "([^"]*)" version "([^"]*)"$`, w.cocoaPodsZIPSource)
 	sc.Step(
@@ -231,6 +235,13 @@ func (w *world) clearCocoaPodsClient() error {
 }
 
 func (w *world) cocoaPodsProject(key string) error {
+	return w.cocoaPodsProjectWith(key, "HelloPod 1.0.0")
+}
+
+// cocoaPodsProjectWith writes a Podfile whose source is the repository key
+// and whose target pins each of pods, a comma-separated list of
+// "<name> <version>".
+func (w *world) cocoaPodsProjectWith(key, pods string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
@@ -242,13 +253,20 @@ func (w *world) cocoaPodsProject(key string) error {
 		machine = "host.docker.internal"
 	}
 	source := base + "/artifactory/api/pods/" + key
+	var lines strings.Builder
+	for _, pod := range strings.Split(pods, ",") {
+		name, version, ok := strings.Cut(strings.TrimSpace(pod), " ")
+		if !ok {
+			return fmt.Errorf("invalid CocoaPods pin %q", pod)
+		}
+		fmt.Fprintf(&lines, "  pod '%s', '%s'\n", name, version)
+	}
 	text := fmt.Sprintf(`source %q
 install! 'cocoapods', :integrate_targets => false
 platform :ios, '12.0'
 target 'Demo' do
-  pod 'HelloPod', '1.0.0'
-end
-`, source)
+%send
+`, source, lines.String())
 	if err := os.WriteFile(filepath.Join(dir, "Podfile"), []byte(text), 0o600); err != nil {
 		return err
 	}

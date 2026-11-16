@@ -245,9 +245,11 @@ func TestUnitSwiftVirtualReadsFollowTheDownloadPolicy(t *testing.T) {
 	f.patch("virtual", excludes(zip))
 	wantProblem(t, get("acme/Widget/1.0.0.zip", "admin"), http.StatusNotFound,
 		fmt.Sprintf(noMember, "virtual", zip))
-	if rec := get("acme/Widget/1.0.0.zip", "nobody"); rec.Code != http.StatusForbidden {
-		t.Fatalf("a caller without Read: %d %s", rec.Code, rec.Body)
-	}
+	// The virtual repository's own patterns come first, for every caller:
+	// it has no permission of its own, and Read is each member's (decision
+	// 0008, R5 and R10).
+	wantProblem(t, get("acme/Widget/1.0.0.zip", "nobody"), http.StatusNotFound,
+		fmt.Sprintf(noMember, "virtual", zip))
 	wantReleases(t, get("acme/Widget", "admin"), "1.0.0", "2.0.0", "3.0.0")
 	wantOK(t, get("acme/Widget/1.0.0", "admin"), `"checksum":"`)
 	f.patch("virtual", func(c *repo.Config) { c.Repositories = []string{"local", "packages"} })
