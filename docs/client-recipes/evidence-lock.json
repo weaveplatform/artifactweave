@@ -58,7 +58,7 @@
   "test/acceptance/clients/swift.Dockerfile": "834491010a9e2d5d2c779261b1d0789f45730be7cf4a1f0cdf0d8c341dba84da",
   "test/acceptance/clients/vagrant.Dockerfile": "8d6061d142be8a35552af1a9bf3edbe0e29a421ff8f430b7b6b901f72bcd574d",
   "test/acceptance/clients/vscode-install.sh": "1a2d9c839a0d5f76507ac3c9e2753eb1813d8fb6c811787a1e7c775ae46649b8",
-  "test/acceptance/clients/vscode.Dockerfile": "5ac4a6880a0b12450ac4130801f4298e85aefe97cf28418e781ea3a21ccb7ee4",
+  "test/acceptance/clients/vscode.Dockerfile": "cd5b110c9c938e369d793d321de151df294ae7965780a1c7a4958b88be38e6b9",
   "test/acceptance/cocoapods_steps_test.go": "2f53df60012b9e9714a0e1b7b93f18e53d5b954311beca933b5091273b26a361",
   "test/acceptance/composer_steps_test.go": "0e2f65c15b6bc6e75a907c8c8e14e49690490f9a575d22049d8a2ad47ef1d7da",
   "test/acceptance/conda_steps_test.go": "c21c114531e4b151403980ea7f254658d70e83283de66da4bc4bd5703077809a",

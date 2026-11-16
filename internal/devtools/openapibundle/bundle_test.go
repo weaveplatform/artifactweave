@@ -192,7 +192,16 @@ const shared = `components:
 // directory, as api/src does, and returns the service directory.
 func sharedService(t *testing.T, sharedBody string, files map[string]string) string {
 	t.Helper()
-	root := t.TempDir()
+	return sharedServiceIn(t, t.TempDir(), sharedBody, files)
+}
+
+// sharedServiceIn is sharedService under a root the caller names, so a test
+// can choose the directory name the bundle's header repeats.
+func sharedServiceIn(t *testing.T, root, sharedBody string, files map[string]string) string {
+	t.Helper()
+	if err := os.MkdirAll(root, 0o750); err != nil {
+		t.Fatal(err)
+	}
 	if sharedBody != "" {
 		write(t, root, SharedFile, sharedBody)
 	}
@@ -312,10 +321,28 @@ func TestUnitBundleSharedAndAdmission(t *testing.T) {
 		lookup(lookup(comps, "headers"), "RetryAfter") == nil {
 		t.Fatal("shared components not merged")
 	}
-	if !strings.Contains(string(out), "'429':\n") ||
-		!strings.Contains(string(out), "$ref: '#/components/responses/ServiceUnavailable'") {
-		t.Fatalf("injected statuses not single-quoted like the fragments:\n%s", out)
+	// Read the quoting from the parsed nodes of /ordinary, which only gets
+	// injected entries. A search of the whole text would find /own's own
+	// '429' from its fragment, and the header's directory name (#1604).
+	for _, status := range []string{"429", "503"} {
+		key := responseKey(resp, status)
+		ref := lookup(lookup(resp, status), "$ref")
+		if key == nil || key.Style != yaml.SingleQuotedStyle ||
+			ref == nil || ref.Style != yaml.SingleQuotedStyle {
+			t.Fatalf("injected %s not single-quoted like the fragments:\n%s", status, out)
+		}
 	}
+}
+
+// responseKey returns the key node of status in a responses mapping, whose
+// Style records how the bundle quoted it.
+func responseKey(resp *yaml.Node, status string) *yaml.Node {
+	for i := 0; i+1 < len(resp.Content); i += 2 {
+		if resp.Content[i].Value == status {
+			return resp.Content[i]
+		}
+	}
+	return nil
 }
 
 func TestUnitBundleSharedPartial(t *testing.T) {
@@ -342,15 +369,32 @@ func TestUnitBundleSharedPartial(t *testing.T) {
 }
 
 func TestUnitBundleWithoutShared(t *testing.T) {
-	svc := sharedService(t, "", map[string]string{
-		"paths-a.yaml": "paths:\n  /x:\n    get:\n      operationId: x\n      responses:\n        '200':\n          description: ok\n",
-	})
-	out, err := Bundle(svc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(out), "429") {
-		t.Fatalf("injected without a shared fragment:\n%s", out)
+	// The bundle's header names the source directory, so a check on the whole
+	// text would also match a temporary directory whose random suffix holds
+	// 429 (#1604). The 429 parent makes that case happen on every run.
+	for name, root := range map[string]string{
+		"temporary directory": t.TempDir(),
+		"429 in the path":     filepath.Join(t.TempDir(), "429"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			svc := sharedServiceIn(t, root, "", map[string]string{
+				"paths-a.yaml": "paths:\n  /x:\n    get:\n      operationId: x\n      responses:\n        '200':\n          description: ok\n",
+			})
+			out, err := Bundle(svc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var doc yaml.Node
+			if err := yaml.Unmarshal(out, &doc); err != nil {
+				t.Fatal(err)
+			}
+			if got := strings.Join(statuses(t, doc.Content[0], "/x", "get"), ","); got != "200" {
+				t.Fatalf("statuses %s, want 200: injected without a shared fragment", got)
+			}
+			if comps := lookup(doc.Content[0], "components"); comps != nil {
+				t.Fatalf("components %v without a shared fragment", mappingKeys(comps))
+			}
+		})
 	}
 }
 
