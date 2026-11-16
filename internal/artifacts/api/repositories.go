@@ -124,13 +124,19 @@ type Repositories interface {
 	// defaults, and a 400 apierror with the validation message or
 	// MsgKeyExists.
 	PrepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error)
-	// CheckMembers refuses a virtual repository whose members, its default
-	// deployment repository among them, do not exist among known, or have a
-	// package type the virtual repository cannot aggregate
-	// (repo.AcceptsMember); a P2 virtual repository's members of another
-	// package type must be local. Other classes pass. The refusal is a 400
-	// apierror naming the member.
-	CheckMembers(c repo.Config, known []repo.Config) error
+	// CheckMembers applies 7.x's save rules for a virtual repository's
+	// members and defaultDeploymentRepo to c, a create when stored is nil
+	// and otherwise an update of stored, against known, the stored
+	// repositories and those the same request creates. A member or
+	// deployment repository the save adds must exist (c's own key counts),
+	// one stored before that no longer exists is dropped from c, the
+	// deployment repository must be a local or federated member when a
+	// create or update sets it, an update may not take its member away, and
+	// members the save changes must have a package type the virtual
+	// repository aggregates (repo.AcceptsMember); a P2 virtual repository's
+	// members of another package type must be local. Other classes pass.
+	// The refusal is a 400 apierror with 7.x's message.
+	CheckMembers(c, stored *repo.Config, known []repo.Config) error
 	// CheckKeypairs refuses signing key references (primaryKeyPairRef,
 	// secondaryKeyPairRef, and keyPair on an Alpine or Debian virtual
 	// repository) to key pairs that do not exist, or whose type the

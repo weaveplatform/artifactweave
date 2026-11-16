@@ -230,7 +230,7 @@ Feature: Repositories API
       {"repositories": ["maven-local"]}
       """
     Then the response status is 400
-    And the response body contains "does not match the virtual repository's package type 'npm'"
+    And the response body contains "Virtual repository 'npm-virtual' has package type 'Npm' but includes non-matching repository 'maven-local' with package type 'Maven'"
     When I POST "/artifactory/api/repositories/npm-virtual" as admin with body:
       """
       {"repositories": ["npm-local"], "defaultDeploymentRepo": "npm-local"}
@@ -248,3 +248,28 @@ Feature: Repositories API
     And the JSON field "description" equals "its last member is gone"
     When I GET "/artifactory/npm-virtual/any/file.txt" as admin
     Then the response status is 404
+
+  @jf
+  Scenario: jf rt repo-create saves a virtual repository that lists itself, and an OCI virtual over Helm OCI
+    Given the JFrog CLI is available
+    And a file "self.json" with content:
+      """
+      {"key": "jf-self", "rclass": "virtual", "packageType": "generic", "repositories": "jf-self"}
+      """
+    And a file "oci.json" with content:
+      """
+      [{"key": "jf-helmoci", "rclass": "local", "packageType": "helmoci"},
+       {"key": "jf-oci", "rclass": "virtual", "packageType": "oci", "repositories": ["jf-helmoci"]}]
+      """
+    When I run jf "rt repo-create {dir}/self.json --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When I GET "/artifactory/api/repositories/jf-self" as admin
+    Then the JSON field "repositories.0" equals "jf-self"
+    When I GET "/artifactory/jf-self/any/file.txt" as admin
+    Then the response status is 404
+    When I run jf "rt repo-create {dir}/oci.json --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When I GET "/artifactory/api/repositories/jf-oci" as admin
+    Then the JSON field "repositories.0" equals "jf-helmoci"
