@@ -4,7 +4,7 @@
 # builds it as artifactweave-accept-maven and runs it with --network host, so
 # mvn reaches the binary on 127.0.0.1. maven-3.9/Dockerfile is the second
 # Maven client (#284).
-FROM maven:3-eclipse-temurin-27@sha256:a6cd0d45e565ec76bf1969702bcbdb800d3461c8338012728e891b8681374575
+FROM maven:3-eclipse-temurin-27@sha256:3175c44b207d6698aecb9bbb5bf285b5b4efcf7f567d6f65d88cd218276a6ab2
 
 # UX-01 verifies Ivy and direct Gradle recipes with released clients too.
 # Checksums are the upstream Maven Central SHA-512 and Gradle release SHA-256.

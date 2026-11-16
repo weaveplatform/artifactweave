@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Cargo/Rust 1.99.1**. Registered classes: **local, remote, federated**.
+Client: **Cargo/Rust 1.100.0**. Registered classes: **local, remote, federated**.
 
 Endpoint: `${AW_URL}/artifactory/api/cargo/${AW_REPO}/index/`
 

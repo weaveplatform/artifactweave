@@ -12,8 +12,8 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Alpine APK](alpine.md) | apk-tools bundled with Alpine 3.24 (immutable image) | local, federated | local, remote, virtual, federated |
 | [Ansible Galaxy collections](ansible.md) | ansible-core 2.22.0 on Python 3.15.2 | local, federated | local, remote, virtual, federated |
 | [Bazel Bzlmod registries](bazelmodules.md) | Bazel from the pinned linux/amd64 image (runtime version recorded by native CI) | local, federated | local, remote, virtual, federated |
-| [Bower with Artifactory resolver](bower.md) | Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.13.0 | local, federated | local, remote, virtual, federated |
-| [Cargo sparse registry](cargo.md) | Cargo/Rust 1.99.1 | local, federated | local, remote, federated |
+| [Bower with Artifactory resolver](bower.md) | Bower 1.8.14; bower-art-resolver 2.0.10; Node 26.13.1 | local, federated | local, remote, virtual, federated |
+| [Cargo sparse registry](cargo.md) | Cargo/Rust 1.100.0 | local, federated | local, remote, federated |
 | [Chef cookbooks](chef.md) | Chef 19.4.46, Knife 19.0.134, knife-art 1.0.2 (Ruby 4.0.9) | local, federated | local, remote, virtual, federated |
 | [CocoaPods CDN](cocoapods.md) | CocoaPods 1.17.0; Ruby 4.0.9 | local, federated | local, remote, virtual, federated |
 | [Composer](composer.md) | Composer 2.11.1; Composer 1.10.28 local compatibility | local, federated | local, remote, virtual, federated |
@@ -38,7 +38,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Apache Maven](maven.md) | Maven 3 image / Temurin 27; compatibility Maven 3.9 image / Temurin 26 (exact bundled versions in CI logs) | local, federated | local, remote, virtual, federated |
 | [NIM metadata and paired container](nimmodel.md) | curl for metadata; crane 0.22.1 for the paired image | none | remote |
 | [Nix binary caches](nix.md) | Nix 2.35.6 | local, federated | local, remote, virtual, federated |
-| [npm](npm.md) | Bundled npm on Node 26.13.0; npm 12.2.1 on Node 24.22.2 | local | local, remote |
+| [npm](npm.md) | Bundled npm on Node 26.13.1; npm 12.2.1 on Node 24.22.2 | local | local, remote |
 | [NuGet v3 with dotnet](nuget.md) | NuGet bundled with .NET SDK 10.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs) | local | local, remote |
 | [OCI artifacts](oci.md) | ORAS 1.3.6; crane 0.22.1; Cosign 3.1.4 | local, federated | local, remote, virtual, federated |
 | [Opkg feeds](opkg.md) | opkg 0.10.0 | local, federated | local, remote, virtual, federated |
