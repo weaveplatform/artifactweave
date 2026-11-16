@@ -22,11 +22,14 @@ func TestAccVirtualWithoutMembers(t *testing.T) {
 			t.Fatalf("create %s: %d %s", key, rec.Code, rec.Body)
 		}
 	}
-	// With no members a deployment repository has nothing to name.
+	// With no members a deployment repository has nothing to name
+	// (DefaultDeploymentRepoInterceptor).
 	if rec := w.do("PUT", "/artifactory/api/repositories/deploy-empty", "admin",
 		`{"rclass":"virtual","defaultDeploymentRepo":"libs-local"}`,
 		"Content-Type", "application/json"); rec.Code != 400 ||
-		!strings.Contains(rec.Body.String(), "defaultDeploymentRepo") {
+		!strings.Contains(rec.Body.String(), "Cannot set repository reference 'libs-local' "+
+			"as the default deployment repository for virtual repository 'deploy-empty' "+
+			"since it is not included in the repository references") {
 		t.Fatalf("deployment repository without members: %d %s", rec.Code, rec.Body)
 	}
 	// The Terraform provider reads an absent repositories as null against
@@ -75,7 +78,8 @@ func TestAccVirtualWithoutMembers(t *testing.T) {
 
 // A member must have the virtual repository's package type unless the
 // virtual repository is generic (RTDEV-62756, 7.133.3), on every write path
-// of the repositories API.
+// of the repositories API, refused with
+// VirtualRepoConfigChangeInterceptor's message.
 func TestAccVirtualMemberPackageTypes(t *testing.T) {
 	w := newRepoWorld(t)
 	w.create(
@@ -84,8 +88,10 @@ func TestAccVirtualMemberPackageTypes(t *testing.T) {
 		repo.Config{Key: "gradle-local", Class: repo.Local, PackageType: repo.Gradle},
 		repo.Config{Key: "npm-virtual", Class: repo.Virtual, PackageType: repo.NPM},
 	)
-	const mismatch = "Virtual repository member 'maven-local' has package type 'maven', " +
-		"which does not match the virtual repository's package type 'npm'"
+	mismatch := func(key string) string {
+		return "Virtual repository '" + key + "' has package type 'Npm' but includes " +
+			"non-matching repository 'maven-local' with package type 'Maven'"
+	}
 	r := "/artifactory/api/repositories/"
 	batch := "/artifactory/api/v2/repositories/batch"
 	for _, tt := range []struct {
@@ -132,8 +138,14 @@ func TestAccVirtualMemberPackageTypes(t *testing.T) {
 		if rec.Code != tt.expected {
 			t.Errorf("%s: %d %s", tt.name, rec.Code, rec.Body)
 		}
+		// The message names the virtual repository: the path's key, or a
+		// batch entry's.
+		key := strings.TrimPrefix(tt.path, r)
+		if _, rest, ok := strings.Cut(tt.body, `"key":"`); ok && tt.path == batch {
+			key, _, _ = strings.Cut(rest, `"`)
+		}
 		if tt.expected == 400 && strings.Contains(tt.body, "maven-local") &&
-			!strings.Contains(rec.Body.String(), mismatch) {
+			!strings.Contains(rec.Body.String(), mismatch(key)) {
 			t.Errorf("%s: message %s", tt.name, rec.Body)
 		}
 	}

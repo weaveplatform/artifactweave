@@ -2378,7 +2378,9 @@ components:
           type: boolean
         defaultDeploymentRepo:
           description: Optional within this object. Key of the member that receives uploads sent to the virtual
-            repository. Must be one of repositories and must not be a remote.
+            repository. A create or an update that sets it must name a local or federated repository among
+            repositories, and an update may not remove its member from repositories; an update that changes neither
+            is accepted as stored.
           type: string
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server.
@@ -2670,8 +2672,11 @@ components:
         repositories:
           description: Optional within this object. Ordered keys of the member repositories; absent or empty means
             none, and a read lists none as an empty array. Resolution tries members in this order; local, remote and
-            other virtual repositories may be mixed. Every key must exist and, unless this repository is generic, have
-            its package type, where maven, gradle, ivy, sbt and p2 count as one.
+            other virtual repositories may be mixed, and the repository may list itself. A key the save adds must exist
+            or be saved by the same request; a stored key that no longer exists is dropped. When the save changes the
+            members each must, unless this repository is generic, have its package type, where maven, gradle, ivy, sbt
+            and p2 count as one and so do oci and helmoci; a p2 repository also takes a local generic member, and its
+            members of another type must be local.
           items:
             description: Optional within this object. A member repository key.
             type: string
