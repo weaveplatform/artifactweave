@@ -211,8 +211,7 @@ func validate(c *Config, keyRules bool) error {
 	// A project's repository without environments is valid: Artifactory
 	// assigns DEV, and repos.CheckEnvironments applies that default on every
 	// write path (decision 0013).
-	switch class {
-	case Remote:
+	if class == Remote {
 		// No package type has a default URL over REST: 7.161.26 keeps its
 		// per-type registry URLs (RepoConfigDefaultValues.DefaultUrl) for
 		// the UI and onboarding, and the provider finds a create of two of
@@ -221,19 +220,11 @@ func validate(c *Config, keyRules bool) error {
 			errs = append(errs, noURL)
 		}
 		validateRetrievalPeriod(c, add)
-	case Virtual:
-		// No members is valid: repositories is optional in 7.x, and deleting
-		// the last member leaves a virtual repository that must still accept
-		// updates. A deployment repository then has nothing to name, so the
-		// check below refuses any.
-		if c.DefaultDeploymentRepo != "" &&
-			!slices.Contains(c.Repositories, c.DefaultDeploymentRepo) {
-			add(
-				"defaultDeploymentRepo",
-				fmt.Sprintf("%q is not one of the member repositories", c.DefaultDeploymentRepo),
-			)
-		}
 	}
+	// A virtual repository's members and defaultDeploymentRepo are checked
+	// by repos.CheckMembers, which needs the stored configuration and the
+	// other repositories: 7.x refuses a deployment repository outside the
+	// members only on a create or when the deployment repository changes.
 	validateNumbers(c, add)
 	switch {
 	case errs == nil:
@@ -307,26 +298,36 @@ func ValidateKeyPair(c *Config, field, name, pairType string) error {
 	}
 }
 
-// mavenGroup is the package types Artifactory treats as one family when it
-// offers members for a virtual repository: 6.20's RepoType.isMavenGroup,
-// which its virtual repository editor filters by (GetAvailableRepositories).
-// 7.x documents only "the same package type", so the family is [I].
+// mavenGroup is the package types 7.x counts as one type in a virtual
+// repository: RepoType.MAVEN_GROUP, which 7.161.26's
+// VirtualRepoConfigChangeInterceptor and isVirtualCanContainRepoWithType
+// both check membership by.
 var mavenGroup = []PackageType{Maven, Gradle, Ivy, SBT, P2}
 
+// ociGroup is the pair VirtualRepoConfigChangeInterceptor.isHelmOciGroup
+// lets share a virtual repository, either way round. Docker is not in it.
+var ociGroup = []PackageType{OCI, HelmOCI}
+
 // AcceptsMember reports whether a virtual repository of package type
-// virtual may list a member of package type member. A generic virtual
-// repository aggregates any type; the Maven family shares one metadata
-// format, so its types mix; every other type takes only its own.
+// virtual may list a member of package type member, as 7.161.26's
+// VirtualRepoConfigChangeInterceptor decides: a generic virtual repository
+// aggregates any type, the Maven group and the OCI pair each count as one
+// type, and every other type takes only its own.
+//
+// A P2 virtual repository also takes a Generic member, which the
+// interceptor would refuse: JFrog's P2 page computes P2 metadata for
+// packages "hosted in Artifactory's local Maven or Generic repositories",
+// and 7.x's UI validator (RepoConfigValidator.filterByType) lets a P2
+// virtual repository aggregate any type. repos.CheckMembers restricts a P2
+// virtual repository's members of another type to local repositories.
 func AcceptsMember(virtual, member PackageType) bool {
 	switch {
-	case virtual == Generic, virtual == member:
+	case virtual == Generic, virtual == member, virtual == P2 && member == Generic:
 		return true
-	case virtual == P2:
-		// A P2 virtual may expose an update site stored in a local Generic
-		// or Maven repository; CheckMembers restricts these types to local.
-		return member == Generic || member == Maven
 	case slices.Contains(mavenGroup, virtual):
 		return slices.Contains(mavenGroup, member)
+	case slices.Contains(ociGroup, virtual):
+		return slices.Contains(ociGroup, member)
 	}
 	return false
 }

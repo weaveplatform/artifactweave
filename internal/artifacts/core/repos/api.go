@@ -94,8 +94,8 @@ func (repositories) PrepareCreate(c repo.Config, existing []repo.Config) (repo.C
 	return PrepareCreate(c, existing)
 }
 
-func (repositories) CheckMembers(c repo.Config, known []repo.Config) error {
-	return CheckMembers(c, known)
+func (repositories) CheckMembers(c, stored *repo.Config, known []repo.Config) error {
+	return CheckMembers(c, stored, known)
 }
 
 func (r repositories) CheckKeypairs(ctx context.Context, c repo.Config) error {
