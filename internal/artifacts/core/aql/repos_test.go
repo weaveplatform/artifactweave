@@ -18,7 +18,7 @@ func TestUnitResolve(t *testing.T) {
 	resolved := func(src string) *Query {
 		t.Helper()
 		q := mustParse(t, src)
-		q.Resolve(repos)
+		q.Resolve(t.Context(), repos)
 		return q
 	}
 	repoSet := func(q *Query) RepoSet {
@@ -85,7 +85,7 @@ func TestUnitResolve(t *testing.T) {
 	if _, ok := q.Criteria.(And)[0].(Or)[0].(RepoSet); !ok {
 		t.Fatalf("$or %#v", q.Criteria)
 	}
-	(&Query{}).Resolve(repos)
+	(&Query{}).Resolve(t.Context(), repos)
 	// Refs sort by key, then the stored repository before its cache, so the
 	// compiled SQL is stable.
 	if got := uniqueRefs(
@@ -154,7 +154,7 @@ func TestUnitExpand(t *testing.T) {
 		"rem-cache": {{"rem", true}},
 		"nope":      {{"nope", false}},
 	} {
-		if got := repos.Expand(key); !slices.Equal(got, want) {
+		if got := repos.Expand(t.Context(), key); !slices.Equal(got, want) {
 			t.Errorf("%s: %v, want %v", key, got, want)
 		}
 	}

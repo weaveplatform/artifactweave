@@ -64,3 +64,30 @@ Feature: Generic remote retrieval through native clients
     Then the response status is 200
     When I GET "/artifactory/api/storage/remote-cache/jf.bin" as admin
     Then the response status is 404
+
+  Scenario: jf rt direct-download through a virtual takes a local copy before the remote cache
+    # The virtual lists the remote first; 7.x still searches every local
+    # member before any remote cache (decision 0008, R1; #1252).
+    When I run curl "--fail --silent --show-error --user reader:Reader-pass1 {url}/remote/jf.bin --output cached.bin"
+    Then the command succeeds
+    And the generic upstream received 1 GET requests for "/jf.bin"
+    When I PUT "/artifactory/api/repositories/order-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"generic"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/order-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"generic","repositories":["remote","order-local"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/order-local/jf.bin" as admin with body:
+      """
+      local bytes
+      """
+    Then the response status is 201
+    When I run jf "rt direct-download order-virtual/jf.bin virtual/ --flat --fail-no-op --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the file "virtual/jf.bin" contains "local bytes"
+    And the generic upstream received 1 GET requests for "/jf.bin"

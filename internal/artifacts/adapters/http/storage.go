@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -276,41 +277,39 @@ func (v storageView) target(ctx context.Context) (itemkit.Found, error) {
 	}
 	// The storage API describes the item at the path as given; only
 	// downloads resolve it through the format.
-	return itemkit.Lookup(ctx, v.st, v.repo, v.isCached, v.path, v.acc, nil, map[string]bool{})
+	return itemkit.Lookup(ctx, v.st, v.repo, v.isCached, v.path, v.acc, nil, virtual.Stored)
 }
 
 // trees are the repository trees a folder view reads: the repository, or a
-// virtual repository's readable members, in order.
-func (v storageView) trees(
-	ctx context.Context,
-	c repo.Config,
-	seen map[string]bool,
-) ([]itemkit.Found, error) {
-	if seen[c.Key] {
-		return nil, nil
+// virtual repository's readable local and federated members and then its
+// remote members' caches, never a live remote (7.161.26's
+// getResolvedLocalFederatedAndCachedRepos, virtual.Stored).
+func (v storageView) trees(ctx context.Context) ([]itemkit.Found, error) {
+	if v.repo.Class != repo.Virtual {
+		cached := v.repo.Class == repo.Remote || v.isCached
+		return []itemkit.Found{
+			{Repo: v.repo, Item: model.Item{RepoKey: v.repo.Key, Cached: cached}},
+		}, nil
 	}
-	seen[c.Key] = true
-	if c.Class != repo.Virtual {
-		cached := c.Class == repo.Remote || (c.Key == v.repo.Key && v.isCached)
-		return []itemkit.Found{{Repo: c, Item: model.Item{RepoKey: c.Key, Cached: cached}}}, nil
+	members, err := virtual.Members(
+		ctx,
+		v.st.Repos(),
+		v.repo,
+		virtual.Options{Order: virtual.Stored},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("members of %s: %w", v.repo.Key, err)
 	}
 	var out []itemkit.Found
-	for _, key := range c.Repositories {
-		m, err := v.st.Repos().Get(ctx, key)
-		if errors.Is(err, kernel.ErrNotFound) {
+	for _, m := range members {
+		if !v.acc.Folder(m.Repo, v.path, api.ActionRead) {
 			continue
 		}
-		if err != nil {
-			return nil, fmt.Errorf("member %s of %s: %w", key, c.Key, err)
-		}
-		if !v.acc.Folder(m, v.path, api.ActionRead) {
-			continue
-		}
-		sub, err := v.trees(ctx, m, seen)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, sub...)
+		cached := m.Repo.Class == repo.Remote
+		out = append(
+			out,
+			itemkit.Found{Repo: m.Repo, Item: model.Item{RepoKey: m.Repo.Key, Cached: cached}},
+		)
 	}
 	return out, nil
 }
@@ -749,7 +748,7 @@ type childWalk struct {
 }
 
 func (v storageView) childWalk(ctx context.Context, folder string) (*childWalk, error) {
-	trees, err := v.trees(ctx, v.repo, map[string]bool{})
+	trees, err := v.trees(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -876,7 +875,7 @@ func (v storageView) mergedWalk(
 	folder string,
 	deep bool,
 ) (*fileListWalk, error) {
-	trees, err := v.trees(ctx, v.repo, map[string]bool{})
+	trees, err := v.trees(ctx)
 	if err != nil {
 		return nil, err
 	}

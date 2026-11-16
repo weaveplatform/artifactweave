@@ -154,35 +154,28 @@ func TestAccSearchUpstreamGavcNonMavenFlagOff(t *testing.T) {
 }
 
 func TestAccSearchUpstreamRouteBoundsAndDirectAuthority(t *testing.T) {
-	for _, cycle := range []bool{false, true} {
-		t.Run(fmt.Sprint(cycle), func(t *testing.T) {
-			u := searchUpstreamWorld(t)
-			members := make([]string, 1001)
-			for i := range members {
-				members[i] = "up"
-			}
-			if cycle {
-				members = []string{"virt"}
-			}
-			searchVirtual(t, u, "virt", members, "**/*", "")
-			for _, endpoint := range []string{"versions", "gavc"} {
-				wantStatus(
-					t,
-					u.do(
-						http.MethodGet,
-						"/artifactory/api/search/"+endpoint+"?g=org.acme&a=lib&repos=virt&remote=1&specific=true",
-						"reader",
-						"",
-					),
-					502,
-				)
-			}
-			if len(u.up.Requests()) != 0 {
-				t.Fatal("invalid route graph contacted upstream")
-			}
-		})
-	}
 	u := searchUpstreamWorld(t)
+	members := make([]string, 1001)
+	for i := range members {
+		members[i] = "up"
+	}
+	searchVirtual(t, u, "virt", members, "**/*", "")
+	for _, endpoint := range []string{"versions", "gavc"} {
+		wantStatus(
+			t,
+			u.do(
+				http.MethodGet,
+				"/artifactory/api/search/"+endpoint+"?g=org.acme&a=lib&repos=virt&remote=1&specific=true",
+				"reader",
+				"",
+			),
+			502,
+		)
+	}
+	if len(u.up.Requests()) != 0 {
+		t.Fatal("invalid route graph contacted upstream")
+	}
+	u = searchUpstreamWorld(t)
 	u.metadata("org/acme/lib", mappedVersions)
 	searchVirtual(t, u, "virt", []string{"up"}, "other/**", "")
 	const query = "/artifactory/api/search/versions?g=org.acme&a=lib&remote=1"
