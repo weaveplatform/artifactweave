@@ -504,6 +504,11 @@ func itemStatusRows() []statusCase {
 		{head, "/artifactory/virt/fixture/get.txt", "user", "", 403},
 		{head, "/artifactory/virt/fixture/get.txt", "anonymous", "", 401},
 		{get, "/artifactory/virt/", "user", "", 403},
+		// Its index lists every member's children; a folder no member
+		// holds is not found (#1537).
+		{get, "/artifactory/virt/", "admin", "", 200},
+		{get, "/artifactory/virt/fixture/", "admin", "", 200},
+		{get, "/artifactory/virt/absent/", "admin", "", 404},
 		{get, "/artifactory/perm-virt/", "user", "", 200},
 		{get, "/artifactory/perm-virt/absent", "user", "", 404},
 		{head, "/artifactory/perm-virt/absent", "user", "", 404},
@@ -1096,6 +1101,19 @@ func storageStatusRows() []statusCase {
 		// anonymous access is on (#1600).
 		{get, file, "anonymous", "", 403},
 		{get, file, "", "", 401},
+		// A virtual repository's views answer as 7.x's ArtifactResource
+		// answers one (#1537): the item info by the first member the caller
+		// may read, a miss or a caller who may read no member 404, the last
+		// modified and permissions views 400, and no statistics.
+		{get, "/artifactory/api/storage/virt/fixture/get.txt", "admin", "", 200},
+		{get, "/artifactory/api/storage/virt/fixture", "admin", "", 200},
+		{get, "/artifactory/api/storage/virt/absent", "admin", "", 404},
+		{get, "/artifactory/api/storage/virt/fixture/get.txt", "user", "", 404},
+		{get, "/artifactory/api/storage/virt/fixture/get.txt?lastModified", "admin", "", 400},
+		{get, "/artifactory/api/storage/virt/fixture/get.txt?permissions", "admin", "", 400},
+		{get, "/artifactory/api/storage/virt/fixture/get.txt?stats", "admin", "", 404},
+		{get, "/artifactory/api/storage/virt/fixture/get.txt?stats", "user", "", 403},
+		{get, "/artifactory/api/storage/virt/fixture?list&deep=1", "admin", "", 200},
 
 		{put, file + "?properties=a=1;b=2,3", "admin", "", 204},
 		{get, file + "?properties", "admin", "", 200},
@@ -1146,7 +1164,9 @@ func storageStatusRows() []statusCase {
 		{patch, rootMeta + "?recursiveProperties=0", "admin", `{"props":{"team":"core"}}`, 204},
 		{get, root + "?properties", "admin", "", 200},
 		{patch, rootMeta, "user", `{"props":{"k":"v"}}`, 403},
-		{get, "/artifactory/api/storage/virt?properties", "admin", "", 404},
+		// A virtual repository's root shows its first member's properties
+		// that has any (ArtifactResource.resolveProperties, #1537).
+		{get, "/artifactory/api/storage/virt?properties", "admin", "", 200},
 	}
 }
 

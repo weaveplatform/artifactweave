@@ -1,13 +1,8 @@
 package itemkit
 
 import (
-	"fmt"
-	"html"
-	"io"
 	"net/http"
-	"net/url"
 	"path"
-	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
@@ -32,39 +27,14 @@ func (s *Kit) getRemoteFolder(w http.ResponseWriter, r *http.Request,
 		httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 		return true
 	}
-	title := html.EscapeString(path.Join(c.Key, req.Path))
-	var body strings.Builder
-	fmt.Fprintf(
-		&body,
-		"<!DOCTYPE html>\n<html><head><title>Index of %s</title></head><body>\n<h1>Index of %s</h1>\n<pre>",
-		title,
-		title,
-	)
+	entries := make([]indexEntry, 0, len(listing.Entries))
 	for _, entry := range listing.Entries {
-		name := path.Base(entry.Path)
-		href := url.PathEscape(name)
-		if strings.Contains(href, ":") {
-			href = "./" + href
-		}
-		if entry.Folder {
-			href, name = href+"/", name+"/"
-		}
-		fmt.Fprintf(
-			&body,
-			"<a href=\"%s\">%s</a>\n",
-			html.EscapeString(href),
-			html.EscapeString(name),
-		)
+		entries = append(entries, indexEntry{name: path.Base(entry.Path), folder: entry.Folder})
 	}
-	body.WriteString("</pre></body></html>\n")
 	if err = listing.Revalidate(r.Context()); err != nil {
 		httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
 		return true
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	if r.Method != http.MethodHead {
-		_, _ = io.WriteString(w, body.String())
-	}
+	writeIndex(w, r, path.Join(c.Key, req.Path), entries)
 	return true
 }

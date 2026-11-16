@@ -141,3 +141,65 @@ Feature: Generic remote retrieval through native clients
     When I run jf "rt direct-download member-virtual/jf.bin hidden/ --flat --fail-no-op --url {url} --user reader --password Reader-pass1"
     Then the command succeeds
     And the file "hidden/jf.bin" contains "jf remote bytes"
+
+  Scenario: curl browses every member of a virtual and jf searches only its stored items
+    # 7.x's index of a virtual folder merges every member's children the
+    # caller may read, a remote member's upstream listing included once it
+    # lists remote folder items (getVirtualRepoBrowsableChildrenData; #1537).
+    # Storage and AQL answer from stored items alone, so the file only the
+    # upstream lists never shows there. Out of readers, reader may read the
+    # remote alone, so its index leaves the local's file out.
+    Given a remote directory index at "/" contains:
+      """
+      <!DOCTYPE html><a href="jf.bin">jf.bin</a><a href="live.bin">live.bin</a>
+      """
+    When I PATCH "/access/api/v2/users/reader/groups" as admin with JSON:
+      """
+      {"remove":["readers"]}
+      """
+    Then the response status is 200
+    When I run curl "--fail --silent --show-error --user reader:Reader-pass1 {url}/remote/curl.bin --output cached.bin"
+    Then the command succeeds
+    When I POST "/artifactory/api/repositories/remote" as admin with body:
+      """
+      {"listRemoteFolderItems":true}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/browse-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"generic"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/browse-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"generic","repositories":["remote","browse-local"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/browse-local/local.bin" as admin with body:
+      """
+      local bytes
+      """
+    Then the response status is 201
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/browse-virtual/"
+    Then the command succeeds
+    And the output contains "Index of browse-virtual"
+    And the output contains "curl.bin"
+    And the output contains "jf.bin"
+    And the output contains "live.bin"
+    And the output contains "local.bin"
+    When I run curl "--fail --silent --show-error --user reader:Reader-pass1 {url}/browse-virtual/"
+    Then the command succeeds
+    And the output contains "live.bin"
+    And the output does not contain "local.bin"
+    When I GET "/artifactory/api/storage/browse-virtual/curl.bin" as admin
+    Then the response status is 200
+    And the JSON field "repo" equals "browse-virtual"
+    When I GET "/artifactory/api/storage/browse-virtual/live.bin" as admin
+    Then the response status is 404
+    When I run jf "rt s browse-virtual/* --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the output contains "remote-cache/curl.bin"
+    And the output contains "browse-local/local.bin"
+    And the output does not contain "live.bin"
+    And the generic upstream received 0 GET requests for "/live.bin"

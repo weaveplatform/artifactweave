@@ -94,11 +94,11 @@ func missed(c repo.Config, cached bool, req ItemRequest) error {
 // unfound answers req, a request c does not hold, which the lookup err
 // did not find: missed, or, for a file request through a virtual
 // repository, the answer of err's walk over the members (virtual.Answer).
-// A virtual repository's folder request is 7.x's directory listing
-// (RepoFilter.doDirectoryRequest), whose answers are
-// https://github.com/weaveplatform/artifactweave/issues/1537's, so it keeps
-// ItemNotFound, and httpkit.Denied when every member that could hold it
-// refused the caller.
+// A virtual repository's folder request reaches here only when no member
+// the caller may read holds the folder and no remote member's upstream
+// lists it (listVirtualFolder), so it keeps ItemNotFound, as 7.x's
+// isItemNotFoundOnVirtualRepo answers, and httpkit.Denied when every
+// member that could hold it refused the caller.
 func unfound(
 	c repo.Config,
 	cached bool,
