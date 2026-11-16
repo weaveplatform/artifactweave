@@ -216,7 +216,8 @@ func TestAccDebianLocalServesAnLzmaIndexAsAnIndex(t *testing.T) {
 	) bool {
 		return !strings.HasPrefix(path, "pool/")
 	}}
-	wantError(t, w.getAs("deb-local", debLzmaIndex, indexOnly), http.StatusForbidden, "Forbidden")
+	wantError(t, w.getAs("deb-local", debLzmaIndex, indexOnly), http.StatusForbidden,
+		debRefusal("deb-local", "deb-local", debLzmaIndex, "reader"))
 }
 
 // TestUnitDebianSnapshotOfARemoteCopiesItsInstallerAndLzmaIndexes: a

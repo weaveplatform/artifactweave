@@ -154,8 +154,9 @@ func p2QueryWorld(t *testing.T) (*itemWorld, *p2Asked) {
 // Deployment and Resolution); neither names a package type it leaves out.
 // The read check comes first (DV-057): a user without read is refused 403
 // and an anonymous caller 401, without asking the upstream; the user, on a
-// remote's file, which the item route reads, with 7.161.26's download
-// answer (#1572), and on the P2 routes with "Forbidden".
+// remote's file, with 7.161.26's download answer (p2Refused), from the item
+// route (#1572) and from the P2 overlay's archive entries alike (#1599),
+// and on a virtual repository with "Forbidden".
 func TestAccP2RoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 	w, asked := p2QueryWorld(t)
 	for _, path := range []string{
@@ -174,12 +175,7 @@ func TestAccP2RoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 				got := w.do(http.MethodGet, target, caller, "")
 				switch caller {
 				case "user":
-					refusal := "Forbidden"
-					if file, ok := strings.CutPrefix(path, "p2-remote/"); ok {
-						refusal = "Download request for repo:path 'p2-remote-cache:" + file +
-							"' is forbidden for user: 'user'.; Path: 'p2-remote:" + file + "'"
-					}
-					wantP2Error(t, got, http.StatusForbidden, refusal)
+					wantP2Error(t, got, http.StatusForbidden, p2Refused(path))
 				case "":
 					wantP2Error(t, got, http.StatusUnauthorized, "Authentication is required")
 				default:
@@ -196,6 +192,32 @@ func TestAccP2RoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 			}
 		}
 	}
+}
+
+// p2Refused is the answer to user, who may not read path,
+// "<key>/<file>": on a remote, 7.161.26's download refusal, which names the
+// remote's cache, with the path (#1572, #1599); on a virtual repository,
+// "Forbidden" (#1533).
+func p2Refused(path string) string {
+	key, file, _ := strings.Cut(path, "/")
+	if key == "p2-virtual" {
+		return "Forbidden"
+	}
+	return "Download request for repo:path '" + key + "-cache:" + file +
+		"' is forbidden for user: 'user'.; Path: '" + key + ":" + file + "'"
+}
+
+// p2Mismatch is the answer to path, "<key>/<file>", that lacks a mandatory
+// matrix key: on a remote, 7.161.26's PROPERTY_MISMATCH reason for its
+// cache, with the path (#1599); on a virtual repository, "Could not find
+// resource" (#1533).
+func p2Mismatch(path string) string {
+	key, file, _ := strings.Cut(path, "/")
+	if key == "p2-virtual" {
+		return "Could not find resource"
+	}
+	return "File '" + key + "-cache:" + file + "' was found, but mandatory properties do not match.; " +
+		"Path: '" + key + "-cache:" + file + "'"
 }
 
 // TestAccP2RemotePassesItsQueryAndMatrixParametersUpstream (#1350, #1371):
@@ -233,7 +255,8 @@ func TestAccP2RemotePassesItsQueryAndMatrixParametersUpstream(t *testing.T) {
 // carries the property, as 7.x's PropertiesImpl.matchQuery answers
 // CONFLICT, and DbStoringRepoMixin.getInfo PROPERTY_MISMATCH, for a
 // mandatory key the file lacks (7.161.26); an update-site archive's cached
-// entry is matched the same way, without asking the upstream (#1371). A
+// entry is matched the same way, without asking the upstream (#1371), and
+// answers with the download's texts (p2Mismatch, p2Refused, #1599). A
 // virtual repository's own p2.index and composite metadata carry no
 // properties [I], so a mandatory key is not found there, and a key they
 // may lack is served.
@@ -253,14 +276,14 @@ func TestAccP2MandatoryMatrixParameters(t *testing.T) {
 		for _, caller := range []string{"admin", "reader"} {
 			got := w.do(http.MethodGet, target, caller, "")
 			if tc.status == http.StatusNotFound {
-				wantP2Error(t, got, http.StatusNotFound, "Could not find resource")
+				wantP2Error(t, got, http.StatusNotFound, p2Mismatch(tc.path))
 			} else if got.Code != tc.status {
 				t.Errorf("%s as %s answered %d %.200s, want %d", target, caller, got.Code,
 					got.Body, tc.status)
 			}
 		}
 		wantP2Error(t, w.do(http.MethodGet, target, "user", ""), http.StatusForbidden,
-			"Forbidden")
+			p2Refused(tc.path))
 		if got := asked.take(); len(got) != 0 {
 			t.Errorf("%s asked the upstream %v", target, got)
 		}

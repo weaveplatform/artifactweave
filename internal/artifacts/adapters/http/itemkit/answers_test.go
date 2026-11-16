@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
@@ -139,4 +141,156 @@ func TestUnitSourceAnswerKeepsTheSourcesOtherAnswers(t *testing.T) {
 		http.StatusNotFound,
 		"Not Found",
 	)
+}
+
+// TestUnitOverlayAnswersAreTheDownloads (#1599): the answers a format
+// overlay writes on the item route are the download's: Missed, Refused and
+// Mismatched are missed, refused and mismatched; ReadAnswer gives a failed
+// read's miss and want of Read those answers, whether the failure is the
+// source's own or pkgroute.SourceError's answer to it, gives a cache fill
+// the caller may not make and an assumed-offline miss the generic route's
+// answers (remoteMissAnswer, #1611), and keeps every
+// other failure, ErrFolderAtPath, the upstream's own status and the
+// policy's refusal among them; NotServed refuses a caller without Read,
+// then answers the download policy, then the miss. A folder request and a
+// virtual repository keep their answers.
+func TestUnitOverlayAnswersAreTheDownloads(t *testing.T) {
+	local := repo.Config{Key: "deb-local", Class: repo.Local}
+	remote := repo.Config{Key: "up", Class: repo.Remote}
+	virtual := repo.Config{Key: "virt", Class: repo.Virtual}
+	req := ItemRequest{Key: "deb-local", Path: "dists/Packages"}
+	remoteReq := ItemRequest{Key: "up", Path: "dists/Packages"}
+	folder := ItemRequest{Key: "deb-local", Path: "dists", IsFolder: true}
+	user := kernel.Principal{Name: "user"}
+	anonymous := kernel.Principal{Name: "anonymous", Anonymous: true}
+	localMiss := "File not found.; Path: 'deb-local:dists/Packages'"
+	localRefusal := "Download request for repo:path 'deb-local:dists/Packages' is forbidden " +
+		"for user: 'user'.; Path: 'deb-local:dists/Packages'"
+
+	wantAnswer(t, Missed(local, false, req), http.StatusNotFound, localMiss)
+	wantAnswer(t, Refused(local, req, user), http.StatusForbidden, localRefusal)
+	wantAnswer(t, Refused(local, req, anonymous), http.StatusUnauthorized, "Unauthorized")
+	wantAnswer(t, Mismatched(remote, remoteReq), http.StatusNotFound,
+		"File 'up-cache:dists/Packages' was found, but mandatory properties do not match.; "+
+			"Path: 'up-cache:dists/Packages'")
+	wantAnswer(t, Missed(virtual, false, ItemRequest{Key: "virt", Path: "a"}), http.StatusNotFound,
+		"Could not find resource")
+	if err := Refused(local, folder, user); !errors.Is(err, kernel.ErrForbidden) {
+		t.Fatal("folder refusal", err)
+	}
+
+	notFound := apierror.New(http.StatusNotFound, http.StatusText(http.StatusNotFound))
+	upstream404 := apierror.New(http.StatusNotFound, http.StatusText(http.StatusNotFound))
+	upstream404.NoChallenge = true
+	policy := errors.Join(
+		kernel.ErrNotFound,
+		format.Rejectf(http.StatusNotFound, "refused by policy"),
+	)
+	for _, tc := range []struct {
+		name    string
+		c       repo.Config
+		req     ItemRequest
+		caller  kernel.Principal
+		err     error
+		status  int
+		message string
+	}{
+		{"source miss", local, req, user, fmt.Errorf("read: %w", kernel.ErrNotFound), 404, localMiss},
+		{"SourceError's miss", remote, remoteReq, user, notFound, 404, "Not Found; Path: 'up:dists/Packages'"},
+		{"source refusal", local, req, user, source.ErrDenied, 403, localRefusal},
+		{"SourceError's refusal", local, req, user, kernel.ErrForbidden, 403, localRefusal},
+		{"SourceError's anonymous refusal", local, req, anonymous, kernel.ErrUnauthenticated, 401, "Unauthorized"},
+		{"upstream's own 404", remote, remoteReq, user, upstream404, 404, "Not Found"},
+		{"virtual miss", virtual, ItemRequest{Key: "virt", Path: "a"}, user, notFound, 404, "Not Found"},
+		{
+			"cache fill refused", remote, remoteReq, user, &source.CacheFillDenied{User: "user", Repo: "up", Path: "dists/Packages"}, 403,
+			"Rejected artifact download request: User user is not permitted to deploy " +
+				"'dists/Packages' into 'up-cache:dists/Packages'.",
+		},
+		{"cache fill refused anonymously", remote, remoteReq, anonymous, &source.CacheFillDenied{User: "user", Repo: "up", Path: "dists/Packages"}, 401, "Unauthorized"},
+		{
+			"assumed offline", remote, remoteReq, user, source.ErrAssumedOffline, 404,
+			"up: is assumed offline, 'up:dists/Packages' is not found at 'dists/Packages'.; " +
+				"Path: 'up:dists/Packages'",
+		},
+		{
+			"index read's refused fill", remote, remoteReq, user,
+			fmt.Errorf("index: %w", RemoteReadError(&source.CacheFillDenied{User: "user", Repo: "up", Path: "dists/Packages"}, false)),
+			403, "Rejected artifact download request: User user is not permitted to deploy " +
+				"'dists/Packages' into 'up-cache:dists/Packages'.",
+		},
+		{
+			"package lookup's refused fill", remote,
+			ItemRequest{Key: "up", Path: "pool/a.deb"},
+			user,
+			RemoteReadError(&source.CacheFillDenied{User: "user", Repo: "up", Path: "dists/Packages"}, false),
+			403, "Rejected artifact download request: User user is not permitted to deploy " +
+				"'pool/a.deb' into 'up-cache:pool/a.deb'.",
+		},
+		{
+			"index read's assumed-offline miss", remote, remoteReq, user,
+			RemoteReadError(source.ErrAssumedOffline, false), 404,
+			"up: is assumed offline, 'up:dists/Packages' is not found at 'dists/Packages'.; " +
+				"Path: 'up:dists/Packages'",
+		},
+		{"index read's miss", remote, remoteReq, user, RemoteReadError(kernel.ErrNotFound, false), 404, "Not Found; Path: 'up:dists/Packages'"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wantAnswer(t, ReadAnswer(tc.c, false, tc.req, tc.caller, tc.err), tc.status, tc.message)
+		})
+	}
+	kept := RemoteReadError(source.ErrAssumedOffline, true)
+	var keptAnswer *apierror.Error
+	if !errors.As(kept, &keptAnswer) || keptAnswer.Status != http.StatusNotFound ||
+		errors.Is(kept, kernel.ErrNotFound) || RemoteReadError(nil, false) != nil {
+		t.Errorf("RemoteReadError %v is not SourceError's answer alone", kept)
+	}
+	for name, err := range map[string]error{
+		"nil":          nil,
+		"folder":       ErrFolderAtPath,
+		"storage":      format.ErrStorageFault,
+		"upstream":     &source.HTTPError{Status: http.StatusBadGateway},
+		"invalid":      source.ErrInvalidRequest,
+		"unsupported":  source.ErrUnsupported,
+		"other":        errors.New("other"),
+		"folder miss":  kernel.ErrNotFound,
+		"denied again": source.ErrDenied,
+		"policy":       policy,
+	} {
+		r := req
+		if strings.HasPrefix(name, "folder ") || name == "denied again" {
+			r = folder
+		}
+		if got := ReadAnswer(
+			local,
+			false,
+			r,
+			user,
+			err,
+		); got != err { //nolint:errorlint // the same error
+			t.Errorf("%s: answered %v, want it kept", name, got)
+		}
+	}
+
+	allow := Access{Decider: &accessapitest.Decider{Admin: true}}
+	deny := Access{Decider: &accessapitest.Decider{}}
+	wantAnswer(t, NotServed(local, false, req, user, allow), http.StatusNotFound, localMiss)
+	wantAnswer(t, NotServed(remote, false, remoteReq, user, allow), http.StatusNotFound,
+		"Not Found; Path: 'up:dists/Packages'")
+	wantAnswer(t, NotServed(local, false, req, user, deny), http.StatusForbidden, localRefusal)
+	wantAnswer(
+		t,
+		NotServed(local, false, req, anonymous, deny),
+		http.StatusUnauthorized,
+		"Unauthorized",
+	)
+	dark := repo.Config{Key: "deb-local", Class: repo.Local, BlackedOut: new(true)}
+	wantAnswer(
+		t,
+		NotServed(dark, false, req, user, allow),
+		http.StatusNotFound,
+		"The repository 'deb-local' is blacked out and cannot serve artifact 'deb-local:dists/Packages'.",
+	)
+	wantAnswer(t, NotServed(local, false, folder, user, deny), http.StatusNotFound,
+		"Could not find resource")
 }

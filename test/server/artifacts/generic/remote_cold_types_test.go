@@ -262,9 +262,9 @@ func TestAccRemoteColdChecksumOfEveryType(t *testing.T) {
 // index.yaml, RubyGems' specs) [I], and an npm package's document path
 // [I]. A miss names its path as 7.x's download does (#1572): the "-cache"
 // key's DbStoringRepoMixin "File not found.", and the remote's a miss of
-// the upstream's [I].
+// the upstream's [I], the Xet record's among them, which the Hugging Face
+// overlay answers as a file the remote does not hold (#1599).
 func TestAccRemoteColdReadKeepsRefusals(t *testing.T) {
-	const notFound = `{"errors":[{"message":"Could not find resource","status":404}]}` + "\n"
 	missed := func(reason, key, p string) string {
 		return `{"errors":[{"message":"` + reason + `; Path: '` + key + `:` + p + `'","status":404}]}` + "\n"
 	}
@@ -298,7 +298,7 @@ func TestAccRemoteColdReadKeepsRefusals(t *testing.T) {
 		{
 			"xet", repo.HuggingFaceML, nil, "reader",
 			"remote/models--acme--widget/.xet/xorbs/" + hexDigest("xet"), http.StatusNotFound,
-			notFound,
+			missed("Not Found", "remote", "models--acme--widget/.xet/xorbs/"+hexDigest("xet")),
 		},
 		{
 			"helm index", repo.Helm, nil, "reader", "remote/index.yaml", http.StatusNotFound,

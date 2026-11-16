@@ -52,6 +52,9 @@
 //     ResolveRepo, DeployTarget, ItemCreated, ItemNotFound, MemberRead,
 //     OverwriteRefusal, ChecksumsJSON, DownloadURI, SplitRepoPath,
 //     NotFoundRepo, View and Forced.
+//   - The download's answers, for an overlay to write: Missed, Refused,
+//     Mismatched, ReadAnswer, RemoteReadError, NotServed and
+//     ErrFolderAtPath.
 //   - Access, Target and AccessFor: the questions handlers ask the
 //     request's permission decider.
 //   - The per-format remote source requests (AlpineSourceRequest and the
@@ -113,8 +116,29 @@
 //     refused, mismatched). Read is checked on that file before a miss is
 //     answered, as checkDownloadIsAllowed checks it before getInfo. A
 //     folder request, a virtual repository and its member reads
-//     (MemberRead; P10's #1533), an overlay and an entry an archive lacks
-//     keep ItemNotFound and httpkit.Denied.
+//     (MemberRead; P10's #1533) and an entry an archive lacks keep
+//     ItemNotFound and httpkit.Denied.
+//   - An overlay answers the same miss, refusal and mismatch on the item
+//     route (#1599), since 7.161.26's RepoFilter sends every GET and HEAD
+//     through DownloadServiceImpl whatever the package type: Missed,
+//     Refused and Mismatched for its own checks, ReadAnswer for a failed
+//     read, and NotServed for a path it has no file for. A folder where
+//     the overlay wants a file keeps ItemNotFound (ErrFolderAtPath) [I],
+//     and a remote's revalidation keeps pkgroute.SourceError's answer.
+//     ReadAnswer answers a cache fill the caller may not make and an
+//     assumed-offline upstream as the item route does (remoteMissAnswer,
+//     #1587, #1601); an overlay's own index read keeps the source's failure
+//     for it with RemoteReadError, and a package found through its index
+//     answers a refused fill of the index for its own path [I].
+//   - ?trace asks the overlays first, as GetItem does (#1595): 7.161.26's
+//     RepoFilter.doGetOrHeadRequest answers ?trace by running the download
+//     itself under a TraceLoggingResponse. The overlay runs against a
+//     writer that records its status and error and refuses content;
+//     ServeContent, ServeItemFile, an archive entry's download and
+//     RemoteDeliveryAllowed record what they found and serve, redirect and
+//     count nothing, and a remote stream is closed unread. A read the
+//     overlay makes through GetItem is decided, not traced again, and a
+//     path no overlay answers keeps the generic trace.
 //   - A file download, streamed, redirected or from a remote's stream,
 //     answers If-None-Match and If-Modified-Since as 7.x's download does
 //     (pkgroute.FileNotModified): one If-None-Match line at a time, less a

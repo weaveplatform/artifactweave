@@ -13,8 +13,10 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
@@ -28,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
@@ -679,4 +682,256 @@ func TestUnitSourceRequestsCheckAlpineAndPassOtherPaths(t *testing.T) {
 			t.Errorf("%s pass-through: %+v, %v", name, out.Resource, err)
 		}
 	}
+}
+
+// TestUnitTraceAsksTheOverlays (#1595): ?trace lets the overlays decide
+// first, as GetItem does, and traces what the one that answers would
+// answer, as 7.161.26's RepoFilter.doGetOrHeadRequest runs the download
+// itself under a TraceLoggingResponse: its error, by the status and the
+// message of its envelope, or the status text of any other body, without
+// naming the repository to a caller it refuses; or, where it would serve,
+// the file it found, through the kit's helpers or a body of its own,
+// without serving, redirecting or counting anything. A read it makes
+// through GetItem, an archive entry's included, is decided, not traced
+// again, and a path every overlay passes keeps the generic trace.
+func TestUnitTraceAsksTheOverlays(t *testing.T) {
+	w := kittest.New(t, inmem.New())
+	file := w.Put(t, w.Local, false, "a/b.txt", []byte("generic"))
+	var zipped bytes.Buffer
+	zw := zip.NewWriter(&zipped)
+	entry, err := zw.Create("x.txt")
+	if err == nil {
+		_, err = entry.Write([]byte("x"))
+	}
+	if err == nil {
+		err = zw.Close()
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := w.Put(t, w.Local, false, "z.zip", zipped.Bytes())
+	var k *itemkit.Kit
+	closed := false
+	overlay := func(
+		got *itemkit.Kit, rw http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
+		cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
+	) bool {
+		switch req.Path {
+		case "miss.idx":
+			httpkit.WriteErr(rw, r, itemkit.Missed(c, cached, req))
+		case "refused.idx":
+			httpkit.WriteErr(rw, r, itemkit.Refused(c, req, p))
+		case "plain.idx":
+			rw.WriteHeader(http.StatusInternalServerError)
+			_, _ = io.WriteString(rw, "not an envelope")
+		case "big.idx":
+			rw.WriteHeader(http.StatusTeapot)
+			_, _ = rw.Write(make([]byte, 65<<10))
+		case "content.idx":
+			itemkit.ServeContent(rw, r, "content.idx", time.Time{}, strings.NewReader("composed"))
+		case "raw.idx":
+			if _, err := io.WriteString(rw, "own body"); err == nil {
+				t.Error("a traced overlay wrote content")
+			}
+		case "file.idx":
+			got.ServeItemFile(rw, r, st, itemkit.Found{Repo: c, Item: file}, p)
+		case "member.idx", "entry.idx":
+			clone := r.Clone(r.Context())
+			clone.URL.Path = "/artifactory/libs-local/a/b.txt"
+			if req.Path == "entry.idx" {
+				clone.URL.Path = "/artifactory/libs-local/z.zip!/x.txt"
+			}
+			clone.URL.RawPath = ""
+			got.GetItem(rw, clone)
+		case "cached.idx":
+			cachedItem := model.Item{RepoKey: "remote", Cached: true, Name: "cached.idx"}
+			if got.RemoteDeliveryAllowed(rw, r, source.Result{Item: &cachedItem}, p.Anonymous) {
+				t.Error("a traced overlay's remote result was delivered")
+			}
+		case "stream.idx":
+			stream := &source.Stream{Body: closer{func() { closed = true }}}
+			if got.RemoteDeliveryAllowed(rw, r, source.Result{Stream: stream}, p.Anonymous) {
+				t.Error("a traced overlay's stream was delivered")
+			}
+		default:
+			return false
+		}
+		return true
+	}
+	k = w.Kit(itemkit.Deps{Overlays: []itemkit.Overlay{overlay}})
+	user := kernel.Principal{Name: "user"}
+	retrieving := "Retrieving info from local repository 'libs-local' type generic"
+	found := func(first ...string) []string {
+		return append(append([]string{"Received request", retrieving}, first...),
+			"Identified requested resource as a file", "Responding with found resource",
+			"Request succeeded")
+	}
+	for _, tc := range []struct {
+		path   string
+		caller kernel.Principal
+		want   []string
+	}{
+		{"miss.idx", kittest.Admin, []string{
+			"Received request", retrieving, "Unable to find resource in libs-local:miss.idx",
+			"Responding with unfound resource",
+			"Sending a response with the status '404' and the message " +
+				"'File not found.; Path: 'libs-local:miss.idx''",
+		}},
+		{"refused.idx", user, []string{
+			"Received request",
+			"Sending a response with the status '403' and the message 'Download request for " +
+				"repo:path 'libs-local:refused.idx' is forbidden for user: 'user'.; " +
+				"Path: 'libs-local:refused.idx''",
+		}},
+		{"plain.idx", kittest.Admin, []string{
+			"Received request", retrieving,
+			"Sending a response with the status '500' and the message 'Internal Server Error'",
+		}},
+		{"big.idx", kittest.Admin, []string{
+			"Received request", retrieving,
+			"Sending a response with the status '418' and the message 'I'm a teapot'",
+		}},
+		{"content.idx", kittest.Admin, found()},
+		{"raw.idx", kittest.Admin, found()},
+		{"file.idx", kittest.Admin, found("Returning found resource from libs-local:a/b.txt")},
+		{"member.idx", kittest.Admin, found("Returning found resource from libs-local:a/b.txt")},
+		{"entry.idx", kittest.Admin, found("Returning found resource from libs-local:z.zip")},
+		{"cached.idx", kittest.Admin, found("Returning found resource from remote-cache:cached.idx")},
+		{"stream.idx", kittest.Admin, found("Returning validated transient resource")},
+		{"a/b.txt", kittest.Admin, found("Returning found resource from libs-local:a/b.txt")},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			r := kittest.Request(t, http.MethodGet, "/artifactory/libs-local/"+tc.path+"?trace")
+			if tc.caller.Name != kittest.Admin.Name {
+				r = r.WithContext(accessapi.WithCaller(r.Context(), tc.caller,
+					&accessapitest.Decider{AllowsFolderFunc: func(
+						accessapi.ResourceType, accessapi.Repo, string, accessapi.Actions,
+					) bool {
+						return true
+					}}))
+			}
+			rec := httptest.NewRecorder()
+			k.GetItem(rec, r)
+			_, steps, ok := strings.Cut(rec.Body.String(), "Steps: \n")
+			if rec.Code != http.StatusOK || !ok {
+				t.Fatalf("answered %d %q", rec.Code, rec.Body)
+			}
+			var got []string
+			for _, line := range strings.Split(strings.TrimSuffix(steps, "\n"), "\n") {
+				_, step, _ := strings.Cut(line, " ")
+				got = append(got, step)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf(
+					"steps\n%s\nwant\n%s",
+					strings.Join(got, "\n"),
+					strings.Join(tc.want, "\n"),
+				)
+			}
+		})
+	}
+	if !closed {
+		t.Error("a traced overlay's stream was left open")
+	}
+	for _, it := range []model.Item{file, archive} {
+		st, err := w.Store.Items().Stats(t.Context(), it.ID)
+		if err != nil || st.DownloadCount != 0 {
+			t.Errorf("downloads of %s %+v, %v; a trace counts none", it.Name, st, err)
+		}
+	}
+}
+
+// closer is a stream body that reports its Close.
+type closer struct{ onClose func() }
+
+func (closer) Read([]byte) (int, error) { return 0, io.EOF }
+
+func (c closer) Close() error {
+	c.onClose()
+	return nil
+}
+
+// TestUnitTraceRefusesAsGetItemDoes: a caller who may read a file's folder
+// but not the file is refused by ?trace as GetItem refuses them, with the
+// download's refusal of a local file, missing or stored, and of the file a
+// checksum names (#1572), and with a virtual repository's own answers for
+// its checksum and archive entry (P10's #1533). 7.161.26's
+// RepoFilter.doGetOrHeadRequest traces the download itself, so the trace's
+// last step is the download's answer. Before, the trace answered the
+// missing file and the checksum 404 "Could not find resource", which GET
+// refuses, and the stored file 403 "Forbidden".
+func TestUnitTraceRefusesAsGetItemDoes(t *testing.T) {
+	w := kittest.New(t, inmem.New())
+	w.Put(t, w.Local, false, "a/b.txt", []byte("generic"))
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	entry, err := zw.Create("x.txt")
+	if err == nil {
+		_, err = entry.Write([]byte("x"))
+	}
+	if err == nil {
+		err = zw.Close()
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Put(t, w.Local, false, "z.zip", archive.Bytes())
+	k := w.Kit(itemkit.Deps{})
+	folderOnly := &accessapitest.Decider{AllowsFolderFunc: func(
+		accessapi.ResourceType, accessapi.Repo, string, accessapi.Actions,
+	) bool {
+		return true
+	}}
+	serve := func(target string) *httptest.ResponseRecorder {
+		r := kittest.Request(t, http.MethodGet, "/artifactory/"+target)
+		r = r.WithContext(
+			accessapi.WithCaller(r.Context(), kernel.Principal{Name: "user"}, folderOnly),
+		)
+		rec := httptest.NewRecorder()
+		k.GetItem(rec, r)
+		return rec
+	}
+	for _, tc := range []struct {
+		target  string
+		status  int
+		message string
+	}{
+		{"libs-local/a/missing.txt", http.StatusForbidden, "Download request for repo:path " +
+			"'libs-local:a/missing.txt' is forbidden for user: 'user'.; Path: 'libs-local:a/missing.txt'"},
+		{"libs-local/a/b.txt", http.StatusForbidden, "Download request for repo:path " +
+			"'libs-local:a/b.txt' is forbidden for user: 'user'.; Path: 'libs-local:a/b.txt'"},
+		{"libs-local/a/b.txt.sha1", http.StatusForbidden, "Download request for repo:path " +
+			"'libs-local:a/b.txt' is forbidden for user: 'user'.; Path: 'libs-local:a/b.txt'"},
+		{"libs/a/b.txt.sha1", http.StatusNotFound, "Could not find resource"},
+		{"libs/z.zip!/x.txt", http.StatusForbidden, "Forbidden"},
+	} {
+		got := serve(tc.target)
+		if got.Code != tc.status || got.Body.String() != errorEnvelope(tc.status, tc.message) {
+			t.Errorf(
+				"GET %s: %d %s, want %d %q",
+				tc.target,
+				got.Code,
+				got.Body,
+				tc.status,
+				tc.message,
+			)
+		}
+		trace := serve(tc.target + "?trace").Body.String()
+		last := fmt.Sprintf(" Sending a response with the status '%d' and the message '%s'\n",
+			tc.status, tc.message)
+		if !strings.HasSuffix(trace, last) {
+			t.Errorf("%s?trace ends\n%s\nwant%s", tc.target, trace, last)
+		}
+	}
+}
+
+// errorEnvelope is the body apierror writes for status and message.
+func errorEnvelope(status int, message string) string {
+	rec := httptest.NewRecorder()
+	httpkit.WriteErr(
+		rec,
+		httptest.NewRequest(http.MethodGet, "/", nil),
+		apierror.New(status, message),
+	)
+	return rec.Body.String()
 }

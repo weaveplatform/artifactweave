@@ -45,8 +45,12 @@ type p2Items struct{ *itemkit.Kit }
 // does not class or a repository that is neither remote nor virtual answers
 // 404; a query and matrix parameters are taken as any file's GET takes them
 // (#1350). Remote reads still cross the common source policy and cache
-// boundary. It reports whether it answered; a repository of another type,
-// and a remote's own update-site files, it leaves to the generic lookup.
+// boundary. A remote's composite children and archive entries miss, are
+// refused and fail a matrix parameter as any file the download answers
+// does (itemkit.Missed, #1599), and a path P2 does not class answers as a
+// file the repository does not hold (itemkit.NotServed). It reports
+// whether it answered; a repository of another type, and a remote's own
+// update-site files, it leaves to the generic lookup.
 func TryP2Item(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
@@ -67,7 +71,7 @@ func TryP2Item(
 		return false
 	}
 	if c.Class != repo.Remote || p2.Classify(req.Path) == p2.KindInvalid {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 		return true
 	}
 	if strings.HasPrefix(req.Path, "__p2_ext/") || p2CompositeName(req.Path) {
@@ -116,7 +120,7 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 	archiveURL string,
 ) {
 	if !acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
 	}
 	// The remote's blackout and patterns refuse an archive entry as they
@@ -172,7 +176,8 @@ func (s p2Items) serveP2Archive(w http.ResponseWriter, r *http.Request,
 	}
 	result, err := s.RemoteSources.Read(r.Context(), q)
 	if err != nil {
-		httpkit.WriteErr(w, r, pkgroute.SourceError(err, p.Anonymous))
+		httpkit.WriteErr(w, r, pkgroute.SourceError(
+			itemkit.ReadAnswer(c, cached, req, p, err), p.Anonymous))
 		return
 	}
 	if !s.RemoteDeliveryAllowed(w, r, result, p.Anonymous) {
@@ -348,8 +353,8 @@ func p2EscapePath(p string) string {
 
 // p2CopyMatches reports whether the copy of req's path that the remote c's
 // cache holds matches the request's matrix parameters, or that it holds
-// none (itemkit.RemoteCopyMatches); otherwise it answers 404, or 500 when
-// the properties cannot be read, and reports false. An external composite
+// none (itemkit.RemoteCopyMatches); otherwise it answers the download's
+// mismatch, or 500 when the properties cannot be read, and reports false. An external composite
 // child and an archive entry are fetched from a URL other than the
 // remote's own, so their parameters are matched here and never passed on
 // [I]; a composite at the remote's own URL passes them on as any remote
@@ -363,7 +368,7 @@ func (s p2Items) p2CopyMatches(
 		return false
 	}
 	if !matches {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.Mismatched(c, req))
 		return false
 	}
 	return true

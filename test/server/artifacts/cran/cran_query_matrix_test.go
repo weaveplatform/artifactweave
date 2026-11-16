@@ -3,8 +3,10 @@ package cran_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // cranAsk is one request the upstream had: the path, and the matrix
@@ -111,9 +114,9 @@ func cranQueryWorld(t *testing.T) (*itemWorld, *cranAsked, []byte) {
 // resolution conditional on properties" (JFrog's guide, Using Properties in
 // Deployment and Resolution); neither names a package type it leaves out.
 // The read check comes first (DV-057): a user without read is refused 403
-// and an anonymous caller 401, without asking the upstream. A local
-// repository's package, which the item route reads, refuses the user with
-// 7.x's download answer (cranRefused); the CRAN routes keep "Forbidden".
+// and an anonymous caller 401, without asking the upstream. Outside a
+// virtual repository the user gets 7.x's download answer (cranRefused),
+// from the item route and the CRAN overlay alike (#1599).
 func TestAccCRANRoutesTakeAQueryAndMatrixParameters(t *testing.T) {
 	w, asked, archive := cranQueryWorld(t)
 	for _, key := range []string{"cran-local", "cran-remote", "cran-virtual"} {
@@ -188,26 +191,41 @@ func TestAccCRANRemotePassesItsQueryAndMatrixParametersUpstream(t *testing.T) {
 	}
 }
 
-// cranRefused is the answer to user, who may not read key, for path: on a
-// local repository's package, which the item route reads, 7.161.26's
-// download refusal (RealRepoBase.assertReadPermissions and the path
-// DownloadServiceImpl.respondResourceNotFound appends, #1572); on the
-// CRAN routes, "Forbidden".
+// cranChecked is the repository whose path 7.161.26's download checks and
+// matches for key, a remote's cache, or "" for a virtual repository, whose
+// answers are P10's (#1533).
+func cranChecked(key string) string {
+	switch key {
+	case "cran-local", "cran-tagged":
+		return key
+	case "cran-remote", "cran-held":
+		return key + "-cache"
+	}
+	return ""
+}
+
+// cranRefused is the answer to user, who may not read key, for path:
+// 7.161.26's download refusal (RealRepoBase.assertReadPermissions and the
+// path DownloadServiceImpl.respondResourceNotFound appends), on the item
+// route (#1572) and on the CRAN overlay's index and remote package alike
+// (#1599); in a virtual repository, "Forbidden".
 func cranRefused(key, path string) string {
-	if path != cranAssertthat || (key != "cran-local" && key != "cran-tagged") {
+	checked := cranChecked(key)
+	if checked == "" {
 		return "Forbidden"
 	}
-	return "Download request for repo:path '" + key + ":" + path + "' is forbidden for user: 'user'.; Path: '" +
-		key + ":" + path + "'"
+	return "Download request for repo:path '" + checked + ":" + path +
+		"' is forbidden for user: 'user'.; Path: '" + key + ":" + path + "'"
 }
 
 // cranMismatch is the answer to a file under key that lacks a mandatory
-// matrix key: on a local repository's package, which the item route reads,
-// 7.161.26's DbStoringRepoMixin.getInfo PROPERTY_MISMATCH reason and the
-// path DownloadServiceImpl.respondResourceNotFound appends (#1572); on the
-// CRAN routes, "Could not find resource".
+// matrix key: 7.161.26's DbStoringRepoMixin.getInfo PROPERTY_MISMATCH
+// reason for the repository that holds it, a remote's cache, and the path
+// DownloadServiceImpl.respondResourceNotFound appends (#1572, #1599); in a
+// virtual repository, "Could not find resource".
 func cranMismatch(key, path string) string {
-	if path != cranAssertthat || (key != "cran-local" && key != "cran-tagged") {
+	key = cranChecked(key)
+	if key == "" {
 		return "Could not find resource"
 	}
 	return "File '" + key + ":" + path + "' was found, but mandatory properties do not match.; Path: '" +
@@ -218,15 +236,14 @@ func cranMismatch(key, path string) string {
 // parameter ("key+=value") serves a stored index or package only when the
 // file carries the property, as 7.x's PropertiesImpl.matchQuery answers
 // CONFLICT, and DbStoringRepoMixin.getInfo PROPERTY_MISMATCH, for a
-// mandatory key the file lacks (7.161.26). A virtual repository's package
+// mandatory key the file lacks (7.161.26), with its text outside a virtual
+// repository (cranMismatch, #1599). A virtual repository's package
 // GET passes over a member whose file lacks it to the next member that
 // lists the package, as 7.x's ArtifactoryVirtualDownloadStrategy passes
 // over a member that does not find the file [I]; a remote's cached copy
 // is matched the same way, without asking the upstream (#1371). A virtual
 // repository's composed index carries no properties [I], so a mandatory key
-// is not found there and a key it may lack is served. A local repository's
-// package, which the item route reads, answers the mismatch with 7.x's
-// text (cranMismatch); the CRAN routes keep "Could not find resource".
+// is not found there and a key it may lack is served.
 func TestAccCRANMandatoryMatrixParameters(t *testing.T) {
 	w, asked, archive := cranQueryWorld(t)
 	for _, tc := range []struct {
@@ -285,5 +302,69 @@ func TestAccCRANMandatoryMatrixParameters(t *testing.T) {
 		if got := w.do(http.MethodGet, target, "admin", ""); got.Code != http.StatusOK {
 			t.Errorf("%s answered %d %.200s, want 200", target, got.Code, got.Body)
 		}
+	}
+}
+
+// TestAccCRANTraceFollowsTheOverlay (#1595): ?trace on a remote CRAN
+// package that the cache does not hold traces what the CRAN overlay would
+// answer, as 7.161.26's RepoFilter.doGetOrHeadRequest answers ?trace by
+// running the download itself under a TraceLoggingResponse: the index and
+// the package are fetched from the upstream, as the download fetches
+// them, and the package is traced as found, the upstream's stream as
+// validated, as the generic route traces one (traceRemoteItem), but nothing
+// is served or counted as a download. Before, the trace skipped the overlay
+// and traced the generic route's read instead.
+func TestAccCRANTraceFollowsTheOverlay(t *testing.T) {
+	w, asked, archive := cranQueryWorld(t)
+	target := "/artifactory/cran-remote/" + cranAssertthat
+	rec := w.do(http.MethodGet, target+"?trace", "admin", "")
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "text/plain" {
+		t.Fatalf("trace answered %d %q %s", rec.Code, rec.Header().Get("Content-Type"), rec.Body)
+	}
+	_, steps, _ := strings.Cut(rec.Body.String(), "Steps: \n")
+	var got []string
+	for _, line := range strings.Split(strings.TrimSuffix(steps, "\n"), "\n") {
+		_, step, _ := strings.Cut(line, " ")
+		got = append(got, step)
+	}
+	want := []string{
+		"Received request",
+		"Retrieving info from remote repository 'cran-remote' type cran",
+		"Returning validated transient resource",
+		"Identified requested resource as a file",
+		"Responding with found resource",
+		"Request succeeded",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("steps\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	if a := asked.take(); !slices.Equal(
+		a,
+		[]cranAsk{{cranIndex, "", ""}, {cranAssertthat, "", ""}},
+	) {
+		t.Errorf("the trace asked the upstream %v, want the index and the package", a)
+	}
+	downloads := func() int64 {
+		t.Helper()
+		it, err := w.db.Items().Get(t.Context(), "cran-remote", true, cranAssertthat)
+		if errors.Is(err, kernel.ErrNotFound) {
+			return 0 // the stream the trace closed unread was never kept
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		st, err := w.db.Items().Stats(t.Context(), it.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return st.DownloadCount
+	}
+	if n := downloads(); n != 0 {
+		t.Errorf("the trace counted %d downloads, want none", n)
+	}
+	// The trace changed nothing the download then serves.
+	if rec := w.do(http.MethodGet, target, "admin", ""); rec.Code != http.StatusOK ||
+		!bytes.Equal(rec.Body.Bytes(), archive) {
+		t.Fatalf("download answered %d", rec.Code)
 	}
 }

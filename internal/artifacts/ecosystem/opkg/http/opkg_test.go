@@ -784,6 +784,7 @@ func TestAccOpkgRemotePackagePinsIndependentIndexAndCachedBytes(t *testing.T) {
 		response,
 		r,
 		remote,
+		remote,
 		false,
 		itemkit.ItemRequest{Path: "../bad.ipk"},
 		want,
@@ -834,7 +835,7 @@ func TestUnitOpkgRemoteReadsWithoutRemoteSources(t *testing.T) {
 			rec := httptest.NewRecorder()
 			r := kittest.Request(t, http.MethodGet, "/artifactory/opkg-remote/"+ipk)
 			req := itemkit.ItemRequest{Key: remote.Key, Path: ipk}
-			opkgItems{w.kit}.serveRemoteOpkgPackage(rec, r, remote, false, req,
+			opkgItems{w.kit}.serveRemoteOpkgPackage(rec, r, remote, remote, false, req,
 				opkg.Package{Path: ipk}, kittest.Admin, kittest.AdminAccess())
 			return rec
 		}},
@@ -939,7 +940,8 @@ func feedOf(t *testing.T, index, ipk []byte) sourceBackend {
 
 // TestAccOpkgRefusalsAnswerTheDownloadPolicy: a feed, and a remote or
 // virtual IPK, is refused to a caller who may not read it before anything
-// else (DV-057). Past that, a blacked-out local or remote repository, its
+// else (DV-057), outside a virtual repository with the download's refusal
+// (#1599). Past that, a blacked-out local or remote repository, its
 // -cache alias, or patterns that reject the requested path answer the
 // download policy's 404 and message before the source is asked, and a
 // virtual repository whose own patterns reject the path answers that no
@@ -969,19 +971,33 @@ func TestAccOpkgRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 		return "The repository '" + key + "' rejected the artifact '" + key + ":" + path +
 			"' due to its include/exclude pattern settings."
 	}
+	// The download's refusal (#1599): 7.161.26's reason for checked, a
+	// remote's cache, with the path the request named.
+	forbidden := func(key, checked, path string) string {
+		return "Download request for repo:path '" + checked + ":" + path +
+			"' is forbidden for user: 'user'.; Path: '" + key + ":" + path + "'"
+	}
 	for _, tc := range []struct {
 		name, key, path, as string
 		status              int
 		message             string
 	}{
-		{"user reads a feed", "opkg-local", opkgFeed, "user", http.StatusForbidden, "Forbidden"},
+		{
+			"user reads a feed", "opkg-local", opkgFeed, "user", http.StatusForbidden,
+			forbidden("opkg-local", "opkg-local", opkgFeed),
+		},
+		{
+			"anonymous user reads a feed", "opkg-local", opkgFeed, "",
+			http.StatusUnauthorized, "Unauthorized",
+		},
 		{
 			"user reads a blacked-out feed", "opkg-dark", opkgFeed, "user",
-			http.StatusForbidden, "Forbidden",
+			http.StatusForbidden, forbidden("opkg-dark", "opkg-dark", opkgFeed),
 		},
 		{
 			"user reads an IPK a remote's patterns reject", "opkg-picky-remote", opkgXlat, "user",
-			http.StatusForbidden, "Forbidden",
+			http.StatusForbidden,
+			forbidden("opkg-picky-remote", "opkg-picky-remote-cache", opkgXlat),
 		},
 		{
 			"blacked-out feed", "opkg-dark", opkgFeed, "admin",
@@ -1021,8 +1037,14 @@ func TestAccOpkgRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rec := w.do(http.MethodGet, "/artifactory/"+tc.key+"/"+tc.path, tc.as, "")
-			wantError(t, rec, tc.status, tc.message)
+			for _, method := range []string{http.MethodGet, http.MethodHead} {
+				rec := w.as(method, "/artifactory/"+tc.key+"/"+tc.path, tc.as)
+				if method == http.MethodGet {
+					wantError(t, rec, tc.status, tc.message)
+				} else if rec.Code != tc.status {
+					t.Errorf("HEAD answered %d, want %d", rec.Code, tc.status)
+				}
+			}
 		})
 	}
 }

@@ -375,27 +375,31 @@ func TestAccAgentPluginsMarketplaceRefusesBeforeReading(t *testing.T) {
 			http.StatusUnauthorized, "Authentication is required",
 		},
 	} {
-		for _, target := range []string{
-			apiPath(tc.key, "marketplace.json"), itemPath(tc.key, "marketplace.json"),
-		} {
-			t.Run(tc.name+" at "+target, func(t *testing.T) {
-				wantError(t, w.do(http.MethodGet, target, tc.as), tc.status, tc.message)
-			})
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			wantError(t, w.do(http.MethodGet, apiPath(tc.key, "marketplace.json"), tc.as),
+				tc.status, tc.message)
+			for _, method := range []string{http.MethodGet, http.MethodHead} {
+				rec := w.do(method, itemPath(tc.key, "marketplace.json"), tc.as)
+				wantAnswer(t, rec, method, tc.status,
+					itemAnswer(tc.key, "marketplace.json", tc.as, tc.status, tc.message))
+			}
+		})
 	}
 }
 
 // TestAccAgentPluginsMarketplaceNotStored: a marketplace file that nothing
 // has stored, where no work queue runs the work a download owes, answers
-// as a missing item at both paths.
+// as a missing item at both paths: the API path's own 404, and the item
+// route's the download's, 7.161.26's "File not found." with the path
+// (#1599).
 func TestAccAgentPluginsMarketplaceNotStored(t *testing.T) {
 	w := newItemWorld(t, func(d *itemkit.Deps) { d.Work = nil })
 	w.repos(pluginsRepo(pluginsLocal, repo.Local))
-	for _, target := range []string{
-		apiPath(pluginsLocal, "marketplace.json"), itemPath(pluginsLocal, "marketplace.json"),
-	} {
-		wantError(t, w.do(http.MethodGet, target, admin),
-			http.StatusNotFound, "Could not find resource")
+	wantError(t, w.do(http.MethodGet, apiPath(pluginsLocal, "marketplace.json"), admin),
+		http.StatusNotFound, "Could not find resource")
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		wantAnswer(t, w.do(method, itemPath(pluginsLocal, "marketplace.json"), admin), method,
+			http.StatusNotFound, "File not found.; Path: '"+pluginsLocal+":marketplace.json'")
 	}
 }
 

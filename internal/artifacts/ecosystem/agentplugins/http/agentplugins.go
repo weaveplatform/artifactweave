@@ -87,16 +87,24 @@ func TryAgentMarketplaceItem(
 // reads the same bytes: the same size and checksums an AQL search or the
 // storage API reports to them, which JFrog CLI checks a download against.
 // itemRoute types the file as the item routes do (ServeItemFile), and the
-// API path as the native APIs do (ServeFile).
+// API path as the native APIs do (ServeFile). On the item route a miss and
+// a refusal take the download's answers too (itemkit.Missed, #1599), as
+// 7.161.26's RepoFilter hands the path to DownloadServiceImpl; the API
+// path, a resource of the format's own, keeps its answers.
 func (s AgentPluginItems) serveAgentMarketplace(
 	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	name string, p kernel.Principal, acc itemkit.Access, itemRoute bool,
 ) {
 	ctx := r.Context()
+	req := itemkit.ItemRequest{Key: c.Key, Path: name}
 	// The read permission first, so a caller who may not read the file
 	// learns nothing of how the repository is set (DV-057); then the
 	// policy at the file's own path, where 7.x stores it.
 	if !acc.File(c, name, api.ActionRead) {
+		if itemRoute {
+			httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
+			return
+		}
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
@@ -119,6 +127,10 @@ func (s AgentPluginItems) serveAgentMarketplace(
 		// yet. A folder at the name holds no marketplace file; the item
 		// route leaves a folder to the generic lookup, and the API path,
 		// which lists no folder, answers it as a missing file.
+		if itemRoute {
+			httpkit.WriteErr(w, r, itemkit.Missed(c, false, req))
+			return
+		}
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	case err != nil:

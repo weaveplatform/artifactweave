@@ -95,6 +95,18 @@ repository's Propagate Query Params is set. Its index takes matrix
 parameters as any remote file does: they go to the upstream after the path,
 and a copy the cache already holds is matched against them first (#1371).
 
+A local, remote or cache repository answers a GET or HEAD of a Release, an index or a package as 7.x's
+download answers any file (#1599): a file it does not hold with 404
+`File not found.; Path: '<key>:<path>'`, a caller without Read with 403
+`Download request for repo:path '<key>:<path>' is forbidden for user:
+'<user>'.; Path: '<key>:<path>'`, naming a remote's `-cache` key as the
+checked path, or 401 `Unauthorized` with the Basic challenge when anonymous,
+and a file the matrix parameters do not match with 404 `File '<key>:<path>'
+was found, but mandatory properties do not match.; Path: '<key>:<path>'`. A
+remote's upstream miss answers 404 `Not Found; Path: '<key>:<path>'`. A
+virtual repository answers 404 `Could not find resource`. `?trace` traces
+that resolution, a cold fetch from the upstream included (#1595).
+
 For source packages, deploy the `.dsc` with `dsc.distribution` and
 `dsc.component`, plus every archive named by that descriptor at the same
 directory. The source only appears in `Sources` once its parts and checksums

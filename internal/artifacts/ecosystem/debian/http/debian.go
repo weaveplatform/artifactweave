@@ -40,8 +40,11 @@ type DebianAPI struct{ *itemkit.Kit }
 // the ordinary item route cannot guarantee for a cached or virtual metadata
 // file. That rule is about permission: the download policy is checked at the
 // index's own path, and an index keeps a package whose file the patterns
-// reject. It reports whether it answered; every other request, a folder
-// among them, it leaves to the overlays after it and the generic lookup.
+// reject. Outside a virtual repository an index misses, is refused and
+// fails a matrix parameter as any file the download answers does
+// (itemkit.Missed, #1599). It reports whether it answered; every other
+// request, a folder among them, it leaves to the overlays after it and the
+// generic lookup.
 func TryDebianItem(
 	k *itemkit.Kit, w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
@@ -78,7 +81,7 @@ func (s DebianAPI) serveDebianIndex(
 	ctx := r.Context()
 	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
 		!acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
 	}
 	// An index takes a query and matrix parameters as every other file
@@ -102,7 +105,7 @@ func (s DebianAPI) serveDebianIndex(
 		return
 	}
 	if cached && c.Class != repo.Remote {
-		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+		httpkit.WriteErr(w, r, itemkit.Missed(c, cached, req))
 		return
 	}
 	var body []byte
@@ -115,10 +118,12 @@ func (s DebianAPI) serveDebianIndex(
 		var it model.Item
 		it, err = st.Items().Get(ctx, c.Key, false, req.Path)
 		if err == nil && it.Folder {
-			err = kernel.ErrNotFound
+			err = itemkit.ErrFolderAtPath
 		}
 		if err == nil {
-			err = matchDebianMatrix(ctx, st, it, req)
+			if err = matchDebianMatrix(ctx, st, it, req); errors.Is(err, kernel.ErrNotFound) {
+				err = itemkit.Mismatched(c, req)
+			}
 		}
 		if err == nil {
 			body, err = s.readDebianBlob(ctx, it.Actual.SHA256)
@@ -132,7 +137,7 @@ func (s DebianAPI) serveDebianIndex(
 		if matches, err = itemkit.RemoteCopyMatches(ctx, st, c, req.Path, req); err != nil {
 			break
 		} else if !matches {
-			err = kernel.ErrNotFound
+			err = itemkit.Mismatched(c, req)
 			break
 		}
 		query := source.Request{
@@ -153,7 +158,7 @@ func (s DebianAPI) serveDebianIndex(
 		var result source.Result
 		result, err = s.RemoteSources.Read(ctx, query)
 		if err != nil {
-			err = pkgroute.SourceError(err, p.Anonymous)
+			err = itemkit.RemoteReadError(err, p.Anonymous)
 			break
 		}
 		checkPermission, used = result.CheckPermission, result.Used
@@ -184,7 +189,8 @@ func (s DebianAPI) serveDebianIndex(
 		err = kernel.ErrNotFound
 	}
 	if err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian Packages index", err))
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "Debian Packages index",
+			itemkit.ReadAnswer(c, cached, req, p, err)))
 		return
 	}
 	if len(body) > debianIndexLimit {
@@ -200,8 +206,11 @@ func (s DebianAPI) serveDebianIndex(
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "Debian index", err))
 		return
 	}
+	// A listed file the caller may not read refuses the index as its own
+	// path would be refused; 7.x serves an index by its path's permission
+	// alone, so no 7.x text names this refusal [I].
 	if err := s.debianIndexReadable(ctx, paths, checkPermission, p, acc, c); err != nil {
-		httpkit.WriteErr(w, r, err)
+		httpkit.WriteErr(w, r, itemkit.ReadAnswer(c, cached, req, p, err))
 		return
 	}
 	if head != nil {

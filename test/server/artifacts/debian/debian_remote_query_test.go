@@ -152,9 +152,9 @@ func queryRemote(t *testing.T, files map[string][]byte) (*harness.RemoteWorld, *
 // so the next caller with a query is served from the cache. A reader and an
 // administrator get the upstream's bytes; a user without read permission is
 // refused 403 and an anonymous caller 401 before the upstream is asked
-// (DV-057): the user, on a remote's Release, InRelease or Contents by-hash
-// file, which the item route reads, with 7.x's download answer (#1572),
-// and on the files the index route serves with "Forbidden", as before. A
+// (DV-057): the user, on the remote, with 7.x's download answer, from the
+// item route (#1572) and the Debian overlay alike (#1599), and on the
+// virtual repository with "Forbidden", as before. A
 // virtual repository over the remote serves its Sources index
 // and Contents by-hash file the same way, where it passed the remote over
 // before.
@@ -171,8 +171,7 @@ func TestAccDebianRemoteIndexServesAQueryAsWithoutOne(t *testing.T) {
 					w, up := queryRemote(t, files)
 					target := "/artifactory/" + key + "/" + p + query
 					refusal := "Forbidden"
-					if _, index := debian.ByHashMetadataPath(p); key == "remote" &&
-						(debian.ReleaseMetadataPath(p) || strings.Contains(p, "/by-hash/") && !index) {
+					if key == "remote" {
 						refusal = remoteRefused(key, p, "denied")
 					}
 					for _, caller := range []string{"denied", "", "reader", "admin"} {
@@ -286,9 +285,15 @@ func TestAccDebianRemoteIndexByHashCopyNeedsReadOnEveryListedPackage(t *testing.
 			if got := up.take(); !slices.Equal(got, []string{"/" + copyPath}) {
 				t.Errorf("the upstream was asked %q, want %q once", got, "/"+copyPath)
 			}
+			// Each is refused as its own file is (#1599); 7.x makes no
+			// such refusal, so no 7.x text names it [I].
 			for _, target := range []string{copyPath, index} {
-				queryRefusal(t, w.Request(http.MethodGet, "/artifactory/remote/"+target,
-					"indexonly", ""), http.StatusForbidden, "Forbidden")
+				queryRefusal(t, w.Request(
+					http.MethodGet,
+					"/artifactory/remote/"+target,
+					"indexonly",
+					"",
+				), http.StatusForbidden, remoteRefused("remote", target, "indexonly"))
 			}
 		})
 	}

@@ -56,12 +56,18 @@ func TestAccDebianRemoteIndexPassesMatrixParametersUpstream(t *testing.T) {
 					{"reader", ";x+=1", http.StatusNotFound, nil},
 				} {
 					r := w.Request(http.MethodGet, target+tc.suffix, tc.caller, "")
-					switch tc.status {
-					case http.StatusForbidden:
+					// The remote answers as the download does (#1599); a
+					// virtual repository keeps its answers (#1533).
+					switch {
+					case tc.status == http.StatusForbidden && key == "remote":
+						queryRefusal(t, r, tc.status, remoteRefused(key, p, tc.caller))
+					case tc.status == http.StatusForbidden:
 						queryRefusal(t, r, tc.status, "Forbidden")
-					case http.StatusUnauthorized:
+					case tc.status == http.StatusUnauthorized:
 						queryRefusal(t, r, tc.status, "Authentication is required")
-					case http.StatusNotFound:
+					case tc.status == http.StatusNotFound && key == "remote":
+						queryRefusal(t, r, tc.status, remoteMismatch(p))
+					case tc.status == http.StatusNotFound:
 						queryRefusal(t, r, tc.status, "Could not find resource")
 					default:
 						if r.Code != http.StatusOK || r.Body.String() != string(files[p]) {

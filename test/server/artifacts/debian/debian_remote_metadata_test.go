@@ -83,9 +83,9 @@ func TestAccDebianRemoteServesComponentFiles(t *testing.T) {
 // the remote's GET the alias still answers 404 and asks nothing. A user
 // without read permission is refused 403 and an anonymous caller 401; the
 // miss and the user's refusal with 7.x's download answers (#1572). A
-// Packages index's by-hash copy is a kept case: the index route served it
-// on the alias before this change, and answers a miss "Not Found" and a
-// user "Forbidden", as it did.
+// Packages index's by-hash copy, which the Debian overlay serves on the
+// alias, answers them too (#1599), where it answered a miss "Not Found" and
+// a user "Forbidden".
 func TestAccDebianRemoteCacheAliasServesCachedMetadata(t *testing.T) {
 	files, _ := queryArchive(t)
 	const installer = "dists/stable/main/debian-installer/binary-amd64/Packages.gz"
@@ -105,9 +105,6 @@ func TestAccDebianRemoteCacheAliasServesCachedMetadata(t *testing.T) {
 			alias := "/artifactory/remote-cache/" + p
 			miss := "File not found.; Path: 'remote-cache:" + p + "'"
 			refusal := remoteRefused("remote-cache", p, "denied")
-			if strings.Contains(p, "/binary-amd64/by-hash/") {
-				miss, refusal = "Not Found", "Forbidden"
-			}
 			queryRefusal(
 				t,
 				w.Request(http.MethodGet, alias, "admin", ""),

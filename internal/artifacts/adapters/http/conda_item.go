@@ -12,19 +12,23 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 )
 
-// TryCondaItem is the item overlay (itemkit.Overlay) that answers 404 for
-// the paths PrivateItem names: stored shards and CAS containers can span
+// TryCondaItem is the item overlay (itemkit.Overlay) that answers the paths
+// PrivateItem names as files the repository does not hold
+// (itemkit.NotServed, #1599): stored shards and CAS containers can span
 // several read grants, so only their native routes construct the
-// representation the current caller is allowed to read. It writes nothing
-// and returns false for every other path.
+// representation the current caller is allowed to read. 7.x keeps a Conda
+// repository's package shards under .jfrog/shards/<...>/package_shards/
+// (CondaShardsCleanupServiceImpl, 7.161.26), not at the path the protocol
+// names, so the item route finds no file there [I for the shard index]. It
+// writes nothing and returns false for every other path.
 func TryCondaItem(
 	_ *itemkit.Kit, w http.ResponseWriter, r *http.Request, _ itemkit.Store, c repo.Config,
-	_ bool, req itemkit.ItemRequest, _ kernel.Principal, _ itemkit.Access,
+	cached bool, req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) bool {
 	if !protocolPrivateItem(c, req.Path) {
 		return false
 	}
-	httpkit.WriteErr(w, r, itemkit.ItemNotFound())
+	httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 	return true
 }
 

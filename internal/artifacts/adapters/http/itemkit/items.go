@@ -413,7 +413,9 @@ func Lookup(
 // GetItem answers GET and HEAD on an item path: file content, a checksum
 // sidecar, or a folder listing; with ?trace, the resolution instead.
 func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
-	if _, ok := r.URL.Query()["trace"]; ok {
+	// A read an overlay makes through GetItem while a trace runs it, such
+	// as a P2 virtual repository's member file, is decided, not traced again.
+	if _, ok := r.URL.Query()["trace"]; ok && overlayTraceOf(r) == nil {
 		s.traceItem(w, r)
 		return
 	}
@@ -777,6 +779,10 @@ func (s *Kit) serveFile(
 	contentType string,
 	form func(string) string,
 ) {
+	if traceServed(r, "Returning found resource from "+
+		traceRepoPath(f.Repo, f.Item.Cached, f.Item.FullPath())) {
+		return
+	}
 	ctx := r.Context()
 	it := f.Item
 	// Before the redirect, so that a redirecting repository answers the

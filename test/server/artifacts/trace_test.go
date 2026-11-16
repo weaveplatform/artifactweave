@@ -112,21 +112,25 @@ func TestAccTraceResolution(t *testing.T) {
 		path, as string
 		expected []string
 	}{
-		// The trace ends with the answer the download would give, 7.x's
-		// "Sending a response with the status '404' and the message 'Could
-		// not find resource'" (KB "The ?trace API").
+		// The trace ends with the answer the download would give (KB "The
+		// ?trace API"): 7.161.26's RepoFilter runs the download itself under
+		// a TraceLoggingResponse, which records the download's own status
+		// and message, 7.x's miss with its path (#1572).
 		{"/artifactory/libs-local/d/none?trace", "admin", []string{
 			"Received request",
 			"Retrieving info from local repository 'libs-local' type generic",
 			"Unable to find resource in libs-local:d/none",
 			"Responding with unfound resource",
-			"Sending a response with the status '404' and the message 'Could not find resource'",
+			"Sending a response with the status '404' and the message " +
+				"'File not found.; Path: 'libs-local:d/none''",
 		}},
 		// A caller who may not read the path learns nothing of the
 		// repository, only the refusal the download would answer.
 		{local, "user", []string{
 			"Received request",
-			"Sending a response with the status '403' and the message 'Forbidden'",
+			"Sending a response with the status '403' and the message 'Download request for " +
+				"repo:path 'libs-local:d/a.txt' is forbidden for user: 'user'.; " +
+				"Path: 'libs-local:d/a.txt''",
 		}},
 		{"/artifactory/missing/a.txt?trace", "admin", []string{
 			"Received request",
@@ -140,7 +144,9 @@ func TestAccTraceResolution(t *testing.T) {
 			"Returning found resource from libs-local:d/a.txt",
 			"Request query properties don't match those that annotate the artifact",
 			"Responding with unfound resource",
-			"Sending a response with the status '404' and the message 'Could not find resource'",
+			"Sending a response with the status '404' and the message 'File " +
+				"'libs-local:d/a.txt' was found, but mandatory properties do not match.; " +
+				"Path: 'libs-local:d/a.txt''",
 		}},
 		{"/artifactory/libs-local/d?trace", "admin", []string{
 			"Received request",
@@ -160,7 +166,8 @@ func TestAccTraceResolution(t *testing.T) {
 			"Retrieving info from cache repository 'up-cache' type generic",
 			"Unable to find resource in up-cache:x.txt",
 			"Responding with unfound resource",
-			"Sending a response with the status '404' and the message 'Could not find resource'",
+			"Sending a response with the status '404' and the message " +
+				"'File not found.; Path: 'up-cache:x.txt''",
 		}},
 		{"/artifactory/libs-local/d/a.txt.sha256?trace", "admin", []string{
 			"Received request",
@@ -178,7 +185,8 @@ func TestAccTraceResolution(t *testing.T) {
 			"Request is for a checksum",
 			"Unable to find resource in libs-local:d/none",
 			"Responding with unfound resource",
-			"Sending a response with the status '404' and the message 'Could not find resource'",
+			"Sending a response with the status '404' and the message " +
+				"'File not found.; Path: 'libs-local:d/none''",
 		}},
 		{"/artifactory/libs-local/z/a.zip!/in.txt?trace", "admin", []string{
 			"Received request",
@@ -204,7 +212,8 @@ func TestAccTraceResolution(t *testing.T) {
 			"Requested resource is contained within an archive",
 			"Unable to find resource in libs-local:z/none.zip",
 			"Responding with unfound resource",
-			"Sending a response with the status '404' and the message 'Could not find resource'",
+			"Sending a response with the status '404' and the message " +
+				"'File not found.; Path: 'libs-local:z/none.zip''",
 		}},
 		{"/artifactory/libs-local/d!/in.txt?trace", "admin", []string{
 			"Received request",
@@ -225,7 +234,7 @@ func TestAccTraceResolution(t *testing.T) {
 	_, steps = traceOf(t, w2, http.MethodGet, "/artifactory/libs-local/d/a.txt?trace", "")
 	wantSteps(t, "anonymous", steps,
 		"Received request",
-		"Sending a response with the status '401' and the message 'Authentication is required'",
+		"Sending a response with the status '401' and the message 'Unauthorized'",
 	)
 	// Without anonymous access, credentials are asked for before any trace.
 	wantStatus(t, w.do(http.MethodGet, local, "", ""), http.StatusUnauthorized)

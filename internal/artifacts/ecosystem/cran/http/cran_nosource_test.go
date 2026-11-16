@@ -71,7 +71,7 @@ func TestUnitCranRemoteReadsWithoutRemoteSources(t *testing.T) {
 			rec := httptest.NewRecorder()
 			r := kittest.Request(t, http.MethodGet, "/artifactory/cran-remote/"+pkg)
 			req := itemkit.ItemRequest{Key: remote.Key, Path: pkg}
-			CranAPI{Kit: kit}.serveRemoteCranPackage(rec, r, remote, false, req,
+			CranAPI{Kit: kit}.serveRemoteCranPackage(rec, r, remote, remote, false, req,
 				cran.Package{Path: pkg}, kittest.Admin, kittest.AdminAccess())
 			return rec
 		}},

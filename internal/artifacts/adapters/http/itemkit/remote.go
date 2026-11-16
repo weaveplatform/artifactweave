@@ -452,7 +452,8 @@ func (s *Kit) ServeRemoteStream(
 
 // RemoteDeliveryAllowed revalidates a result that asks for it before it is
 // delivered, and on a failure closes its stream, answers with the source
-// error and reports false.
+// error and reports false. Under an overlay's trace it records the result
+// in place of delivering it, closes its stream and reports false.
 func (s *Kit) RemoteDeliveryAllowed(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -461,6 +462,13 @@ func (s *Kit) RemoteDeliveryAllowed(
 ) bool {
 	if err := remoteDeliveryErr(r.Context(), result, anonymous); err != nil {
 		httpkit.WriteErr(w, r, err)
+		return false
+	}
+	// Under a trace the result is the decision: nothing is delivered.
+	if traceServed(r, remoteTraceStep(result)) {
+		if result.Stream != nil {
+			_ = result.Stream.Body.Close()
+		}
 		return false
 	}
 	return true

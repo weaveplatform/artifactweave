@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"strings"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -148,6 +150,119 @@ func checksumRefused(c repo.Config, req ItemRequest, caller kernel.Principal) er
 	return refused(c, req, caller)
 }
 
+// Missed is missed for the format overlays (Deps.Overlays), as Refused and
+// Mismatched are refused and mismatched: 7.161.26's RepoFilter.doDownload hands
+// every GET and HEAD of /artifactory/<key>/<path> to DownloadServiceImpl,
+// whatever the package type, and a type's own handling lives inside the
+// repository's getInfo, so a file an overlay serves misses and is refused
+// as any other file on the item route is (#1599). A virtual repository, its
+// member reads and a folder request keep their answers, as there.
+func Missed(c repo.Config, cached bool, req ItemRequest) error { return missed(c, cached, req) }
+
+// Refused is refused for the format overlays (Missed).
+func Refused(c repo.Config, req ItemRequest, caller kernel.Principal) error {
+	return refused(c, req, caller)
+}
+
+// Mismatched is mismatched for the format overlays (Missed).
+func Mismatched(c repo.Config, req ItemRequest) error { return mismatched(c, req) }
+
+// ErrFolderAtPath is an overlay's read that found a folder where the file
+// it serves would be. 7.161.26 answers a file request that finds a folder
+// with a redirect to the folder's listing (RemoteRepoBase.getInfo, "Expected
+// file but got directory, requesting a redirect"), which no overlay makes,
+// so ReadAnswer leaves it to the answer each gave it before #1599. It is
+// kernel.ErrNotFound to every other reader, a virtual repository's search
+// of its members among them.
+var ErrFolderAtPath = fmt.Errorf("itemkit: a folder holds the path: %w", kernel.ErrNotFound)
+
+// ReadAnswer answers err, an overlay's failure to read the file req names,
+// as the download answers it, the way sourceAnswer answers the generic
+// route's remote read: a want of Read takes refused, and a miss takes
+// missed. err may be the source's own error or pkgroute.SourceError's answer
+// to it, as the overlays' shared index reads return: a want of Read is
+// source.ErrDenied, kernel.ErrForbidden or kernel.ErrUnauthenticated, and a
+// miss kernel.ErrNotFound or SourceError's 404 "Not Found" for it. cached is
+// whether req named a remote's cache. The failures sourceAnswer keeps are
+// returned as they are: a storage fault, the download policy's refusal,
+// which can be kernel.ErrNotFound too (pkgroute.IsRefusal), the upstream's
+// own status (source.HTTPError, whose SourceError answer sends no
+// challenge), an invalid or unsupported request; so are ErrFolderAtPath,
+// any other failure, and every failure of a request fileRequest leaves to
+// the old answers. The caller answers what is returned as it did before.
+func ReadAnswer(
+	c repo.Config,
+	cached bool,
+	req ItemRequest,
+	caller kernel.Principal,
+	err error,
+) error {
+	if err == nil || !fileRequest(c, req) {
+		return err
+	}
+	// An overlay path is the item route's, so a cache fill the caller may
+	// not make and an assumed-offline miss answer as sourceAnswer answers
+	// them, before the miss either one is too.
+	if answer := remoteMissAnswer(c, req, caller, remoteReadCause(req, err)); answer != nil {
+		return answer
+	}
+	var failure *source.HTTPError
+	var answer *apierror.Error
+	switch {
+	case errors.Is(err, format.ErrStorageFault),
+		pkgroute.IsRefusal(err),
+		errors.As(err, &failure),
+		errors.Is(err, source.ErrInvalidRequest),
+		errors.Is(err, source.ErrUnsupported),
+		errors.Is(err, ErrFolderAtPath):
+		return err
+	case errors.Is(err, source.ErrDenied),
+		errors.Is(err, kernel.ErrForbidden),
+		errors.Is(err, kernel.ErrUnauthenticated):
+		return refused(c, req, caller)
+	case errors.Is(err, kernel.ErrNotFound):
+		return missed(c, cached, req)
+	case errors.As(err, &answer) && answer.Status == http.StatusNotFound &&
+		answer.Message == http.StatusText(http.StatusNotFound) && !answer.NoChallenge:
+		return missed(c, cached, req)
+	}
+	return err
+}
+
+// NotServed answers req, a path an overlay does not serve on the item
+// route, as the generic route answers a file it does not hold: Read on the
+// path first, then the download policy, then the miss, the order of
+// 7.161.26's checkDownloadIsAllowed and getInfo. The overlays that keep a
+// format's own records from the item route (Chef's api/v1 documents, Conda's
+// shards, Hugging Face's Xet records, Machine Learning's staging and
+// manifests) and the paths a format refuses answer so: on 7.x such a path
+// holds no file the download serves [I for a remote, whose upstream 7.x
+// would ask]. A request fileRequest leaves to the old answers keeps
+// ItemNotFound whoever asks, as before.
+func NotServed(
+	c repo.Config,
+	cached bool,
+	req ItemRequest,
+	caller kernel.Principal,
+	acc Access,
+) error {
+	if !fileRequest(c, req) {
+		return ItemNotFound()
+	}
+	p := resourcePath(req.Path)
+	if !acc.Folder(c, req.Path, accessapi.ActionRead) || !acc.File(c, p, accessapi.ActionRead) {
+		return refused(c, req, caller)
+	}
+	if err := generic.CheckDownload(c, p, false); err != nil {
+		var rejected *format.RejectionError
+		if errors.As(err, &rejected) {
+			return apierror.New(rejected.Status, rejected.Message)
+		}
+		return err //nolint:wrapcheck // CheckDownload answers with RejectionError alone
+	}
+	return missed(c, cached, req)
+}
+
 // sourceAnswer answers err, a remote source's failure to read req, as
 // pkgroute.SourceError does, except that a file request's miss and want of
 // Read take the download's answers (missed, refused). The failures
@@ -174,4 +289,48 @@ func sourceAnswer(c repo.Config, req ItemRequest, caller kernel.Principal, err e
 	}
 	//nolint:wrapcheck // typed HTTP response
 	return pkgroute.SourceError(err, caller.Anonymous)
+}
+
+// RemoteReadError is pkgroute.SourceError's answer to err, a remote
+// source's read that an overlay's own index read makes, and keeps err for
+// ReadAnswer alone: the error unwraps to the answer, so every check a
+// caller makes, a virtual repository's passing over a member's miss
+// included, sees the answer as before, while ReadAnswer still finds a
+// cache fill the caller may not make or an assumed-offline upstream, which
+// SourceError answers as the plain miss each one also is.
+func RemoteReadError(err error, anonymous bool) error {
+	answer := pkgroute.SourceError(err, anonymous)
+	if answer == nil {
+		return nil
+	}
+	return &remoteReadError{answer: answer, cause: err}
+}
+
+// remoteReadError is RemoteReadError's answer with the read's failure.
+type remoteReadError struct {
+	answer error
+	cause  error
+}
+
+func (e *remoteReadError) Error() string { return e.answer.Error() }
+
+func (e *remoteReadError) Unwrap() error { return e.answer }
+
+// remoteReadCause is the failure behind err that remoteMissAnswer reads:
+// the read's own failure RemoteReadError kept, or err. A refused fill of
+// another file than req's, the index an overlay reads to find req's
+// package, is restated for req's file, since 7.161.26 downloads a remote's
+// package alone and RemoteRepoBase.downloadAndSave checks the package's
+// own cache path; under one permission on the remote both checks agree
+// [I].
+func remoteReadCause(req ItemRequest, err error) error {
+	cause := err
+	if kept := new(remoteReadError); errors.As(err, &kept) {
+		cause = kept.cause
+	}
+	p := resourcePath(req.Path)
+	if denied := new(source.CacheFillDenied); errors.As(cause, &denied) && denied.Path != p {
+		return &source.CacheFillDenied{User: denied.User, Repo: denied.Repo, Path: p}
+	}
+	return cause
 }

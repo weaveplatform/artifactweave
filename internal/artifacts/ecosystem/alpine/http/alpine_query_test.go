@@ -120,27 +120,27 @@ func alpineQueryWorld(t *testing.T) (*itemWorld, *alpineAsked) {
 	return w, asked
 }
 
-// alpineItemRoute reports whether the generic item route answers path
-// under key: a package in a local or remote repository. The Alpine index
-// route and a virtual repository answer the rest.
-func alpineItemRoute(key, path string) bool {
+// alpineDownloadAnswers reports whether key answers as the download does
+// (#1572): a local or remote repository, whose index the Alpine overlay
+// serves with the download's answers too (#1599). A virtual repository's
+// answers are P10's (#1533).
+func alpineDownloadAnswers(key string) bool {
 	switch key {
 	case alpineLocal, "alpine-tagged", alpineRemote, "alpine-held":
-		return path == apkHelloPath
+		return true
 	}
 	return false
 }
 
 // alpineRefusal is the answer to caller, who may not read path under key:
-// on the item route, 7.161.26's download refusal (#1572), which names a
-// remote's cache as the path it checks, or 401 "Unauthorized" for an
-// anonymous caller; on the Alpine routes, "Forbidden" or "Authentication
-// is required".
+// 7.161.26's download refusal, which names a remote's cache as the path it
+// checks, or 401 "Unauthorized" for an anonymous caller; in a virtual
+// repository, "Forbidden" or "Authentication is required".
 func alpineRefusal(key, path, caller string) (int, string) {
 	switch {
-	case !alpineItemRoute(key, path) && caller == "":
+	case !alpineDownloadAnswers(key) && caller == "":
 		return http.StatusUnauthorized, "Authentication is required"
-	case !alpineItemRoute(key, path):
+	case !alpineDownloadAnswers(key):
 		return http.StatusForbidden, "Forbidden"
 	case caller == "":
 		return http.StatusUnauthorized, "Unauthorized"
@@ -154,11 +154,11 @@ func alpineRefusal(key, path, caller string) (int, string) {
 }
 
 // alpineMismatch is the answer to a file under key that does not match a
-// matrix parameter: on the item route, 7.161.26's PROPERTY_MISMATCH reason
-// for the repository that holds the file, a remote's cache (#1572); on the
-// Alpine routes, "Could not find resource".
+// matrix parameter: 7.161.26's PROPERTY_MISMATCH reason for the repository
+// that holds the file, a remote's cache (#1572); in a virtual repository,
+// "Could not find resource".
 func alpineMismatch(key, path string) string {
-	if !alpineItemRoute(key, path) {
+	if !alpineDownloadAnswers(key) {
 		return "Could not find resource"
 	}
 	if key == alpineRemote || key == "alpine-held" {

@@ -99,12 +99,22 @@ func withStore(wrap func(serverStore) serverStore) func(*overlayConfig) {
 // other name a user whom none allows.
 func (w *overlayWorld) request(key, path, as string) *http.Request {
 	w.t.Helper()
+	return w.requestBy(http.MethodGet, key, path, as)
+}
+
+// requestBy is request with method; an empty as is the anonymous user.
+func (w *overlayWorld) requestBy(method, key, path, as string) *http.Request {
+	w.t.Helper()
 	p, d := kittest.Admin, kittest.AdminAccess().Decider
-	if as != kittest.Admin.Name {
+	switch as {
+	case kittest.Admin.Name:
+	case "":
+		p, d = kernel.Principal{Name: kernel.AnonymousUser, Anonymous: true},
+			&accessapitest.Decider{}
+	default:
 		p, d = kernel.Principal{Name: as}, &accessapitest.Decider{}
 	}
-	r := httptest.NewRequestWithContext(w.t.Context(), http.MethodGet,
-		"/artifactory/"+key+"/"+path, nil)
+	r := httptest.NewRequestWithContext(w.t.Context(), method, "/artifactory/"+key+"/"+path, nil)
 	return r.WithContext(accessapi.WithCaller(r.Context(), p, d))
 }
 
@@ -247,6 +257,27 @@ func wantError(t *testing.T, rec *httptest.ResponseRecorder, status int, message
 		body.Errors[0].Message != message {
 		t.Errorf("answered %d %s, want %d %q", rec.Code, rec.Body, status, message)
 	}
+}
+
+// wantAnswer is wantError for a GET, and for a HEAD, which carries the
+// status alone, the status.
+func wantAnswer(
+	t *testing.T, rec *httptest.ResponseRecorder, method string, status int, message string,
+) {
+	t.Helper()
+	if method == http.MethodGet {
+		wantError(t, rec, status, message)
+	} else if rec.Code != status {
+		t.Errorf("%s answered %d, want %d", method, rec.Code, status)
+	}
+}
+
+// debRefusal is the download's refusal of path under key to user (#1599):
+// 7.161.26's reason for checked, the path it checks, a remote's cache,
+// with the path the request named.
+func debRefusal(key, checked, path, user string) string {
+	return "Download request for repo:path '" + checked + ":" + path +
+		"' is forbidden for user: '" + user + "'.; Path: '" + key + ":" + path + "'"
 }
 
 // sourceBackend is a remote source transport made of one function.

@@ -77,6 +77,11 @@ func (s *Kit) getArchiveEntry(
 		httpkit.WriteErr(w, r, s.InternalError(ctx, "archive entry", err))
 		return
 	}
+	// An overlay's read under a trace records the archive and serves nothing.
+	if traceServed(r, "Returning found resource from "+
+		traceRepoPath(f.Repo, f.Item.Cached, f.Item.FullPath())) {
+		return
+	}
 	r = downloadRequest(r)
 	name := path.Base(entry)
 	h := w.Header()

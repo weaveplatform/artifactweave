@@ -136,6 +136,24 @@ var (
 	anonymous = &caller{kernel.Anonymous, &accessapitest.Decider{}}
 )
 
+// itemAnswer is the message the item route answers for name under key to
+// as, where the API path answers status and message: the download's
+// refusal and miss (#1599), 7.161.26's reason with the path, in place of
+// "Forbidden", "Authentication is required" and "Could not find resource".
+// Any other answer is both paths'.
+func itemAnswer(key, name string, as *caller, status int, message string) string {
+	switch {
+	case status == http.StatusUnauthorized:
+		return "Unauthorized"
+	case status == http.StatusForbidden:
+		return "Download request for repo:path '" + key + ":" + name +
+			"' is forbidden for user: '" + as.p.Name + "'.; Path: '" + key + ":" + name + "'"
+	case message == "Could not find resource":
+		return "File not found.; Path: '" + key + ":" + name + "'"
+	}
+	return message
+}
+
 // do serves method on target through the routes as the caller as, or with
 // no caller in the context when as is nil, which the router's
 // authentication never lets through.
@@ -214,6 +232,19 @@ func (w *itemWorld) stored(name string) model.Item {
 		w.t.Fatalf("%s is not stored: %v", name, err)
 	}
 	return it
+}
+
+// wantAnswer is wantError for a GET, and for a HEAD, which carries the
+// status alone, the status.
+func wantAnswer(
+	t *testing.T, rec *httptest.ResponseRecorder, method string, status int, message string,
+) {
+	t.Helper()
+	if method == http.MethodGet {
+		wantError(t, rec, status, message)
+	} else if rec.Code != status {
+		t.Errorf("%s answered %d, want %d", method, rec.Code, status)
+	}
 }
 
 // wantError fails the test unless rec answered status with the Artifactory
