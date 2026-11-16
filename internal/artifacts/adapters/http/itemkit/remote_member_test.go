@@ -474,3 +474,27 @@ func TestUnitVirtualUpstreamStepTrace(t *testing.T) {
 		}
 	}
 }
+
+// TestUnitVirtualUpstreamStepTracesAPolicyRefusalOnce (#1535): a remote
+// member whose download policy refuses its upstream read is traced once,
+// as a direct read of it is, and the walk passes over it: the refusal is
+// not the virtual repository's answer, which here is the next member's
+// 403, so the trace does not respond with an unfound resource.
+func TestUnitVirtualUpstreamStepTracesAPolicyRefusalOnce(t *testing.T) {
+	w := newMemberWorld(t)
+	w.src.answer = func(q source.Request) (source.Result, error) {
+		if q.Repo.Key == kittest.RemoteKey {
+			return source.Result{}, &format.RejectionError{
+				Status: http.StatusConflict, Message: "blocked", Policy: true,
+			}
+		}
+		return source.Result{}, source.ErrDenied
+	}
+	body := w.get(t, http.MethodGet, "/artifactory/pair/f.bin?trace").Body.String()
+	const denied = "Download denied (blocked) - returning un-found resource"
+	if n := strings.Count(body, denied); n != 1 ||
+		!strings.Contains(body, "Sending a response with the status '403'") ||
+		strings.Contains(body, "Responding with unfound resource") {
+		t.Fatalf("%d refusal lines in\n%s", n, body)
+	}
+}

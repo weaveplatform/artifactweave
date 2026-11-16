@@ -80,7 +80,9 @@ func (s *Kit) fileStep(r *http.Request, req ItemRequest, p kernel.Principal, acc
 		if !s.upstreamReads(m, dl.path) {
 			return Found{}, passedOver, nil
 		}
+		restore := keepUnfound(dl)
 		read, ok := s.readRemoteItem(r, m, memberRequest(req, m), p, acc, dl.trace)
+		restore()
 		if !ok {
 			// The member's cache holds the path, which its cache step
 			// answered.
@@ -117,7 +119,9 @@ func (s *Kit) archiveStep(
 	return func(
 		ctx context.Context, dl *Download, m repo.Config, res *virtual.Resolution,
 	) (Found, memberAnswer, error) {
+		restore := keepUnfound(dl)
 		a, read, ok := s.readRemoteArchive(r, m, memberRequest(req, m), archive, p, acc, dl.trace)
+		restore()
 		if !ok {
 			return Found{}, passedOver, nil
 		}
@@ -309,15 +313,32 @@ func upstreamMiss(read remoteRead) readMiss {
 	return readServes
 }
 
+// keepUnfound returns what puts back dl's mark of an unfound answer
+// (resolutionTrace.unfound) once a remote member's upstream read has been
+// made. The read traces a refusal by the member's download policy as a
+// direct read does (resolutionTrace.denied), but that marks the answer of a
+// direct request, and the walk passes over the member, as lookupMember
+// passes over its download check, and answers on.
+func keepUnfound(dl *Download) func() {
+	if dl.trace == nil {
+		return func() {}
+	}
+	unfound := dl.trace.unfound
+	return func() { dl.trace.unfound = unfound }
+}
+
 // traceMiss records why a walk passed over the remote member m's upstream
 // step, in the words 7.161.26's remote logs: a refusal as
 // createUnfoundRepoResource logs it, a miss as the stored lookup's, and a
-// failure as RemoteRepoBase.handleGenericException's.
+// failure as RemoteRepoBase.handleGenericException's. The read has traced
+// a refusal by the member's download policy already (readRemoteItem).
 func traceMiss(dl *Download, m repo.Config, read remoteRead) {
 	var rejected *format.RejectionError
 	switch {
 	case errors.As(read.cause, &rejected):
-		dl.stepf("Download denied (%s) - returning un-found resource", rejected.Message)
+		if !rejected.Policy {
+			dl.stepf("Download denied (%s) - returning un-found resource", rejected.Message)
+		}
 	case errors.Is(read.cause, kernel.ErrNotFound):
 		dl.stepf("Unable to find resource in %s", traceRepoPath(m, false, dl.path))
 	default:
