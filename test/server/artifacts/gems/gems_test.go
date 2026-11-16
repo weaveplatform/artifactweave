@@ -581,7 +581,12 @@ func TestAccLocalAndVirtualIndexesFailClosedOnCorruptStoredArchive(t *testing.T)
 	}
 }
 
-func TestAccVirtualRejectsWrongPackageTypeMember(t *testing.T) {
+// A member of another package type, which only data saved before the save
+// checks can hold (decision 0008, R11), adds nothing to a merged index: the
+// kit's walk passes over it. The gem download keeps its own member loop
+// (https://github.com/weaveplatform/artifactweave/issues/1538), which
+// refuses it.
+func TestAccVirtualPassesOverWrongPackageTypeMember(t *testing.T) {
 	w := newWorld(t)
 	c, err := w.db.Repos().Get(t.Context(), "gems-virtual")
 	if err != nil {
@@ -591,20 +596,23 @@ func TestAccVirtualRejectsWrongPackageTypeMember(t *testing.T) {
 	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&other)); err != nil {
 		t.Fatal(err)
 	}
+	status(
+		t,
+		w.do(http.MethodPut, "/artifactory/generic-local/gems/rake-12.3.1.gem", "admin", w.gem),
+		http.StatusCreated,
+	)
 	c.Repositories = []string{other.Key}
 	if err := w.db.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"versions", "gems/rake-12.3.1.gem"} {
-		got := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/"+path, "admin", nil)
-		if got.Code < 400 {
-			t.Fatalf(
-				"wrong-type virtual member accepted through %s: %d %s",
-				path,
-				got.Code,
-				got.Body,
-			)
-		}
+	versions := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/versions", "admin", nil)
+	status(t, versions, http.StatusOK)
+	if strings.Contains(versions.Body.String(), "rake") {
+		t.Fatalf("wrong-type member merged into the index: %s", versions.Body)
+	}
+	got := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/gems/rake-12.3.1.gem", "admin", nil)
+	if got.Code < 400 {
+		t.Fatalf("wrong-type virtual member served a gem: %d %s", got.Code, got.Body)
 	}
 }
 

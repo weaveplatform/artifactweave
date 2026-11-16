@@ -22,11 +22,12 @@
 //   - For Answer: a walk's Resolution, the resource path it looked for,
 //     whether the caller is anonymous, and the virtual's
 //     hideUnauthorizedResources.
+//   - For Collect: a walk's members and the format's read of one member's
+//     document; for a Merger, the parts Collect returns.
 //
 // Planned: artifactoryRequestsCanRetrieveRemoteArtifacts and
-// virtualRetrievalCachePeriodSecs, and the Merger that each format
-// implements in its ecosystem/<type>/virtual.go (target layout, lines
-// 659-665; decision 0008).
+// virtualRetrievalCachePeriodSecs (target layout, lines 659-665; decision
+// 0008).
 //
 // # Outputs
 //
@@ -42,9 +43,17 @@
 //   - deploy.go: DeployTarget, the local or federated repository a deploy
 //     to a virtual repository lands in, or ErrNoDeployTarget, which the
 //     item routes answer with 7.x's 405 (decision 0008, R6).
+//   - merge.go: Merger, the contract a format implements in its
+//     ecosystem/<type>/virtual.go to merge its members' metadata, with
+//     Part, one member's document; Collect, the members' documents in the
+//     walk's order, leaving out each whose read is ErrPassOver or a miss
+//     (R3); and the helpers a merge is built from: UnionBy (the first
+//     member wins a key), SortVersions (stable), Latest (stable versions
+//     first), Accepts (both repositories' patterns, for a merged list
+//     filtered before it is paged, R5), and APIBase and ItemBase, the
+//     virtual repository's URL a merged document points at.
 //
-// Planned (target layout, lines 659-663): merge.go, the Merger interface a
-// format implements to merge metadata; cache.go, merged metadata cached
+// Planned (target layout, lines 659-663): cache.go, merged metadata cached
 // for virtualRetrievalCachePeriodSecs.
 //
 // # Invariants
@@ -60,6 +69,8 @@
 //     never fail a walk; only a member read that fails does.
 //   - DeployTarget never returns a remote or virtual repository, whatever
 //     the stored configuration names.
+//   - Collect keeps the walk's order and never drops a member for a fault:
+//     only ErrPassOver and kernel.ErrNotFound leave a member out.
 //
 // # References
 //
@@ -71,7 +82,7 @@
 //     https://github.com/weaveplatform/artifactweave/issues/958 holds the
 //     map.
 //   - Decision 0008: docs/research/decisions/0008-virtual-repositories.md,
-//     rules R1, R2 and R6, with their Artifactory 7.161.26 sources.
+//     rules R1 to R6, with their Artifactory 7.161.26 sources.
 //   - Decision 0044:
 //     docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Placeholders".
@@ -84,7 +95,9 @@
 // answers (Resolution, Answer;
 // https://github.com/weaveplatform/artifactweave/issues/1533); and the
 // deploy target (DeployTarget;
-// https://github.com/weaveplatform/artifactweave/issues/1534). The rest of
+// https://github.com/weaveplatform/artifactweave/issues/1534); and the
+// merge contract (Merger, Collect and its helpers;
+// https://github.com/weaveplatform/artifactweave/issues/1536). The rest of
 // the package is planned for P10's other tickets
 // (https://github.com/weaveplatform/artifactweave/issues/1521).
 //
@@ -95,5 +108,7 @@
 // cycles, self-members, missing keys and nested pattern drops, Walk's
 // routes, bounds and failures, and Answer's statuses. deploy_test.go covers
 // DeployTarget for each class the defaultDeploymentRepo may name, unset and
-// missing, and a read that fails.
+// missing, and a read that fails. merge_test.go merges with a test Merger
+// built from the helpers alone, as a format's virtual.go would be, and
+// covers Collect's pass-overs and faults and each helper's edges.
 package virtual

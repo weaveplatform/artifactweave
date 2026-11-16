@@ -755,7 +755,10 @@ RTFACT-19925, RTFACT-29572 and RTFACT-24940. So:
 ### R5. Virtual repositories
 
 - **A merge leaves out a blacked-out member,** local or remote, since the documentation says
-  resolution ignores it (`Kit.MergeMembers`).
+  resolution ignores it (`Kit.MergeMembers`). The package handlers' walk also flattens nested
+  virtual repositories and leaves out, silently, a member of another type and one the caller
+  may read nothing in, which a package handler counts as not found (decision 0008, R2, R3,
+  R11).
 - **A member that refuses only a release's file stays in the merge,** with the release listed
   (RTFACT-25571, RTFACT-6205).
 - **A member that refuses the document's own path is left out** [I], as
