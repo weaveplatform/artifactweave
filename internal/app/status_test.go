@@ -399,14 +399,26 @@ func multipartStatusRows() []statusCase {
 			"",
 			400,
 		},
-		{create, uploadsCreate + "?repoKey=missing&repoPath=f&partSizeMB=1", "admin", "", 404},
+		{create, uploadsCreate + "?repoPath=f&partSizeMB=1", "admin", "", 400},
+		// 7.x's generateToken refuses a missing repository as it refuses a
+		// caller without Deploy, and checks no repository's class (#1627).
+		{create, uploadsCreate + "?repoKey=missing&repoPath=f&partSizeMB=1", "admin", "", 403},
+		{create, uploadsCreate + "?repoKey=&repoPath=f&partSizeMB=1", "admin", "", 403},
 		{
 			create,
 			uploadsCreate + "?repoKey=remote-private&repoPath=f&partSizeMB=1",
 			"admin",
 			"",
-			405,
+			200,
 		},
+		{
+			create,
+			uploadsCreate + "?repoKey=remote-private&repoPath=f&partSizeMB=1",
+			"user",
+			"",
+			403,
+		},
+		{create, uploadsCreate + "?repoKey=missing&repoPath=f&partSizeMB=1", "anonymous", "", 401},
 		{create, c, "user", "", 403},
 		{create, c, "anonymous", "", 401},
 		{create, c, "", "", 401},

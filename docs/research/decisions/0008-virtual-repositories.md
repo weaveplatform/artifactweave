@@ -125,10 +125,15 @@ An upload to a virtual goes to its `defaultDeploymentRepo`, which is a local or 
 member, and needs Deploy on that repository's path, not on the virtual's. With none set, or
 with one that names no local or federated repository, it answers 405 with `Allow: GET` and
 `No local repository was configured as local deployment repository for the (<key>) virtual repository.`
-before any permission is checked. This holds for a plain, checksum, archive or folder deploy
-and for the CLI's multipart upload: the create of a multipart upload through a virtual
-without one answers the same 405 **[I]** (7.x checks Deploy on the virtual's own path there
-and refuses the closing checksum deploy with this 405; `MultipartUploadServiceImpl` 109-118).
+before any permission is checked. This holds for a plain, checksum, archive or folder deploy,
+so for the checksum deploy that ends the CLI's multipart upload too. The create of a
+multipart upload refuses no repository for its class: through a virtual it checks Deploy on
+the `defaultDeploymentRepo`'s path, whatever that names, or on the virtual's own path when it
+names none, which an administrator always holds and otherwise only a grant on any repository
+covers; a caller without it gets 403 `The user is not allowed to deploy to this location`
+([#1627](https://github.com/weaveplatform/artifactweave/issues/1627)). An upload begun
+through a virtual without a local or federated one fails at that closing checksum deploy
+with this 405.
 An upload to a remote repository's key, or its cache's, answers 404
 `Could not find a local repository named <key> to deploy to.`, the key as the request gave it.
 A virtual cannot be another virtual's `defaultDeploymentRepo`
@@ -164,7 +169,11 @@ Sources: `util/UploadServiceUtils.getTargetRepository` 248-261;
 `repo/webdav/methods/DeleteMethod.handle` 75-83;
 `repo/service/mover/RepoPathMover.throwExceptionIfTargetRepoIsForbidden` 121-138;
 `repo/service/RepositoryServiceImpl` (a cache registered only for a remote that stores
-artifacts locally); `MultipartUploadResource` and `MultipartUploadServiceImpl.generateToken`;
+artifacts locally); `MultipartUploadResource` and `MultipartUploadServiceImpl.generateToken`
+and `getRepoPath` 80-119; `security/AuthorizationServiceBase.hasPermission` 298 (an
+administrator), and `LegacyAuthorizationServiceImpl.hasMatchingRepoKey` 825-836 and
+`AuthorizationServiceImpl.createArtifactPermissionScope` 682-687 (a virtual's key, or one no
+repository has, matches only a grant on any repository or on that key);
 JFrog's
 [Configure Virtual Repositories for Deployment](https://docs.jfrog.com/artifactory/docs/deploy-artifacts#configure-virtual-repositories-for-deployment).
 
