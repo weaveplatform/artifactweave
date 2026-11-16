@@ -286,7 +286,7 @@ func (s CranAPI) cranIndexRead(
 		if err != nil {
 			return view, fmt.Errorf(
 				"cran: remote index: %w",
-				pkgroute.SourceError(err, p.Anonymous),
+				itemkit.RemoteReadError(err, p.Anonymous),
 			)
 		}
 		view.checkPermission, view.revalidate, view.used =

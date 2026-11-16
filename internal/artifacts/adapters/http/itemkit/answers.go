@@ -203,7 +203,7 @@ func ReadAnswer(
 	// An overlay path is the item route's, so a cache fill the caller may
 	// not make and an assumed-offline miss answer as sourceAnswer answers
 	// them, before the miss either one is too.
-	if answer := remoteMissAnswer(c, req, caller, err); answer != nil {
+	if answer := remoteMissAnswer(c, req, caller, remoteReadCause(req, err)); answer != nil {
 		return answer
 	}
 	var failure *source.HTTPError
@@ -289,4 +289,48 @@ func sourceAnswer(c repo.Config, req ItemRequest, caller kernel.Principal, err e
 	}
 	//nolint:wrapcheck // typed HTTP response
 	return pkgroute.SourceError(err, caller.Anonymous)
+}
+
+// RemoteReadError is pkgroute.SourceError's answer to err, a remote
+// source's read that an overlay's own index read makes, and keeps err for
+// ReadAnswer alone: the error unwraps to the answer, so every check a
+// caller makes, a virtual repository's passing over a member's miss
+// included, sees the answer as before, while ReadAnswer still finds a
+// cache fill the caller may not make or an assumed-offline upstream, which
+// SourceError answers as the plain miss each one also is.
+func RemoteReadError(err error, anonymous bool) error {
+	answer := pkgroute.SourceError(err, anonymous)
+	if answer == nil {
+		return nil
+	}
+	return &remoteReadError{answer: answer, cause: err}
+}
+
+// remoteReadError is RemoteReadError's answer with the read's failure.
+type remoteReadError struct {
+	answer error
+	cause  error
+}
+
+func (e *remoteReadError) Error() string { return e.answer.Error() }
+
+func (e *remoteReadError) Unwrap() error { return e.answer }
+
+// remoteReadCause is the failure behind err that remoteMissAnswer reads:
+// the read's own failure RemoteReadError kept, or err. A refused fill of
+// another file than req's, the index an overlay reads to find req's
+// package, is restated for req's file, since 7.161.26 downloads a remote's
+// package alone and RemoteRepoBase.downloadAndSave checks the package's
+// own cache path; under one permission on the remote both checks agree
+// [I].
+func remoteReadCause(req ItemRequest, err error) error {
+	cause := err
+	if kept := new(remoteReadError); errors.As(err, &kept) {
+		cause = kept.cause
+	}
+	p := resourcePath(req.Path)
+	if denied := new(source.CacheFillDenied); errors.As(cause, &denied) && denied.Path != p {
+		return &source.CacheFillDenied{User: denied.User, Repo: denied.Repo, Path: p}
+	}
+	return cause
 }

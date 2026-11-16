@@ -273,10 +273,7 @@ func (s alpineItems) alpineIndexRead(
 		result, err := s.RemoteSources.Read(ctx, query)
 		if err != nil {
 			//nolint:wrapcheck // Preserve the classified source status.
-			return view, pkgroute.SourceError(
-				err,
-				p.Anonymous,
-			)
+			return view, itemkit.RemoteReadError(err, p.Anonymous)
 		}
 		view.checkPermission = result.CheckPermission
 		view.revalidate = result.Revalidate

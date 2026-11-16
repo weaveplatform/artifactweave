@@ -213,10 +213,37 @@ func TestUnitOverlayAnswersAreTheDownloads(t *testing.T) {
 			"up: is assumed offline, 'up:dists/Packages' is not found at 'dists/Packages'.; " +
 				"Path: 'up:dists/Packages'",
 		},
+		{
+			"index read's refused fill", remote, remoteReq, user,
+			fmt.Errorf("index: %w", RemoteReadError(&source.CacheFillDenied{User: "user", Repo: "up", Path: "dists/Packages"}, false)),
+			403, "Rejected artifact download request: User user is not permitted to deploy " +
+				"'dists/Packages' into 'up-cache:dists/Packages'.",
+		},
+		{
+			"package lookup's refused fill", remote,
+			ItemRequest{Key: "up", Path: "pool/a.deb"},
+			user,
+			RemoteReadError(&source.CacheFillDenied{User: "user", Repo: "up", Path: "dists/Packages"}, false),
+			403, "Rejected artifact download request: User user is not permitted to deploy " +
+				"'pool/a.deb' into 'up-cache:pool/a.deb'.",
+		},
+		{
+			"index read's assumed-offline miss", remote, remoteReq, user,
+			RemoteReadError(source.ErrAssumedOffline, false), 404,
+			"up: is assumed offline, 'up:dists/Packages' is not found at 'dists/Packages'.; " +
+				"Path: 'up:dists/Packages'",
+		},
+		{"index read's miss", remote, remoteReq, user, RemoteReadError(kernel.ErrNotFound, false), 404, "Not Found; Path: 'up:dists/Packages'"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			wantAnswer(t, ReadAnswer(tc.c, false, tc.req, tc.caller, tc.err), tc.status, tc.message)
 		})
+	}
+	kept := RemoteReadError(source.ErrAssumedOffline, true)
+	var keptAnswer *apierror.Error
+	if !errors.As(kept, &keptAnswer) || keptAnswer.Status != http.StatusNotFound ||
+		errors.Is(kept, kernel.ErrNotFound) || RemoteReadError(nil, false) != nil {
+		t.Errorf("RemoteReadError %v is not SourceError's answer alone", kept)
 	}
 	for name, err := range map[string]error{
 		"nil":          nil,

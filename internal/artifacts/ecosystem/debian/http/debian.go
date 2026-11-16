@@ -158,7 +158,7 @@ func (s DebianAPI) serveDebianIndex(
 		var result source.Result
 		result, err = s.RemoteSources.Read(ctx, query)
 		if err != nil {
-			err = pkgroute.SourceError(err, p.Anonymous)
+			err = itemkit.RemoteReadError(err, p.Anonymous)
 			break
 		}
 		checkPermission, used = result.CheckPermission, result.Used

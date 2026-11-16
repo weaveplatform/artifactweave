@@ -10,8 +10,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
@@ -288,6 +291,104 @@ func TestAccFormatOverlayDownloadAnswers(t *testing.T) {
 						t.Errorf("%s %s as %q: challenge %q", method, a.path, a.user, challenge)
 					}
 				}
+			}
+		})
+	}
+}
+
+// TestAccFormatOverlayRemoteFillAnswers: a remote file a format overlay
+// serves on the item route, an index or a package, answers a caller who
+// may read the remote but not fill its cache, and a read while the
+// upstream is assumed offline, as the item route answers any remote file
+// (#1587, #1601), since 7.161.26 serves these files through
+// DownloadServiceImpl and RemoteRepoBase: 403 "Rejected artifact download
+// request: " and assertValidDeployPathAndPermissions' reason for the
+// file's cache path, with no path suffix, and 401 with the challenge for
+// an anonymous caller (respondFoundResource); and internalGetInfo's
+// assumed-offline miss with respondResourceNotFound's path. A package the
+// overlay finds through its index, an opkg IPK or a CRAN source package,
+// answers for its own path [I]. Before, the Alpine, Debian, opkg and CRAN
+// indexes and the opkg and CRAN packages answered the plain miss, 404 "Not
+// Found", for both.
+func TestAccFormatOverlayRemoteFillAnswers(t *testing.T) {
+	cases := []struct {
+		pt    repo.PackageType
+		paths []string
+	}{
+		{repo.Alpine, []string{"v3.20/main/x86_64/APKINDEX.tar.gz"}},
+		{repo.Debian, []string{"dists/stable/main/binary-amd64/Packages"}},
+		{repo.Opkg, []string{"feed/Packages", "feed/464xlat_13_x86_64.ipk"}},
+		{repo.Cran, []string{"src/contrib/PACKAGES", "src/contrib/assertthat_0.2.1.tar.gz"}},
+		{repo.P2, []string{"artifacts.jar"}},
+	}
+	want := func(t *testing.T, w *harness.RemoteWorld, path, user string, status int, message string) {
+		t.Helper()
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			rec := w.Request(method, "/artifactory/remote/"+path, user, "")
+			if rec.Code != status ||
+				method == http.MethodGet && rec.Body.String() != errorBody(t, status, message) {
+				t.Errorf("%s %s as %q: %d %s, want %d %s", method, path, user,
+					rec.Code, rec.Body, status, message)
+			}
+			challenge := rec.Header().Get("WWW-Authenticate")
+			if status == http.StatusUnauthorized &&
+				challenge != `Basic realm="Artifactory Realm"` ||
+				status != http.StatusUnauthorized && challenge != "" {
+				t.Errorf("%s %s as %q: challenge %q", method, path, user, challenge)
+			}
+		}
+	}
+	for _, tc := range cases {
+		t.Run(string(tc.pt)+"/fill", func(t *testing.T) {
+			w := overlayAnswersWorld(t, tc.pt)
+			ctx := t.Context()
+			if err := w.Runtime.Store.Users().
+				Create(ctx, accesstest.User{Name: "viewer", PasswordHash: support.CheapHash}); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Runtime.Store.Permissions().Create(ctx, accesstest.Permission{
+				Name: "remote-view",
+				Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+					Actions: accesstest.Grants{Users: map[string]api.Actions{
+						"viewer": api.ActionRead, kernel.AnonymousUser: api.ActionRead,
+					}},
+					Targets: map[string]accesstest.Target{"remote": {}},
+				}},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			for _, p := range tc.paths {
+				w.Upstream.Set("/"+p, fakeupstream.Resource{Body: []byte("upstream bytes")})
+			}
+			for _, p := range tc.paths {
+				want(t, w, p, "viewer", http.StatusForbidden,
+					"Rejected artifact download request: User viewer is not permitted to deploy '"+
+						p+"' into 'remote-cache:"+p+"'.")
+				want(t, w, p, "", http.StatusUnauthorized, "Unauthorized")
+				if n := w.Upstream.Count(http.MethodGet, "/"+p); n != 0 {
+					t.Errorf("%s: a caller who may not fill the cache downloaded it %d times", p, n)
+				}
+			}
+		})
+		t.Run(string(tc.pt)+"/offline", func(t *testing.T) {
+			w := overlayAnswersWorld(t, tc.pt)
+			for _, p := range tc.paths {
+				w.Upstream.Set("/"+p, fakeupstream.Resource{
+					Fault: fakeupstream.Fault{DropConnection: true},
+				})
+			}
+			// Connection failures have the upstream assumed offline, as in
+			// the generic suite's TestAccRemoteAssumedOfflineAnswersFromTheCache.
+			for range 10 {
+				w.Request(http.MethodGet, "/artifactory/remote/"+tc.paths[0], "reader", "")
+			}
+			asked := len(w.Upstream.Requests())
+			for _, p := range tc.paths {
+				want(t, w, p, "reader", http.StatusNotFound, "remote: is assumed offline, 'remote:"+
+					p+"' is not found at '"+p+"'.; Path: 'remote:"+p+"'")
+			}
+			if len(w.Upstream.Requests()) != asked {
+				t.Errorf("an assumed-offline upstream was asked: %v", w.Upstream.Requests()[asked:])
 			}
 		})
 	}

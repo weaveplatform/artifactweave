@@ -53,7 +53,8 @@
 //     OverwriteRefusal, ChecksumsJSON, DownloadURI, SplitRepoPath,
 //     NotFoundRepo, View and Forced.
 //   - The download's answers, for an overlay to write: Missed, Refused,
-//     Mismatched, ReadAnswer, NotServed and ErrFolderAtPath.
+//     Mismatched, ReadAnswer, RemoteReadError, NotServed and
+//     ErrFolderAtPath.
 //   - Access, Target and AccessFor: the questions handlers ask the
 //     request's permission decider.
 //   - The per-format remote source requests (AlpineSourceRequest and the
@@ -124,6 +125,11 @@
 //     read, and NotServed for a path it has no file for. A folder where
 //     the overlay wants a file keeps ItemNotFound (ErrFolderAtPath) [I],
 //     and a remote's revalidation keeps pkgroute.SourceError's answer.
+//     ReadAnswer answers a cache fill the caller may not make and an
+//     assumed-offline upstream as the item route does (remoteMissAnswer,
+//     #1587, #1601); an overlay's own index read keeps the source's failure
+//     for it with RemoteReadError, and a package found through its index
+//     answers a refused fill of the index for its own path [I].
 //   - ?trace asks the overlays first, as GetItem does (#1595): 7.161.26's
 //     RepoFilter.doGetOrHeadRequest answers ?trace by running the download
 //     itself under a TraceLoggingResponse. The overlay runs against a

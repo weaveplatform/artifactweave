@@ -141,7 +141,9 @@ R1 to R14 apply it to every native protocol:
   on the item route, such as an Alpine, Debian, opkg or CRAN index, a CRAN or opkg package,
   a P2 archive or a Chef, Conda or machine learning item, answers the same (#1599), as
   7.161.26's `RepoFilter` sends every GET and HEAD through `DownloadServiceImpl` whatever
-  the package type. A folder request, a virtual repository, a format's API route and a
+  the package type. So do a remote's refused cache fill and assumed-offline miss on those
+  overlays (#1587, #1601), a package found through its index answering for its own path [I].
+  A folder request, a virtual repository, a format's API route and a
   folder where an overlay wants a file [I] keep "Forbidden", "Authentication is required"
   and their own not-found.
 - **A virtual repository** passes over a member that refuses, as it passes over one without

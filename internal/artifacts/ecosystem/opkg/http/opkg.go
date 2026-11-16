@@ -274,7 +274,7 @@ func (s opkgItems) opkgIndexRead(
 		if err != nil {
 			return view, fmt.Errorf(
 				"opkg: remote index: %w",
-				pkgroute.SourceError(err, p.Anonymous),
+				itemkit.RemoteReadError(err, p.Anonymous),
 			)
 		}
 		view.checkPermission, view.revalidate, view.used =
