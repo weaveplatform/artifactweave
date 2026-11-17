@@ -353,14 +353,22 @@ func (s *Service) Mount(
 	src repo.Config,
 	srcName, hex string,
 ) (model.Item, bool, error) {
-	_, err := layout.FindBlob(ctx, s.Store.Items(), src.Key, srcName, hex)
+	from, err := layout.FindBlob(ctx, s.Store.Items(), src.Key, srcName, hex)
 	if errors.Is(err, kernel.ErrNotFound) {
 		return model.Item{}, false, nil
 	}
 	if err != nil {
 		return model.Item{}, false, err //nolint:wrapcheck // the layout names itself
 	}
-	it, err := s.items().DeployByChecksum(ctx, uploadDeploy(o, hex))
+	return s.CopyBlob(ctx, o, from)
+}
+
+// CopyBlob links an already-authorized source item into o's image without
+// copying bytes. Virtual pushes and mounts also use cached remote items, which
+// Mount's local-image lookup cannot find. The caller checks the source's current
+// read permission and download policy before calling it.
+func (s *Service) CopyBlob(ctx context.Context, o Owner, from model.Item) (model.Item, bool, error) {
+	it, err := s.items().DeployByChecksum(ctx, uploadDeploy(o, from.Actual.SHA256))
 	if errors.Is(err, item.ErrNoBlob) {
 		return model.Item{}, false, nil
 	}

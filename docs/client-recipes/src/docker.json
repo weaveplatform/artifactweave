@@ -27,8 +27,8 @@
     }
   ],
   "publish": {
-    "classes": "LF",
-    "note": "Publish to a concrete local or one-node federated target.",
+    "classes": "LVF",
+    "note": "A virtual publishes to its configured local or federated defaultDeploymentRepo. DEPLOY is checked on that member; virtual upload URLs and token scopes retain the virtual key. Remote repositories reject writes.",
     "steps": [
       {
         "language": "sh",
@@ -51,7 +51,8 @@
   "limitations": [
     "Registry client URLs omit /artifactory; the discovery endpoint is /v2/.",
     "Changing tag contents can require DELETE permission under strict tag overwrite.",
-    "Docker itself is runner-provided, not a pinned released archive. The separately pinned crane/ORAS lanes supply stable registry-client evidence."
+    "Docker itself is runner-provided, not a pinned released archive. The separately pinned crane/ORAS lanes supply stable registry-client evidence.",
+    "Manifest/blob DELETE through a virtual is refused with HTTP 400; delete through the concrete member. A virtual without a default deployment repository refuses publishing with HTTP 405."
   ],
   "evidence": [
     {
@@ -79,6 +80,12 @@
       "path": "test/acceptance/features/registry_virtual.feature",
       "contains": [
         "crane pulls local and remote images by tag and digest through one virtual"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/registry_virtual.feature",
+      "contains": [
+        "crane pushes a derived image through the virtual using cached remote layers"
       ]
     }
   ]

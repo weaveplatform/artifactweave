@@ -43,7 +43,13 @@ func (s DockerAPI) DeleteDockerTag(
 	if err != nil {
 		return nil, err
 	}
-	c, err := dockerRepo(ctx, st, req.RepoKey)
+	c, found, err := Lookup(ctx, st, req.RepoKey)
+	if err == nil && found && c.Class == repo.Virtual {
+		return nil, httpkit.BadRequestf("Unable to delete a manifest from a virtual repository")
+	}
+	if err == nil {
+		c, err = dockerRepo(ctx, st, req.RepoKey)
+	}
 	if err != nil {
 		return nil, s.ItemError(ctx, "resolve repository", err)
 	}

@@ -44,7 +44,7 @@ helm registry login "$AW_REGISTRY" --username "$AW_USER" --password "$AW_TOKEN"
 
 ## Publish
 
-Classes: **local, federated**. Publish to the OCI namespace of a local or one-node federated repository.
+Classes: **local, virtual, federated**. A virtual publishes to its configured local or federated defaultDeploymentRepo. DEPLOY is checked on that member; virtual upload URLs and token scopes retain the virtual key. Remote repositories reject writes.
 
 ```sh
 helm package acme --version 0.1.0
@@ -67,6 +67,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 - Strict tag overwrite may require DELETE when an existing chart version changes.
 - JFrog CLI can wrap helm push to record build-info; configure its isolated home as in the generic recipe and add --build-name/--build-number.
 - The client uses oci://authority/repository, not the classic /artifactory/api/helm path.
+- Manifest/blob DELETE through a virtual is refused with HTTP 400; delete through the concrete member. A virtual without a default deployment repository refuses publishing with HTTP 405.
 
 ## Verification sources
 
@@ -76,4 +77,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [.github/actions/jfrog-cli/action.yml](../../.github/actions/jfrog-cli/action.yml).
 - Evidence: [test/acceptance/features/helm_oci.feature](../../test/acceptance/features/helm_oci.feature).
 - Evidence: [test/acceptance/features/registry_remote.feature](../../test/acceptance/features/registry_remote.feature).
+- Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).
 - Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).
