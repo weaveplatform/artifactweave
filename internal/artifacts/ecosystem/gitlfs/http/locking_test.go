@@ -322,6 +322,57 @@ func TestAccGitLFSVirtualLocksFailClosedWhenDeploymentTargetDisappears(t *testin
 	}
 }
 
+// The lock routes walk the virtual repository's members as reads do: a
+// lock in a member reached through a nested virtual repository conflicts,
+// lists and verifies, past a cycle and a repeated member (decision 0008,
+// R2), where the walk answered 400 "unsupported Git LFS member". Without a
+// deployment target, create and unlock answer 7.x's 405 with Allow: GET
+// and its message (R6), where they answered "Git LFS lock create denied"
+// and "Git LFS unlock denied".
+func TestAccGitLFSVirtualLocksWalkNestedMembersAndRefuseWithoutTarget(t *testing.T) {
+	f := lockFixture(t, repo.Virtual)
+	member := artmodel.GitLFSLock{
+		ID: "nested-lock", RepoKey: "lfs-empty", Path: "assets/shared.bin",
+		Owner: "bob", LockedAt: time.Now().UTC().Truncate(time.Second),
+	}
+	if err := f.db.GitLFSLocks().Create(t.Context(), member); err != nil {
+		t.Fatal(err)
+	}
+	createLFS(t, f.db, repo.Config{
+		Key: "lfs-inner", Class: repo.Virtual, Repositories: []string{"lfs", "lfs-empty"},
+	})
+	patchLFS(t, f.db, "lfs", func(c *repo.Config) {
+		c.Repositories = []string{"lfs-inner", "lfs", "lfs-local", "lfs-local"}
+	})
+	status, conflict := lockCall(t, f, "POST", "/locks", "alice", `{"path":"assets/shared.bin"}`)
+	if status != http.StatusConflict || conflict.Lock.ID != member.ID {
+		t.Fatalf("nested create: %d %+v", status, conflict)
+	}
+	status, listed := lockCall(t, f, "GET", "/locks", "reader", "")
+	if status != http.StatusOK || len(listed.Locks) != 1 || listed.Locks[0].ID != member.ID {
+		t.Fatalf("nested list: %d %+v", status, listed)
+	}
+	status, verified := lockCall(t, f, "POST", "/locks/verify", "alice", `{}`)
+	if status != http.StatusOK || len(verified.Theirs) != 1 || verified.Theirs[0].ID != member.ID {
+		t.Fatalf("nested verify: %d %+v", status, verified)
+	}
+	status, created := lockCall(t, f, "POST", "/locks", "alice", `{"path":"assets/own.bin"}`)
+	if status != http.StatusCreated {
+		t.Fatalf("seed lock: %d %+v", status, created)
+	}
+	patchLFS(t, f.db, "lfs", func(c *repo.Config) { c.DefaultDeploymentRepo = "" })
+	for path, body := range map[string]string{
+		"lfs/locks": `{"path":"assets/new.bin"}`, "lfs/locks/" + created.Lock.ID + "/unlock": `{}`,
+	} {
+		for _, user := range []string{"alice", "reader"} {
+			wantNoDeployTarget(t, lfsAnswerOf(t, f.server, http.MethodPost, path, user, body))
+		}
+	}
+	if _, err := f.db.GitLFSLocks().Get(t.Context(), "lfs-local", created.Lock.ID); err != nil {
+		t.Fatalf("refused unlock removed the lock: %v", err)
+	}
+}
+
 func TestAccGitLFSVirtualCrossMemberConflictAndVerification(t *testing.T) {
 	f := lockFixture(t, repo.Virtual)
 	upstream := artmodel.GitLFSLock{

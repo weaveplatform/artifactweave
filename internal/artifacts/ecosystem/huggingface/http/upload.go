@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -49,8 +48,15 @@ type preuploadRequest struct {
 	GitIgnore string          `json:"gitIgnore,omitempty"` //nolint:tagliatelle // Hub preupload wire key.
 }
 
+// targetRequest is the request a write of id lands in: the repository's
+// own for a local or federated repository, with Write asked on the model's
+// folder, and a virtual repository's deployment target (deployTarget). A
+// remote repository takes no write.
 func (h handler) targetRequest(r *http.Request, id format.Identity) (*http.Request, error) {
 	c := pkgroute.RequestFrom(r).Repo
+	if c.Class == repo.Virtual {
+		return h.deployTarget(r, id)
+	}
 	if !h.k.CanFolder(r, id.Prefix(), api.ActionWrite) {
 		return nil, apierror.New(http.StatusForbidden, "model deployment is not authorized")
 	}
@@ -60,34 +66,7 @@ func (h handler) targetRequest(r *http.Request, id format.Identity) (*http.Reque
 			"cannot deploy to a remote model repository",
 		)
 	}
-	if c.Class != repo.Virtual {
-		return r, nil
-	}
-	if c.DefaultDeploymentRepo == "" || !slices.Contains(c.Repositories, c.DefaultDeploymentRepo) {
-		return nil, apierror.New(
-			http.StatusMethodNotAllowed,
-			"virtual model repository has no deployment target",
-		)
-	}
-	member, err := h.k.DB().Repos().Get(r.Context(), c.DefaultDeploymentRepo)
-	if err != nil {
-		if errors.Is(err, kernel.ErrNotFound) {
-			return nil, apierror.New(http.StatusNotFound, "model deployment target not found")
-		}
-		return nil, fmt.Errorf("huggingface: deployment member: %w", err)
-	}
-	if member.Class != repo.Local && member.Class != repo.Federated ||
-		member.PackageType != repo.HuggingFaceML {
-		return nil, apierror.New(http.StatusBadRequest, "invalid virtual model deployment target")
-	}
-	mr, err := h.k.MemberRequest(r, member)
-	if err != nil {
-		return nil, fmt.Errorf("huggingface: member request: %w", err)
-	}
-	if !h.k.CanFolder(mr, id.Prefix(), api.ActionWrite) {
-		return nil, apierror.New(http.StatusForbidden, "model deployment target is not authorized")
-	}
-	return mr, nil
+	return r, nil
 }
 
 func (h handler) preupload(w http.ResponseWriter, r *http.Request) {

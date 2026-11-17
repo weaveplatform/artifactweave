@@ -16,8 +16,17 @@ Feature: Native Hugging Face model and dataset repositories
       | local     | hf-local |
       | federated | hf-fed   |
 
+  # The virtual repository's local member is empty at first, so the first
+  # download comes from its remote member; once the local member holds the
+  # model, local members come first (decision 0008, R1).
   Scenario: Hub client resolves through a virtual member
     Given the registry is running
+    And a controlled Hugging Face model and dataset upstream is available
+    When I PUT "/artifactory/api/repositories/hf-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"huggingfaceml","url":"{upstream}"}
+      """
+    Then the response status is 200
     When I PUT "/artifactory/api/repositories/hf-member" as admin with body:
       """
       {"rclass":"local","packageType":"huggingfaceml"}
@@ -25,10 +34,11 @@ Feature: Native Hugging Face model and dataset repositories
     Then the response status is 200
     When I PUT "/artifactory/api/repositories/hf-virtual" as admin with body:
       """
-      {"rclass":"virtual","packageType":"huggingfaceml","repositories":["hf-member"]}
+      {"rclass":"virtual","packageType":"huggingfaceml","repositories":["hf-member","hf-remote"]}
       """
     Then the response status is 200
-    When the pinned Hugging Face client publishes and downloads model and dataset through "hf-member"
+    When the pinned Hugging Face client downloads model and dataset through "hf-virtual"
+    And the pinned Hugging Face client publishes and downloads model and dataset through "hf-member"
     And the pinned Hugging Face client downloads model and dataset through "hf-virtual"
 
   Scenario: Hub client resolves remote content from cache while upstream is offline

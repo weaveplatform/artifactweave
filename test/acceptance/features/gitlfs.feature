@@ -168,6 +168,36 @@ Feature: Git LFS batch and basic transfers
     And the server answered no request with 500 since the last command
     And the output contains "403"
 
+  # The local member is empty at first, so the fetch comes from the remote
+  # member; the publish lands in the local member, which the fresh clone
+  # then reads first (decision 0008, R1 and R6).
+  Scenario: the pinned client pulls through a virtual repository over a local and a remote member
+    Given the registry is running
+    And a native Git LFS upstream serves an unchanged object
+    When I PUT "/artifactory/api/repositories/lfs-pull-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"gitlfs","url":"{upstream}"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/lfs-pull-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"gitlfs"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/lfs-pull" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"gitlfs","repositories":["lfs-pull-local","lfs-pull-remote"],"defaultDeploymentRepo":"lfs-pull-local"}
+      """
+    Then the response status is 200
+    Given the Git LFS client can reach the registry
+    When I fetch the upstream Git LFS asset through "lfs-pull" in a fresh client "cold"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When I publish and freshly clone a Git LFS asset through "lfs-pull"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the output contains "git-lfs/3.8.1"
+
   Scenario: the pinned client resolves a remote object through the cache while offline
     Given the registry is running
     And a native Git LFS upstream serves an unchanged object
