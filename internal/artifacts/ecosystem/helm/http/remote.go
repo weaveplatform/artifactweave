@@ -72,14 +72,25 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, requested st
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
 		return
 	}
-	if !h.k.Require(w, r, requested, api.ActionRead) ||
-		(provenance && !h.k.Require(w, r, owner, api.ActionRead)) {
+	if !h.k.Require(w, r, requested, api.ActionRead) || provenance && !h.k.Require(w, r, owner, api.ActionRead) {
 		return
 	}
-	index, metadata, err := h.upstreamIndex(r, requested)
+	result, err := h.remoteChart(r, requested)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
+	}
+	h.k.ServeResult(w, r, result)
+}
+
+func (h handler) remoteChart(r *http.Request, requested string) (source.Result, error) {
+	owner, provenance := strings.CutSuffix(requested, ".prov")
+	if !helmfmt.IsChartPath(owner) {
+		return source.Result{}, apierror.New(http.StatusNotFound, "Could not find resource")
+	}
+	index, metadata, err := h.upstreamIndex(r, requested)
+	if err != nil {
+		return source.Result{}, err
 	}
 	for _, versions := range index.versions {
 		for _, version := range versions {
@@ -93,8 +104,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, requested st
 				// RepoBase.accepts checks every path but a checksum's.
 				if metadata.CheckPermission != nil {
 					if err = metadata.CheckPermission(r.Context(), owner); err != nil {
-						h.k.Error(w, r, pkgroute.SourceError(err, false))
-						return
+						return source.Result{}, fmt.Errorf("helm chart authority: %w", pkgroute.SourceError(err, false))
 					}
 				}
 				resource := pkgroute.Resource(r, requested, "")
@@ -118,8 +128,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, requested st
 				)
 				result, readErr := h.k.Read(r, resource)
 				if readErr != nil {
-					h.k.Error(w, r, readErr)
-					return
+					return source.Result{}, fmt.Errorf("helm chart: %w", readErr)
 				}
 				if provenance && result.Item != nil {
 					if err = h.cachedProvenance(
@@ -127,17 +136,15 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, requested st
 						result,
 						resource.Validate,
 					); err != nil {
-						h.k.Error(w, r, err)
-						return
+						return source.Result{}, err
 					}
 				}
 				fenceHelmDisclosures(&result, metadata, []string{owner})
-				h.k.ServeResult(w, r, result)
-				return
+				return result, nil
 			}
 		}
 	}
-	h.k.Error(w, r, apierror.New(http.StatusNotFound, "Could not find resource"))
+	return source.Result{}, apierror.New(http.StatusNotFound, "Could not find resource")
 }
 
 // Cache-only artifacts are selected by their local path, without re-running

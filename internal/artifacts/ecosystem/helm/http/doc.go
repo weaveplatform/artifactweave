@@ -84,7 +84,8 @@
 //
 // # Status
 //
-// Implemented P8, with remote retrieval in P9. Moved here in P9d.
+// Implemented P8, with remote retrieval in P9. Moved here in P9d. P10 HLM-01
+// adds merged virtual indexes and member chart/provenance downloads.
 //
 // # Testing
 //

@@ -68,6 +68,14 @@
       ]
     },
     {
+      "path": "test/acceptance/features/helm_virtual.feature",
+      "contains": [
+        "repo add aw {url}/api/helm/helm-virtual",
+        "dependency update parent",
+        "pull aw/acme --version 0.1.0 --verify"
+      ]
+    },
+    {
       "path": "test/acceptance/client_steps_test.go",
       "contains": [
         "HELM_CONFIG_HOME=",

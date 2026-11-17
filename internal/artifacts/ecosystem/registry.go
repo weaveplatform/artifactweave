@@ -96,7 +96,7 @@ var handlers = []struct {
 	{gitlfs.Serves, func(Settings) format.Handler { return gitlfs.Handler{} }},
 	{docker.Serves, func(Settings) format.Handler { return docker.Handler{} }},
 	{golang.Serves, func(Settings) format.Handler { return golang.Handler{} }},
-	{helm.Serves, func(Settings) format.Handler { return helm.Handler{} }},
+	{helm.Serves, func(s Settings) format.Handler { return helm.Handler{IndexChanged: s.Helm.IndexChanged} }},
 	{hex.Serves, func(Settings) format.Handler { return hex.Handler{} }},
 	{huggingface.Serves, func(Settings) format.Handler { return huggingface.Handler{} }},
 	{luarocks.Serves, func(Settings) format.Handler { return luarocks.Handler{} }},

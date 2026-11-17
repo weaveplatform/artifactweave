@@ -38,10 +38,16 @@ type RemoteWorld struct {
 // remote's cache only for a caller with Deploy/Cache on it, #1587); and the
 // router over the runtime's store, hot blob store, authenticator, token
 // service and keyring and the artifacts module's remote sources and remote
-// HTTP pool, with a logger that discards.
-func NewRemoteWorld(t *testing.T) *RemoteWorld {
+// HTTP pool, with a logger that discards. Optional mutators select runtime
+// configuration, such as the database used by a server contract.
+func NewRemoteWorld(t *testing.T, mutate ...func(*config.Config)) *RemoteWorld {
 	t.Helper()
-	rt := App(t, func(cfg *config.Config) { cfg.Bootstrap.AdminPassword = "pw" })
+	rt := App(t, func(cfg *config.Config) {
+		cfg.Bootstrap.AdminPassword = "pw"
+		for _, fn := range mutate {
+			fn(cfg)
+		}
+	})
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	c := *repo.Defaults(&repo.Config{
 		Key: "remote", Class: repo.Remote, PackageType: repo.Generic, URL: up.URL,
@@ -74,6 +80,7 @@ func NewRemoteWorld(t *testing.T) *RemoteWorld {
 		Keys:          rt.Keys,
 		RemoteSources: rt.Artifacts.RemoteSources(),
 		RemoteHTTP:    rt.Artifacts.RemoteHTTP(),
+		VirtualCache:  rt.Artifacts.VirtualCache(),
 		Logger:        slog.New(slog.DiscardHandler),
 	})
 	return &RemoteWorld{T: t, Runtime: rt, H: h, Upstream: up, Repo: c}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -71,8 +72,23 @@ func (k *Kit) Merged(
 		Visibility: digest(append(spell(kept), whole)...),
 		Base:       baseurl.From(r.Context()),
 	}
-	return k.o.Cache.Get(r.Context(), key, virtual.Period(v), //nolint:wrapcheck // build's own answer
-		func(ctx context.Context) (virtual.Entry, error) { return build(r.WithContext(ctx)) })
+	ctx := r.Context()
+	if k.p.MergeWait <= 0 {
+		//nolint:wrapcheck // the cache preserves the builder's answer
+		return k.o.Cache.Get(
+			ctx,
+			key,
+			virtual.Period(v),
+			func(ctx context.Context) (virtual.Entry, error) { return build(r.WithContext(ctx)) },
+		)
+	}
+	waitCtx, cancel := context.WithTimeout(ctx, k.p.MergeWait)
+	defer cancel()
+	entry, err := k.o.Cache.Get(waitCtx, key, virtual.Period(v), func(ctx context.Context) (virtual.Entry, error) { return build(r.WithContext(ctx)) })
+	if errors.Is(waitCtx.Err(), context.DeadlineExceeded) && errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+		return build(r)
+	}
+	return entry, err //nolint:wrapcheck // the cache preserves the builder's answer
 }
 
 // MergedPart is Merged for one member's part of a merged document, for a

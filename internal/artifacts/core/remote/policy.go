@@ -49,6 +49,9 @@ type Store interface {
 // source.Service; CheckCurrent repeats it inside the short publication transaction
 // and verifies the effective credential revision without network access.
 type Policy struct {
+	// MetadataChanged observes successful metadata publication or a remote miss.
+	// Composition uses it for Helm merged-index invalidation only.
+	MetadataChanged func(context.Context, repo.Config, string)
 	// Smart reads, in place of the policy, every request whose context
 	// carries no WithSmart mark; NewSmart in artifacts/core/remote/smart
 	// installs itself here. Nil leaves every read to the policy.
