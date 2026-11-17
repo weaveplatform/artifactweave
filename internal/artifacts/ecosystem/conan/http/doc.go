@@ -116,6 +116,11 @@
 // Implemented P9c, which delivered the plan's P31 group (issues #770 to
 // #775). Moved here in P9d.
 //
+// P10 (#1554): virtual walks use the shared engine, including nesting, cycles,
+// duplicates, member permissions and pass-over warnings. Revision and search
+// mergers use the shared visibility-aware cache; uploads check the default
+// deployment target.
+//
 // # Testing
 //
 //   - validation_test.go: the credential exchange's boundaries (a Basic

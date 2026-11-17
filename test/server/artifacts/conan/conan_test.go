@@ -17,7 +17,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 func TestAccConanSearchAndPackageDeletion(t *testing.T) {
@@ -373,8 +375,8 @@ func TestAccConanInvalidRoutesAndClassPolicy(t *testing.T) {
 		{"PUT", base + "/revisions/abc/files/conanmanifest.txt", "invalid", 400},
 		{"PUT", "/artifactory/api/conan/conan-remote/v2/conans/hello/1.0/_/_/revisions/abc/files/conanfile.py", "recipe", 405},
 		{"PUT", "/artifactory/api/conan/conan-virtual/v2/conans/hello/1.0/_/_/revisions/abc/files/conanfile.py", "recipe", 405},
-		{"PUT", "/artifactory/api/conan/conan-bad-virtual/v2/conans/hello/1.0/_/_/revisions/abc/files/conanfile.py", "recipe", 400},
-		{"PUT", "/artifactory/api/conan/conan-missing-deploy/v2/conans/hello/1.0/_/_/revisions/abc/files/conanfile.py", "recipe", 404},
+		{"PUT", "/artifactory/api/conan/conan-bad-virtual/v2/conans/hello/1.0/_/_/revisions/abc/files/conanfile.py", "recipe", 405},
+		{"PUT", "/artifactory/api/conan/conan-missing-deploy/v2/conans/hello/1.0/_/_/revisions/abc/files/conanfile.py", "recipe", 405},
 	} {
 		rec := w.do(tc.method, tc.path, "admin", tc.body)
 		if rec.Code != tc.expected {
@@ -541,7 +543,7 @@ func TestAccConanVirtualMemberOrderAndValidation(t *testing.T) {
 			t.Fatalf("upload %s: %d %s", tc.name, rec.Code, rec.Body)
 		}
 	}
-	for _, key := range []string{"conan-order", "conan-missing"} {
+	for _, key := range []string{"conan-order", "conan-missing", "conan-duplicate", "conan-nested"} {
 		prefix := "/artifactory/api/conan/" + key + "/v2/conans/hello/1.0/_/_"
 		for _, path := range []string{"/latest", "/revisions/abc/files/conanfile.py"} {
 			if rec := w.do("GET", prefix+path, "admin", ""); rec.Code != 200 {
@@ -555,15 +557,15 @@ func TestAccConanVirtualMemberOrderAndValidation(t *testing.T) {
 			"/artifactory/api/conan/"+key+"/v2/conans/search",
 			"admin",
 			"",
-		); rec.Code != 400 {
-			t.Errorf("invalid virtual %s: %d %s", key, rec.Code, rec.Body)
+		); rec.Code != 200 {
+			t.Errorf("virtual graph %s: %d %s", key, rec.Code, rec.Body)
 		}
 	}
 	for _, path := range []string{
 		"/latest", "/search", "/revisions/abc/files/conanfile.py",
 	} {
 		base := "/artifactory/api/conan/conan-duplicate/v2/conans/hello/1.0/_/_"
-		if rec := w.do("GET", base+path, "admin", ""); rec.Code != 400 {
+		if rec := w.do("GET", base+path, "admin", ""); rec.Code != 200 {
 			t.Errorf("duplicate virtual %s: %d %s", path, rec.Code, rec.Body)
 		}
 	}
@@ -1271,7 +1273,7 @@ func TestAccConanRemoteManifestDeliveryBoundary(t *testing.T) {
 	}
 }
 
-func TestAccConanVirtualPropagatesMemberFailure(t *testing.T) {
+func TestAccConanVirtualPassesOverMemberFailure(t *testing.T) {
 	svc := &source.Service{
 		Resolve: sourceIdentity,
 		HTTP: sourceBackend(
@@ -1297,7 +1299,11 @@ func TestAccConanVirtualPropagatesMemberFailure(t *testing.T) {
 		base + "/revisions/abc/files",
 		base + "/revisions/abc/files/conanfile.py",
 	} {
-		if rec := w.do("GET", path, "admin", ""); rec.Code != http.StatusBadGateway {
+		want := http.StatusNotFound
+		if strings.HasSuffix(path, "/search") {
+			want = http.StatusOK
+		}
+		if rec := w.do("GET", path, "admin", ""); rec.Code != want {
 			t.Errorf("virtual member failure %s: %d %s", path, rec.Code, rec.Body)
 		}
 	}
@@ -1461,4 +1467,111 @@ func TestAccConanDownloadPolicyLocalAndVirtual(t *testing.T) {
 		"No repository found to serve the request for conan-virt:"+stored("conanfile.py"))
 	conanServed(t, virt(recipe+"/revisions/abc/files"), "conanfile.py")
 	conanServed(t, virt(recipe+"/revisions/abc/files/conanmanifest.txt"), md5Hex("recipe one"))
+}
+
+func TestAccConanVirtualCacheAndMemberGrants(t *testing.T) {
+	w := newItemWorld(t, false, func(c *Config) { c.VirtualCache = virtual.NewCache(virtual.CacheOptions{}) })
+	for _, c := range []repo.Config{
+		{Key: "data", Class: repo.Local, PackageType: repo.Conan},
+		{Key: "inner", Class: repo.Virtual, PackageType: repo.Conan, Repositories: []string{"outer", "data", "data"}},
+		{Key: "outer", Class: repo.Virtual, PackageType: repo.Conan, Repositories: []string{"inner"}, DefaultDeploymentRepo: "data"},
+	} {
+		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.db.Users().Create(t.Context(), accesstest.User{Name: "member", PasswordHash: support.CheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.db.Permissions().
+		Create(t.Context(), accesstest.Permission{Name: "member-grant", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"member": api.ActionRead | api.ActionWrite}}, Targets: map[string]accesstest.Target{"data": {}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	base := "/artifactory/api/conan/outer/v2/conans/hello/1.0/_/_"
+	publish := func(rev string) {
+		t.Helper()
+		files := base + "/revisions/" + rev + "/files/"
+		for _, f := range []struct{ name, body string }{{"conanfile.py", "recipe"}, {"conanmanifest.txt", fmt.Sprintf("1\nconanfile.py: %s\n", md5Hex("recipe"))}} {
+			rec := w.do("PUT", files+f.name, "member", f.body)
+			if rec.Code != 201 {
+				t.Fatal(rec.Code, rec.Body)
+			}
+		}
+	}
+	publish("abc")
+	if err := w.db.Users().Create(t.Context(), accesstest.User{Name: "file-only", PasswordHash: support.CheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.db.Permissions().
+		Create(t.Context(), accesstest.Permission{Name: "file-only", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"file-only": api.ActionRead}}, Targets: map[string]accesstest.Target{"data": {Include: []string{"**/conanfile.py"}}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		key  string
+		want int
+	}{{"outer", 404}, {"data", 403}} {
+		path := "/artifactory/api/conan/" + tc.key + "/v2/conans/hello/1.0/_/_/revisions/abc/files/conanfile.py"
+		rec := w.do("GET", path, "file-only", "")
+		if rec.Code != tc.want {
+			t.Fatal("manifest permission", tc.key, rec.Code, rec.Body)
+		}
+	}
+
+	first := w.do("GET", base+"/revisions", "member", "")
+	if first.Code != 200 || !strings.Contains(first.Body.String(), "abc") {
+		t.Fatal(first.Code, first.Body)
+	}
+	publish("def")
+	cached := w.do("GET", base+"/revisions", "member", "")
+	if cached.Body.String() != first.Body.String() {
+		t.Fatal("member write invalidated cached Conan revisions")
+	}
+	v, err := w.db.Repos().Get(t.Context(), "outer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	period := -1
+	v.VirtualRetrievalCachePeriodSecs = &period
+	if err = w.db.Repos().Update(t.Context(), v); err != nil {
+		t.Fatal(err)
+	}
+	fresh := w.do("GET", base+"/revisions", "member", "")
+	if fresh.Code != 200 || !strings.Contains(fresh.Body.String(), "def") {
+		t.Fatal(fresh.Code, fresh.Body)
+	}
+	period = 7200
+	v.VirtualRetrievalCachePeriodSecs = &period
+	if err = w.db.Repos().Update(t.Context(), v); err != nil {
+		t.Fatal(err)
+	}
+	if rec := w.do("GET", base+"/revisions", "member", ""); rec.Code != 200 {
+		t.Fatal(rec.Code, rec.Body)
+	}
+	if rec := w.do("DELETE", "/artifactory/api/conan/data/v2/conans/hello/1.0/_/_/revisions/abc", "admin", ""); rec.Code != 204 {
+		t.Fatal(rec.Code, rec.Body)
+	}
+	stale := w.do("GET", base+"/revisions", "member", "")
+	if !strings.Contains(stale.Body.String(), "abc") {
+		t.Fatal("member delete invalidated the cache early")
+	}
+	gone := w.do("GET", base+"/revisions/abc/files/conanfile.py", "member", "")
+	if gone.Code != 404 {
+		t.Fatal(gone.Code, gone.Body)
+	}
+	rebuilt := w.do("GET", base+"/revisions", "member", "")
+	if rebuilt.Code != 200 || strings.Contains(rebuilt.Body.String(), "abc") {
+		t.Fatal("member absence did not evict merged revisions", rebuilt.Code, rebuilt.Body)
+	}
+	// The next checks use the same member grants, with virtual patterns applied.
+	exclude := "_/hello/**"
+	v.ExcludesPattern = &exclude
+	if err = w.db.Repos().Update(t.Context(), v); err != nil {
+		t.Fatal(err)
+	}
+	for _, tail := range []string{"/revisions", "/latest", "/search"} {
+		rec := w.do("GET", base+tail, "member", "")
+		if rec.Code != 404 {
+			t.Fatal(tail, rec.Code, rec.Body)
+		}
+	}
 }

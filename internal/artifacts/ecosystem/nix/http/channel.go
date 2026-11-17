@@ -1,7 +1,6 @@
 package nixhttp
 
 import (
-	"errors"
 	"fmt"
 	"html"
 	"net/http"
@@ -57,7 +56,7 @@ func (h handler) channels(w http.ResponseWriter, r *http.Request, path string) {
 // whose file they reject (R3).
 func (h handler) channel(w http.ResponseWriter, r *http.Request, name string) {
 	folder := "channels/" + name
-	if !h.k.RequireFolder(w, r, folder, accessapi.ActionRead) {
+	if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual && !h.k.RequireFolder(w, r, folder, accessapi.ActionRead) {
 		return
 	}
 	if err := h.k.CheckBlackedOut(r, folder); err != nil {
@@ -138,7 +137,7 @@ func (h handler) newest(r *http.Request, name string) (nixfmt.Snapshot, error) {
 func (h handler) virtualNewest(r *http.Request, name string) (nixfmt.Snapshot, error) {
 	folder := "channels/" + name
 	var found nixfmt.Snapshot
-	err := h.members(r, func(mr *http.Request) (bool, error) {
+	err := h.members(r, "", func(mr *http.Request) (bool, error) {
 		if !h.k.CanFolder(mr, folder, accessapi.ActionRead) ||
 			h.k.CheckBlackedOut(mr, folder) != nil {
 			return false, nil
@@ -157,21 +156,15 @@ func (h handler) virtualNewest(r *http.Request, name string) (nixfmt.Snapshot, e
 // repository in order, until try reports that it answered. A member that
 // no longer exists is skipped, and so is one for which try fails as
 // missing reports. kernel.ErrNotFound means no member answered.
-func (h handler) members(r *http.Request, try func(*http.Request) (bool, error)) error {
-	for _, key := range pkgroute.RequestFrom(r).Repo.Repositories {
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("nix: member: %w", err)
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return fmt.Errorf("nix: member: %w", err)
-		}
+func (h handler) members(r *http.Request, path string, try func(*http.Request) (bool, error)) error {
+	members, err := h.k.MergeMembers(r, path)
+	if err != nil {
+		return fmt.Errorf("nix virtual members: %w", err)
+	}
+	for _, mr := range members {
 		done, err := try(mr)
-		if missing(err) {
+		if pkgroute.PassedOver(err) {
+			h.k.WarnPassedOver(mr, err)
 			continue
 		}
 		if err != nil {
@@ -190,7 +183,7 @@ func (h handler) members(r *http.Request, try func(*http.Request) (bool, error))
 // The page discloses the tarball, so Read is checked there; the page is
 // computed, so only the blackout refuses it, at the request's path.
 func (h handler) snapshotPage(w http.ResponseWriter, r *http.Request, s nixfmt.Snapshot) {
-	if !h.k.Require(w, r, s.Path(), accessapi.ActionRead) {
+	if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual && !h.k.Require(w, r, s.Path(), accessapi.ActionRead) {
 		return
 	}
 	if err := h.k.CheckBlackedOut(r, s.Dir()); err != nil {
@@ -215,7 +208,7 @@ func (h handler) holds(r *http.Request, s nixfmt.Snapshot) error {
 	c := pkgroute.RequestFrom(r).Repo
 	switch c.Class {
 	case repo.Virtual:
-		return h.members(r, func(mr *http.Request) (bool, error) {
+		return h.members(r, "", func(mr *http.Request) (bool, error) {
 			if !h.k.Can(mr, s.Path(), accessapi.ActionRead) ||
 				h.k.CheckBlackedOut(mr, s.Dir()) != nil {
 				return false, nil
@@ -268,14 +261,14 @@ func (h handler) snapshotFile(w http.ResponseWriter, r *http.Request, s nixfmt.S
 // (R5).
 func (h handler) virtualSnapshot(w http.ResponseWriter, r *http.Request, s nixfmt.Snapshot) {
 	path := s.Path()
-	if !h.k.Require(w, r, path, accessapi.ActionRead) {
+	if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual && !h.k.Require(w, r, path, accessapi.ActionRead) {
 		return
 	}
 	if err := h.k.CheckDownload(r, path); err != nil {
 		h.fail(w, r, err)
 		return
 	}
-	err := h.members(r, func(mr *http.Request) (bool, error) {
+	err := h.members(r, s.Path(), func(mr *http.Request) (bool, error) {
 		if !h.k.Can(mr, path, accessapi.ActionRead) {
 			return false, nil
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	hexfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/hex"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -131,7 +132,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path == "public_key" {
-		if !h.k.RequireFolder(w, r, "", accessapi.ActionRead) {
+		if !h.k.RequireRoot(w, r) {
 			return
 		}
 		key, err := h.signingKey(r)
@@ -142,7 +143,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.write(w, r, []byte(hexfmt.PublicKeyPEM(key)), "application/x-pem-file")
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", accessapi.ActionRead) {
+	if !h.k.RequireRoot(w, r) {
 		return
 	}
 	// 7.x keeps names, versions and packages/<name> at those paths (the
@@ -265,7 +266,12 @@ func (h handler) packageItem(r *http.Request, it model.Item) (hexfmt.Package, er
 }
 
 func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
-	if !h.k.Require(w, r, path, accessapi.ActionRead) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual && !h.virtualReadable(r, path) {
+		h.k.Require(w, r, path, accessapi.ActionRead)
+		return
+	}
+
+	if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual && !h.k.Require(w, r, path, accessapi.ActionRead) {
 		return
 	}
 	c := pkgroute.RequestFrom(r).Repo
@@ -276,7 +282,7 @@ func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
 			h.k.Error(w, r, err)
 			return
 		}
-		members, err := h.members(r)
+		members, err := h.members(r, path)
 		if err != nil {
 			h.k.Error(w, r, err)
 			return
@@ -289,7 +295,8 @@ func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
 				// The remote adapter resolves and validates the artifact against
 				// its upstream signed registry before delivery.
 				result, err := h.remoteResult(mr, path)
-				if missing(err) {
+				if pkgroute.PassedOver(err) {
+					h.k.WarnPassedOver(mr, err)
 					continue
 				}
 				if err != nil {
@@ -300,7 +307,8 @@ func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
 				return
 			}
 			found, err := h.k.DownloadItem(mr, path)
-			if missing(err) {
+			if pkgroute.PassedOver(err) {
+				h.k.WarnPassedOver(mr, err)
 				continue
 			}
 			if err != nil {
@@ -320,44 +328,23 @@ func (h handler) tarball(w http.ResponseWriter, r *http.Request, path string) {
 	h.k.ServeItem(w, r, path)
 }
 
-func (h handler) members(r *http.Request) ([]*http.Request, error) {
-	c := pkgroute.RequestFrom(r).Repo
-	seen := map[string]bool{c.Key: true}
-	var out []*http.Request
-	for _, key := range c.Repositories {
-		if seen[key] {
-			return nil, apierror.New(http.StatusBadRequest, "invalid Hex virtual member")
-		}
-		seen[key] = true
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("hex: load virtual member: %w", err)
-		}
-		if member.PackageType != repo.Hex ||
-			member.Class != repo.Local && member.Class != repo.Remote {
-			return nil, apierror.New(http.StatusBadRequest, "invalid Hex virtual member")
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return nil, fmt.Errorf("hex: authorize virtual member: %w", err)
-		}
-		out = append(out, mr)
+func (h handler) members(r *http.Request, path string) ([]*http.Request, error) {
+	members, err := h.k.MergeMembers(r, path)
+	if err != nil {
+		return nil, fmt.Errorf("hex virtual members: %w", err)
 	}
-	return out, nil
+	return members, nil
 }
 
 func (h handler) virtualPackages(
 	r *http.Request,
 	path string,
 ) (map[string]hexfmt.RegistryPackage, error) {
-	members, err := h.members(r)
+	members, err := h.members(r, path)
 	if err != nil {
 		return nil, err
 	}
-	out := map[string]hexfmt.RegistryPackage{}
+	var parts []virtual.Part[map[string]hexfmt.RegistryPackage]
 	for _, mr := range members {
 		// The folder must match remoteMetadata's PermissionPath: a remote
 		// member's registry read refuses the whole request when the caller
@@ -373,50 +360,28 @@ func (h handler) virtualPackages(
 			continue
 		}
 		entries, err := h.packages(mr, path)
-		if missing(err) {
+		if pkgroute.PassedOver(err) {
+			h.k.WarnPassedOver(mr, err)
 			continue
 		}
 		if err != nil {
 			return nil, err
 		}
+		filtered := map[string]hexfmt.RegistryPackage{}
 		for name, entry := range entries {
-			current := out[name]
-			if current.Name == "" {
-				current.Name = name
-			}
-			current.Repository = pkgroute.RequestFrom(r).Repo.Key
-			seen := map[string]bool{}
-			for _, release := range current.Releases {
-				seen[release.Version] = true
-			}
-			offset := uint64(len(current.Advisories))
-			added := false
+			releases := make([]hexfmt.Package, 0, len(entry.Releases))
 			for _, release := range entry.Releases {
-				// The member's listing checked the member's permissions only.
-				// The virtual's tarball route also requires the virtual's own,
-				// so a release that fails them must not be listed either.
 				p, ok := hexfmt.TarballPath(name, release.Version)
-				if !seen[release.Version] && ok && h.k.Can(r, p, accessapi.ActionRead) {
-					mapped := rebindRelease(release, entry.Repository, current.Repository)
-					mapped.AdvisoryIndexes = slices.Clone(mapped.AdvisoryIndexes)
-					for i := range mapped.AdvisoryIndexes {
-						mapped.AdvisoryIndexes[i] += offset
-					}
-					current.Releases = append(current.Releases, mapped)
-					added = true
+				if ok && h.k.Can(mr, p, accessapi.ActionRead) && h.virtualReadable(r, p) {
+					releases = append(releases, release)
 				}
 			}
-			// names lists every package in out, so one without a readable
-			// release must not enter it.
-			if added {
-				current.Advisories = append(current.Advisories, entry.Advisories...)
-				out[name] = current
-			}
+			entry.Releases = releases
+			filtered[name] = entry
 		}
+		parts = append(parts, virtual.Part[map[string]hexfmt.RegistryPackage]{Member: pkgroute.RequestFrom(mr).Repo, Doc: filtered})
 	}
-	for name, entry := range out {
-		out[name] = compactAdvisories(entry)
-	}
+	out, _ := (hexfmt.Merger{Repository: pkgroute.RequestFrom(r).Repo.Key}).Merge(r.Context(), parts)
 	return out, nil
 }
 
@@ -434,37 +399,21 @@ func missing(err error) bool {
 // inside the repository Mix selected. Explicit references to another registry
 // retain their original destination.
 func rebindRelease(release hexfmt.Package, from, to string) hexfmt.Package {
-	if from == "" || from == to {
-		return release
-	}
-	release.Requirements = slices.Clone(release.Requirements)
-	for i := range release.Requirements {
-		if release.Requirements[i].Repository == from {
-			release.Requirements[i].Repository = to
-		}
-	}
-	return release
+	return hexfmt.RebindRelease(release, from, to)
 }
 
-// Keep only advisories referenced by readable releases. Remap their indexes
-// after virtual member selection so denied or shadowed versions disclose none.
 func compactAdvisories(reg hexfmt.RegistryPackage) hexfmt.RegistryPackage {
-	reg.Releases = slices.Clone(reg.Releases)
-	oldToNew := map[uint64]uint64{}
-	var advisories [][]byte
-	for i := range reg.Releases {
-		indexes := slices.Clone(reg.Releases[i].AdvisoryIndexes)
-		for j, old := range indexes {
-			mapped, ok := oldToNew[old]
-			if !ok {
-				mapped = uint64(len(advisories))
-				oldToNew[old] = mapped
-				advisories = append(advisories, reg.Advisories[old])
-			}
-			indexes[j] = mapped
-		}
-		reg.Releases[i].AdvisoryIndexes = indexes
+	return hexfmt.CompactAdvisories(reg)
+}
+
+// Preserve a caller's explicitly scoped virtual grant while allowing access
+// through member grants alone (decision 0008 R10; #1554).
+func (h handler) virtualReadable(r *http.Request, path string) bool {
+	v := pkgroute.RequestFrom(r).Repo
+	d, ok := accessapi.DeciderFrom(r.Context())
+	if !ok {
+		return false
 	}
-	reg.Advisories = advisories
-	return reg
+	hasVirtual := d.AllowsFolder(accessapi.ResourceArtifact, accessapi.Repo{Key: v.Key, Class: string(v.Class)}, "", accessapi.ActionRead)
+	return !hasVirtual || h.k.Can(r, path, accessapi.ActionRead)
 }

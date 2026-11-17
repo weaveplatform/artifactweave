@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
@@ -17,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	platsqltest "github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
@@ -609,4 +611,100 @@ func virtualRemoteExpired(t *testing.T, w *virtualRemoteWorld) {
 	})
 	wantFetched(t, "offline copy", w.do(http.MethodGet,
 		"/artifactory/maven-pair/"+snapshot("offline"), "reader", ""), 200, "a v1")
+}
+
+func TestAccVirtualOriginRestriction(t *testing.T) {
+	w := newVirtualRemoteWorld(t, "sqlite")
+	w.upA.Set("/origin.bin", fakeupstream.Resource{Body: []byte("origin")})
+	read := func(h http.Header) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodGet, "/artifactory/virt/origin.bin", nil)
+		r.Header = h
+		r.SetBasicAuth("reader", "pw")
+		rec := httptest.NewRecorder()
+		w.h.ServeHTTP(rec, r)
+		return rec
+	}
+	for _, name := range []string{remote.OriginHeader, remote.OriginatedHeader} {
+		rec := read(http.Header{name: {"other"}})
+		if rec.Code != 404 || len(w.upA.Requests()) != 0 {
+			t.Fatal(rec.Code, rec.Body, w.upA.Requests())
+		}
+	}
+	v, err := w.rt.Store.Repos().Get(t.Context(), "virt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	yes := true
+	v.ArtifactoryRequestsCanRetrieveRemoteArtifacts = &yes
+	w.update(v)
+	wantFetched(t, "enabled", read(http.Header{remote.OriginatedHeader: {"other"}}), 200, "origin")
+	for _, q := range w.upA.Requests() {
+		if !q.HeaderMatches(remote.OriginHeader, remote.OriginHostID()) {
+			t.Fatal(q.Header)
+		}
+	}
+	no := false
+	v.ArtifactoryRequestsCanRetrieveRemoteArtifacts = &no
+	w.update(v)
+	before := len(w.upA.Requests())
+	wantFetched(t, "cache", read(http.Header{remote.OriginHeader: {"other"}}), 200, "origin")
+	if len(w.upA.Requests()) != before {
+		t.Fatal("cache read reached upstream")
+	}
+	rec := read(http.Header{remote.OriginatedHeader: {"other", remote.OriginHostID()}})
+	if rec.Code != 404 || !strings.Contains(rec.Body.String(), "Recursive call detected") {
+		t.Fatal(rec.Code, rec.Body)
+	}
+}
+
+func TestAccVirtualOriginLoopbackChain(t *testing.T) {
+	w := newVirtualRemoteWorld(t, "sqlite")
+	var recursive atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rec := httptest.NewRecorder()
+		w.h.ServeHTTP(rec, r)
+		if strings.Contains(rec.Body.String(), "Recursive call detected") {
+			recursive.Store(true)
+		}
+		for key, values := range rec.Header() {
+			rw.Header()[key] = values
+		}
+		rw.WriteHeader(rec.Code)
+		_, _ = rw.Write(rec.Body.Bytes())
+	}))
+	defer server.Close()
+	a, err := w.rt.Store.Repos().Get(t.Context(), "remote-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.URL = server.URL + "/artifactory/pair"
+	a.Username = "admin"
+	a.Password = "pw"
+	w.update(a)
+	v, err := w.rt.Store.Repos().Get(t.Context(), "pair")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v.Repositories = []string{"remote-b"}
+	w.update(v)
+	w.upB.Set("/disabled.bin", fakeupstream.Resource{Body: []byte("disabled")})
+	if got := w.do("GET", "/artifactory/remote-a/disabled.bin", "admin", ""); got.Code != 404 {
+		t.Fatal(got.Code, got.Body)
+	}
+	if w.upB.Count("GET", "/disabled.bin") != 0 {
+		t.Fatal("disabled chain contacted upstream")
+	}
+	yes := true
+	v.ArtifactoryRequestsCanRetrieveRemoteArtifacts = &yes
+	w.update(v)
+	w.upB.Set("/enabled.bin", fakeupstream.Resource{Body: []byte("enabled")})
+	wantFetched(t, "enabled chain", w.do("GET", "/artifactory/remote-a/enabled.bin", "admin", ""), 200, "enabled")
+	v.Repositories = []string{"remote-a"}
+	w.update(v)
+	if got := w.do("GET", "/artifactory/remote-a/loop.bin", "admin", ""); got.Code != 404 {
+		t.Fatal(got.Code, got.Body)
+	}
+	if !recursive.Load() {
+		t.Fatal("loop did not reach recursion guard")
+	}
 }

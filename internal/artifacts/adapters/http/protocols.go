@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	agentpackageshttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/agentpackages/http"
 	aieditorextensionshttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/aieditorextensions/http"
 	ansiblehttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/ansible/http"
@@ -52,6 +53,13 @@ import (
 func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 	return pkgroute.Options{
 		Store: s.cfg.Store,
+		NoUpstream: func(r *http.Request, v repo.Config) bool {
+			switch v.PackageType {
+			case repo.Swift, repo.Terraform, repo.Composer:
+				return false
+			}
+			return remote.NoOriginUpstream(r.Context(), v)
+		},
 		Items: func() *item.Service { return s.Items(s.cfg.Store) },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item) {
 			p, _ := kernel.FromContext(r.Context())
@@ -173,7 +181,7 @@ func Protocols(d Deps) []pkgroute.Protocol {
 		),
 		nimmodelhttp.Protocol(d.RemoteSources),
 		jetbrainspluginshttp.Protocol(d.RemoteSources),
-		golanghttp.Protocol(),
+		golanghttp.Protocol(d.RemoteSources),
 		npmhttp.Protocol(npmhttp.Options{
 			RemoteSources:  d.RemoteSources,
 			Accounts:       npmAccounts(d),

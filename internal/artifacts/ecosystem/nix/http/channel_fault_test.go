@@ -181,7 +181,7 @@ func TestAccNixChannelFaultsDoNotLookLikeMisses(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.patch("virtual", func(c *repo.Config) { c.Repositories = []string{"other"} })
-	status(t, f.do("GET", base+"channels/"+channel, nil, ""), 400)
+	status(t, f.do("GET", base+"channels/"+channel, nil, ""), 404)
 }
 
 // channelSource answers a remote's channel reads with a release URL under

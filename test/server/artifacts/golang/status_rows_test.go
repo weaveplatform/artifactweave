@@ -103,7 +103,7 @@ func goStatusRows() []statusCase {
 		{goList, goBase + "npm-local/" + goModule + "/@v/list", "admin", "", 404},
 		// Remote and virtual Go repositories are P9's and P10's.
 		{goList, goBase + "go-remote/" + goModule + "/@v/list", "admin", "", 501},
-		{goList, goBase + "go-virtual/" + goModule + "/@v/list", "admin", "", 501},
+		{goList, goBase + "go-virtual/" + goModule + "/@v/list", "admin", "", 200},
 		{goListHead, v + "list", "admin", "", 200},
 
 		// v1.0.0's .info is synthesised, v1.1.0's stored.

@@ -218,6 +218,42 @@ func TestUnitHexLocalAndVirtualSignedRegistry(t *testing.T) {
 				gotPackages, err)
 		}
 	}
+	// A federated member is local during a nested walk, even though Hex's
+	// direct federated protocol and repository creation remain unsupported.
+	member, err := w.db.Repos().Get(t.Context(), "hex-local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	member.Class = repo.Federated
+	if err = w.db.Repos().Update(t.Context(), member); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []repo.Config{
+		{Key: "hex-inner", Class: repo.Virtual, PackageType: repo.Hex, KeyPair: "hex-signing", Repositories: []string{"hex-outer", "hex-local", "hex-local"}},
+		{Key: "hex-outer", Class: repo.Virtual, PackageType: repo.Hex, KeyPair: "hex-signing", Repositories: []string{"hex-inner", "hex-outer"}},
+	} {
+		if err = w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tail := range []string{"packages/decimal", "tarballs/decimal-2.0.0.tar"} {
+		rec := w.do("GET", "/artifactory/api/hex/hex-outer/"+tail, "admin", "")
+		if rec.Code != 200 {
+			t.Fatal(rec.Code, rec.Body)
+		}
+	}
+	nested, err := w.db.Repos().Get(t.Context(), "hex-inner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	exclude := "tarballs/**"
+	nested.ExcludesPattern = &exclude
+	if err = w.db.Repos().Update(t.Context(), nested); err != nil {
+		t.Fatal(err)
+	}
+	if rec := w.do("GET", "/artifactory/api/hex/hex-outer/tarballs/decimal-2.0.0.tar", "admin", ""); rec.Code != 404 {
+		t.Fatal("nested virtual patterns ignored", rec.Code, rec.Body)
+	}
 }
 
 func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) {
@@ -334,16 +370,16 @@ func TestUnitHexInvalidRoutesAndRepositoryConfigurationFailClosed(t *testing.T) 
 		{"hex-garbled-key/public_key", http.StatusServiceUnavailable},
 		{"hex-broken-local/packages/decimal", http.StatusInternalServerError},
 		{"hex-garbage-local/packages/decimal", http.StatusInternalServerError},
-		{"hex-remote-member/versions", http.StatusBadRequest},
-		{"hex-remote-member/tarballs/decimal-2.0.0.tar", http.StatusBadRequest},
+		{"hex-remote-member/versions", http.StatusOK},
+		{"hex-remote-member/tarballs/decimal-2.0.0.tar", http.StatusNotFound},
 		{"hex-mismatch-local/packages/other", http.StatusInternalServerError},
 		{"hex-no-key/packages/../secret", http.StatusNotFound},
 		{"hex-no-key/packages/not!name", http.StatusNotFound},
 		{"hex-no-key/versions?sort=asc", http.StatusBadRequest},
-		{"hex-bad-member/versions", http.StatusBadRequest},
-		{"hex-bad-member/tarballs/decimal-2.0.0.tar", http.StatusBadRequest},
-		{"hex-duplicate-member/versions", http.StatusBadRequest},
-		{"hex-duplicate-member/tarballs/decimal-2.0.0.tar", http.StatusBadRequest},
+		{"hex-bad-member/versions", http.StatusServiceUnavailable},
+		{"hex-bad-member/tarballs/decimal-2.0.0.tar", http.StatusNotFound},
+		{"hex-duplicate-member/versions", http.StatusServiceUnavailable},
+		{"hex-duplicate-member/tarballs/decimal-2.0.0.tar", http.StatusNotFound},
 		{"hex-missing-member/packages/decimal", http.StatusNotFound},
 		{"hex-missing-member/tarballs/decimal-2.0.0.tar", http.StatusNotFound},
 		{"hex-empty-virtual/tarballs/decimal-2.0.0.tar", http.StatusNotFound},

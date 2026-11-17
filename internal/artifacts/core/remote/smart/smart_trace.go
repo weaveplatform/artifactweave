@@ -2,6 +2,7 @@ package smart
 
 import (
 	"context"
+	"encoding/hex"
 	"net/http"
 	"slices"
 	"strings"
@@ -26,6 +27,13 @@ func SmartTrace(next http.Handler) http.Handler {
 		var trace []string
 		for _, raw := range r.Header.Values(SmartOriginHeader) {
 			for node := range strings.SplitSeq(raw, ",") {
+				// Our transport's opaque host markers are not Smart node/repo
+				// identities and must not consume its separate eight-node budget.
+				if len(node) == 24 {
+					if _, err := hex.DecodeString(node); err == nil {
+						continue
+					}
+				}
 				trace = append(trace, node)
 				if len(trace) >= 8 {
 					break

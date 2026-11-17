@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	nixfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nix"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -138,7 +139,11 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	if path == "nix-cache-info" {
 		// Read permission comes before the download policy (DV-057), so a
 		// caller who may not read gets 403 or 401, not the policy's 404.
-		if !h.k.Require(w, r, path, accessapi.ActionRead) {
+		if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+			if !h.k.RequireRoot(w, r) {
+				return
+			}
+		} else if !h.k.Require(w, r, path, accessapi.ActionRead) {
 			return
 		}
 		if err := generic.CheckDownload(pkgroute.RequestFrom(r).Repo, path, false); err != nil {
@@ -202,18 +207,6 @@ func write(w http.ResponseWriter, r *http.Request, data []byte, mediaType string
 	itemkit.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
 }
 
-// missing reports a member that a virtual repository passes over: one
-// without the path, and one whose download policy refuses it, a remote
-// member's included, since 7.x ignores a blacked-out member when it
-// resolves and resolves nothing from a member whose patterns reject the
-// path (R5). An upstream fault is neither, so the virtual
-// repository fails closed on it.
-func missing(err error) bool {
-	var e *apierror.Error
-	return errors.Is(err, kernel.ErrNotFound) || errors.As(err, &e) && e.Status == 404 ||
-		pkgroute.IsRefusal(err)
-}
-
 // lookup finds the narinfo of the store path whose hash is hash, and the
 // NAR it names, for a caller who may read both. archive is empty for a
 // narinfo request, and the NAR's URL, nar/<file>, for a NAR request. Both
@@ -238,41 +231,33 @@ func (h handler) lookup(r *http.Request, hash, archive string) (located, error) 
 		nar = nixfmt.ArchiveItem(hash, archive, cached)
 		checked = nar
 	}
-	if !h.k.Can(r, path, accessapi.ActionRead) ||
-		nar != "" && !h.k.Can(r, nar, accessapi.ActionRead) {
+	if c.Class != repo.Virtual && (!h.k.Can(r, path, accessapi.ActionRead) ||
+		nar != "" && !h.k.Can(r, nar, accessapi.ActionRead)) {
 		return located{}, source.ErrDenied
 	}
 	if err := generic.CheckDownload(c, checked, false); err != nil {
 		return located{}, fmt.Errorf("nix: lookup: %w", err)
 	}
 	if c.Class == repo.Virtual {
-		for _, key := range c.Repositories {
-			member, err := h.k.DB().Repos().Get(r.Context(), key)
-			if errors.Is(err, kernel.ErrNotFound) {
-				continue
-			}
-			if err != nil {
-				return located{}, fmt.Errorf("nix: member: %w", err)
-			}
-			mr, err := h.k.MemberRequest(r, member)
-			if err != nil {
-				return located{}, fmt.Errorf("nix: lookup: %w", err)
-			}
+		members, err := h.k.MergeMembers(r, checked)
+		if err != nil {
+			return located{}, fmt.Errorf("nix virtual members: %w", err)
+		}
+		for _, mr := range members {
+			member := pkgroute.RequestFrom(mr).Repo
 			memberInfo := nixfmt.InfoItem(hash, member.Class == repo.Remote)
 			if !h.k.Can(mr, memberInfo, accessapi.ActionRead) {
 				continue
 			}
 			found, err := h.lookup(mr, hash, archive)
-			if missing(err) {
+			if pkgroute.PassedOver(err) {
+				h.k.WarnPassedOver(mr, err)
 				continue
 			}
 			if err != nil {
 				return located{}, fmt.Errorf("nix: lookup: %w", err)
 			}
 			stored := nixfmt.ArchiveItem(hash, found.info.URL, false)
-			if !h.k.Can(r, stored, accessapi.ActionRead) {
-				continue
-			}
 			memberCheck := found.check
 			found.check = func(ctx context.Context) error {
 				if err := h.current(r, path, stored); err != nil {
@@ -327,7 +312,22 @@ func (h handler) current(r *http.Request, paths ...string) error {
 	}
 	r = r.WithContext(accessapi.WithCaller(r.Context(), p, d))
 	for _, path := range paths {
-		if !h.k.Can(r, path, accessapi.ActionRead) {
+		if c.Class == repo.Virtual {
+			members, e := h.k.MergeMembers(r, "")
+			if e != nil {
+				return fmt.Errorf("nix virtual authority: %w", e)
+			}
+			readable := false
+			for _, mr := range members {
+				if h.k.Can(mr, path, accessapi.ActionRead) {
+					readable = true
+					break
+				}
+			}
+			if !readable {
+				return source.ErrDenied
+			}
+		} else if !h.k.Can(r, path, accessapi.ActionRead) {
 			return source.ErrDenied
 		}
 	}
@@ -363,6 +363,24 @@ func (h handler) put(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := pkgroute.RequestFrom(r).Repo
+	if c.Class == repo.Virtual {
+		target, e := virtual.DeployTarget(r.Context(), h.k.DB().Repos(), c)
+		if errors.Is(e, virtual.ErrNoDeployTarget) {
+			w.Header().Set("Allow", "GET")
+			h.fail(w, r, apierror.New(405, fmt.Sprintf("No local repository was configured as local deployment repository for the (%s) virtual repository.", c.Key)))
+			return
+		}
+		if e != nil {
+			h.fail(w, r, e)
+			return
+		}
+		r, e = h.k.MemberRequest(r, target)
+		if e != nil {
+			h.fail(w, r, e)
+			return
+		}
+		c = target
+	}
 	if c.Class != repo.Local && c.Class != repo.Federated {
 		h.fail(w, r, apierror.New(405, "Nix publication requires a hosted repository"))
 		return

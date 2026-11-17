@@ -277,9 +277,7 @@ func TestAccNixPathAndVirtualPolicyFailures(t *testing.T) {
 			t.Fatal(err)
 		}
 		code := 404
-		if kind == "wrong-member" {
-			code = 400
-		}
+
 		// The virtual repository's patterns rejecting only the NAR leave
 		// the narinfo served; policy_test.go checks the NAR's refusal.
 		if kind == "excluded" {

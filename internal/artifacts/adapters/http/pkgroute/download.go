@@ -203,6 +203,11 @@ func (k *Kit) walk(
 // nothing at or below readAt in it.
 func (k *Kit) walkSource(ctx context.Context, v, m repo.Config, path, readAt string) (Source, bool) {
 	src, ok := k.p.Sources[m.Class]
+	// A federated member is hosted for virtual resolution (R1), even
+	// when the protocol does not serve that class directly, as Hex does not.
+	if !ok && m.Class == repo.Federated {
+		src, ok = k.p.Sources[repo.Local]
+	}
 	if !ok || !repo.AcceptsMember(v.PackageType, m.PackageType) ||
 		generic.CheckDownload(m, path, false) != nil || !readable(ctx, m, readAt, true) {
 		return nil, false

@@ -190,6 +190,7 @@ func TestAccNixVirtualPassesOverARemoteMembersRefusedNAR(t *testing.T) {
 	f.publish()
 	excludeNAR := "nar/**"
 	c.ExcludesPattern = &excludeNAR
+	c.PriorityResolution = repo.Flex(true)
 	if err := f.db.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}

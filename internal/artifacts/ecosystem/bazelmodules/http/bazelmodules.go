@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	fmtbazel "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/bazelmodules"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -126,7 +127,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, missing())
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
+	if !h.k.RequireRoot(w, r) {
 		return
 	}
 	// Read permission first (DV-057), then the policy at the path 7.x keeps
@@ -735,34 +736,6 @@ func (h handler) upstreamSource(
 	return doc, result, err
 }
 
-func (h handler) virtualMembers(r *http.Request) ([]*http.Request, error) {
-	v := pkgroute.RequestFrom(r).Repo
-	seen := map[string]bool{v.Key: true}
-	members := []*http.Request{}
-	for _, key := range v.Repositories {
-		if seen[key] {
-			return nil, apierror.New(400, "invalid virtual Bazel Modules member")
-		}
-		seen[key] = true
-		c, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("bazelmodules: get virtual member: %w", err)
-		}
-		if c.Class != repo.Local && c.Class != repo.Remote && c.Class != repo.Federated {
-			return nil, apierror.New(400, "invalid virtual Bazel Modules member class")
-		}
-		mr, err := h.k.MemberRequest(r, c)
-		if err != nil {
-			return nil, fmt.Errorf("bazelmodules: authorize virtual member: %w", err)
-		}
-		members = append(members, mr)
-	}
-	return members, nil
-}
-
 func (h handler) virtualRead(
 	ctx context.Context,
 	w http.ResponseWriter,
@@ -774,10 +747,7 @@ func (h handler) virtualRead(
 		writeJSON(w, r, []byte("{}"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, "modules/"+q.name, api.ActionRead) {
-		return
-	}
-	members, err := h.virtualMembers(r)
+	members, err := h.k.MergeMembers(r, policyPath(q, repo.Virtual))
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -800,7 +770,8 @@ func (h handler) virtualRead(
 		}
 		if member.Class == repo.Remote {
 			_, _, e := h.upstreamSource(mr, q)
-			if isMissing(e) {
+			if pkgroute.PassedOver(e) {
+				h.k.WarnPassedOver(mr, e)
 				continue
 			}
 			if e != nil {
@@ -829,26 +800,16 @@ func (h handler) virtualMetadata(
 	q requestPath,
 	members []*http.Request,
 ) {
-	all := map[string]bool{}
-	yanked := map[string]string{}
-	deprecated := ""
+	var parts []virtual.Part[fmtbazel.VersionMetadata]
 	for _, mr := range members {
 		if !h.k.CanFolder(mr, "modules/"+q.name, api.ActionRead) {
 			continue
 		}
-		// A blacked-out member, and one whose patterns reject metadata.json,
-		// add nothing (R5); a member whose patterns reject a version's files
-		// keeps the version listed (R3).
-		if generic.CheckDownload(pkgroute.RequestFrom(mr).Repo, routePath(q), false) != nil {
-			continue
-		}
+		var doc fmtbazel.VersionMetadata
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
-			data, result, e := h.remoteBytes(
-				mr,
-				"modules/"+q.name+"/metadata.json",
-				func(b []byte) error { _, e := parseMetadata(b); return e },
-			)
-			if isMissing(e) {
+			data, result, e := h.remoteBytes(mr, "modules/"+q.name+"/metadata.json", func(b []byte) error { _, e := parseMetadata(b); return e })
+			if pkgroute.PassedOver(e) {
+				h.k.WarnPassedOver(mr, e)
 				continue
 			}
 			if e != nil {
@@ -860,55 +821,40 @@ func (h handler) virtualMetadata(
 				h.k.Error(w, r, e)
 				return
 			}
+			doc = fmtbazel.VersionMetadata{YankedVersions: metadata.YankedVersions, Deprecated: metadata.Deprecated}
 			for _, v := range metadata.Versions {
-				if h.k.Can(mr, "modules/"+q.name+"/"+v+"/MODULE.bazel", api.ActionRead) &&
-					!all[v] {
-					all[v] = true
-					if reason, ok := metadata.YankedVersions[v]; ok {
-						yanked[v] = reason
-					}
-					if deprecated == "" {
-						deprecated = metadata.Deprecated
-					}
+				p := "modules/" + q.name + "/" + v + "/MODULE.bazel"
+				if h.k.Can(mr, p, api.ActionRead) {
+					doc.Versions = append(doc.Versions, v)
 				}
 			}
 		} else {
-			items, _, e := h.k.DB().
-				Items().
-				Children(ctx, pkgroute.RequestFrom(mr).Repo.Key, false, "modules/"+q.name, kernel.Page{Limit: kernel.MaxLimit})
-			if e != nil && !errors.Is(e, kernel.ErrNotFound) {
+			items, _, e := h.k.DB().Items().Children(ctx, pkgroute.RequestFrom(mr).Repo.Key, false, "modules/"+q.name, kernel.Page{Limit: kernel.MaxLimit})
+			if pkgroute.PassedOver(e) {
+				h.k.WarnPassedOver(mr, e)
+				continue
+			}
+			if e != nil {
 				h.k.Error(w, r, e)
 				return
 			}
 			for _, it := range items {
-				if it.Folder && fmtbazel.ValidVersion(it.Name) &&
+				p := "modules/" + q.name + "/" + it.Name + "/MODULE.bazel"
+				if it.Folder && fmtbazel.ValidVersion(it.Name) && h.k.Can(mr, p, api.ActionRead) &&
 					h.localComplete(mr, requestPath{name: q.name, version: it.Name}) {
-					all[it.Name] = true
+					doc.Versions = append(doc.Versions, it.Name)
 				}
 			}
 		}
+		parts = append(parts, virtual.Part[fmtbazel.VersionMetadata]{Member: pkgroute.RequestFrom(mr).Repo, Doc: doc})
 	}
-	versions := []string{}
-	for v := range all {
-		versions = append(versions, v)
-	}
-	slices.Sort(versions)
-	if len(versions) == 0 {
+	doc, _ := (fmtbazel.Merger{}).Merge(ctx, parts)
+	if len(doc.Versions) == 0 {
 		h.k.Error(w, r, missing())
 		return
 	}
-	body, _ := json.Marshal(
-		metadataDocument{Versions: versions, YankedVersions: yanked, Deprecated: deprecated},
-	)
+	body, _ := json.Marshal(doc)
 	writeJSON(w, r, body)
-}
-
-func isMissing(err error) bool {
-	if errors.Is(err, kernel.ErrNotFound) {
-		return true
-	}
-	var api *apierror.Error
-	return errors.As(err, &api) && api.Status == http.StatusNotFound
 }
 
 func (h handler) virtualSource(w http.ResponseWriter, r, mr *http.Request, q requestPath) {

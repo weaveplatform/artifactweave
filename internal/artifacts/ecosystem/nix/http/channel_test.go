@@ -189,7 +189,7 @@ func TestAccNixChannelUploadRefusals(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantBody(t, f.do("PUT", snapshotDir("/artifactory/api/nix/virtual/", older), good, ""), 405,
-		"Nix publication requires a hosted repository")
+		"No local repository was configured as local deployment repository for the (virtual) virtual repository.")
 }
 
 // The answers outside a well-formed channel, snapshot or tarball path stay
@@ -289,8 +289,8 @@ func TestAccNixChannelVirtual(t *testing.T) {
 	wantLocation(t, f, base+"channels/"+channel, "", channel+"/nixpkgs/"+older)
 	served(older, first)
 	served(newer, second)
-	status(t, f.do("GET", base+"channels/"+channel, nil, "denied"), 403)
-	status(t, f.do("GET", snapshotDir(base, older)+"/"+tarball, nil, "anonymous"), 401)
+	status(t, f.do("GET", base+"channels/"+channel, nil, "denied"), 404)
+	status(t, f.do("GET", snapshotDir(base, older)+"/"+tarball, nil, "anonymous"), 404)
 	on, off := true, false
 	f.patch("local", func(c *repo.Config) { c.BlackedOut = &on })
 	wantLocation(t, f, base+"channels/"+channel, "", channel+"/nixpkgs/"+newer)

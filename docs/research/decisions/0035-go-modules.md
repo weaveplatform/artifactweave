@@ -149,7 +149,7 @@ Every error under `/artifactory/api/go/` is plain text, `text/plain; charset=utf
 | 404 | an unknown repository, a repository of another package type, an unknown or invisible module or version, a path that is no Go operation, and `sumdb/` |
 | 405 | another method on a Go path |
 | 409 | a `.zip` or `.mod` republished with different content |
-| 501 | a remote or virtual Go repository, naming its class (decision 0003) |
+| 501 | a direct remote Go request or a virtual PUT, naming its class (decision 0003) |
 
 ### Permissions
 
@@ -265,8 +265,9 @@ preserve signed bytes. Its adapter/field matrix assigns this format's P9 tickets
 P10/later handoffs. #633 implements the [Go upstream source](../../implementation/go-upstream-source.md)
 for every GOPROXY endpoint with shared policy and complete-body validation. Raw metadata
 remains independent of the cached module index. Controlled source-contract tests pass;
-native virtual resolution remains a P10 exit. Local behavior and direct remote class
-gates in this ADR are unchanged.
+P10 GOV-01 now serves virtual reads and proves a cold native build over local and
+private remote modules, followed by an offline build from the remote cache. Local
+behavior and direct remote class gates in this ADR are unchanged.
 
 ## Constraints
 
@@ -281,7 +282,7 @@ gates in this ADR are unchanged.
 - A version whose deploy stopped between PUTs stays invisible until its missing file is
   deployed or the version is deleted.
 - Direct remote Go routes retain 501 after the P9 source implementation; virtual Go
-  routes retain 501 until P10; the sumdb proxy and
+  reads are served by GOV-01, while virtual PUT retains 501 until GOV-02; the sumdb proxy and
   VCS-backed remotes belong to P28, with P33 sharing VCS transport. Artifactory 7.x deploys through a virtual
   Go repository to its default deployment repository (JFrog's Go Modules page), so a
   `PUT` to one is among what P10 adds.

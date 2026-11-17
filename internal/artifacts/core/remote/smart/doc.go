@@ -61,6 +61,9 @@
 //   - The work kinds, the header name, the status document's fields and the
 //     error texts stay byte-identical.
 //
+// The transport also appends its process host identity to the shared origin
+// header; Smart node/repository identities remain distinct (P10 #1542).
+//
 // # References
 //
 //   - Decision 0007: docs/research/decisions/0007-remote-repositories.md

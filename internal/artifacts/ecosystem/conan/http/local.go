@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
@@ -25,10 +24,7 @@ const (
 	maxUpload   = 2 << 30
 )
 
-type revision struct {
-	Revision string    `json:"revision"`
-	Time     time.Time `json:"time"`
-}
+type revision = conanfmt.Revision
 
 func (h handler) recipeRevisions(w http.ResponseWriter, r *http.Request, ref conanfmt.Reference) {
 	if r.Method != http.MethodGet {
@@ -178,7 +174,7 @@ func (h handler) fileList(w http.ResponseWriter, r *http.Request, root string) {
 		h.method(w, r)
 		return
 	}
-	if !h.k.RequireFolder(w, r, root, api.ActionRead) {
+	if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual && !h.k.RequireFolder(w, r, root, api.ActionRead) {
 		return
 	}
 	c := pkgroute.RequestFrom(r).Repo
@@ -234,7 +230,7 @@ func (h handler) file(w http.ResponseWriter, r *http.Request, f conanfmt.FilePat
 	c := pkgroute.RequestFrom(r).Repo
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
-		if !h.k.Require(w, r, f.Path(), api.ActionRead) {
+		if c.Class != repo.Virtual && !h.k.Require(w, r, f.Path(), api.ActionRead) {
 			return
 		}
 		if c.Class == repo.Remote {
@@ -448,7 +444,7 @@ func (h handler) search(w http.ResponseWriter, r *http.Request) {
 		h.method(w, r)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
+	if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual && !h.k.RequireRoot(w, r) {
 		return
 	}
 	c := pkgroute.RequestFrom(r).Repo
@@ -534,7 +530,7 @@ func (h handler) packageSearch(w http.ResponseWriter, r *http.Request, ref conan
 		ref.Revision = list[0].Revision
 	}
 	root := ref.Root() + "/package"
-	if !h.k.RequireFolder(w, r, root, api.ActionRead) {
+	if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual && !h.k.RequireFolder(w, r, root, api.ActionRead) {
 		return
 	}
 	items, err := conanfmt.Files(r.Context(), h.k.DB(), c, root)

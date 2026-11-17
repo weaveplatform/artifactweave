@@ -33,6 +33,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
@@ -492,6 +493,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		middleware.RecoverPanic(logger, redactLoggedPath),
 		middleware.AccessLog(logger, redactLoggedPath),
 		baseurl.Middleware(cfg.BaseURL),
+		remote.OriginTrace,
 		smart.SmartTrace,
 		dockerhttp.APIVersion,
 		registry.Challenge,

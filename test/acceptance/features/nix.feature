@@ -57,7 +57,17 @@ Feature: Nix publishes and substitutes signed binary cache content
       {"rclass":"remote","packageType":"nix","url":"{upstream}","primaryKeyPairRef":"nix-signing"}
       """
     Then the response status is 200
-    When I substitute the controlled Nix path from "nix-remote" with the "trusted" key
+    When I PUT "/artifactory/api/repositories/nix-empty" as admin with body:
+      """
+      {"rclass":"local","packageType":"nix"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/nix-mixed" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"nix","repositories":["nix-empty","nix-remote"]}
+      """
+    Then the response status is 200
+    When I substitute the controlled Nix path from "nix-mixed" with the "trusted" key
     Then the command succeeds
     And the output contains "native nix fixture"
     When I POST "/artifactory/api/repositories/nix-remote" as admin with body:
@@ -66,7 +76,7 @@ Feature: Nix publishes and substitutes signed binary cache content
       """
     Then the response status is 200
     And the generic upstream stops
-    When I substitute the controlled Nix path from "nix-remote" with the "trusted" key
+    When I substitute the controlled Nix path from "nix-mixed" with the "trusted" key
     Then the command succeeds
     And the output contains "native nix fixture"
 

@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/reindexauth"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/alpine"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cran"
@@ -489,8 +490,11 @@ func lookupMembers(
 	dl *Download,
 	order virtual.Order,
 ) (Found, error) {
-	o := virtual.Options{Order: order}
+	o := virtual.Options{Order: order, NoUpstream: remote.NoOriginUpstream(ctx, c)}
 	if dl != nil {
+		if o.NoUpstream {
+			dl.upstream = nil
+		}
 		o.Path, o.Folder = dl.path, dl.isFolder
 	}
 	members, err := virtual.Members(ctx, st.Repos(), c, o)
@@ -748,6 +752,15 @@ func (e *memberMiss) Unwrap() error { return kernel.ErrNotFound }
 // GetItem answers GET and HEAD on an item path: file content, a checksum
 // sidecar, or a folder listing; with ?trace, the resolution instead.
 func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
+	if remote.RecursiveOrigin(r.Context()) {
+		httpkit.WriteErr(w, r, apierror.New(http.StatusNotFound, fmt.Sprintf("Recursive call detected for '%s'. Returning nothing.", r.URL.RequestURI())))
+		return
+	}
+
+	s.getItem(w, r)
+}
+
+func (s *Kit) getItem(w http.ResponseWriter, r *http.Request) {
 	// A read an overlay makes through GetItem while a trace runs it, such
 	// as a P2 virtual repository's member file, is decided, not traced again.
 	if _, ok := r.URL.Query()["trace"]; ok && overlayTraceOf(r) == nil {

@@ -154,6 +154,10 @@ type Protocol struct {
 	// protocol serves a virtual repository's files through its members by
 	// registering Virtual for repo.Virtual.
 	Sources map[repo.Class]Source
+	// MemberOnly leaves these sources available to a virtual member walk
+	// while preserving the unsupported-class answer on direct requests.
+	// Go remotes are reachable only through a virtual repository in 7.x.
+	MemberOnly []repo.Class
 	// NoPriority leaves the members' priorityResolution out of the order a
 	// virtual repository's members are walked in (virtual.Options), for a
 	// package type whose 7.x virtual repository ignores it.
@@ -562,7 +566,7 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 			return
 		}
 		src, ok := k.p.Sources[c.Class]
-		if !ok {
+		if !ok || slices.Contains(k.p.MemberOnly, c.Class) {
 			k.Error(w, r, apierror.New(http.StatusNotImplemented, fmt.Sprintf(
 				"'%s' is a %s repository, which artifactweave does not serve through the %s API yet",
 				c.Key,

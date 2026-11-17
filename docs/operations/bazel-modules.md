@@ -96,3 +96,22 @@ still owns comparison with the chosen live Artifactory target build.
 Bazel Modules repositories serve module dependency resolution. Bazel's
 action cache and Maven dependencies use their separate repository protocols,
 as the JFrog guide describes.
+
+## P10 shared virtual engine (#1554)
+
+Virtual repositories use the shared effective member order and flatten nested
+virtuals. Cycles, self-members and duplicate members are skipped. Unreadable,
+excluded, offline and missing members pass over; upstream failures that qualify
+as pass-over are logged as warnings. Member permissions govern reads and the
+local/federated default deployment target governs writes, without requiring an
+`ANY` permission target on the virtual key.
+
+Conan caches merged revision and search metadata for
+`virtualRetrievalCachePeriodSecs`; writes to a member do not invalidate it.
+Bazel, Hex and Nix merge per request. Hex preserves the winning releases'
+advisories and re-signs its registry; Nix preserves the serving member's signature.
+
+**[I], P19/#216:** cache all merged Conan metadata, pass over qualifying upstream
+faults with warnings, retain Conan's native remove 405, and route native Nix
+publication to the default deployment target. These are controlled-fixture
+implementation choices, not live Artifactory observations.
