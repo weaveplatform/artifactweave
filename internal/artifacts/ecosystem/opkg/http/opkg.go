@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -24,9 +25,14 @@ import (
 )
 
 var (
-	errOpkgVirtualCycle = errors.New("server: opkg virtual member cycle")
-	errOpkgMemberType   = errors.New("server: opkg virtual member has incompatible package type")
-	errOpkgIndexLarge   = errors.New("server: opkg index exceeds limit")
+	errOpkgIndexLarge = errors.New("server: opkg index exceeds limit")
+	// errOpkgNoSources is a remote member read on a server built without a
+	// remote source service: this server's fault, which no walk passes
+	// over, so the virtual feed answers 500 as the remote's own feed does.
+	errOpkgNoSources = errors.New("server: opkg remote member read without a source service")
+	// errOpkgVirtualFeed is a virtual feed this server could not encode or
+	// sign: its fault, answered 500 whatever the key store said.
+	errOpkgVirtualFeed = errors.New("server: opkg virtual feed")
 )
 
 type opkgIndexView struct {
@@ -99,7 +105,11 @@ func (s opkgItems) serveOpkgIndex(
 		httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 		return
 	}
-	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
+	if c.Class == repo.Virtual {
+		if !s.VirtualGate(w, r, st, c, req.Path, p, acc, "Opkg virtual members") {
+			return
+		}
+	} else if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
 		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
@@ -130,23 +140,13 @@ func (s opkgItems) serveOpkgIndex(
 	var body []byte
 	var used func(context.Context) error
 	if c.Class == repo.Virtual {
-		indexPath := opkg.IndexPath(feed, opkg.PackagesName)
-		candidates, err := s.opkgCandidates(ctx, st, c, indexPath, p, acc, false,
-			map[string]bool{})
-		if err != nil {
-			httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg virtual feed", err))
-			return
-		}
-		packages := make([]opkg.Package, 0, len(candidates))
-		for _, candidate := range candidates {
-			packages = append(packages, candidate.pkg)
-		}
-		files, err := opkg.EncodeIndex(packages, feed)
-		if err == nil {
-			err = opkg.SignFeed(ctx, s.Access.Keys, c, files)
-		}
-		if err != nil {
+		files, err := s.virtualOpkgFeed(r, st, c, feed, p, acc)
+		switch {
+		case errors.Is(err, errOpkgVirtualFeed):
 			httpkit.WriteErr(w, r, s.InternalError(ctx, "Opkg virtual feed", err))
+			return
+		case err != nil:
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "Opkg virtual feed", err))
 			return
 		}
 		body = files[path.Base(req.Path)]
@@ -333,105 +333,152 @@ func (s opkgItems) readOpkgBlob(ctx context.Context, sha string) ([]byte, error)
 	return body, nil
 }
 
-// opkgCandidates walks ordered virtual members. A duplicate path belongs to
-// the first readable member; for an IPK GET (download true) the later
-// members' rows for it follow, so a GET whose matrix parameters the first
-// member's file does not match can pass over to the next (serveOpkgPackage).
-// A member whose download policy refuses its
-// feed takes no part in the feed, and only a blacked-out one in an IPK GET
-// (opkgMemberRefusesFeed). With download false, for the feed, a row stays
-// when the member's or the virtual repository's patterns reject its file,
-// which the feed keeps as 7.x's virtual indexes do (RTFACT-30656). With
-// download true, for an IPK GET, such a row is left out, so the GET passes
-// over that member to the next one that lists the path.
-func (s opkgItems) opkgCandidates(
-	ctx context.Context, st itemkit.Store, c repo.Config, indexPath string,
-	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
-) ([]opkgCandidate, error) {
-	if seen[c.Key] || len(seen) >= 8 {
-		return nil, errOpkgVirtualCycle
+// opkgProtocol is the protocol whose kit walks an Opkg virtual
+// repository's members (itemkit.Kit.Packages): the overlay reads each
+// member's feed itself, so the sources only name the classes the walk
+// keeps, a remote member as its upstream step.
+func opkgProtocol(k *itemkit.Kit) pkgroute.Protocol {
+	return pkgroute.Protocol{
+		Name:  "opkg",
+		Types: []repo.PackageType{repo.Opkg},
+		Sources: map[repo.Class]pkgroute.Source{
+			repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},
+			repo.Remote: pkgroute.Remote{Service: k.RemoteSources},
+		},
 	}
-	seen[c.Key] = true
-	defer delete(seen, c.Key)
-	var out []opkgCandidate
-	selected := map[string]bool{}
-	for _, key := range c.Repositories {
-		member, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("opkg: virtual member %s: %w", key, err)
-		}
-		if member.PackageType != repo.Opkg {
-			return nil, fmt.Errorf("%w: %s", errOpkgMemberType, key)
-		}
-		if !acc.Folder(member, indexPath, accessapi.ActionRead) ||
-			!acc.File(member, indexPath, accessapi.ActionRead) ||
-			opkgMemberRefusesFeed(member, indexPath, download) {
-			continue
-		}
-		var entries []opkgCandidate
-		if member.Class == repo.Virtual {
-			entries, err = s.opkgCandidates(ctx, st, member, indexPath, p, acc, download, seen)
-		} else {
-			var view opkgIndexView
-			view, err = s.opkgMemberIndex(ctx, st, member, false, indexPath, p, acc)
-			if err == nil && view.revalidate != nil {
-				err = view.revalidate(ctx)
+}
+
+// virtualOpkgFeed is the virtual repository c's feed for the caller, every
+// feed file by its name: its members' packages (opkg.Merger), encoded and
+// signed with c's own GPG key pair when it names one (opkg.SignFeed). The
+// members are the package handlers' walk (pkgroute.Collect) at the feed's
+// Packages: 7.x's order, nested virtual repositories flattened with a
+// cycle or a diamond skipped, a member of another type passed over
+// (decision 0008, R1, R2 and R11), and each member that misses, refuses or
+// fails passed over with the rest listed (R3; RTFACT-30422 shows a YUM
+// virtual merging without its failing remote) [I]. Opkg's virtual
+// repositories carry no virtualRetrievalCachePeriodSecs, so the feed is
+// built on every request (Packages without the cache), and a feed no
+// member serves is the empty one.
+//
+// c's own include and exclude patterns are not asked again at Packages:
+// the overlay has checked them at the file the client asked for, as for
+// any download.
+func (s opkgItems) virtualOpkgFeed(
+	r *http.Request, st itemkit.Store, c repo.Config, feed string,
+	p kernel.Principal, acc itemkit.Access,
+) (map[string][]byte, error) {
+	k, err := s.Packages(opkgProtocol(s.Kit), false)
+	if err != nil {
+		return nil, fmt.Errorf("opkg: virtual feed: %w", err)
+	}
+	open := c
+	open.IncludesPattern, open.ExcludesPattern = nil, nil
+	indexPath := opkg.IndexPath(feed, opkg.PackagesName)
+	var files map[string][]byte
+	// The kit keeps nothing, so Merged builds here, on this request, and
+	// files is this request's own.
+	_, err = k.Merged(k.Bind(r, open), indexPath, indexPath,
+		func(r *http.Request) (virtual.Entry, error) {
+			parts, err := pkgroute.Collect(k, r, indexPath, func(mr *http.Request) ([]opkg.Package, error) {
+				rows, err := s.memberOpkgPackages(mr, st, indexPath, "", p, acc)
+				k.WarnPassedOver(mr, err)
+				return rows, err
+			})
+			if err != nil {
+				return virtual.Entry{}, err //nolint:wrapcheck // the kit names the member and its fault
 			}
+			packages, _ := opkg.Merger{}.Merge(r.Context(), parts)
+			files, err = opkg.EncodeIndex(packages, feed)
 			if err == nil {
-				for _, pkg := range view.packages {
-					if download && generic.CheckDownload(member, pkg.Path, false) != nil {
-						continue
-					}
-					allowed, checkErr := opkgPackageReadable(
-						ctx, member, pkg.Path, acc, view.checkPermission)
-					if checkErr != nil {
-						err = checkErr
-						break
-					}
-					if allowed {
-						entries = append(entries, opkgCandidate{repo: member, pkg: pkg})
-					}
-				}
+				err = opkg.SignFeed(r.Context(), s.Access.Keys, c, files)
 			}
-		}
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("opkg: member %s index: %w", key, err)
-		}
-		for _, entry := range entries {
-			if !download && selected[entry.pkg.Path] ||
-				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) {
-				continue
+			if err != nil {
+				return virtual.Entry{}, fmt.Errorf("%w: %s", errOpkgVirtualFeed, err.Error())
 			}
-			if download && generic.CheckDownload(c, entry.pkg.Path, false) != nil {
-				continue
-			}
-			selected[entry.pkg.Path] = true
-			out = append(out, entry)
+			return virtual.Entry{}, nil
+		})
+	return files, err //nolint:wrapcheck // the kit's and the merge's own answers
+}
+
+// virtualOpkgCandidates are the members of the virtual repository c whose
+// feed at indexPath lists the IPK at path, in the walk's order, each with
+// its row, so a GET whose matrix parameters the first member's file does
+// not match passes over to the next (serveOpkgPackage). The walk is the
+// package handlers' at the IPK's own path (pkgroute.Collect), so each
+// member's policy is checked at that path, never at the feed read to find
+// it, as 6.20's VirtualRepoDownloadStrategy and the patterns FAQ have it
+// ("artifacts that match an exclude pattern are not resolved from that
+// repository"): a member whose patterns reject only its feed still serves
+// the IPK, and one that rejects the IPK takes no part.
+func (s opkgItems) virtualOpkgCandidates(
+	r *http.Request, st itemkit.Store, c repo.Config, indexPath, path string,
+	p kernel.Principal, acc itemkit.Access,
+) ([]opkgCandidate, error) {
+	k, err := s.Packages(opkgProtocol(s.Kit), false)
+	if err != nil {
+		return nil, fmt.Errorf("opkg: virtual package: %w", err)
+	}
+	parts, err := pkgroute.Collect(k, k.Bind(r, c), path, func(mr *http.Request) ([]opkg.Package, error) {
+		rows, err := s.memberOpkgPackages(mr, st, indexPath, path, p, acc)
+		k.WarnPassedOver(mr, err)
+		return rows, err
+	})
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the kit names the member and its fault
+	}
+	var out []opkgCandidate
+	for _, part := range parts {
+		for _, pkg := range part.Doc {
+			out = append(out, opkgCandidate{repo: part.Member, pkg: pkg})
 		}
 	}
 	return out, nil
 }
 
-// opkgMemberRefusesFeed reports whether a virtual repository's member takes
-// no part because its download policy refuses the feed at indexPath. The
-// virtual feed leaves out a member that refuses the document. An IPK GET
-// checks each member at the IPK's own path, as 6.20's
-// VirtualRepoDownloadStrategy does and as the patterns FAQ puts it
-// ("artifacts that match an exclude pattern are not resolved from that
-// repository"), so there the feed is only the lookup that finds the file: a
-// blacked-out member, which refuses every file, takes no part, and patterns
-// that reject only the feed leave the member's IPKs served.
-func opkgMemberRefusesFeed(member repo.Config, indexPath string, download bool) bool {
-	if !download {
-		return generic.CheckDownload(member, indexPath, false) != nil
+// memberOpkgPackages reads the packages one member of a virtual repository
+// lists in its feed at indexPath, through the member request mr, filtered
+// by the caller's Read in that member alone: no permission target can name
+// the virtual repository (decision 0006), so the member that serves a row
+// decides it (decision 0008, R3). A member whose feed the caller may not
+// read is passed over as not found. For the virtual feed (ipk "") a row
+// whose file the patterns reject stays, as 7.x's virtual indexes keep it
+// and refuse only its GET (RTFACT-30656); for an IPK GET only that IPK's
+// row is kept.
+func (s opkgItems) memberOpkgPackages(
+	mr *http.Request, st itemkit.Store, indexPath, ipk string, p kernel.Principal,
+	acc itemkit.Access,
+) ([]opkg.Package, error) {
+	ctx := mr.Context()
+	m := pkgroute.RequestFrom(mr).Repo
+	if !acc.Folder(m, indexPath, accessapi.ActionRead) ||
+		!acc.File(m, indexPath, accessapi.ActionRead) {
+		return nil, kernel.ErrForbidden
 	}
-	return member.Class != repo.Virtual && generic.CheckBlackedOut(member, indexPath) != nil
+	if m.Class == repo.Remote && s.RemoteSources == nil {
+		return nil, errOpkgNoSources
+	}
+	view, err := s.opkgMemberIndex(ctx, st, m, false, indexPath, p, acc)
+	if err == nil && view.revalidate != nil {
+		err = view.revalidate(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	var rows []opkg.Package
+	for _, pkg := range view.packages {
+		if ipk != "" && pkg.Path != ipk {
+			continue
+		}
+		allowed, err := opkgPackageReadable(ctx, m, pkg.Path, acc, view.checkPermission)
+		if err != nil {
+			return nil, err
+		}
+		if allowed {
+			rows = append(rows, pkg)
+		}
+	}
+	return rows, nil
 }
 
 func (s opkgItems) serveOpkgPackage(
@@ -442,7 +489,11 @@ func (s opkgItems) serveOpkgPackage(
 		httpkit.WriteErr(w, r, itemkit.Missed(c, cached, req))
 		return
 	}
-	if !acc.File(c, req.Path, accessapi.ActionRead) {
+	if c.Class == repo.Virtual {
+		if !s.VirtualGate(w, r, st, c, req.Path, p, acc, "Opkg virtual members") {
+			return
+		}
+	} else if !acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
 	}
@@ -476,8 +527,7 @@ func (s opkgItems) serveOpkgPackage(
 	var candidates []opkgCandidate
 	var err error
 	if c.Class == repo.Virtual {
-		candidates, err = s.opkgCandidates(r.Context(), st, c, indexPath, p, acc, true,
-			map[string]bool{})
+		candidates, err = s.virtualOpkgCandidates(r, st, c, indexPath, req.Path, p, acc)
 	} else {
 		var view opkgIndexView
 		view, err = s.opkgMemberIndex(r.Context(), st, c, cached, indexPath, p, acc)

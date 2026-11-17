@@ -25,9 +25,13 @@
 //     index and packages under the kit's Alpine source request
 //     (itemkit.AlpineSourceRequest); access/api's Keys, through which the
 //     format's SigningKey reads a virtual repository's RSA key pair; the
-//     generic download policy (artifacts/ecosystem/generic); and the format
-//     package (artifacts/ecosystem/alpine), whose rules parse every path,
-//     decode member indexes and encode and sign the virtual index.
+//     generic download policy (artifacts/ecosystem/generic); the router
+//     kit the item kit builds for the overlay (itemkit.Kit.Packages,
+//     pkgroute.ItemKit), whose walk, Merged and server-wide merged metadata
+//     cache a virtual index is built through; and the format package
+//     (artifacts/ecosystem/alpine), whose rules parse every path, decode
+//     member indexes, merge them (alpine.Merger) and encode and sign the
+//     virtual index.
 //
 // # Outputs
 //
@@ -41,8 +45,12 @@
 //   - A caller receives a local, federated or remote repository's index
 //     only when they have Read permission on every package it lists. A
 //     virtual index lists only the packages the caller has Read permission
-//     on, both in the virtual repository and in the member that holds them,
-//     and a package path belongs to the first member that lists it. The
+//     on in the member that holds them, and a package path belongs to the
+//     first member that lists it. A caller reads an index or a package
+//     through a virtual repository when they may read it there or in a
+//     member the walk reaches (itemkit.Access.VirtualReads; decision 0008,
+//     R3), and one refused is answered 404 "Resource not found" while the
+//     virtual repository hides unauthorized resources (R4). The
 //     download policy does not filter or refuse an index for the packages
 //     it lists: a package whose file the include and exclude patterns
 //     reject stays listed and only its GET is refused, as in 7.x's Debian
@@ -54,13 +62,20 @@
 //     answer that no repository serves the request. A virtual package's GET
 //     passes over a member whose download policy refuses the file to the
 //     next member that lists it.
-//   - A missing member, or one whose index is unpublished, unreadable to the
-//     caller or refused by the member's download policy, is skipped; a
-//     member of another package type, a member cycle or a chain of more
-//     than eight nested repositories is refused. A virtual package's GET
-//     checks a member's policy at the package's own path, never at the
-//     index it reads to find the package, so there only a blacked-out
-//     member is skipped for its index.
+//   - A virtual index walks its members as the package handlers do
+//     (pkgroute.Collect; decision 0008): nested virtual repositories are
+//     flattened in 7.x's order with a cycle skipped, and a missing member,
+//     one of another package type, one whose index is unpublished,
+//     unreadable to the caller or refused by its download policy, and a
+//     remote whose upstream misses or fails are passed over, a failure with
+//     a warning [I]. A virtual package's GET checks a member's policy at the
+//     package's own path, never at the index it reads to find the package.
+//   - The merged index is signed with the virtual repository's own key
+//     pair, members' keys ignored, and is unsigned without one
+//     (alpine-linux-repositories.md). It is kept for the virtual
+//     repository's virtualRetrievalCachePeriodSecs, one entry per set of
+//     members the caller can read (pkgroute.Kit.Merged, R8); a rebuild that
+//     finds no member's index drops it and answers an empty index [I].
 //   - A virtual repository serves a package only when an index the caller
 //     can see lists it.
 //   - An index is read up to 36 MiB, a remote's is validated before it is
@@ -107,7 +122,9 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P29 group (issues #757 to
-// #760), as the server root's alpine.go. P9d moved it here (WEB-13).
+// #760), as the server root's alpine.go. P9d moved it here (WEB-13). P10
+// built the virtual index from the shared engine's walk, merge and cache
+// (https://github.com/weaveplatform/artifactweave/issues/1551).
 //
 // # Testing
 //
@@ -120,10 +137,15 @@
 // package served from a member whose patterns reject only its index; local
 // index content that is a folder, lost, empty, unreadable or malformed; a
 // remote index whose authority is rechecked, streamed or cached; virtual
-// indexes that skip unreadable members and fail closed on cycles, wrong
-// member types, store faults and unusable signing keys; virtual packages
+// indexes that skip unreadable members and fail closed on store faults and
+// unusable signing keys; virtual packages
 // served from a listed local file or relayed from a remote member; and
 // remote index and package reads on a server built without remote sources.
+// virtual_test.go covers the shared engine's walk: nested members and
+// cycles, members passed over (another type, a remote that misses, fails
+// or may not be read), a reader of the members alone and the hidden
+// refusal, and the merged index's cache (the period, -1, a rebuild that
+// finds no member, callers' visibility) on a fake clock.
 // Its item GETs run through the kit with TryAlpineItem as the only overlay.
 // The @alpine acceptance partition (test/acceptance/features/alpine.feature)
 // drives its indexes and packages through the router with apk.

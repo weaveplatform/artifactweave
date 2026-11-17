@@ -33,9 +33,17 @@ including the zstd output of Fedora 42 `createrepo_c`.
 On virtual repositories, the Yum API also accepts
 `?path=<directory>/repodata` to validate a particular root. Local and
 federated repositories reject that query parameter. Delete and trash restore
-reconcile hosted indexes. Virtual repositories compose readable member
-metadata in configured order and serve packages from the selected member;
-their view is generated from current member metadata.
+reconcile hosted indexes. Virtual repositories compose member metadata as the
+package handlers walk members (decision 0008): nested virtual repositories
+flattened in 7.x's order, a cycle skipped, and a member of another type, one
+that misses, one the caller may not read and one whose upstream fails passed
+over. Packages are filtered by the caller's Read in the member that lists
+them and served from the first member that lists them. A caller who may read
+only the members reads the repodata through the virtual repository. The
+merged repodata is kept as one set for the virtual repository's
+`virtualRetrievalCachePeriodSecs` (-1 builds it on every read), one entry per
+set of members the caller can read; `POST /api/yum/<virtual>` builds it again,
+so the next read serves the new set.
 
 A GET of a virtual repository's repodata or package, like a GET of a local
 or remote repository's files, takes the query parameters Artifactory

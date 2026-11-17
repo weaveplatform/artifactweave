@@ -266,6 +266,9 @@ over the members' documents that `pkgroute.Collect` reads in the package handler
 | Go | `@v/list` union; remote Go members are only reachable this way |
 | Terraform | provider and module version lists |
 | Docker, OCI | `tags/list` union, `_catalog` union; `resolveDockerTagsByTimestamp` picks the newest manifest for a tag |
+| Alpine | `APKINDEX.tar.gz`, union of packages, each from the first member that lists it, signed with the virtual's own `keyPair` (members' keys ignored; unsigned without one, per alpine-linux-repositories.md); a member that fails is passed over **[I]** ([RTFACT-30422](https://jfrog.atlassian.net/browse/RTFACT-30422)) |
+| RPM (YUM) | `repodata` (`repomd.xml`, primary, filelists, other) as one set, union of packages, each from the first member that lists it, signed with the virtual's GPG `keyPair`; `POST /api/yum/<virtual>` builds the set again **[I]**; a member that fails is passed over **[I]** (RTFACT-30422) |
+| Opkg | `Packages`, `Packages.gz` and `Packages.sig`, union of packages, each from the first member that lists it, signed with the virtual's GPG `keyPair`; built on every request, as Opkg has no `virtualRetrievalCachePeriodSecs` |
 
 ### R8. Merged metadata cache
 

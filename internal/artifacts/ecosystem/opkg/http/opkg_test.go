@@ -146,6 +146,11 @@ func TestAccOpkgSourceValidatesIndependentUpstreamContent(t *testing.T) {
 	}
 }
 
+// TestAccOpkgVirtualGraphAndRouteBoundaries: the virtual feed walks its
+// members as the package handlers do (decision 0008): a cycle is skipped,
+// a member of another type and one whose patterns reject the feed are
+// passed over, so each answers the empty feed, while a remote member on a
+// server with no source service is this server's fault and answers 500.
 func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 	w := newItemWorld(t)
 	hiddenFeed := "feed/Packages"
@@ -170,49 +175,6 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := opkgItems{newKit(Config{Store: w.db, Blobs: w.blobs})}
-	for _, tc := range []struct {
-		key      string
-		expected error
-	}{
-		{"opkg-empty", nil},
-		{"opkg-hidden", nil},
-		{"opkg-cycle", errOpkgVirtualCycle},
-		{"opkg-mixed", errOpkgMemberType},
-		{"opkg-offline", source.ErrUnavailable},
-	} {
-		c, err := w.db.Repos().Get(t.Context(), tc.key)
-		if err != nil {
-			t.Fatal(err)
-		}
-		got, err := svc.opkgCandidates(
-			t.Context(),
-			w.db,
-			c,
-			"feed/Packages",
-			p,
-			acc,
-			false,
-			map[string]bool{},
-		)
-		if !errors.Is(err, tc.expected) || tc.expected == nil && len(got) != 0 {
-			t.Errorf("%s: candidates=%v error=%v, want %v", tc.key, got, err, tc.expected)
-		}
-	}
-	if _, err := svc.opkgCandidates(
-		t.Context(),
-		w.db,
-		repo.Config{Key: "opkg-cycle"},
-		"feed/Packages",
-		p,
-		acc,
-		false,
-		map[string]bool{"opkg-cycle": true},
-	); !errors.Is(
-		err,
-		errOpkgVirtualCycle,
-	) {
-		t.Errorf("previsited member accepted: %v", err)
-	}
 	if _, err := svc.opkgMemberIndex(
 		t.Context(),
 		w.db,
@@ -258,8 +220,12 @@ func TestAccOpkgVirtualGraphAndRouteBoundaries(t *testing.T) {
 		{"/artifactory/opkg-empty/feed/alpha_1.0_all.ipk", "admin", http.StatusNotFound},
 		{"/artifactory/opkg-empty/feed/alpha_1.0_all.ipk?download=1", "admin", http.StatusNotFound},
 		{"/artifactory/opkg-empty/feed/alpha_1.0_all.ipk", "user", http.StatusForbidden},
-		{"/artifactory/opkg-cycle/feed/Packages", "admin", http.StatusInternalServerError},
-		{"/artifactory/opkg-mixed/feed/Packages", "admin", http.StatusInternalServerError},
+		{"/artifactory/opkg-cycle/feed/Packages", "admin", http.StatusOK},
+		{"/artifactory/opkg-cycle/feed/alpha_1.0_all.ipk", "admin", http.StatusNotFound},
+		{"/artifactory/opkg-mixed/feed/Packages", "admin", http.StatusOK},
+		{"/artifactory/opkg-hidden/feed/Packages", "admin", http.StatusOK},
+		{"/artifactory/opkg-offline/feed/Packages", "admin", http.StatusInternalServerError},
+		{"/artifactory/opkg-offline/feed/alpha_1.0_all.ipk", "admin", http.StatusInternalServerError},
 	} {
 		res := w.do(http.MethodGet, tc.url, tc.as, "")
 		if res.Code != tc.status {
@@ -356,9 +322,8 @@ func TestAccOpkgDirectRoutingRejectsUnsafeAndWrongClassRequests(t *testing.T) {
 	if err := w.db.Repos().Create(t.Context(), local); err != nil {
 		t.Fatal(err)
 	}
-	if candidates, err := svc.opkgCandidates(t.Context(), w.db, localVirtual,
-		"feed/Packages", p, acc, false, map[string]bool{}); err != nil || len(candidates) != 0 {
-		t.Errorf("unpublished member index exposed candidates: %v, %v", candidates, err)
+	if listed, err := virtualFeedOf(t, svc, w.db, localVirtual); err != nil || len(listed) != 0 {
+		t.Errorf("unpublished member index exposed packages: %v, %v", listed, err)
 	}
 }
 
@@ -603,22 +568,9 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 		t.Errorf("direct feed leaked unreadable package: status=%d used=%d", status, used)
 	}
 	freshStream()
-	candidates, err := svc.opkgCandidates(
-		t.Context(),
-		w.db,
-		virtual,
-		"feed/Packages",
-		p,
-		acc,
-		false,
-		map[string]bool{},
-	)
-	if err != nil || len(candidates) != 1 || candidates[0].pkg.Name != "464xlat" {
-		t.Errorf(
-			"virtual feed did not filter unreadable package: candidates=%v err=%v",
-			candidates,
-			err,
-		)
+	listed, err := virtualFeedOf(t, svc, w.db, virtual)
+	if err != nil || len(listed) != 1 || listed[0].Name != "464xlat" {
+		t.Errorf("virtual feed did not filter unreadable package: listed=%v err=%v", listed, err)
 	}
 	sources.Revalidate = func(_ context.Context, q source.Request, _ source.Permit) error {
 		if strings.Contains(q.Resource.Path, "6in4") {
@@ -630,10 +582,11 @@ func TestAccOpkgRemoteIndexRejectsFaultsAndRevokedAuthority(t *testing.T) {
 		t.Errorf("unavailable descendant authority exposed feed: status=%d used=%d", status, used)
 	}
 	freshStream()
-	if _, err := svc.opkgCandidates(
-		t.Context(), w.db, virtual, "feed/Packages", p, acc, false, map[string]bool{},
-	); !errors.Is(err, source.ErrUnavailable) {
-		t.Errorf("virtual member hid source authority failure: %v", err)
+	// A member whose source cannot check a listed package's authority is
+	// passed over as any member fault is (decision 0008, R3) [I]: its feed
+	// lists nothing, and no other package leaks.
+	if listed, err := virtualFeedOf(t, svc, w.db, virtual); err != nil || len(listed) != 0 {
+		t.Errorf("virtual feed kept a member whose authority failed: %v, %v", listed, err)
 	}
 	feedChecks := 0
 	sources.Revalidate = func(_ context.Context, q source.Request, _ source.Permit) error {

@@ -39,10 +39,20 @@ one-node federated indexes are rebuilt asynchronously and signed with the
 repository's RSA pair. `POST /artifactory/api/alpine/<repo>/reindex` queues a
 full local index rebuild. Delete and trash restore queue the same metadata
 reconciliation. A remote repository validates upstream index and package
-structure before caching; virtual indexes filter unreadable member packages,
-merge readable records in member order, and sign the combined index. A caller
-with index-only permission cannot read an index that lists packages they may
-not fetch.
+structure before caching. A virtual index walks its members as the package
+handlers do (decision 0008): nested virtual repositories are flattened in
+7.x's order, a cycle is skipped, and a member of another type, one that
+misses, one the caller may not read and one whose upstream fails are passed
+over, so the index lists the rest. Records are filtered by the caller's Read
+in the member that lists them, merged first member first, and signed with the
+virtual repository's own `keyPair`; members' keys are ignored and a virtual
+repository with no `keyPair` serves an unsigned index. A caller who may read
+only the members reads the index and packages through the virtual repository;
+while it hides unauthorized resources a refusal is 404 `Resource not found`.
+The merged index is kept for the virtual repository's
+`virtualRetrievalCachePeriodSecs` (-1 builds it on every read), one entry per
+set of members the caller can read. A caller with index-only permission
+cannot read an index that lists packages they may not fetch.
 
 A GET of an `APKINDEX.tar.gz` or a package takes the query parameters Artifactory documents for any
 file, such as `skipUpdateStats`, and matrix parameters, matched against the
@@ -73,8 +83,8 @@ that resolution, a cold fetch from the upstream included (#1595).
 The container runs as the host user, so `apk --initdb` uses `--usermode` to
 create its database without root privileges; signature checks remain enabled.
 It proves real `apk add` through local, remote, virtual and one-node federated
-repositories; first-member selection for duplicate packages, remote members
-through a signed virtual index, offline cache reuse, same-origin redirects, index signing,
+repositories; first-member selection for duplicate packages, a local and a
+remote member through one signed virtual index, offline cache reuse, same-origin redirects, index signing,
 delete/restore/reindex, malformed local and upstream bytes, and narrow read
 and deploy permissions. The controlled APK fixture follows Alpine's
 [APK v2 specification](https://wiki.alpinelinux.org/wiki/Apk_spec): signed

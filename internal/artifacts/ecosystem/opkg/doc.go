@@ -22,8 +22,9 @@
 //     queue, which runs the feed rebuild (KindIndex) through Handler.Work
 //     and every format's reindex, the reindex operation's included (its
 //     writeProps=0 sets Env.SkipProperties), through Handler.Reindex; the
-//     protocol (opkghttp), which reads member feeds (DecodeIndex) and
-//     writes a virtual repository's (EncodeIndex, SignFeed); and the item
+//     protocol (opkghttp), which reads member feeds (DecodeIndex), merges
+//     them (Merger) and writes a virtual repository's (EncodeIndex,
+//     SignFeed); and the item
 //     kit's remote source request (artifacts/adapters/http/itemkit), which
 //     checks upstream feed metadata or an IPK before a remote caches it
 //     (IsIndex, FeedPath, DecodeIndex, ValidateRelease, ValidPath,
@@ -56,6 +57,10 @@
 //     SignatureName, IsIndex, FeedPath, IndexPath, DecodeIndex,
 //     EncodeIndex, ValidateRelease, Digest and SignFeed.
 //   - The stored names: KindIndex and the Prop* property names.
+//   - Merger: the virtual.Merger (artifacts/core/virtual) of a virtual
+//     repository's feed, which the protocol builds through the shared
+//     engine: its members' packages, one per path, the first member's row
+//     first.
 //
 // # Invariants
 //
@@ -105,7 +110,8 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P29 group (issues #757 to
-// #760). Moved here in P9d.
+// #760). Moved here in P9d. Merger added in P10
+// (https://github.com/weaveplatform/artifactweave/issues/1551).
 //
 // # Testing
 //
@@ -123,6 +129,8 @@
 //     IPKs and a failing package inventory.
 //   - contract_test.go: the format contract suite (artifacts/core/formattest)
 //     with KindIndex as the repository's work.
+//   - virtual_test.go: the Merger keeps the first member's row of each
+//     package path, in the walk's order.
 //
 // testdata holds the contract IPKs that build-contract-fixtures.sh makes and
 // the published OpenWrt 24.10.0 index and IPK, which the protocol's tests
