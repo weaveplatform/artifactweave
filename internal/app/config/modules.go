@@ -7,6 +7,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/conda"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/helm"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/pypi"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
@@ -58,6 +59,7 @@ func (c Config) Artifacts() artifacts.Settings {
 			// Negated so that the zero debian.Settings is 7.x's default
 			// for callers built without configuration.
 			Debian: debian.Settings{DisableMetadataValidation: !c.Debian.MetadataValidation},
+			Maven:  maven.Settings{MetadataVersion3Enabled: c.Maven.MetadataVersion3Enabled},
 			Helm:   helm.Settings{RelativeURLs: &relativeURLs},
 			NPM: npm.Settings{
 				TagLatestByPublish: c.NPM.TagLatestByPublish,

@@ -367,6 +367,7 @@ var overlays = []itemkit.Overlay{
 	rpmhttp.TryRPMItem,
 	opkghttp.TryOpkgItem,
 	p2http.TryP2Item,
+	mavenhttp.TryMavenMetadataItem,
 }
 
 // kitDeps returns the item kit's dependencies from cfg, with the router's

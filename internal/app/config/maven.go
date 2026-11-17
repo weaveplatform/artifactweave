@@ -14,6 +14,7 @@ const DefaultMavenSnapshotCleanupInterval = 5 * time.Minute
 // Maven holds the Maven, Gradle, Ivy and SBT repositories' options
 // (decision 0036).
 type Maven struct {
+	MetadataVersion3Enabled *bool `yaml:"metadata_version3_enabled,omitempty"`
 	// SnapshotCleanupInterval is how often each node runs the
 	// maxUniqueSnapshots cleanups that deploys have marked in the work
 	// queue (maven.snapshot_cleanup_interval).
@@ -23,6 +24,14 @@ type Maven struct {
 // setMaven assigns one key under maven; sub is the key without that
 // prefix.
 func setMaven(m *Maven, sub, key, value string) error {
+	if sub == "metadata_version3_enabled" {
+		valueBool := true
+		if err := setBool(&valueBool, key, value); err != nil {
+			return err
+		}
+		m.MetadataVersion3Enabled = &valueBool
+		return nil
+	}
 	if sub != "snapshot_cleanup_interval" {
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
