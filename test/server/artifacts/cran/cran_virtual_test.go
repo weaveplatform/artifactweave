@@ -109,7 +109,8 @@ func TestAccCRANVirtualListsTheGreatestVersionOfAName(t *testing.T) {
 
 // TestAccCRANVirtualReadsThroughItsMembers (#1552): a caller who may read
 // a member, and no virtual repository, reads the virtual index and the
-// member's archive through it, listing only what that member serves, where
+// member's archive through it, listing only what that member serves, a
+// member whose index it may not read passed over, where
 // it was refused 403; the member that serves a row decides it (decision
 // 0008, R3). A caller who may read no member is refused 403, and an
 // anonymous caller 401.
@@ -121,7 +122,12 @@ func TestAccCRANVirtualReadsThroughItsMembers(t *testing.T) {
 		Name: "cran-local-read",
 		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
 			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]accesstest.Target{"cran-local": {Include: []string{"**"}}},
+			// The remote's archives alone, so its index is refused and the
+			// remote passed over.
+			Targets: map[string]accesstest.Target{
+				"cran-local":  {Include: []string{"**"}},
+				"cran-remote": {Include: []string{"src/contrib/*.tar.gz"}},
+			},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -169,5 +175,31 @@ func TestAccCRANVirtualIndexIsKeptForThePeriod(t *testing.T) {
 	}
 	if got := read("cran-fresh"); got == fresh || !strings.Contains(got, "Package: omega") {
 		t.Errorf("a period of -1 served\n%s\nwant omega added", got)
+	}
+}
+
+// TestAccCRANVirtualAnswersAStorageFault (#1552): a member whose stored
+// index cannot be read is a fault of this server, never passed over as a
+// member that does not serve the index, so the virtual index and a virtual
+// package answer 500 rather than leave the member's packages out (decision
+// 0008, R3: only a miss, a refusal or an upstream fault is passed over), as
+// a hand-written member loop answered it before.
+func TestAccCRANVirtualAnswersAStorageFault(t *testing.T) {
+	var failure *cranMigrationFailure
+	w := newItemWorld(t, false, func(c *Config) {
+		failure = &cranMigrationFailure{Store: c.Store}
+		c.Store = failure
+	})
+	cranPublish(t, w, "cran-local", func(*repo.Config) {}, cranZeta(t, "1.0"))
+	cranRepo(t, w, repo.Config{
+		Key: "cran-view", Class: repo.Virtual, PackageType: repo.Cran,
+		Repositories: []string{"cran-local"},
+	})
+	// No merge is kept yet, so none can be served as a stale fallback
+	// (virtual.Cache.Get).
+	failure.mode = "index"
+	for _, path := range []string{cranIndex, "src/contrib/zeta_1.0.tar.gz"} {
+		wantStatus(t, w.do(http.MethodGet, "/artifactory/cran-view/"+path, "admin", ""),
+			http.StatusInternalServerError)
 	}
 }

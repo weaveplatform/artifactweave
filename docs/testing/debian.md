@@ -73,9 +73,21 @@ by-hash copy and those files once the remote has cached them, without
 asking the upstream, and before that answers 404 "File not found.; Path:
 '<remote>-cache:<path>'" (#1382, #1572), as it serves a Packages or Sources
 index and its by-hash copy.
-A virtual repository merges authorized package records in member order and
-signs its own view, in plain and gzip forms and the forms its own
-`optionalIndexCompressionFormats` names. It leaves out a remote member's
+A virtual repository merges authorized package records in 7.x's resolution
+order and signs its own view, in plain and gzip forms and the forms its own
+`optionalIndexCompressionFormats` names (#1552). Nested virtual members are
+walked once, so a cycle or a virtual that lists itself adds nothing. A
+member the caller may read decides what it lists, without a grant on the
+virtual repository, and a caller who may read no member is refused 403, 401
+when anonymous, or 404 `Resource not found` while the virtual's
+`hideUnauthorizedResources` is on. A member of another type, a Trivial-layout
+member, and a member that misses or fails are passed over, the failure
+logged; with no member left the metadata answers 404. A remote member is
+indexed only for the virtual's Indexed Remote Architectures
+(`debianDefaultArchitectures`, amd64 when unset). The merged metadata is kept
+for the virtual's `virtualRetrievalCachePeriodSecs`, separately for callers
+who may read different members; `-1` builds it on every read, and a snapshot
+builds its own copy. It leaves out a remote member's
 index that does not decode or does not have the digest the member's Release
 gives it, as it would a missing one. Any other file under `dists/`, such
 as a component Release, a Contents index, a translation, an installer file

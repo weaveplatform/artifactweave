@@ -20,8 +20,10 @@ import (
 func TestUnitMergerKeepsTheFirstMembersRowOfEachFilename(t *testing.T) {
 	const amd, arm = "dists/stable/main/binary-amd64/Packages", "dists/stable/main/binary-arm64/Packages"
 	row := func(name, file, from string) PackageRecord {
-		return PackageRecord{Name: name, Version: "1.0", Filename: file,
-			Raw: []byte("Package: " + name + "\nVersion: 1.0\nFilename: " + file + "\nX-From: " + from + "\n\n")}
+		return PackageRecord{
+			Name: name, Version: "1.0", Filename: file,
+			Raw: []byte("Package: " + name + "\nVersion: 1.0\nFilename: " + file + "\nX-From: " + from + "\n\n"),
+		}
 	}
 	parts := []virtual.Part[[]MemberIndex]{
 		{Member: repo.Config{Key: "local"}, Doc: []MemberIndex{

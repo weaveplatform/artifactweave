@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -107,5 +108,23 @@ func TestUnitCRANMemberIndexRefusesALocalCacheAlias(t *testing.T) {
 		repo.Config{Key: "cran-local", Class: repo.Local}, true, false,
 		"src/contrib/PACKAGES", p, acc); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatalf("local cache alias accepted: %v", err)
+	}
+}
+
+// TestUnitCRANVirtualReadsNeedTheRouterKitsStore: a kit built without the
+// router kit's store (itemkit.Deps.PackageOptions) cannot walk a virtual
+// repository's members, for its index or a package.
+func TestUnitCRANVirtualReadsNeedTheRouterKitsStore(t *testing.T) {
+	w := newItemWorld(t)
+	svc := CranAPI{Kit: newKit(Config{Store: w.db, Blobs: w.blobs})}
+	c := repo.Config{Key: "cran-virtual", Class: repo.Virtual, PackageType: repo.Cran}
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+	if _, err := svc.virtualCranIndex(r, w.db, c, "src/contrib", "src/contrib/PACKAGES",
+		kernel.Principal{}, itemkit.Access{}); err == nil {
+		t.Error("the virtual index was read without the router kit's store")
+	}
+	if _, err := svc.virtualCranCandidates(r, w.db, c, "src/contrib/PACKAGES",
+		"src/contrib/zeta_1.0.tar.gz", kernel.Principal{}, itemkit.Access{}); err == nil {
+		t.Error("a virtual package was read without the router kit's store")
 	}
 }

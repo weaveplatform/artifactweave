@@ -28,7 +28,8 @@
 //     once its rebuild is done, a remote's from upstream) and encoding
 //     again only the packages the caller has Read permission on, a
 //     package the download policy's patterns reject among them, a virtual
-//     repository's members merged in order (EncodeIndex), whose POST
+//     repository's members merged by Merger, one row per name at the
+//     greatest version (EncodeIndex), whose POST
 //     /api/cran/{repoKey}/sources and binaries check the feed (Feed) and
 //     take the package's identity from the archive (ReadUploaded,
 //     ErrPackage), and whose archive migration (GET
@@ -135,6 +136,8 @@
 //     feeds and size limits, excess records, untrusted paths and
 //     duplicates.
 //   - archive_test.go: LegacyArchiveTarget.
+//   - virtual_test.go: Merger's greatest version per name, the first
+//     member on a tie, and names that differ only in case kept apart.
 //   - edge_test.go: index ownership and the upload policy, untrusted
 //     archive content, .tar.xz and binary indexes, the DESCRIPTION and
 //     index trust boundary, cached and remote content queuing nothing,

@@ -1,6 +1,6 @@
 @cran
 Feature: Native CRAN package installation
-  R 4.6.1 installs unchanged published CRAN source bytes through the
+  R 4.6.2 installs unchanged published CRAN source bytes through the
   repository's PACKAGES metadata and source archive paths.
 
   Scenario Outline: R installs from a <class> CRAN repository
@@ -66,6 +66,40 @@ Feature: Native CRAN package installation
     Then the command succeeds
     And the server answered no request with 500 since the last command
     And the server answered 200 to GET "/artifactory/cran-virtual/src/contrib/assertthat_0.2.1.tar.gz"
+
+  Scenario: R installs from a remote member through a nested CRAN virtual
+    Given the registry is running
+    And the R client can reach the registry
+    And the published assertthat CRAN upstream is available
+    When I PUT "/artifactory/api/repositories/cran-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"cran","url":"{upstream}"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/cran-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"cran"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/cran-inner" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"cran","repositories":["cran-local"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/cran-outer" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"cran","repositories":["cran-remote","cran-inner"]}
+      """
+    Then the response status is 200
+    When I POST "/artifactory/api/repositories/cran-inner" as admin with body:
+      """
+      {"repositories":["cran-local","cran-outer"]}
+      """
+    Then the response status is 200
+    When I install assertthat from CRAN repository "cran-outer" with R
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the server answered 200 to GET "/artifactory/cran-outer/src/contrib/assertthat_0.2.1.tar.gz"
 
   Scenario: R installs an archive fetched through a same-origin CRAN redirect
     Given the registry is running

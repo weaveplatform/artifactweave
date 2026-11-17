@@ -29514,7 +29514,7 @@ components:
           description: Optional within this object. Stored only. A virtual Debian repository indexes no package itself. A Debian repository's v1 read gives false when unset, and any other repository's false whatever was sent; the v2 read leaves it out but for a Debian repository.
           type: boolean
         debianDefaultArchitectures:
-          description: Optional within this object. Comma-separated architectures used when generating aggregated Debian metadata. Stored only.
+          description: Optional within this object. Comma-separated architectures used when generating aggregated Debian metadata. A Debian virtual repository indexes its remote members for these architectures alone, amd64 when unset.
           type: string
         debianTrivialLayout:
           # JFrog's Debian guide: a virtual repository includes only repositories with the
