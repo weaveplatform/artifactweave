@@ -544,9 +544,9 @@ parser used by each member's resolver. Thus the no-match fallback matters for mi
 layouts; it must not be replaced by a blanket token or `-SNAPSHOT` check.
 
 Snapshot selection skips members that do not handle snapshots and bypasses standalone
-remote cache steps while upstream reads are available. The remote's own policy
-chooses its cached, refreshed or transient result. Cache-only originated requests
-retain their existing R7 restriction. A unique exact snapshot ends the walk;
+remote cache steps. The remote's own policy
+chooses its cached, refreshed or transient result. Originated requests retain their R7 restriction: no upstream steps. Standalone
+remote caches remain excluded by the snapshot rule, leaving only local candidates. A unique exact snapshot ends the walk;
 otherwise the first candidate, the first exact match over a non-exact candidate,
 or a strictly later last-modified time becomes the winner. A newer non-exact
 candidate can replace an exact candidate. Ties retain the current winner.

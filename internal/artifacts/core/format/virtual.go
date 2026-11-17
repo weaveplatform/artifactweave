@@ -30,8 +30,8 @@ type VirtualChoice struct {
 
 // VirtualSelection keeps format policy out of the member walk. Skip returns
 // trace steps when a member is excluded. Choose compares an authorized candidate
-// with the current winner (nil initially). DirectRemotes bypasses cache steps
-// while an upstream read is available, letting the remote choose its own copy.
+// with the current winner (nil initially). DirectRemotes bypasses standalone
+// cache steps, letting each remote choose its own copy through its source policy.
 type VirtualSelection struct {
 	DirectRemotes bool
 	Skip          func(repo.Config) []string

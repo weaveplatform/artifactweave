@@ -28,7 +28,7 @@ func lookupSelected(ctx context.Context, st Store, members []virtual.Member, pat
 		if m.Upstream && (dl.upstream == nil || dl.isFolder) {
 			continue
 		}
-		if selection.DirectRemotes && m.Repo.Class == repo.Remote && !m.Upstream && dl.upstream != nil {
+		if selection.DirectRemotes && m.Repo.Class == repo.Remote && !m.Upstream {
 			continue
 		}
 		key := m.Repo.Key

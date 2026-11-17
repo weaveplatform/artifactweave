@@ -271,12 +271,10 @@ func TestAccMavenVirtualRemoteReleaseAndOrigin(t *testing.T) {
 				t.Fatal(r.Code, r.Body.String())
 			}
 			before := len(w.up.Requests())
-			// R7 permits only existing cached members for an originated request.
+			// R7 removes upstream steps; snapshot selection also excludes standalone
+			// caches (RTFACT-7095), so only the local candidate remains.
 			r = w.request("GET", "/artifactory/virtual/"+snap, "admin", "", "X-Artifactory-Originated", "another-node")
 			want := "local snapshot"
-			if store {
-				want = string(body)
-			}
 			if r.Code != 200 || r.Body.String() != want || len(w.up.Requests()) != before {
 				t.Fatal(r.Code, r.Body.String(), w.up.Requests())
 			}
