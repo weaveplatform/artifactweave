@@ -16,7 +16,7 @@ records the choices.
 
 P6's local registry and native-client/conformance exits are complete; P8 adds the
 Helm OCI exit proof described in [research 30](30-helm.md). P9 now implements remote
-registry fetching; virtual aggregation remains P10. The upstream and Artifactory claims marked
+registry fetching; P10 DKR-01 adds virtual manifest and blob reads. The upstream and Artifactory claims marked
 **[I]** below remain live-comparison work even where the corresponding local handler
 is implemented ([build status](../implementation/plan.md#build-status)).
 
@@ -269,10 +269,15 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   single-segment Docker Hub names (`ocicontainer/docker_utils.go`). For a virtual
   repository it reads `/api/repositories/<key>` and keeps the layers in its
   `defaultDeploymentRepo` (`ocicontainer/buildinfo.go`).
-- **[I]** Upstream fetching arrives with remote repositories and member resolution with
-  virtual ones. Until then a remote Docker repository has nothing in its cache to serve,
-  and a virtual one has neither the tag union nor `resolveDockerTagsByTimestamp`
-  (decision 0008).
+- **[D/S]** P9 serves remote registry reads. P10 DKR-01 walks flattened members for
+  manifest/blob GET and HEAD, retaining member policy and selecting the first hit.
+  The tag union and `resolveDockerTagsByTimestamp` remain DKR-03/DKR-04.
+- **[I]**, #216/P19: `X-Artifactory-Docker-Registry` names the serving member,
+  digest hints never key by tag, and parent-manifest queries use the first member
+  holding the child. The public 7.x references do not settle these combinations;
+  DKR-01 follows its specified fallbacks. Source constants in 7.161.26
+  `ConstantValues` 802–809 set 24 hours and 10,000 entries for both virtual
+  digest caches. See decision 0031's DKR-01 section for tests and URL evidence.
 
 ## 3. Authentication and tokens
 

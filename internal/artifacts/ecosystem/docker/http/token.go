@@ -212,8 +212,14 @@ func (g *Registry) allowedOn(ctx context.Context, realm, name string) ([]string,
 			actionPull: accessapi.ActionRead, actionPush: accessapi.ActionWrite,
 			actionDelete: accessapi.ActionDelete,
 		} {
-			if d.AllowsFolder(accessapi.ResourceArtifact, repo, t.image, need) &&
-				!slices.Contains(allowed, a) {
+			ok := d.AllowsFolder(accessapi.ResourceArtifact, repo, t.image, need)
+			if c.Class == "virtual" && a == actionPull {
+				ok, err = virtualReadable(ctx, g.store.Repos(), c, t.image, d)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if ok && !slices.Contains(allowed, a) {
 				allowed = append(allowed, a)
 			}
 		}

@@ -76,3 +76,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [.github/actions/jfrog-cli/action.yml](../../.github/actions/jfrog-cli/action.yml).
 - Evidence: [test/acceptance/features/helm_oci.feature](../../test/acceptance/features/helm_oci.feature).
 - Evidence: [test/acceptance/features/registry_remote.feature](../../test/acceptance/features/registry_remote.feature).
+- Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).

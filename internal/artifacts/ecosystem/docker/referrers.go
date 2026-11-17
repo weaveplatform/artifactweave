@@ -54,7 +54,7 @@ func ImageManifests(
 	items port.ItemStore,
 	repoKey, name string,
 ) ([]aql.Hit, error) {
-	hits, err := searchManifests(ctx, items, repoKey, name)
+	hits, err := searchManifests(ctx, items, repoKey, name, false)
 	if err != nil {
 		return nil, fmt.Errorf("docker: list the manifests of %s: %w", name, err)
 	}
@@ -78,7 +78,7 @@ func FindReferrers(
 			Part: aql.PartPair, Key: ArtifactTypeProperty, Op: aql.OpEq, Value: artifactType,
 		})
 	}
-	hits, err := searchManifests(ctx, items, repoKey, name, by...)
+	hits, err := searchManifests(ctx, items, repoKey, name, false, by...)
 	if err != nil {
 		return nil, fmt.Errorf("docker: find the referrers of %s in %s: %w", subject, name, err)
 	}
@@ -92,11 +92,12 @@ func searchManifests(
 	ctx context.Context,
 	items port.ItemStore,
 	repoKey, name string,
+	cached bool,
 	more ...aql.Node,
 ) ([]aql.Hit, error) {
 	criteria := make(aql.And, 0, 5+len(more))
 	criteria = append(criteria,
-		aql.RepoSet{Refs: []aql.RepoRef{{Key: repoKey}}},
+		aql.RepoSet{Refs: []aql.RepoRef{{Key: repoKey, Cached: cached}}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
 		aql.Or{
 			&aql.FieldCriterion{Field: aql.FieldName, Op: aql.OpEq, Text: ManifestFile},
@@ -110,4 +111,14 @@ func searchManifests(
 	criteria = append(criteria, more...)
 	q := aql.Query{Criteria: criteria, Include: []string{"property.*"}}
 	return items.Search(ctx, &q, aql.Options{}) //nolint:wrapcheck // the callers name the search
+}
+
+// ImageManifestsIn reads the selected member's local or cached tree. A remote
+// parent-list query never enumerates or fetches unknown upstream tags.
+func ImageManifestsIn(ctx context.Context, items port.ItemStore, key, name string, cached bool) ([]aql.Hit, error) {
+	hits, err := searchManifests(ctx, items, key, name, cached)
+	if err != nil {
+		return nil, fmt.Errorf("docker: list cached manifests of %s: %w", name, err)
+	}
+	return hits, nil
 }

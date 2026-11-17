@@ -16079,13 +16079,16 @@
       "fmt.Sprintf",
       "httpkit.BadRequestf",
       "httpkit.Denied",
+      "itemkit.NotFoundRepo",
       "layout.ValidTag",
       "s.Content",
       "s.InternalError",
       "s.ItemCaller",
       "s.ItemError",
       "s.registry",
-      "s.registry().ParentManifests"
+      "s.registry().ParentManifests",
+      "s.virtualParents",
+      "st.Repos"
     ],
     "review_family": "native-docker",
     "effects": "resource mutation/action; see served contract and handler calls",

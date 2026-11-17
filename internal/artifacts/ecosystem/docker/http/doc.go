@@ -96,8 +96,11 @@
 //   - On a server that authenticates every request (Options.Authenticated),
 //     a request whose principal carries no decider is refused, never
 //     allowed.
-//   - A remote repository answers reads only, and a virtual one 405
-//     UNSUPPORTED.
+//   - A remote repository answers reads only. A virtual repository walks
+//     flattened members for manifest/blob GET and HEAD, retaining each
+//     member's permissions and source policy. Other kinds remain 405
+//     UNSUPPORTED until their P10 tickets. Digest location hints are bounded
+//     and recheck authority; tags always use the effective member order.
 //   - The JFrog operations under the Artifactory prefix (promote,
 //     parentManifests and delete) are no registry paths and keep the
 //     Artifactory envelope.

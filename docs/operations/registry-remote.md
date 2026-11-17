@@ -4,7 +4,9 @@ Remote `docker`, `oci` and `helmoci` repositories support Distribution v2 reads:
 tag/digest manifests, indexes and their platform manifests, blobs, tags and OCI
 referrers. Repository-path, Artifactory-prefix and configured subdomain routing
 use the same local authentication challenge as local registries. Remote uploads,
-mounts and deletes are refused; virtual aggregation remains P10.
+mounts and deletes are refused. Virtual repositories now resolve manifest/blob
+GET and HEAD through their local, federated and remote members. Other virtual
+operations remain in their P10 tickets.
 
 ```sh
 curl --fail --user admin "$REGISTRY/artifactory/api/repositories/dockerhub" \
@@ -77,3 +79,21 @@ artifactweave behavior, not an observed Artifactory response.
 Protocol sources checked 2026-10-22: [OCI Distribution v1.1.1](https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md),
 [OCI descriptor URLs and integrity](https://github.com/opencontainers/image-spec/blob/v1.1.1/descriptor.md)
 and [Helm OCI registries](https://helm.sh/docs/topics/registries/).
+
+
+A virtual uses the first readable member holding the requested tag, manifest digest
+or blob. Nested virtuals flatten in effective priority order; a priority member's
+miss still falls through. The virtual's own image-path patterns apply to admins
+as well, then each member keeps its own read permission and download policy.
+Authenticate against the virtual image name as usual; a virtual-scoped pull token
+does not need separate member scopes. Manifest responses name their serving member
+in `X-Artifactory-Docker-Registry`.
+
+Digest-location hints expire after 24 hours, use at most 10,000 entries, and recheck
+current authority before reuse. Tags are never keyed in this cache: a remote tag's
+shared metadata TTL still decides when to refresh. Offline and origin-restricted
+requests retain cache-only behavior. A missing cached digest holder triggers a
+fresh member walk; changed membership or patterns discard the virtual's hints.
+`FindParentManifestLists` searches the selected member's retained manifest tree.
+Virtual uploads, push/delete, tag/catalog listings and referrers retain 405 until
+their corresponding P10 tickets.

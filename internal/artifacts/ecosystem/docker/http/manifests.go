@@ -71,6 +71,10 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 	if excluded(w, q, it) {
 		return
 	}
+	g.serveManifest(w, r, q, it)
+}
+
+func (g *Registry) serveManifest(w http.ResponseWriter, r *http.Request, q Request, it model.Item) {
 	content, _, err := g.blobs.Open(r.Context(), it.Actual.SHA256)
 	if err != nil {
 		g.writeErr(w, r, err)

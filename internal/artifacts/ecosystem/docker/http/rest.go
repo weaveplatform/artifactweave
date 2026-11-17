@@ -21,7 +21,10 @@ import (
 // operations under a repository's Docker API path (tag delete, promotion and
 // parent manifest lists), over the item kit. They are no registry paths, so
 // they answer in the Artifactory envelope, not the registry's.
-type DockerAPI struct{ *itemkit.Kit }
+type DockerAPI struct {
+	*itemkit.Kit
+	Registry *Registry
+}
 
 // DeleteDockerTag is the multi-architecture tag delete, the JFrog REST
 // operation under a repository's Docker API path (decision 0031): the tag
@@ -232,13 +235,26 @@ func (s DockerAPI) FindParentManifestLists(
 	if err != nil {
 		return nil, err
 	}
-	c, err := dockerRepo(ctx, st, req.RepoKey)
+	c, found, err := Lookup(ctx, st, req.RepoKey)
+	if err == nil && !found {
+		err = itemkit.NotFoundRepo(req.RepoKey)
+	}
+	if err == nil && c.Class == repo.Remote {
+		c, err = dockerRepo(ctx, st, req.RepoKey)
+	}
 	if err != nil {
 		return nil, s.ItemError(ctx, "resolve repository", err)
 	}
 	var name, tag string
 	if req.Body != nil {
 		name, tag = req.Body.DockerRepository, req.Body.Tag
+	}
+	allowed := acc.File(c, name+"/", api.ActionRead)
+	if c.Class == repo.Virtual {
+		allowed, err = virtualReadable(ctx, st.Repos(), c, name, acc.Decider)
+		if err != nil {
+			return nil, s.InternalError(ctx, "docker virtual permissions", err)
+		}
 	}
 	switch {
 	case name == "" || tag == "":
@@ -247,17 +263,21 @@ func (s DockerAPI) FindParentManifestLists(
 		return nil, httpkit.BadRequestf("invalid image name '%s'", name)
 	case !layout.ValidTag(tag):
 		return nil, httpkit.BadRequestf("invalid tag '%s'", tag)
-	case !acc.File(c, name+"/", api.ActionRead):
+	case !allowed:
 		return nil, httpkit.Denied(p)
 	}
-	parents, err := s.registry(st).ParentManifests(ctx,
-		registry.Owner{Repo: c, Name: name, By: p.Name}, tag)
+	var parents []registry.Parent
+	if c.Class == repo.Virtual {
+		parents, err = s.virtualParents(ctx, c, name, tag)
+	} else {
+		parents, err = s.registry(st).ParentManifests(ctx, registry.Owner{Repo: c, Name: name, By: p.Name}, tag)
+	}
 	switch {
 	case errors.Is(err, kernel.ErrNotFound):
 		return nil, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Tag '%s' of image '%s' does not exist in '%s'", tag, name, c.Key))
 	case err != nil:
-		return nil, s.InternalError(ctx, "docker parent manifests", err)
+		return nil, s.ItemError(ctx, "docker parent manifests", err)
 	}
 	//nolint:tagliatelle // the generated response's field names, JFrog's own
 	type entry = struct {

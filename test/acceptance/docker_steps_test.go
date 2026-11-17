@@ -45,6 +45,7 @@ func (w *world) registerDocker(sc *godog.ScenarioContext) {
 	sc.Step(`^(crane|oras|cosign) is available$`, w.toolAvailable)
 	sc.Step(`^I run (crane|oras|cosign) "([^"]*)"$`, w.runTool)
 	sc.Step(`^I keep the output as "([^"]*)"$`, w.keepOutput)
+	sc.Step(`^the output is the kept value "([^"]*)"$`, w.outputIsKept)
 	sc.Step(`^the auth entry is keyed by the registry URL$`, w.authEntryKeyed)
 	sc.Step(`^a layer "([^"]*)" holding "([^"]*)" with content "([^"]*)"$`, w.writeLayer)
 	sc.Step(`^a file "([^"]*)" with expanded content:$`, w.writeExpandedFile)
@@ -289,6 +290,15 @@ func (w *world) keepOutput(name string) error {
 		w.vars = map[string]string{}
 	}
 	w.vars[name] = v
+	return nil
+}
+
+func (w *world) outputIsKept(name string) error {
+	want, ok := w.vars[name]
+	got := strings.TrimSpace(string(w.body))
+	if !ok || got != want {
+		return fmt.Errorf("output %q differs from kept %s: %q", got, name, want)
+	}
 	return nil
 }
 

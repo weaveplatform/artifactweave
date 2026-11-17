@@ -35,6 +35,15 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 		Write(w, err)
 		return
 	}
+	result, err := g.readRegistry(r, q, false)
+	if err != nil {
+		g.remoteError(w, r, q, err)
+		return
+	}
+	g.serveRemoteResult(w, r, q, result)
+}
+
+func (g *Registry) readRegistry(r *http.Request, q Request, cached bool) (source.Result, error) {
 	op := map[Kind]string{KindManifest: "manifests", KindBlob: "blobs", KindTags: "tags", KindReferrers: "referrers"}[q.Kind]
 	ref := q.Reference
 	if q.Kind == KindTags {
@@ -42,25 +51,28 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 	}
 	resource, err := layout.RegistryResource(q.Name, op, ref)
 	if err != nil {
-		Write(w, Errorf(http.StatusBadRequest, CodeNameInvalid, "invalid registry reference"))
-		return
+		return source.Result{}, Errorf(http.StatusBadRequest, CodeNameInvalid, "invalid registry reference")
 	}
 	p, _ := kernel.FromContext(r.Context())
 	d, _ := accessapi.DeciderFrom(r.Context())
 	result, err := g.sources.Read(
 		r.Context(),
 		source.Request{
-			Repo:     q.Repo,
-			Subject:  accessapi.SubjectOf(p),
-			Access:   d,
-			Resource: resource,
-			Project:  q.Repo.ProjectKey,
+			Repo:      q.Repo,
+			Subject:   accessapi.SubjectOf(p),
+			Access:    d,
+			Resource:  resource,
+			Project:   q.Repo.ProjectKey,
+			CacheOnly: cached,
 		},
 	)
 	if err != nil {
-		g.remoteError(w, r, q, err)
-		return
+		return result, fmt.Errorf("registry source read: %w", err)
 	}
+	return result, nil
+}
+
+func (g *Registry) serveRemoteResult(w http.ResponseWriter, r *http.Request, q Request, result source.Result) {
 	stream, err := g.remoteStream(r, result)
 	if err != nil {
 		g.remoteError(w, r, q, err)

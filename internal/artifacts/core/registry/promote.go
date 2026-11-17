@@ -314,15 +314,22 @@ func (s *Service) ParentManifests(ctx context.Context, o Owner, tag string) ([]P
 	if err != nil {
 		return nil, err
 	}
+	return s.ParentsOfManifest(ctx, o, child)
+}
+
+// ParentsOfManifest searches the member holding child, including a remote cache,
+// after the virtual download walk has selected and authorized that member.
+func (s *Service) ParentsOfManifest(ctx context.Context, o Owner, child model.Item) ([]Parent, error) {
 	want := "sha256:" + child.Actual.SHA256
-	hits, err := layout.ImageManifests(ctx, s.Store.Items(), o.Repo.Key, o.Name)
+	hits, err := layout.ImageManifestsIn(ctx, s.Store.Items(), o.Repo.Key, o.Name, child.Cached)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // the layout names itself
 	}
 	byDigest := map[string]*Parent{}
 	var parents []*Parent
 	for _, h := range hits {
-		if h.Item.Name != layout.ListManifestFile {
+		if h.Item.Name != layout.ListManifestFile && first(h.Properties, layout.ManifestTypeProperty) != layout.MediaTypeOCIIndex &&
+			first(h.Properties, layout.ManifestTypeProperty) != layout.MediaTypeDockerList {
 			continue
 		}
 		digest := "sha256:" + h.Item.Actual.SHA256
