@@ -147,20 +147,28 @@ func TestAccDebianIndexKeepsAPackageThePatternsReject(t *testing.T) {
 
 // TestAccDebianRemoteIndexRefusedByThePolicy: a remote repository's index,
 // and the same index through its -cache alias, answers the policy's 404 and
-// message naming the remote and the index's path when the remote is blacked
-// out or its patterns reject that path, before its source is asked, with
-// the path asked for after it (#1630).
+// message when the remote is blacked out or its patterns reject that path,
+// before its source is asked, with the path asked for after it (#1630). The
+// message names the repository the request named, the cache for its alias,
+// as 7.x's cache repository checks the remote's settings under its own key.
 func TestAccDebianRemoteIndexRefusedByThePolicy(t *testing.T) {
 	w := newOverlayWorld(t, refuseSources(t))
 	w.debRepos(
 		repo.Config{Key: "deb-dark", Class: repo.Remote, BlackedOut: new(true)},
 		repo.Config{Key: "deb-hidden", Class: repo.Remote, ExcludesPattern: new("**/Packages*")},
 	)
-	blackedOut := "The repository 'deb-dark' is blacked out and cannot serve artifact " +
-		"'deb-dark:" + debPackages + "'."
-	rejected := "The repository 'deb-hidden' rejected the artifact 'deb-hidden:" + debPackages +
-		"' due to its include/exclude pattern settings."
-	for _, tc := range []struct{ key, message string }{
+	blackedOut := func(key string) string {
+		return "The repository '" + key + "' is blacked out and cannot serve artifact '" +
+			key + ":" + debPackages + "'."
+	}
+	rejected := func(key string) string {
+		return "The repository '" + key + "' rejected the artifact '" + key + ":" + debPackages +
+			"' due to its include/exclude pattern settings."
+	}
+	for _, tc := range []struct {
+		key     string
+		message func(string) string
+	}{
 		{"deb-dark", blackedOut},
 		{"deb-dark-cache", blackedOut},
 		{"deb-hidden", rejected},
@@ -168,7 +176,7 @@ func TestAccDebianRemoteIndexRefusedByThePolicy(t *testing.T) {
 	} {
 		t.Run(tc.key, func(t *testing.T) {
 			wantError(t, w.get(tc.key, debPackages, "admin"), http.StatusNotFound,
-				tc.message+"; Path: '"+tc.key+":"+debPackages+"'")
+				tc.message(tc.key)+"; Path: '"+tc.key+":"+debPackages+"'")
 		})
 	}
 }

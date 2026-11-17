@@ -89,6 +89,16 @@ synthetic item rows. `/api/storage/vendor` and `vendor-cache/` remain cache-only
 even when browsing is enabled, so an uncached listed child still has no Storage API
 item record.
 
+A virtual repository's folder index (`GET /artifactory/virtual/` or
+`GET /artifactory/virtual/path/`) lists every member's children the caller may read,
+as Artifactory 7.x merges them: a local member's, a remote member's cached children
+and, when that remote lists remote folder items, its upstream's. The member's and the
+virtual repository's include and exclude patterns filter them, and a name several
+members hold shows once. A member whose upstream fails to list leaves only its own
+upstream children out; the rest of the index still answers. The Storage API through
+a virtual repository stays cache-only, as for the remote itself
+([#1537](https://github.com/weaveplatform/artifactweave/issues/1537)).
+
 The parser omits parent/traversal links, foreign origins, credentials and unsafe
 paths. The returned HTML escapes names and does not expose upstream query strings.
 Repository patterns and current Read permission filter every file and folder; source,

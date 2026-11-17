@@ -58,12 +58,14 @@
 //     core.
 //   - Hook errors. An error from a hook inside a write's transaction rolls
 //     the write back.
-//   - *RejectionError, made by Rejectf: a format's refusal. The HTTP layer
-//     answers it with Status and Message in the envelope of the surface the
-//     request arrived on; a copy or move reports it and skips the item.
-//     Policy marks the repository's own policy for the path (blackout,
-//     patterns, release and snapshot handling), which a download on the
-//     item route answers with the path it was asked for, as 7.x does.
+//   - *RejectionError, made by Rejectf or PolicyRefusal: a format's
+//     refusal. The HTTP layer answers it with Status and Message in the
+//     envelope of the surface the request arrived on; a copy or move
+//     reports it and skips the item. PolicyRefusal's mark Policy the
+//     repository's own policy for the path (blackout, patterns, release and
+//     snapshot handling), which a download on the item route answers with
+//     the path it was asked for, as 7.x does, and with Named's words for a
+//     remote's cache when the request named the cache.
 //   - *AcceptedError: a deploy or checksum upload that Admit takes without
 //     storing it. The HTTP layer answers Status with an empty body, and an
 //     exploded archive leaves the entry out.

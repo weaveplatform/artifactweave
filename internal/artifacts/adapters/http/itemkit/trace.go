@@ -648,7 +648,7 @@ func (s *Kit) traceOverlays(
 				traceRepoPath(c, cached || c.Class == repo.Remote, resourcePath(req.Path)))
 		}
 		if overlayRefused(c, req, answer) {
-			t.denied(generic.CheckDownload(c, resourcePath(req.Path), false))
+			t.denied(asNamed(c, cached, generic.CheckDownload(c, resourcePath(req.Path), false)))
 		}
 		return true, answer
 	}
