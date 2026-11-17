@@ -270,7 +270,7 @@ func (g *Registry) dispatch(w http.ResponseWriter, r *http.Request, q Request) {
 	}
 	if q.Repo.Class == repo.Virtual && (g.uploads == nil ||
 		!virtualPull(q.Kind, r.Method) && !virtualWrite(q.Kind, r.Method) &&
-			!(r.Method == http.MethodDelete && (q.Kind == KindManifest || q.Kind == KindBlob))) {
+			(r.Method != http.MethodDelete || q.Kind != KindManifest && q.Kind != KindBlob)) {
 		g.writeErr(w, r, unsupportedVirtual(q.Repo))
 		return
 	}
