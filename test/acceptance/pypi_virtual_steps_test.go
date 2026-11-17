@@ -22,6 +22,8 @@ import (
 )
 
 func (w *world) registerVirtualPyPI(sc *godog.ScenarioContext) {
+	sc.Step(`^I publish virtual Python distributions with "([^"]*)" at "([^"]*)"$`, w.publishVirtualPython)
+	sc.Step(`^I install published virtual Python distributions with "([^"]*)" into "([^"]*)"$`, w.installPublishedVirtualPython)
 	sc.Step(`^a virtual Python upstream serves dependent wheel and sdist in "([^"]*)"$`, w.virtualPythonUpstream)
 	sc.Step(`^I install virtual Python packages with "([^"]*)" into "([^"]*)"$`, w.installVirtualPython)
 }
@@ -197,4 +199,21 @@ func (w *world) installVirtualPython(client, env string) error {
 		args = "--no-config pip install --python " + env + "/bin/python --no-cache --index-url {authurl}/api/pypi/pypi-virtual/simple/ acme-smoke==1.0.0"
 	}
 	return w.runPython(client, args)
+}
+
+func (w *world) publishVirtualPython(client, suffix string) error {
+	endpoint := "{url}/api/pypi/pypi-virtual/" + suffix
+	files := " dist/acme_publish-1.0.0-py3-none-any.whl dist/acme_source-1.0.0.tar.gz"
+	if client == "twine" {
+		return w.runPython(client, "upload --non-interactive --disable-progress-bar --repository-url "+endpoint+" --username admin --password {password}"+files)
+	}
+	return w.runPython(client, "--no-config publish --publish-url "+endpoint+" --username admin --password {password}"+files)
+}
+
+func (w *world) installPublishedVirtualPython(client, env string) error {
+	packages := " acme-publish==1.0.0 acme-source==1.0.0"
+	if client == "pip" {
+		return w.runPython(client, "--isolated --python "+env+" install --retries 0 --no-cache-dir --index-url {authurl}/api/pypi/pypi-virtual/simple/"+packages)
+	}
+	return w.runPython(client, "--no-config pip install --python "+env+"/bin/python --no-cache --index-url {authurl}/api/pypi/pypi-virtual/simple/"+packages)
 }

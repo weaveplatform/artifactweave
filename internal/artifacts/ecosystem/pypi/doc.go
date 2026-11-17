@@ -81,7 +81,9 @@
 // Implemented P8 (PyPI local repositories), with remote repositories in
 // P9. Moved here in P9d. P10 virtual.go merges readable project records
 // with priority and complete filename ownership; the HTTP adapter serves
-// virtual simple/Warehouse metadata, distributions and wheel metadata.
+// virtual simple/Warehouse metadata, distributions and wheel metadata. PYP-02
+// maps multipart uploads and package PUTs to the deployment target under its
+// permissions and admission rules, with immediate virtual read-back.
 //
 // # Testing
 //

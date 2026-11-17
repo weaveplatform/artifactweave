@@ -30,15 +30,6 @@ func (virtualSource) Item(context.Context, pkgroute.Store, repo.Config, string) 
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
-func (h handler) virtualWrite(w http.ResponseWriter, r *http.Request) bool {
-	c := pkgroute.RequestFrom(r).Repo
-	if c.Class != repo.Virtual {
-		return false
-	}
-	h.k.Error(w, r, apierror.New(http.StatusNotImplemented, fmt.Sprintf("'%s' is a virtual repository, which artifactweave does not serve through the pypi API yet", c.Key)))
-	return true
-}
-
 type virtualFile struct {
 	remoteFile
 	file   pypifmt.File

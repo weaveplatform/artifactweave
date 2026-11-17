@@ -193,7 +193,7 @@ func TestAccPypiVirtualReadsAndWarehouse(t *testing.T) {
 	}
 	for _, method := range []string{"PUT", "POST"} {
 		r := w.Request(method, root, "admin", "")
-		if r.Code != 501 {
+		if r.Code != 405 {
 			t.Fatal(method, r.Code, r.Body.String())
 		}
 	}

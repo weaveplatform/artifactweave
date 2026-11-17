@@ -43,7 +43,7 @@ export AW_PYPI_INDEX="$AW_AUTH_URL/artifactory/api/pypi/$AW_REPO/simple/"
 
 ## Publish
 
-Classes: **local**. Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.
+Classes: **local, virtual**. Publish to a local repository or a virtual with a local/federated defaultDeploymentRepo. Grant Write on that target; use the base URL, not /simple/. Remote repositories do not accept publication.
 
 The upload endpoint differs from /simple/. Keep secrets out of captured command output.
 
@@ -69,6 +69,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 - Poetry and Twine have additional tested flows in the linked acceptance files; this minimal recipe uses uv.
 - Replacing a stored version with different bytes requires delete permission as well as write permission.
 - Virtual installs are qualified with pip and uv over local plus remote members in HTML and JSON modes; federated native-client qualification remains in the follow-on phase.
+- Virtual publication is qualified with Twine and uv; the deployment target must be an effectively reachable local or federated member.
 
 ## Verification sources
 

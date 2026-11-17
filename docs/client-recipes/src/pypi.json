@@ -27,8 +27,8 @@
     }
   ],
   "publish": {
-    "classes": "L",
-    "note": "Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
+    "classes": "LV",
+    "note": "Publish to a local repository or a virtual with a local/federated defaultDeploymentRepo. Grant Write on that target; use the base URL, not /simple/. Remote repositories do not accept publication.",
     "steps": [
       {
         "language": "sh",
@@ -51,21 +51,26 @@
   "limitations": [
     "Poetry and Twine have additional tested flows in the linked acceptance files; this minimal recipe uses uv.",
     "Replacing a stored version with different bytes requires delete permission as well as write permission.",
-    "Virtual installs are qualified with pip and uv over local plus remote members in HTML and JSON modes; federated native-client qualification remains in the follow-on phase."
+    "Virtual installs are qualified with pip and uv over local plus remote members in HTML and JSON modes; federated native-client qualification remains in the follow-on phase.",
+    "Virtual publication is qualified with Twine and uv; the deployment target must be an effectively reachable local or federated member."
   ],
   "evidence": [
     {
       "path": "test/acceptance/features/pypi_virtual.feature",
       "contains": [
         "pip and uv install wheel and sdist dependencies from virtual HTML and JSON indexes",
-        "I install virtual Python packages"
+        "I install virtual Python packages",
+        "twine and uv publish a wheel and sdist to a virtual deployment target and install back",
+        "virtual Python publication rejects install paths and a missing deployment target"
       ]
     },
     {
       "path": "test/acceptance/pypi_virtual_steps_test.go",
       "contains": [
         "func (w *world) installVirtualPython",
-        "dependentMetadata(data, \"acme-private==1.0.0\", \"acme-source==1.0.0\")"
+        "dependentMetadata(data, \"acme-private==1.0.0\", \"acme-source==1.0.0\")",
+        "func (w *world) publishVirtualPython",
+        "func (w *world) installPublishedVirtualPython"
       ]
     },
     {

@@ -7,7 +7,9 @@ Uploads remain refused. Existing local and federated upload and lifecycle behavi
 unchanged. Virtual PyPI repositories now serve reads over local and remote members;
 the detailed protocol and compatibility rules are recorded in
 [decision 0037](../research/decisions/0037-pypi.md#p10-virtual-python-reads-pyp-01).
-Virtual uploads remain 501 until PYP-02.
+Virtual publication uses a configured local or federated `defaultDeploymentRepo` and
+the target's Write permissions. Twine/uv publish to the virtual's base URL, while
+pip/uv install from `/simple/`; see [the publication contract](../research/decisions/0037-pypi.md#p10-virtual-python-publication-pyp-02).
 
 Configure a remote repository with `packageType: "pypi"`. `pyPIRegistryUrl` is the
 registry API base (default `https://pypi.org`); `pyPIRepositorySuffix` is appended to
