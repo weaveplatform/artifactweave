@@ -2,6 +2,9 @@
 # Native gallery installation is exercised on the pinned Ubuntu image.
 FROM ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2
 
+COPY ubuntu-mirrors.sh /usr/local/bin/ubuntu-mirrors
+RUN ubuntu-mirrors
+
 # The bundled vsce-sign verifier loads libssl.so.3 at runtime; Ubuntu 26.10
 # otherwise provides only libssl.so.4 and fails closed before verification.
 RUN apt-get update && apt-get install -y --no-install-recommends \
