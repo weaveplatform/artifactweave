@@ -49,9 +49,12 @@
 //   - A path segment must be canonical, without escapes, semicolons,
 //     backslashes or NUL (400), and only the identifier lookup and a
 //     manifest's swift-version take a query (400).
-//   - Only local and federated repositories publish, with PUT
-//     /{scope}/{name}/{version} (405), and write permission on the
-//     archive's path. The multipart form carries one source-archive part,
+//   - Local and federated repositories publish, with PUT
+//     /{scope}/{name}/{version}, and a virtual repository publishes into
+//     its default deployment repository, or answers 405 with Allow: GET
+//     without one (decision 0008, R6); a remote answers 405. Publishing
+//     needs write permission on the archive's path in the repository the
+//     release lands in. The multipart form carries one source-archive part,
 //     binary or base64, of at most 512 MiB (413), and an optional metadata
 //     JSON object of at most 64 KiB; a signed release is refused (422)
 //     until signatures are validated, an invalid archive, an empty one
@@ -63,12 +66,15 @@
 //     takes release metadata only with exactly one valid source-archive
 //     resource, delivers an archive only when it validates and matches that
 //     resource's SHA-256, and rechecks the caller's read when it delivers.
-//   - A virtual repository's members are distinct local, federated or
-//     remote repositories (400), read in order: release lists merge, the
-//     first member that holds a version supplies it, and manifests are
-//     served without the member's Link headers and with redirects onto the
-//     virtual URL, so the client's next request meets the virtual
-//     repository's permissions. A member that fails answers 502.
+//   - A virtual repository reads its members through the package
+//     handlers' walk (pkgroute.Collect, decision 0008): nested virtual
+//     repositories flattened, cycles and duplicates skipped, in 7.x's
+//     effective order. Release lists merge (swiftfmt.Releases), the first
+//     member that holds a version supplies it, and manifests are served
+//     without the member's Link headers and with redirects onto the
+//     virtual URL. Each member decides Read on what it serves; a member
+//     that misses, refuses, may not be read or whose upstream fails is
+//     passed over, and none answers the registry's 404.
 //   - The download policy (decision 0032) is checked after Read
 //     permission. A blacked-out local or federated repository refuses
 //     every read, the release list, release metadata and Package.swift at

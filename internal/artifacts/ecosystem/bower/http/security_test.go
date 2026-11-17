@@ -70,7 +70,10 @@ func TestUnitBowerRoutesDoNotDiscloseInvalidOrDeniedPackages(t *testing.T) {
 	}
 }
 
-func TestUnitBowerVirtualCatalogDedupeAndCycleDenial(t *testing.T) {
+// A virtual repository's catalog lists a package two members hold once,
+// and a cycle, a self-member and a nested virtual repository resolve
+// through the shared walk rather than answer 400 (decision 0008, R2).
+func TestUnitBowerVirtualCatalogDedupeAndNesting(t *testing.T) {
 	f := newFixture(t)
 	a := f.repo("bower-a", repo.Local)
 	b := f.repo("bower-b", repo.Federated)
@@ -92,23 +95,35 @@ func TestUnitBowerVirtualCatalogDedupeAndCycleDenial(t *testing.T) {
 		strings.Count(r.Body.String(), `"name":"hello"`) != 1 {
 		t.Fatalf("virtual search deduped incorrectly: %d %s", r.Code, r.Body)
 	}
-	_ = f.repo("bower-cycle", repo.Virtual, "bower-cycle")
-	if r := f.get("/artifactory/api/bower/bower-cycle/packages", "admin"); r.Code == http.StatusOK {
-		t.Fatal("virtual cycle exposed a catalog")
+	_ = f.repo("bower-cycle", repo.Virtual, "bower-cycle", a.Key)
+	if r := f.get("/artifactory/api/bower/bower-cycle/packages", "admin"); r.Code != http.StatusOK ||
+		strings.Count(r.Body.String(), `"name":"hello"`) != 1 {
+		t.Fatalf("self-member catalog = %d %s", r.Code, r.Body)
 	}
 	if r := f.get(
 		"/artifactory/api/bower/bower-cycle/refs/bower-cycle/hello",
 		"admin",
-	); r.Code == http.StatusOK {
-		t.Fatal("virtual cycle exposed refs")
+	); r.Code != http.StatusOK || strings.Count(r.Body.String(), "refs/tags/v1.0.0") != 1 {
+		t.Fatalf("self-member refs = %d %s", r.Code, r.Body)
 	}
-	_ = f.repo("bower-nested", repo.Virtual, "bower-v")
-	_ = f.repo("bower-invalid", repo.Virtual, "bower-nested")
+	_ = f.repo("bower-nested", repo.Virtual, "bower-v", "bower-invalid")
+	_ = f.repo("bower-invalid", repo.Virtual, "bower-nested", a.Key)
+	for path, want := range map[string]string{
+		"packages":                 `"name":"hello"`,
+		"packages/search/hel":      `"name":"hello"`,
+		"packages/hello":           `"name":"hello"`,
+		"refs/bower-invalid/hello": "refs/tags/v1.0.0",
+	} {
+		if r := f.get("/artifactory/api/bower/bower-invalid/"+path, "admin"); r.Code !=
+			http.StatusOK || strings.Count(r.Body.String(), want) != 1 {
+			t.Fatalf("nested virtual %s = %d %s", path, r.Code, r.Body)
+		}
+	}
 	if r := f.get(
-		"/artifactory/api/bower/bower-invalid/packages",
+		"/artifactory/api/bower/bower-invalid/binaries/bower-invalid/hello.git/v1.0.0",
 		"admin",
-	); r.Code == http.StatusOK {
-		t.Fatal("nested virtual member exposed a catalog")
+	); r.Code != http.StatusOK {
+		t.Fatalf("nested virtual archive = %d %s", r.Code, r.Body)
 	}
 	_ = f.repo("bower-missing", repo.Virtual, "does-not-exist")
 	if r := f.get(

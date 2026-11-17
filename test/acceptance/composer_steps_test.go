@@ -18,14 +18,30 @@ import (
 
 func (w *world) registerComposer(sc *godog.ScenarioContext) {
 	sc.Step(`^a Composer archive with message "([^"]*)"$`, w.writeComposerArchive)
+	sc.Step(
+		`^a Composer archive of version "([^"]*)" with message "([^"]*)"$`,
+		w.writeComposerArchiveVersion,
+	)
 	sc.Step(`^a Composer upstream serves that archive$`, w.composerUpstream)
+	sc.Step(
+		`^a Composer upstream serves that archive as version "([^"]*)"$`,
+		w.composerUpstreamVersion,
+	)
 	sc.Step(`^a Composer project for repository "([^"]*)"$`, w.composerProject)
+	sc.Step(
+		`^a Composer project for repository "([^"]*)" requiring version "([^"]*)"$`,
+		w.composerProjectVersion,
+	)
 	sc.Step(`^I run Composer "([^"]*)"$`, w.runComposer)
 	sc.Step(`^I run Composer 1 "([^"]*)"$`, w.runComposer1)
 	sc.Step(`^I clear the Composer installation$`, w.clearComposerInstallation)
 }
 
 func (w *world) writeComposerArchive(message string) error {
+	return w.writeComposerArchiveVersion("1.0.0", message)
+}
+
+func (w *world) writeComposerArchiveVersion(version, message string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
@@ -36,7 +52,7 @@ func (w *world) writeComposerArchive(message string) error {
 	var b bytes.Buffer
 	z := zip.NewWriter(&b)
 	for name, content := range map[string]string{
-		"composer.json":  `{"name":"acme/widget","version":"1.0.0","type":"library"}`,
+		"composer.json":  `{"name":"acme/widget","version":"` + version + `","type":"library"}`,
 		"src/Widget.php": "<?php // " + message + "\n",
 	} {
 		f, e := z.Create(name)
@@ -53,7 +69,9 @@ func (w *world) writeComposerArchive(message string) error {
 	return os.WriteFile(filepath.Join(dir, "composer", "widget.zip"), b.Bytes(), 0o600)
 }
 
-func (w *world) composerUpstream() error {
+func (w *world) composerUpstream() error { return w.composerUpstreamVersion("1.0.0") }
+
+func (w *world) composerUpstreamVersion(version string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
@@ -70,7 +88,8 @@ func (w *world) composerUpstream() error {
 	}
 	digest := sha1.Sum(archive) //nolint:gosec // Composer's dist.shasum.
 	metadata := fmt.Sprintf(
-		`{"packages":{"acme/widget":[{"name":"acme/widget","version":"1.0.0","type":"library","dist":{"type":"zip","url":"%s/composer/dist.zip","shasum":"%x"}}]}}`,
+		`{"packages":{"acme/widget":[{"name":"acme/widget","version":%q,"type":"library","dist":{"type":"zip","url":"%s/composer/dist.zip","shasum":"%x"}}]}}`,
+		version,
 		w.remote.URL,
 		digest,
 	)
@@ -84,6 +103,10 @@ func (w *world) composerUpstream() error {
 }
 
 func (w *world) composerProject(repoKey string) error {
+	return w.composerProjectVersion(repoKey, "1.0.0")
+}
+
+func (w *world) composerProjectVersion(repoKey, version string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
@@ -94,7 +117,7 @@ func (w *world) composerProject(repoKey string) error {
 	}
 	doc := map[string]any{
 		"name":    "acceptance/root",
-		"require": map[string]string{"acme/widget": "1.0.0"},
+		"require": map[string]string{"acme/widget": version},
 		"repositories": []any{
 			map[string]string{
 				"type": "composer",

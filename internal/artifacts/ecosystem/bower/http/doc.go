@@ -47,12 +47,13 @@
 //     virtual repository's own patterns with "No repository found to serve
 //     the request", and a remote's at the path its cache keeps the archive
 //     at. The package lookup and refs of a blacked-out repository answer
-//     the blackout, naming the request's path, while the package list and
+//     the blackout, naming the request's path, while its package list and
 //     search keep their answers. A version whose files the patterns reject
 //     stays listed, and a remote's metadata reads check its blackout alone.
-//     A virtual repository resolves without a blacked-out member, passes
-//     over a member that refuses any file of the archive, and refuses an
-//     external dependency's archive its own patterns reject.
+//     A virtual repository resolves and lists without a blacked-out
+//     member, passes over a member that refuses any file of the archive,
+//     and refuses an external dependency's archive its own patterns
+//     reject.
 //   - A Git remote follows a registry pointer only within the configured
 //     Git origin and path, and an archive enters the remote cache only
 //     after its paths, size, file count, manifest and gzip integrity pass;
@@ -60,9 +61,16 @@
 //   - A registration is immutable, needs write permission on the package in
 //     the addressed repository and the selected remote, and treats a
 //     private Stash SSH address as a locator, never as a transport.
-//   - A virtual repository resolves its members in order, and, when it
-//     rewrites external dependencies, admits only sources its allowlist
-//     patterns match, through its selected remote's cache.
+//   - A virtual repository reads its members through the package
+//     handlers' walk (pkgroute.Collect, decision 0008): nested virtual
+//     repositories flattened, cycles and duplicates skipped, in 7.x's
+//     effective order. Its package list and versions merge (bower.Names,
+//     bower.Versions), and a version's archive comes from the first member
+//     that holds and serves it. Each member decides Read on what it
+//     serves; a member that misses, refuses, may not be read or whose
+//     upstream fails is passed over. When it rewrites external
+//     dependencies it admits only sources its allowlist patterns match,
+//     through its selected remote's cache.
 //   - Statuses and error texts stay byte-identical.
 //
 // # References

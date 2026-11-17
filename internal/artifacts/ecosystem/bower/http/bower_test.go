@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -195,5 +196,82 @@ func TestUnitBowerRemoteRefsAndArchiveValidation(t *testing.T) {
 		strings.Repeat("1", 44) + " refs/tags/1.0.0^{}\n"))
 	if err != nil || len(refs) != 1 || refs[0].Version != "1.0.0" || refs[0].Tag != "1.0.0" {
 		t.Fatalf("non-version refs and plain tag: %+v, %v", refs, err)
+	}
+}
+
+// A virtual repository takes its members from the shared walk (decision
+// 0008, R1 to R3): a local member reached through a nested virtual
+// repository resolves, a cycle and a repeated member are skipped, a remote
+// member whose upstream fails is passed over, and a caller who may read
+// only the local member resolves through the virtual repository, with the
+// unreadable remote member passed over.
+func TestUnitBowerVirtualResolvesThroughTheSharedWalk(t *testing.T) {
+	f := scriptedBowerRemote(t, false, func(context.Context, source.Request, source.Permit) (source.Result, error) {
+		return source.Result{}, source.ErrUnavailable
+	})
+	l := f.repo("bower-local", repo.Local)
+	_ = f.repo("bower-nested", repo.Virtual, l.Key, "bower-v")
+	_ = f.repo("bower-v", repo.Virtual, "bower-remote", "bower-nested", "bower-v", "bower-remote")
+	f.deploy(l, "hello", "1.0.0", "bower.json", `{"name":"hello","version":"1.0.0"}`)
+	f.deploy(l, "hello", "1.0.0", "lib/index.js", "from-local")
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "local-only",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"member": api.ActionRead}},
+			Targets: map[string]accesstest.Target{l.Key: {}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const base = "/artifactory/api/bower/bower-v/"
+	for _, user := range []string{"admin", "member"} {
+		for path, want := range map[string]string{
+			"packages":               `[{"name":"hello","url":"art://bower-v/hello"}]`,
+			"packages/search/hel":    `[{"name":"hello","url":"art://bower-v/hello"}]`,
+			"packages/hello":         `{"name":"hello","url":"art://bower-v/hello"}`,
+			"refs/bower-v/hello":     "refs/tags/v1.0.0\n",
+			"refs/bower-v/not-there": "Bower package not found",
+		} {
+			rec := f.get(base+path, user)
+			if !strings.Contains(rec.Body.String(), want) {
+				t.Fatalf("%s %s: %d %s, want %s", user, path, rec.Code, rec.Body, want)
+			}
+		}
+		rec := f.get(base+"binaries/bower-v/hello.git/v1.0.0", user)
+		if rec.Code != http.StatusOK || archivedIndex(t, rec) != "from-local" {
+			t.Fatalf("%s archive: %d %s", user, rec.Code, rec.Body)
+		}
+		rec = f.get(base+"binaries/bower-v/hello.git/v2.0.0", user)
+		if rec.Code != http.StatusNotFound || bowerMessage(t, rec) != "Bower version not found" {
+			t.Fatalf("%s missing version: %d %s", user, rec.Code, rec.Body)
+		}
+	}
+}
+
+// A member the caller may not read a version's manifest in is passed over
+// for the next member that holds the version (decision 0008, R3 and R10).
+func TestUnitBowerVirtualPassesOverAMemberThatHidesTheVersion(t *testing.T) {
+	f := newFixture(t)
+	a, b := f.repo("bower-a", repo.Local), f.repo("bower-b", repo.Local)
+	for _, c := range []repo.Config{a, b} {
+		f.deploy(c, "hello", "1.0.0", "bower.json", `{"name":"hello","version":"1.0.0"}`)
+		f.deploy(c, "hello", "1.0.0", "lib/index.js", "from-"+c.Key)
+	}
+	_ = f.repo("bower-v", repo.Virtual, a.Key, b.Key)
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "partial",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
+				a.Key: {Include: []string{"hello/2.0.0/**"}},
+				b.Key: {},
+			},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rec := f.get("/artifactory/api/bower/bower-v/binaries/bower-v/hello.git/v1.0.0", "partial")
+	if rec.Code != http.StatusOK || archivedIndex(t, rec) != "from-bower-b" {
+		t.Fatalf("archive past a member that hides the version: %d %s", rec.Code, rec.Body)
 	}
 }

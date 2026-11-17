@@ -114,22 +114,32 @@ func (h handler) localReleases(w http.ResponseWriter, r *http.Request, p swiftfm
 		h.k.Error(w, r, err)
 		return
 	}
-	c := pkgroute.RequestFrom(r).Repo
-	pkg, err := h.k.DB().Packages().Find(r.Context(), c.Key, p.ID())
-	if errors.Is(err, kernel.ErrNotFound) {
+	versions, err := h.localVersions(r, p)
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
+		h.k.Error(w, r, err)
+		return
+	}
+	if len(versions) == 0 {
 		h.k.Error(w, r, bad(http.StatusNotFound, "Swift package not found"))
 		return
 	}
+	writeJSON(w, r, releaseList(r, p, versions))
+}
+
+// localVersions lists the releases of p the repository of r holds whose
+// archive the caller may read: kernel.ErrNotFound when it holds no
+// package p.
+func (h handler) localVersions(r *http.Request, p swiftfmt.Package) ([]string, error) {
+	c := pkgroute.RequestFrom(r).Repo
+	pkg, err := h.k.DB().Packages().Find(r.Context(), c.Key, p.ID())
 	if err != nil {
-		h.k.Error(w, r, err)
-		return
+		return nil, fmt.Errorf("swift: find package: %w", err)
 	}
 	versions, err := h.k.DB().Packages().Versions(r.Context(), pkg.ID)
 	if err != nil {
-		h.k.Error(w, r, err)
-		return
+		return nil, fmt.Errorf("swift: list versions: %w", err)
 	}
-	out := releases{Releases: map[string]release{}}
+	var out []string
 	for _, v := range versions {
 		p.Version = v.Version
 		if !swiftfmt.ValidVersion(v.Version) || !h.k.Can(r, p.ArchivePath(), api.ActionRead) {
@@ -140,16 +150,22 @@ func (h handler) localReleases(w http.ResponseWriter, r *http.Request, p swiftfm
 			continue
 		}
 		if err != nil {
-			h.k.Error(w, r, err)
-			return
+			return nil, fmt.Errorf("swift: release archive: %w", err)
 		}
-		out.Releases[v.Version] = release{URL: releaseURL(r, p)}
+		out = append(out, v.Version)
 	}
-	if len(out.Releases) == 0 {
-		h.k.Error(w, r, bad(http.StatusNotFound, "Swift package not found"))
-		return
+	return out, nil
+}
+
+// releaseList is the registry's release list of p's versions, each at its
+// URL under the repository the client asked (releaseURL).
+func releaseList(r *http.Request, p swiftfmt.Package, versions []string) releases {
+	out := releases{Releases: make(map[string]release, len(versions))}
+	for _, v := range versions {
+		p.Version = v
+		out.Releases[v] = release{URL: releaseURL(r, p)}
 	}
-	writeJSON(w, r, out)
+	return out
 }
 
 func (h handler) localReleaseInfo(

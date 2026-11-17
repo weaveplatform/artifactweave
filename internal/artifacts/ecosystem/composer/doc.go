@@ -39,6 +39,10 @@
 //   - The archive rules: ParseArchive, Package and its Document, ValidName,
 //     ValidVersion, HostedPath and the bounds (ArchiveLimit,
 //     MetadataLimit).
+//   - Releases, the virtual.Merger of a virtual repository's p2 metadata:
+//     the union of its members' releases, each version from the first
+//     member in the walk that lists it (decision 0008, "Per-format
+//     merges").
 //
 // # Invariants
 //
@@ -85,4 +89,5 @@
 //     cached-write rules.
 //   - admission_test.go: admission and reindex of a local repository
 //     through the item service.
+//   - virtual_test.go: the merge of a virtual repository's releases.
 package composer

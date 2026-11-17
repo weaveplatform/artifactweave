@@ -401,14 +401,17 @@ func TestAccComposerVirtualSelectsRemoteDistribution(t *testing.T) {
 		t.Fatal(err)
 	}
 	local := f.create("local", repo.Local)
-	f.deploy(local, "1.0.0", "local second")
+	fromLocal := f.deploy(local, "1.1.0", "local")
 	f.create("all", repo.Virtual, "remote", "local")
 	base := "/artifactory/api/composer/all"
-	if got := f.request(
-		"GET",
-		base+"/p2/acme/widget.json",
-	); got.Code != 200 ||
-		!strings.Contains(got.Body.String(), base+"/dist/acme/widget/1.0.0.zip") {
+	// The p2 metadata is the union of both members' versions, the local
+	// member's first (decision 0008, R1), each pointing at the virtual
+	// repository's dist.
+	got := f.request("GET", base+"/p2/acme/widget.json")
+	body := got.Body.String()
+	if got.Code != 200 || !strings.Contains(body, base+"/dist/acme/widget/1.0.0.zip") ||
+		!strings.Contains(body, base+"/dist/acme/widget/1.1.0.zip") ||
+		strings.Index(body, `"1.1.0"`) > strings.Index(body, `"1.0.0"`) {
 		t.Fatalf("virtual remote metadata: %d %s", got.Code, got.Body)
 	}
 	if got := f.request(
@@ -417,5 +420,9 @@ func TestAccComposerVirtualSelectsRemoteDistribution(t *testing.T) {
 	); got.Code != 200 ||
 		!bytes.Equal(got.Body.Bytes(), archive) {
 		t.Fatalf("virtual remote distribution: %d %s", got.Code, got.Body)
+	}
+	if got := f.request("GET", base+"/dist/acme/widget/1.1.0.zip"); got.Code != 200 ||
+		!bytes.Equal(got.Body.Bytes(), fromLocal) {
+		t.Fatalf("virtual local distribution: %d %s", got.Code, got.Body)
 	}
 }

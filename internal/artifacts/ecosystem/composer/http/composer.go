@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/composer"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -139,6 +141,10 @@ func (h handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 func (h handler) root(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualRoot(w, r)
+		return
+	}
 	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
@@ -155,21 +161,6 @@ func (h handler) root(w http.ResponseWriter, r *http.Request) {
 			h.fail(w, r, err)
 			return
 		}
-		respondJSON(
-			w,
-			r,
-			map[string]any{
-				"packages": map[string]any{},
-				"metadata-url": "/artifactory/api/composer/" + url.PathEscape(
-					publicKey(r),
-				) + "/p2/%package%.json",
-			},
-		)
-		return
-	}
-	if q.Repo.Class == repo.Virtual {
-		// V2 discovers each package by p2; the local v1 catalog is built only
-		// for hosted repositories while v1 virtual is outside JFrog support.
 		respondJSON(
 			w,
 			r,
@@ -215,6 +206,35 @@ func (h handler) root(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
+// virtualRoot serves a virtual repository's packages.json, which names
+// only where Composer 2 finds each package's p2 metadata: the local v1
+// catalog is built only for hosted repositories, and v1 virtual is outside
+// JFrog support. A virtual repository has no permission target of its own,
+// so a caller who may read the virtual repository or any of its members is
+// served; one who may read neither gets the protocol's not-found (decision
+// 0008, R3 and R10).
+func (h handler) virtualRoot(w http.ResponseWriter, r *http.Request) {
+	if r.URL.RawQuery != "" {
+		h.bad(w, r)
+		return
+	}
+	if !h.k.CanFolder(r, "", api.ActionRead) {
+		members, err := h.k.MergeMembers(r, "")
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		if len(members) == 0 {
+			h.notFound(w, r)
+			return
+		}
+	}
+	respondJSON(w, r, map[string]any{
+		"packages":     map[string]any{},
+		"metadata-url": "/artifactory/api/composer/" + url.PathEscape(publicKey(r)) + "/p2/%package%.json",
+	})
+}
+
 func (h handler) p2(w http.ResponseWriter, r *http.Request) {
 	if r.URL.RawQuery != "" {
 		h.bad(w, r)
@@ -225,7 +245,7 @@ func (h handler) p2(w http.ResponseWriter, r *http.Request) {
 		h.notFound(w, r)
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
+	if !h.requireRead(w, r, name) {
 		return
 	}
 	document := "p2/" + name + ".json"
@@ -289,30 +309,52 @@ func (h handler) lookup(r *http.Request, name string) ([]release, error) {
 	case repo.Remote:
 		return h.remoteP2(r, name)
 	case repo.Virtual:
-		members, err := h.members(r)
-		if err != nil {
-			return nil, err
-		}
-		for _, member := range members {
-			found, err := h.memberLookup(r, member, name)
-			if err != nil {
-				return nil, err
-			}
-			if len(found) > 0 {
-				return found, nil
-			}
-		}
-		return nil, kernel.ErrNotFound
+		return h.virtualLookup(r, name)
 	}
 	return nil, source.ErrUnsupported
 }
 
+// requireRead refuses a caller who may not read the package folder in the
+// request's repository, before anything is looked up (DV-057). A virtual
+// repository has no permission target of its own: each member decides Read
+// on what it serves, and a member the caller may not read is not found, so
+// a caller who may read only the members is served and one who may read
+// none gets the protocol's not-found (decision 0008, R3 and R10).
+func (h handler) requireRead(w http.ResponseWriter, r *http.Request, folder string) bool {
+	return pkgroute.RequestFrom(r).Repo.Class == repo.Virtual ||
+		h.k.RequireFolder(w, r, folder, api.ActionRead)
+}
+
+// virtualLookup merges the releases of name that a virtual repository's
+// members list (composer.Releases) through the package handlers' walk:
+// nested virtual repositories flattened, cycles and duplicates skipped, and
+// a member that is blacked out, that the caller may read nothing in, whose
+// read misses or is refused, or whose upstream fails passed over (decision
+// 0008, R1 to R3). Composer keeps no metadata at a documented path, so only
+// a member's blackout refuses it ([I], R2a). Each version is kept from the
+// first member in the walk that lists it, which records it as the member
+// its dist comes from.
+func (h handler) virtualLookup(r *http.Request, name string) ([]release, error) {
+	parts, err := pkgroute.Collect(h.k, r, "", func(mr *http.Request) ([]release, error) {
+		return h.memberLookup(r, mr, name)
+	})
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the kit's answer or a member's fault, as it is
+	}
+	merged, _ := composer.Releases[release]{
+		Version: func(rel release) string { return rel.Version },
+	}.Merge(r.Context(), parts)
+	if len(merged) == 0 {
+		return nil, kernel.ErrNotFound
+	}
+	return merged, nil
+}
+
 // memberLookup returns the releases of name in member, a member request of
 // virtual request r, under r's distribution URLs, or none when the caller
-// may not read the package there, the member lacks it, or the member is
-// blacked out: 7.x ignores a blacked-out repository when it resolves (R5).
+// may not read the package there or the member lacks it.
 func (h handler) memberLookup(r, member *http.Request, name string) ([]release, error) {
-	if !h.k.CanFolder(member, name, api.ActionRead) || h.k.CheckBlackedOut(member, "") != nil {
+	if !h.k.CanFolder(member, name, api.ActionRead) {
 		return nil, nil
 	}
 	found, err := h.lookup(member, name)
@@ -327,31 +369,6 @@ func (h handler) memberLookup(r, member *http.Request, name string) ([]release, 
 		found[i].Document["dist"] = distDocument(r, name, found[i].Version, found[i].SHA1)
 	}
 	return found, nil
-}
-
-func (h handler) members(r *http.Request) ([]*http.Request, error) {
-	q := pkgroute.RequestFrom(r)
-	seen := map[string]bool{q.Repo.Key: true}
-	var members []*http.Request
-	for _, key := range q.Repo.Repositories {
-		if seen[key] {
-			return nil, apierror.New(http.StatusBadRequest, "invalid Composer virtual member")
-		}
-		seen[key] = true
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("get composer virtual member %s: %w", key, err)
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return nil, fmt.Errorf("composer member request %s: %w", key, err)
-		}
-		members = append(members, mr)
-	}
-	return members, nil
 }
 
 func (h handler) hosted(r *http.Request) (catalog, error) {
@@ -430,13 +447,8 @@ func (h handler) hosted(r *http.Request) (catalog, error) {
 func distDocument(r *http.Request, name, version, sha1 string) map[string]any {
 	return map[string]any{
 		"type": "zip",
-		"url": fmt.Sprintf(
-			"%s/artifactory/api/composer/%s/dist/%s/%s.zip",
-			baseurl.From(r.Context()),
-			url.PathEscape(publicKey(r)),
-			name,
-			url.PathEscape(version),
-		),
+		"url": virtual.APIBase(baseurl.From(r.Context()), "composer", url.PathEscape(publicKey(r))) +
+			"/dist/" + name + "/" + url.PathEscape(version) + ".zip",
 		"shasum": sha1,
 	}
 }
@@ -459,7 +471,7 @@ func (h handler) dist(w http.ResponseWriter, r *http.Request) {
 		h.notFound(w, r)
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
+	if !h.requireRead(w, r, name) {
 		return
 	}
 	switch pkgroute.RequestFrom(r).Repo.Class {
@@ -492,53 +504,42 @@ func (h handler) dist(w http.ResponseWriter, r *http.Request) {
 	h.notFound(w, r)
 }
 
-// virtualDist serves version's archive from the member a virtual
-// repository resolves name to, the first that holds a release of it: when
-// that member lacks the version the answer is not found. When the member
-// refuses the archive, it is passed over for the next member that holds
-// the version, as 7.x ignores a blacked-out member and passes over one
-// that cannot serve the file (R5); the virtual repository's own patterns
-// refuse it with "No repository found to serve the request". A later
-// member is read only once an earlier one is passed over.
+// virtualDist serves version's archive from the first member in the walk
+// that lists the version, the member the virtual repository's p2 took it
+// from (virtualLookup), so a version only a later member holds is served
+// from that member. A member whose own policy refuses the archive is passed
+// over for the next member that lists the version, as 7.x ignores a
+// blacked-out member and passes over one that cannot serve the file (R5);
+// the virtual repository's own patterns refuse it with "No repository found
+// to serve the request". A later member is read only once no earlier one
+// serves the version.
 func (h handler) virtualDist(w http.ResponseWriter, r *http.Request, name, version string) {
-	members, err := h.members(r)
+	members, err := h.k.MergeMembers(r, "")
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
-	passing := false
 	for _, member := range members {
 		found, err := h.memberLookup(r, member, name)
+		if pkgroute.PassedOver(err) {
+			continue
+		}
 		if err != nil {
 			h.fail(w, r, err)
 			return
 		}
-		if len(found) == 0 {
+		i := slices.IndexFunc(found, func(rel release) bool { return rel.Version == version })
+		if i < 0 {
 			continue
 		}
-		var rel *release
-		for i := range found {
-			if found[i].Version == version {
-				rel = &found[i]
-				break
-			}
-		}
-		switch {
-		case rel == nil && passing:
-			continue
-		case rel == nil:
-			h.notFound(w, r)
-			return
-		}
-		if err := h.k.CheckDocument(member, rel.Path); err != nil {
+		if err := h.k.CheckDocument(member, found[i].Path); err != nil {
 			if pkgroute.IsRefusal(err) {
 				h.k.Error(w, r, err)
 				return
 			}
-			passing = true
 			continue
 		}
-		h.serveDist(w, member, *rel)
+		h.serveDist(w, member, found[i])
 		return
 	}
 	h.notFound(w, r)

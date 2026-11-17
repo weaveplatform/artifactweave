@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	bowerfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/bower"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -138,18 +139,28 @@ func (h handler) registrationTarget(r *http.Request, name, raw string) (*http.Re
 		}
 		return r, nil
 	}
-	members, err := h.virtualMembers(r)
+	// The remote members in 7.x's effective order, nested virtual
+	// repositories flattened and cycles skipped (decision 0008, R1, R2).
+	// A registration is a write, which the selected remote's own Write
+	// decides, so the read walk's pass-overs do not apply.
+	steps, err := virtual.Members(r.Context(), h.k.DB().Repos(), c, virtual.Options{
+		Order: virtual.Package,
+	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("bower virtual members: %w", err)
 	}
-	for _, mr := range members {
-		member := pkgroute.RequestFrom(mr).Repo
-		if member.Class != repo.Remote {
+	for _, m := range steps {
+		if m.Repo.Class != repo.Remote || m.Repo.PackageType != repo.Bower {
 			continue
 		}
-		if _, err := gitPointerURL(member, name, raw); err == nil {
-			return mr, nil
+		if _, err := gitPointerURL(m.Repo, name, raw); err != nil {
+			continue
 		}
+		mr, err := h.k.MemberRequest(r, m.Repo)
+		if err != nil {
+			return nil, fmt.Errorf("bower registration member: %w", err)
+		}
+		return mr, nil
 	}
 	return nil, source.ErrInvalidRequest
 }

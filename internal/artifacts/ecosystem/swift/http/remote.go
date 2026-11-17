@@ -297,37 +297,16 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, q request) {
 		if !h.k.RequireFolder(w, r, p.Scope+"/"+p.Name, api.ActionRead) {
 			return
 		}
-		out, result, err := h.remoteReleases(r, p)
+		versions, result, err := h.remoteVersions(r, p)
 		if err != nil {
 			h.k.Error(w, r, err)
 			return
 		}
-		paths := []string{}
-		for version := range out.Releases {
-			p.Version = version
-			path := p.ArchivePath()
-			if !h.k.Can(r, path, api.ActionRead) {
-				delete(out.Releases, version)
-				continue
-			}
-			// A release whose archive the remote's patterns reject stays
-			// listed (R3), so the rows take Read permission alone.
-			if err := result.CheckPermission(r.Context(), path); errors.Is(err, source.ErrDenied) {
-				delete(out.Releases, version)
-				continue
-			} else if err != nil {
-				h.k.Error(w, r, err)
-				return
-			}
-			out.Releases[version] = release{URL: releaseURL(r, p)}
-			paths = append(paths, path)
-		}
-		if len(out.Releases) == 0 {
+		if len(versions) == 0 {
 			h.k.Error(w, r, bad(http.StatusNotFound, "Swift package not found"))
 			return
 		}
-		fence(&result, result, result.CheckPermission, paths)
-		result, err = remoteJSONResult(result, out)
+		result, err = remoteJSONResult(result, releaseList(r, p, versions))
 		if err != nil {
 			h.k.Error(w, r, err)
 			return
@@ -340,14 +319,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, q request) {
 			h.k.Error(w, r, err)
 			return
 		}
-		fence(&result, result, result.CheckPermission, []string{p.ArchivePath()})
-		result, err = remoteJSONResult(result, info)
-		if err != nil {
-			h.k.Error(w, r, err)
-			return
-		}
-		w.Header().Set("Content-Version", "1")
-		h.k.ServeResult(w, r, result)
+		h.serveRemoteInfo(w, r, p, info, result)
 	case "archive":
 		result, err := h.remoteArchive(r, p)
 		if err != nil {
@@ -358,13 +330,68 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, q request) {
 		w.Header().Set("Content-Type", "application/zip")
 		h.k.ServeResult(w, r, result)
 	case "manifest":
-		h.remoteManifest(w, r, p)
+		result, err := h.remoteManifest(r, p)
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		w.Header().Set("Content-Version", "1")
+		h.k.ServeResult(w, r, result)
 	default:
 		h.k.Error(w, r, kernel.ErrNotFound)
 	}
 }
 
-func (h handler) remoteManifest(w http.ResponseWriter, r *http.Request, p swiftfmt.Package) {
+// remoteVersions lists the releases of p the remote of r lists whose
+// archive the caller may read, with the read's result fenced to recheck
+// them when it is served. A release whose archive the remote's patterns
+// reject stays listed (R3), so the rows take Read permission alone.
+func (h handler) remoteVersions(r *http.Request, p swiftfmt.Package) ([]string, source.Result, error) {
+	out, result, err := h.remoteReleases(r, p)
+	if err != nil {
+		return nil, source.Result{}, err
+	}
+	var versions, paths []string
+	for version := range out.Releases {
+		p.Version = version
+		path := p.ArchivePath()
+		if !h.k.Can(r, path, api.ActionRead) {
+			continue
+		}
+		if err := result.CheckPermission(r.Context(), path); errors.Is(err, source.ErrDenied) {
+			continue
+		} else if err != nil {
+			return nil, source.Result{}, fmt.Errorf("swift: release permission: %w", err)
+		}
+		versions = append(versions, version)
+		paths = append(paths, path)
+	}
+	fence(&result, result, result.CheckPermission, paths)
+	return versions, result, nil
+}
+
+// serveRemoteInfo serves a remote release's metadata, info, read through
+// result.
+func (h handler) serveRemoteInfo(
+	w http.ResponseWriter,
+	r *http.Request,
+	p swiftfmt.Package,
+	info releaseInfo,
+	result source.Result,
+) {
+	fence(&result, result, result.CheckPermission, []string{p.ArchivePath()})
+	result, err := remoteJSONResult(result, info)
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Version", "1")
+	h.k.ServeResult(w, r, result)
+}
+
+// remoteManifest reads p's Package.swift through the remote of r, fenced
+// to recheck the caller's Read on the release's archive when it is served.
+func (h handler) remoteManifest(r *http.Request, p swiftfmt.Package) (source.Result, error) {
 	// Registry manifests are a separate upstream representation and may differ
 	// from the default manifest in a release's archive.
 	upstream := p.Scope + "/" + p.Name + "/" + p.Version + "/Package.swift"
@@ -402,21 +429,17 @@ func (h handler) remoteManifest(w http.ResponseWriter, r *http.Request, p swiftf
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		h.k.Error(w, r, err)
-		return
+		return source.Result{}, fmt.Errorf("swift: remote manifest: %w", err)
 	}
 	result, err = h.metadataStream(r, result, 1<<20)
 	if err != nil {
-		h.k.Error(w, r, remoteInvalid())
-		return
+		return source.Result{}, remoteInvalid()
 	}
 	if result.CheckPermission == nil {
 		_ = result.Stream.Body.Close()
-		h.k.Error(w, r, remoteInvalid())
-		return
+		return source.Result{}, remoteInvalid()
 	}
 	fence(&result, result, result.CheckPermission, []string{p.ArchivePath()})
 	result.Stream.MediaType = "text/x-swift"
-	w.Header().Set("Content-Version", "1")
-	h.k.ServeResult(w, r, result)
+	return result, nil
 }

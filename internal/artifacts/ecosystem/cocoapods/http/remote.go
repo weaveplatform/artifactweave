@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	podfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/kernel/antpath"
@@ -213,7 +214,7 @@ func (h handler) remoteRead(w http.ResponseWriter, r *http.Request, path string)
 		return
 	}
 	if name, version, ok := parseSpecPath(path); ok {
-		h.remoteSpec(w, r, r, result, name, version, pkgroute.RequestFrom(r).Repo.Key)
+		h.remoteSpec(w, r, result, name, version, pkgroute.RequestFrom(r).Repo.Key)
 		return
 	}
 	if strings.HasPrefix(path, "all_pods_versions_") || path == "all_pods.txt" {
@@ -338,9 +339,13 @@ func sourceDetails(
 	return fields, target, checksum, nil
 }
 
+// remoteSpec serves the podspec result of the remote request r, its
+// source rewritten to the archive route of publicKey, the repository the
+// client asked: a virtual repository's spec fetches its archive through
+// the virtual repository, from the member that served the spec.
 func (h handler) remoteSpec(
 	w http.ResponseWriter,
-	r, visible *http.Request,
+	r *http.Request,
 	result source.Result,
 	name, version, publicKey string,
 ) {
@@ -370,23 +375,13 @@ func (h handler) remoteSpec(
 			return
 		}
 		ext := archiveExtension(fields, target)
-		if !h.k.Can(r, sourcePath(name, version, ext), api.ActionRead) ||
-			!h.k.Can(visible, sourcePath(name, version, ext), api.ActionRead) {
+		if !h.k.Can(r, sourcePath(name, version, ext), api.ActionRead) {
 			h.k.Error(w, r, notFound())
 			return
 		}
-		location := baseurl.From(
-			r.Context(),
-		) + "/artifactory/api/pods/" + url.PathEscape(
-			publicKey,
-		) + "/" +
-			url.PathEscape(
-				"sources",
-			) + "/" + url.PathEscape(
-			name,
-		) + "/" + url.PathEscape(
-			version,
-		) + "/source" + ext
+		location := virtual.APIBase(baseurl.From(r.Context()), "pods", publicKey) +
+			"/sources/" + url.PathEscape(name) + "/" + url.PathEscape(version) +
+			"/source" + ext
 		origin := map[string]string{"http": location}
 		if checksum != "" {
 			origin["sha256"] = checksum

@@ -172,6 +172,46 @@ Feature: Native CocoaPods CDN repositories
     Then the command succeeds
     And the file "Pods/HelloPod/Sources/HelloPod.m" exists
 
+  Scenario: install pods through a virtual repository over a remote member and a nested local member
+    Given the registry is running
+    And the CocoaPods client can reach the registry
+    And a CocoaPods project for repository "pods-mix" with the pods "HelloPod 1.0.0, OtherPod 2.0.0"
+    And a CocoaPods archive named "HelloPod" version "1.0.0"
+    And a CocoaPods HTTP upstream serves the archive "HelloPod-1.0.0.tar.gz"
+    When I PUT "/artifactory/api/repositories/pods-mix-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"cocoapods","url":"{upstream}","podsCdnUrl":"{upstream}","hardFail":true,"externalDependenciesEnabled":true,"externalDependenciesPatterns":["{upstream}/**"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/pods-mix-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"cocoapods"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/pods-mix-nested" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"cocoapods","repositories":["pods-mix-local"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/pods-mix" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"cocoapods","repositories":["pods-mix-remote","pods-mix-nested"]}
+      """
+    Then the response status is 200
+    Given a CocoaPods archive named "OtherPod" version "2.0.0"
+    When I deploy the file "OtherPod-2.0.0.tar.gz" to "/artifactory/pods-mix-local/OtherPod/2.0.0/OtherPod-2.0.0.tar.gz" as admin
+    Then the response status is 201
+    When I GET "/artifactory/api/pods/pods-mix/all_pods.txt" as admin
+    Then the response status is 200
+    And the response body contains "HelloPod"
+    And the response body contains "OtherPod"
+    When I run pod "repo add-cdn pods-mix {platform}/artifactory/api/pods/pods-mix"
+    Then the command succeeds
+    When I run pod "install --no-repo-update --verbose"
+    Then the command succeeds
+    And the file "Pods/HelloPod/Sources/HelloPod.m" exists
+    And the file "Pods/OtherPod/Sources/HelloPod.m" exists
+
   Scenario: delete restore and reindex reconcile the local CDN view
     Given the registry is running
     When I PUT "/artifactory/api/repositories/pods-life" as admin with body:

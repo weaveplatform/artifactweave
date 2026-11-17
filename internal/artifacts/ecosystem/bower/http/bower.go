@@ -84,7 +84,7 @@ func (h handler) packageByName(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Bower package"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, api.ActionRead) || !h.resolution(w, r) {
+	if !h.requireRead(w, r, name) || !h.resolution(w, r) {
 		return
 	}
 	versions, err := h.versions(r, name)
@@ -97,6 +97,17 @@ func (h handler) packageByName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonAnswer(w, r, h.entry(r, name))
+}
+
+// requireRead refuses a caller who may not read folder in the request's
+// repository, before anything is looked up (DV-057). A virtual repository
+// has no permission target of its own: each member decides Read on what
+// it serves, and a member the caller may not read is not found, so a
+// caller who may read only the members is served and one who may read none
+// gets the protocol's not-found (decision 0008, R3 and R10).
+func (h handler) requireRead(w http.ResponseWriter, r *http.Request, folder string) bool {
+	return pkgroute.RequestFrom(r).Repo.Class == repo.Virtual ||
+		h.k.RequireFolder(w, r, folder, api.ActionRead)
 }
 
 // resolution refuses the package lookup and refs a client resolves a
@@ -140,36 +151,56 @@ func (h handler) packages(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) list(w http.ResponseWriter, r *http.Request, query string) {
-	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
+	if !h.requireRead(w, r, "") {
 		return
 	}
-	names, err := h.packageNames(r, query)
+	var names []string
+	var err error
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		names, err = h.virtualListed(r, query)
+	} else {
+		catalog := pkgroute.RequestFrom(r).Repo.Class == repo.Remote && gitRemote(r)
+		names, err = h.listed(r, query, catalog)
+	}
 	if err != nil {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
 	}
-	answer := []packageEntry{}
-	gitCatalog := pkgroute.RequestFrom(r).Repo.Class == repo.Remote && gitRemote(r)
+	answer := make([]packageEntry, 0, len(names))
+	for _, name := range names {
+		answer = append(answer, h.entry(r, name))
+	}
+	jsonAnswer(w, r, answer)
+}
+
+// listed is the names of the repository of r that its package list and
+// search answer: each that contains query and has a version the caller may
+// read. catalog lists a Git remote's registered names alone.
+func (h handler) listed(r *http.Request, query string, catalog bool) ([]string, error) {
+	names, err := h.packageNames(r, query)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
 	for _, name := range names {
 		if query != "" && !strings.Contains(name, query) {
 			continue
 		}
-		if gitCatalog {
+		if catalog {
 			// Bower registry search lists registered names, including Git repos
 			// without semver tags. Do not issue one smart-Git request per result.
-			answer = append(answer, h.entry(r, name))
+			out = append(out, name)
 			continue
 		}
-		vs, err := h.readableVersions(r, name, false)
+		vs, err := h.versions(r, name)
 		if err != nil {
-			h.k.Error(w, r, pkgroute.SourceError(err, false))
-			return
+			return nil, err
 		}
 		if len(vs) > 0 {
-			answer = append(answer, h.entry(r, name))
+			out = append(out, name)
 		}
 	}
-	jsonAnswer(w, r, answer)
+	return out, nil
 }
 
 func (h handler) refs(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +222,7 @@ func (h handler) refs(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Bower refs path"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, api.ActionRead) || !h.resolution(w, r) {
+	if !h.requireRead(w, r, name) || !h.resolution(w, r) {
 		return
 	}
 	versions, err := h.versions(r, name)
@@ -240,10 +271,15 @@ func (h handler) binary(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Bower version"))
 		return
 	}
-	if !h.k.Require(w, r, bowerfmt.ManifestPath(name, version), api.ActionRead) {
+	virtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
+	if !virtual && !h.k.Require(w, r, bowerfmt.ManifestPath(name, version), api.ActionRead) {
 		return
 	}
 	if !h.archivePolicy(w, r, name, version) {
+		return
+	}
+	if virtual {
+		h.virtualBinary(w, r, name, version, tag)
 		return
 	}
 	versions, err := h.versions(r, name)
@@ -301,10 +337,9 @@ func identity(r *http.Request, binary bool) (name, tag string, ok bool) {
 	return name, tag, true
 }
 
+// packageNames lists the names a local, federated or remote repository
+// holds; a virtual repository's are its members' (virtualListed).
 func (h handler) packageNames(r *http.Request, query string) ([]string, error) {
-	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
-		return h.virtualPackageNames(r, query)
-	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		return h.remotePackageNames(r, query)
 	}
@@ -326,26 +361,22 @@ func (h handler) packageNames(r *http.Request, query string) ([]string, error) {
 	}
 }
 
-// versions lists the versions of name a client resolves from, which leave a
-// virtual repository's blacked-out member out (readableVersions).
+// versions lists the versions of name whose manifest the caller may read.
+// A version whose files the patterns reject stays listed, as Artifactory's
+// listings keep it and refuse only the file (R3). A virtual repository's
+// are its members' (virtualVersions), which leave a blacked-out member out
+// as 7.x's walk does (decision 0008, R3; decision 0032, R5); a repository
+// of its own keeps a blacked-out repository's package list and search, as
+// a native search keeps its answer (R2b).
 func (h handler) versions(r *http.Request, name string) ([]string, error) {
-	return h.readableVersions(r, name, true)
-}
-
-// readableVersions lists the versions of name whose manifest the caller may
-// read. A version whose files the patterns reject stays listed, as
-// Artifactory's listings keep it and refuse only the file (R3). resolving
-// leaves a virtual repository's blacked-out member out, which 7.x ignores
-// when it resolves (R5); the package list and search keep a blacked-out
-// local member's packages, as a native search keeps a blacked-out
-// repository's answer (R2b).
-func (h handler) readableVersions(r *http.Request, name string, resolving bool) ([]string, error) {
+	class := pkgroute.RequestFrom(r).Repo.Class
+	if class == repo.Virtual {
+		return h.virtualVersions(r, name)
+	}
 	if !h.k.CanFolder(r, name, api.ActionRead) {
 		return nil, nil
 	}
-	switch pkgroute.RequestFrom(r).Repo.Class {
-	case repo.Virtual:
-		return h.virtualVersions(r, name, resolving)
+	switch class {
 	case repo.Remote:
 		return h.remoteVersions(r, name)
 	default:

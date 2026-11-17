@@ -36,12 +36,17 @@
 //     the package index, and the archives; for a remote repository, the
 //     upstream CDN metadata, checked whole, with each podspec's source
 //     pointed at this server, and the source archives; for a virtual
-//     repository, its members in priority order.
+//     repository, its members' CDN indexes merged (cocoapods.Index) and
+//     each podspec and archive from the first member in the package
+//     handlers' walk that has it (pkgroute.Collect, decision 0008).
 //
 // # Invariants
 //
 //   - A list, podspec or archive answers only what the caller may read: a
-//     version the caller may not read is left out of every list.
+//     version the caller may not read is left out of every list. Through a
+//     virtual repository each member decides Read on what it serves, and a
+//     member that misses, refuses, may not be read or whose upstream fails
+//     is passed over.
 //   - Upstream CDN metadata and source archives are checked whole before
 //     they are cached, and a source archive is fetched only from an origin
 //     the repository allows (externalDependenciesEnabled and its patterns).

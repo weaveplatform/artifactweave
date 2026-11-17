@@ -46,6 +46,9 @@
 //     the stored archives (Reindex).
 //   - FetchCocoaPodsGit: the deterministic tar.gz of a Git-sourced pod's
 //     revision and its pinned submodules, answered as an upstream response.
+//   - Pods and Index, the virtual.Merger of a virtual repository's CDN
+//     indexes: every pod and version any member lists (decision 0008,
+//     "Per-format merges").
 //
 // # Invariants
 //
@@ -108,4 +111,5 @@
 //     revocation during a submodule fetch, against fake Git upstreams, some
 //     serving the packs in test/fixtures/cocoapods-git; remote_fixture_test.go
 //     holds the remote policy fixture they share with nothing else.
+//   - virtual_test.go: the merge of a virtual repository's CDN indexes.
 package cocoapods

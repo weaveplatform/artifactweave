@@ -480,12 +480,20 @@ func TestUnitBowerVirtualCatalogSkipsUnreadableMember(t *testing.T) {
 	}
 }
 
-func TestUnitBowerVirtualRechecksMemberConfigurationBeforeArchive(t *testing.T) {
+// A member that turns into a virtual repository while a binary request is
+// served does not fail the request: a nested virtual repository is a
+// member like any other (decision 0008, R2), so the archive is still read
+// from the remote member that listed the version.
+func TestUnitBowerVirtualKeepsServingWhenAMemberTurnsVirtual(t *testing.T) {
 	refs := strings.Repeat("a", 44) + " refs/tags/v1.0.0\n"
 	var f *fixture
-	changed := false
+	changed, archived := false, false
 	backend := bowerSourceRead(
 		func(_ context.Context, q source.Request, _ source.Permit) (source.Result, error) {
+			if q.Resource.Path == "hello/1.0.0/bower-archive.tar.gz" {
+				archived = true
+				return source.Result{}, kernel.ErrNotFound
+			}
 			if q.Resource.Path != "catalog/hello/refs" {
 				t.Fatalf("unexpected upstream read: %s", q.Resource.Path)
 			}
@@ -510,7 +518,7 @@ func TestUnitBowerVirtualRechecksMemberConfigurationBeforeArchive(t *testing.T) 
 		"/artifactory/api/bower/bower-virtual/binaries/bower-virtual/hello.git/v1.0.0",
 		"admin",
 	)
-	if !changed || r.Code == http.StatusOK {
-		t.Fatalf("changed virtual member was served: %d %s", r.Code, r.Body)
+	if !changed || !archived || r.Code != http.StatusNotFound {
+		t.Fatalf("archive after a member turned virtual: read %v, %d %s", archived, r.Code, r.Body)
 	}
 }

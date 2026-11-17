@@ -97,8 +97,9 @@ func TestUnitBowerBinaryDownloadPolicy(t *testing.T) {
 // repository, naming the request's path, after read permission (R2a); the
 // package list and search keep their answers (R2b); a version whose file
 // the patterns reject stays listed (R3); and a binary is refused before its
-// version is looked up. A virtual repository resolves without a
-// blacked-out member, passes over a member whose patterns reject any file
+// version is looked up. A virtual repository resolves and lists without a
+// blacked-out member, which 7.x's walk passes over (decision 0008, R3;
+// decision 0032, R5), passes over a member whose patterns reject any file
 // of the archive, and its own patterns refuse a binary whether the version
 // exists or not (R5).
 func TestAccBowerDownloadPolicyLocalAndVirtual(t *testing.T) {
@@ -129,7 +130,11 @@ func TestAccBowerDownloadPolicyLocalAndVirtual(t *testing.T) {
 	a.refused(binary(l.Key, "9.9.9"), blackedOut(l.Key, "hello/9.9.9/bower.json"))
 	a.refused("bower-virtual/packages/solo", "Bower package not found")
 	a.refused("bower-virtual/refs/bower-virtual/solo", "Bower package not found")
-	a.answered("bower-virtual/packages", `"name":"hello"`, `"name":"solo"`)
+	a.answered("bower-virtual/packages", `"name":"hello"`)
+	if rec := f.get("/artifactory/api/bower/bower-virtual/packages", "admin"); strings.Contains(
+		rec.Body.String(), `"name":"solo"`) {
+		t.Fatalf("a blacked-out member's package was listed: %s", rec.Body)
+	}
 	a.answered("bower-virtual/refs/bower-virtual/hello", "refs/tags/v1.0.0")
 	a.archived(binary("bower-virtual", "1.0.0"), "from-bower-fed")
 

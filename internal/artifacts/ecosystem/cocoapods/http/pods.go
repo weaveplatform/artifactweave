@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	podfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -101,11 +102,14 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.remoteRead(w, r, path)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
-		return
-	}
+	// A virtual repository has no permission target of its own: each member
+	// decides Read on what it serves, so a caller who may read only the
+	// members is served (decision 0008, R10).
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
 		h.virtualRead(w, r, path)
+		return
+	}
+	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
 		return
 	}
 	if strings.HasPrefix(path, "packages/") {
@@ -210,7 +214,7 @@ func specFor(base, key string, a podfmt.Archive) ([]byte, error) {
 	if err := json.Unmarshal(a.Spec, &fields); err != nil {
 		return nil, fmt.Errorf("cocoapods: indexed podspec: %w", err)
 	}
-	archiveURL := base + "/artifactory/api/pods/" + url.PathEscape(key) +
+	archiveURL := virtual.APIBase(base, "pods", key) +
 		"/packages/" + url.PathEscape(a.Name) + "/" + url.PathEscape(a.Version) + "/" +
 		url.PathEscape(a.Name+"-"+a.Version+".tar.gz")
 	source := map[string]string{"http": archiveURL}

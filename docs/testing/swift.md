@@ -1,6 +1,6 @@
 # Swift Package Registry
 
-SwiftPM uses `/artifactory/api/swift/<repository>` for local, remote, virtual and one-node federated Swift repositories. Local and federated publication stores an immutable source archive at `<scope>/<name>/<name>-<version>.zip`; the registry derives version lists, release metadata and manifests from that archive. Remote repositories cache validated registry responses and checksum-pinned ZIPs. Virtual repositories search members in configured order.
+SwiftPM uses `/artifactory/api/swift/<repository>` for local, remote, virtual and one-node federated Swift repositories. Local and federated publication stores an immutable source archive at `<scope>/<name>/<name>-<version>.zip`; the registry derives version lists, release metadata and manifests from that archive. Remote repositories cache validated registry responses and checksum-pinned ZIPs. A virtual repository merges its members' release lists and serves each release from the first member that has it, local members before remote ones, nested virtual repositories included; a member that misses, fails or that you may not read is passed over. Read on the members is enough to resolve through it.
 
 ## Connect SwiftPM
 
@@ -24,6 +24,8 @@ To publish from a package root to a **local or federated** repository:
 swift package-registry publish acme.Widget 1.0.0 \
   --url https://registry.example/artifactory/api/swift/swift-local
 ```
+
+A publish to a **virtual** repository lands in its default deployment repository, where you need Write; a virtual repository without one answers 405.
 
 To resolve from a project that declares `.package(id: "acme.Widget", from: "1.0.0")`:
 
@@ -51,7 +53,7 @@ Every error under `/artifactory/api/swift/<repository>/`, whether the registry, 
 ## Evidence
 
 - [`swift.feature`](../../test/acceptance/features/swift.feature) exercises native metadata, reindex and an error's `Content-Version` against the full server.
-- [`TestAccSwiftPMAnonymousPublish` and `TestAccSwiftPMRemoteVirtualAndOffline`](../../internal/artifacts/ecosystem/swift/http/swift_test.go) run a real SwiftPM client against local, federated, remote and virtual repositories, with redirect and offline cache checks. CI uses the [digest-pinned Swift image](ci-client-images.md); local opt-in runs the installed SwiftPM client.
+- [`TestAccSwiftPMAnonymousPublish` and `TestAccSwiftPMRemoteVirtualAndOffline`](../../internal/artifacts/ecosystem/swift/http/swift_test.go) run a real SwiftPM client against local, federated, remote and virtual repositories, with redirect and offline cache checks. [`TestAccSwiftPMVirtualLocalRemoteAndPublish`](../../internal/artifacts/ecosystem/swift/http/remote_test.go) publishes through a virtual repository into its deployment repository and resolves releases from its local and remote members as a caller who may read only the members. CI uses the [digest-pinned Swift image](ci-client-images.md); local opt-in runs the installed SwiftPM client.
 - [`TestAccSwiftPMPrintsProblemDetails`](../../internal/artifacts/ecosystem/swift/http/problem_test.go) runs SwiftPM, configured as the client recipe configures it, against the production router and checks that it prints the server's detail for a 401, a 403 and a 409. `TestAccSwiftErrorsCarryContentVersion` in the same file checks the header on the handlers', the authentication middleware's and the request limiter's errors.
 - [JFrog Swift repository guide](https://docs.jfrog.com/artifactory/docs/swift-repositories) and the [Swift Package Registry specification](https://github.com/swiftlang/swift-package-manager/blob/main/Documentation/PackageRegistry/Registry.md) provide the client and protocol contracts.
 

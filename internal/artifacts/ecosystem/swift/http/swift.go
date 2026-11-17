@@ -143,7 +143,12 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 			h.k.Error(w, r, bad(http.StatusBadRequest, "Swift identifier lookup requires one URL"))
 			return
 		}
-		if !h.k.RequireFolder(w, r, "", api.ActionRead) {
+		// A virtual repository has no permission target of its own, so a
+		// caller who may read only its members gets the lookup's answer
+		// rather than 403 (decision 0008, R3 and R10): SwiftPM asks it
+		// first for a URL dependency under --replace-scm-with-registry.
+		if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual &&
+			!h.k.RequireFolder(w, r, "", api.ActionRead) {
 			return
 		}
 		h.k.Error(w, r, bad(http.StatusNotFound, "Swift package identifier mapping not found"))
@@ -178,7 +183,12 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	if class := pkgroute.RequestFrom(r).Repo.Class; class != repo.Local && class != repo.Federated {
+	class := pkgroute.RequestFrom(r).Repo.Class
+	if class == repo.Virtual {
+		h.virtualPublish(w, r, q.packageID)
+		return
+	}
+	if class != repo.Local && class != repo.Federated {
 		h.k.Error(
 			w,
 			r,

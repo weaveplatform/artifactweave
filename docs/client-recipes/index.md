@@ -49,7 +49,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [RPM / DNF](rpm.md) | DNF and RPM bundled with Fedora 45 (immutable image) | local, federated | local, remote, virtual, federated |
 | [sbt artifacts](sbt.md) | sbt 2.0.12; Eclipse Temurin 26 | local, federated | local, remote, virtual, federated |
 | [Agent skills](skills.md) | JFrog CLI 2.131.0 | local | local |
-| [Swift Package Registry](swift.md) | Swift/SwiftPM 6.4.2 pinned Linux client | local, federated | local, remote, virtual, federated |
+| [Swift Package Registry](swift.md) | Swift/SwiftPM 6.4.2 pinned Linux client | local, virtual, federated | local, remote, virtual, federated |
 | [Terraform module and provider registries](terraform.md) | Terraform 1.17.1; JFrog CLI 2.131.0 | local, federated | local, remote, virtual, federated |
 | [Terraform remote state](terraformbackend.md) | Terraform 1.17.1 | local | local |
 | [Vagrant boxes](vagrant.md) | Vagrant 2.4.9 (Linux amd64) | local, federated | local, federated |

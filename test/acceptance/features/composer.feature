@@ -74,6 +74,38 @@ Feature: Composer resolves native packages through the approved repository class
     Then the command succeeds
     And the file "composer-project/vendor/acme/widget/src/Widget.php" contains "first member"
 
+  Scenario: Composer 2 installs a version only a later virtual member holds
+    Given the registry is running
+    And the Composer client can reach the registry
+    And a Composer archive of version "2.0.0" with message "remote member"
+    And a Composer upstream serves that archive as version "2.0.0"
+    When I PUT "/artifactory/api/repositories/php-mix-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"composer"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/php-mix-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"composer","url":"{upstream}/composer","composerRegistryUrl":"{upstream}/composer"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/php-mix" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"composer","repositories":["php-mix-local","php-mix-remote"]}
+      """
+    Then the response status is 200
+    Given a Composer archive with message "local member"
+    When I deploy the file "composer/widget.zip" to "/artifactory/php-mix-local/acme/widget/1.0.0.zip" as admin
+    Then the response status is 201
+    When I GET "/artifactory/api/composer/php-mix/p2/acme/widget.json" as admin
+    Then the response status is 200
+    And the response body contains "/api/composer/php-mix/dist/acme/widget/1.0.0.zip"
+    And the response body contains "/api/composer/php-mix/dist/acme/widget/2.0.0.zip"
+    Given a Composer project for repository "php-mix" requiring version "2.0.0"
+    When I run Composer "install --no-interaction --prefer-dist --no-plugins --no-scripts"
+    Then the command succeeds
+    And the file "composer-project/vendor/acme/widget/src/Widget.php" contains "remote member"
+
   Scenario: Composer 2 uses a remote registry and its offline cache alias
     Given the registry is running
     And the Composer client can reach the registry
