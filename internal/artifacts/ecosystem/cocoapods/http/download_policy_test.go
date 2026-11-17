@@ -216,6 +216,13 @@ func TestUnitDownloadPolicyThroughAVirtualRepository(t *testing.T) {
 	f.patch("pods-locals", func(c *repo.Config) { c.ExcludesPattern = &excluded })
 	wantRefusal(t, "virtual excludes the documents", f.get("pods-locals", "all_pods.txt"),
 		"No repository found to serve the request for pods-locals:.pod/cdn/all_pods.txt")
+	// The virtual repository's own patterns come before its root gate, so
+	// a caller who may read no member gets the same refusal (R5).
+	for _, doc := range []string{"all_pods.txt", "CocoaPods-version.yml"} {
+		wantRefusal(t, "virtual excludes the documents, a caller who reads no member",
+			f.getAs("nobody", "pods-locals", doc),
+			"No repository found to serve the request for pods-locals:.pod/cdn/"+doc)
+	}
 	served("virtual excludes the documents", archive, "first archive")
 	excluded = "LocalPod/**"
 	f.patch("pods-locals", func(c *repo.Config) { c.ExcludesPattern = &excluded })

@@ -61,7 +61,10 @@ metadata and source bytes to a fresh client. A virtual repository merges
 its members' CDN indexes, local members before remote ones and nested
 virtual repositories included, and keeps a selected package's metadata and
 bytes with the first member that has it; a member that misses, fails or
-that the caller may not read is passed over. Federation here is one-node behavior; cross-peer
+that the caller may not read is passed over, a failing one with a warning
+in the server log. A caller who may read no member is refused the CDN
+indexes, `CocoaPods-version.yml` and `deprecated_podspecs.txt` with 403 (401
+when anonymous). Federation here is one-node behavior; cross-peer
 convergence is [P13](../implementation/plan.md).
 
 ## Git sources and submodules

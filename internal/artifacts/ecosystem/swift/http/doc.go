@@ -74,7 +74,9 @@
 //     without the member's Link headers and with redirects onto the
 //     virtual URL. Each member decides Read on what it serves; a member
 //     that misses, refuses, may not be read or whose upstream fails is
-//     passed over, and none answers the registry's 404.
+//     passed over, the last with a warning in the log
+//     (pkgroute.Kit.WarnPassedOver) [I], and none answers the registry's
+//     404.
 //   - The download policy (decision 0032) is checked after Read
 //     permission. A blacked-out local or federated repository refuses
 //     every read, the release list, release metadata and Package.swift at

@@ -126,7 +126,9 @@ func TestUnitBowerSourceBackendErrorDoesNotExposeMetadata(t *testing.T) {
 // A virtual repository passes over a remote member whose upstream cannot
 // be reached, as 7.x's walk ignores a member that does not serve the
 // request [I] (decision 0008, R3; pkgroute.PassedOver): its package list
-// answers without it and its refs answer the protocol's not-found.
+// answers without it and its refs and archive answer the protocol's
+// not-found. Each pass-over of the fault is logged as a warning naming the
+// member and the virtual repository (pkgroute.Kit.WarnPassedOver).
 func TestUnitBowerVirtualPassesOverMemberSourceFailure(t *testing.T) {
 	f := newFixture(t)
 	c := f.repo("bower-remote", repo.Remote)
@@ -151,9 +153,32 @@ func TestUnitBowerVirtualPassesOverMemberSourceFailure(t *testing.T) {
 		http.StatusOK || r.Body.String() != "[]\n" {
 		t.Fatalf("package list over a failed member = %d %s", r.Code, r.Body)
 	}
+	wantWarned(t, f, "package list")
 	if r := f.get("/artifactory/api/bower/bower-virtual/refs/bower-virtual/hello", "admin"); r.Code !=
 		http.StatusNotFound || bowerMessage(t, r) != "Bower package not found" {
 		t.Fatalf("refs over a failed member = %d %s", r.Code, r.Body)
+	}
+	wantWarned(t, f, "refs")
+	if r := f.get("/artifactory/api/bower/bower-virtual/binaries/bower-virtual/hello.git/v1.0.0", "admin"); r.Code !=
+		http.StatusNotFound || bowerMessage(t, r) != "Bower version not found" {
+		t.Fatalf("archive over a failed member = %d %s", r.Code, r.Body)
+	}
+	wantWarned(t, f, "archive")
+}
+
+// wantWarned checks that the request just made logged the warning for the
+// failing member bower-remote of bower-virtual, and clears the log.
+func wantWarned(t *testing.T, f *fixture, what string) {
+	t.Helper()
+	got := f.logs.String()
+	f.logs.Reset()
+	for _, want := range []string{
+		"level=WARN", `msg="virtual repository passed over a failing member"`,
+		"member=bower-remote", "virtual=bower-virtual",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("%s: log %q lacks %q", what, got, want)
+		}
 	}
 }
 

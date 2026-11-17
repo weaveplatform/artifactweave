@@ -139,7 +139,10 @@
 // Formats that implement Merger: Bower (Names, Versions), CocoaPods
 // (Index), Composer (Releases) and Swift (Releases), each in its
 // ecosystem/<type>/virtual.go
-// (https://github.com/weaveplatform/artifactweave/issues/1539).
+// (https://github.com/weaveplatform/artifactweave/issues/1539). Of these
+// four, only Composer keeps a merged document in Cache (its p2 metadata),
+// as 7.161.26 saves a period for a Composer virtual repository alone among
+// them (https://github.com/weaveplatform/artifactweave/issues/1652).
 // Alpine (APKINDEX.tar.gz), RPM (repodata) and Opkg (the feed) implement
 // it over their package rows, each in its ecosystem/<type>/virtual.go, and
 // keep Alpine's and RPM's merges in Cache

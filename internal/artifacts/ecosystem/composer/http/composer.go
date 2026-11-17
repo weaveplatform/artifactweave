@@ -209,25 +209,17 @@ func (h handler) root(w http.ResponseWriter, r *http.Request) {
 // virtualRoot serves a virtual repository's packages.json, which names
 // only where Composer 2 finds each package's p2 metadata: the local v1
 // catalog is built only for hosted repositories, and v1 virtual is outside
-// JFrog support. A virtual repository has no permission target of its own,
-// so a caller who may read the virtual repository or any of its members is
-// served; one who may read neither gets the protocol's not-found (decision
-// 0008, R3 and R10).
+// JFrog support. It is a document of the whole repository, so it asks the
+// virtual repository's root gate (pkgroute.Kit.RequireRoot): a caller who
+// may read the root of no member is refused, as gems' indexes and the
+// LuaRocks manifest are (decision 0008, R3).
 func (h handler) virtualRoot(w http.ResponseWriter, r *http.Request) {
 	if r.URL.RawQuery != "" {
 		h.bad(w, r)
 		return
 	}
-	if !h.k.CanFolder(r, "", api.ActionRead) {
-		members, err := h.k.MergeMembers(r, "")
-		if err != nil {
-			h.k.Error(w, r, err)
-			return
-		}
-		if len(members) == 0 {
-			h.notFound(w, r)
-			return
-		}
+	if !h.k.RequireRoot(w, r) {
+		return
 	}
 	respondJSON(w, r, map[string]any{
 		"packages":     map[string]any{},
@@ -255,6 +247,10 @@ func (h handler) p2(w http.ResponseWriter, r *http.Request) {
 	if !h.checkBlackedOut(w, r, document) {
 		return
 	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualP2(w, r, name, document, dev)
+		return
+	}
 	releases, err := h.lookup(r, name)
 	if err != nil {
 		if errors.Is(err, kernel.ErrNotFound) {
@@ -264,13 +260,7 @@ func (h handler) p2(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
-	entries := []map[string]any{}
-	for _, rel := range releases {
-		isDev := strings.HasPrefix(rel.Version, "dev-") || strings.HasSuffix(rel.Version, "-dev")
-		if isDev == dev {
-			entries = append(entries, rel.Document)
-		}
-	}
+	entries := p2Entries(releases, dev)
 	if len(entries) == 0 {
 		h.notFound(w, r)
 		return
@@ -284,6 +274,62 @@ func (h handler) p2(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	respondJSON(w, r, map[string]any{"packages": map[string]any{name: entries}})
+}
+
+// virtualP2 serves a virtual repository's p2 document, the union of its
+// members' releases (virtualLookup), kept for the virtual repository's
+// virtualRetrievalCachePeriodSecs (pkgroute.Kit.Merged, decision 0008 R8).
+// Of the seven formats ADP-01 and ADP-05 moved onto the shared walk,
+// 7.161.26 keeps a merged-metadata period for Composer alone: its UI saves
+// one for a Composer virtual (RepoConfigDescriptorBuilder.
+// populateVirtualComposerDescriptor 897-903, ComposerTypeSpecificConfigModel
+// 38), which VirtualRepo.isCachedResourceExpired 658-669 reads. Which of
+// Composer's documents 7.x keeps under it is closed code; p2 is the one
+// merged from the members, so it is the one kept [I]. A member's remote
+// metadata is rechecked (revalidate) when the document is built, not on a
+// hit, as 7.x serves a kept document without asking its members.
+func (h handler) virtualP2(w http.ResponseWriter, r *http.Request, name, document string, dev bool) {
+	e, err := h.k.Merged(r, "", document, func(r *http.Request) (virtual.Entry, error) {
+		releases, err := h.virtualLookup(r, name)
+		if err != nil {
+			return virtual.Entry{}, err
+		}
+		entries := p2Entries(releases, dev)
+		if len(entries) == 0 {
+			return virtual.Entry{}, kernel.ErrNotFound
+		}
+		for _, rel := range releases {
+			if rel.revalidate != nil {
+				if err := rel.revalidate(r.Context()); err != nil {
+					return virtual.Entry{}, pkgroute.SourceError(err, false) //nolint:wrapcheck // the protocol's answer
+				}
+			}
+		}
+		body, err := json.Marshal(map[string]any{"packages": map[string]any{name: entries}})
+		return virtual.Entry{Body: body}, err //nolint:wrapcheck // a map of JSON documents always marshals
+	})
+	switch {
+	case errors.Is(err, kernel.ErrNotFound):
+		h.notFound(w, r)
+	case err != nil:
+		h.fail(w, r, err)
+	default:
+		respondBody(w, r, e.Body)
+	}
+}
+
+// p2Entries is the documents of releases a p2 document lists: the
+// development versions for p2/<name>~dev.json, the others for
+// p2/<name>.json.
+func p2Entries(releases []release, dev bool) []map[string]any {
+	entries := []map[string]any{}
+	for _, rel := range releases {
+		isDev := strings.HasPrefix(rel.Version, "dev-") || strings.HasSuffix(rel.Version, "-dev")
+		if isDev == dev {
+			entries = append(entries, rel.Document)
+		}
+	}
+	return entries
 }
 
 func parseP2(rest string) (string, bool, bool) {
@@ -330,13 +376,16 @@ func (h handler) requireRead(w http.ResponseWriter, r *http.Request, folder stri
 // nested virtual repositories flattened, cycles and duplicates skipped, and
 // a member that is blacked out, that the caller may read nothing in, whose
 // read misses or is refused, or whose upstream fails passed over (decision
-// 0008, R1 to R3). Composer keeps no metadata at a documented path, so only
-// a member's blackout refuses it ([I], R2a). Each version is kept from the
-// first member in the walk that lists it, which records it as the member
-// its dist comes from.
+// 0008, R1 to R3), a fault among them with a warning in the log
+// (pkgroute.Kit.WarnPassedOver) [I]. Composer keeps no metadata at a
+// documented path, so only a member's blackout refuses it ([I], R2a). Each
+// version is kept from the first member in the walk that lists it, which
+// records it as the member its dist comes from.
 func (h handler) virtualLookup(r *http.Request, name string) ([]release, error) {
 	parts, err := pkgroute.Collect(h.k, r, "", func(mr *http.Request) ([]release, error) {
-		return h.memberLookup(r, mr, name)
+		found, err := h.memberLookup(r, mr, name)
+		h.k.WarnPassedOver(mr, err)
+		return found, err
 	})
 	if err != nil {
 		return nil, err //nolint:wrapcheck // the kit's answer or a member's fault, as it is
@@ -521,6 +570,7 @@ func (h handler) virtualDist(w http.ResponseWriter, r *http.Request, name, versi
 	}
 	for _, member := range members {
 		found, err := h.memberLookup(r, member, name)
+		h.k.WarnPassedOver(member, err)
 		if pkgroute.PassedOver(err) {
 			continue
 		}
@@ -615,6 +665,11 @@ func (h handler) notFound(w http.ResponseWriter, r *http.Request) {
 
 func respondJSON(w http.ResponseWriter, r *http.Request, v any) {
 	data, _ := json.Marshal(v)
+	respondBody(w, r, data)
+}
+
+// respondBody answers the JSON document data.
+func respondBody(w http.ResponseWriter, r *http.Request, data []byte) {
 	digest := sha256.Sum256(data)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "private, no-cache")

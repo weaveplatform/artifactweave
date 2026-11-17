@@ -1,6 +1,6 @@
 # Swift Package Registry
 
-SwiftPM uses `/artifactory/api/swift/<repository>` for local, remote, virtual and one-node federated Swift repositories. Local and federated publication stores an immutable source archive at `<scope>/<name>/<name>-<version>.zip`; the registry derives version lists, release metadata and manifests from that archive. Remote repositories cache validated registry responses and checksum-pinned ZIPs. A virtual repository merges its members' release lists and serves each release from the first member that has it, local members before remote ones, nested virtual repositories included; a member that misses, fails or that you may not read is passed over. Read on the members is enough to resolve through it.
+SwiftPM uses `/artifactory/api/swift/<repository>` for local, remote, virtual and one-node federated Swift repositories. Local and federated publication stores an immutable source archive at `<scope>/<name>/<name>-<version>.zip`; the registry derives version lists, release metadata and manifests from that archive. Remote repositories cache validated registry responses and checksum-pinned ZIPs. A virtual repository merges its members' release lists and serves each release from the first member that has it, local members before remote ones, nested virtual repositories included; a member that misses, fails or that you may not read is passed over, a failing one with a warning in the server log. Read on the members is enough to resolve through it.
 
 ## Connect SwiftPM
 

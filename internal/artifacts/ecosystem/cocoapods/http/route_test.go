@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -45,6 +46,9 @@ type routeFixture struct {
 	blobs  *fs.Store
 	// faults are the errors the router kit logged as unexpected.
 	faults []error
+	// logs holds what the router kit logged, its warnings for a virtual
+	// repository's failing member among them.
+	logs *bytes.Buffer
 }
 
 type brokenCDNBody struct{}
@@ -113,10 +117,11 @@ func newRouteFixture(t *testing.T) *routeFixture {
 		}
 		return kernel.Principal{Name: name, Admin: name == "admin"}
 	}))
-	f := &routeFixture{t: t, router: r, db: db, up: up, source: service, blobs: blobs}
+	f := &routeFixture{t: t, router: r, db: db, up: up, source: service, blobs: blobs, logs: new(bytes.Buffer)}
 	f.kit = pkgroute.Mount(r, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
-		Fault: func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
+		Logger: slog.New(slog.NewTextHandler(f.logs, nil)),
+		Fault:  func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it artmodel.Item) {
 			body, _, err := blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {
@@ -498,7 +503,9 @@ func TestUnitVirtualSourceSelectsMemberWithMatchingArchive(t *testing.T) {
 
 // A remote member whose upstream answers an invalid index or a 5xx is
 // passed over, as 7.x's walk passes over every member that does not serve
-// the request [I] (decision 0008, R3): the hosted member answers.
+// the request [I] (decision 0008, R3): the hosted member answers. Each
+// pass-over of the fault is logged as a warning naming the member and the
+// virtual repository (pkgroute.Kit.WarnPassedOver).
 func TestUnitVirtualPassesOverFailingRemoteMember(t *testing.T) {
 	f := newRouteFixture(t)
 	f.seedLocal("LocalPod", "1.0.0")
@@ -507,6 +514,7 @@ func TestUnitVirtualPassesOverFailingRemoteMember(t *testing.T) {
 	if resp.Code != http.StatusOK || resp.Body.String() != "LocalPod\n" {
 		t.Fatalf("index over an invalid upstream index = %d %q", resp.Code, resp.Body)
 	}
+	f.wantWarned("index")
 	f.up.Set(
 		"/"+podfmt.SpecPath("LocalPod", "1.0.0"),
 		fakeupstream.Resource{Status: http.StatusServiceUnavailable},
@@ -523,6 +531,31 @@ func TestUnitVirtualPassesOverFailingRemoteMember(t *testing.T) {
 	if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(),
 		"/artifactory/api/pods/pods-virtual/packages/LocalPod/1.0.0/") {
 		t.Fatalf("spec over a failing remote member = %d %s", resp.Code, resp.Body)
+	}
+	f.logs.Reset()
+	// Locals come before remotes (R1), so only a pod the hosted member
+	// lacks reaches the failing remote.
+	f.up.Set("/"+podfmt.SpecPath("RemotePod", "2.0.0"), fakeupstream.Resource{Status: http.StatusServiceUnavailable})
+	resp = f.get("pods-virtual", podfmt.SpecPath("RemotePod", "2.0.0"))
+	if resp.Code != http.StatusNotFound || !strings.Contains(resp.Body.String(), "CocoaPods resource not found") {
+		t.Fatalf("spec only a failing remote member holds = %d %s", resp.Code, resp.Body)
+	}
+	f.wantWarned("spec")
+}
+
+// wantWarned checks that the request just made logged the warning for the
+// failing member pods-remote of pods-virtual, and clears the log.
+func (f *routeFixture) wantWarned(what string) {
+	f.t.Helper()
+	got := f.logs.String()
+	f.logs.Reset()
+	for _, want := range []string{
+		"level=WARN", `msg="virtual repository passed over a failing member"`,
+		"member=pods-remote", "virtual=pods-virtual",
+	} {
+		if !strings.Contains(got, want) {
+			f.t.Fatalf("%s: log %q lacks %q", what, got, want)
+		}
 	}
 }
 
@@ -969,10 +1002,18 @@ func TestUnitVirtualResolvesThroughTheSharedWalk(t *testing.T) {
 			t.Fatalf("%s missing spec: %d %s", user, rec.Code, rec.Body)
 		}
 	}
-	// A caller who may read no member, and a hosted archive's path without
-	// its packages/ prefix, get the CDN's not-found (R3).
+	// A caller who may read no member is refused a document of the whole
+	// repository at the root gate (RequireRoot), and gets the CDN's
+	// not-found for a pod's spec; a hosted archive's path without its
+	// packages/ prefix is not found (R3).
+	for _, path := range []string{"all_pods.txt", shard, "CocoaPods-version.yml", "deprecated_podspecs.txt"} {
+		if rec := f.getAs("nobody", "pods-virtual", path); rec.Code != http.StatusForbidden ||
+			strings.TrimSpace(rec.Body.String()) != `{"errors":[{"message":"Forbidden","status":403}]}` {
+			t.Fatalf("nobody %s: %d %s", path, rec.Code, rec.Body)
+		}
+	}
 	for user, path := range map[string]string{
-		"nobody": "CocoaPods-version.yml",
+		"nobody": spec,
 		"admin":  "LocalPod/1.0.0/LocalPod-1.0.0.tar.gz",
 	} {
 		if rec := f.getAs(user, "pods-virtual", path); rec.Code != http.StatusNotFound ||

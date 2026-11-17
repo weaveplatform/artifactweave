@@ -302,7 +302,9 @@ func TestUnitSwiftRemoteRefusesBadRegistryRepresentations(t *testing.T) {
 // has resolve without a 400 (decision 0008, R2), and a remote member whose
 // upstream fails or answers what the registry cannot use is passed over,
 // so with no other member the answer is the registry's 404, never 502 (R3,
-// [I]). A caller who may read no member gets the same 404, never 403.
+// [I]). A caller who may read no member gets the same 404, never 403. The
+// failing member is logged as a warning naming it and the virtual
+// repository (pkgroute.Kit.WarnPassedOver).
 func TestUnitSwiftVirtualPassesOverInvalidMembersAndUpstreamFailure(t *testing.T) {
 	const prefix = "/artifactory/api/swift/virtual/acme/Widget"
 	for _, tc := range []struct {
@@ -348,6 +350,9 @@ func TestUnitSwiftVirtualPassesOverInvalidMembersAndUpstreamFailure(t *testing.T
 				return
 			}
 			wantProblem(t, rec, http.StatusNotFound, "Swift package not found")
+			if tc.breakSource {
+				wantSwiftWarned(t, f.fixture, "release list")
+			}
 			if tc.name == "missing member" {
 				wantProblem(t, f.do(http.MethodGet, prefix+"/1.0.0.zip", nil, "", "admin"),
 					http.StatusNotFound, "Swift release not found")
@@ -375,7 +380,24 @@ func TestUnitSwiftVirtualPassesOverInvalidMembersAndUpstreamFailure(t *testing.T
 		wantProblem(t, f.do(http.MethodGet,
 			"/artifactory/api/swift/virtual/acme/Widget/1.0.0", nil, "", "admin"),
 			http.StatusNotFound, "Swift release not found")
+		wantSwiftWarned(t, f.fixture, "release metadata")
 	})
+}
+
+// wantSwiftWarned checks that the request just made logged the warning for
+// the failing member packages of virtual, and clears the log.
+func wantSwiftWarned(t *testing.T, f *fixture, what string) {
+	t.Helper()
+	got := f.logs.String()
+	f.logs.Reset()
+	for _, want := range []string{
+		"level=WARN", `msg="virtual repository passed over a failing member"`,
+		"member=packages", "virtual=virtual",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("%s: log %q lacks %q", what, got, want)
+		}
+	}
 }
 
 func TestUnitSwiftLocalDoesNotAdvertiseStaleOrUnreadableReleases(t *testing.T) {

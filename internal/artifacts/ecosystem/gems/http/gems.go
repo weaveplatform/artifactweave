@@ -249,6 +249,16 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, missing())
 		return
 	}
+	// A virtual repository's own patterns refuse a spec index file before
+	// its root gate, for every caller (decision 0008, R5): 7.x checks them
+	// before it searches a member. A hosted repository asks Read first
+	// (DV-057).
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual && specIndex(path) {
+		if err := h.k.CheckDocument(r, path); err != nil {
+			h.fail(w, r, pkgroute.SourceError(err, false))
+			return
+		}
+	}
 	if !h.k.RequireRoot(w, r) {
 		return
 	}

@@ -68,7 +68,11 @@
 //     bower.Versions), and a version's archive comes from the first member
 //     that holds and serves it. Each member decides Read on what it
 //     serves; a member that misses, refuses, may not be read or whose
-//     upstream fails is passed over. When it rewrites external
+//     upstream fails is passed over, the last with a warning in the log
+//     (pkgroute.Kit.WarnPassedOver) [I]. The package list and search are
+//     documents of the whole repository: a caller who may read the root of
+//     no member is refused 403, 401 when anonymous (RequireRoot, decision
+//     0008, R3). When it rewrites external
 //     dependencies it admits only sources its allowlist patterns match,
 //     through its selected remote's cache.
 //   - Statuses and error texts stay byte-identical.

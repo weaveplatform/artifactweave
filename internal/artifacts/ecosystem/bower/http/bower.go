@@ -150,8 +150,13 @@ func (h handler) packages(w http.ResponseWriter, r *http.Request) {
 	h.list(w, r, "")
 }
 
+// list answers the package list and search, documents of the whole
+// repository, after its root gate (pkgroute.Kit.RequireRoot): Read on a
+// hosted or remote repository's root, and for a virtual repository Read on
+// the root of any member, so a caller who may read no member is refused as
+// gems' indexes and the LuaRocks manifest are (decision 0008, R3).
 func (h handler) list(w http.ResponseWriter, r *http.Request, query string) {
-	if !h.requireRead(w, r, "") {
+	if !h.k.RequireRoot(w, r) {
 		return
 	}
 	var names []string

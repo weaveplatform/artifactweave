@@ -99,6 +99,20 @@ unless a member denied Read. An upstream's own 401 or 403 refuses this server, n
 so it passes over the same way and never counts toward the 403 **[I]**
 ([#1535](https://github.com/weaveplatform/artifactweave/issues/1535)).
 
+A document of the whole repository is not one package's, so the not-found above does not
+apply to it: a virtual repository serves it only to a caller who may read the root of some
+member, refuses anyone else with 403 (401 for an anonymous caller), and checks its own
+patterns first (R5) (`pkgroute.Kit.RequireRoot`). These are the RubyGems spec indexes and
+metadata, the LuaRocks manifest, the Bower package list and search, CocoaPods' `all_pods.txt`,
+its `all_pods_versions_*` shards, `CocoaPods-version.yml` and `deprecated_podspecs.txt`, and
+Composer's `packages.json`; pub and Swift serve none. 7.x's gate for the root of a virtual is
+`AuthorizationServiceBase.computeUserHasPermissionsOnRepositoryRoot` 1047-1078 (Read on the
+root of any member), and its native browser refuses a virtual's listing when no member is
+readable (`BaseBrowseNativeService.isItemListEmptyDueAnonymousMissingPermission` 281-318).
+Which of the closed package handlers ask it is **[I]**
+([#1652](https://github.com/weaveplatform/artifactweave/issues/1652)). A package's own
+document keeps the not-found.
+
 Sources: `repo/virtual/ArtifactoryVirtualDownloadStrategy.processStandard` 209-260;
 `repo/db/DbLocalRepo.checkDownloadIsAllowed` 212-219 and
 `repo/RemoteRepoBase.checkDownloadIsAllowed` 744-758 (R10).
@@ -259,7 +273,7 @@ over the members' documents that `pkgroute.Collect` reads in the package handler
 | PyPI | simple index and project pages, union of files; JSON only when every member can |
 | Bower | package list and search, union of names; a package's refs, union of versions, each archive from the first member that holds it |
 | CocoaPods | `all_pods.txt` and the `all_pods_versions_*` shards, union of pods and versions; a podspec from the first member that has it, its source rewritten to the virtual |
-| Composer | `p2` metadata, union of releases, each version and its dist from the first member that lists it; the order 7.x gives a merged list is **[I]** ([RTFACT-30366](https://jfrog.atlassian.net/browse/RTFACT-30366)) |
+| Composer | `p2` metadata, union of releases, each version and its dist from the first member that lists it, kept for the virtual's period (R8); the order 7.x gives a merged list is **[I]** ([RTFACT-30366](https://jfrog.atlassian.net/browse/RTFACT-30366)) |
 | Swift | release list, union of versions; release metadata, `Package.swift` and the archive from the first member that has the release; a publish lands in the default deployment repository (R6) |
 | NuGet | registration pages, flat-container version lists and search results |
 | Helm | `index.yaml` entries union, chart URLs rewritten; Helm and Helm OCI cannot share a virtual |
@@ -282,7 +296,17 @@ drops every cached index of each Helm virtual that contains it, through nesting
 CRAN, Conan, Debian, Helm, npm and YUM (RPM) virtuals carry the field (model default 600);
 JFrog's page also lists it for Alpine and OCI, default 7200, and the OCI entry is **[I]**
 because the 7.161.26 model leaves OCI out. Whether 7.x stores a negative period through the
-REST API is **[I]**. artifactweave merges the other types per request. It holds the cache in
+REST API is **[I]**. 7.161.26's UI also saves a period for a Composer virtual
+(`RepoConfigDescriptorBuilder.populateVirtualComposerDescriptor` 897-903), so artifactweave
+keeps a Composer virtual's `p2` metadata, the document it merges from the members; which of
+Composer's documents 7.x keeps is **[I]**. The UI's pub model has the field
+(`PubTypeSpecificConfigModel` line 22) but `populateVirtualTypeSpecific` never saves it, and
+RubyGems, LuaRocks, Bower, CocoaPods and Swift have none in the model, the UI, JFrog's page or
+JFrog's Terraform provider. A RubyGems virtual's index is built by a reindex job
+(`GemsVirtualIndexHandler`, [RTFACT-10024](https://jfrog.atlassian.net/browse/RTFACT-10024)),
+not kept for a period; artifactweave merges it per request **[I]**
+([#1652](https://github.com/weaveplatform/artifactweave/issues/1652)). artifactweave merges
+the other types per request. It holds the cache in
 each process, bounded, and keys an entry by what the caller may read, so no caller gets a
 merge built from members it cannot read (Helm's index is per permission set,
 [RTFACT-25936](https://jfrog.atlassian.net/browse/RTFACT-25936)). Coordination across nodes
