@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit/kittest"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -42,13 +43,17 @@ type Config struct {
 // the access module's, which the router binds over the same store.
 type serverStore interface {
 	itemkit.Store
+	pkgroute.Store
 	accesstest.Store
 }
 
 // newKit returns the item kit over c. The router's overlays are left out:
 // no test here serves an item GET.
 func newKit(c Config) *itemkit.Kit {
-	return itemkit.New(itemkit.Deps{Store: c.Store, Blobs: c.Blobs, Access: c.Access})
+	return itemkit.New(itemkit.Deps{
+		Store: c.Store, Blobs: c.Blobs, Access: c.Access,
+		PackageOptions: pkgroute.Options{Store: c.Store},
+	})
 }
 
 // withAccess returns c with the access module over its store, as the router

@@ -92,43 +92,17 @@ func TestUnitCRANSourceValidatesPublishedBytes(t *testing.T) {
 	}
 }
 
-func TestUnitCRANVirtualRejectsCyclesAndWrongMembers(t *testing.T) {
+// TestUnitCRANMemberIndexRefusesALocalCacheAlias: a local repository has
+// no cache, so its -cache alias reads no index. A virtual repository's
+// walk is the shared engine's (TestAccCRANVirtualWalksNestedMembersOnce).
+func TestUnitCRANMemberIndexRefusesALocalCacheAlias(t *testing.T) {
 	w := newItemWorld(t)
-	for _, c := range []repo.Config{
-		{Key: "cran-wrong", Class: repo.Local, PackageType: repo.Maven},
-		{Key: "cran-local", Class: repo.Local, PackageType: repo.Cran},
-		{Key: "cran-empty", Class: repo.Virtual, PackageType: repo.Cran, Repositories: []string{"absent"}},
-		{Key: "cran-cycle", Class: repo.Virtual, PackageType: repo.Cran, Repositories: []string{"cran-cycle"}},
-		{Key: "cran-mixed", Class: repo.Virtual, PackageType: repo.Cran, Repositories: []string{"cran-wrong"}},
-	} {
-		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
-			t.Fatal(err)
-		}
-	}
 	p := kernel.Principal{Name: "admin", Admin: true}
 	acc, err := itemkit.AccessFor(t.Context(), authorizerOver(t, w.db), p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	svc := CranAPI{Kit: newKit(Config{Store: w.db, Blobs: w.blobs})}
-	for _, tc := range []struct {
-		key      string
-		expected error
-	}{
-		{"cran-empty", nil},
-		{"cran-cycle", errCranVirtualCycle},
-		{"cran-mixed", errCranMemberType},
-	} {
-		c, err := w.db.Repos().Get(t.Context(), tc.key)
-		if err != nil {
-			t.Fatal(err)
-		}
-		got, err := svc.cranCandidates(t.Context(), w.db, c, "src/contrib/PACKAGES", p, acc,
-			false, map[string]bool{})
-		if !errors.Is(err, tc.expected) || tc.expected == nil && len(got) != 0 {
-			t.Errorf("%s: candidates=%v error=%v", tc.key, got, err)
-		}
-	}
 	if _, err := svc.cranMemberIndex(t.Context(), w.db,
 		repo.Config{Key: "cran-local", Class: repo.Local}, true, false,
 		"src/contrib/PACKAGES", p, acc); !errors.Is(err, kernel.ErrNotFound) {

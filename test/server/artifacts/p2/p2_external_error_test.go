@@ -178,6 +178,10 @@ type p2BrokenReader struct{}
 
 func (p2BrokenReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
+// TestAccP2VirtualRejectsForgedMemberSelectionAndCycle: a member path
+// names a listed member, never a key the caller forges, and a virtual
+// repository that is its own member lists no child, where it answered 500:
+// the walk skips a virtual it has visited (decision 0008, R2; #1552).
 func TestAccP2VirtualRejectsForgedMemberSelectionAndCycle(t *testing.T) {
 	var childReads int
 	backend := sourceBackend(
@@ -239,7 +243,8 @@ func TestAccP2VirtualRejectsForgedMemberSelectionAndCycle(t *testing.T) {
 		t.Fatalf("valid member route changed: %d, reads %d", res.Code, childReads)
 	}
 	res = w.do(http.MethodGet, "/artifactory/p2-cycle-virtual/compositeContent.xml", "admin", "")
-	if res.Code == http.StatusOK || childReads != 1 {
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="0"`) ||
+		childReads != 1 {
 		t.Fatalf("virtual member cycle leaked content: %d, reads %d", res.Code, childReads)
 	}
 }
@@ -323,6 +328,11 @@ func TestAccP2ExternalCompositeDepthStopsBeforePublishingNextChild(t *testing.T)
 	}
 }
 
+// TestAccP2VirtualInventoryKeepsOnlyReadableNativeMembersInOrder: the
+// composite lists the members that can supply P2 metadata in the package
+// handlers' walk order, the local member before the remotes, a nested P2
+// virtual member as one child at the place of the first member it alone
+// reaches (decision 0008, R1 and R2; #1552).
 func TestAccP2VirtualInventoryKeepsOnlyReadableNativeMembersInOrder(t *testing.T) {
 	w := newItemWorld(t, false)
 	for _, c := range []repo.Config{
@@ -334,10 +344,14 @@ func TestAccP2VirtualInventoryKeepsOnlyReadableNativeMembersInOrder(t *testing.T
 			Key: "p2-inventory-npm", Class: repo.Remote, PackageType: repo.NPM,
 			URL: "https://npm.example/",
 		},
+		{
+			Key: "p2-inventory-inner", Class: repo.Remote, PackageType: repo.P2,
+			URL: "https://inner.example/site/",
+		},
 		{Key: "p2-inventory-local", Class: repo.Local, PackageType: repo.Generic},
 		{
 			Key: "p2-inventory-nested", Class: repo.Virtual, PackageType: repo.P2,
-			Repositories: []string{"p2-inventory-remote"},
+			Repositories: []string{"p2-inventory-remote", "p2-inventory-inner", "p2-inventory-root"},
 		},
 		{
 			Key: "p2-inventory-root", Class: repo.Virtual, PackageType: repo.P2,
@@ -353,9 +367,9 @@ func TestAccP2VirtualInventoryKeepsOnlyReadableNativeMembersInOrder(t *testing.T
 	}
 	res := w.do(http.MethodGet, "/artifactory/p2-inventory-root/compositeContent.xml", "admin", "")
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="3"`) ||
-		!strings.Contains(res.Body.String(), "<child location=\"p2-inventory-remote\"/>\n"+
-			"<child location=\"p2-inventory-nested\"/>\n"+
-			"<child location=\"p2-inventory-local\"/>\n") {
+		!strings.Contains(res.Body.String(), "<child location=\"p2-inventory-local\"/>\n"+
+			"<child location=\"p2-inventory-remote\"/>\n"+
+			"<child location=\"p2-inventory-nested\"/>\n") {
 		t.Fatalf("virtual native member order/filter changed: %d %s", res.Code, res.Body)
 	}
 	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{

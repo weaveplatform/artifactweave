@@ -276,13 +276,16 @@ func TestUnitCRANRemoteIndexRejectsRevokedPackageAuthority(t *testing.T) {
 		Key: "cran-revoked-view", Class: repo.Virtual,
 		PackageType: repo.Cran, Repositories: []string{"cran-revoked-file"},
 	})
-	for _, path := range []string{
-		"/artifactory/cran-revoked-file/src/contrib/PACKAGES",
-		"/artifactory/cran-revoked-view/src/contrib/PACKAGES",
+	// The remote's own index answers the upstream's fault; through the
+	// virtual repository the walk passes the failing member over and lists
+	// the others, here none (decision 0008, R3) [I].
+	for path, status := range map[string]int{
+		"/artifactory/cran-revoked-file/src/contrib/PACKAGES": http.StatusBadGateway,
+		"/artifactory/cran-revoked-view/src/contrib/PACKAGES": http.StatusOK,
 	} {
 		checks = 0
 		got := w.do(http.MethodGet, path, "admin", "")
-		wantStatus(t, got, http.StatusBadGateway)
+		wantStatus(t, got, status)
 		if checks < 3 || strings.Contains(got.Body.String(), "assertthat") {
 			t.Fatalf(
 				"revoked package authority disclosed index: checks=%d body=%s",
