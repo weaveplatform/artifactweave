@@ -90,3 +90,41 @@ Feature: Puppet installs modules and their dependencies through native Forge met
     Then the command succeeds
     And the file "virtual-modules/widget/metadata.json" contains "acme-widget"
     And the file "virtual-modules/helper/metadata.json" contains "acme-helper"
+
+  Scenario: Puppet resolves modules through a virtual over a remote and a nested virtual
+    Given the registry is running
+    And the Puppet client can reach the registry
+    And the Puppet fixtures are ready
+    And a Puppet upstream serves the controlled modules
+    When I PUT "/artifactory/api/repositories/puppet-forge" as admin with body:
+      """
+      {"rclass":"remote","packageType":"puppet","url":"{upstream}/puppet/"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/puppet-root" as admin with body:
+      """
+      {"rclass":"local","packageType":"puppet"}
+      """
+    Then the response status is 200
+    When I deploy the file "acme-widget-1.0.0.tar.gz" to "/artifactory/puppet-root/acme-widget/acme-widget-1.0.0.tar.gz" as admin
+    Then the response status is 201
+    When I PUT "/artifactory/api/repositories/puppet-inner" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"puppet","repositories":["puppet-root","puppet-inner"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/puppet-all" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"puppet","repositories":["puppet-forge","puppet-inner","puppet-all"]}
+      """
+    Then the response status is 200
+    When I POST "/access/api/v1/tokens" as admin with body:
+      """
+      {"expires_in":3600}
+      """
+    Then the response status is 200
+    And I keep the JSON field "access_token" of the response as "puppet-token"
+    When I install Puppet module "acme-widget" from "puppet-all" into "nested-modules"
+    Then the command succeeds
+    And the file "nested-modules/widget/metadata.json" contains "acme-widget"
+    And the file "nested-modules/helper/metadata.json" contains "acme-helper"

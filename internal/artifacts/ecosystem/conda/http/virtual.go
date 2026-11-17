@@ -116,7 +116,7 @@ func (h handler) part(mr *http.Request, id condafmt.MetadataPath, policy readPol
 	}
 	if pkgroute.RequestFrom(mr).Repo.Class != repo.Remote {
 		index, err := h.memberIndex(mr, canonical, policy)
-		return index, pkgroute.SourceError(err, false)
+		return index, pkgroute.SourceError(err, false) //nolint:wrapcheck // the member's answer, as the protocol gives it
 	}
 	// fence is set only when this request built the part: a request that
 	// waited on another's build, or was served a kept part, has none.
@@ -136,7 +136,7 @@ func (h handler) part(mr *http.Request, id condafmt.MetadataPath, policy readPol
 			// stale fallback (virtual.Cache.Get).
 			return virtual.Entry{}, fmt.Errorf("%w: %w", virtual.ErrPassOver, err)
 		case err != nil:
-			return virtual.Entry{}, err
+			return virtual.Entry{}, err //nolint:wrapcheck // the member's answer, as the protocol gives it
 		}
 		body, err := json.Marshal(keptPart{Records: index.records, Modified: index.modified})
 		return virtual.Entry{Body: body}, err //nolint:wrapcheck // records of strings and numbers always marshal

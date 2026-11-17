@@ -654,7 +654,7 @@ func (h handler) virtual(
 		err = pkgroute.SourceError(err, false)
 		h.k.WarnPassedOver(mr, err)
 		if err != nil {
-			return nil, err
+			return nil, err //nolint:wrapcheck // the member's answer, as the protocol gives it
 		}
 		for i := range found {
 			found[i].member = mr

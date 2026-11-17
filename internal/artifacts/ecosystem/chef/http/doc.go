@@ -104,6 +104,13 @@
 //     version declares one, its identity and its dependencies and platforms
 //     match the version that advertised it. A cache hit rechecks the
 //     source's authority and the caller's read permission.
+//   - A virtual repository's members come from the package handlers' walk
+//     (#1553): nested virtual repositories flattened with a cycle or
+//     duplicate skipped, Read each member's alone, and a member that misses,
+//     is refused or fails passed over, a fault with a warning [I]. Its
+//     cookbook and version records (chef.Releases) are kept for its
+//     virtualRetrievalCachePeriodSecs (decision 0008, R8). A share lands in
+//     its default deployment repository [I] (R6).
 //   - A virtual repository resolves its members in order, the first member
 //     that holds a version supplying it; a download passes over a member
 //     whose own policy refuses the archive to the next one that holds the

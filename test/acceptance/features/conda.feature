@@ -64,6 +64,35 @@ Feature: Native Conda channels resolve packages through the current micromamba c
     Then the command succeeds
     And the server answered no request with 500 since the last command
 
+  Scenario: micromamba installs through a virtual channel over a remote and a nested virtual
+    Given the registry is running
+    And the Conda client can reach the registry
+    And a Conda upstream serves the controlled package
+    When I PUT "/artifactory/api/repositories/conda-upstream" as admin with body:
+      """
+      {"rclass":"remote","packageType":"conda","url":"{upstream}"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/conda-own" as admin with body:
+      """
+      {"rclass":"local","packageType":"conda"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/conda-inner" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"conda","repositories":["conda-own","conda-inner"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/conda-all" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"conda","repositories":["conda-inner","conda-upstream","conda-all"]}
+      """
+    Then the response status is 200
+    Given the Conda channel is "conda-all"
+    When I run micromamba "create --yes --prefix /work/conda-env --channel {conda_channel} --override-channels artifactweave-conda-fixture=1.0.0"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+
   Scenario: micromamba installs through the remote cache after the upstream stops
     Given the registry is running
     And the Conda client can reach the registry

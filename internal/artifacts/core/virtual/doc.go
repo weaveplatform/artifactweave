@@ -148,6 +148,12 @@
 // keep Alpine's and RPM's merges in Cache
 // (https://github.com/weaveplatform/artifactweave/issues/1551).
 //
+// Ansible and Chef (Releases), Puppet (Releases) and Conda (Merger, one
+// subdir's channel index) implement it, each in its
+// ecosystem/<type>/virtual.go; Chef keeps its cookbook and version records
+// in Cache, and Conda each remote member's part of an index
+// (https://github.com/weaveplatform/artifactweave/issues/1553).
+//
 // # Testing
 //
 // resolve_test.go is an external test package (virtual_test) over Configs:

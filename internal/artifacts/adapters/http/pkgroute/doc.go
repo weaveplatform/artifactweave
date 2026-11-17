@@ -250,6 +250,11 @@
 // ItemKit and Bind for the item routes' virtual indexes
 // (https://github.com/weaveplatform/artifactweave/issues/1551).
 //
+// Ansible, Chef, Puppet and Conda take their members from the same walk,
+// with Chef's cookbook records kept through Merged and each Conda remote
+// member's part through MergedPart
+// (https://github.com/weaveplatform/artifactweave/issues/1553).
+//
 // # Testing
 //
 // The package's own tests mount a test protocol over the in-memory store,

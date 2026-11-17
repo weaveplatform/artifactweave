@@ -84,3 +84,40 @@ Feature: Knife publishes and installs Chef cookbooks through native Supermarket 
     When I install Chef cookbook "widget" from "chef-virtual" into "virtual-installed"
     Then the command succeeds
     And the file "virtual-installed/helper/metadata.json" contains "helper"
+
+  Scenario: Knife resolves cookbooks through a virtual over a remote and a nested virtual
+    Given the registry is running
+    And the Chef client can reach the registry
+    And the Chef cookbook sources are ready
+    When I PUT "/artifactory/api/repositories/chef-seed" as admin with body:
+      """
+      {"rclass":"local","packageType":"chef"}
+      """
+    Then the response status is 200
+    When I publish Chef cookbook "helper" to "chef-seed"
+    Given a Chef upstream serves the cookbooks published in "chef-seed"
+    When I PUT "/artifactory/api/repositories/chef-supermarket" as admin with body:
+      """
+      {"rclass":"remote","packageType":"chef","url":"{upstream}/chef"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/chef-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"chef"}
+      """
+    Then the response status is 200
+    When I publish Chef cookbook "widget" to "chef-local"
+    When I PUT "/artifactory/api/repositories/chef-inner" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"chef","repositories":["chef-local","chef-inner"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/chef-all" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"chef","repositories":["chef-supermarket","chef-inner","chef-all"]}
+      """
+    Then the response status is 200
+    When I install Chef cookbook "widget" from "chef-all" into "nested-installed"
+    Then the command succeeds
+    And the file "nested-installed/widget/metadata.json" contains "widget"
+    And the file "nested-installed/helper/metadata.json" contains "helper"

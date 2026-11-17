@@ -42,6 +42,38 @@ Feature: Native Ansible Galaxy collections
     And the controlled Ansible dependency is installed
     And the server answered 200 to GET "/artifactory/api/ansible/ansible-virtual/api/v3/plugin/ansible/content/published/collections/artifacts/weave-sample-1.0.0.tar.gz"
 
+  Scenario: Galaxy publishes through a virtual to its deployment repository and installs over a remote and a nested virtual
+    Given the registry is running
+    And the Ansible client can reach the registry
+    When I build the controlled Ansible collections
+    Given the controlled Ansible Galaxy upstream is available
+    When I PUT "/artifactory/api/repositories/ansible-galaxy" as admin with body:
+      """
+      {"rclass":"remote","packageType":"ansible","url":"{upstream}"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/ansible-deploy" as admin with body:
+      """
+      {"rclass":"local","packageType":"ansible"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/ansible-inner" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"ansible","repositories":["ansible-deploy","ansible-inner"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/ansible-all" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"ansible","repositories":["ansible-galaxy","ansible-inner","ansible-deploy"],"defaultDeploymentRepo":"ansible-deploy"}
+      """
+    Then the response status is 200
+    And I publish the controlled Ansible collections to "ansible-all"
+    When I GET "/artifactory/ansible-deploy/collections/weave/sample/1.0.0/weave-sample-1.0.0.tar.gz" as admin
+    Then the response status is 200
+    And I install the controlled Ansible collection from "ansible-all"
+    Then the command succeeds
+    And the controlled Ansible dependency is installed
+
   Scenario: Galaxy installs redirected remote collections and resolves offline from an empty client
     Given the registry is running
     And the Ansible client can reach the registry

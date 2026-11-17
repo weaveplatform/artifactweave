@@ -80,12 +80,6 @@ func (h handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 	h.k.Error(w, r, pkgroute.SourceError(err, p.Anonymous || p.Name == ""))
 }
 
-func isMissing(err error) bool {
-	var e *apierror.Error
-	return errors.Is(err, kernel.ErrNotFound) ||
-		errors.As(err, &e) && e.Status == http.StatusNotFound
-}
-
 func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil {
@@ -446,7 +440,7 @@ func (h handler) virtualReleases(r *http.Request, ns, name, download string) (ca
 		err = pkgroute.SourceError(err, false)
 		h.k.WarnPassedOver(mr, err)
 		if err != nil {
-			return nil, err
+			return nil, err //nolint:wrapcheck // the member's answer, as the protocol gives it
 		}
 		checks = append(checks, found.checks...)
 		return found.items, nil

@@ -51,7 +51,7 @@ func (h handler) virtualModule(r *http.Request, name string) (moduleRecord, bool
 		case pkgroute.PassedOver(err):
 			continue
 		case err != nil:
-			return moduleRecord{}, false, err
+			return moduleRecord{}, false, err //nolint:wrapcheck // the member's answer, as the protocol gives it
 		case found:
 			return doc, true, nil
 		}

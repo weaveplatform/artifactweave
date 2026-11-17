@@ -106,8 +106,10 @@ func TestAccChefVirtualPassesOverMissingFailingAndUnreadableMembers(t *testing.T
 	answered(t, f.do("GET", base+"/api/v1/cookbooks/widget/versions/2_0_0", "reader"), 200, `"version":"2.0.0"`)
 	answered(t, f.do("GET", base+"/api/v1/cookbooks/widget/versions/2_0_0/download", "reader"), 200, "")
 	answered(t, f.do("GET", base+"/api/v1/cookbooks", "reader"), 200, `"cookbook_name":"widget"`)
-	for _, path := range []string{"/api/v1/cookbooks/widget", "/api/v1/cookbooks/widget/versions/2_0_0",
-		"/api/v1/cookbooks/widget/versions/2_0_0/download"} {
+	for _, path := range []string{
+		"/api/v1/cookbooks/widget", "/api/v1/cookbooks/widget/versions/2_0_0",
+		"/api/v1/cookbooks/widget/versions/2_0_0/download",
+	} {
 		answered(t, f.do("GET", base+path, "stranger"), 404, "Chef cookbook or version not found")
 	}
 	for _, tc := range []struct {

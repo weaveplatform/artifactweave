@@ -60,10 +60,17 @@ Publish also accepts the Supermarket multipart `tarball` field. A version is
 immutable through the native publish route: repeating a version returns 409.
 
 Use a virtual key in the same URL to install across ordered L/R/F members.
-Each returned version must pass the virtual and selected member permissions
-and include/exclude patterns. First readable member wins a duplicate version.
-Metadata links point to the virtual endpoint and each request resolves current
-membership. Nested virtual membership returns 400 through the shared seam.
+Members come from the shared walk: nested virtual members are walked, a cycle
+or duplicate is skipped, and local members come before remote ones. Each
+returned version must pass the selected member's permissions and
+include/exclude patterns; a token with Read on the members only resolves
+through the virtual. First readable member wins a duplicate version. A member
+that misses or fails is passed over, a failing one with a warning in the log.
+Metadata links point to the virtual endpoint. The cookbook and version records
+are kept for the virtual's `virtualRetrievalCachePeriodSecs` (0 or -1 builds
+them on every read; a member's 404 drops the entry). `knife supermarket share`
+to a virtual lands in its default deployment repository; without one it
+answers 405, as does a cookbook delete through a virtual.
 
 For R, configure the repository URL as the Supermarket root, normally
 `https://supermarket.chef.io`. The adapter generates its own bounded pagination

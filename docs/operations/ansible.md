@@ -26,9 +26,12 @@ ansible-galaxy collection publish ./dist/team-example-1.0.0.tar.gz
 ansible-galaxy collection install 'team.example:>=1.0.0,<2.0.0'
 ```
 
-Use local or federated repositories for publish. Remote and virtual repositories
-serve collection discovery, dependency metadata and downloads; publishing to them
-returns 405. All discovery, version metadata and archives require read permission;
+Use local or federated repositories for publish, or a virtual repository with a
+default deployment repository, where the collection lands and whose import task the
+virtual repository answers, so `ansible-galaxy collection publish -s
+.../api/ansible/<virtual>` completes. A virtual repository without one answers 405
+"No local repository was configured as local deployment repository for the
+(<virtual>) virtual repository." with `Allow: GET`, and a remote answers 405. All discovery, version metadata and archives require read permission;
 a publication requires deploy permission on its final archive path. Publishing an
 existing version through Galaxy returns 409.
 
@@ -59,14 +62,16 @@ collection endpoint on the same origin, and rejects cycles or duplicate versions
 Each metadata document is bounded to 2 MiB. Invalid metadata returns 502; upstream
 status failures retain the shared source policy's status mapping.
 
-Virtual repositories merge readable concrete local, remote and federated members
-in configured order. The first readable member providing a version wins, and
-artifact downloads resolve through that same order. A 404 member falls through;
-other upstream failures stop resolution. Both virtual and member permissions apply.
-Missing configured members are skipped. Nested virtual or incompatible members
-return 400 through the existing package-router contract; generic nested graph
-resolution remains P10. This is an operation boundary within the supported virtual
-class, not a claim of nested-virtual support.
+Virtual repositories merge their members in the shared walk of decision 0008: nested
+virtual members are walked, a cycle or a member listed twice is skipped, and local and
+federated members come before remote ones. The first readable member providing a
+version wins, and artifact downloads resolve through that same order. A member that
+misses, that the caller may not read, or that fails is passed over; a failing member
+is logged as a warning. Read is each member's alone, so a token with Read on the
+members only, and no `ANY` target, resolves through the virtual repository. Missing
+configured members and members of another type are skipped. The version list is
+merged on every request: Artifactory 7.161.26 saves no retrieval cache period for an
+Ansible virtual.
 
 ## Integrity and limits
 

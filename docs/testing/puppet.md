@@ -43,14 +43,19 @@ Use the virtual repository key in the same URL to resolve dependencies across
 ordered members. A remote repository's URL is its Forge API root, normally
 `https://forgeapi.puppet.com`. The native adapter supplies the mandatory Forge
 query fields itself; `propagateQueryParams` need not be enabled. Tokens need
-Read on each advertised archive path and on each selected virtual member.
+Read on each advertised archive path in the member that serves it; a virtual
+repository is never asked for Read itself, so Read on the members alone, with
+no `ANY` target, resolves through it.
 Deploy requires Write, and replacement also requires Delete.
 
 `GET .../v3/releases?module=acme-widget` lists versions and dependency constraints.
 `GET .../v3/modules/acme-widget` and `GET .../v3/releases/acme-widget-1.0.0`
 return module and release metadata. Search currently supports an exact module
-name (`GET .../v3/modules?query=acme-widget`). Arbitrary search queries and nested
-virtual members are refused explicitly.
+name (`GET .../v3/modules?query=acme-widget`). Arbitrary search queries are
+refused explicitly. A virtual repository's members come from the shared walk:
+nested virtual members are walked, a cycle or duplicate is skipped, local
+members come before remote ones, and a member that misses or fails is passed
+over, a failing one with a warning in the log.
 
 The release list and the search page as the whole-repository lists below do: 20
 entries unless `limit` asks for up to 100, a larger `limit` served as 100, under
@@ -121,18 +126,16 @@ release before it installs it. The record is still read under the release
 pages' authority, and a record the upstream does not hold, or one listing no
 release the caller may read, still answers 404. A virtual repository whose
 members' pages list no release of the module the caller may read answers
-`v3/modules/<m>` with the record its first remote member, in member order,
+`v3/modules/<m>` with the record its first remote member, in the walk's order,
 answers so (#1422) [I]. JFrog's Puppet repositories page says a virtual
 repository aggregates its members and supports r10k, which reads this record
 before the release record and archive the virtual repository already answers
-for such a module (#1369); no source shows 7.x's answer. The virtual
-repository's Read on the module folder is checked first, then each member is
+for such a module (#1369); no source shows 7.x's answer. Each member is
 checked as the merge of the release pages checks it: a member the caller may
 not read the module folder of, a blacked-out member, one whose patterns reject
-`.puppet/<m>/releases.json`, one whose upstream holds no record and one whose
-record lists no release the caller may read, in the virtual repository and in
-the member, are passed over (R5). Any other failure of the member fails the
-answer, as a remote's does. The record is the member's, module-wide fields
+`.puppet/<m>/releases.json`, one whose upstream holds no record, fails or
+answers a record that fails its checks, and one whose record lists no release
+the caller may read in the member, are passed over (R3, R5). The record is the member's, module-wide fields
 included, rather than merged from releases as a listed module's is, and its
 links are relative, so they lead back to the virtual repository. A module some
 member lists keeps its merged record and never reads a module record.

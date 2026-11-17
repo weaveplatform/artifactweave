@@ -128,11 +128,10 @@
 //     (#1370) [I]; its release list and search still answer from the
 //     pages. A virtual repository whose members' pages list no release of
 //     the module the caller may read answers the record its first remote
-//     member, in member order, answers so, read under that member's
-//     authority after the virtual repository's Read, passing over a member
-//     that is blacked out, refuses the release pages' policy path, holds no
-//     record or lists no release the caller may read in both repositories
-//     (#1422) [I].
+//     member, in the walk's order, answers so, read under that member's
+//     authority, passing over a member that is blacked out, refuses the
+//     release pages' policy path, holds no record, fails, or lists no
+//     release the caller may read in it (#1422, #1553) [I].
 //   - A remote builds each Forge query itself (module, limit, offset,
 //     sort_by and exclude_fields), never forwards a client's, module_groups
 //     included, never
@@ -168,7 +167,12 @@
 //     archive from its first remote member, in member order, whose
 //     upstream's record holds the release, once every member's pages leave
 //     it out (#1369) [I].
-//   - A virtual repository resolves its members in order, leaving out a
+//   - A virtual repository resolves its members (puppet.Releases) in the
+//     package handlers' walk (#1553), nested virtual repositories flattened
+//     with a cycle or duplicate skipped and local members first (decision
+//     0008, R1, R2); Read is each member's alone, and a member that misses,
+//     is refused or fails is passed over, a fault with a warning [I] (R3).
+//     It merges on every request [I] (R8). It leaves out a
 //     blacked-out member and, outside the search, a remote whose patterns
 //     reject its release pages. A version comes from the first member that holds it and whose
 //     own policy accepts its archive; when none does, it stays listed from

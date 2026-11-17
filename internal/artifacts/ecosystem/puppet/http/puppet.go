@@ -401,7 +401,7 @@ func (h handler) virtualRecord(
 		case pkgroute.PassedOver(err):
 			continue
 		case err != nil:
-			return release{}, false, err
+			return release{}, false, err //nolint:wrapcheck // the member's answer, as the protocol gives it
 		case found:
 			rel.member = mr
 			return rel, true, nil
@@ -1055,7 +1055,7 @@ func (h handler) virtual(r *http.Request, name string, u use) ([]release, error)
 		err = pkgroute.SourceError(err, false)
 		h.k.WarnPassedOver(mr, err)
 		if err != nil {
-			return nil, err
+			return nil, err //nolint:wrapcheck // the member's answer, as the protocol gives it
 		}
 		member := pkgroute.RequestFrom(mr).Repo
 		for i := range found {

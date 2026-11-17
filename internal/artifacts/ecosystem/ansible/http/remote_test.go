@@ -194,3 +194,26 @@ func TestAccGalaxyNoStoreAndInvalidArchiveAreNeverCached(t *testing.T) {
 		t.Fatal("no-store archive was reused")
 	}
 }
+
+// A virtual repository over a remote and a nested virtual repository over a
+// local walks each real member once (decision 0008, R2): all lists the
+// remote, inner, itself and inner again, and inner lists the local and
+// itself. It lists the versions of both members and serves each archive
+// from the member that holds it, with no 400 for the cycle or the
+// duplicate, as main answered.
+func TestAccGalaxyVirtualOverARemoteAndANestedVirtual(t *testing.T) {
+	f, _, _, _ := remoteFixture(t)
+	f.deployVersion(f.repo, "2.0.0")
+	f.createRepo("inner", repo.Virtual, "ansible-local", "inner")
+	f.createRepo("all", repo.Virtual, "ansible-remote", "inner", "all", "inner")
+	if got := versionsOf(t, f.do("GET", virtualVersions, nil, "", "")); strings.Join(got, ",") != "2.0.0,1.2.3" {
+		t.Fatalf("versions through nested members = %v", got)
+	}
+	for v, body := range map[string][]byte{"1.2.3": f.data, "2.0.0": versionArchive(t, f.data, "2.0.0")} {
+		w := f.do("GET", virtualArchive+v+".tar.gz", nil, "", "")
+		requireStatus(t, w, http.StatusOK)
+		if !bytes.Equal(w.Body.Bytes(), body) {
+			t.Fatalf("archive %s through nested members changed", v)
+		}
+	}
+}
