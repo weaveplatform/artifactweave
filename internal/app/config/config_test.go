@@ -202,7 +202,7 @@ func TestUnitEnvCoversEveryKey(t *testing.T) {
 			env[envName(k)] = "3"
 		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
 			strings.HasSuffix(k, ".ttl"), k == "work.lease", strings.HasPrefix(k, "aql_timeout."),
-			strings.HasPrefix(k, "maven."), k == "npm.login_token_expiry",
+			k == "maven.snapshot_cleanup_interval", k == "npm.login_token_expiry",
 			strings.HasPrefix(k, "nuget."):
 			env[envName(k)] = "45s"
 		default:

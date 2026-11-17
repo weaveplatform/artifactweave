@@ -56,6 +56,7 @@ type Settings struct {
 	Conda conda.Settings
 	// Debian is the Debian format's: debian.metadata_validation.
 	Debian debian.Settings
+	Maven  maven.Settings
 	// Helm is the classic Helm protocol's URL mode (decision 0039).
 	Helm helm.Settings
 	// NPM is the npm format's (decision 0034).
