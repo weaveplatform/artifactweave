@@ -38,6 +38,30 @@ func TestUnitRejectf(t *testing.T) {
 	}
 }
 
+// TestUnitPolicyRefusalIsNamedForTheCache (#1630): a policy's refusal names
+// the repository and repo path it refuses, and Named states it for another
+// key, a remote's cache, keeping its status and the path; a refusal Rejectf
+// made has no key to change.
+func TestUnitPolicyRefusalIsNamedForTheCache(t *testing.T) {
+	refusal := PolicyRefusal(http.StatusNotFound, "'%[1]s' refuses '%[1]s:%[2]s'", "up", "a/f.bin")
+	if !refusal.Policy || refusal.Status != http.StatusNotFound ||
+		refusal.Message != "'up' refuses 'up:a/f.bin'" {
+		t.Fatalf("refusal %#v", refusal)
+	}
+	named := refusal.Named("up-cache")
+	if !named.Policy || named.Status != http.StatusNotFound ||
+		named.Message != "'up-cache' refuses 'up-cache:a/f.bin'" {
+		t.Errorf("named %#v", named)
+	}
+	if refusal.Message != "'up' refuses 'up:a/f.bin'" {
+		t.Errorf("Named changed the refusal it was asked of: %q", refusal.Message)
+	}
+	other := Rejectf(http.StatusConflict, "the repository '%s' refuses %s", "up", "x")
+	if got := other.Named("up-cache"); got != other {
+		t.Errorf("Rejectf's refusal named %#v, want it kept", got)
+	}
+}
+
 // An AcceptedError names its status, so a log of the write says what the
 // client was answered.
 func TestUnitAcceptedError(t *testing.T) {

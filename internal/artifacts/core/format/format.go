@@ -456,11 +456,41 @@ type RejectionError struct {
 	// it was asked for after the message (itemkit's lookupRefusal); every
 	// other surface answers Status and Message alone, as for any refusal.
 	Policy bool
+	// template and path are a PolicyRefusal's message before the key went
+	// in, kept so Named can state it for another key.
+	template, path string
 }
 
 // Rejectf returns a RejectionError with a formatted message.
 func Rejectf(status int, format string, args ...any) *RejectionError {
 	return &RejectionError{Status: status, Message: fmt.Sprintf(format, args...)}
+}
+
+// PolicyRefusal returns the refusal of the repository key's own policy for
+// path (Policy), whose message is template with %[1]s for key and %[2]s
+// for path, as each of 7.x's policy exceptions names the repository that
+// refuses and the repo path it refuses.
+func PolicyRefusal(status int, template, key, path string) *RejectionError {
+	return &RejectionError{
+		Status:   status,
+		Message:  fmt.Sprintf(template, key, path),
+		Policy:   true,
+		template: template,
+		path:     path,
+	}
+}
+
+// Named is r as the repository key states it. A remote repository's cache
+// checks the remote's settings, but 7.161.26's DbCacheRepo checks them
+// under its own key, the remote's plus "-cache" (LocalCacheRepoConfig 40),
+// and assertValidPath's exceptions name that repository and its repo path
+// (RepoBase.getRepoPath 122-123). A refusal PolicyRefusal did not make
+// names no key Named can change and is r itself.
+func (r *RejectionError) Named(key string) *RejectionError {
+	if r.template == "" {
+		return r
+	}
+	return PolicyRefusal(r.Status, r.template, key, r.path)
 }
 
 // Error returns Message alone, without Status, so a refusal that is wrapped

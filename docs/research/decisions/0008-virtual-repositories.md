@@ -45,9 +45,17 @@ first (R2). A remote listed before a local is therefore searched after it, unles
 remote has `priorityResolution`. Package handlers walk the same list and leave the caches
 out while remote members remain in it, so each remote is asked once.
 
+A remote's cache step checks the copy it finds for expiry. An expired copy is not found
+there, so a later cache's fresh copy wins. Otherwise the remote's own step revalidates the
+file, and serves the expired copy when the remote does not find it. An offline remote's
+copies never expire, and neither does a release. This server judges a copy expired by the
+rule a direct read of the remote revalidates it by (`remote.Fresh`)
+([#1641](https://github.com/weaveplatform/artifactweave/issues/1641)).
+
 Sources: `repo/virtual/VirtualRepositoriesResolver.assembleSearchRepositoriesList` 104-143,
 over `VirtualRepositoryConfigResolverImpl.getRepoConfigs` 61-90, which lists every local
-and federated member before every remote one; `ph/PackageRepoServiceImpl.getSubRepositories`
+and federated member before every remote one; `repo/db/DbCacheRepo.getInfo` 127-149 and
+`isExpired` 235-245; `repo/RemoteRepoBase.internalGetInfo` 517-555; `ph/PackageRepoServiceImpl.getSubRepositories`
 318-339; JFrog's [Virtual Resolution Order](https://docs.jfrog.com/artifactory/docs/virtual-repositories#virtual-resolution-order):
 "local repositories first, then remote repository caches, and finally remote repositories
 themselves", each in "the order in which they are listed in the configuration".
@@ -272,6 +280,18 @@ each process, bounded, and keys an entry by what the caller may read, so no call
 merge built from members it cannot read (Helm's index is per permission set,
 [RTFACT-25936](https://jfrog.atlassian.net/browse/RTFACT-25936)). Coordination across nodes
 is P35's ([shared remote retrieval policy](../../implementation/remote-cache-policy.md#concurrency-and-publication)).
+
+The cache (`core/virtual/cache.go`, [#1543](https://github.com/weaveplatform/artifactweave/issues/1543))
+keys an entry by virtual repository, document, member list, the members the caller may read
+in whole, and base URL. A caller who may read only part of a member, or of the virtual
+repository through an `ANY` target, gets a merge of its own on every request. Each node holds
+at most `virtual.metadata_cache.max_entries` documents and `max_size` bytes, the least recently
+used dropped first. A rebuild that fails answers the last merge, whether its entry aged out or
+was zapped, because 7.x's zap only marks the cached file as never updated
+(`RepositoryServiceImpl.zapFileFromVirtual`), the state age expiry leaves it in. The REST and
+descriptor paths keep refusing a negative period: JFrog's Terraform provider validates
+`retrieval_cache_period_seconds` with `IntAtLeast(0)`, and no source shows 7.x storing -1
+through REST. A -1 that reaches the cache another way is always expired, as in 7.x.
 
 Sources: `repo/virtual/VirtualRepo.isCachedResourceExpired` 658-662;
 `repo/virtual/ArtifactoryVirtualDownloadStrategy.getInfoInternal` 90-136;

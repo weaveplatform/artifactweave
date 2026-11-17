@@ -123,14 +123,17 @@ func TestAccVirtualReadDecidedByMembers(t *testing.T) {
 	wantStatus(t, w.do(http.MethodGet, "/artifactory/virt-ab/", "user", ""), http.StatusOK)
 	wantStatus(t, w.do(http.MethodGet, "/artifactory/virt-ab/", "deployer", ""),
 		http.StatusForbidden)
-	// The storage API's read gate asks the members too; its answers are
-	// #1537's.
+	// The storage API's item info asks the members too, and answers a
+	// caller who may read none of them as a miss (getVirtualRepoItem,
+	// #1537).
 	rec := w.do(http.MethodGet, "/artifactory/api/storage/virt-ab/both.bin", "user", "")
 	wantStatus(t, rec, http.StatusOK)
 	wantStatus(t, w.do(http.MethodGet, "/artifactory/api/storage/virt-ab", "user", ""),
 		http.StatusOK)
-	wantStatus(t, w.do(http.MethodGet, "/artifactory/api/storage/virt-ab", "deployer", ""),
-		http.StatusForbidden)
+	if rec := w.do(http.MethodGet, "/artifactory/api/storage/virt-ab", "deployer", ""); rec.Code !=
+		http.StatusNotFound || rec.Body.String() != errorBody(t, http.StatusNotFound, "Not Found") {
+		t.Errorf("virt-ab's root as deployer: %d %s", rec.Code, rec.Body)
+	}
 }
 
 // TestAccVirtualMissAndRefusalStatuses: a walk that finds nothing answers

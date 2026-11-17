@@ -1020,7 +1020,7 @@ func TestAccOpkgRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 		{
 			"blacked-out remote's cache", "opkg-dark-remote-cache", opkgFeed, "admin",
 			http.StatusNotFound,
-			blackedOut("opkg-dark-remote", "opkg-dark-remote-cache", opkgFeed),
+			blackedOut("opkg-dark-remote-cache", "opkg-dark-remote-cache", opkgFeed),
 		},
 		{
 			"blacked-out remote's IPK", "opkg-dark-remote", opkgXlat, "admin",

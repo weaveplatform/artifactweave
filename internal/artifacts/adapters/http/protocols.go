@@ -79,6 +79,7 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 			httpkit.WriteJSON(w, http.StatusCreated, itemkit.ItemCreated(r.Context(), it))
 		},
 		Fault: func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
+		Cache: s.cfg.VirtualCache,
 	}
 }
 

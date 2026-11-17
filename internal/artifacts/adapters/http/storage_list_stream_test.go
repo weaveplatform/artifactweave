@@ -438,7 +438,8 @@ func seedFileLists(t *testing.T, db serverStore) {
 // files that tie for their folder's newest, where the order the collected
 // last-modified read met them in (tree, then (path, name)) is not their
 // full path order: -d/f before !x at the root, y/b/d before y/b-c/e, and
-// tie-a's x/z.bin before tie-b's x/a.bin.
+// tie-a's x/z.bin before tie-b's x/a.bin, which a virtual repository's
+// last modified view no longer reaches, as 7.x answers it 400 (#1537).
 func seedTies(t *testing.T, db serverStore, at time.Time) {
 	t.Helper()
 	ctx := t.Context()
@@ -588,7 +589,10 @@ func TestAccStorageListAnswersAsBefore(t *testing.T) {
 // missing folders and files, for the administrator and a partial reader.
 // A virtual repository lists its members' children member by member, not
 // merged by name; and among equally new items the one the collected read
-// met first is reported.
+// met first is reported. A virtual repository's info answers what the
+// collected view finds; where that refused or missed, it describes a later
+// member the caller may read or answers 7.x's 404 "Not Found", and its
+// last modified view is 7.x's 400 (#1537).
 func TestAccStorageFolderViewsStreamTheCollected(t *testing.T) {
 	for _, backend := range []string{"inmem", "sqlite", "postgres"} {
 		t.Run(backend, func(t *testing.T) {
@@ -623,6 +627,9 @@ func TestAccStorageFolderViewsStreamTheCollected(t *testing.T) {
 								basic(user, "pw"),
 								"",
 							)
+							if virtualKeys[key] && !virtualAsCollected(t, target, view, got, want) {
+								continue
+							}
 							if got.Code != want.Code ||
 								got.Header().
 									Get("Content-Type") !=
@@ -657,6 +664,37 @@ func TestAccStorageFolderViewsStreamTheCollected(t *testing.T) {
 			}
 		})
 	}
+}
+
+// virtualKeys are the virtual repositories seedFileLists creates.
+var virtualKeys = map[string]bool{"libs": true, "outer": true, "tie": true}
+
+// virtualAsCollected checks got, a virtual repository's answer to target,
+// against want, the collected view's, where they part: the last modified
+// view is refused 400, and info the collected view refused or missed
+// describes a later member or misses with 7.x's "Not Found". It reports
+// whether got must still answer want's bytes.
+func virtualAsCollected(
+	t *testing.T,
+	target, view string,
+	got, want *httptest.ResponseRecorder,
+) bool {
+	t.Helper()
+	notLocal := `{"errors":[{"message":"` + textNotLocal + `","status":400}]}` + "\n"
+	notFound := `{"errors":[{"message":"Not Found","status":404}]}` + "\n"
+	switch {
+	case view != "":
+		if got.Code != http.StatusBadRequest || got.Body.String() != notLocal {
+			t.Fatalf("%s: %d %s, want 400 %s", target, got.Code, got.Body, notLocal)
+		}
+		return false
+	case want.Code == http.StatusOK:
+		return true
+	case got.Code == http.StatusNotFound && got.Body.String() != notFound,
+		got.Code != http.StatusNotFound && got.Code != http.StatusOK:
+		t.Fatalf("%s: %d %s, collected %d %s", target, got.Code, got.Body, want.Code, want.Body)
+	}
+	return false
 }
 
 // fileListFaults fails the item store's walks of a folder, by full path,
@@ -770,7 +808,6 @@ func TestAccStorageFolderViewsStoreFaults(t *testing.T) {
 		{"libs/a", 1},
 		{"libs-local/wide?lastModified", 0},
 		{"libs-local/wide?lastModified", 1},
-		{"libs/?lastModified", 2},
 	} {
 		skip = c.skip
 		got := do(t, h, http.MethodGet, storagePrefix+c.target, basic("admin", "pw"), "")

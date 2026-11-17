@@ -459,20 +459,20 @@ func TestAccStorageRootProperties(t *testing.T) {
 	}
 
 	// A remote repository's root properties are its cache's, read through
-	// either key; a virtual repository's root holds none.
+	// either key. A virtual repository's root holds none of its own and
+	// shows its first member's that has any (ArtifactResource.
+	// resolveProperties, #1537): up's cache, as other-local's and
+	// libs-local's roots have none now.
 	wantStatus(t, w.do(http.MethodPut, api+"up-cache?properties=k=v", "admin", ""),
 		http.StatusNoContent)
-	for _, key := range []string{"up-cache", "up"} {
-		if props(key)["k"] == nil {
-			t.Fatalf("%s: root properties missing", key)
+	for _, key := range []string{"up-cache", "up", "virt"} {
+		if !reflect.DeepEqual(props(key)["k"], []any{"v"}) {
+			t.Fatalf("%s: root properties %v", key, props(key))
 		}
 	}
 	wantStatus(t, w.do(http.MethodPut, api+"up?properties=k=v", "admin", ""), http.StatusBadRequest)
 	wantStatus(t, w.do(http.MethodPut, api+"virt?properties=k=v", "admin", ""),
 		http.StatusBadRequest)
-	if props("virt") != nil {
-		t.Fatal("a virtual repository's root has properties")
-	}
 
 	// Annotating the root needs the action on the whole repository; reading
 	// or deploying there is not enough.
