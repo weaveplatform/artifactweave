@@ -23,7 +23,7 @@ func (c Config) Access() accessapi.Settings {
 
 // Artifacts returns the artifacts module's settings from the download,
 // search, aql_timeout, build, deploy, npm, cran, huggingface, maven, nuget,
-// remote, gc, conda, debian, helm and pypi sections.
+// remote, gc, virtual, conda, debian, helm and pypi sections.
 // Formats.TerraformBackend.Keys stays nil: the keyring is not
 // configuration, and app sets it.
 func (c Config) Artifacts() artifacts.Settings {
@@ -51,6 +51,8 @@ func (c Config) Artifacts() artifacts.Settings {
 		AllowedPrivateOrigins:          c.Remote.AllowedPrivateOrigins,
 		GCGrace:                        c.GC.GracePeriod,
 		GCInterval:                     c.GC.Interval,
+		VirtualCacheEntries:            c.Virtual.MetadataCache.MaxEntries,
+		VirtualCacheBytes:              int64(c.Virtual.MetadataCache.MaxSize),
 		Formats: ecosystem.Settings{
 			Conda: conda.Settings{ShardsEnabled: c.Conda.ShardsEnabled},
 			// Negated so that the zero debian.Settings is 7.x's default

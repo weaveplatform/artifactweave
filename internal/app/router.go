@@ -37,6 +37,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/usage"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	agentpluginshttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/agentplugins/http"
 	alpinehttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/alpine/http"
@@ -244,6 +245,11 @@ type RouterConfig struct {
 	// (artifactshttp.Protocols). Only tests set it, to mount a test-only
 	// protocol.
 	Protocols []pkgroute.Protocol
+	// VirtualCache is the process's merged virtual metadata cache, sized
+	// by virtual.metadata_cache (decision 0008, R8). Nil builds one with
+	// the default bounds, so a router built by hand caches as the
+	// application's does.
+	VirtualCache *virtual.Cache
 }
 
 // newRegistry is the Docker registry for cfg, with the access module's token
@@ -411,6 +417,7 @@ func artifactsDeps(cfg RouterConfig) artifactshttp.Deps {
 		HuggingFaceXetEnabled:       cfg.HuggingFaceXetEnabled,
 		NPMLoginTokenExpiry:         cfg.NPMLoginTokenExpiry,
 		NPMMaxPublishSize:           cfg.NPMMaxPublishSize,
+		VirtualCache:                cfg.VirtualCache,
 	}
 }
 
@@ -434,6 +441,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	logger := cfg.Logger
 	if logger == nil {
 		logger = slog.Default()
+	}
+	if cfg.VirtualCache == nil {
+		cfg.VirtualCache = virtual.NewCache(virtual.CacheOptions{Log: logger})
 	}
 	r := chi.NewRouter()
 	artAPI := newArtifactoryAPI(cfg)

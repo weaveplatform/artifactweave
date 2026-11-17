@@ -166,6 +166,16 @@ func Collect[T any](
 // step (Options.NoUpstream, R7), so its source serves only what its cache
 // holds.
 func (k *Kit) members(r *http.Request, path string) ([]virtual.Member, []*http.Request, error) {
+	_, members, requests, err := k.walk(r, path)
+	return members, requests, err
+}
+
+// walk is members with the steps virtual.Members gave before any was
+// passed over, which the merged metadata cache keys on (Merged).
+func (k *Kit) walk(
+	r *http.Request,
+	path string,
+) ([]virtual.Member, []virtual.Member, []*http.Request, error) {
 	v := RequestFrom(r).Repo
 	o := virtual.Options{Order: virtual.Package, Path: path, NoPriority: k.p.NoPriority}
 	if k.o.NoUpstream != nil {
@@ -173,7 +183,7 @@ func (k *Kit) members(r *http.Request, path string) ([]virtual.Member, []*http.R
 	}
 	steps, err := virtual.Members(r.Context(), k.o.Store.Repos(), v, o)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%s: %w", k.p.Name, err)
+		return nil, nil, nil, fmt.Errorf("%s: %w", k.p.Name, err)
 	}
 	members := make([]virtual.Member, 0, len(steps))
 	requests := make([]*http.Request, 0, len(steps))
@@ -183,7 +193,7 @@ func (k *Kit) members(r *http.Request, path string) ([]virtual.Member, []*http.R
 			requests = append(requests, memberRequest(r, v, m, src))
 		}
 	}
-	return members, requests, nil
+	return steps, members, requests, nil
 }
 
 // walkSource is the Source the package handlers' walk through the virtual
