@@ -2,7 +2,13 @@
 
 Remote `helm` repositories serve an upstream `index.yaml`, chart archives and
 provenance through `/artifactory/api/helm/<repo>/`. Helm OCI uses the separate
-Docker/OCI adapter (#624). Virtual index merging remains P10.
+Docker/OCI adapter (#624). Virtual repositories merge readable member indexes.
+With `useNamespaces: true`, chart URLs name a flattened real member and reads
+select it exclusively on both the Helm API and item routes. Allowed external
+charts use the virtual `_external` API route and retain their remote member's
+URL and source policies. Publish through the virtual item route to its configured
+`defaultDeploymentRepo`; the next index read includes the deployed chart.
+A virtual without that deployment target refuses writes with 405.
 
 ```sh
 curl --fail --user admin "$REGISTRY/artifactory/api/repositories/charts" \

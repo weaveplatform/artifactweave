@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -17,8 +18,9 @@ import (
 // The HTTP walk decides member visibility; a readable member contributes every
 // chart, including charts whose own download permission refuses the caller.
 type Merger struct {
-	Settings  Settings
-	Base, Key string
+	Settings      Settings
+	Base, Key     string
+	UseNamespaces bool
 }
 
 // Merge retains the first member's copy of a chart version, sorts newest first,
@@ -47,7 +49,7 @@ func (m Merger) Merge(_ context.Context, parts []virtual.Part[Index]) (Index, er
 				var locations []string
 				for _, location := range version.URLs {
 					u, err := url.Parse(location)
-					if err != nil || u.IsAbs() || u.Host != "" || u.RawQuery != "" || u.Fragment != "" || strings.HasPrefix(u.Path, "_external/") {
+					if err != nil || u.IsAbs() || u.Host != "" || u.RawQuery != "" || u.Fragment != "" {
 						continue
 					}
 					p := strings.TrimPrefix(u.Path, "/")
@@ -55,8 +57,19 @@ func (m Merger) Merge(_ context.Context, parts []virtual.Part[Index]) (Index, er
 						continue
 					}
 					location = chartURL(p)
+					external := strings.HasPrefix(p, "_external/")
+					if external && part.Member.Class != repo.Remote {
+						continue
+					}
+					if m.UseNamespaces {
+						location = chartURL(part.Member.Key) + "/" + location
+					}
 					if !m.Settings.IsRelative() {
-						location = virtual.ItemBase(m.Base, m.Key) + "/" + location
+						base := virtual.ItemBase(m.Base, m.Key)
+						if external {
+							base = virtual.APIBase(m.Base, "helm", m.Key)
+						}
+						location = base + "/" + location
 					}
 					locations = append(locations, location)
 				}
@@ -74,4 +87,20 @@ func (m Merger) Merge(_ context.Context, parts []virtual.Part[Index]) (Index, er
 		slices.SortStableFunc(versions, func(a, b ChartVersion) int { return model.CompareSemver(b.Version, a.Version) })
 	}
 	return out, nil
+}
+
+// NamespacePath recognizes real member keys after flattening, independently of
+// read permission and path filters. A refused named member must never fall back
+// to a folder of the same name in a different member.
+func NamespacePath(c repo.Config, members []virtual.Member, p string) (member, path string, named bool) {
+	if c.UseNamespaces == nil || !*c.UseNamespaces {
+		return "", p, false
+	}
+	first, rest, _ := strings.Cut(p, "/")
+	for _, m := range members {
+		if m.Repo.Key == first {
+			return first, rest, true
+		}
+	}
+	return "", p, false
 }

@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
@@ -63,6 +66,61 @@ func TestUnitHelmVirtualIndexMerge(t *testing.T) {
 	out, err := (helm.Merger{}).Merge(t.Context(), []virtual.Part[helm.Index]{{Doc: helm.Index{}}})
 	if err != nil || out.Entries == nil || len(out.Entries) != 0 {
 		t.Fatal(out, err)
+	}
+}
+
+func TestUnitHelmNamespacedAndExternalURLs(t *testing.T) {
+	for _, relative := range []bool{true, false} {
+		for _, namespaces := range []bool{true, false} {
+			t.Run(fmt.Sprintf("relative=%t/namespaces=%t", relative, namespaces), func(t *testing.T) {
+				member := repo.Config{Key: "upstream", Class: repo.Remote}
+				index := helm.Index{
+					Entries: map[string][]helm.ChartVersion{
+						"web": {{Chart: helm.Chart{Name: "web", Version: "1.0.0"}, URLs: []string{"nested/a%20chart.tgz", "_external/https/charts.example/releases/web.tgz"}}},
+					},
+				}
+				out, err := (helm.Merger{Settings: helm.Settings{RelativeURLs: &relative}, UseNamespaces: namespaces, Base: "https://proxy.example/prefix", Key: "v"}).Merge(
+					t.Context(),
+					[]virtual.Part[helm.Index]{{Member: member, Doc: index}},
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				prefix := ""
+				if namespaces {
+					prefix = "upstream/"
+				}
+				want := []string{prefix + "nested/a%20chart.tgz", prefix + "_external/https/charts.example/releases/web.tgz"}
+				if !relative {
+					want[0] = "https://proxy.example/prefix/artifactory/v/" + want[0]
+					want[1] = "https://proxy.example/prefix/artifactory/api/helm/v/" + want[1]
+				}
+				if !slices.Equal(out.Entries["web"][0].URLs, want) {
+					t.Fatal(out.Entries, want)
+				}
+			})
+		}
+	}
+}
+
+func TestUnitHelmNamespacePath(t *testing.T) {
+	members := []virtual.Member{{Repo: repo.Config{Key: "first"}}, {Repo: repo.Config{Key: "remote"}}}
+	for _, tc := range []struct {
+		name, path, member, actual string
+		enabled, named             bool
+	}{
+		{"off", "first/web.tgz", "", "first/web.tgz", false, false},
+		{"member", "first/web.tgz", "first", "web.tgz", true, true},
+		{"remote", "remote/sub/web.tgz", "remote", "sub/web.tgz", true, true},
+		{"folder", "other/web.tgz", "", "other/web.tgz", true, false},
+		{"root", "first", "first", "", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			member, actual, named := helm.NamespacePath(repo.Config{UseNamespaces: &tc.enabled}, members, tc.path)
+			if member != tc.member || actual != tc.actual || named != tc.named {
+				t.Fatal(member, actual, named)
+			}
+		})
 	}
 }
 

@@ -46,6 +46,7 @@ import (
 	cranhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cran/http"
 	debianhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian/http"
 	dockerhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker/http"
+	helmhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/helm/http"
 	luarockshttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/luarocks/http"
 	mavenhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven/http"
 	npmhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm/http"
@@ -368,6 +369,7 @@ var overlays = []itemkit.Overlay{
 	opkghttp.TryOpkgItem,
 	p2http.TryP2Item,
 	mavenhttp.TryMavenMetadataItem,
+	helmhttp.TryHelmNamespaceItem,
 }
 
 // kitDeps returns the item kit's dependencies from cfg, with the router's
