@@ -168,7 +168,8 @@
       "redirect_test.go",
       "remote_fill_test.go",
       "remote_matrix_test.go",
-      "remote_member_test.go"
+      "remote_member_test.go",
+      "virtual_listing_test.go"
     ],
     "internal/configuration/adapters/http": [
       "descriptor_test.go",
@@ -262,6 +263,7 @@
       "virtual_order_test.go",
       "virtual_remote_test.go",
       "virtual_status_test.go",
+      "virtual_storage_test.go",
       "virtual_write_test.go"
     ],
     "test/server/configuration": [

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html"
 	"io"
 	"net/http"
 	"net/url"
@@ -798,7 +797,9 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
-		s.getUnfoundItem(w, r, st, c, cached, req, p, acc, dl, err)
+		if !s.listUnfoundVirtualFolder(w, r, st, c, req, acc) {
+			s.getUnfoundItem(w, r, st, c, cached, req, p, acc, dl, err)
+		}
 		return
 	}
 	if err != nil {
@@ -1245,8 +1246,10 @@ func (s *StatusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 func startsAtZero(rng string) bool { return strings.HasPrefix(strings.TrimSpace(rng), "bytes=0-") }
 
 // listFolder answers a folder GET with a plain HTML index, as Artifactory
-// serves browsers. named is the repository the request named, a virtual
-// repository when f was found in one of its members.
+// serves browsers. named is the repository the request named: a virtual
+// repository lists every member's children (listVirtualFolder), whether f
+// is the folder a member holds or, at its root, the virtual repository's
+// own.
 func (s *Kit) listFolder(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -1257,6 +1260,12 @@ func (s *Kit) listFolder(
 ) {
 	ctx := r.Context()
 	folder := f.Item.FullPath()
+	if named.Class == repo.Virtual {
+		if !s.listVirtualFolder(w, r, st, named, folder, acc, f.Repo.Class != repo.Virtual) {
+			httpkit.WriteErr(w, r, ItemNotFound())
+		}
+		return
+	}
 	var children []model.Item
 	page := kernel.Page{Limit: kernel.MaxLimit}
 	for {
@@ -1271,53 +1280,19 @@ func (s *Kit) listFolder(
 		}
 		page.After = next
 	}
-	title := html.EscapeString(path.Join(f.Repo.Key, folder))
-	var b strings.Builder
-	fmt.Fprintf(&b, "<!DOCTYPE html>\n<html><head><title>Index of %s</title></head><body>\n", title)
-	fmt.Fprintf(&b, "<h1>Index of %s</h1>\n<pre>", title)
-	patterns := []repo.RepoPatterns{repo.PatternsOf(f.Repo)}
-	if named.Key != f.Repo.Key {
-		patterns = append(patterns, repo.PatternsOf(named))
-	}
+	patterns := repo.PatternsOf(f.Repo)
+	var entries []indexEntry
 	for _, c := range children {
 		// Children the caller may not see are left out; a folder shows when
 		// something below it is readable. So are children the patterns
-		// reject, the member's and the virtual repository's, as
-		// Artifactory's browsing leaves them out
-		// (TreeBrowsingCriteriaBuilder.applyRepoIncludeExclude,
-		// RepositoryBrowsingServiceImpl.virtualRepoAccepts).
-		if !acc.Item(f.Repo, c.FullPath(), c.Folder, accessapi.ActionRead) ||
-			!acceptedByAll(patterns, c.FullPath(), c.Folder) {
-			continue
-		}
-		href, text := url.PathEscape(c.Name), c.Name
-		if strings.Contains(href, ":") {
-			// A browser reads "sha256:<hex>/", a Docker digest folder, as a
-			// URL with the scheme sha256 (RFC 3986, 4.2); the dot segment
-			// keeps it relative.
-			href = "./" + href
-		}
-		if c.Folder {
-			href, text = href+"/", text+"/"
-		}
-		fmt.Fprintf(&b, "<a href=\"%s\">%s</a>\n", html.EscapeString(href), html.EscapeString(text))
-	}
-	b.WriteString("</pre></body></html>\n")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	if r.Method != http.MethodHead {
-		_, _ = io.WriteString(w, b.String())
-	}
-}
-
-// acceptedByAll reports whether every set of patterns accepts p.
-func acceptedByAll(patterns []repo.RepoPatterns, p string, folder bool) bool {
-	for _, pat := range patterns {
-		if !pat.Accepts(p, folder) {
-			return false
+		// reject, as Artifactory's browsing leaves them out
+		// (TreeBrowsingCriteriaBuilder.applyRepoIncludeExclude).
+		if acc.Item(f.Repo, c.FullPath(), c.Folder, accessapi.ActionRead) &&
+			patterns.Accepts(c.FullPath(), c.Folder) {
+			entries = append(entries, indexEntry{name: c.Name, folder: c.Folder})
 		}
 	}
-	return true
+	writeIndex(w, r, path.Join(f.Repo.Key, folder), entries)
 }
 
 // fileChecksumRoute reports whether the checksum request at p on c, a

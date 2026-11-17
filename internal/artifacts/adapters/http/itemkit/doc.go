@@ -168,8 +168,23 @@
 //     with "; Path: '<virtual>:<path>'"; a virtual repository with no
 //     member to search, or whose patterns reject the path, answers "No
 //     repository found to serve the request for <virtual>:<path>" with
-//     the same suffix. A folder request through it keeps ItemNotFound and
-//     httpkit.Denied.
+//     the same suffix. A folder request through it answers the folder
+//     index below.
+//   - A folder GET or HEAD through a virtual repository, its root
+//     included, answers the HTML index of every member's children
+//     (listVirtualFolder), as 7.161.26's RepositoryBrowsingServiceImpl.
+//     getVirtualRepoBrowsableChildrenData merges them (#1537). Each member
+//     whose folder the caller may read lists its stored children, a remote
+//     member its cache's and, when it lists remote folder items, its
+//     upstream's; the member's patterns and those of every virtual
+//     repository on the route (virtualRepoAccepts) filter them, and a
+//     Maven group virtual repository hides Maven index paths. A name
+//     several members hold shows once, a folder where any member's is one
+//     [I], and an upstream that fails to list leaves only that member's
+//     children out [I]. Where no member the caller may read holds the
+//     folder and no upstream lists it, the request keeps ItemNotFound, and
+//     httpkit.Denied when every member that could hold it refused the
+//     caller.
 //   - An overlay answers the same miss, refusal and mismatch on the item
 //     route (#1599), since 7.161.26's RepoFilter sends every GET and HEAD
 //     through DownloadServiceImpl whatever the package type: Missed,
@@ -274,8 +289,9 @@
 // split out as the item kit in P9d (WEB-06), which also narrowed its store
 // to Store (ART-22). P10 gave DeployTarget 7.x's answers for a virtual
 // repository and the item routes' PUT its own for a remote one (#1534),
-// and the walk through a virtual repository its remote members' upstream
-// steps (#1535).
+// the walk through a virtual repository its remote members' upstream
+// steps (#1535), and a virtual repository's folder index every member's
+// children (#1537).
 //
 // # Testing
 //
@@ -291,7 +307,9 @@
 // (remoteMissAnswer); remote_member_test.go a walk's upstream steps over
 // a fake remote source: each failure it passes over or answers, a found
 // file, a checksum and an archive (upstreamMiss, fileStep, archiveStep,
-// remoteArchive); redirect_test.go the signing-failure
+// remoteArchive); virtual_listing_test.go a virtual
+// repository's folder index, its merge, filters, misses and store faults;
+// redirect_test.go the signing-failure
 // throttle, the descriptor's minimum redirect size, the request copy
 // without the preconditions a download ignores, the request the download
 // reads, ServeContent, the checksum file's answers, the browser and
