@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,6 +25,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -40,11 +42,21 @@ type fixture struct {
 	blobs  blob.Store
 	// faults are the errors the router kit logged as unexpected.
 	faults []error
+	// logs holds what the router kit logged, its warnings for a virtual
+	// repository's failing member among them.
+	logs *bytes.Buffer
 }
 
 func newFixture(t *testing.T) *fixture { return newFixtureWithSource(t, nil) }
 
 func newFixtureWithSource(t *testing.T, remote *source.Service) *fixture {
+	t.Helper()
+	return newFixtureWithCache(t, remote, nil)
+}
+
+// newFixtureWithCache is newFixtureWithSource whose kit keeps merged
+// virtual metadata in cache (pkgroute.Options.Cache).
+func newFixtureWithCache(t *testing.T, remote *source.Service, cache *virtual.Cache) *fixture {
 	t.Helper()
 	db := inmem.New()
 	blobs, err := fs.New(t.TempDir())
@@ -61,10 +73,12 @@ func newFixtureWithSource(t *testing.T, remote *source.Service) *fixture {
 		}
 		return kernel.Principal{Name: name, Admin: name == "admin"}
 	}))
-	f := &fixture{t: t, db: db, items: items, blobs: blobs}
+	f := &fixture{t: t, db: db, items: items, blobs: blobs, logs: new(bytes.Buffer)}
 	opts := pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
-		Fault: func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
+		Logger: slog.New(slog.NewTextHandler(f.logs, nil)),
+		Cache:  cache,
+		Fault:  func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 		ItemError: func(_ context.Context, _ string, err error) error {
 			var reject *format.RejectionError
 			if errors.As(err, &reject) {
@@ -292,11 +306,16 @@ func TestAccComposerRefusalsAndVirtualAuthority(t *testing.T) {
 			t.Errorf("unexpected success %s", path)
 		}
 	}
-	// A caller who may read no member finds nothing: a package handler
-	// counts an unreadable member as not found and never answers 403
-	// (decision 0008, R3).
+	// A caller who may read no member finds no package: a package handler
+	// counts an unreadable member as not found and never answers 403 for a
+	// package's document (decision 0008, R3). packages.json, a document of
+	// the whole repository, asks the root gate instead (RequireRoot).
+	if got := f.requestAs("GET", base+"/packages.json", "ungranted"); got.Code != 403 ||
+		strings.TrimSpace(got.Body.String()) != `{"errors":[{"message":"Forbidden","status":403}]}` {
+		t.Fatalf("denied packages.json %d %s", got.Code, got.Body)
+	}
 	for _, path := range []string{
-		"/packages.json", "/p2/acme/widget.json",
+		"/p2/acme/widget.json",
 		"/dist/acme/widget/1.0.0.zip",
 	} {
 		if got := f.requestAs("GET", base+path, "ungranted"); got.Code != 404 ||

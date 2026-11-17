@@ -20,7 +20,8 @@ import (
 // 7.x's effective order (decision 0008, R1, R2). A member that is blacked
 // out, that the caller may read nothing in or may not read the release in,
 // whose read misses or is refused, or whose upstream fails or answers
-// what the registry cannot use is passed over (R3): no member answers the
+// what the registry cannot use is passed over (R3), a fault among them with
+// a warning in the log (pkgroute.Kit.WarnPassedOver) [I]: no member answers the
 // registry's not-found, never 403 or 502. 7.x keeps a release's metadata
 // and Package.swift in documents of its own (RTFACT-29202), whose path no
 // source names, so only the archive takes the virtual repository's
@@ -42,7 +43,9 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, q request) 
 // swiftfmt.Releases, each release at the virtual repository's URL.
 func (h handler) virtualReleases(w http.ResponseWriter, r *http.Request, p swiftfmt.Package) {
 	parts, err := pkgroute.Collect(h.k, r, "", func(mr *http.Request) ([]string, error) {
-		return h.memberVersions(mr, p)
+		versions, err := h.memberVersions(mr, p)
+		h.k.WarnPassedOver(mr, err)
+		return versions, err
 	})
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -135,6 +138,7 @@ func (h handler) remoteRelease(w http.ResponseWriter, mr *http.Request, q reques
 	if q.kind == "release" {
 		info, result, err := h.remoteInfo(mr, p)
 		if err != nil {
+			h.k.WarnPassedOver(mr, err)
 			return false, passedOver(err)
 		}
 		h.serveRemoteInfo(w, mr, p, info, result)
@@ -142,6 +146,7 @@ func (h handler) remoteRelease(w http.ResponseWriter, mr *http.Request, q reques
 	}
 	result, err := h.remoteManifest(mr, p)
 	if err != nil {
+		h.k.WarnPassedOver(mr, err)
 		return false, passedOver(err)
 	}
 	w.Header().Set("Content-Version", "1")
@@ -191,6 +196,7 @@ func (h handler) virtualArchive(w http.ResponseWriter, r *http.Request, p swiftf
 		}
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
 			result, err := h.remoteArchive(mr, p)
+			h.k.WarnPassedOver(mr, err)
 			if pkgroute.PassedOver(err) {
 				continue
 			}

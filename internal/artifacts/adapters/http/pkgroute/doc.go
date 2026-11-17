@@ -243,7 +243,10 @@
 // merged metadata cache's (Merged;
 // https://github.com/weaveplatform/artifactweave/issues/1543), and the
 // root gate and the warning for a failing member
-// (https://github.com/weaveplatform/artifactweave/issues/1538), and
+// (https://github.com/weaveplatform/artifactweave/issues/1538), which
+// Bower, CocoaPods, Composer and Swift now ask too, with Composer's p2
+// metadata kept through Merged
+// (https://github.com/weaveplatform/artifactweave/issues/1652); and
 // ItemKit and Bind for the item routes' virtual indexes
 // (https://github.com/weaveplatform/artifactweave/issues/1551).
 //

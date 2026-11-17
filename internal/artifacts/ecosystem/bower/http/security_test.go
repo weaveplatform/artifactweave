@@ -507,3 +507,35 @@ func TestUnitBowerArchiveEnforcesGlobalPAXPolicy(t *testing.T) {
 		})
 	}
 }
+
+// The package list and search are documents of the whole repository, so a
+// virtual repository asks its root gate before it lists (pkgroute.Kit.
+// RequireRoot): a caller who may read the root of no member is refused, as
+// gems' indexes and the LuaRocks manifest are, and one who may read a
+// member is served (decision 0008, R3; AuthorizationServiceBase.
+// computeUserHasPermissionsOnRepositoryRoot 1047-1078, 7.161.26).
+func TestUnitBowerVirtualCatalogAsksTheRootGate(t *testing.T) {
+	f := newFixture(t)
+	local := f.repo("bower-local", repo.Local)
+	_ = f.repo("bower-virtual", repo.Virtual, local.Key)
+	f.deploy(local, "hello", "1.0.0", "bower.json", `{"name":"hello","version":"1.0.0"}`)
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "bower-member",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"member": api.ActionRead}},
+			Targets: map[string]accesstest.Target{local.Key: {}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"packages", "packages/search/hel"} {
+		r := f.get("/artifactory/api/bower/bower-virtual/"+path, "nobody")
+		if r.Code != http.StatusForbidden || strings.TrimSpace(r.Body.String()) != `{"errors":[{"message":"Forbidden","status":403}]}` {
+			t.Fatalf("%s for a caller who reads no member = %d %s", path, r.Code, r.Body)
+		}
+		r = f.get("/artifactory/api/bower/bower-virtual/"+path, "member")
+		if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), `"name":"hello"`) {
+			t.Fatalf("%s for a member reader = %d %s", path, r.Code, r.Body)
+		}
+	}
+}

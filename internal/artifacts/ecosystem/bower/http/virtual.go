@@ -19,7 +19,8 @@ import (
 // virtual repositories flattened, cycles and duplicates skipped, each member
 // in 7.x's effective order, and a member that is blacked out, that the
 // caller may read nothing in, or whose read misses or whose upstream fails
-// passed over (decision 0008, R1 to R3). Bower keeps none of this metadata
+// passed over (decision 0008, R1 to R3), a fault among them with a warning
+// in the log (pkgroute.Kit.WarnPassedOver) [I]. Bower keeps none of this metadata
 // at a documented path, so no path of it takes the members' patterns.
 // Each member decides Read on its own rows: a virtual repository has no
 // permission target of its own (decision 0008, R10).
@@ -29,7 +30,9 @@ import (
 // that member.
 func (h handler) virtualListed(r *http.Request, query string) ([]string, error) {
 	parts, err := pkgroute.Collect(h.k, r, "", func(mr *http.Request) ([]string, error) {
-		return h.listed(mr, query, false)
+		names, err := h.listed(mr, query, false)
+		h.k.WarnPassedOver(mr, err)
+		return names, err
 	})
 	if err != nil {
 		return nil, err //nolint:wrapcheck // the kit's answer or a member's fault, as it is
@@ -42,7 +45,9 @@ func (h handler) virtualListed(r *http.Request, query string) ([]string, error) 
 // there, in the walk's order.
 func (h handler) virtualVersions(r *http.Request, name string) ([]string, error) {
 	parts, err := pkgroute.Collect(h.k, r, "", func(mr *http.Request) ([]string, error) {
-		return h.versions(mr, name)
+		vs, err := h.versions(mr, name)
+		h.k.WarnPassedOver(mr, err)
+		return vs, err
 	})
 	if err != nil {
 		return nil, err //nolint:wrapcheck // the kit's answer or a member's fault, as it is
@@ -87,6 +92,7 @@ func (h handler) virtualBinary(w http.ResponseWriter, r *http.Request, name, ver
 			continue
 		}
 		vs, err := h.versions(mr, name)
+		h.k.WarnPassedOver(mr, err)
 		switch {
 		case err != nil && pkgroute.PassedOver(err):
 			continue

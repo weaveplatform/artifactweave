@@ -15,7 +15,7 @@
   "internal/artifacts/ecosystem/huggingface/http/migration_test.go": "09531c49d7d12e0e80d7a1ee397671e203a1b9a61034619edb6a8c51890c604a",
   "internal/artifacts/ecosystem/swift/http/problem_test.go": "269ff4c61c236f65447a6667b79d9e6ede5be15e11904ee6e7f133d307f2cc87",
   "internal/artifacts/ecosystem/swift/http/remote_test.go": "c3194e4425b5034b44bf134ba6b859e3dc436d75924a13b64c86a0ce19c8faf1",
-  "internal/artifacts/ecosystem/swift/http/swift_test.go": "06575ba79dfe73a81cf08e8c29f8cfead3a9216e5c532f600be5fd00fd91843b",
+  "internal/artifacts/ecosystem/swift/http/swift_test.go": "33fb28436ba5d217f0d37f8cecebdbf79d21ff99ee7bf181a03d403ccb9e7b40",
   "internal/artifacts/ecosystem/vcs/http/archive_git_test.go": "e2abf637236dfd09bb3be506d34c5679b6d1cdf71a1f010d3864a283c41081e5",
   "internal/artifacts/ecosystem/vcs/http/testdata/git-archives.json": "14daa762e7d6755f087b523a619f930d19217addd34269175ecc2b7db5271aba",
   "test/acceptance/alpine_steps_test.go": "c6ff98ca3a15ce1bbd8c1bb0c1f4eb6064c4722102071cd1a4a018dc86d1c9a1",
