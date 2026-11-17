@@ -264,6 +264,8 @@ func Walk(
 // first refusal for the answer (R3; ArtifactoryVirtualDownloadStrategy.
 // processStandard 209-260, checkIfForbidden 436-442).
 type Resolution struct {
+	// Missing is the format's miss reason; empty retains the standard answer.
+	Missing   string
 	Found     bool
 	Forbidden *Denial
 }
@@ -320,7 +322,11 @@ func Answer(v repo.Config, path string, r Resolution, anonymous, hideGlobal bool
 	d := r.Forbidden
 	switch {
 	case d == nil:
-		return apierror.New(http.StatusNotFound, "Could not find resource"+suffix)
+		reason := r.Missing
+		if reason == "" {
+			reason = "Could not find resource"
+		}
+		return apierror.New(http.StatusNotFound, reason+suffix)
 	case hideGlobal || v.HideUnauthorizedResources != nil && *v.HideUnauthorizedResources:
 		return apierror.New(http.StatusNotFound, "Resource not found"+suffix)
 	case anonymous:

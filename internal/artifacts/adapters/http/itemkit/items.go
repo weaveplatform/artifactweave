@@ -355,10 +355,11 @@ type resolver func(ctx context.Context, c repo.Config, d format.Download) (strin
 // download checks (generic.CheckDownload) against the path and folder it
 // checks, and the format's rewrite of the path.
 type Download struct {
-	path     string
-	isFolder bool
-	matrix   model.Matrix
-	resolve  resolver
+	path          string
+	isFolder      bool
+	matrix        model.Matrix
+	resolve       resolver
+	selectVirtual func(context.Context, repo.Config, string) (*format.VirtualSelection, error)
 	// trace records the steps of a ?trace request (traceItem); nil for a
 	// download.
 	trace *resolutionTrace
@@ -516,6 +517,15 @@ func lookupMembers(
 			"unfound resource")
 		return Found{}, format.Rejectf(http.StatusNotFound,
 			"No repository found to serve the request for %s:%s", c.Key, dl.path)
+	}
+	if dl.selectVirtual != nil && !dl.isFolder {
+		selection, err := dl.selectVirtual(ctx, c, dl.path)
+		if err != nil {
+			return Found{}, fmt.Errorf("virtual selection: %w", err)
+		}
+		if selection != nil {
+			return lookupSelected(ctx, st, members, p, acc, dl, selection)
+		}
 	}
 	var res virtual.Resolution
 	var closest *Found
@@ -826,6 +836,7 @@ func (s *Kit) getItem(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
+	dl.selectVirtual = s.Items(st).SelectVirtual
 	lookupRequest, _ := pomLookupRequest(ctx, r, c, req)
 	dl.upstream = s.walkStep(lookupRequest, req, p, acc)
 	if req.Path == "" {

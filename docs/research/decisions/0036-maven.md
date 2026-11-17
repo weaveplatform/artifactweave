@@ -357,7 +357,7 @@ The local behavior in this ADR is unchanged.
   come from 6.20 only and are on #216.
 - Without the 60-second quiet period, a job that falls while a build is being deployed counts
   the files of it already stored; the floor of two keeps the build before it.
-- Remote retrieval is implemented by #625; cross-member Maven snapshot/token resolution remains P10 (decision [0008](0008-virtual-repositories.md)).
+- Remote retrieval is implemented by #625; P10 MVN-02 adds cross-member Maven snapshot/token resolution below (decision [0008](0008-virtual-repositories.md)).
 
 ## Owned follow-up
 
@@ -522,3 +522,70 @@ its passing continuation verifies HEAD, conditional GET, checksum headers and
 all three merged sidecars. Additional unit and route checks cover timestamps,
 plugins, snapshot gates, malformed members, priority, indexer bypass, exact
 misses, permission fall-through and hidden denials.
+
+
+## P10 cross-member snapshot and token selection (MVN-02)
+
+The item lookup asks the requested format for a `VirtualSelection` before choosing
+a member result. Maven, Gradle, Ivy and sbt share Maven's policy. Ordinary paths
+retain the existing first-hit walk; the storage API still reads paths as given.
+The engine owns permission/pattern checks, member resolution, first-denial memory,
+remote retrieval and stream lifetimes. Maven owns the comparison and trace reasons.
+Unused transient bodies close immediately, including on later lookup/comparison
+errors; only delivery records a download.
+
+The original virtual layout decides the rule, exactly as 7.161.26's
+`ArtifactoryVirtualDownloadStrategy.getInfoFromSearchableRepositories` (157–193):
+`integration || (!valid && (MavenSnapshot || INTEGRATION))` selects snapshots;
+otherwise a `[RELEASE]` path selects the release rule. A valid non-integration
+module keeps first-hit behavior even if its path contains `[INTEGRATION]`.
+`RepoBase.getItemModuleInfo` uses ordinary module parsing, without the version-token
+parser used by each member's resolver. Thus the no-match fallback matters for mixed
+layouts; it must not be replaced by a blanket token or `-SNAPSHOT` check.
+
+Snapshot selection skips members that do not handle snapshots and bypasses standalone
+remote cache steps. The remote's own policy
+chooses its cached, refreshed or transient result. Originated requests retain their R7 restriction: no upstream steps. Standalone
+remote caches remain excluded by the snapshot rule, leaving only local candidates. A unique exact snapshot ends the walk;
+otherwise the first candidate, the first exact match over a non-exact candidate,
+or a strictly later last-modified time becomes the winner. A newer non-exact
+candidate can replace an exact candidate. Ties retain the current winner.
+
+Release selection skips release-disabled members when the original module info is
+valid, then chooses the first candidate, the first exact match, or a higher
+`baseRev`/`fileItegRev` under the existing Mercury comparator. Both rules stop at
+the first non-priority member once a priority member supplied the winner. Per-member
+`Resolve`, source policy, headers, checksums and filename contracts remain in force.
+A trace records the actual walk and comparison decisions.
+
+No candidate returns the first member's denial (including hidden/anonymous forms),
+or a snapshot 404 `Artifact not found: <path>` and the existing release 404
+`Could not find resource`, each with the requested virtual path suffix.
+**[I], #216/P19:** the source's cached-miss date suffix has no corresponding resource
+in the shared negative cache and is omitted. In 7.161.26's snapshot loop, `latestRes`
+is assigned only a found resource, so the later non-found suffix condition is also
+unreachable in that implementation. No trial/live Artifactory capture was used.
+
+Primary evidence is the verified official
+[7.161.26 OSS source archive](https://releases.jfrog.io/artifactory/bintray-artifactory/org/artifactory/oss/jfrog-artifactory-oss/7.161.26/jfrog-artifactory-oss-7.161.26-sources.tar.gz),
+SHA-256 `b867422f3137c542b402c38a2ca2584396ef431b691ca70f038ff5cc3768802c`:
+`ArtifactoryVirtualDownloadStrategy` (274–422), `RepoBase` (132–167),
+`ModuleInfoUtils` (76–94), and the existing `LocalLatestVersionResolver.compareLatest`.
+
+The same router probe on main `dbd75b7f7` and MVN-02 produces:
+
+| Request over two members | Main | MVN-02 |
+|---|---|---|
+| `[RELEASE]`, first 1.0 / second 2.0 | 200, first 1.0 | 200, second 2.0 |
+| Non-unique snapshot, second modified later | 200, first build | 200, second build |
+| Unique snapshot held only in second | 200, second build | Same 200 and bytes |
+| `[INTEGRATION]`, original layout does not match | 200, first build | 200, second/later-modified build |
+| Missing snapshot | 404, `Could not find resource` | 404, `Artifact not found: <path>` |
+| Missing release token | 404, `Could not find resource` | Same 404 and reason |
+| Plain release held in both | 200, first member | Same 200 and bytes |
+
+Unit and controlled-upstream server tests cover numeric Mercury ordering, exact vs
+newer choices, ties, priority boundaries, member release/snapshot policies, mixed
+virtual/member layouts, denials, both remote storage modes, remote metadata,
+origin restrictions, GET/HEAD/checksums, trace decisions and losing-stream cleanup.
+Path translation remains MVN-06; native Maven/Gradle qualification remains MVN-04.

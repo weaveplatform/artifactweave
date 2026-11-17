@@ -172,7 +172,8 @@
       "remote_matrix_test.go",
       "remote_member_test.go",
       "virtual_listing_test.go",
-      "virtual_read_test.go"
+      "virtual_read_test.go",
+      "virtual_selection_test.go"
     ],
     "internal/configuration/adapters/http": [
       "descriptor_test.go",

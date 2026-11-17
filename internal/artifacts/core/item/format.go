@@ -347,3 +347,11 @@ func (s *Service) ReindexPath(ctx context.Context, c repo.Config, path string) e
 	}
 	return s.Reindex(ctx, c)
 }
+
+// SelectVirtual obtains the requested format's cross-member download policy.
+func (s *Service) SelectVirtual(ctx context.Context, c repo.Config, path string) (*format.VirtualSelection, error) {
+	if h, ok := s.format(c.PackageType).(format.VirtualSelector); ok {
+		return h.SelectVirtual(ctx, s.env(), c, path) //nolint:wrapcheck // the format owns the selection error
+	}
+	return nil, nil //nolint:nilnil // no selector keeps the ordinary first-hit walk
+}

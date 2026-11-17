@@ -144,7 +144,9 @@
 // Implemented P7, with remote retrieval in P9. Moved here in P9d. P10
 // virtual.go implements POM repository-reference cleanup, called before an
 // item route returns a Maven-family or generic virtual POM. Roadmap:
-// MVN-01 adds the Merger of virtual maven-metadata.xml.
+// MVN-01 adds the Merger of virtual maven-metadata.xml. MVN-02 supplies the
+// format hook for cross-member snapshot and release-token selection, retaining
+// the original virtual layout's mode decision and the member resolver contracts.
 //
 // # Testing
 //
