@@ -464,8 +464,8 @@ func TestAccRepositoriesAndPaths(t *testing.T) {
 			"",
 			base + "go-virtual/" + lib + "/@v/list",
 			"reader",
-			501,
-			"is a virtual repository",
+			200,
+			"v1.0.0",
 		},
 		{
 			"other type",

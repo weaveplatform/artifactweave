@@ -45,21 +45,45 @@ escaped identities, exact bytes/digests, pseudo-versions, mutable metadata, immu
 files, negative TTL, 404/410 versus failure, private credentials, repository
 isolation, permission and credential fencing, cancellation, interrupted/invalid
 content and warm/offline reads. The existing
-`internal/artifacts/ecosystem/golang/http` class-gate test continues to require 501
-for a direct native remote or virtual route. P9 source completion does not open those
-routes.
+`internal/artifacts/ecosystem/golang/http` class gate retains 501 for direct remote
+reads and virtual PUT. GOV-01 registers the remote source only for virtual member
+reads and unions local/federated lists with authoritative upstream lists. Duplicate
+versions keep the first member's line; list ordering and cross-member latest selection
+are inferred cases for #216/P19. Member faults that the shared package walk passes over
+are logged with their type and produce the virtual's 404 when no member serves it.
 
-P10 must wire this source into a Go virtual repository over local and remote members,
-then prove native `go mod download` and `go build` with an empty client cache. The proof
-must include mixed local/remote dependencies, case escaping and pseudo-versions,
-private credentials, warm/offline resolution and failure handling. Configure GOPROXY
-only to artifactweave and show there is no direct/public fallback or VCS contact.
-Publishing through the virtual's default local repository remains a separate P10 exit.
+`test/acceptance/features/go.feature` now proves native `go mod download` and
+`go build` through a virtual with an empty client cache, mixed local and private remote
+dependencies, case escaping and a pseudo-version. After stopping the upstream and
+clearing the client's module cache, the build succeeds from the remote cache. GOPROXY
+names only artifactweave; no direct/public proxy or VCS fallback is configured.
+`test/server/artifacts/golang/virtual_test.go` covers merged versions, latest, duplicate
+precedence, missing modules/versions and the direct-remote, virtual-PUT and sumdb guards.
+Publishing through the virtual's default local repository remains GOV-02.
 
 Sumdb proxying and VCS-backed Go remotes remain P28 capabilities, with VCS machinery
 shared with P33. Disabling checksum verification in an isolated private-module fixture
-cannot qualify sumdb. Native virtual-client evidence remains pending until P10.
+cannot qualify sumdb. The virtual-client evidence above qualifies GOV-01 reads.
 
 These tests prove artifactweave source behavior. Exact Artifactory response envelopes,
 `.info` freshness and cache/permission behavior remain inferred comparison cases for
 #216/P19; ADR0035 retains its existing status.
+
+## GOV-01 before/after evidence
+
+The same router probes ran on main `dcd46bf91` and the GOV-01 branch against
+controlled members (no Artifactory instance). Native commands used the isolated
+scenario's `GONOSUMDB=*`, `GOTOOLCHAIN=local`, `GOFLAGS=-modcacherw` and fresh caches.
+
+| Request through the Go API | Main | GOV-01 |
+|---|---|---|
+| Virtual list, latest, version info/mod/zip | 501 | 200 |
+| Virtual missing module / missing version | 501 | 404 with module/version text |
+| Direct remote read | 501 | 501, same body |
+| Virtual PUT | 501 | 501, same body |
+| Virtual sumdb probe | 404 | 404 |
+
+`@go_virtual` passes `go mod download`, `go build -mod=mod .`, then
+`go clean -modcache` and another build with the private upstream stopped. Its ZIP
+request count remains one across both builds. This establishes native virtual read
+resolution; exact 7.x comparisons remain the inferred cases above.

@@ -368,3 +368,58 @@ Feature: Go module repositories answer the GOPROXY protocol
     When I GET "/artifactory/api/go/go-local/example.com/acme/greet/@v/list" as admin
     Then the response body contains "v1.0.0 20"
     And the response body does not contain "v1.1.0"
+
+  @go @go_virtual
+  Scenario: A cold Go build resolves local and private remote modules through one virtual
+    Given the Go toolchain is available
+    And a Go module "example.com/acme/local" at "v1.0.0" laid out as a module proxy under "local-proxy"
+    When I deploy the files under "local-proxy" to "/artifactory/go-local/" as admin
+    Then the response status is 201
+    Given a private Go upstream serves module "example.com/Team/Remote" at "v0.0.0-20261016120000-abcdefabcdef"
+    When I PUT "/artifactory/api/repositories/go-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"go","url":"{upstream}","username":"go-upstream","password":"upstream-pass"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/go-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"go","repositories":["go-local","go-remote"]}
+      """
+    Then the response status is 200
+    Given the registry is fronted by TLS
+    And the Go proxy is "{tlsauthurl}/api/go/go-virtual"
+    And a file "app/go.mod" with content:
+      """
+      module example.com/app
+
+      go 1.22
+
+      require (
+        example.com/acme/local v1.0.0
+        example.com/Team/Remote v0.0.0-20261016120000-abcdefabcdef
+      )
+      """
+    And a file "app/main.go" with content:
+      """
+      package main
+
+      import (
+        "fmt"
+        local "example.com/acme/local"
+        remote "example.com/Team/Remote"
+      )
+
+      func main() { fmt.Println(local.Greeting, remote.Greeting) }
+      """
+    When I run go "mod download" in "app"
+    Then the command succeeds
+    When I run go "build -mod=mod ." in "app"
+    Then the command succeeds
+    And the generic upstream received 1 GET requests for "/example.com/!team/!remote/@v/v0.0.0-20261016120000-abcdefabcdef.zip"
+    When the generic upstream stops
+    And I run go "clean -modcache"
+    Then the command succeeds
+    When I run go "build -mod=mod ." in "app"
+    Then the command succeeds
+    And the generic upstream received 1 GET requests for "/example.com/!team/!remote/@v/v0.0.0-20261016120000-abcdefabcdef.zip"
+    And the server answered no request with 500 since the last command

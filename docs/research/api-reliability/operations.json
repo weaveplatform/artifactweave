@@ -21387,7 +21387,7 @@
   {
     "route": "PUT /artifactory/api/go/{repoKey}/*",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
-    "handler": "internal/app/router.go: internal/artifacts/ecosystem/golang/http.publisher.publish-fm",
+    "handler": "internal/artifacts/ecosystem/golang/http/golang.go: internal/artifacts/ecosystem/golang/http.Protocol.func1.1",
     "review_family": "native-go",
     "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
     "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",

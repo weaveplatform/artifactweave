@@ -62,7 +62,7 @@ jf gp v1.0.0
 
 ## Install or resolve
 
-Classes: **local**. Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.
+Classes: **local, virtual**. Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.
 
 ```sh
 go mod download -json example.com/acme/greet@v1.0.0
@@ -74,8 +74,8 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - No comma/direct GOPROXY fallback is configured, so a public origin cannot silently satisfy this check.
 - The registry does not implement a public checksum database. Keep public checksum verification enabled and scope GONOSUMDB narrowly to private namespaces.
-- The catalog also registers virtual/federated classes, but this recipe only advertises classes with matching native-client evidence. Registered configuration support alone is not a native recipe qualification; remaining virtual/federated proof belongs to the follow-on phase.
-- The Go upstream source implementation is below HTTP routing. Native Go virtual resolution remains the explicit P10 handoff in docs/implementation/go-upstream-source.md.
+- Read through a virtual Go repository over local, federated and administrator-configured remote members. Direct remote Go routes and publication through a virtual still answer 501; virtual publication is GOV-02.
+- Sumdb proxying and VCS-backed resolution belong to P28. This recipe does not qualify federated multi-node behavior.
 
 ## Verification sources
 
@@ -86,3 +86,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/go.feature](../../test/acceptance/features/go.feature).
 - Evidence: [test/acceptance/client_steps_test.go](../../test/acceptance/client_steps_test.go).
 - Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).
+- Evidence: [test/acceptance/go_virtual_steps_test.go](../../test/acceptance/go_virtual_steps_test.go).
