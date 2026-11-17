@@ -19,9 +19,14 @@ import (
 )
 
 func (h handler) upload(w http.ResponseWriter, r *http.Request) {
-	if h.virtualWrite(w, r) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualUpload(w, r)
 		return
 	}
+	h.uploadTo(w, r, nil)
+}
+
+func (h handler) uploadTo(w http.ResponseWriter, r *http.Request, via *repo.Config) {
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.k.Error(
 			w,
@@ -41,7 +46,11 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	if !h.k.RequireFolder(w, r, "", api.ActionWrite) {
+	if via != nil {
+		if !h.virtualDeployAllowed(w, r, *via, "", true) {
+			return
+		}
+	} else if !h.k.RequireFolder(w, r, "", api.ActionWrite) {
 		return
 	}
 	form, err := h.k.ReadForm(r, "content")
@@ -74,12 +83,19 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request) {
 		form.File,
 		declared,
 		func(inspected any) (string, error) {
-			return pypifmt.UploadPath(
+			path, err := pypifmt.UploadPath(
 				inspected,
 				pkgroute.RequestFrom(r).Repo,
 				form.Fields.Get("name"),
 				form.Fields.Get("version"),
 			)
+			if err != nil {
+				return "", fmt.Errorf("pypi upload path: %w", err)
+			}
+			if via != nil && !h.k.Can(r, path, api.ActionWrite) {
+				return "", virtualDeployRefusal(r, *via, path)
+			}
+			return path, nil
 		},
 	)
 	if err != nil {
@@ -92,7 +108,8 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request) {
 // put is REST deployment through the package API, including matrix properties.
 // The item service applies the same format admission as ordinary item routes.
 func (h handler) put(w http.ResponseWriter, r *http.Request) {
-	if h.virtualWrite(w, r) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualPut(w, r)
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {

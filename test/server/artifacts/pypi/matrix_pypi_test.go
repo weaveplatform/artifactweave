@@ -77,7 +77,11 @@ var pypiMatrixPart = matrixPart{
 			}
 			rows = append(rows, r)
 		}
-		rows = append(rows, row(pypiUpload, pypiBase+"pypi-virtual", pypiUploadBody("work"), anyone, 501))
+		rows = append(
+			rows,
+			row(pypiUpload, pypiBase+"pypi-virtual", pypiUploadBody("work"), holds("pypi-local", "work/1.0/work-1.0-py3-none-any.whl", api.ActionWrite), 200).alone(),
+			row(pypiPut, pypiBase+"pypi-virtual/work/{p}.txt", "file", holds("pypi-local", "work/file.txt", api.ActionWrite), 201),
+		)
 		return rows
 	},
 }

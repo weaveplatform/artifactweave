@@ -211,7 +211,7 @@ func pypiUploadStatusRows() []statusCase {
 		{pypiUpload, local, "anonymous", body, 401},
 		{pypiUpload, local, "", body, 401},
 		{pypiUpload, pypiBase + "pypi-remote", "admin", body, 501},
-		{pypiUpload, pypiBase + "pypi-virtual", "admin", body, 501},
+		{pypiUpload, pypiBase + "pypi-virtual", "admin", body, 200},
 		{pypiUpload, local, "admin", "xml", 415},
 		{pypiUploadFolder, local + "/folder", "admin", body, 405},
 		{pypiUploadFolder, local + "/simple/", "admin", body, 405},
