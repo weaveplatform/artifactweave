@@ -74,7 +74,7 @@ func (h handler) memberVersions(mr *http.Request, p swiftfmt.Package) ([]string,
 	// serving would run (fence) runs here.
 	if result.Revalidate != nil {
 		if err := result.Revalidate(mr.Context()); err != nil {
-			return nil, pkgroute.SourceError(err, false)
+			return nil, pkgroute.SourceError(err, false) //nolint:wrapcheck // the protocol's answer, which the walk passes over
 		}
 	}
 	if result.Used != nil {

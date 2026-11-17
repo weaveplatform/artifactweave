@@ -247,3 +247,31 @@ func TestUnitBowerVirtualResolvesThroughTheSharedWalk(t *testing.T) {
 		}
 	}
 }
+
+// A member the caller may not read a version's manifest in is passed over
+// for the next member that holds the version (decision 0008, R3 and R10).
+func TestUnitBowerVirtualPassesOverAMemberThatHidesTheVersion(t *testing.T) {
+	f := newFixture(t)
+	a, b := f.repo("bower-a", repo.Local), f.repo("bower-b", repo.Local)
+	for _, c := range []repo.Config{a, b} {
+		f.deploy(c, "hello", "1.0.0", "bower.json", `{"name":"hello","version":"1.0.0"}`)
+		f.deploy(c, "hello", "1.0.0", "lib/index.js", "from-"+c.Key)
+	}
+	_ = f.repo("bower-v", repo.Virtual, a.Key, b.Key)
+	if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "partial",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"partial": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
+				a.Key: {Include: []string{"hello/2.0.0/**"}},
+				b.Key: {},
+			},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rec := f.get("/artifactory/api/bower/bower-v/binaries/bower-v/hello.git/v1.0.0", "partial")
+	if rec.Code != http.StatusOK || archivedIndex(t, rec) != "from-bower-b" {
+		t.Fatalf("archive past a member that hides the version: %d %s", rec.Code, rec.Body)
+	}
+}

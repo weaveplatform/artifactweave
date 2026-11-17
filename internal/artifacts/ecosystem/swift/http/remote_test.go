@@ -246,6 +246,61 @@ func TestUnitSwiftVirtualResolvesThroughTheSharedWalk(t *testing.T) {
 		http.StatusNotFound, "Swift package identifier mapping not found")
 }
 
+// A member the caller may read nothing of the package in, or not the
+// release's archive in, is passed over for the next member, and a remote
+// member whose Package.swift fails upstream is passed over like a miss
+// (decision 0008, R3 and R10).
+func TestUnitSwiftVirtualPassesOverMembersThatDoNotServeTheRelease(t *testing.T) {
+	f := newRemoteFixture(t)
+	remoteZIP := f.seed(t, "correct")
+	f.up.Set("/swift/acme/Widget/1.0.0/Package.swift",
+		fakeupstream.Resource{Status: http.StatusServiceUnavailable})
+	for _, c := range []repo.Config{
+		{Key: "local", Class: repo.Local},
+		{Key: "virtual", Class: repo.Virtual, Repositories: []string{"local", "packages"}},
+		{Key: "upstream-only", Class: repo.Virtual, Repositories: []string{"packages"}},
+	} {
+		c.PackageType = repo.Swift
+		if err := f.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.publish("local", "1.0.0", archive(t, "LocalWidget/"))
+	f.publish("local", "3.0.0", archive(t, "LocalWidget/"))
+	// Deploy/Cache on the remote lets a cold read fill its cache (#1587).
+	for user, local := range map[string]string{
+		"elsewhere": "acme/Other/**",
+		"archive":   "acme/Widget/Widget-3.0.0.zip",
+	} {
+		if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+			Name: user,
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{
+					user: api.ActionRead | api.ActionWrite,
+				}},
+				Targets: map[string]accesstest.Target{
+					"local":    {Include: []string{local}},
+					"packages": {},
+				},
+			}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const v = "/artifactory/api/swift/virtual/acme/Widget"
+	wantReleases(t, f.do(http.MethodGet, v, nil, "", "elsewhere"), "1.0.0", "2.0.0")
+	wantOK(t, f.do(http.MethodGet, v+"/1.0.0", nil, "", "archive"), remoteChecksum(remoteZIP))
+	rec := f.do(http.MethodGet, v+"/1.0.0.zip", nil, "", "archive")
+	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), remoteZIP) {
+		t.Fatalf("archive past a member that hides it: %d %s", rec.Code, rec.Body)
+	}
+	wantProblem(t, f.do(http.MethodGet,
+		"/artifactory/api/swift/upstream-only/acme/Widget/1.0.0/Package.swift", nil, "", "admin"),
+		http.StatusNotFound, "Swift release not found")
+}
+
+func remoteChecksum(zip []byte) string { return fmt.Sprintf("%x", sha256.Sum256(zip)) }
+
 // swift package-registry publish to a virtual repository lands in its
 // default deployment repository; without one the answer is 7.x's 405 with
 // Allow: GET (decision 0008, R6).

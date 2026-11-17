@@ -295,8 +295,10 @@ func TestAccComposerRefusalsAndVirtualAuthority(t *testing.T) {
 	// A caller who may read no member finds nothing: a package handler
 	// counts an unreadable member as not found and never answers 403
 	// (decision 0008, R3).
-	for _, path := range []string{"/packages.json", "/p2/acme/widget.json",
-		"/dist/acme/widget/1.0.0.zip"} {
+	for _, path := range []string{
+		"/packages.json", "/p2/acme/widget.json",
+		"/dist/acme/widget/1.0.0.zip",
+	} {
 		if got := f.requestAs("GET", base+path, "ungranted"); got.Code != 404 ||
 			!strings.Contains(got.Body.String(), "Composer package not found") {
 			t.Fatalf("denied %s %d %s", path, got.Code, got.Body)
@@ -557,5 +559,62 @@ func TestAccComposerVirtualResolvesThroughTheSharedWalk(t *testing.T) {
 	if got := f.requestAs("GET", base+"/dist/acme/widget/2.0.0.zip", "member"); got.Code != 404 ||
 		!strings.Contains(got.Body.String(), "Composer package not found") {
 		t.Fatalf("member dist of the unreadable remote's version: %d %s", got.Code, got.Body)
+	}
+}
+
+// A member the caller may read only another package in, and a member that
+// lacks the package, are passed over: the p2 metadata and the dist come
+// from the next member that lists the version (decision 0008, R3 and R10).
+func TestAccComposerVirtualPassesOverMembersWithoutThePackage(t *testing.T) {
+	fromRemote := makeZIP(t, "2.0.0", "remote")
+	b := &sourceBackend{content: map[string][]byte{
+		"packages.json": []byte(`{"packages":{},"metadata-url":"/p2/%package%.json"}`),
+		"p2/acme/widget.json": []byte(fmt.Sprintf(`{"packages":{"acme/widget":[`+
+			`{"name":"acme/widget","version":"2.0.0","dist":{"type":"zip","url":"https://up.example/b.zip","shasum":"%s"}}]}}`,
+			sha1Hex(fromRemote))),
+		"acme/widget/2.0.0.zip": fromRemote,
+	}}
+	f := newFixtureWithSource(t, &source.Service{
+		HTTP: b, Cache: b,
+		Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
+			return artmodel.SourceIdentity{
+				Kind: artmodel.ExternalHTTP, Repository: "remote", ID: "source", Generation: "1",
+			}, nil
+		},
+	})
+	rc := f.create("remote", repo.Remote)
+	rc.URL, rc.ComposerRegistryURL = "https://up.example", "https://up.example"
+	if err := f.db.Repos().Update(context.Background(), rc); err != nil {
+		t.Fatal(err)
+	}
+	fromLocal := f.deploy(f.create("local", repo.Local), "1.0.0", "local")
+	f.create("all", repo.Virtual, "local", "remote")
+	if err := f.db.Permissions().Create(context.Background(), accesstest.Permission{
+		Name: "elsewhere",
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{"elsewhere": api.ActionRead}},
+			Targets: map[string]accesstest.Target{
+				"local":  {Include: []string{"acme/other/**"}},
+				"remote": {},
+			},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const base = "/artifactory/api/composer/all"
+	got := f.requestAs("GET", base+"/p2/acme/widget.json", "elsewhere")
+	if got.Code != 200 || !strings.Contains(got.Body.String(), sha1Hex(fromRemote)) ||
+		strings.Contains(got.Body.String(), sha1Hex(fromLocal)) {
+		t.Fatalf("p2 past a member the caller may not read the package in: %d %s", got.Code, got.Body)
+	}
+	if got := f.requestAs("GET", base+"/dist/acme/widget/2.0.0.zip", "elsewhere"); got.Code != 200 ||
+		!bytes.Equal(got.Body.Bytes(), fromRemote) {
+		t.Fatalf("dist past a member the caller may not read the package in: %d %s", got.Code, got.Body)
+	}
+	for _, path := range []string{"/p2/acme/missing.json", "/dist/acme/missing/1.0.0.zip"} {
+		if got := f.request("GET", base+path); got.Code != 404 ||
+			!strings.Contains(got.Body.String(), "Composer package not found") {
+			t.Fatalf("a package no member holds, %s: %d %s", path, got.Code, got.Body)
+		}
 	}
 }

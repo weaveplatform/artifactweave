@@ -969,4 +969,15 @@ func TestUnitVirtualResolvesThroughTheSharedWalk(t *testing.T) {
 			t.Fatalf("%s missing spec: %d %s", user, rec.Code, rec.Body)
 		}
 	}
+	// A caller who may read no member, and a hosted archive's path without
+	// its packages/ prefix, get the CDN's not-found (R3).
+	for user, path := range map[string]string{
+		"nobody": "CocoaPods-version.yml",
+		"admin":  "LocalPod/1.0.0/LocalPod-1.0.0.tar.gz",
+	} {
+		if rec := f.getAs(user, "pods-virtual", path); rec.Code != http.StatusNotFound ||
+			!strings.Contains(rec.Body.String(), "CocoaPods resource not found") {
+			t.Fatalf("%s %s: %d %s", user, path, rec.Code, rec.Body)
+		}
+	}
 }

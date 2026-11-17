@@ -50,15 +50,15 @@ func (h handler) virtualVersions(r *http.Request, name string) ([]string, error)
 	return bowerfmt.Versions{}.Merge(r.Context(), parts) //nolint:wrapcheck // a pure merge never fails
 }
 
+// serveBinary serves version's archive from r's own repository, never a
+// virtual one: binary hands a virtual request to virtualBinary, which
+// serves through a member request.
 func (h handler) serveBinary(w http.ResponseWriter, r *http.Request, name, version, tag string) {
-	switch pkgroute.RequestFrom(r).Repo.Class {
-	case repo.Remote:
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.remoteBinary(w, r, name, version, tag)
-	case repo.Virtual:
-		h.virtualBinary(w, r, name, version, tag)
-	default:
-		h.localBinary(w, r, name, version)
+		return
 	}
+	h.localBinary(w, r, name, version)
 }
 
 // virtualBinary serves version's archive from the first member in the walk
