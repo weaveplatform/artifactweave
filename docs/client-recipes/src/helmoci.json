@@ -67,6 +67,12 @@
       "contains": [
         "Helm pulls an OCI chart through the remote"
       ]
+    },
+    {
+      "path": "test/acceptance/features/registry_virtual.feature",
+      "contains": [
+        "Helm pulls local and remote chart versions through a Helm OCI virtual"
+      ]
     }
   ]
 }

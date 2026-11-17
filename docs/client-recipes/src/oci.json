@@ -71,6 +71,12 @@
       "contains": [
         "DOCKER_CONFIG="
       ]
+    },
+    {
+      "path": "test/acceptance/features/registry_virtual.feature",
+      "contains": [
+        "oras pulls both OCI members through a virtual repository"
+      ]
     }
   ]
 }

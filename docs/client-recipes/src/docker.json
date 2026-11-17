@@ -74,6 +74,12 @@
       "contains": [
         "password (the user name must be the token's subject)"
       ]
+    },
+    {
+      "path": "test/acceptance/features/registry_virtual.feature",
+      "contains": [
+        "crane pulls local and remote images by tag and digest through one virtual"
+      ]
     }
   ]
 }

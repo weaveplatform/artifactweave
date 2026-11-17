@@ -149,6 +149,9 @@
 //     https://github.com/weaveplatform/artifactweave/issues/1180 (a remote
 //     repository's cached images in the index)
 //
+// P10 DKR-01 adds the pure virtual member walk and bounded digest-location
+// hints (virtual.go); the HTTP slice keeps scope and member delivery checks.
+//
 // # Status
 //
 // Implemented P6, with Helm OCI chart metadata in P8 and remote retrieval

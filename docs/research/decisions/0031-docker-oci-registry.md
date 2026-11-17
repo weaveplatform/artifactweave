@@ -680,7 +680,7 @@ raw tags/referrer listings remain independent of that index. Local behavior is u
 P28 owns port-per-repository routing (DV-009), complete list-manifest overwrite
 cleanup (DV-084) and discovery/implementation of any additional target digest
 algorithms. P12 supplies configuration and native anonymous-access proof (#303);
-P9/P10 supply remote and virtual behavior. P41 broadens supported native clients.
+P9 supplies remote behavior; P10 DKR-01 supplies virtual pulls below. P41 broadens supported native clients.
 
 Docker documents [Registry V1 removal and schema-1 removal](https://docs.docker.com/engine/deprecated/)
 with V2 and schema-2/OCI replacements. These specific old wire contracts may stay
@@ -730,3 +730,85 @@ These assignments describe planned work, not current runtime support.
 - jfrog-cli-artifactory `4a0f3827cfa0`, `artifactory/commands/ocicontainer`
 - <https://docs.jfrog.com/artifactory/docs/additional-docker-information.md>
 - <https://docs.jfrog.com/integrations/reference/promotedockerimage.md>
+
+
+## P10 virtual pulls (DKR-01)
+
+Manifest and blob GET/HEAD work through Docker, OCI and Helm OCI virtuals.
+The Docker format obtains `virtual.Members` in resolve order: priority local/
+federated members, priority remote caches and upstreams, then the same groups for
+other members. Nested virtuals flatten once, their path filters included. The
+first readable member holding the resource wins; a priority member's miss does
+not end the walk. Tags always use this order and are never location-cache keys.
+
+The original virtual image scope is validated before member resolution. Read on
+real members makes the image readable through the virtual, as the shared engine
+permits; a permission target cannot name a virtual repository. Each candidate then
+requires the member's direct read permission on `<image>/`, including the exact
+file-permission semantics of the existing registry. A narrow descendant permission
+cannot widen to a whole-image pull. Token scopes remain
+`repository:<virtual>/<image>:pull`; a member does not require another token scope.
+A caller who cannot read the virtual is refused as a local pull is. An unreadable,
+blacked-out, excluded or unavailable member is passed over, and an exhausted walk
+answers 404 `MANIFEST_UNKNOWN` or `BLOB_UNKNOWN`.
+
+The virtual's download patterns apply first, including to administrators. Local
+members preserve their existing manifest/blob lookup and download headers. Remote
+cache steps use cache-only reads and the shared `remote.Fresh` rule against
+matching current-source cache entries. Expired online content passes to the
+upstream step; offline and origin-restricted reads retain stale-cache reuse.
+Upstream steps use that remote's source service,
+retaining its credentials, refresh/offline/no-store policy and delivery fence.
+A chosen remote result uses the existing remote response path. No content is
+written to the virtual, and `X-Artifactory-Docker-Registry` names the serving member
+on manifests as it does on a direct read. Blob responses retain their existing
+absence of that header.
+
+A bounded in-process cache remembers digest locations for 24 hours, up to 10,000
+entries, using separate manifest/blob keys within the budget. A hint still checks
+current membership, permission and policy. A miss drops the hint and walks again.
+A configuration fingerprint includes the virtual, nested virtuals and real members;
+changes to membership or patterns invalidate all hints for that virtual before
+reuse. Revision metadata is bounded by live entries. In-flight older reads cannot
+turn a hint into authority: the next request checks its current revision again.
+
+`FindParentManifestLists` selects the first member holding the tag and searches
+only that member for parents. A remote contributes its retained manifest tree,
+without enumerating unknown upstream tags; transient child reads are closed and
+are not counted as downloads. Existing direct REST behavior is retained.
+DeleteDockerTag, uploads/push/delete, tags, catalog and referrers keep their existing
+405 responses. Promotion's existing virtual-target 400 remains unchanged.
+
+Primary sources checked 2026-11-17:
+[Additional Docker Information](https://docs.jfrog.com/artifactory/docs/additional-docker-information)
+confirms virtual pull and normal resolution-order behavior;
+[Find Parent Manifest Lists](https://docs.jfrog.com/artifactory/reference/findParentManifestLists)
+requires repository Read and defines the REST response. The verified official
+7.161.26 OSS archive's `ConstantValues` 802–809 confirms the cache defaults.
+**[I], #216/P19:** public sources do not settle serving-member registry headers,
+tag-keyed manifest caching, or virtual parent-list selection. The implementation
+uses DKR-01's explicit fallbacks: serving-member header, digest-only keys and the
+first holding member. Remote parent lookup is limited to retained metadata because
+upstream registries expose no reverse-parent enumeration API. No trial/live
+Artifactory capture was used.
+
+`registry_virtual.feature` qualifies pinned crane 0.22.1, ORAS 1.3.6 and Helm 4.3.1
+with local and remote members, tag/digest resolution and exact artifact/chart bytes.
+The Docker daemon scenario uses the existing Linux-only harness. Controlled-upstream
+server tests cover all three types, nested members, duplicates, permissions,
+priority misses, policies, cache counts/invalidation, token scopes and parent lists.
+
+The same router probe on main `dbd75b7f7` and DKR-01 produces:
+
+| Request | Main | DKR-01 |
+|---|---|---|
+| Manifest GET/HEAD by local tag | 405 | 200, serving member `first` |
+| Manifest GET/HEAD by digest | 405 | 200, same local bytes/digest |
+| Blob GET/HEAD | 405 | 200, same member bytes/digest |
+| Remote-only manifest GET/HEAD | 405 | 200, serving member `remote` |
+| Missing manifest | 405 | 404 `MANIFEST_UNKNOWN` |
+| Only unreadable local holds the tag | 405 | 404 `MANIFEST_UNKNOWN` |
+| Pull token issuance | 200 | Same 200; virtual token now pulls |
+| Push / catalog / tags / referrers | 405 | Same 405 and refusal text |
+| DeleteDockerTag | 405 | Same 405 and refusal text |
+| FindParentManifestLists, local child without parents | 405 | 200, empty parent list |

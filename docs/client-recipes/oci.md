@@ -67,3 +67,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/registry_clients.feature](../../test/acceptance/features/registry_clients.feature).
 - Evidence: [test/acceptance/features/registry_remote.feature](../../test/acceptance/features/registry_remote.feature).
 - Evidence: [test/acceptance/docker_steps_test.go](../../test/acceptance/docker_steps_test.go).
+- Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).

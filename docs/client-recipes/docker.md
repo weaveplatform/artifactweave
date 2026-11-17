@@ -67,3 +67,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/registry_clients.feature](../../test/acceptance/features/registry_clients.feature).
 - Evidence: [test/acceptance/features/docker.feature](../../test/acceptance/features/docker.feature).
 - Evidence: [internal/access/adapters/http/authn_middleware.go](../../internal/access/adapters/http/authn_middleware.go).
+- Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).

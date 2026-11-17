@@ -494,6 +494,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	maps.Copy(slashes, accesshttp.SlashCollections())
 	// The registry exists before the middleware, whose challenge it writes.
 	registry := newRegistry(cfg, kit)
+	dockerOps.Registry = registry
 	head := middleware.HeadAsGet{Serves: headServed(), RunsGet: headRunsGetRoute}
 	r.Use(
 		httpkit.ErrorProfiles(errorProfileRules),

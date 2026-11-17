@@ -116,7 +116,8 @@ type Registry struct {
 	redirectManifest func(http.ResponseWriter, *http.Request, repo.Config, model.Item, string) bool
 	// tagLists keeps remote tags lists decoded, so that a later page of a
 	// list reads only its own tags (remoteTagList); nil keeps none.
-	tagLists *tagCache
+	tagLists  *tagCache
+	locations *layout.MemberLocations
 }
 
 type endpointKey struct {
@@ -129,7 +130,7 @@ func New(o Options) *Registry {
 	g := &Registry{
 		sources: o.Sources, authenticated: o.Authenticated,
 		store: o.Store, fault: o.Fault, tokens: o.Tokens, identity: o.Identity,
-		endpoints: map[endpointKey]Endpoint{}, tagLists: newTagCache(remoteTagsBudget),
+		endpoints: map[endpointKey]Endpoint{}, tagLists: newTagCache(remoteTagsBudget), locations: layout.NewMemberLocations(),
 	}
 	if o.SubdomainMatch {
 		g.parent = baseHost(o.BaseURL)
@@ -267,9 +268,17 @@ func (g *Registry) dispatch(w http.ResponseWriter, r *http.Request, q Request) {
 			return
 		}
 	}
+	if q.Repo.Class == repo.Virtual && (!virtualPull(q.Kind, r.Method) || g.uploads == nil) {
+		g.writeErr(w, r, unsupportedVirtual(q.Repo))
+		return
+	}
 	if q.Kind.image() && !ValidName(q.Name) {
 		Write(w, Errorf(http.StatusBadRequest, CodeNameInvalid,
 			"invalid image name %q: reference images as <host>/<repository>/<image>", q.Name))
+		return
+	}
+	if q.Repo.Class == repo.Virtual {
+		g.serveVirtual(w, r, q)
 		return
 	}
 	if q.Repo.Class == repo.Remote && (q.Kind.image() || q.Kind == KindCatalog) {
@@ -303,8 +312,8 @@ var methods = map[Kind][]string{
 }
 
 // resolveInto sets q.Repo to the repository q.RepoKey names, unless the
-// subdomain already did. Remote content requires its adapter; virtual member
-// resolution remains a separate P10 capability.
+// subdomain already did. Remote content requires its adapter; dispatch limits
+// virtual reads to manifests and blobs.
 func (g *Registry) resolveInto(ctx context.Context, q *Request) error {
 	if !q.isResolved && g.store == nil {
 		// A router built without a store, as the server's routing tests
@@ -328,8 +337,6 @@ func (g *Registry) resolveInto(ctx context.Context, q *Request) error {
 		if g.sources != nil {
 			return nil
 		}
-		fallthrough
-	case repo.Virtual:
 		return Errorf(http.StatusMethodNotAllowed, CodeUnsupported,
 			"%s is a %s repository, which the registry does not serve yet",
 			q.Repo.Key, q.Repo.Class)
