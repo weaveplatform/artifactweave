@@ -33,6 +33,7 @@ func (w *world) registerRemoteNuGet(sc *godog.ScenarioContext) {
 		`^a private NuGet v3 upstream serves signed packages with dependencies$`,
 		w.signedNuGetUpstream,
 	)
+	sc.Step(`^the signed NuGet dependency is available only from a local member$`, w.localSignedNuGetDependency)
 	sc.Step(`^I run verified dotnet "([^"]*)"$`, w.runVerifiedDotnet)
 }
 
@@ -312,4 +313,13 @@ func (w *world) tamperSignedNuGet(src, dst string) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(w.dir, dst), out.Bytes(), 0o600)
+}
+
+// Remove all upstream routes for the dependency: a successful parent-only
+// restore must obtain its transitive dependency from the local member.
+func (w *world) localSignedNuGetDependency() error {
+	for _, path := range []string{"/flat/acme.dependency/index.json", "/registration/acme.dependency/index.json", "/opaque-pages/acme.dependency", "/content/acme.dependency.signed.nupkg"} {
+		w.remote.Delete(path)
+	}
+	return nil
 }
