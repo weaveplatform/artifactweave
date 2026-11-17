@@ -25,7 +25,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [RubyGems and Bundler](gems.md) | RubyGems 4.0.23 and Bundler 4.0.23 on Ruby 4.0.9 | local, federated | local, remote, virtual, federated |
 | [Generic files](generic.md) | JFrog CLI 2.131.0 | local, federated | local, remote, virtual, federated |
 | [Git LFS](gitlfs.md) | Git LFS 3.8.1 | local, federated | local, remote, virtual, federated |
-| [Go modules](go.md) | Go 1.27 (module toolchain); JFrog CLI 2.131.0 | local | local, virtual |
+| [Go modules](go.md) | Go 1.27 (module toolchain); JFrog CLI 2.131.0 | local, virtual | local, virtual |
 | [Gradle Maven-layout repositories](gradle.md) | Gradle 9.8.2 on Temurin 27; optional JFrog CLI 2.131.0 wrapper | local, federated | local, remote, virtual, federated |
 | [Classic Helm charts](helm.md) | Helm 4.3.1 | local, federated | local, remote, virtual, federated |
 | [Helm OCI charts](helmoci.md) | Helm 4.3.1; JFrog CLI 2.131.0 | local, federated | local, remote, virtual, federated |

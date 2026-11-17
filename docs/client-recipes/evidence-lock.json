@@ -84,7 +84,7 @@
   "test/acceptance/features/docker.feature": "841a88f096b370198c0379c60fd5ca77c03279b08872accb81c936708f44f7b2",
   "test/acceptance/features/gems.feature": "157a8b676e211236b6ff747c0fec060063154eedcc5d5798f8a46ee3fdfb60f0",
   "test/acceptance/features/gitlfs.feature": "6d5c6e5d81e4dde530c4b1b98316c3b4dad2b3865ffed8ed6d6bc381b9707770",
-  "test/acceptance/features/go.feature": "597f5988999b9a2bc08b73250c26f0a790c8b8c5c82538654e02c004640bca6b",
+  "test/acceptance/features/go.feature": "f9dbc79661b55d44ef775397bd0cd8f181825103cfa936a8d4644fe02553363c",
   "test/acceptance/features/helm_classic.feature": "7054049d633da485fd581177aa711cc3486bcc5f41669ed18b6c5406b3e11bdd",
   "test/acceptance/features/helm_oci.feature": "d2a0b9b2c7d792df465d91108c93280ff93582f77b9fc5937ba4bb116924e9bd",
   "test/acceptance/features/helm_remote.feature": "e76ebaa07dc536b3b7629787ac784179ef51c09462cd8bc5ebc9d87a67c0be55",

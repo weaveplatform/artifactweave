@@ -423,3 +423,94 @@ Feature: Go module repositories answer the GOPROXY protocol
     Then the command succeeds
     And the generic upstream received 1 GET requests for "/example.com/!team/!remote/@v/v0.0.0-20261016120000-abcdefabcdef.zip"
     And the server answered no request with 500 since the last command
+
+  @go @jf @go_virtual_publish
+  Scenario: Publish a Go build through a virtual and resolve mixed dependencies through the same virtual
+    Given the Go toolchain is available
+    And the JFrog CLI is available
+    And a private Go upstream serves module "example.com/Team/Remote" at "v0.0.0-20261016120000-abcdefabcdef"
+    When I PUT "/artifactory/api/repositories/go-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"go","url":"{upstream}","username":"go-upstream","password":"upstream-pass"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/go-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"go","repositories":["go-local","go-remote"],"defaultDeploymentRepo":"go-local"}
+      """
+    Then the response status is 200
+    Given a file "producer/go.mod" with content:
+      """
+      module example.com/acme/published
+
+      go 1.22
+      """
+    And a file "producer/lib.go" with content:
+      """
+      package published
+
+      const Greeting = "published through the virtual"
+      """
+    When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
+    Then the command succeeds
+    When I run jf "go-config --server-id-resolve aw --server-id-deploy aw --repo-resolve go-virtual --repo-deploy go-virtual" in "producer"
+    Then the command succeeds
+    When I run jf "gp v1.0.0 --build-name go-virtual-publish --build-number 1" in "producer"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When I run jf "gp v1.0.0 --build-name go-virtual-publish --build-number 1" in "producer"
+    Then the command succeeds
+    When I run jf "rt bp go-virtual-publish 1 --server-id aw"
+    Then the command succeeds
+    When I GET "/artifactory/api/build/go-virtual-publish/1" as admin
+    Then the response status is 200
+    And the JSON field "buildInfo.modules.0.id" equals "example.com/acme/published"
+    And the JSON field "buildInfo.modules.0.artifacts" has 3 entries
+    When I GET "/artifactory/api/storage/go-local/example.com/acme/published/@v/v1.0.0.zip" as admin
+    Then the response status is 200
+    When I GET "/artifactory/api/storage/go-local/example.com/acme/published/@v/v1.0.0.mod" as admin
+    Then the response status is 200
+    When I GET "/artifactory/api/storage/go-local/example.com/acme/published/@v/v1.0.0.info" as admin
+    Then the response status is 200
+    Given the registry is fronted by TLS
+    And the Go proxy is "{tlsauthurl}/api/go/go-virtual"
+    And a file "consumer/go.mod" with content:
+      """
+      module example.com/consumer
+
+      go 1.22
+
+      require (
+        example.com/acme/published v1.0.0
+        example.com/Team/Remote v0.0.0-20261016120000-abcdefabcdef
+      )
+      """
+    And a file "consumer/main.go" with content:
+      """
+      package main
+
+      import (
+        "fmt"
+        published "example.com/acme/published"
+        remote "example.com/Team/Remote"
+      )
+
+      func main() { fmt.Println(published.Greeting, remote.Greeting) }
+      """
+    When I run go "clean -modcache"
+    Then the command succeeds
+    When I run go "mod download" in "consumer"
+    Then the command succeeds
+    When I run go "build -mod=mod ." in "consumer"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    Given a file "producer/lib.go" with content:
+      """
+      package published
+
+      const Greeting = "changed immutable version"
+      """
+    When I run jf "gp v1.0.0" in "producer"
+    Then the command fails
+    And the server answered 409 to PUT "/artifactory/api/go/go-virtual/example.com/acme/published/@v/v1.0.0.zip"
+    And the server answered no request with 500 since the last command

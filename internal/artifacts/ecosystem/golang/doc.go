@@ -87,7 +87,7 @@
 //
 // Implemented P7, with remote retrieval in P9. Moved here in P9d. P10
 // virtual.go merges Go module version lists; golang/http serves virtual
-// reads over local, federated and remote members. Virtual publishing is GOV-02.
+// reads over local, federated and remote members. Virtual publishing uses the default deployment member (GOV-02).
 //
 // # Testing
 //

@@ -9,7 +9,9 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	goformat "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/golang"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -37,6 +39,13 @@ func (p publisher) publish(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		k.Error(w, r, err)
 		return
+	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		var ok bool
+		r, ok = p.deployment(w, r)
+		if !ok {
+			return
+		}
 	}
 	declared := pkgroute.DeclaredChecksums(r.Header)
 	var it model.Item
@@ -93,4 +102,30 @@ func (p publisher) storeInfo(
 	}
 	return p.k.Store( //nolint:wrapcheck // the kit's answer, given as it is
 		r, f.Path(), bytes.NewReader(body), props, declared)
+}
+
+// The target request keeps the original URL and caller, so the local
+// publisher's immutable-file and overwrite rules apply on the DDR path.
+func (p publisher) deployment(w http.ResponseWriter, r *http.Request) (*http.Request, bool) {
+	v := pkgroute.RequestFrom(r).Repo
+	target, err := virtual.DeployTarget(r.Context(), p.k.DB().Repos(), v)
+	if errors.Is(err, virtual.ErrNoDeployTarget) {
+		w.Header().Set("Allow", "GET")
+		p.k.Error(
+			w,
+			r,
+			apierror.New(http.StatusMethodNotAllowed, fmt.Sprintf("No local repository was configured as local deployment repository for the (%s) virtual repository.", v.Key)),
+		)
+		return nil, false
+	}
+	if err != nil {
+		p.k.Error(w, r, err)
+		return nil, false
+	}
+	member, err := p.k.MemberRequest(r, target)
+	if err != nil {
+		p.k.Error(w, r, err)
+		return nil, false
+	}
+	return member, true
 }

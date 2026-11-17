@@ -37,6 +37,10 @@
 //     one that does answers 405 to a method no route serves.
 //   - A version list says nothing about what the caller may not read: a
 //     module with no version the caller may read answers 404.
+//   - Virtual writes resolve the default deployment repository first and
+//     check its path permissions, then use the same immutable-file and
+//     .info overwrite rules as direct publication. No target answers R6's
+//     405 with Allow: GET; direct remote routes remain 501.
 //   - A deploy of different content over a stored .zip or .mod answers 409
 //     even for a caller who may delete, since go.sum pins it.
 //   - A version is visible by what is stored, and the download policy
