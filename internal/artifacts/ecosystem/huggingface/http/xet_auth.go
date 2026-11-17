@@ -232,7 +232,10 @@ func (h handler) restoreXetClaim(r *http.Request, c xetClaim, write bool) (*http
 	if write {
 		action = accessapi.ActionWrite
 	}
-	if !h.k.CanFolder(r, id.Prefix(), action) {
+	// No permission target names a virtual repository, so its claim is
+	// checked where the member is: the read's chosen member
+	// (xetPublishedFile) or the write's deployment target (targetRequest).
+	if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual && !h.k.CanFolder(r, id.Prefix(), action) {
 		return nil, forbidden
 	}
 	if write {

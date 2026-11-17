@@ -121,32 +121,39 @@ func remoteSetup(t *testing.T, upstreamURL string, ttl int) func(*fixture) *sour
 		if e := f.db.Repos().Update(t.Context(), c); e != nil {
 			t.Fatal(e)
 		}
-		resolver, e := upstream.NewResolver(
-			f.db,
-			nil,
-			upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
-		)
-		if e != nil {
-			t.Fatal(e)
-		}
-		pool := new(upstream.Pool)
-		policy := &remote.Policy{
-			Store:   f.db,
-			Blobs:   f.items.Blobs,
-			Items:   f.items,
-			Pool:    pool,
-			Options: resolver.Options,
-			Key:     []byte(strings.Repeat("k", 32)),
-			Now:     time.Now,
-		}
-		t.Cleanup(pool.Close)
-		return &source.Service{
-			HTTP:  policy,
-			Cache: policy,
-			Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
-				return f.db.RemoteCache().Source(ctx, c.Key)
-			},
-		}
+		return remoteService(t, f)
+	}
+}
+
+// remoteService is the remote source service over f's store and blobs, for
+// a fixture with remote repositories.
+func remoteService(t *testing.T, f *fixture) *source.Service {
+	t.Helper()
+	resolver, e := upstream.NewResolver(
+		f.db,
+		nil,
+		upstream.ResolverOptions{RevisionKey: []byte(strings.Repeat("k", 32))},
+	)
+	if e != nil {
+		t.Fatal(e)
+	}
+	pool := new(upstream.Pool)
+	policy := &remote.Policy{
+		Store:   f.db,
+		Blobs:   f.items.Blobs,
+		Items:   f.items,
+		Pool:    pool,
+		Options: resolver.Options,
+		Key:     []byte(strings.Repeat("k", 32)),
+		Now:     time.Now,
+	}
+	t.Cleanup(pool.Close)
+	return &source.Service{
+		HTTP:  policy,
+		Cache: policy,
+		Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
+			return f.db.RemoteCache().Source(ctx, c.Key)
+		},
 	}
 }
 

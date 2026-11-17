@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -45,6 +46,9 @@ type Options struct {
 	RemoteSources *source.Service
 	Keys          *crypt.Keyring
 	Now           func() time.Time
+	// Logger receives the warning for a virtual repository's member that a
+	// read passed over for a fault; nil means slog.Default.
+	Logger *slog.Logger
 }
 
 type virtualSource struct{}
@@ -67,6 +71,9 @@ func (virtualSource) Item(
 // 501 while that is nil. Its Signed answers true for the Xet CAS routes and
 // a signed LFS upload, whose own capability the handlers verify.
 func Protocol(o Options) pkgroute.Protocol {
+	if o.Logger == nil {
+		o.Logger = slog.Default()
+	}
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
 		repo.Federated: pkgroute.Local{},

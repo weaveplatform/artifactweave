@@ -218,11 +218,12 @@ func TestUnitBatchChecksReadPermissionBeforeThePolicy(t *testing.T) {
 	}
 }
 
-// A virtual repository's own patterns refuse an object once a member the
-// caller may read is found (DV-057): a reader's transfer answers 404 "No
-// repository found to serve the request", Artifactory's answer for a
-// virtual repository, where the object was served (main) or answered "Git
-// LFS object unavailable" (#1250); a caller who may read no member gets 403.
+// A virtual repository's own patterns refuse an object before any member
+// is asked, as 7.x checks them first, an administrator's too (decision
+// 0008, R5): a transfer answers 404 "No repository found to serve the
+// request", Artifactory's answer for a virtual repository, for a reader
+// and for a caller who may read no member, who got 403 "Git LFS read
+// denied" once a readable member was looked for first (#1540).
 func TestUnitVirtualPatternsRefuseAfterReadPermission(t *testing.T) {
 	f := newFixture(t, repo.Virtual)
 	body := []byte("virtual policy Git LFS bytes\n")
@@ -240,11 +241,11 @@ func TestUnitVirtualPatternsRefuseAfterReadPermission(t *testing.T) {
 		wantAnswer(t, status, answer, http.StatusNotFound, "")
 	}
 	status, answer = lfsCall(t, f.server, http.MethodGet, transfer, "intruder", "")
-	wantAnswer(t, status, answer, http.StatusForbidden, "Git LFS read denied")
+	wantAnswer(t, status, answer, http.StatusNotFound, refused)
 	reader := policyBatch(t, f.server, "lfs", "reader", "download", oid, len(body))
 	wantObjectError(t, reader, http.StatusNotFound)
 	intruder := policyBatch(t, f.server, "lfs", "intruder", "download", oid, len(body))
-	wantObjectError(t, intruder, http.StatusForbidden)
+	wantObjectError(t, intruder, http.StatusNotFound)
 	upload := policyBatch(t, f.server, "lfs", "", "upload", oid, len(body))
 	if got := upload.Objects[0]; got.Error != nil || len(got.Actions) != 0 {
 		t.Fatalf("upload batch for a stored object: %+v", got)

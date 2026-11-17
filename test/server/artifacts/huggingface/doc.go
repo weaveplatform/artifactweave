@@ -16,7 +16,10 @@
 //     harness's item world under the root's name (fixture_test.go,
 //     newItemWorld): the users reader, deployer and user, the deploy-libs
 //     permission and eight local, remote and virtual repositories, with the
-//     request and seed helpers of test/server/support.
+//     request and seed helpers of test/server/support; and over an
+//     application runtime (harness.App) with its remote sources and a fake
+//     upstream, for a virtual repository with a remote member
+//     (huggingface_virtual_test.go).
 //   - The Xet fixtures in
 //     internal/artifacts/ecosystem/huggingface/xet/testdata, read
 //     root-relative through repopath.
@@ -40,6 +43,12 @@
 //   - huggingface_lfs_checksums_test.go: a Git LFS file keeps its upload's
 //     SHA-1 and MD5, in its item download and storage answer, and in a
 //     revision that inherits it (#1581).
+//   - huggingface_virtual_test.go: a virtual repository over [remote,
+//     nested virtual -> local], on SQLite and PostgreSQL, with grants on
+//     its members alone: a commit and a Xet publish through it, its nested
+//     member's model and Xet reconstruction, a model only its remote
+//     member's upstream holds, and R6's 405 without a deployment target
+//     (#1540).
 //
 // # References
 //

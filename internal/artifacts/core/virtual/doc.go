@@ -123,10 +123,13 @@
 // https://github.com/weaveplatform/artifactweave/issues/1536); the
 // merged metadata cache (Cache;
 // https://github.com/weaveplatform/artifactweave/issues/1543), which the
-// families wire into their merges; and RubyGems, LuaRocks and Dart pub
+// families wire into their merges; RubyGems, LuaRocks and Dart pub
 // virtual repositories on it, each with its Merger in
 // ecosystem/<type>/virtual.go
-// (https://github.com/weaveplatform/artifactweave/issues/1538). The storage
+// (https://github.com/weaveplatform/artifactweave/issues/1538); and Git LFS
+// and Hugging Face on Members' Package walk and DeployTarget, their tests in
+// their ecosystem/<type>/http packages
+// (https://github.com/weaveplatform/artifactweave/issues/1540). The storage
 // API's views and the folder index of a virtual repository read its members
 // through Stored and Walk
 // (https://github.com/weaveplatform/artifactweave/issues/1537). The rest of

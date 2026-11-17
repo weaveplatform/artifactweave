@@ -82,7 +82,7 @@ func (h handler) xetPublishedFile(
 	if _, ok := xet.ParseHash(hash); !ok {
 		return selected{}, record, badIdentity()
 	}
-	chosen, err := h.selectRepo(r, id, c.Reference, map[string]bool{})
+	chosen, err := h.selectRepo(r, id, c.Reference)
 	if err != nil {
 		return chosen, record, err
 	}

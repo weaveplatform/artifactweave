@@ -141,7 +141,7 @@ func TestUnitVirtualObjectRouteDoesNotDiscloseMissingOrDeniedMembers(t *testing.
 		expected int
 	}{
 		{name: "permitted but absent", expected: http.StatusNotFound},
-		{name: "ungranted reader", user: "intruder", expected: http.StatusForbidden},
+		{name: "ungranted reader", user: "intruder", expected: http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			status, body := rawLFSRequest(t, f, http.MethodGet, path, "", "", "", tc.user)
@@ -178,6 +178,10 @@ func TestUnitDirectObjectReadHonorsDigestAndDeclaredSize(t *testing.T) {
 	}
 }
 
+// A stale member configuration fails no batch: a member reached twice, one
+// that is gone and one of another type are skipped and the object's 404
+// comes from the walk. A deployment target that is gone refuses the whole
+// upload batch (TestUnitVirtualDeploysToTheDefaultDeploymentRepository).
 func TestUnitVirtualStaleMembersFailClosed(t *testing.T) {
 	oid := strings.Repeat("a", 64)
 	for _, tc := range []struct {
@@ -187,13 +191,9 @@ func TestUnitVirtualStaleMembersFailClosed(t *testing.T) {
 		expected int
 	}{
 		{
-			name: "deployment target removed", op: "upload", expected: http.StatusMethodNotAllowed,
-			setup: func(_ *testing.T, _ *fixture, c *repo.Config) {
-				c.DefaultDeploymentRepo = "missing"
-			},
-		},
-		{
-			name: "duplicate member", op: "download", expected: http.StatusBadRequest,
+			// A repeated member is skipped (decision 0008, R2) where it
+			// answered 400: the one walk misses the object.
+			name: "duplicate member", op: "download", expected: http.StatusNotFound,
 			setup: func(_ *testing.T, _ *fixture, c *repo.Config) {
 				c.Repositories = []string{"lfs-local", "lfs-local"}
 			},
@@ -205,7 +205,9 @@ func TestUnitVirtualStaleMembersFailClosed(t *testing.T) {
 			},
 		},
 		{
-			name: "wrong package member", op: "download", expected: http.StatusBadRequest,
+			// A member of another type is passed over (R11) where it
+			// answered 400.
+			name: "wrong package member", op: "download", expected: http.StatusNotFound,
 			setup: func(t *testing.T, f *fixture, c *repo.Config) {
 				wrong := *repo.Defaults(&repo.Config{
 					Key: "wrong", Class: repo.Local, PackageType: repo.NPM,

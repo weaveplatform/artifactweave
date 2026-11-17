@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"mime"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	baseformat "github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	format "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -38,7 +40,12 @@ const (
 // Options configures Protocol. RemoteSources is the remote source service;
 // nil leaves the remote class without a source, so a remote repository
 // answers 501.
-type Options struct{ RemoteSources *source.Service }
+type Options struct {
+	RemoteSources *source.Service
+	// Logger receives the warning for a virtual repository's member that a
+	// read passed over for a fault; nil means slog.Default.
+	Logger *slog.Logger
+}
 
 // Protocol returns the Git LFS protocol for gitlfs repositories: the batch
 // API (POST objects/batch), basic object transfers (GET, HEAD and PUT of
@@ -49,6 +56,9 @@ type Options struct{ RemoteSources *source.Service }
 // source supports no single-item lookup, because the handlers read its
 // members themselves.
 func Protocol(o Options) pkgroute.Protocol {
+	if o.Logger == nil {
+		o.Logger = slog.Default()
+	}
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},
 		repo.Virtual: virtualSource{},
@@ -174,6 +184,14 @@ func (h handler) batch(w http.ResponseWriter, r *http.Request) {
 		case "upload":
 			err = h.uploadEntry(r, obj, &entry)
 		}
+		// Both answer the request rather than one object: git-lfs asks for
+		// credentials only on the batch's own 401, and a virtual repository
+		// without a deployment target refuses every upload with 7.x's 405,
+		// Allow: GET and message (decision 0008, R4 and R6) [I].
+		if errors.Is(err, errChallenge) || errors.Is(err, virtual.ErrNoDeployTarget) {
+			h.k.Error(w, r, err)
+			return
+		}
 		if err != nil {
 			entry.Error = &objectError{Code: statusOf(err), Message: "Git LFS object unavailable"}
 		}
@@ -251,11 +269,13 @@ func (h handler) downloadEntry(r *http.Request, obj batchObject, out *batchResul
 	return nil
 }
 
-// available reports whether a download batch may hand out obj. The download
-// policy comes after Read permission (DV-057), so a caller who may not read
-// gets 403 whatever the repository's settings: find checks a local or
-// federated repository's policy, the source boundary a remote's, and
-// virtualMember a virtual repository's own patterns.
+// available reports whether a download batch may hand out obj. For a
+// local, federated or remote repository the download policy comes after
+// Read permission (DV-057), so a caller who may not read gets 403 whatever
+// the repository's settings: find checks a local or federated repository's
+// policy and the source boundary a remote's. A virtual repository has no
+// permission of its own, so virtualMember checks its patterns first and
+// then each member's Read (decision 0008, R5).
 func (h handler) available(r *http.Request, obj batchObject) error {
 	path, _ := format.ObjectPath(obj.OID)
 	switch pkgroute.RequestFrom(r).Repo.Class {
@@ -290,7 +310,7 @@ func (h handler) targetRequest(r *http.Request, path string) (*http.Request, err
 	if c.Class != repo.Virtual {
 		return r, nil
 	}
-	mr, err := h.virtualDeploymentRequest(r)
+	mr, err := h.deployTarget(r)
 	if err != nil {
 		return nil, err
 	}
@@ -298,61 +318,6 @@ func (h handler) targetRequest(r *http.Request, path string) (*http.Request, err
 		return nil, apierror.New(http.StatusForbidden, "Git LFS deployment target denied")
 	}
 	return mr, nil
-}
-
-// virtualDeploymentRequest resolves the one L/F member that owns writes from
-// a virtual Git LFS endpoint. Object transfers and path locks share it.
-func (h handler) virtualDeploymentRequest(r *http.Request) (*http.Request, error) {
-	c := pkgroute.RequestFrom(r).Repo
-	if c.DefaultDeploymentRepo == "" || !slices.Contains(c.Repositories, c.DefaultDeploymentRepo) {
-		return nil, apierror.New(
-			http.StatusMethodNotAllowed,
-			"virtual Git LFS deployment target is missing",
-		)
-	}
-	member, err := h.k.DB().Repos().Get(r.Context(), c.DefaultDeploymentRepo)
-	if err != nil {
-		return nil, fmt.Errorf("gitlfs: deployment member: %w", err)
-	}
-	if member.PackageType != repo.GitLFS ||
-		member.Class != repo.Local && member.Class != repo.Federated {
-		return nil, apierror.New(http.StatusBadRequest, "invalid Git LFS deployment target")
-	}
-	mr, err := h.k.MemberRequest(r, member)
-	if err != nil {
-		return nil, fmt.Errorf("gitlfs: deployment request: %w", err)
-	}
-	return mr, nil
-}
-
-func (h handler) members(r *http.Request) ([]*http.Request, error) {
-	c := pkgroute.RequestFrom(r).Repo
-	seen := map[string]bool{c.Key: true}
-	result := make([]*http.Request, 0, len(c.Repositories))
-	for _, key := range c.Repositories {
-		if seen[key] {
-			return nil, apierror.New(http.StatusBadRequest, "invalid Git LFS virtual member")
-		}
-		seen[key] = true
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("gitlfs: virtual member: %w", err)
-		}
-		if member.PackageType != repo.GitLFS ||
-			member.Class != repo.Local && member.Class != repo.Federated &&
-				member.Class != repo.Remote {
-			return nil, apierror.New(http.StatusBadRequest, "unsupported Git LFS member")
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return nil, fmt.Errorf("gitlfs: member request: %w", err)
-		}
-		result = append(result, mr)
-	}
-	return result, nil
 }
 
 func (h handler) find(r *http.Request, path string) (pkgroute.Found, error) {
@@ -458,46 +423,6 @@ func (h handler) serveObject(w http.ResponseWriter, r *http.Request, obj batchOb
 	default:
 		return source.ErrUnsupported
 	}
-}
-
-// virtualMember returns the first member of a virtual repository, in its
-// order, that the caller may read and that holds obj, passing over one that
-// misses obj or whose own policy refuses it. The virtual repository's own
-// patterns are checked once a member the caller may read is found, so a
-// caller who may read none gets 403 and learns nothing of them (DV-057).
-// They refuse a remote member's object too, which the source boundary
-// checks against the remote's own policy alone: an object they reject is
-// served by no member, 404 "No repository found to serve the request for
-// <virtual>:<path>" (decision 0032, 6.20 VirtualRepoDownloadStrategy).
-func (h handler) virtualMember(r *http.Request, obj batchObject) (*http.Request, error) {
-	path, _ := format.ObjectPath(obj.OID)
-	members, err := h.members(r)
-	if err != nil {
-		return nil, err
-	}
-	readable := false
-	for _, member := range members {
-		if !h.k.Can(member, path, api.ActionRead) {
-			continue
-		}
-		if !readable {
-			if err = h.k.CheckDownload(r, path); err != nil {
-				return nil, fmt.Errorf("gitlfs: download policy: %w", err)
-			}
-			readable = true
-		}
-		if err = h.available(member, obj); missing(err) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		return member, nil
-	}
-	if !readable {
-		return nil, apierror.New(http.StatusForbidden, "Git LFS read denied")
-	}
-	return nil, kernel.ErrNotFound
 }
 
 func (h handler) upload(w http.ResponseWriter, r *http.Request) {
