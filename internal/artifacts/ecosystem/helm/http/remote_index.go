@@ -88,6 +88,16 @@ func readRemoteIndex(body io.Reader) (remoteIndex, error) {
 }
 
 func decodeRemoteIndex(c repo.Config, responseBase string, body io.Reader) (remoteIndex, error) {
+	return decodeIndex(c, responseBase, body, false)
+}
+
+func decodeVirtualIndex(c repo.Config, responseBase string, body io.Reader) (remoteIndex, error) {
+	return decodeIndex(c, responseBase, body, true)
+}
+
+var errExternalChartDenied = errors.New("helm external chart URL is not allowed")
+
+func decodeIndex(c repo.Config, responseBase string, body io.Reader, filterExternal bool) (remoteIndex, error) {
 	out, err := readRemoteIndex(body)
 	if err != nil {
 		return remoteIndex{}, err
@@ -118,6 +128,9 @@ func decodeRemoteIndex(c repo.Config, responseBase string, body io.Reader) (remo
 			for _, raw := range entry.URLs {
 				target, targetErr := chartTarget(c, responseBase, raw)
 				if targetErr != nil {
+					if filterExternal && errors.Is(targetErr, errExternalChartDenied) {
+						continue
+					}
 					return remoteIndex{}, targetErr
 				}
 				location := target.path
@@ -132,7 +145,9 @@ func decodeRemoteIndex(c repo.Config, responseBase string, body io.Reader) (remo
 				seen[target.url.String()] = entry
 				v.targets = append(v.targets, target)
 			}
-			out.versions[name] = append(out.versions[name], v)
+			if len(v.targets) > 0 {
+				out.versions[name] = append(out.versions[name], v)
+			}
 		}
 		slices.SortStableFunc(out.versions[name], func(a, b remoteVersion) int {
 			return -model.CompareSemver(a.chart.Version, b.chart.Version)
@@ -144,6 +159,10 @@ func decodeRemoteIndex(c repo.Config, responseBase string, body io.Reader) (remo
 func validateRemoteIndex(
 	c repo.Config,
 ) func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error {
+	return indexValidator(c, decodeRemoteIndex)
+}
+
+func indexValidator(c repo.Config, decode func(repo.Config, string, io.Reader) (remoteIndex, error)) func(context.Context, io.ReadSeeker, int64, source.MetadataResponse) error {
 	return func(ctx context.Context, body io.ReadSeeker, size int64, response source.MetadataResponse) error {
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("helm index validation: %w", err)
@@ -151,7 +170,7 @@ func validateRemoteIndex(
 		if size < 0 || size > remoteIndexLimit {
 			return remoteError()
 		}
-		_, err := decodeRemoteIndex(c, response.BaseURL, body)
+		_, err := decode(c, response.BaseURL, body)
 		return err
 	}
 }
@@ -226,7 +245,7 @@ func (s chartScope) location(u *url.URL) (string, error) {
 		}
 	}
 	if !allowed {
-		return "", remoteError()
+		return "", fmt.Errorf("%w: %w", errExternalChartDenied, remoteError())
 	}
 	return "_external/" + u.Scheme + "/" + u.Host + u.Path, nil
 }

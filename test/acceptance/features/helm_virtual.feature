@@ -1,7 +1,7 @@
 @helm @helm_virtual
 Feature: Helm resolves local and remote charts through one virtual repository
 
-  Scenario Outline: signed charts and remote dependencies resolve with relative URLs <relative>
+  Scenario Outline: charts, member selection and publishing resolve with relative URLs <relative> and namespaces <namespaces>
     Given the registry is running with environment "ARTIFACTWEAVE_HELM_RELATIVE_URLS=<relative>"
     And helm is available
     When I run helm "create acme"
@@ -27,9 +27,21 @@ Feature: Helm resolves local and remote charts through one virtual repository
     When I run helm "package web --destination local"
     Then the command succeeds
     When I deploy the files under "local" to "/artifactory/helm-local" as admin
+    Given a file "web/Chart.yaml" with content:
+      """
+      apiVersion: v2
+      name: web
+      version: 0.1.0
+      description: remote duplicate with different bytes
+      """
+    When I run helm "package web --destination charts"
+    Then the command succeeds
+    When I run helm "repo index charts"
+    Then the command succeeds
+    Given a Helm upstream serves the files under "charts"
     When I PUT "/artifactory/api/repositories/helm-virtual" as admin with body:
       """
-      {"rclass":"virtual","packageType":"helm","repositories":["helm-local","helm-remote"]}
+      {"rclass":"virtual","packageType":"helm","repositories":["helm-local","helm-remote"],"useNamespaces":<namespaces>,"defaultDeploymentRepo":"helm-local"}
       """
     Then the response status is 200
     When I run helm "repo add aw {url}/api/helm/helm-virtual --username admin --password {password}"
@@ -51,6 +63,13 @@ Feature: Helm resolves local and remote charts through one virtual repository
     When I run helm "pull aw/web --version 0.1.0"
     Then the command succeeds
     And the files "local/web-0.1.0.tgz" and "web-0.1.0.tgz" are identical
+    Given a file "explicit/.keep" with content:
+      """
+      destination directory
+      """
+    When I run helm "pull {url}/api/helm/helm-virtual/<member>web-0.1.0.tgz --destination explicit --username admin --password {password}"
+    Then the command succeeds
+    And the files "<selected>/web-0.1.0.tgz" and "explicit/web-0.1.0.tgz" are identical
     When I run helm "template preview acme-0.1.0.tgz"
     Then the command succeeds
     And the output contains "kind: Deployment"
@@ -72,7 +91,28 @@ Feature: Helm resolves local and remote charts through one virtual repository
     Then the response status is 200
     And the response body does not contain "local://"
 
+    When I run helm "create published"
+    Then the command succeeds
+    When I run helm "package published --destination publish"
+    Then the command succeeds
+    When I deploy the files under "publish" to "/artifactory/helm-virtual" as admin
+    When I run helm "repo update aw"
+    Then the command succeeds
+    When I run helm "search repo aw/published --versions"
+    Then the command succeeds
+    And the output contains "aw/published"
+    Given a file "pulled/.keep" with content:
+      """
+      destination directory
+      """
+    When I run helm "pull aw/published --version 0.1.0 --destination pulled"
+    Then the command succeeds
+    And the files "publish/published-0.1.0.tgz" and "pulled/published-0.1.0.tgz" are identical
+    And the server answered no request with 500 since the last command
+
     Examples:
-      | relative | download             |
-      | true     | api/helm/helm-virtual |
-      | false    | helm-virtual         |
+      | relative | namespaces | download                         | member       | selected |
+      | true     | false      | api/helm/helm-virtual             |              | local    |
+      | false    | false      | helm-virtual                     |              | local    |
+      | true     | true       | api/helm/helm-virtual/helm-remote | helm-remote/ | charts   |
+      | false    | true       | helm-virtual/helm-remote          | helm-remote/ | charts   |

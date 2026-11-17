@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
@@ -54,8 +55,10 @@ func Protocol(o Options) pkgroute.Protocol {
 }
 
 type handler struct {
-	k        *pkgroute.Kit
-	settings helmfmt.Settings
+	k           *pkgroute.Kit
+	settings    helmfmt.Settings
+	virtualRead bool
+	item        *itemkit.Kit
 }
 
 func (h handler) read(w http.ResponseWriter, r *http.Request) {

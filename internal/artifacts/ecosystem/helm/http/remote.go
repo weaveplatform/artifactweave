@@ -32,6 +32,10 @@ func (h handler) upstreamIndex(
 	download string,
 ) (remoteIndex, source.Result, error) {
 	c := pkgroute.RequestFrom(r).Repo
+	decode, variant := decodeRemoteIndex, "helm-index-v2"
+	if h.virtualRead {
+		decode, variant = decodeVirtualIndex, "helm-virtual-index-v1"
+	}
 	resource := source.Resource{
 		Kind:   source.ResourceKindMetadata,
 		Path:   helmfmt.IndexPath,
@@ -47,8 +51,8 @@ func (h handler) upstreamIndex(
 		PermissionFolder: true,
 		PolicyPath:       download,
 		BlackoutOnly:     download != helmfmt.IndexPath,
-		Variant:          "helm-index-v2",
-		ValidateMetadata: validateRemoteIndex(c),
+		Variant:          variant,
+		ValidateMetadata: indexValidator(c, decode),
 	}
 	result, err := h.k.Read(r, resource)
 	if err != nil {
@@ -58,7 +62,7 @@ func (h handler) upstreamIndex(
 		return remoteIndex{}, result, remoteError()
 	}
 	defer result.Stream.Body.Close()
-	index, err := decodeRemoteIndex(c, result.Metadata.BaseURL, result.Stream.Body)
+	index, err := decode(c, result.Metadata.BaseURL, result.Stream.Body)
 	return index, result, err
 }
 
