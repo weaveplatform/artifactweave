@@ -87,6 +87,8 @@ Feature: Smart Remote synchronization uses bounded authenticated peer operations
     Then the response status is 200
     When I run curl "--max-time 10 --silent --show-error --user admin:{password} {url}/loop/file.bin --output loop.json --write-out %{http_code}"
     Then the command succeeds
-    And the output contains "502"
+    # The item origin guard stops the returning hop before Smart Remote's
+    # separate eight-node guard; 7.x's recursive download answer is 404.
+    And the output contains "404"
     When I GET "/artifactory/loop-cache/file.bin" as admin
     Then the response status is 404

@@ -108,3 +108,8 @@ Remote trace in `X-Artifactory-Originated`, and sends `Origin-Artifactory` too.
 Smart identities include a repository component and cannot equal the host token.
 Transport host markers do not count toward Smart's eight-node budget. Smart's existing loop and hop bounds still apply; the ordinary item-download loop
 guard additionally detects repeated host origins. See [transport origin handling](remote-http-transport.md#virtual-origin-requests-p10-1542).
+
+A Smart source whose URL points back to this server is stopped by P10's item
+origin recursion guard before the separate eight-node Smart trace limit. Its
+native self-loop scenario therefore expects 404 and verifies that no cache item
+was admitted; 502 remains the source boundary's answer to its own loop errors.
