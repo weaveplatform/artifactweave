@@ -174,17 +174,17 @@ func TestAccGalaxyVirtualOrderedReadableMembers(t *testing.T) {
 	if err := f.db.Repos().Update(t.Context(), virtual); err != nil {
 		t.Fatal(err)
 	}
-	requireStatus(
-		t,
-		f.do(
-			"GET",
-			"/artifactory/api/ansible/virtual/api/v3/collections/weave/sample/versions/",
-			nil,
-			"",
-			"",
-		),
-		400,
-	)
+	// A virtual repository that lists itself skips the cycle (decision
+	// 0008, R2) and so lists nothing.
+	if got := versionsOf(t, f.do(
+		"GET",
+		"/artifactory/api/ansible/virtual/api/v3/collections/weave/sample/versions/",
+		nil,
+		"",
+		"",
+	)); len(got) != 0 {
+		t.Fatalf("self cycle listed %v", got)
+	}
 	requireStatus(
 		t,
 		f.do("POST", "/artifactory/api/ansible/virtual/api/v3/artifacts/collections/", nil, "", ""),

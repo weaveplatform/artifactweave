@@ -36,11 +36,15 @@ func packageLookup(id condafmt.PackagePath) readPolicy {
 	return readPolicy{path: id.Path, download: true}
 }
 
+// readPackage serves the package id. A virtual repository is not asked
+// for Read: no permission target can name one (decision 0006), so the
+// member that serves the package decides, and a caller who may read it in
+// no member gets Conda's not-found (decision 0008, R3).
 func (h handler) readPackage(w http.ResponseWriter, r *http.Request, id condafmt.PackagePath) {
-	if !h.k.Require(w, r, id.Path, api.ActionRead) {
+	if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual && !h.k.Require(w, r, id.Path, api.ActionRead) {
 		return
 	}
-	if err := h.servePackage(w, r, id, map[string]bool{}); err != nil {
+	if err := h.servePackage(w, r, id); err != nil {
 		if errors.Is(err, kernel.ErrNotFound) {
 			err = apierror.New(http.StatusNotFound, "Conda package not found")
 		}
@@ -48,60 +52,20 @@ func (h handler) readPackage(w http.ResponseWriter, r *http.Request, id condafmt
 	}
 }
 
-func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafmt.PackagePath,
-	seen map[string]bool,
-) error {
+func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafmt.PackagePath) error {
 	c := pkgroute.RequestFrom(r).Repo
-	if seen[c.Key] || len(seen) >= 8 {
-		return source.ErrInvalidRequest
-	}
-	seen[c.Key] = true
-	defer delete(seen, c.Key)
 	if err := generic.CheckDownload(c, id.Path, false); err != nil {
 		return fmt.Errorf("conda: download policy: %w", err)
 	}
 	if c.Class == repo.Virtual {
-		members, err := h.members(r)
-		if err != nil {
-			return err
-		}
-		for _, mr := range members {
-			if !h.k.Can(mr, id.Path, api.ActionRead) {
-				continue
-			}
-			// A member whose own policy refuses the package, a blacked-out
-			// one included, is passed over as one without it is (R5,
-			// decision 0032), since its index now lists a package whose file
-			// its patterns reject.
-			if generic.CheckDownload(pkgroute.RequestFrom(mr).Repo, id.Path, false) != nil {
-				continue
-			}
-			indexPath := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
-			index, err := h.memberIndex(mr, indexPath, packageLookup(id), map[string]bool{})
-			if shardNotFound(err) {
-				continue
-			}
-			if err != nil {
-				return err
-			}
-			if _, ok := recordOf(index.records, id); !ok {
-				continue
-			}
-			if index.finish != nil {
-				if err := index.finish(r.Context()); err != nil {
-					return fmt.Errorf("conda: virtual member authority: %w", err)
-				}
-			}
-			return h.servePackage(w, mr, id, seen)
-		}
-		return kernel.ErrNotFound
+		return h.virtualPackage(w, r, id)
 	}
 	if !h.k.Can(r, id.Path, api.ActionRead) ||
 		!h.k.CanFolder(r, path.Dir(id.Path), api.ActionRead) {
 		return source.ErrDenied
 	}
 	indexPath := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
-	index, err := h.memberIndex(r, indexPath, packageLookup(id), map[string]bool{})
+	index, err := h.memberIndex(r, indexPath, packageLookup(id))
 	if err != nil {
 		return err
 	}
@@ -114,7 +78,16 @@ func (h handler) servePackage(w http.ResponseWriter, r *http.Request, id condafm
 			return fmt.Errorf("conda: package index authority: %w", err)
 		}
 	}
-	if c.Class != repo.Remote {
+	return h.serveRecord(w, r, id, rec)
+}
+
+// serveRecord serves the package id that rec, the record of r's own
+// index, describes: a local or federated repository's stored file, or a
+// remote's upstream file checked against rec.
+func (h handler) serveRecord(w http.ResponseWriter, r *http.Request, id condafmt.PackagePath,
+	rec condafmt.Record,
+) error {
+	if pkgroute.RequestFrom(r).Repo.Class != repo.Remote {
 		h.k.ServeItem(w, r, id.Path)
 		return nil
 	}

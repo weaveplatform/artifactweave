@@ -464,12 +464,14 @@ func TestAccPuppetVirtualOverARemoteMember(t *testing.T) {
 			[]string{"1.0.0"},
 			"1.1.0",
 		},
+		// The walk asks the local member before the remote (decision 0008,
+		// R1), so the local member serves the version both hold.
 		{
 			"release pages excluded",
 			func(c *repo.Config) { c.ExcludesPattern = new(".puppet/**") },
 			map[string]string{"1.1.0": "local"},
-			nil,
-			[]string{"1.0.0", "1.1.0"},
+			[]string{"1.1.0"},
+			[]string{"1.0.0"},
 			nil,
 			"1.1.0,1.0.0",
 		},

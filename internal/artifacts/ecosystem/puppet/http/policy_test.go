@@ -398,7 +398,6 @@ func (f *fixture) grant(targets map[string]accesstest.Target) {
 // listing alike, so the client resolves behind the repository's
 // permissions.
 func TestUnitReadPermissionStillDecidesTheListing(t *testing.T) {
-	all := accesstest.Target{Include: []string{"**"}}
 	newer := accesstest.Target{
 		Include: []string{"**"}, Exclude: []string{"**/acme-widget-2.0.0.tar.gz"},
 	}
@@ -424,9 +423,12 @@ func TestUnitReadPermissionStillDecidesTheListing(t *testing.T) {
 			t.Fatalf("unreadable archive: %d", r.Code)
 		}
 	})
+	// Through a virtual repository the member's Read decides alone: no
+	// permission target can name the virtual repository (decision 0006,
+	// decision 0008 R3), so a caller with no "ANY" target is served.
 	t.Run("virtual", func(t *testing.T) {
 		f := hosted(t)
-		f.grant(map[string]accesstest.Target{f.c.Key: all, "virtual": newer})
+		f.grant(map[string]accesstest.Target{f.c.Key: newer})
 		if got := releaseVersions(t, f.do("GET",
 			"/artifactory/api/puppet/virtual/v3/releases?module=acme-widget", "viewer",
 		)); len(got) != 1 || got["1.0.0"] == "" {

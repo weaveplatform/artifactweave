@@ -16,15 +16,15 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"golang.org/x/mod/semver"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	ansiblefmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/ansible"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
@@ -134,7 +134,25 @@ func (h handler) checkIdentity(w http.ResponseWriter, r *http.Request, ns, name 
 		h.fail(w, r, apierror.New(http.StatusBadRequest, "invalid collection identity"))
 		return false
 	}
-	return h.k.RequireFolder(w, r, "collections/"+ns+"/"+name, api.ActionRead)
+	return h.requireRead(w, r, "collections/"+ns+"/"+name, true)
+}
+
+// requireRead refuses a caller who may not read path, a folder when folder
+// is set, in the request's repository before anything is looked up. A
+// virtual repository is not asked: no permission target can name one
+// (decision 0006), so each member decides Read on what it serves and a
+// member the caller may not read is not found. A caller who may read only
+// the members is served, and one who may read none gets the protocol's
+// not-found (decision 0008, R3).
+func (h handler) requireRead(w http.ResponseWriter, r *http.Request, path string, folder bool) bool {
+	switch {
+	case pkgroute.RequestFrom(r).Repo.Class == repo.Virtual:
+		return true
+	case folder:
+		return h.k.RequireFolder(w, r, path, api.ActionRead)
+	default:
+		return h.k.Require(w, r, path, api.ActionRead)
+	}
 }
 
 // resolution refuses the Galaxy metadata a client resolves a collection
@@ -362,88 +380,82 @@ func (h handler) pageStored(
 // the package index's (model.CompareGalaxy).
 func newestFirst(a, b string) int { return model.CompareGalaxy(b, a) }
 
-func (h handler) memberRequests(r *http.Request) ([]*http.Request, error) {
-	q := pkgroute.RequestFrom(r)
-	if q.Repo.Class != repo.Virtual {
-		return []*http.Request{r}, nil
-	}
-	out := make([]*http.Request, 0, len(q.Repo.Repositories))
-	for _, key := range q.Repo.Repositories {
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("ansible: virtual member: %w", err)
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return nil, fmt.Errorf("ansible: member request: %w", err)
-		}
-		out = append(out, mr)
-	}
-	return out, nil
-}
-
-// releases lists the collection's releases, a virtual repository's merged
-// from its members in order. download, when set, is the artifact a download
-// serves: a virtual repository's member whose download policy refuses it,
-// a remote member's own included, is passed over, as a search for a file
-// passes over it, so the next member that lists the version serves it. A
-// listing leaves out a blacked-out member, which 7.x ignores when it
-// resolves (R5), and keeps every other member's releases, those whose files
-// the patterns reject included (R3).
+// releases lists the collection's releases: a local, federated or remote
+// repository's own (memberReleases), or a virtual repository's merged from
+// its members (virtualReleases). download, when set, is the artifact a
+// download serves.
 func (h handler) releases(r *http.Request, ns, name, download string) (catalog, error) {
-	members, err := h.memberRequests(r)
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		return h.virtualReleases(r, ns, name, download)
+	}
+	out, err := h.memberReleases(r, ns, name, download)
 	if err != nil {
 		return catalog{}, err
 	}
-	virtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
-	byVersion := map[string]bool{}
-	var out catalog
-	for _, member := range members {
-		if !h.k.CanFolder(member, "collections/"+ns+"/"+name, api.ActionRead) {
-			continue
-		}
-		// With no download path only the blackout refuses.
-		if virtual &&
-			generic.CheckDownload(pkgroute.RequestFrom(member).Repo, download, false) != nil {
-			continue
-		}
-		var releases []release
-		if pkgroute.RequestFrom(member).Repo.Class == repo.Remote {
-			remote, readErr := h.remoteVersions(member, ns, name, download)
-			releases, err = remote.items, readErr
-			out.checks = append(out.checks, remote.checks...)
-		} else {
-			// The index's order reversed is a hosted list's (newestFirst),
-			// so the stable sort below leaves a hosted member's versions
-			// that differ only in build metadata as that list orders them.
-			releases, err = h.localVersions(member, ns, name)
-			slices.Reverse(releases)
-		}
-		if virtual && (isMissing(err) || errors.Is(err, source.ErrDenied)) {
-			continue
-		}
-		if err != nil {
-			return catalog{}, err
-		}
-		for _, rel := range releases {
-			if !byVersion[rel.Meta.Version] && h.k.Can(r,
-				ansiblefmt.Path(ns, name, rel.Meta.Version), api.ActionRead) {
-				out.items = append(out.items, rel)
-				byVersion[rel.Meta.Version] = true
-			}
-		}
-	}
-	// Stable, so versions that differ only in build metadata keep the
-	// order their members list them in, member by member: a remote
-	// member's upstream's own. The sort was unstable before #1426, which
-	// kept them so for twelve versions or fewer.
-	slices.SortStableFunc(out.items, func(a, b release) int {
-		return semver.Compare("v"+b.Meta.Version, "v"+a.Meta.Version)
-	})
+	out.items, _ = ansiblefmt.Releases[release]{Version: releaseVersion}.Merge(r.Context(),
+		[]virtual.Part[[]release]{{Doc: out.items}})
 	return out, nil
+}
+
+func releaseVersion(rel release) string { return rel.Meta.Version }
+
+// memberReleases lists the releases of the collection that the repository
+// of r, a local, federated or remote one, holds and the caller may read
+// there: none when the caller may read nothing of the collection's folder.
+// A hosted list comes in the index's order reversed, which is its own
+// (newestFirst), so the merge's stable sort leaves versions that differ
+// only in build metadata as that list orders them.
+func (h handler) memberReleases(r *http.Request, ns, name, download string) (catalog, error) {
+	if !h.k.CanFolder(r, "collections/"+ns+"/"+name, api.ActionRead) {
+		return catalog{}, nil
+	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
+		return h.remoteVersions(r, ns, name, download)
+	}
+	releases, err := h.localVersions(r, ns, name)
+	slices.Reverse(releases)
+	return catalog{items: releases}, err
+}
+
+// virtualReleases merges the releases of the collection that the members
+// of a virtual repository list (ansiblefmt.Releases), in the package
+// handlers' walk (pkgroute.Collect): nested virtual repositories flattened
+// with a cycle or a duplicate skipped (decision 0008, R2), and a member that
+// is blacked out, whose patterns reject download, that the caller may read
+// nothing in, or whose read misses or is refused passed over (R3, R5). A
+// member's fault, an upstream's 5xx, one it cannot reach or an answer that
+// fails its checks, is passed over too, with a warning in the log
+// (pkgroute.Kit.WarnPassedOver) [I]. A version is the first member's that
+// lists it, and its Read is that member's: no permission target can name
+// the virtual repository (decision 0006), so a caller who may read only the
+// members is served (R3). With no download path only a member's blackout
+// refuses it, since a listing keeps a release whose archive the patterns
+// reject (R3).
+//
+// Ansible keeps no merged metadata for virtualRetrievalCachePeriodSecs:
+// 7.161.26's REST model takes the period for Chef, Conda, CRAN, Conan,
+// Debian, Helm, npm and YUM alone (VirtualRepositoryConfigurationImpl
+// 91-93), and its UI saves none for Ansible
+// (RepoConfigDescriptorBuilder.populateVirtualTypeSpecific 849-887), though
+// its Ansible model has the field (AnsibleTypeSpecificConfigModel 20), as
+// pub's has (decision 0008, R8) [I].
+func (h handler) virtualReleases(r *http.Request, ns, name, download string) (catalog, error) {
+	var checks []func(context.Context) error
+	parts, err := pkgroute.Collect(h.k, r, download, func(mr *http.Request) ([]release, error) {
+		found, err := h.memberReleases(mr, ns, name, download)
+		err = pkgroute.SourceError(err, false)
+		h.k.WarnPassedOver(mr, err)
+		if err != nil {
+			return nil, err
+		}
+		checks = append(checks, found.checks...)
+		return found.items, nil
+	})
+	if err != nil {
+		return catalog{}, err //nolint:wrapcheck // the kit's answer or a member's fault, as it is
+	}
+	items, _ := ansiblefmt.Releases[release]{Version: releaseVersion}.Merge(r.Context(), parts)
+	return catalog{items: items, checks: checks}, nil
 }
 
 func (h handler) collection(w http.ResponseWriter, r *http.Request, ns, name string) {
@@ -627,7 +639,7 @@ func (h handler) artifact(w http.ResponseWriter, r *http.Request, file string) {
 		return
 	}
 	path := ansiblefmt.Path(ns, name, version)
-	if !h.k.Require(w, r, path, api.ActionRead) {
+	if !h.requireRead(w, r, path, false) {
 		return
 	}
 	// The policy's own 404 and message, not "Could not find resource",
@@ -654,24 +666,57 @@ func (h handler) artifact(w http.ResponseWriter, r *http.Request, file string) {
 	h.k.ServeItem(w, rel.Req, path)
 }
 
+// publishTarget returns the request a publish to r's repository stores
+// with: r itself for a local or federated repository, or, for a virtual
+// repository, a member request for its default deployment repository, a
+// local or federated repository (virtual.DeployTarget). JFrog's Ansible
+// Repositories page publishes with ansible-galaxy collection publish -s
+// .../api/ansible/ansible-virtual, and 7.x deploys through a virtual
+// repository to that repository, answering 405 with Allow: GET without one
+// before it checks any permission (UploadServiceUtils.getTargetRepository
+// 248-261, 7.161.26; decision 0008, R6). A remote repository takes no
+// publish.
+func (h handler) publishTarget(w http.ResponseWriter, r *http.Request) (*http.Request, bool) {
+	var err error
+	target := r
+	switch v := pkgroute.RequestFrom(r).Repo; v.Class {
+	case repo.Local, repo.Federated:
+	case repo.Virtual:
+		var c repo.Config
+		c, err = virtual.DeployTarget(r.Context(), h.k.DB().Repos(), v)
+		switch {
+		case errors.Is(err, virtual.ErrNoDeployTarget):
+			err = itemkit.NoDeployTarget(v.Key)
+		case err == nil:
+			target, err = h.k.MemberRequest(r, c)
+		default:
+			err = fmt.Errorf("ansible: %w", err)
+		}
+	default:
+		err = apierror.New(http.StatusMethodNotAllowed,
+			"collection publish requires a local or federated repository")
+	}
+	if err != nil {
+		h.k.Error(w, r, err)
+		return nil, false
+	}
+	return target, true
+}
+
+// publish stores a collection in the repository publishTarget names, on
+// whose collections folder the caller needs Write. The task URL it answers
+// stays the request's own repository's, so ansible-galaxy polls the import
+// through the virtual repository it published to (importTask).
 func (h handler) publish(w http.ResponseWriter, r *http.Request) {
-	class := pkgroute.RequestFrom(r).Repo.Class
-	if class != repo.Local && class != repo.Federated {
-		h.k.Error(
-			w,
-			r,
-			apierror.New(
-				http.StatusMethodNotAllowed,
-				"collection publish requires a local or federated repository",
-			),
-		)
-		return
-	}
 	r.Body = http.MaxBytesReader(w, r.Body, 2*ansiblefmt.MaxArchiveBytes+maxPageBytes)
-	if !h.k.RequireFolder(w, r, "collections", api.ActionWrite) {
+	target, ok := h.publishTarget(w, r)
+	if !ok {
 		return
 	}
-	f, err := h.k.ReadFormLimited(r, "file", ansiblefmt.MaxArchiveBytes)
+	if !h.k.RequireFolder(w, target, "collections", api.ActionWrite) {
+		return
+	}
+	f, err := h.k.ReadFormLimited(target, "file", ansiblefmt.MaxArchiveBytes)
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -694,7 +739,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 	}
 	path := ansiblefmt.Path(meta.Namespace, meta.Name, meta.Version)
 	if _, err := h.k.StoreNew(
-		r,
+		target,
 		path,
 		f.File,
 		nil,
@@ -716,10 +761,31 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
+// importTask answers the import task of a published collection, task
+// being its SHA-256, once the collection is stored in the repository a
+// publish to the request's repository stores in (publishTarget): a virtual
+// repository answers for its default deployment repository's collections,
+// with Read asked there, so ansible-galaxy polls the task through the
+// virtual repository it published to. A virtual repository without one,
+// and a remote repository, hold no task.
 func (h handler) importTask(w http.ResponseWriter, r *http.Request, task string) {
 	if len(task) != 64 {
 		h.fail(w, r, missing())
 		return
+	}
+	target := r
+	if v := pkgroute.RequestFrom(r).Repo; v.Class == repo.Virtual {
+		c, err := virtual.DeployTarget(r.Context(), h.k.DB().Repos(), v)
+		if err == nil {
+			target, err = h.k.MemberRequest(r, c)
+		}
+		if errors.Is(err, virtual.ErrNoDeployTarget) {
+			err = missing()
+		}
+		if err != nil {
+			h.fail(w, r, err)
+			return
+		}
 	}
 	items, _, err := h.k.DB().Items().FindByChecksum(r.Context(),
 		kernel.Checksums{SHA256: task}, kernel.Page{Limit: kernel.MaxLimit})
@@ -728,8 +794,8 @@ func (h handler) importTask(w http.ResponseWriter, r *http.Request, task string)
 		return
 	}
 	for _, it := range items {
-		if it.RepoKey == pkgroute.RequestFrom(r).Repo.Key && !it.Cached &&
-			h.k.Can(r, it.FullPath(), api.ActionRead) {
+		if it.RepoKey == pkgroute.RequestFrom(target).Repo.Key && !it.Cached &&
+			h.k.Can(target, it.FullPath(), api.ActionRead) {
 			if _, _, _, ok := ansiblefmt.ParsePath(it.FullPath()); ok {
 				writeJSON(w, r, http.StatusOK, map[string]any{
 					"state": "completed", "finished_at": it.Updated.UTC().Format(time.RFC3339Nano),

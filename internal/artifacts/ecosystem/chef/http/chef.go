@@ -1,6 +1,7 @@
 package chefhttp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,11 +14,13 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	cheffmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/chef"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -153,7 +156,25 @@ func (h handler) identity(w http.ResponseWriter, r *http.Request) (string, bool)
 		h.k.Error(w, r, apierror.New(400, "invalid cookbook request"))
 		return "", false
 	}
-	return name, h.k.RequireFolder(w, r, name, api.ActionRead)
+	return name, h.requireRead(w, r, name, true)
+}
+
+// requireRead refuses a caller who may not read path, a folder when folder
+// is set, in the request's repository before anything is looked up. A
+// virtual repository is not asked: no permission target can name one
+// (decision 0006), so each member decides Read on what it serves and a
+// member the caller may not read is not found. A caller who may read only
+// the members is served, and one who may read none gets Chef's not-found
+// (decision 0008, R3).
+func (h handler) requireRead(w http.ResponseWriter, r *http.Request, path string, folder bool) bool {
+	switch {
+	case pkgroute.RequestFrom(r).Repo.Class == repo.Virtual:
+		return true
+	case folder:
+		return h.k.RequireFolder(w, r, path, api.ActionRead)
+	default:
+		return h.k.Require(w, r, path, api.ActionRead)
+	}
 }
 
 // resolution refuses the cookbook and version records a client resolves a
@@ -205,18 +226,57 @@ func (h handler) cookbook(w http.ResponseWriter, r *http.Request) {
 	if !ok || !h.resolution(w, r) {
 		return
 	}
-	found, err := h.lookup(r, name)
-	if err == nil && len(found) == 0 {
-		err = missing()
-	}
-	if err == nil {
-		err = h.authority(r, found)
-	}
+	h.record(w, r, "cookbooks/"+name, func(r *http.Request) (any, error) {
+		found, err := h.lookup(r, name)
+		if err == nil && len(found) == 0 {
+			err = missing()
+		}
+		if err == nil {
+			err = h.authority(r, found)
+		}
+		if err != nil {
+			return nil, err
+		}
+		return cookbookRecord(r, found), nil
+	})
+}
+
+// record answers the cookbook or version record build makes. Through a
+// virtual repository the record is kept for the virtual repository's
+// virtualRetrievalCachePeriodSecs (pkgroute.Kit.Merged, decision 0008 R8):
+// 7.161.26 takes the period for a Chef virtual repository in its REST
+// model (VirtualRepositoryConfigurationImpl 91-93) and its UI
+// (RepoConfigDescriptorBuilder.populateVirtualChefDescriptor 944-950),
+// and VirtualRepo.isCachedResourceExpired reads it. A member's new version
+// shows once the record expires; a rebuild that finds the cookbook or
+// version in no member answers Chef's not-found and drops the kept record,
+// as 7.x drops a cached resource no member serves any more
+// (ArtifactoryVirtualDownloadStrategy.getInfoInternal 90-136). Which of
+// Chef's documents the closed handler keeps is [I]: the cookbook and
+// version records are the ones merged from the members. A remote member's
+// authority is checked when the record is built, not on a hit, as 7.x
+// serves a kept document without asking its members. document names the
+// record.
+func (h handler) record(
+	w http.ResponseWriter,
+	r *http.Request,
+	document string,
+	build func(*http.Request) (any, error),
+) {
+	e, err := h.k.Merged(r, "", document, func(r *http.Request) (virtual.Entry, error) {
+		doc, err := build(r)
+		if err != nil {
+			return virtual.Entry{}, err
+		}
+		var body bytes.Buffer
+		err = json.NewEncoder(&body).Encode(doc)
+		return virtual.Entry{Body: body.Bytes()}, err //nolint:wrapcheck // a record of strings and maps always encodes
+	})
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
-	writeJSON(w, r, 200, cookbookRecord(r, found))
+	writeBody(w, r, 200, e.Body)
 }
 
 // resolve finds the version a version record or a download names. A
@@ -234,7 +294,7 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request, download bool) 
 		h.k.Error(w, r, apierror.New(400, "invalid cookbook version"))
 		return release{}, false
 	}
-	if version != "latest" && !h.k.Require(w, r, cheffmt.Path(name, version), api.ActionRead) {
+	if version != "latest" && !h.requireRead(w, r, cheffmt.Path(name, version), false) {
 		return release{}, false
 	}
 	if download && version != "latest" {
@@ -244,32 +304,52 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request, download bool) 
 	} else if !h.resolution(w, r) {
 		return release{}, false
 	}
-	found, err := h.lookup(r, name)
+	if !download {
+		// version answers the record from find itself, through the cache.
+		return release{meta: cheffmt.Metadata{Name: name, Version: version}}, true
+	}
+	rel, err := h.find(r, name, version)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return release{}, false
 	}
+	if version == "latest" && !h.archivePolicy(w, r, rel.meta.Path) {
+		return release{}, false
+	}
+	return rel, true
+}
+
+// find returns version of cookbook name, or its highest readable version
+// for latest, once its authority holds, or Chef's not-found.
+func (h handler) find(r *http.Request, name, version string) (release, error) {
+	found, err := h.lookup(r, name)
+	if err != nil {
+		return release{}, err
+	}
 	for _, rel := range found {
 		if version == "latest" || rel.meta.Version == version {
 			if err = h.authority(r, []release{rel}); err != nil {
-				h.k.Error(w, r, err)
-				return release{}, false
+				return release{}, err
 			}
-			if download && version == "latest" && !h.archivePolicy(w, r, rel.meta.Path) {
-				return release{}, false
-			}
-			return rel, true
+			return rel, nil
 		}
 	}
-	h.k.Error(w, r, missing())
-	return release{}, false
+	return release{}, missing()
 }
 
 func (h handler) version(w http.ResponseWriter, r *http.Request) {
-	rel, ok := h.resolve(w, r, false)
-	if ok {
-		writeJSON(w, r, 200, versionRecord(r, rel.meta))
+	want, ok := h.resolve(w, r, false)
+	if !ok {
+		return
 	}
+	name, version := want.meta.Name, want.meta.Version
+	h.record(w, r, "cookbooks/"+name+"/versions/"+version, func(r *http.Request) (any, error) {
+		rel, err := h.find(r, name, version)
+		if err != nil {
+			return nil, err
+		}
+		return versionRecord(r, rel.meta), nil
+	})
 }
 
 // archive serves a version's archive. A virtual repository's comes from
@@ -317,14 +397,49 @@ func (h handler) memberRefuses(mr *http.Request, path string) bool {
 	return h.k.CheckDownload(mr, path) != nil
 }
 
+// publishTarget returns the request a share to r's repository stores with:
+// r itself for a local or federated repository, or, for a virtual
+// repository, a member request for its default deployment repository, a
+// local or federated repository (virtual.DeployTarget). 7.x deploys through
+// a virtual repository to that repository and answers 405 with Allow: GET
+// without one, before it checks any permission
+// (UploadServiceUtils.getTargetRepository 248-261, 7.161.26; decision 0008,
+// R6). That knife's share through a virtual repository takes the same path
+// is [I]: the Chef handler is closed code. A remote repository takes no
+// share.
+func (h handler) publishTarget(w http.ResponseWriter, r *http.Request) (*http.Request, bool) {
+	var err error
+	target := r
+	switch v := pkgroute.RequestFrom(r).Repo; v.Class {
+	case repo.Local, repo.Federated:
+	case repo.Virtual:
+		var c repo.Config
+		c, err = virtual.DeployTarget(r.Context(), h.k.DB().Repos(), v)
+		switch {
+		case errors.Is(err, virtual.ErrNoDeployTarget):
+			err = itemkit.NoDeployTarget(v.Key)
+		case err == nil:
+			target, err = h.k.MemberRequest(r, c)
+		default:
+			err = fmt.Errorf("chef: %w", err)
+		}
+	default:
+		err = apierror.New(405, "cookbook publish requires a local or federated repository")
+	}
+	if err != nil {
+		h.k.Error(w, r, err)
+		return nil, false
+	}
+	return target, true
+}
+
+// publish stores a shared cookbook in the repository publishTarget names,
+// on whose cookbook folder the caller needs Write. The record it answers
+// names the request's own repository, so a share through a virtual
+// repository points the client back at it.
 func (h handler) publish(w http.ResponseWriter, r *http.Request) {
-	c := pkgroute.RequestFrom(r).Repo
-	if c.Class != repo.Local && c.Class != repo.Federated {
-		h.k.Error(
-			w,
-			r,
-			apierror.New(405, "cookbook publish requires a local or federated repository"),
-		)
+	target, ok := h.publishTarget(w, r)
+	if !ok {
 		return
 	}
 	name := strings.TrimSuffix(chi.URLParam(r, "name"), ".tgz")
@@ -339,15 +454,15 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(400, "invalid cookbook category"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, api.ActionWrite) {
+	if !h.k.RequireFolder(w, target, name, api.ActionWrite) {
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 2*cheffmt.MaxArchiveBytes)
+	target.Body = http.MaxBytesReader(w, r.Body, 2*cheffmt.MaxArchiveBytes)
 	var upload pkgroute.Form
 	if name == "" {
-		upload, err = h.k.ReadFormLimited(r, "tarball", cheffmt.MaxArchiveBytes)
+		upload, err = h.k.ReadFormLimited(target, "tarball", cheffmt.MaxArchiveBytes)
 	} else {
-		upload.File, err = h.k.Upload(r, r.Body)
+		upload.File, err = h.k.Upload(target, target.Body)
 	}
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -365,7 +480,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err = h.k.StoreNew(
-		r,
+		target,
 		cheffmt.Path(meta.Name, meta.Version),
 		upload.File,
 		nil,
@@ -512,67 +627,53 @@ func (h handler) stored(r *http.Request, name string, v model.PackageVersion) (r
 }
 
 // virtual merges the versions of name that find returns for each member
-// of a virtual repository, in order, the first member that holds a
-// version supplying it.
+// of a virtual repository (cheffmt.Releases), in the package handlers' walk
+// (pkgroute.Collect): nested virtual repositories flattened with a cycle or
+// a duplicate skipped (decision 0008, R2), and a member that is blacked
+// out, that the caller may read nothing in, or whose read misses or is
+// refused passed over (R3, R5). A member's fault, an upstream's 5xx, one it
+// cannot reach or an answer that fails its checks, is passed over too, with
+// a warning in the log (pkgroute.Kit.WarnPassedOver) [I]; a member's
+// "Chef releases exceed limit" still fails the merge. A version is the
+// first member's that lists it, with Read asked in that member alone: no
+// permission target can name the virtual repository (decision 0006), so a
+// caller who may read only the members is served. A version whose archive a
+// member's patterns or the virtual repository's own reject stays listed
+// (R3, R5); its download passes over that member or is refused (archive).
 func (h handler) virtual(
 	r *http.Request,
 	name string,
 	find func(*http.Request) ([]release, error),
 ) ([]release, error) {
-	q := pkgroute.RequestFrom(r)
-	byVersion := map[string]release{}
-	for _, key := range q.Repo.Repositories {
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
+	parts, err := pkgroute.Collect(h.k, r, "", func(mr *http.Request) ([]release, error) {
+		var found []release
+		var err error
+		if h.k.CanFolder(mr, name, api.ActionRead) {
+			found, err = find(mr)
 		}
+		err = pkgroute.SourceError(err, false)
+		h.k.WarnPassedOver(mr, err)
 		if err != nil {
-			return nil, fmt.Errorf("chef: virtual member: %w", err)
-		}
-		// 7.x ignores a blacked-out member when it resolves (R5).
-		if generic.CheckBlackedOut(member, "") != nil {
-			continue
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return nil, err //nolint:wrapcheck // protocol class refusal
-		}
-		if !h.k.CanFolder(mr, name, api.ActionRead) {
-			continue
-		}
-		found, err := find(mr)
-		if err != nil {
-			var response *apierror.Error
-			if errors.Is(err, kernel.ErrNotFound) ||
-				errors.As(err, &response) && response.Status == http.StatusNotFound {
-				continue
-			}
 			return nil, err
 		}
-		// A version whose archive a member's patterns or the virtual
-		// repository's own reject stays listed (R3, R5); its download
-		// passes over that member or is refused (archive).
-		for _, v := range found {
-			if !h.k.Can(r, v.meta.Path, api.ActionRead) {
-				continue
-			}
-			v.member = mr
-			if first, exists := byVersion[v.meta.Version]; exists {
-				first.alternates = append(first.alternates, v)
-				byVersion[v.meta.Version] = first
-			} else {
-				byVersion[v.meta.Version] = v
-			}
+		for i := range found {
+			found[i].member = mr
 		}
+		return found, nil
+	})
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the kit's answer or a member's fault, as it is
 	}
-	if len(byVersion) > maxVersions {
+	out, _ := cheffmt.Releases[release]{
+		Version: func(rel release) string { return rel.meta.Version },
+		Also: func(first, later release) release {
+			first.alternates = append(first.alternates, later)
+			return first
+		},
+	}.Merge(r.Context(), parts)
+	if len(out) > maxVersions {
 		return nil, apierror.New(503, "Chef releases exceed limit")
 	}
-	out := make([]release, 0, len(byVersion))
-	for _, v := range byVersion {
-		out = append(out, v)
-	}
-	sortReleases(out)
 	return out, nil
 }
 
@@ -595,5 +696,16 @@ func writeJSON(w http.ResponseWriter, r *http.Request, status int, doc any) {
 	w.WriteHeader(status)
 	if r.Method != http.MethodHead {
 		_ = json.NewEncoder(w).Encode(doc)
+	}
+}
+
+// writeBody answers body, a document writeJSON's encoder wrote, as
+// writeJSON answers it.
+func writeBody(w http.ResponseWriter, r *http.Request, status int, body []byte) {
+	w.Header().Set("Content-Type", mediaType)
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.WriteHeader(status)
+	if r.Method != http.MethodHead {
+		_, _ = w.Write(body)
 	}
 }

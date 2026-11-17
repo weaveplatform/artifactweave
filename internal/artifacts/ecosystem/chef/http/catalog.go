@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	cheffmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/chef"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -122,7 +123,7 @@ func (h handler) catalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit = min(limit, pageLimit)
-	if !h.k.RequireFolder(w, r, "", api.ActionRead) {
+	if !h.k.RequireRoot(w, r) {
 		return
 	}
 	if h.answerHostedCatalog(w, r, query, start, limit) {
@@ -184,26 +185,24 @@ func (h handler) catalog(w http.ResponseWriter, r *http.Request) {
 // lastStart is the highest start a catalog takes: one past what a hosted
 // catalog can hold, as before, unless the catalog holds an upstream's,
 // whose pages a client must reach past maxVersions: a remote's, or a
-// virtual repository's with a remote member. A virtual repository of
-// hosted members alone keeps the hosted bound, since #1306 changes only
-// catalogs over an upstream. Membership is read from the configuration,
-// not filtered by blackout or the caller, so the bound does not change with
-// either.
+// virtual repository's with a remote member, nested virtual repositories'
+// included (decision 0008, R2). A virtual repository of hosted members
+// alone keeps the hosted bound, since #1306 changes only catalogs over an
+// upstream. Membership is read from the configuration, not filtered by
+// blackout or the caller, so the bound does not change with either.
 func (h handler) lastStart(r *http.Request) (int, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	switch c.Class {
 	case repo.Remote:
 		return maxPosition, nil
 	case repo.Virtual:
-		for _, key := range c.Repositories {
-			member, err := h.k.DB().Repos().Get(r.Context(), key)
-			if errors.Is(err, kernel.ErrNotFound) {
-				continue
-			}
-			if err != nil {
-				return 0, fmt.Errorf("chef: member: %w", err)
-			}
-			if member.Class == repo.Remote {
+		members, err := virtual.Members(r.Context(), h.k.DB().Repos(), c,
+			virtual.Options{Order: virtual.Stored})
+		if err != nil {
+			return 0, fmt.Errorf("chef: members: %w", err)
+		}
+		for _, m := range members {
+			if m.Repo.Class == repo.Remote {
 				return maxPosition, nil
 			}
 		}
@@ -223,7 +222,7 @@ func (h handler) listed(r *http.Request, query string) ([]entry, []release, erro
 	out := []entry{}
 	checks := []release{}
 	for _, name := range names {
-		if !h.k.CanFolder(r, name, api.ActionRead) {
+		if !h.canName(r, name) {
 			continue
 		}
 		found, err := h.catalogLookup(r, name, search)
@@ -515,31 +514,26 @@ func (h handler) catalogLookup(r *http.Request, name string, search bool) ([]rel
 	}
 }
 
-// members returns a virtual repository's member requests, in order,
-// leaving out a member that no longer exists, one that is blacked out,
-// which 7.x ignores when it resolves (R5), so that a blacked-out remote
-// member's refusal does not refuse the virtual repository's catalog, and
-// one whose root the caller may not read.
+// canName reports whether a catalog lists cookbook name of r's repository
+// to the caller: Read below its folder in a local, federated or remote
+// repository. A virtual repository is not asked: no permission target can
+// name one (decision 0006), and each member's cookbooks are filtered by
+// Read in that member (decision 0008, R3).
+func (h handler) canName(r *http.Request, name string) bool {
+	return pkgroute.RequestFrom(r).Repo.Class == repo.Virtual ||
+		h.k.CanFolder(r, name, api.ActionRead)
+}
+
+// members returns a virtual repository's member requests in the package
+// handlers' walk (pkgroute.Kit.MergeMembers): nested virtual repositories
+// flattened with a cycle or a duplicate skipped (decision 0008, R2), and a
+// member that is blacked out, which 7.x ignores when it resolves (R5), so
+// that a blacked-out remote member's refusal does not refuse the virtual
+// repository's catalog, or whose root the caller may not read passed over.
 func (h handler) members(r *http.Request) ([]*http.Request, error) {
-	out := []*http.Request{}
-	for _, key := range pkgroute.RequestFrom(r).Repo.Repositories {
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("chef: member: %w", err)
-		}
-		if generic.CheckBlackedOut(member, "") != nil {
-			continue
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return nil, fmt.Errorf("chef: member request: %w", err)
-		}
-		if h.k.CanFolder(mr, "", api.ActionRead) {
-			out = append(out, mr)
-		}
+	out, err := h.k.MergeMembers(r, "")
+	if err != nil {
+		return nil, fmt.Errorf("chef: members: %w", err)
 	}
 	return out, nil
 }
@@ -618,8 +612,7 @@ func (h handler) upstreamPart(
 			}
 			seen[item.Name] = true
 			if at := pos + i; at < from || at >= from+room ||
-				!h.k.CanFolder(mr, item.Name, api.ActionRead) ||
-				!h.k.CanFolder(r, item.Name, api.ActionRead) {
+				!h.k.CanFolder(mr, item.Name, api.ActionRead) || !h.canName(r, item.Name) {
 				continue
 			}
 			part.entries = append(part.entries, entry{

@@ -172,7 +172,7 @@ func (h handler) releases(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
+	if !h.requireRead(w, r, name, true) {
 		return
 	}
 	page, total, err := h.releasePage(r, name, offset, limit)
@@ -312,7 +312,7 @@ func (h handler) release(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(400, "invalid Puppet release"))
 		return
 	}
-	if !h.k.Require(w, r, puppetfmt.Path(name, version), api.ActionRead) {
+	if !h.requireRead(w, r, puppetfmt.Path(name, version), false) {
 		return
 	}
 	releases, err := h.lookup(r, name, listing)
@@ -362,59 +362,68 @@ func (h handler) upstreamRecord(
 	}
 }
 
-// virtualRecord asks a virtual repository's remote members, in member
+// virtualRecord asks a virtual repository's remote members, in the walk's
 // order, for the upstream's record of a release every member's release
 // pages leave out, and returns the first that holds it, served through that
 // member (#1369). JFrog's Puppet repositories page says a virtual repository
 // aggregates its members for the Puppet client and r10k, and r10k reads
 // v3/releases/<slug> and then fetches the file_uri it names, so the virtual
 // repository answers both from the member that holds the record. That 7.x's
-// virtual repository asks its remote members so is [I]. A member is passed
-// over as the merge of the release pages passes it over (virtual): one the
-// caller may not read the module folder of, and one whose read answers 404,
-// as a blacked-out member's or one whose patterns reject the read does. To
-// serve the archive, a member whose own patterns reject the archive is
-// passed over too, as it is for a listed release (R5).
+// virtual repository asks its remote members so is [I]. The members are the
+// package handlers' walk (remoteMembers), so a nested virtual repository's
+// remote members are asked too. A member is passed over as the merge of the
+// release pages passes it over (virtual): one the caller may not read the
+// module folder of, and one whose read misses, is refused or fails, as a
+// blacked-out member's or one whose patterns reject the read does. To serve
+// the archive, a member whose own patterns reject the archive is passed over
+// too, as it is for a listed release (R5).
 func (h handler) virtualRecord(
 	r *http.Request,
 	name, version string,
 	u use,
 ) (release, bool, error) {
-	path := puppetfmt.Path(name, version)
-	for _, key := range pkgroute.RequestFrom(r).Repo.Repositories {
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return release{}, false, fmt.Errorf("puppet: virtual member: %w", err)
-		}
-		if member.Class != repo.Remote ||
-			u == download && generic.CheckDownload(member, path, false) != nil {
-			continue
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return release{}, false, err //nolint:wrapcheck // protocol class refusal
-		}
+	at := ""
+	if u == download {
+		at = puppetfmt.Path(name, version)
+	}
+	members, err := h.remoteMembers(r, at)
+	if err != nil {
+		return release{}, false, err
+	}
+	for _, mr := range members {
 		if !h.k.CanFolder(mr, name, api.ActionRead) {
 			continue
 		}
 		rel, found, err := h.remoteRelease(mr, name, version, u)
-		if err != nil {
-			var response *apierror.Error
-			if errors.Is(err, kernel.ErrNotFound) ||
-				errors.As(err, &response) && response.Status == http.StatusNotFound {
-				continue
-			}
+		err = pkgroute.SourceError(err, false)
+		h.k.WarnPassedOver(mr, err)
+		switch {
+		case pkgroute.PassedOver(err):
+			continue
+		case err != nil:
 			return release{}, false, err
-		}
-		if found {
+		case found:
 			rel.member = mr
 			return rel, true, nil
 		}
 	}
 	return release{}, false, nil
+}
+
+// remoteMembers returns the requests of a virtual repository's remote
+// members in the package handlers' walk (pkgroute.Kit.MergeMembers): nested
+// virtual repositories flattened with a cycle or a duplicate skipped
+// (decision 0008, R2), and a member that is blacked out, whose patterns
+// reject path, or whose root the caller may not read passed over (R3, R5).
+// An empty path checks the blackout alone.
+func (h handler) remoteMembers(r *http.Request, path string) ([]*http.Request, error) {
+	members, err := h.k.MergeMembers(r, path)
+	if err != nil {
+		return nil, fmt.Errorf("puppet: members: %w", err)
+	}
+	return slices.DeleteFunc(members, func(mr *http.Request) bool {
+		return pkgroute.RequestFrom(mr).Repo.Class != repo.Remote
+	}), nil
 }
 
 func (h handler) module(w http.ResponseWriter, r *http.Request) {
@@ -423,7 +432,7 @@ func (h handler) module(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(400, "invalid Puppet module"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
+	if !h.requireRead(w, r, name, true) {
 		return
 	}
 	releases, err := h.lookup(r, name, listing)
@@ -483,7 +492,7 @@ func (h handler) unlistedModule(w http.ResponseWriter, r *http.Request, name str
 	)
 	switch pkgroute.RequestFrom(r).Repo.Class {
 	case repo.Remote:
-		doc, found, err = h.unlistedRecord(r, name, nil)
+		doc, found, err = h.unlistedRecord(r, name)
 	case repo.Virtual:
 		doc, found, err = h.virtualModule(r, name)
 	}
@@ -512,20 +521,17 @@ func (h handler) unlistedModule(w http.ResponseWriter, r *http.Request, name str
 // checked as a release page's are, and its current release is the newest
 // one's own record, v3/releases/<slug> (remoteRelease); both are read under
 // the release pages' authority, Read on the module folder and the download
-// policy at .puppet/<m>/releases.json (DV-057). via, when it is set, is the
-// request of the virtual repository r is a member request of, whose Read
-// must hold on each release too, as it must on a release a member's pages
-// list (virtual). A record the upstream does not hold, or that lists
+// policy at .puppet/<m>/releases.json (DV-057). Read is asked in the remote
+// alone, also when r is a virtual repository's member request: no
+// permission target can name the virtual repository (decision 0006), so the
+// member decides (decision 0008, R3). A record the upstream does not hold,
+// or that lists
 // no release the caller may read, is none to answer; a listed release whose
 // own record the upstream does not hold is invalid upstream metadata. The
 // release list and the search still answer from the release pages, as the
 // Forge's own search leaves out a module of another group (it found
 // puppetlabs-sqlserver only with module_groups on 2026-11-12).
-func (h handler) unlistedRecord(
-	r *http.Request,
-	name string,
-	via *http.Request,
-) (moduleRecord, bool, error) {
+func (h handler) unlistedRecord(r *http.Request, name string) (moduleRecord, bool, error) {
 	read, found, err := h.remoteModule(r, name, listing)
 	if err != nil || !found {
 		return moduleRecord{}, false, err
@@ -543,8 +549,7 @@ func (h handler) unlistedRecord(
 	var releases []release
 	for _, v := range versions {
 		path := puppetfmt.Path(name, v)
-		if via != nil && !h.k.Can(via, path, api.ActionRead) ||
-			!h.k.Can(r, path, api.ActionRead) {
+		if !h.k.Can(r, path, api.ActionRead) {
 			continue
 		}
 		if err = read.checkPermission(r.Context(), path); err != nil {
@@ -595,7 +600,7 @@ func (h handler) modules(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := q.Get("query")
-	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
+	if !h.requireRead(w, r, name, true) {
 		return
 	}
 	releases, err := h.lookup(r, name, search)
@@ -664,7 +669,7 @@ func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := puppetfmt.Path(name, version)
-	if !h.k.Require(w, r, path, api.ActionRead) {
+	if !h.requireRead(w, r, path, false) {
 		return
 	}
 	// The archive is a download, which Artifactory refuses at its own path
@@ -998,63 +1003,77 @@ func (h handler) stored(r *http.Request, name string, v model.PackageVersion) (r
 	return release{meta: meta, metadata: metadata, item: item, details: d}, nil
 }
 
+// requireRead refuses a caller who may not read path, a folder when folder
+// is set, in the request's repository before anything is looked up. A
+// virtual repository is not asked: no permission target can name one
+// (decision 0006), so each member decides Read on what it serves and a
+// member the caller may not read is not found. A caller who may read only
+// the members is served, and one who may read none gets Puppet's not-found
+// (decision 0008, R3).
+func (h handler) requireRead(w http.ResponseWriter, r *http.Request, path string, folder bool) bool {
+	switch {
+	case pkgroute.RequestFrom(r).Repo.Class == repo.Virtual:
+		return true
+	case folder:
+		return h.k.RequireFolder(w, r, path, api.ActionRead)
+	default:
+		return h.k.Require(w, r, path, api.ActionRead)
+	}
+}
+
+// virtual merges the releases of module name that each member of a virtual
+// repository lists (puppetfmt.Releases), in the package handlers' walk
+// (pkgroute.Collect): nested virtual repositories flattened with a cycle or
+// a duplicate skipped (decision 0008, R2), and a member that is blacked
+// out, that the caller may read nothing in, or whose read misses or is
+// refused passed over (R3, R5), as a remote member whose patterns reject
+// its release pages is outside the search (R2b). A member's fault, an
+// upstream's 5xx, one it cannot reach or an answer that fails its checks,
+// is passed over too, with a warning in the log
+// (pkgroute.Kit.WarnPassedOver) [I]; a member's "Puppet releases exceed
+// limit" still fails the merge. Read on a release is its member's alone: no
+// permission target can name the virtual repository (decision 0006), so a
+// caller who may read only the members is served.
+//
+// A member whose patterns reject only a release's archive stays in the
+// merge with the release listed, and the archive comes from the first
+// member that holds the version and serves it (R5, RTFACT-25571), so the
+// listing gives that member's checksum. The virtual repository's own
+// patterns leave the release listed too (R3); the archive route refuses its
+// archive. Puppet keeps no merged metadata for a period: 7.161.26's REST
+// model takes virtualRetrievalCachePeriodSecs for no Puppet virtual
+// repository (VirtualRepositoryConfigurationImpl 91-93), and its own
+// reindex cache (RTFACT-18934) is a system property's, so the merge runs on
+// every request (decision 0008, R8) [I].
 func (h handler) virtual(r *http.Request, name string, u use) ([]release, error) {
-	q := pkgroute.RequestFrom(r)
-	byVersion := map[string]release{}
-	for _, key := range q.Repo.Repositories {
-		member, err := h.k.DB().Repos().Get(r.Context(), key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
+	parts, err := pkgroute.Collect(h.k, r, "", func(mr *http.Request) ([]release, error) {
+		var found []release
+		var err error
+		if h.k.CanFolder(mr, name, api.ActionRead) {
+			found, err = h.lookup(mr, name, u)
 		}
+		err = pkgroute.SourceError(err, false)
+		h.k.WarnPassedOver(mr, err)
 		if err != nil {
-			return nil, fmt.Errorf("puppet: virtual member: %w", err)
-		}
-		mr, err := h.k.MemberRequest(r, member)
-		if err != nil {
-			return nil, err //nolint:wrapcheck // protocol class refusal
-		}
-		if !h.k.CanFolder(mr, name, api.ActionRead) {
-			continue
-		}
-		// A blacked-out member, local or remote, and, outside the search, a
-		// remote member whose patterns reject its release pages answer 404
-		// here, or for the search find nothing, and are left out of the
-		// merge (R5, R2b).
-		found, err := h.lookup(mr, name, u)
-		if err != nil {
-			var response *apierror.Error
-			if errors.Is(err, kernel.ErrNotFound) ||
-				errors.As(err, &response) && response.Status == http.StatusNotFound {
-				continue
-			}
 			return nil, err
 		}
-		for _, v := range found {
-			if !h.k.Can(r, v.meta.Path, api.ActionRead) {
-				continue
-			}
-			// A member whose patterns reject only a release's archive
-			// stays in the merge with the release listed, and the archive
-			// comes from the first member that holds the version and
-			// serves it (R5, RTFACT-25571), so the listing gives
-			// that member's checksum. The virtual repository's own
-			// patterns leave the release listed too (R3); the archive
-			// route refuses its archive.
-			v.member = mr
-			v.refused = generic.CheckDownload(member, v.meta.Path, false) != nil
-			if prior, exists := byVersion[v.meta.Version]; !exists || prior.refused && !v.refused {
-				byVersion[v.meta.Version] = v
-			}
+		member := pkgroute.RequestFrom(mr).Repo
+		for i := range found {
+			found[i].member = mr
+			found[i].refused = generic.CheckDownload(member, found[i].meta.Path, false) != nil
 		}
+		return found, nil
+	})
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the kit's answer or a member's fault, as it is
 	}
-	if len(byVersion) > maxVersions {
+	out, _ := puppetfmt.Releases[release]{
+		Version: func(rel release) string { return rel.meta.Version },
+		Refused: func(rel release) bool { return rel.refused },
+	}.Merge(r.Context(), parts)
+	if len(out) > maxVersions {
 		return nil, apierror.New(503, "Puppet releases exceed limit")
 	}
-	out := make([]release, 0, len(byVersion))
-	for _, v := range byVersion {
-		out = append(out, v)
-	}
-	sortReleases(out)
 	return out, nil
 }
 

@@ -86,8 +86,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafmt.MetadataPath) {
-	if !h.k.RequireFolder(w, r, path.Dir(id.Path), api.ActionRead) ||
-		!h.k.Require(w, r, id.Path, api.ActionRead) {
+	if !h.requireIndexRead(w, r, id) {
 		return
 	}
 	sharded := id.Filename == condafmt.ShardIndexFilename || condafmt.IsShardFilename(id.Filename)
@@ -113,7 +112,7 @@ func (h handler) readMetadata(w http.ResponseWriter, r *http.Request, id condafm
 		return
 	}
 	canonical := condafmt.IndexPath(id.Channel, id.Subdir, "repodata.json")
-	index, err := h.memberIndex(r, canonical, readPolicy{path: id.Path}, map[string]bool{})
+	index, err := h.memberIndex(r, canonical, readPolicy{path: id.Path})
 	if err != nil {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
 		return
@@ -195,31 +194,22 @@ type readPolicy struct {
 }
 
 // memberIndex returns only package records the caller may read. A virtual
-// aggregates concrete members in configured order; it never inherits one
-// member's authority or source network permit from another. The records of
-// packages whose files the patterns reject are kept: only their downloads
-// are refused (R3).
+// repository merges its members' in the package handlers' walk
+// (virtualIndex); it never inherits one member's authority or source
+// network permit from another. The records of packages whose files the
+// patterns reject are kept: only their downloads are refused (R3).
 func (h handler) memberIndex(
 	r *http.Request,
 	indexPath string,
 	policy readPolicy,
-	seen map[string]bool,
 ) (channelIndex, error) {
 	c := pkgroute.RequestFrom(r).Repo
 	id, ok := condafmt.ParseMetadataPath(indexPath)
 	if !ok {
 		return channelIndex{}, kernel.ErrNotFound
 	}
-	if seen[c.Key] || len(seen) >= 8 {
-		return channelIndex{}, apierror.New(
-			http.StatusBadRequest,
-			"Conda virtual member cycle",
-		)
-	}
-	seen[c.Key] = true
-	defer delete(seen, c.Key)
 	if c.Class == repo.Virtual {
-		return h.virtualIndex(r, id, policy, seen)
+		return h.virtualIndex(r, id, policy)
 	}
 	if !h.k.CanFolder(r, path.Dir(indexPath), api.ActionRead) ||
 		!h.k.Can(r, indexPath, api.ActionRead) {
