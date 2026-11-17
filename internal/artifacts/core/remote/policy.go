@@ -207,6 +207,12 @@ func (p *Policy) Read(
 		// refresh it, as the remote retrieval contract records.
 		return p.direct(ctx, q, permit, opts, key, noStore)
 	}
+	// A returning hop into this exact fill must reach the next HTTP hop's
+	// recursion guard without joining itself or superseding its cache token.
+	// The original fill owns persistence; this nested read owns its response.
+	if returningOrigin(ctx) && p.flights.Active(p.FlightKey(key, permit.Identity)) {
+		return p.direct(ctx, q, permit, opts, key, true)
+	}
 	// 7.161.26's DownloadServiceImpl.respond answers a HEAD from the
 	// upstream's info alone only where the remote stores nothing,
 	// "otherwise download the artifact normally and return the full info

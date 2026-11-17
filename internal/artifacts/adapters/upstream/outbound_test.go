@@ -119,3 +119,38 @@ func TestAccOutboundHooksOnRequestsAndRedirects(t *testing.T) {
 		}
 	})
 }
+
+func TestAccReservedOriginHeaders(t *testing.T) {
+	s := fakeupstream.New(t, fakeupstream.Options{})
+	s.Set("/item", fakeupstream.Resource{Body: []byte("ok")})
+	c := clientFor(t, repo.Config{URL: s.URL}, remote.Options{Prepare: func(r *http.Request) error {
+		r.Header.Set(remote.OriginHeader, "configured")
+		r.Header.Set(remote.OriginatedHeader, "configured")
+		return nil
+	}})
+	ctx := remote.WithOutbound(t.Context(), remote.Outbound{Header: func(r *http.Request) { r.Header.Set(remote.OriginHeader, "hook") }})
+	res, err := c.Do(ctx, remote.Request{Method: http.MethodGet, Path: "item"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body(t, res) != "ok" {
+		t.Fatal("body")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.URL+"/item", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set(remote.OriginatedHeader, "configured")
+	res, err = c.Send(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body(t, res) != "ok" {
+		t.Fatal("body")
+	}
+	for _, r := range s.Requests() {
+		if !r.HeaderMatches(remote.OriginatedHeader, remote.OriginHostID()) || !r.HeaderMatches(remote.OriginHeader, remote.OriginHostID()) {
+			t.Fatal(r.Header)
+		}
+	}
+}

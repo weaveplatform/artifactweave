@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -42,6 +43,7 @@ func (g *FlightGroup[T]) Do(
 	key string,
 	work func(context.Context) (T, error),
 ) (T, error) {
+	key = originFlightKey(ctx, key)
 	var zero T
 	if err := ctx.Err(); err != nil {
 		return zero, fmt.Errorf("join remote retrieval: %w", err)
@@ -84,6 +86,19 @@ func (g *FlightGroup[T]) Do(
 	case <-f.done:
 		return f.result, f.err
 	}
+}
+
+// Active reports whether key has work in progress under any origin trace.
+// A returning hop uses this to avoid superseding its own original cache fill.
+func (g *FlightGroup[T]) Active(key string) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for active := range g.active {
+		if active == key || strings.HasPrefix(active, key+"/origin/") {
+			return true
+		}
+	}
+	return false
 }
 
 // Pending reports how many callers wait on the group's active flights.

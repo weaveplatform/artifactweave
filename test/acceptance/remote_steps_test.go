@@ -10,9 +10,11 @@ import (
 	"github.com/cucumber/godog"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 )
 
 func (w *world) registerRemote(sc *godog.ScenarioContext) {
+	sc.Step(`^the generic upstream received a GET for "([^"]*)" with origin headers$`, w.remoteOriginHeaders)
 	w.registerSmartRemote(sc)
 	w.registerRemoteNPM(sc)
 	w.registerRemoteHelm(sc)
@@ -67,4 +69,13 @@ func (w *world) runCurl(args string) error {
 		return err
 	}
 	return nil
+}
+
+func (w *world) remoteOriginHeaders(path string) error {
+	for _, r := range w.remote.Requests() {
+		if r.Method == "GET" && r.Path == path && r.Header.Get(remote.OriginHeader) != "" && r.Header.Get(remote.OriginatedHeader) != "" {
+			return nil
+		}
+	}
+	return fmt.Errorf("no upstream GET for %s carried origin headers", path)
 }

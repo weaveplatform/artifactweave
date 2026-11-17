@@ -878,3 +878,14 @@ func TestAccSmartUploadPropertiesFailClosed(t *testing.T) {
 		})
 	}
 }
+
+func TestUnitSmartTraceDoesNotCountTransportHosts(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.Header.Add(SmartOriginHeader, "0123456789abcdef01234567,peer/repo")
+	SmartTrace(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		trace, _ := r.Context().Value(smartTraceKey{}).([]string)
+		if len(trace) != 1 || trace[0] != "peer/repo" {
+			t.Fatalf("host consumed Smart hop budget: %v", trace)
+		}
+	})).ServeHTTP(httptest.NewRecorder(), r)
+}
