@@ -51,7 +51,9 @@
 //     member wins a key), SortVersions (stable), Latest (stable versions
 //     first), Accepts (both repositories' patterns, for a merged list
 //     filtered before it is paged, R5), and APIBase and ItemBase, the
-//     virtual repository's URL a merged document points at.
+//     virtual repository's URL a merged document points at. The formats'
+//     Mergers so far: gems.Merger, luarocks.Merger and pub.Merger
+//     (https://github.com/weaveplatform/artifactweave/issues/1538).
 //
 // Planned (target layout, lines 659-663): cache.go, merged metadata cached
 // for virtualRetrievalCachePeriodSecs.
@@ -100,7 +102,10 @@
 // route's upstream steps, which itemkit takes in Resolve's order
 // (https://github.com/weaveplatform/artifactweave/issues/1535); and the
 // merge contract (Merger, Collect and its helpers;
-// https://github.com/weaveplatform/artifactweave/issues/1536). The rest of
+// https://github.com/weaveplatform/artifactweave/issues/1536); and the
+// RubyGems, LuaRocks and Dart pub virtual repositories on it, each with its
+// Merger in ecosystem/<type>/virtual.go
+// (https://github.com/weaveplatform/artifactweave/issues/1538). The rest of
 // the package is planned for P10's other tickets
 // (https://github.com/weaveplatform/artifactweave/issues/1521).
 //
@@ -113,5 +118,7 @@
 // DeployTarget for each class the defaultDeploymentRepo may name, unset and
 // missing, and a read that fails. merge_test.go merges with a test Merger
 // built from the helpers alone, as a format's virtual.go would be, and
-// covers Collect's pass-overs and faults and each helper's edges.
+// covers Collect's pass-overs and faults and each helper's edges. Each
+// format's Merger has its own virtual_test.go beside it (gems, luarocks and
+// pub so far).
 package virtual

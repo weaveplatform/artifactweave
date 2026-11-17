@@ -53,7 +53,7 @@ EOF
 
 ## Publish
 
-Classes: **local, federated**. Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.
+Classes: **local, virtual, federated**. Publish only to the classes listed here. A virtual repository stores what it is sent in its default deployment repository, local or federated, and answers 405 without one. A federated recipe proves one-node behavior; remote repositories are read-only client sources.
 
 ```sh
 luarocks upload hello-1.0-1.rockspec
@@ -71,7 +71,7 @@ luarocks install hello 1.0-1 --tree "$PWD/installed"
 
 Classes outside **local, remote, virtual, federated** are not registered for this format. Commands above apply only to each operation's listed classes. Federated evidence is for one node; it does not establish cross-vendor replication.
 
-- Remote and virtual sources resolve rocks; target a local/federated repository for this publication recipe.
+- Remote sources only resolve rocks; a virtual repository publishes to its default deployment repository.
 - The install tree, client home and caches must all start empty.
 
 ## Verification sources
@@ -82,3 +82,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/luarocks_local.feature](../../test/acceptance/features/luarocks_local.feature).
 - Evidence: [test/acceptance/luarocks_steps_test.go](../../test/acceptance/luarocks_steps_test.go).
 - Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).
+- Evidence: [test/acceptance/features/luarocks_virtual.feature](../../test/acceptance/features/luarocks_virtual.feature).

@@ -379,18 +379,12 @@ func TestAccNativeRejectsInvalidProtocolRequests(t *testing.T) {
 			)
 		}
 	}
-	for _, repoKey := range []string{"gems-virtual"} {
-		status(
-			t,
-			w.do(http.MethodPost, "/artifactory/api/gems/"+repoKey+"/api/v1/gems", "admin", w.gem),
-			http.StatusMethodNotAllowed,
-		)
-		status(
-			t,
-			w.do(http.MethodDelete, "/artifactory/api/gems/"+repoKey+"/api/v1/yank", "admin", nil),
-			http.StatusMethodNotAllowed,
-		)
-	}
+	// A yank through a virtual repository has no 7.x source, so it keeps
+	// its 405 [I]; a push lands in the deployment repository
+	// (TestAccVirtualPushLandsInTheDeploymentRepository).
+	wantError(t,
+		w.do(http.MethodDelete, "/artifactory/api/gems/gems-virtual/api/v1/yank", "admin", nil),
+		http.StatusMethodNotAllowed, "yank requires a local or federated repository")
 	status(t, w.do(http.MethodGet, base+"versions", "", nil), http.StatusUnauthorized)
 }
 
@@ -476,6 +470,9 @@ func TestAccNativeRawRubyGemsTokenAuth(t *testing.T) {
 	)
 }
 
+// A grant naming the virtual repository alone, which no 7.x permission
+// target can express, reads no member: the virtual repository's indexes
+// refuse it, as the item routes refuse its root, and its gem is not found.
 func TestAccVirtualFiltersUnreadableMember(t *testing.T) {
 	w := newWorld(t)
 	status(
@@ -492,7 +489,7 @@ func TestAccVirtualFiltersUnreadableMember(t *testing.T) {
 		t.Fatal(err)
 	}
 	versions := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/versions", "limited", nil)
-	status(t, versions, http.StatusOK)
+	status(t, versions, http.StatusForbidden)
 	if strings.Contains(versions.Body.String(), "rake") {
 		t.Fatalf("member data leaked into virtual index: %s", versions.Body)
 	}
@@ -508,7 +505,9 @@ func TestAccVirtualFiltersUnreadableMember(t *testing.T) {
 	)
 }
 
-func TestAccVirtualRejectsMemberCycleAndSkipsRemovedMember(t *testing.T) {
+// A virtual repository that lists itself skips itself (R2), with no 400 or
+// 500, and one that lists a removed member skips that member.
+func TestAccVirtualSkipsMemberCycleAndRemovedMember(t *testing.T) {
 	w := newWorld(t)
 	c, err := w.db.Repos().Get(t.Context(), "gems-virtual")
 	if err != nil {
@@ -518,12 +517,15 @@ func TestAccVirtualRejectsMemberCycleAndSkipsRemovedMember(t *testing.T) {
 	if err := w.db.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"versions", "gems/rake-12.3.1.gem"} {
-		got := w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/"+path, "admin", nil)
-		if got.Code < 400 {
-			t.Errorf("member cycle accepted through %s: %d %s", path, got.Code, got.Body)
-		}
+	status(t, w.do(http.MethodPut, "/artifactory/gems-local/gems/rake-12.3.1.gem", "admin", w.gem),
+		http.StatusCreated)
+	if !lists(t, w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/versions", "admin", nil)) {
+		t.Error("a virtual repository that lists itself lost its other member's gem")
 	}
+	wantGem(t, w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/gems/rake-12.3.1.gem",
+		"admin", nil), w.gem)
+	wantError(t, w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/gems/rake-1.0.0.gem",
+		"admin", nil), http.StatusNotFound, "Could not find resource")
 	c.Repositories = []string{"removed-member", "gems-local"}
 	if err := w.db.Repos().Update(t.Context(), c); err != nil {
 		t.Fatal(err)
@@ -1302,13 +1304,215 @@ func TestAccVirtualRemoteMemberPolicy(t *testing.T) {
 		t.Error("the remote's own specs.4.8.gz changed")
 	}
 
-	// A member that fails to serve the gem it lists fails the download, as
-	// before: only a member without the gem, or one that refuses it, is
-	// passed over.
+	// A member whose upstream fails to serve the gem it lists is passed
+	// over, as one whose upstream answers 5xx is [I]; the remote's own
+	// route still answers the failure.
 	w.setPolicy("gems-remote", false, "", "")
 	broken := bytes.Clone(w.gem)
 	broken[len(broken)/2] ^= 1
 	up.Set("/gems/rake-12.3.1.gem", fakeupstream.Resource{Body: broken})
-	status(t, w.do(http.MethodGet, virtual+"gems/rake-12.3.1.gem", "admin", nil),
+	wantError(t, w.do(http.MethodGet, virtual+"gems/rake-12.3.1.gem", "admin", nil),
+		http.StatusNotFound, "Could not find resource")
+	status(t, w.do(http.MethodGet, remote+"gems/rake-12.3.1.gem", "admin", nil),
 		http.StatusBadGateway)
+}
+
+// grantRead gives user Read and Deploy/Cache on every path of each
+// repository in keys: a read that fills a remote's cache needs Deploy/Cache
+// (#1587), as a push does.
+func (w *world) grantRead(user string, keys ...string) {
+	w.t.Helper()
+	if err := w.db.Users().
+		Create(w.t.Context(), accesstest.User{Name: user, PasswordHash: support.CheapHash}); err != nil {
+		w.t.Fatal(err)
+	}
+	targets := map[string]accesstest.Target{}
+	for _, key := range keys {
+		targets[key] = accesstest.Target{Include: []string{"**"}}
+	}
+	if err := w.db.Permissions().Create(w.t.Context(), accesstest.Permission{
+		Name: user,
+		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]api.Actions{
+				user: api.ActionRead | api.ActionWrite,
+			}},
+			Targets: targets,
+		}},
+	}); err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+// setMembers sets the members and default deployment repository of the
+// virtual repository key.
+func (w *world) setMembers(key, deployTo string, members ...string) {
+	w.t.Helper()
+	c, err := w.db.Repos().Get(w.t.Context(), key)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	c.Repositories, c.DefaultDeploymentRepo = members, deployTo
+	if err := w.db.Repos().Update(w.t.Context(), c); err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+// listsGem reports whether the 200 compact versions index rec lists name.
+func listsGem(t *testing.T, rec *httptest.ResponseRecorder, name string) bool {
+	t.Helper()
+	status(t, rec, http.StatusOK)
+	return slices.ContainsFunc(strings.Split(rec.Body.String(), "\n"), func(line string) bool {
+		return strings.HasPrefix(line, name+" ")
+	})
+}
+
+// TestAccVirtualWalksNestedMembersForMemberReaders: a virtual repository
+// over [remote, nested virtual -> local] lists the remote's foo and the
+// local member's rake, skipping the nested repository's way back to the
+// outer one and itself (R2), for an administrator and for a caller with
+// Read on the members alone (R3). A caller who may read only the local
+// member gets its gems alone, the remote passed over and its gem not
+// found. A remote member whose upstream has no index, or answers 5xx, is
+// passed over [I], and the index lists the other members' gems.
+func TestAccVirtualWalksNestedMembersForMemberReaders(t *testing.T) {
+	up := fakeupstream.New(t, fakeupstream.Options{})
+	w := newRemoteWorld(t, up)
+	foo, err := gemfmt.Read(t.Context(), bytes.NewReader(w.gem), int64(len(w.gem)),
+		"gems/rake-12.3.1.gem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	foo.Name, foo.Path = "foo", "gems/foo-12.3.1.gem"
+	foos := []gemfmt.Package{foo}
+	up.Set("/versions", fakeupstream.Resource{Body: gemfmt.CompactVersions(foos)})
+	up.Set("/info/foo", fakeupstream.Resource{Body: gemfmt.CompactInfo("foo", foos)})
+	status(t, w.do(http.MethodPut, "/artifactory/gems-local/gems/rake-12.3.1.gem", "admin", w.gem),
+		http.StatusCreated)
+	inner := repo.Config{
+		Key: "gems-inner", Class: repo.Virtual, PackageType: repo.Gems,
+		Repositories: []string{"gems-local", "gems-remote-virtual", "gems-inner"},
+	}
+	if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&inner)); err != nil {
+		t.Fatal(err)
+	}
+	w.setMembers("gems-remote-virtual", "", "gems-remote", "gems-inner")
+	w.grantRead("members", "gems-local", "gems-remote")
+	w.grantRead("local-reader", "gems-local")
+	const virtual = "/artifactory/api/gems/gems-remote-virtual/"
+	for _, user := range []string{"admin", "members"} {
+		versions := w.do(http.MethodGet, virtual+"versions", user, nil)
+		if !listsGem(t, versions, "rake") || !listsGem(t, versions, "foo") {
+			t.Fatalf("versions as %s: %s", user, versions.Body)
+		}
+		wantGem(t, w.do(http.MethodGet, virtual+"gems/rake-12.3.1.gem", user, nil), w.gem)
+	}
+	versions := w.do(http.MethodGet, virtual+"versions", "local-reader", nil)
+	if !listsGem(t, versions, "rake") || listsGem(t, versions, "foo") {
+		t.Fatalf("versions without the remote member: %s", versions.Body)
+	}
+	wantError(t, w.do(http.MethodGet, virtual+"gems/foo-12.3.1.gem", "local-reader", nil),
+		http.StatusNotFound, "Could not find resource")
+
+	for name, failure := range map[string]fakeupstream.Resource{
+		"missing index": {Status: http.StatusNotFound},
+		"failing index": {Status: http.StatusInternalServerError},
+	} {
+		w := newRemoteWorld(t, fakeupstream.New(t, fakeupstream.Options{}))
+		upstream := fakeupstream.New(t, fakeupstream.Options{})
+		upstream.Set("/versions", failure)
+		remote, err := w.db.Repos().Get(t.Context(), "gems-remote")
+		if err != nil {
+			t.Fatal(err)
+		}
+		remote.URL = upstream.URL
+		if err := w.db.Repos().Update(t.Context(), remote); err != nil {
+			t.Fatal(err)
+		}
+		status(t, w.do(http.MethodPut, "/artifactory/gems-local/gems/rake-12.3.1.gem", "admin",
+			w.gem), http.StatusCreated)
+		w.setMembers("gems-remote-virtual", "", "gems-remote", "gems-local")
+		for _, path := range []string{"versions", "specs.4.8.gz", "api/v1/search.json?query=rake"} {
+			if !lists(t, w.do(http.MethodGet, virtual+path, "admin", nil)) {
+				t.Errorf("%s: %s lost the local member's rake", name, path)
+			}
+		}
+	}
+}
+
+// TestAccVirtualGemsIgnorePriorityResolution: JFrog's RubyGems page says
+// priority resolution is not supported for RubyGems virtual repositories,
+// so a remote member that sets it is still searched after the local one
+// (R1's groups without priority): the local member serves the gem and the
+// upstream is never asked for it.
+func TestAccVirtualGemsIgnorePriorityResolution(t *testing.T) {
+	up := fakeupstream.New(t, fakeupstream.Options{})
+	w := newRemoteWorld(t, up)
+	p, err := gemfmt.Read(t.Context(), bytes.NewReader(w.gem), int64(len(w.gem)),
+		"gems/rake-12.3.1.gem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	packages := []gemfmt.Package{p}
+	up.Set("/versions", fakeupstream.Resource{Body: gemfmt.CompactVersions(packages)})
+	up.Set("/info/rake", fakeupstream.Resource{Body: gemfmt.CompactInfo("rake", packages)})
+	up.Set("/gems/rake-12.3.1.gem", fakeupstream.Resource{Body: w.gem})
+	remote, err := w.db.Repos().Get(t.Context(), "gems-remote")
+	if err != nil {
+		t.Fatal(err)
+	}
+	remote.PriorityResolution = repo.Flex(true)
+	if err := w.db.Repos().Update(t.Context(), remote); err != nil {
+		t.Fatal(err)
+	}
+	status(t, w.do(http.MethodPut, "/artifactory/gems-local/gems/rake-12.3.1.gem", "admin", w.gem),
+		http.StatusCreated)
+	w.setMembers("gems-remote-virtual", "", "gems-remote", "gems-local")
+	wantGem(t, w.do(http.MethodGet, "/artifactory/api/gems/gems-remote-virtual/gems/rake-12.3.1.gem",
+		"admin", nil), w.gem)
+	if n := up.Count("", "/gems/rake-12.3.1.gem"); n != 0 {
+		t.Fatalf("the remote member was asked for the gem first: %d requests", n)
+	}
+}
+
+// TestAccVirtualPushLandsInTheDeploymentRepository: gem push to a virtual
+// repository stores the gem in its default deployment repository, local or
+// federated, asking Write of that repository alone (RTFACT-17787; decision
+// 0008, R6). Write on the virtual repository alone does not deploy, and
+// without a deployment repository the push answers R6's 405 with Allow:
+// GET.
+func TestAccVirtualPushLandsInTheDeploymentRepository(t *testing.T) {
+	w := newWorld(t)
+	const push = "/artifactory/api/gems/gems-virtual/api/v1/gems"
+	w.grantRead("pusher", "gems-local")
+	w.grantRead("virtual-pusher", "gems-virtual", "gems-fed")
+	status(t, w.do(http.MethodPost, push, "virtual-pusher", w.gem), http.StatusForbidden)
+	got := w.do(http.MethodPost, push, "pusher", w.gem)
+	status(t, got, http.StatusOK)
+	if got.Body.String() != "Successfully registered gem: rake (12.3.1)\n" {
+		t.Fatalf("push answer %q", got.Body)
+	}
+	if _, err := w.db.Items().Get(t.Context(), "gems-local", false,
+		"gems/rake-12.3.1.gem"); err != nil {
+		t.Fatalf("gem in the deployment repository: %v", err)
+	}
+	if !lists(t, w.do(http.MethodGet, "/artifactory/api/gems/gems-virtual/versions", "pusher",
+		nil)) {
+		t.Fatal("the pushed gem is not listed through the virtual repository")
+	}
+	status(t, w.do(http.MethodPost, push, "pusher", w.gem), http.StatusConflict)
+
+	w.setMembers("gems-virtual", "gems-fed", "gems-local", "gems-fed")
+	status(t, w.do(http.MethodPost, push, "virtual-pusher", w.gem), http.StatusOK)
+	if _, err := w.db.Items().Get(t.Context(), "gems-fed", false,
+		"gems/rake-12.3.1.gem"); err != nil {
+		t.Fatalf("gem in the federated deployment repository: %v", err)
+	}
+
+	w.setMembers("gems-virtual", "", "gems-local", "gems-fed")
+	got = w.do(http.MethodPost, push, "admin", w.gem)
+	wantError(t, got, http.StatusMethodNotAllowed, "No local repository was configured as "+
+		"local deployment repository for the (gems-virtual) virtual repository.")
+	if allow := got.Header().Get("Allow"); allow != http.MethodGet {
+		t.Fatalf("Allow: %q", allow)
+	}
 }

@@ -26,8 +26,8 @@
     }
   ],
   "publish": {
-    "classes": "LF",
-    "note": "Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
+    "classes": "LVF",
+    "note": "Publish only to the classes listed here. A virtual repository stores what it is sent in its default deployment repository, local or federated, and answers 405 without one. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
     "steps": [
       {
         "language": "sh",
@@ -65,6 +65,12 @@
         "pub publish --force",
         "I clear the Dart pub client cache",
         "pub get"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/pub.feature",
+      "contains": [
+        "publish_to: \"{darturl}/artifactory/api/pub/pub-all\""
       ]
     }
   ]

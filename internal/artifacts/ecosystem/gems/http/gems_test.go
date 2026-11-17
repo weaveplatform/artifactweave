@@ -26,7 +26,7 @@ func TestUnitRubyGemsDetailsAndVersionDocuments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows := []entry{{Package: p, at: time.Unix(0, 0)}}
+	rows := []gemfmt.Release{{Package: p, Created: time.Unix(0, 0)}}
 	for _, path := range []string{"api/v1/gems/rake.json", "api/v1/versions/rake.json", "api/v1/versions/rake"} {
 		body, media, err := render(path, rows)
 		if err != nil || media != "application/json" || !json.Valid(body) ||

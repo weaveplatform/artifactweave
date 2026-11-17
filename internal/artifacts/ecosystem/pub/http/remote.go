@@ -82,7 +82,7 @@ func parseVersions(data []byte, name, responseBase string) ([]release, error) {
 			remoteURL: u.String(),
 		})
 	}
-	sortReleases(out)
+	pubfmt.SortNewestFirst(out, release.version)
 	return out, nil
 }
 

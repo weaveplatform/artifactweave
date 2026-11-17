@@ -7,8 +7,10 @@ import (
 	"net/url"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	pubfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/pub"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -18,7 +20,7 @@ import (
 const maxMultipartBytes = pubfmt.MaxArchiveBytes + 2<<20
 
 func (h handler) publishStart(w http.ResponseWriter, r *http.Request) {
-	if !h.publishAllowed(w, r) {
+	if _, ok := h.publishTarget(w, r); !ok {
 		return
 	}
 	writeJSON(w, r, http.StatusOK, map[string]any{
@@ -28,15 +30,18 @@ func (h handler) publishStart(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) publishUpload(w http.ResponseWriter, r *http.Request) {
-	if !h.publishAllowed(w, r) {
+	target, ok := h.publishTarget(w, r)
+	if !ok {
 		return
 	}
 	if r.ContentLength > maxMultipartBytes {
 		h.k.Error(w, r, apierror.New(http.StatusRequestEntityTooLarge, "pub archive exceeds limit"))
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxMultipartBytes)
-	form, err := h.k.ReadForm(r, "file")
+	// Through a virtual repository target is a copy of r, and the form is
+	// read from its body.
+	target.Body = http.MaxBytesReader(w, r.Body, maxMultipartBytes)
+	form, err := h.k.ReadForm(target, "file")
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -61,10 +66,10 @@ func (h handler) publishUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := pubfmt.Path(meta.Name, meta.Version)
-	if !h.k.Require(w, r, path, api.ActionWrite) {
+	if !h.k.Require(w, target, path, api.ActionWrite) {
 		return
 	}
-	item, err := h.k.StoreNew(r, path, form.File, nil, kernel.Checksums{}, func() error {
+	item, err := h.k.StoreNew(target, path, form.File, nil, kernel.Checksums{}, func() error {
 		return apierror.New(http.StatusConflict, "Dart pub version already published")
 	})
 	if err != nil {
@@ -82,7 +87,8 @@ func (h handler) publishUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h handler) publishComplete(w http.ResponseWriter, r *http.Request) {
-	if !h.publishAllowed(w, r) {
+	target, ok := h.publishTarget(w, r)
+	if !ok {
 		return
 	}
 	query := r.URL.Query()
@@ -93,10 +99,12 @@ func (h handler) publishComplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := pubfmt.Path(name, version)
-	if !h.k.Require(w, r, path, api.ActionWrite) {
+	if !h.k.Require(w, target, path, api.ActionWrite) {
 		return
 	}
-	item, err := h.k.DB().Items().Get(r.Context(), pkgroute.RequestFrom(r).Repo.Key, false, path)
+	item, err := h.k.DB().Items().Get(
+		r.Context(), pkgroute.RequestFrom(target).Repo.Key, false, path,
+	)
 	if errors.Is(err, kernel.ErrNotFound) {
 		h.k.Error(w, r, apierror.New(http.StatusNotFound, "pub version not found"))
 		return
@@ -116,16 +124,44 @@ func (h handler) publishComplete(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h handler) publishAllowed(w http.ResponseWriter, r *http.Request) bool {
-	class := pkgroute.RequestFrom(r).Repo.Class
-	if class != repo.Local && class != repo.Federated {
+// publishTarget returns the request a publish step to r's repository
+// writes with, once the caller holds Write on that repository's root: r
+// itself for a local or federated repository, or, for a virtual repository,
+// a member request for its default deployment repository, a local or
+// federated member (virtual.DeployTarget), whose Write alone the publish
+// needs. 7.x publishes through a virtual repository to that repository
+// (RTFACT-31048 logs a dart pub publish to the virtual "pub" deployed to
+// pub-local; decision 0008, R6), and without one answers 405 with Allow:
+// GET before it checks any permission (UploadServiceUtils.
+// getTargetRepository 248-261, 7.161.26). The URLs a step hands the client
+// stay the virtual repository's (hostedURL of r), so the client's next step
+// comes through it too. A remote repository takes no publish.
+func (h handler) publishTarget(w http.ResponseWriter, r *http.Request) (*http.Request, bool) {
+	target := r
+	switch v := pkgroute.RequestFrom(r).Repo; v.Class {
+	case repo.Local, repo.Federated:
+	case repo.Virtual:
+		c, err := virtual.DeployTarget(r.Context(), h.k.DB().Repos(), v)
+		switch {
+		case errors.Is(err, virtual.ErrNoDeployTarget):
+			err = itemkit.NoDeployTarget(v.Key)
+		case err == nil:
+			target, err = h.k.MemberRequest(r, c)
+		default:
+			err = fmt.Errorf("pub: %w", err)
+		}
+		if err != nil {
+			h.k.Error(w, r, err)
+			return nil, false
+		}
+	default:
 		h.k.Error(w, r, apierror.New(
 			http.StatusMethodNotAllowed,
 			"Dart pub publishing requires a local or federated repository",
 		))
-		return false
+		return nil, false
 	}
-	return h.k.RequireFolder(w, r, "", api.ActionWrite)
+	return target, h.k.RequireFolder(w, target, "", api.ActionWrite)
 }
 
 func hostedURL(r *http.Request) string {

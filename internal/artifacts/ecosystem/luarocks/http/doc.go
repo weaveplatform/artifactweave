@@ -24,11 +24,15 @@
 //     repository and the caller, checks permissions, reads multipart
 //     uploads, stores uploaded files and their signatures through the item
 //     service, where the format's hooks admit them, reads the package
-//     index, items and blobs, builds a virtual repository's member
-//     requests, serves items and writes errors; the remote source service,
+//     index, items and blobs, walks a virtual repository's members
+//     (MergeMembers, Collect) and logs a member it passes over for a
+//     fault, serves items and writes errors; the core virtual package
+//     (artifacts/core/virtual), which names a virtual repository's
+//     deployment repository; the remote source service,
 //     which fetches a remote's upstream manifests and rocks into the remote
 //     cache; and the format package, whose rules parse every file name,
-//     check every upstream file and map upload version ids.
+//     check every upstream file and map upload version ids, and whose
+//     Merger merges a virtual repository's members' manifests.
 //
 // # Outputs
 //
@@ -46,7 +50,8 @@
 // # Invariants
 //
 //   - Reads take the read grant and uploads the write grant on the
-//     repository. An uploaded rockspec needs a valid root rockspec file
+//     repository; through a virtual repository, which no permission target
+//     can name, the members' grants decide instead. An uploaded rockspec needs a valid root rockspec file
 //     name (400); a rock's version id must name a stored version (404) whose
 //     package and version its file name gives (400). A signature,
 //     rockspec_sig or rock_sig, must be <file>.asc of at most 1 MiB (400)
@@ -58,13 +63,21 @@
 //     fetches a rock only when the current upstream manifest lists its
 //     exact file name, and caches it only when it passes the format's
 //     checks.
-//   - A virtual repository's members are distinct local or remote LuaRocks
-//     repositories, checked at each request (400). Their manifests merge in
-//     member order, each filtered by the caller's grant on that member; the
-//     first member that holds an exact rock supplies it; and an upload goes
-//     to the default deployment repository, which must be a local member
-//     (405 when none is set, 400 when it is missing or not local) that the
-//     caller may also write to (403).
+//   - A virtual repository reads its members in the package handlers' walk
+//     (decision 0008, R1, R2), read at each request: local and federated
+//     members before remote ones, priorityResolution first, nested virtual
+//     repositories flattened, and a member listed twice, a cycle and a
+//     member of another type skipped. Their manifests merge in that order
+//     (luarocks.Merger), each filtered by the caller's grant on that
+//     member, and need the read grant on the root of some member
+//     (RequireRoot); the first member that holds an exact rock supplies it.
+//     A member without the file, one the caller may not read and one whose
+//     upstream fails or cannot be reached are passed over (R3), the last
+//     with a warning [I], so a rock no member serves is the virtual
+//     repository's 404. An upload goes to the default deployment
+//     repository, local or federated, which the caller must be able to
+//     write to (403), and without one answers 405 with Allow: GET and
+//     7.x's message (R6).
 //   - Remote and virtual reads take no query (400).
 //   - A local or federated repository resolves, and so may queue the
 //     manifest work for, only the names the work writes: manifest and
@@ -145,11 +158,14 @@
 //     metadata, accepts dotted names, skips legacy versions and refuses
 //     executable, ambiguous or invalid input without running Lua.
 //   - virtual_routes_test.go (external): virtual manifest and rock
-//     resolution, uploads to the deployment target, refused members,
-//     queries and denied members, the target's checks and grants, empty and
-//     failing manifests, member changes at request time and store faults.
+//     resolution in R1's order, nested members, cycles and member-only
+//     readers, uploads to a local or federated deployment target, members
+//     of another type passed over, queries and denied members, the
+//     target's checks and grants, empty manifests and failing members
+//     passed over, member changes at request time and store faults.
 //   - virtual_test.go: the virtual source's refusal of a single-item
 //     lookup, and manifest merging in member order.
+//   - ../virtual_test.go: the Merger.
 //   - policy_test.go (external): the download policy on the local, remote
 //     and virtual manifests and rocks: blackout, patterns on the manifest
 //     and on one rock, members passed over or left out, and the virtual

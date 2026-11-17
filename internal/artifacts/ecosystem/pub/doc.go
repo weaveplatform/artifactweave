@@ -21,14 +21,16 @@
 //     queue, which runs every format's reindex through it (JFrog's
 //     /api/pub/{repoKey}/reindex schedules one); and the protocol, which
 //     checks names and versions (ValidName, ValidVersion), builds archive
-//     paths (Path), reads uploaded and upstream archives (ReadArchive) and
-//     decodes the version metadata the index holds (Metadata).
+//     paths (Path), reads uploaded and upstream archives (ReadArchive),
+//     decodes the version metadata the index holds (Metadata), orders a
+//     versions list (SortNewestFirst) and merges a virtual repository's
+//     members' versions (Merger).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold the
 //     archives, and its store holds the items, their properties and the
 //     package index (artifacts/core/pkgindex). The generic blackout and
 //     include and exclude checks (artifacts/ecosystem/generic) run before
 //     the format's own. YAML (gopkg.in/yaml.v3) decodes the pubspecs, and
-//     golang.org/x/mod/semver checks versions.
+//     golang.org/x/mod/semver checks and orders versions.
 //   - Settings: none.
 //
 // # Outputs
@@ -47,6 +49,12 @@
 //     archive.
 //   - The path and archive rules: ValidName, ValidVersion, Path, ParsePath,
 //     ReadArchive, Metadata, ErrArchive and the archive bounds.
+//   - Merger and SortNewestFirst: the virtual.Merger
+//     (artifacts/core/virtual) of a virtual repository's versions, which
+//     keeps, for each version, the first member's release in the walk's
+//     order, the member its archive download serves it from (decision
+//     0008, "Per-format merges"), and the newest-first SemVer order a
+//     versions document lists, which hosted and remote lists share.
 //
 // # Invariants
 //
@@ -84,10 +92,12 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P30 group (issues #762 to
-// #768). Moved here in P9d.
+// #768). Moved here in P9d. Merger and SortNewestFirst added in P10
+// (https://github.com/weaveplatform/artifactweave/issues/1538).
 //
 // # Testing
 //
+//   - virtual_test.go: the Merger lists each version once, newest first.
 //   - archive_test.go: whole-tarball validation, invalid manifests, and the
 //     path round trip.
 //   - handler_test.go: admission against the archive's identity and the

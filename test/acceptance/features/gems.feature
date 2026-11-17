@@ -53,6 +53,49 @@ Feature: Native RubyGems and Bundler repositories
     Then the command succeeds
     And the server answered no request with 500 since the last command
 
+  # A virtual repository over a local and a remote member: gem push
+  # through it lands in its default deployment repository (RTFACT-17787),
+  # and gem and Bundler resolve through both members.
+  Scenario: gem push and install through a virtual repository over local and remote members
+    Given the registry is running
+    And the Ruby client can reach the registry
+    And a RubyGems upstream serves the pinned rake gem
+    When I PUT "/artifactory/api/repositories/gems-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"gems"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/gems-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"gems","url":"{upstream}"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/gems-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"gems","repositories":["gems-remote","gems-local"],"defaultDeploymentRepo":"gems-local"}
+      """
+    Then the response status is 200
+    When I POST "/access/api/v1/tokens" as admin with body:
+      """
+      {"expires_in":3600}
+      """
+    Then the response status is 200
+    And I keep the JSON field "access_token" of the response as "gems-token"
+    Given the RubyGems source is "gems-virtual"
+    When I run Ruby gem "push /work/rake-12.3.1.gem --host {gemhost}" with the kept token "gems-token" as its API key
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When I GET "/artifactory/gems-local/gems/rake-12.3.1.gem" as admin
+    Then the response status is 200
+    When I run Ruby "bundle" "install"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the file "Gemfile.lock" contains "rake (12.3.1)"
+    When I run Ruby "gem" "install rake -v 12.3.1 --source {gemsource} --clear-sources --install-dir /work/gem-installed --no-document"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the file "gem-installed/gems/rake-12.3.1/README.rdoc" exists
+
   Scenario: gem and Bundler install from a remote cache
     Given the registry is running
     And the Ruby client can reach the registry

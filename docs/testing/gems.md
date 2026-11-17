@@ -18,7 +18,12 @@ gem install rake -v 12.3.1 --source https://<user>:<token>@<host>/artifactory/ap
 For Bundler, write `source 'https://<user>:<token>@<host>/artifactory/api/gems/<repo>/'`
 and `gem 'rake', '12.3.1'` to a Gemfile, then run `bundle install`. Avoid
 committing credentials in Gemfiles or lockfiles. `gem push` sends the archive
-to `/artifactory/api/gems/<repo>/api/v1/gems`; the standard Artifactory item
+to `/artifactory/api/gems/<repo>/api/v1/gems`. A push to a virtual repository
+lands in its default deployment repository, local or federated, and needs
+deploy permission there only, as JFrog fixed in 6.12.0
+([RTFACT-17787](https://jfrog.atlassian.net/browse/RTFACT-17787)); without a
+default deployment repository it answers 405 with `Allow: GET`. A yank
+through a virtual repository answers 405. The standard Artifactory item
 `PUT /artifactory/<repo>/gems/<file>.gem` is also accepted. A local or
 one-node federated repository can rebuild its index with
 `POST /artifactory/api/gems/<repo>/reindex`. Deletion and restore through the
@@ -33,19 +38,22 @@ accumulate additions and yanks; the last row supplies the current `info`
 MD5. Remote metadata is rendered from gem entries the caller can read, so
 denied archives are absent from compact, Marshal and JSON indexes. Remote
 cache freshness, offline reads and redirect rules follow the shared remote
-source policy. A virtual repository walks its configured
-members in order, deduplicates identical archive paths and omits entries
-that the caller cannot read in both the virtual and member repositories.
+source policy.
 
-The [current JFrog guide](https://docs.jfrog.com/artifactory/docs/rubygems-repositories)
-documents compact indexes on L/R/V, but says **virtual priority resolution
-is limited after deprecation of `/dependencies`**. The signed
-[format inventory](../implementation/package-format-inventory.json) calls
-for ordered virtual members. Here, ordering selects the first readable
-member for an identical archive path; Bundler may still choose among
-different versions according to its own dependency solver. This is a
-specific compatibility boundary, not a claim that JFrog guarantees
-priority selection for every Bundler resolution. The
+A virtual repository walks its members as 7.x's package handlers do: local
+and federated members first, then remote ones, each group in configured
+order, with nested virtual repositories flattened and a member reached
+twice, or a cycle, skipped. The
+[current JFrog guide](https://docs.jfrog.com/artifactory/docs/rubygems-repositories)
+says "Priority resolution is currently not supported for RubyGems virtual
+repositories", so a member's `priorityResolution` does not move it. The
+first member in that order that lists an archive path supplies it, and
+Bundler still chooses among different versions with its own dependency
+solver. The caller's read permission on each member decides what that
+member contributes; the virtual repository itself takes no permission, as
+no permission target can name one. A member without the index, one the
+caller cannot read, and a remote whose upstream fails or cannot be reached
+are passed over, and the index lists the other members' gems. The
 [RubyGems compact index specification](https://guides.rubygems.org/rubygems-org-compact-index-api/)
 defines the index and checksum fields; the
 [RubyGems API](https://guides.rubygems.org/rubygems-org-api/) defines push.

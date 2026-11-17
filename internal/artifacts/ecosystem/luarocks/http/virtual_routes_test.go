@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -148,10 +149,18 @@ func TestAccVirtualManifestAndArtifactResolution(t *testing.T) {
 	if err := f.db.Repos().Update(t.Context(), virtual); err != nil {
 		t.Fatal(err)
 	}
+	// R1 searches local members before remote ones whatever the
+	// configured order, unless only the remote sets priorityResolution.
 	got = f.do(http.MethodGet, virtualBase+"visible-1.0-1.rockspec", nil, "", "admin")
-	if got.Code != 200 || bytes.Equal(got.Body.Bytes(), localSpec) {
+	if got.Code != 200 || !bytes.Equal(got.Body.Bytes(), localSpec) {
 		t.Fatalf("reordered member artifact: %d %s", got.Code, got.Body)
 	}
+	patchRepo(t, f.fixture, "rocks", func(c *repo.Config) { c.PriorityResolution = repo.Flex(true) })
+	got = f.do(http.MethodGet, virtualBase+"visible-1.0-1.rockspec", nil, "", "admin")
+	if got.Code != 200 || bytes.Equal(got.Body.Bytes(), localSpec) {
+		t.Fatalf("priority remote member artifact: %d %s", got.Code, got.Body)
+	}
+	patchRepo(t, f.fixture, "rocks", func(c *repo.Config) { c.PriorityResolution = repo.Flex(false) })
 	got = f.do(http.MethodGet, virtualBase+"local-only-2.0-1.rockspec", nil, "", "admin")
 	if got.Code != 200 || !bytes.Equal(got.Body.Bytes(), spec("local-only", "2.0-1")) {
 		t.Fatalf("fallback from remote to local: %d %s", got.Code, got.Body)
@@ -164,6 +173,98 @@ repository = { ["visible"] = { ["1.0-1"] = { { arch = "rockspec" } }, ["2.0-1"] 
 	got = f.do(http.MethodGet, virtualBase+"manifest-5.4", nil, "", "admin")
 	if got.Code != 200 || !strings.Contains(got.Body.String(), "2.0-1") {
 		t.Fatalf("refreshed remote member: %d %s", got.Code, got.Body)
+	}
+}
+
+// TestAccVirtualWalksNestedMembersForMemberReaders: a virtual repository
+// over [remote, nested virtual -> local] reads the local member through the
+// nested one, and a nested virtual repository that lists the outer one
+// back, or one that lists itself, is skipped (R2) without a 400 or 500. A
+// caller with Read on the members alone, and none on the virtual
+// repository, resolves through it (R3); one who may read only the local
+// member sees only its rocks, and the remote's are not found. A remote
+// member whose upstream fails is passed over [I].
+func TestAccVirtualWalksNestedMembersForMemberReaders(t *testing.T) {
+	f := newVirtualFixture(t)
+	uploadSpecTo(t, f.fixture, "local", "local-only", "2.0-1", spec("local-only", "2.0-1"))
+	nested := *repo.Defaults(&repo.Config{
+		Key: "nested", Class: repo.Virtual, PackageType: repo.LuaRocks,
+		Repositories: []string{"local", "combined", "nested"},
+	})
+	if err := f.db.Repos().Create(t.Context(), nested); err != nil {
+		t.Fatal(err)
+	}
+	patchRepo(t, f.fixture, "combined", func(c *repo.Config) {
+		c.Repositories = []string{"rocks", "nested", "combined"}
+	})
+	for user, targets := range map[string]map[string]accesstest.Target{
+		"members":    {"local": {Include: []string{"**"}}, "rocks": {Include: []string{"**"}}},
+		"local-only": {"local": {Include: []string{"**"}}},
+	} {
+		if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
+			Name: user,
+			Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]api.Actions{user: api.ActionRead}},
+				Targets: targets,
+			}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, key := range []string{"combined", "nested"} {
+		base := "/artifactory/api/luarocks/" + key + "/"
+		for _, user := range []string{"admin", "members"} {
+			wantBody(t, f.do(http.MethodGet, base+"manifest", nil, "", user),
+				[]string{`["local-only"]`, `["visible"]`, `["hidden"]`}, nil)
+			for path, want := range map[string][]byte{
+				"local-only-2.0-1.rockspec": spec("local-only", "2.0-1"),
+				"visible-1.0-1.src.rock":    rock(t, "visible", "1.0-1"),
+			} {
+				rec := f.do(http.MethodGet, base+path, nil, "", user)
+				if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), want) {
+					t.Fatalf("%s%s as %s: %d %s", base, path, user, rec.Code, rec.Body)
+				}
+			}
+		}
+	}
+	wantBody(t, f.do(http.MethodGet, virtualBase+"manifest", nil, "", "local-only"),
+		[]string{`["local-only"]`}, []string{"visible", "hidden"})
+	wantError(t, f.do(http.MethodGet, virtualBase+"visible-1.0-1.rockspec", nil, "", "local-only"),
+		http.StatusNotFound, "Could not find resource")
+
+	broken := *repo.Defaults(&repo.Config{
+		Key: "broken", Class: repo.Remote, PackageType: repo.LuaRocks, URL: f.up.URL + "/broken/",
+	})
+	if err := f.db.Repos().Create(t.Context(), broken); err != nil {
+		t.Fatal(err)
+	}
+	f.up.Set("/broken/manifest", fakeupstream.Resource{Status: http.StatusInternalServerError})
+	f.up.Set("/broken/visible-1.0-1.rockspec",
+		fakeupstream.Resource{Status: http.StatusInternalServerError})
+	patchRepo(t, f.fixture, "combined", func(c *repo.Config) {
+		c.Repositories = []string{"broken", "nested"}
+	})
+	wantBody(t, f.do(http.MethodGet, virtualBase+"manifest", nil, "", "admin"),
+		[]string{`["local-only"]`}, []string{"visible"})
+	if n := f.up.Count("", "/broken/manifest"); n == 0 {
+		t.Fatal("the failing remote member was never asked")
+	}
+	rec := f.do(http.MethodGet, virtualBase+"local-only-2.0-1.rockspec", nil, "", "admin")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("local rock past a failing remote: %d %s", rec.Code, rec.Body)
+	}
+	wantError(t, f.do(http.MethodGet, virtualBase+"visible-1.0-1.rockspec", nil, "", "admin"),
+		http.StatusNotFound, "Could not find resource")
+}
+
+// wantNoDeployTarget checks rec is R6's answer to a deploy to the virtual
+// repository "combined" without a local or federated deployment target.
+func wantNoDeployTarget(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	wantError(t, rec, http.StatusMethodNotAllowed, "No local repository was configured as "+
+		"local deployment repository for the (combined) virtual repository.")
+	if allow := rec.Header().Get("Allow"); allow != http.MethodGet {
+		t.Fatalf("Allow: %q", allow)
 	}
 }
 
@@ -210,12 +311,14 @@ func TestAccVirtualUploadUsesLocalDeploymentTarget(t *testing.T) {
 	}
 	body, ct = form(t, "rockspec_file", "no-target-1.0-1.rockspec", spec("no-target", "1.0-1"))
 	rec = f.do(http.MethodPost, virtualBase+"api/1/secret/upload", body, ct, "admin")
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("missing deployment target: %d %s", rec.Code, rec.Body)
-	}
+	wantNoDeployTarget(t, rec)
 }
 
-func TestAccVirtualRejectsUnsupportedMembers(t *testing.T) {
+// TestAccVirtualPassesOverUnsupportedMembersAndDeploysToAFederatedTarget:
+// a member of another package type, which only data saved before the save
+// checks can name (R11), is passed over, and a federated member is read
+// and deployed to as a local one is (decision 0008, R6).
+func TestAccVirtualPassesOverUnsupportedMembersAndDeploysToAFederatedTarget(t *testing.T) {
 	f := newVirtualFixture(t)
 	other := *repo.Defaults(&repo.Config{Key: "other", Class: repo.Local, PackageType: repo.NPM})
 	if err := f.db.Repos().Create(context.Background(), other); err != nil {
@@ -229,13 +332,11 @@ func TestAccVirtualRejectsUnsupportedMembers(t *testing.T) {
 	if err := f.db.Repos().Update(t.Context(), virtual); err != nil {
 		t.Fatal(err)
 	}
-	rec := f.do(http.MethodGet, virtualBase+"manifest", nil, "", "admin")
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("unsupported member: %d %s", rec.Code, rec.Body)
-	}
-	rec = f.do(http.MethodGet, virtualBase+"visible-1.0-1.rockspec", nil, "", "admin")
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("unsupported member artifact: %d %s", rec.Code, rec.Body)
+	wantBody(t, f.do(http.MethodGet, virtualBase+"manifest", nil, "", "admin"),
+		[]string{`["visible"]`, `["hidden"]`}, nil)
+	rec := f.do(http.MethodGet, virtualBase+"visible-1.0-1.rockspec", nil, "", "admin")
+	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), spec("visible", "1.0-1")) {
+		t.Fatalf("rock past a member of another type: %d %s", rec.Code, rec.Body)
 	}
 	peer := *repo.Defaults(&repo.Config{Key: "peer", Class: repo.Federated, PackageType: repo.LuaRocks})
 	if err := f.db.Repos().Create(t.Context(), peer); err != nil {
@@ -246,14 +347,23 @@ func TestAccVirtualRejectsUnsupportedMembers(t *testing.T) {
 	if err := f.db.Repos().Update(t.Context(), virtual); err != nil {
 		t.Fatal(err)
 	}
-	rec = f.do(http.MethodGet, virtualBase+"manifest", nil, "", "admin")
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("unsupported federated member: %d %s", rec.Code, rec.Body)
+	wantBody(t, f.do(http.MethodGet, virtualBase+"manifest", nil, "", "admin"),
+		nil, []string{"visible"})
+	id := uploadSpecTo(t, f.fixture, "combined", "federated", "1.0-1", spec("federated", "1.0-1"))
+	if _, err := f.db.Items().Get(t.Context(), "peer", false, "federated-1.0-1.rockspec"); err != nil {
+		t.Fatalf("rockspec through the virtual repository: %v", err)
 	}
-	body, ct := form(t, "rockspec_file", "unsupported-1.0-1.rockspec", spec("unsupported", "1.0-1"))
-	rec = f.do(http.MethodPost, virtualBase+"api/1/secret/upload", body, ct, "admin")
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("unsupported federated deployment target: %d %s", rec.Code, rec.Body)
+	body, ct := form(t, "rock_file", "federated-1.0-1.src.rock", rock(t, "federated", "1.0-1"))
+	rec = f.do(http.MethodPost, fmt.Sprintf("%sapi/1/secret/upload_rock/%d", virtualBase, id),
+		body, ct, "admin")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("rock through the virtual repository: %d %s", rec.Code, rec.Body)
+	}
+	wantBody(t, f.do(http.MethodGet, virtualBase+"manifest", nil, "", "admin"),
+		[]string{`["federated"]`, `"src"`}, nil)
+	rec = f.do(http.MethodGet, virtualBase+"federated-1.0-1.rockspec", nil, "", "admin")
+	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), spec("federated", "1.0-1")) {
+		t.Fatalf("federated member's rockspec: %d %s", rec.Code, rec.Body)
 	}
 }
 
@@ -267,7 +377,8 @@ func TestAccVirtualReadRejectsQueriesAndConcealsDeniedMembers(t *testing.T) {
 		{virtualBase + "not-a-rock", "admin", http.StatusNotFound},
 		{virtualBase + "missing-1.0-1.rockspec", "admin", http.StatusNotFound},
 		{virtualBase + "manifest", "nobody", http.StatusForbidden},
-		{virtualBase + "visible-1.0-1.rockspec", "nobody", http.StatusForbidden},
+		// A caller who may read no member finds no rock (R3).
+		{virtualBase + "visible-1.0-1.rockspec", "nobody", http.StatusNotFound},
 	} {
 		rec := f.do(http.MethodGet, tc.path, nil, "", tc.user)
 		if rec.Code != tc.expected {
@@ -326,8 +437,10 @@ func TestAccVirtualDeploymentRequiresValidLocalTargetAndBothGrants(t *testing.T)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("target read denied: %d %s", rec.Code, rec.Body)
 	}
+	// A grant naming the virtual repository alone, which no 7.x permission
+	// target can express, reads no member, so it reads no manifest.
 	rec = f.do(http.MethodGet, virtualBase+"manifest", nil, "", "publisher")
-	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "visible") {
+	if rec.Code != http.StatusForbidden || strings.Contains(rec.Body.String(), "visible") {
 		t.Fatalf("member without grant appeared in virtual index: %d %s", rec.Code, rec.Body)
 	}
 	virtual, err := f.db.Repos().Get(t.Context(), "combined")
@@ -345,16 +458,18 @@ func TestAccVirtualDeploymentRequiresValidLocalTargetAndBothGrants(t *testing.T)
 		spec("remote-target", "1.0-1"),
 	)
 	rec = f.do(http.MethodPost, virtualBase+"api/1/secret/upload", body, ct, "admin")
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("remote deployment target: %d %s", rec.Code, rec.Body)
-	}
+	wantNoDeployTarget(t, rec)
 	if _, err := f.db.Items().
 		Get(t.Context(), "rocks", false, "remote-target-1.0-1.rockspec"); err == nil {
 		t.Fatal("virtual upload wrote to remote target")
 	}
 }
 
-func TestAccVirtualManifestIsEmptyWithoutMembersAndFailsClosedOnBadRemote(t *testing.T) {
+// TestAccVirtualManifestIsEmptyWithoutMembersAndPassesOverABadRemote: a
+// virtual repository without members lists nothing, and a remote member
+// whose upstream manifest fails LuaRocks' checks is passed over as a
+// failing upstream is [I], so its rocks are not found.
+func TestAccVirtualManifestIsEmptyWithoutMembersAndPassesOverABadRemote(t *testing.T) {
 	f := newVirtualFixture(t)
 	virtual, err := f.db.Repos().Get(t.Context(), "combined")
 	if err != nil {
@@ -378,11 +493,11 @@ func TestAccVirtualManifestIsEmptyWithoutMembersAndFailsClosedOnBadRemote(t *tes
 		fakeupstream.Resource{Body: []byte(`repository = os.execute("bad")`)},
 	)
 	rec = f.do(http.MethodGet, virtualBase+"manifest", nil, "", "admin")
-	if rec.Code != http.StatusBadGateway {
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "visible") {
 		t.Fatalf("invalid member manifest: %d %s", rec.Code, rec.Body)
 	}
 	rec = f.do(http.MethodGet, virtualBase+"visible-1.0-1.rockspec", nil, "", "admin")
-	if rec.Code != http.StatusBadGateway {
+	if rec.Code != http.StatusNotFound {
 		t.Fatalf("rock with invalid member manifest: %d %s", rec.Code, rec.Body)
 	}
 }
@@ -406,8 +521,9 @@ func TestAccVirtualRevalidatesMemberConfigurationAtRequestTime(t *testing.T) {
 	if err := f.db.Repos().Update(t.Context(), virtual); err != nil {
 		t.Fatal(err)
 	}
+	// A member listed twice keeps its first place (R2).
 	rec = f.do(http.MethodGet, virtualBase+"manifest", nil, "", "admin")
-	if rec.Code != http.StatusBadRequest {
+	if rec.Code != http.StatusOK || strings.Count(rec.Body.String(), `["visible"]`) != 1 {
 		t.Fatalf("duplicate member: %d %s", rec.Code, rec.Body)
 	}
 	virtual.Repositories = []string{"gone"}
@@ -417,9 +533,7 @@ func TestAccVirtualRevalidatesMemberConfigurationAtRequestTime(t *testing.T) {
 	}
 	body, ct := form(t, "rockspec_file", "unsafe-1.0-1.rockspec", spec("unsafe", "1.0-1"))
 	rec = f.do(http.MethodPost, virtualBase+"api/1/secret/upload", body, ct, "admin")
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("deleted deployment member: %d %s", rec.Code, rec.Body)
-	}
+	wantNoDeployTarget(t, rec)
 	nested := *repo.Defaults(&repo.Config{
 		Key: "nested", Class: repo.Virtual, PackageType: repo.LuaRocks,
 		Repositories: []string{"rocks"},
@@ -433,7 +547,7 @@ func TestAccVirtualRevalidatesMemberConfigurationAtRequestTime(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec = f.do(http.MethodGet, virtualBase+"manifest", nil, "", "admin")
-	if rec.Code != http.StatusBadRequest {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `["visible"]`) {
 		t.Fatalf("nested virtual member: %d %s", rec.Code, rec.Body)
 	}
 }
@@ -477,8 +591,9 @@ func TestAccVirtualRejectsChangedDeploymentTargetType(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("changed deployment target type: %d %s", rec.Code, rec.Body)
 	}
+	// The member is passed over for the manifest (R11).
 	rec = f.do(http.MethodGet, virtualBase+"manifest", nil, "", "admin")
-	if rec.Code != http.StatusBadRequest {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `["visible"]`) {
 		t.Fatalf("changed member package type: %d %s", rec.Code, rec.Body)
 	}
 }

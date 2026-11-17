@@ -23,11 +23,15 @@
 //     the handlers also reach through DB(), and which resolves the
 //     repository and the caller, checks permissions, stores a pushed gem
 //     through the item service, where the format's hooks admit it, deletes
-//     a yanked one, reads items and blobs, builds a virtual repository's
-//     member requests, serves items and writes errors; the remote source
+//     a yanked one, reads items and blobs, walks a virtual repository's
+//     members (MergeMembers, Collect) and logs a member it passes over
+//     for a fault, serves items and writes errors; the core virtual
+//     package (artifacts/core/virtual), which names a virtual repository's
+//     deployment repository; the remote source
 //     service, which fetches a remote's upstream compact index and gems
 //     into the remote cache; and the format package, whose rules read every
-//     gem and render and check every index.
+//     gem and render and check every index, and whose Merger merges a
+//     virtual repository's members' gems.
 //
 // # Outputs
 //
@@ -53,8 +57,13 @@
 //
 // # Invariants
 //
-//   - Only local and federated repositories take a push or a yank (405),
-//     with write or delete permission under gems/. A pushed gem of at most
+//   - Local and federated repositories take a push and a yank, with write
+//     or delete permission under gems/; a remote takes neither (405). A
+//     push to a virtual repository lands in its default deployment
+//     repository, local or federated, with write permission there alone
+//     (RTFACT-17787), and without one answers 405 with Allow: GET and
+//     7.x's message (decision 0008, R6); a yank through one answers 405
+//     [I]. A pushed gem of at most
 //     256 MiB must read as valid (400) and is stored at the path its
 //     identity gives, never over a stored version (409). A yank's form, at
 //     most 4 KiB, or its query, names the gem, its version and its
@@ -67,9 +76,18 @@
 //     upstream's compact index, whose info files must match the MD5 the
 //     versions file lists, and fetches a gem only when that index lists its
 //     version, delivering it only when it validates and matches the listed
-//     SHA-256. A virtual repository renders them from its members in order:
-//     the first member to list a path supplies it, the caller must be able
-//     to read it in both repositories, and a member cycle is refused (400).
+//     SHA-256. A virtual repository renders them from its members in the
+//     package handlers' walk, without priorityResolution (JFrog's RubyGems
+//     page: "Priority resolution is currently not supported for RubyGems
+//     virtual repositories"), nested virtual repositories flattened and a
+//     cycle skipped (decision 0008, R1, R2): the first member to list a
+//     path supplies it (gems.Merger), each row filtered by the caller's
+//     Read in its member, never in the virtual repository, which no
+//     permission target can name. Its indexes need Read on the root of
+//     some member (RequireRoot). A member without the index, one the
+//     caller may not read and one whose upstream fails or cannot be
+//     reached are passed over (R3), the last with a warning [I]; a
+//     virtual gem download tries the members in the same walk.
 //   - The download policy, after read permission: a blacked-out local or
 //     federated repository refuses its spec index files, quick gemspecs
 //     and compact index with the blackout's 404, and a pattern on a spec
@@ -119,11 +137,14 @@
 //
 //   - gems_test.go: the gem and versions JSON documents, unknown index
 //     paths, and the virtual source's refusal of a single-item lookup.
+//   - ../virtual_test.go: the Merger.
 //
 // The guard suite test/server/artifacts/gems drives the protocol through
 // the whole server: local, federated and virtual reads, push and its
 // permissions, refused requests, yank, token authentication, a virtual
-// repository's member filtering and cycles, stored gems that fail closed,
+// repository's member filtering, nesting, cycles, members passed over, its
+// order without priority and a push to its deployment repository, stored
+// gems that fail closed,
 // the remote's index checks, cache, offline reads and redirects, the
 // download policy on local, virtual and remote reads, the stored index
 // documents' file headers and revalidation (gems_index_headers_test.go),

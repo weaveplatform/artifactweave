@@ -45,6 +45,7 @@
 //     virtual repository reads its remote members' caches alone (decision
 //     0008, R7), which
 //     https://github.com/weaveplatform/artifactweave/issues/1542 sets.
+//   - Options.Logger: where WarnPassedOver logs; nil means slog.Default.
 //
 // # Outputs
 //
@@ -52,8 +53,10 @@
 //   - Store, the store the kit resolves repositories and reads items in, and
 //     DB() returns. Each composite store in app satisfies it, so the server
 //     passes the store it holds.
-//   - Permission helpers: Can, CanFolder, CanAll, Require and
-//     RequireFolder. CanAll says whether the caller may read every path
+//   - Permission helpers: Can, CanFolder, CanAll, Require, RequireFolder
+//     and RequireRoot, the gate before a document of the whole repository,
+//     which a virtual repository passes when the caller may read the root
+//     of any member (decision 0008, R3). CanAll says whether the caller may read every path
 //     below a folder, so a list may count and page in its store (#1425,
 //     #1426).
 //   - Download helpers: DownloadItem, ResolveDownloadItem, ServeItem,
@@ -70,8 +73,10 @@
 //     handlers' walk through a virtual repository (virtual.Members,
 //     virtual.Package); Collect, each member's document for a format's
 //     virtual.Merger; PassedOver, whether a member read's error passes over
-//     that member; and Virtual, the Source that serves a virtual
-//     repository's file from the first member that holds it.
+//     that member; WarnPassedOver, the warning for a member passed over for
+//     a fault rather than a miss or a refusal [I]; and Virtual, the Source
+//     that serves a virtual repository's file from the first member that
+//     holds it.
 //   - Deploy helpers: Store, StoreOnce, StoreNew, StoreResolved, Upload,
 //     Deploy, DeployItem, Created, Annotate, Delete and DeleteTree.
 //   - Multipart helpers: ReadForm, ReadFormLimited and ReadFormWith; path
@@ -217,7 +222,9 @@
 // followed. Moved here in P9d, which narrowed the kit's store to Store
 // (https://github.com/weaveplatform/artifactweave/issues/1089). P10 added
 // the virtual walk and the merge contract's kit side
-// (https://github.com/weaveplatform/artifactweave/issues/1536).
+// (https://github.com/weaveplatform/artifactweave/issues/1536), and the
+// root gate and the warning for a failing member
+// (https://github.com/weaveplatform/artifactweave/issues/1538).
 //
 // # Testing
 //
@@ -231,7 +238,8 @@
 // read's policy path and a remote member's refusal against a fake source
 // boundary; virtual_test.go covers the virtual walk (MergeMembers'
 // nesting, pass-overs and cache-only steps, Collect with a test merge,
-// PassedOver and Virtual); source_result_test.go tests ServeResult from inside the
+// PassedOver and Virtual), and root_test.go RequireRoot and
+// WarnPassedOver; source_result_test.go tests ServeResult from inside the
 // package; conditional_test.go covers ServeStream's conditional answers and
 // FileNotModified, and etag_test.go a file stream's SHA-1 ETag. Every
 // native protocol's route suite under test/server/artifacts reaches it

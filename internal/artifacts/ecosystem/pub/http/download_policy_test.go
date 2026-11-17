@@ -339,12 +339,11 @@ func TestUnitDownloadPolicyOfARemoteRepository(t *testing.T) {
 	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), fromB) {
 		t.Errorf("remote member excludes the archive: archive %d %s", rec.Code, rec.Body)
 	}
-	// Every member's versions are read before an archive is chosen, as the
-	// list reads them, so a member whose source fails fails the download.
-	v.setMembers("pub-b", "pub-down")
+	// A member whose source fails is passed over [I], so the archive comes
+	// from the member that holds it.
+	v.setMembers("pub-down", "pub-b")
 	rec = v.do(http.MethodGet, base+"/packages/visible_pub/versions/1.0.0.tar.gz", "admin", "", nil)
-	if status, message := pubError(t, rec); status != http.StatusBadGateway ||
-		message != "Bad Gateway" {
-		t.Errorf("failing member: archive %d %q", status, message)
+	if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), fromB) {
+		t.Errorf("failing member: archive %d %s", rec.Code, rec.Body)
 	}
 }

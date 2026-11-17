@@ -23,9 +23,22 @@ dart pub token add "$PUB_HOSTED_URL" --env-var AW_PUB_TOKEN
 Set `publish_to: https://registry.example/artifactory/api/pub/pub-local`
 in the producer's `pubspec.yaml`, then run `dart pub publish`. A consumer
 can use `PUB_HOSTED_URL` and `dart pub get`, or put the hosted URL on an
-individual dependency. A virtual URL aggregates the configured member
-repositories in order. Set a remote repository's URL to the upstream hosted
+individual dependency. Set a remote repository's URL to the upstream hosted
 registry, such as `https://pub.dev`.
+
+A virtual URL aggregates its members as 7.x's package handlers walk them:
+local and federated members before remote ones, members with
+`priorityResolution` first, nested virtual repositories flattened, and a
+member reached twice, or a cycle, skipped. The first member that lists a
+version supplies it. The virtual repository itself takes no permission, as no
+permission target can name one: the caller's read permission on each member
+decides what it lists, and a member the caller cannot read, one without the
+package, and a remote whose upstream fails are passed over. `dart pub
+publish` to a virtual URL stores the archive in its default deployment
+repository, local or federated, and needs write permission there only, as
+[RTFACT-31048](https://jfrog.atlassian.net/browse/RTFACT-31048)'s log of a
+publish through a virtual repository shows; without a default deployment
+repository it answers 405 with `Allow: GET`.
 
 Packages are stored at `<name>/<name>-<version>.tar.gz`; the server exposes
 the package/version index through the hosted API. Upload checks the archive's
@@ -41,7 +54,8 @@ restore recreates it and its metadata.
 [`@pub` acceptance](../../test/acceptance/features/pub.feature) runs the
 [digest-pinned Dart client](ci-client-images.md). It publishes and resolves on local and
 one-node federated repositories, resolves local and remote packages through
-a virtual repository, follows a controlled remote archive redirect, and
+a virtual repository and publishes through it to its default deployment
+repository, follows a controlled remote archive redirect, and
 resolves again from the server cache after the upstream stops and the client
 cache is cleared. A remote refresh scenario zaps cached metadata and uses
 `dart pub upgrade` to discover an added upstream version while retaining the
