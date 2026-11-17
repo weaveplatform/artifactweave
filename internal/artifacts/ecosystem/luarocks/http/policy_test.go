@@ -242,6 +242,10 @@ func TestAccVirtualManifestAndRocksFollowTheDownloadPolicy(t *testing.T) {
 	patchRepo(t, f.fixture, "combined", excludes("manifest*"))
 	wantError(t, get("manifest-5.4", "admin"), http.StatusNotFound,
 		fmt.Sprintf(noMember, "combined", "manifest-5.4"))
+	// The patterns come before the manifest's root gate, so a caller who
+	// may read no member gets the same refusal, not 403 (R5).
+	wantError(t, get("manifest-5.4", "nobody"), http.StatusNotFound,
+		fmt.Sprintf(noMember, "combined", "manifest-5.4"))
 	patchRepo(t, f.fixture, "combined", excludes("visible-1.0-1.rockspec"))
 	wantError(t, get("visible-1.0-1.rockspec", "admin"), http.StatusNotFound,
 		fmt.Sprintf(noMember, "combined", "visible-1.0-1.rockspec"))

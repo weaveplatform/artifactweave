@@ -18,9 +18,12 @@ import (
 // member in 7.x's effective order. A member that is blacked out or whose
 // patterns reject the CDN document, that the caller may read nothing in,
 // whose read misses or is refused, or whose upstream fails is passed over
-// (decision 0008, R1 to R3). Each member decides Read on the pods and
+// (decision 0008, R1 to R3), a fault among them with a warning in the log
+// (pkgroute.Kit.WarnPassedOver) [I]. Each member decides Read on the pods and
 // versions it serves: a virtual repository has no permission target of its
-// own (R10), and a caller who may read no member gets the CDN's not-found.
+// own (R10). A caller who may read no member gets the CDN's not-found for a
+// pod's document or archive, and is refused a document of the whole
+// repository (virtualRootGate).
 
 func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string) {
 	if !validCDNPath(path) {
@@ -33,17 +36,7 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string
 	}
 	switch {
 	case path == "CocoaPods-version.yml" || path == "deprecated_podspecs.txt":
-		// The virtual repository's own patterns refuse a CDN document they
-		// reject at its 7.x path ([I], R5). These documents name no pod, so
-		// a caller who may read the virtual repository or any member gets
-		// them, and one who may read neither gets the CDN's not-found.
-		members, err := h.k.MergeMembers(r, cdnDocument(path))
-		if err != nil {
-			h.k.Error(w, r, err)
-			return
-		}
-		if len(members) == 0 && !h.k.CanFolder(r, "", api.ActionRead) {
-			h.k.Error(w, r, notFound())
+		if !h.virtualRootGate(w, r, path) {
 			return
 		}
 		if path == "deprecated_podspecs.txt" {
@@ -77,13 +70,34 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request, path string
 	}
 }
 
+// virtualRootGate asks the gates of a CDN document of the whole
+// repository, all_pods.txt, a shard of it, CocoaPods-version.yml or
+// deprecated_podspecs.txt, and reports whether the caller passed. The
+// virtual repository's own patterns refuse the document first, at its 7.x
+// path ([I], R5), for every caller. Then its root gate
+// (pkgroute.Kit.RequireRoot) refuses a caller who may read the root of no
+// member, as gems' indexes and the LuaRocks manifest are (decision 0008,
+// R3).
+func (h handler) virtualRootGate(w http.ResponseWriter, r *http.Request, path string) bool {
+	if err := h.k.CheckDocument(r, cdnDocument(path)); err != nil {
+		h.k.Error(w, r, err)
+		return false
+	}
+	return h.k.RequireRoot(w, r)
+}
+
 // virtualIndex merges the members' CDN index at path, all_pods.txt or one
 // shard, with podfmt.Index. A remote member contributes the rows of its
 // upstream's index, a hosted member those of its package index; each keeps
 // only the pods and versions the caller may read in that member.
 func (h handler) virtualIndex(w http.ResponseWriter, r *http.Request, path string) {
+	if !h.virtualRootGate(w, r, path) {
+		return
+	}
 	parts, err := pkgroute.Collect(h.k, r, cdnDocument(path), func(mr *http.Request) (podfmt.Pods, error) {
-		return h.memberIndex(mr, path)
+		pods, err := h.memberIndex(mr, path)
+		h.k.WarnPassedOver(mr, err)
+		return pods, err
 	})
 	if err != nil {
 		h.k.Error(w, r, pkgroute.SourceError(err, false))
@@ -153,6 +167,7 @@ func (h handler) virtualSpec(w http.ResponseWriter, r *http.Request, path, name,
 	for _, mr := range members {
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
 			result, err := h.remoteResult(mr, path, false)
+			h.k.WarnPassedOver(mr, err)
 			if pkgroute.PassedOver(err) {
 				continue
 			}
@@ -236,6 +251,7 @@ func (h handler) virtualSourceArchive(
 			continue
 		}
 		result, err := h.remoteResult(mr, podfmt.SpecPath(name, version), true)
+		h.k.WarnPassedOver(mr, err)
 		if pkgroute.PassedOver(err) {
 			continue
 		}

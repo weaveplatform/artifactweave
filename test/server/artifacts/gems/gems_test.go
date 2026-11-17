@@ -1202,6 +1202,17 @@ func TestAccVirtualIndexPolicy(t *testing.T) {
 	w.setPolicy("gems-virtual", false, "", "**/specs.4.8.gz")
 	wantError(t, w.do(http.MethodGet, base+"specs.4.8.gz", "reader", nil), http.StatusNotFound,
 		"No repository found to serve the request for gems-virtual:specs.4.8.gz")
+	// The virtual repository's patterns come before the index's root gate,
+	// so a caller who may read no member gets the same refusal (R5); an
+	// index they leave alone still asks the gate.
+	if err := w.db.Users().
+		Create(t.Context(), accesstest.User{Name: "nobody", PasswordHash: support.CheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	wantError(t, w.do(http.MethodGet, base+"specs.4.8.gz", "nobody", nil), http.StatusNotFound,
+		"No repository found to serve the request for gems-virtual:specs.4.8.gz")
+	wantError(t, w.do(http.MethodGet, base+"latest_specs.4.8.gz", "nobody", nil),
+		http.StatusForbidden, "Forbidden")
 	listed(true, "latest_specs.4.8.gz", "versions")
 	w.setPolicy("gems-virtual", false, "", "gems/**")
 	listed(true, indexes...)

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -37,6 +38,9 @@ type fixture struct {
 	sources *source.Service
 	// faults are the errors the router kit logged as unexpected.
 	faults []error
+	// logs holds what the router kit logged, its warnings for a virtual
+	// repository's failing member among them.
+	logs bytes.Buffer
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -61,7 +65,8 @@ func (f *fixture) mount(svc *source.Service) {
 	}))
 	options := pkgroute.Options{
 		Store: f.db, Items: func() *item.Service { return f.items },
-		Fault: func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
+		Logger: slog.New(slog.NewTextHandler(&f.logs, nil)),
+		Fault:  func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 		ItemError: func(_ context.Context, _ string, err error) error {
 			var refused *format.RejectionError
 			if errors.As(err, &refused) {

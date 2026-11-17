@@ -57,7 +57,13 @@
 //     releases (composer.Releases), each version from the first member that
 //     lists it, and its dist comes from that member. Each member decides
 //     Read on what it serves; a member that misses, refuses, may not be
-//     read or whose upstream fails is passed over.
+//     read or whose upstream fails is passed over, the last with a warning
+//     in the log (pkgroute.Kit.WarnPassedOver) [I]. The p2 metadata is kept
+//     for the virtual repository's virtualRetrievalCachePeriodSecs
+//     (pkgroute.Kit.Merged, decision 0008 R8), so a member's new release
+//     shows once it expires. packages.json is a document of the whole
+//     repository: a caller who may read the root of no member is refused
+//     403, 401 when anonymous (RequireRoot, R3).
 //   - The download policy (decision 0032): a blacked-out repository, a
 //     remote's included, refuses packages.json and p2 metadata with the
 //     blackout's 404 naming the request path, after read permission; 7.x
@@ -120,6 +126,9 @@
 //     remote repositories.
 //   - served_copy_fault_test.go: a cached root or p2 document whose copy
 //     fails a read as the route reads it answers 500 and stays cached.
+//   - virtual_cache_test.go: a virtual repository's p2 metadata kept for
+//     its period, a period of 0, failures that are not kept, and the
+//     warning for a member passed over for a fault.
 //
 // The router's guard TestAccNativeComposerRoutesAvoidHandwrittenStubs
 // (internal/app) and the @composer acceptance scenarios, with the native

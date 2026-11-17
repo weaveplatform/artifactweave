@@ -46,7 +46,13 @@
 //     version the caller may not read is left out of every list. Through a
 //     virtual repository each member decides Read on what it serves, and a
 //     member that misses, refuses, may not be read or whose upstream fails
-//     is passed over.
+//     is passed over, the last with a warning in the log
+//     (pkgroute.Kit.WarnPassedOver) [I]. all_pods.txt, the
+//     all_pods_versions_* shards, CocoaPods-version.yml and
+//     deprecated_podspecs.txt are documents of the whole repository: after
+//     the virtual repository's own patterns, a caller who may read the root
+//     of no member is refused 403, 401 when anonymous (RequireRoot,
+//     decision 0008, R3).
 //   - Upstream CDN metadata and source archives are checked whole before
 //     they are cached, and a source archive is fetched only from an origin
 //     the repository allows (externalDependenciesEnabled and its patterns).

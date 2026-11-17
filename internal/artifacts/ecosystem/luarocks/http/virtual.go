@@ -153,15 +153,19 @@ type manifestPart struct {
 
 // virtualManifest merges the manifest at path of each member in the
 // package handlers' walk (pkgroute.Collect) with luafmt.Merger, in R1's
-// order. The caller needs Read on the root of some member (RequireRoot),
-// and each member's rows take that member's Read alone. The virtual
-// repository's own patterns rejecting the manifest refuse it, and a member
-// that is blacked out or whose patterns reject the manifest's path is left
-// out, remote members included: 7.x ignores a blacked-out repository when
-// it resolves (R5). A member without the manifest is passed over, and so is
-// one whose upstream fails or cannot be reached, with a warning
-// (WarnPassedOver) [I].
+// order. The virtual repository's own patterns rejecting the manifest
+// refuse it first, for every caller (R5). Then the caller needs Read on the
+// root of some member (RequireRoot), and each member's rows take that
+// member's Read alone. A member that is blacked out or whose patterns
+// reject the manifest's path is left out, remote members included: 7.x
+// ignores a blacked-out repository when it resolves (R5). A member without
+// the manifest is passed over, and so is one whose upstream fails or cannot
+// be reached, with a warning (WarnPassedOver) [I].
 func (h handler) virtualManifest(w http.ResponseWriter, r *http.Request, path string) {
+	if err := h.k.CheckDocument(r, path); err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
 	if !h.k.RequireRoot(w, r) {
 		return
 	}

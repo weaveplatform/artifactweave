@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -50,6 +51,9 @@ type fixture struct {
 	items    *item.Service
 	mu       *sync.Mutex
 	requests map[string]int
+	// logs holds what the router kit logged, its warnings for a virtual
+	// repository's failing member among them.
+	logs *bytes.Buffer
 }
 
 func newFixture(
@@ -109,8 +113,10 @@ func newFixture(
 	if len(configure) != 0 {
 		protocol = configure[0](items, db)
 	}
+	logs := new(bytes.Buffer)
 	pkgroute.Mount(r, pkgroute.Options{
 		Store: db, Items: func() *item.Service { return items },
+		Logger: slog.New(slog.NewTextHandler(logs, nil)),
 		ItemError: func(_ context.Context, _ string, err error) error {
 			var rejected *format.RejectionError
 			if errors.As(err, &rejected) {
@@ -129,7 +135,7 @@ func newFixture(
 			}
 		},
 	}, swifthttp.Protocol(protocol))
-	return &fixture{t: t, r: r, db: db, items: items, requests: counts, mu: countsMu}
+	return &fixture{t: t, r: r, db: db, items: items, requests: counts, mu: countsMu, logs: logs}
 }
 
 func (f *fixture) count(method, path string) int {
