@@ -15,9 +15,18 @@ Use the Git credential helper to provide a user or access token with artifact
 read or write permission on the repository. `git lfs push origin HEAD` sends
 the batch request and raw SHA-256 objects to a local or one-node federated
 repository. `git lfs fetch origin HEAD` and a fresh Git clone retrieve them.
-A virtual repository reads its configured members in order and sends uploads
-to `defaultDeploymentRepo`; a remote repository caches verified upstream
-objects and is read-only to Git LFS clients.
+A virtual repository reads its members in the order every package handler
+walks: nested virtual repositories flattened, cycles and repeated members
+skipped, local members before remote ones. Its own include and exclude
+patterns refuse an object first. A member the caller cannot read, one without
+the object and one whose upstream fails are passed over, the last logged as a
+warning; with none left an object answers 404, and an anonymous caller who can
+read no member gets the 401 challenge for the whole batch. Uploads and locks go
+to `defaultDeploymentRepo`, a local or federated repository, and need Deploy
+there alone; without one they answer 405 with `Allow: GET` and "No local
+repository was configured as local deployment repository for the (<key>)
+virtual repository." A remote repository caches verified upstream objects and
+is read-only to Git LFS clients.
 
 The server stores an object as
 `objects/{first-two-OID-characters}/{next-two}/{64-character-sha256-OID}`.
@@ -75,7 +84,8 @@ outage detection should use the plain command or inspect the HTTP response.
 The pinned acceptance client is Git LFS 3.8.1. Its image verifies upstream's
 published archive SHA-256. The [native fixture](../../test/acceptance/features/gitlfs.feature)
 tests publish and fresh clone through local, federated and virtual repositories,
-remote cold and offline fetches, and two-user locking through local,
+a pull through a virtual repository over a local and a remote member, remote
+cold and offline fetches, and two-user locking through local,
 federated and virtual repositories. It also proves remote lock-list freshness
 and failure when the upstream stops. The current
 [JFrog Git LFS guide](https://docs.jfrog.com/artifactory/docs/git-lfs-repositories)

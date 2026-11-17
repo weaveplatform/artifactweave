@@ -36,7 +36,8 @@
 // # Outputs
 //
 //   - Protocol and Options: the routes, the source of each repository
-//     class and the Artifactory error profile.
+//     class and the Artifactory error profile; Options.Logger receives the
+//     warning for a virtual repository's member passed over for a fault.
 //   - Answers: a batch's transfer, hash algorithm and per-object upload or
 //     download action on this repository, or the object's error (POST
 //     objects/batch); an object (GET and HEAD objects/{oid}); an upload's
@@ -56,22 +57,34 @@
 //     an object already stored with the same identity answers success.
 //   - Writes take the write grant on the object's or lock's path. A remote
 //     repository is read-only (405). A virtual repository writes to its
-//     default deployment repository, a local or federated Git LFS member
-//     (405 when none is set, 400 when it is not one), whose grants apply.
-//     A caller who cannot read an object gets an upload action whether or
-//     not it exists, so a batch never reveals an object it cannot read.
-//   - A virtual repository reads its local, federated and remote Git LFS
-//     members in order (400 for any other or a repeated member), skipping
-//     members the caller cannot read and those that miss, and answers 403
-//     when none is readable.
+//     default deployment repository, a local or federated Git LFS
+//     repository (virtual.DeployTarget), with the write grant asked there
+//     alone; with none, or one that is gone, remote or virtual, an upload
+//     batch, a transfer, a lock and an unlock answer 7.x's 405 with Allow:
+//     GET and "No local repository was configured as local deployment
+//     repository for the (<key>) virtual repository." before any
+//     permission is asked (decision 0008, R6). A caller who cannot read an
+//     object gets an upload action whether or not it exists, so a batch
+//     never reveals an object it cannot read.
+//   - A virtual repository reads its members in the package handlers' walk
+//     (pkgroute.Kit.MergeMembers): nested virtual repositories flattened,
+//     a cycle, a self-member or a repeated member skipped, a member of
+//     another type passed over, locals before remotes (decision 0008, R1,
+//     R2 and R11). A member the caller may not read the object in, one
+//     that misses it and one whose upstream fails pass over, the last
+//     logged (R3); another error ends the walk. With no member serving,
+//     the object answers 404, and an anonymous caller who may read it in
+//     no member the 401 challenge, a batch's for the whole batch, unless
+//     the virtual repository hides unauthorized resources (R4). The lock
+//     routes walk the same members without the download policy or Read.
 //   - The download policy (decision 0032) comes after Read permission
 //     (DV-057), so a caller who may not read an object gets 403 whatever
 //     the repository's settings. A blacked-out repository, local,
 //     federated or remote, refuses every object, and patterns refuse the
 //     objects they reject: a transfer answers 404 with the policy's
 //     message, a download batch the object's 404. A virtual repository's
-//     own patterns refuse an object once a member the caller may read is
-//     found, a remote member's included: a transfer answers 404 "No
+//     own patterns refuse an object before any member is asked, an
+//     administrator's too (decision 0008, R5): a transfer answers 404 "No
 //     repository found to serve the request". A member that refuses is
 //     passed over. An upload batch and a PUT's identity recheck look a
 //     stored object up without the policy, so it is never offered for
@@ -131,7 +144,8 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P33 group (issues #782 to
-// #788). Moved here in P9d.
+// #788). Moved here in P9d. P10 put virtual reads and writes on the shared
+// engine (ADP-07, #1540).
 //
 // # Testing
 //
@@ -156,14 +170,21 @@
 //   - remote_validation_test.go and locking_remote_validation_test.go: the
 //     upstream batch, action URL, redirect, cached identity and lock page
 //     checks, the lock cursor's binding, and the lock origin guard.
+//   - virtual_test.go (external): a virtual repository's nested members,
+//     cycles and duplicates, a faulty member passed over and logged, a
+//     remote-only object, the answers to each caller when no member
+//     serves, and its deployment target and R6's 405 (#1540).
 //   - download_policy_test.go (external): a direct object download from a
 //     blacked-out repository, or of an excluded object, answers the
 //     policy's 404 and message; local and remote batches check Read
 //     permission first; a virtual repository's patterns refuse a local or
-//     remote member's object after Read permission; a blacked-out remote
+//     remote member's object before any member is asked; a blacked-out remote
 //     member is passed over; and a stored object is never offered for
 //     upload again.
 //
 // The @gitlfs acceptance scenarios drive git-lfs through local, federated,
-// virtual and remote repositories, including two-user locking.
+// virtual and remote repositories, including two-user locking and a pull
+// through a virtual repository over a local and a remote member;
+// test/server/artifacts/gitlfs drives the assembled server through a
+// virtual repository over [remote, nested virtual -> local].
 package gitlfshttp

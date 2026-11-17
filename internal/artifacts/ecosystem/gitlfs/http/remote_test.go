@@ -9,9 +9,11 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -53,6 +55,28 @@ type remoteFixture struct {
 	actionAuthSeen   atomic.Bool
 	leakedActionAuth atomic.Bool
 	available        atomic.Bool
+	// logs holds what the protocol logged, such as a virtual repository's
+	// member passed over for a fault.
+	logs lockedBuffer
+}
+
+// lockedBuffer is a bytes.Buffer that handlers on the server's goroutines
+// write while the test reads it.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
 
 func newRemoteFixture(t *testing.T) *remoteFixture {
@@ -256,7 +280,9 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 				}
 			},
 		},
-		gitlfshttp.Protocol(gitlfshttp.Options{RemoteSources: svc}),
+		gitlfshttp.Protocol(gitlfshttp.Options{
+			RemoteSources: svc, Logger: slog.New(slog.NewTextHandler(&f.logs, nil)),
+		}),
 	)
 	f.server = httptest.NewServer(router)
 	t.Cleanup(f.server.Close)

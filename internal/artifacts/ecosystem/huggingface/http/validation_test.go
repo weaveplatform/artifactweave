@@ -143,27 +143,45 @@ func TestUnitNativeTreeAndMutableRefStayWithinPublishedRevision(t *testing.T) {
 	}
 }
 
+// A write through a virtual repository lands in its default deployment
+// repository, a local or federated one, with Write asked on the model's
+// folder there alone (decision 0008, R6): a user with Write on the virtual
+// repository's key alone is refused, and one with Write on the target alone
+// deploys, where the virtual repository's key was asked first. Without a
+// target, or with one that is gone or remote, the answer is 7.x's 405 with
+// Allow: GET and its message, where it was 405 "virtual model repository
+// has no deployment target", 404 or 400. A target outside the members takes
+// the write, as 7.x's UploadServiceUtils.getTargetRepository looks it up
+// among local and federated repositories (#1534).
 func TestUnitVirtualDeploymentRequiresAuthorizedLocalMember(t *testing.T) {
 	for _, tc := range []struct {
 		name, target string
 		memberClass  repo.Class
 		include      bool
-		virtualOnly  bool
+		writeOn      string
 		user         string
 		expected     int
+		memberType   repo.PackageType
 	}{
-		{"no deployment member", "", repo.Local, true, false, "", 405},
-		{"target outside members", "member", repo.Local, false, false, "", 405},
-		{"removed deployment member", "removed", repo.Local, true, false, "", 404},
-		{"remote deployment member", "member", repo.Remote, true, false, "", 400},
-		{"denied model write", "member", repo.Local, true, false, "intruder", 403},
-		{"denied member write", "member", repo.Local, true, true, "virtual-only", 403},
-		{"local deployment member", "member", repo.Local, true, false, "", 200},
+		{"no deployment member", "", repo.Local, true, "", "", 405, ""},
+		{"target outside members", "member", repo.Local, false, "", "", 200, ""},
+		{"removed deployment member", "removed", repo.Local, true, "", "", 405, ""},
+		{"remote deployment member", "member", repo.Remote, true, "", "", 405, ""},
+		{"denied model write", "member", repo.Local, true, "", "intruder", 403, ""},
+		{"denied member write", "member", repo.Local, true, "hf", "virtual-only", 403, ""},
+		{"target-only write", "member", repo.Local, true, "member", "member-only", 200, ""},
+		{"no target before permissions", "", repo.Local, true, "", "intruder", 405, ""},
+		{"local deployment member", "member", repo.Local, true, "", "", 200, ""},
+		{"deployment member of another type", "member", repo.Local, true, "", "", 400, repo.Generic},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newFixture(t, repo.Virtual, func(f *fixture) *source.Service {
+				memberType := tc.memberType
+				if memberType == "" {
+					memberType = repo.HuggingFaceML
+				}
 				member := *repo.Defaults(&repo.Config{
-					Key: "member", Class: tc.memberClass, PackageType: repo.HuggingFaceML,
+					Key: "member", Class: tc.memberClass, PackageType: memberType,
 				})
 				if err := f.db.Repos().Create(t.Context(), member); err != nil {
 					t.Fatal(err)
@@ -179,14 +197,14 @@ func TestUnitVirtualDeploymentRequiresAuthorizedLocalMember(t *testing.T) {
 				if err := f.db.Repos().Update(t.Context(), virtual); err != nil {
 					t.Fatal(err)
 				}
-				if tc.virtualOnly {
+				if tc.writeOn != "" {
 					if err := f.db.Permissions().Create(t.Context(), accesstest.Permission{
-						Name: "virtual-only-write",
+						Name: "one-key-write",
 						Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
 							Actions: accesstest.Grants{
-								Users: map[string]api.Actions{"virtual-only": api.ActionWrite},
+								Users: map[string]api.Actions{tc.user: api.ActionRead | api.ActionWrite},
 							},
-							Targets: map[string]accesstest.Target{"hf": {Include: []string{"**"}}},
+							Targets: map[string]accesstest.Target{tc.writeOn: {Include: []string{"**"}}},
 						}},
 					}); err != nil {
 						t.Fatal(err)
@@ -206,24 +224,34 @@ func TestUnitVirtualDeploymentRequiresAuthorizedLocalMember(t *testing.T) {
 			if r.StatusCode != tc.expected {
 				t.Fatalf("virtual preupload: %d %s", r.StatusCode, b)
 			}
+			if tc.expected == http.StatusMethodNotAllowed && (r.Header.Get("Allow") != http.MethodGet ||
+				!bytes.Contains(b, []byte("No local repository was configured as local "+
+					"deployment repository for the (hf) virtual repository."))) {
+				t.Fatalf("virtual preupload without a target: allow=%q %s", r.Header.Get("Allow"), b)
+			}
+			if tc.expected == http.StatusBadRequest &&
+				!bytes.Contains(b, []byte("invalid virtual model deployment target")) {
+				t.Fatalf("virtual preupload to a target of another type: %s", b)
+			}
 			if tc.expected != 200 {
 				return
 			}
 			body := `{"key":"header","value":{"summary":"publish"}}` + "\n" +
 				`{"key":"file","value":{"path":"config.json","content":"e30=","encoding":"base64"}}` + "\n"
-			r = f.request(
+			r = f.requestAs(
 				"POST",
 				"api/models/acme/demo/commit/main",
 				"application/x-ndjson",
 				[]byte(body),
+				tc.user,
 			)
 			b = readResponse(t, r)
 			if r.StatusCode != 200 {
 				t.Fatalf("virtual commit: %d %s", r.StatusCode, b)
 			}
-			r = f.request("GET", "api/models/acme/demo/revision/main", "", nil)
+			r = f.requestAs("GET", "api/models/acme/demo/revision/main", "", nil, tc.user)
 			b = readResponse(t, r)
-			if r.StatusCode != 200 || !bytes.Contains(b, []byte(`"rfilename":"config.json"`)) {
+			if tc.include && (r.StatusCode != 200 || !bytes.Contains(b, []byte(`"rfilename":"config.json"`))) {
 				t.Fatalf("virtual member read: %d %s", r.StatusCode, b)
 			}
 		})

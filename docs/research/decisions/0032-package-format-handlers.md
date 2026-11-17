@@ -655,6 +655,14 @@ segment instead of rehashing a whole model. Transient/no-store sources retain th
 existing Hub HTTP path without advertising Xet, preventing repeated full-stream
 transfers. Offline, source refresh and final authority fences remain owned by P9. Cross-peer federation remains P13.
 
+Through a virtual repository (#1540) the revision's one member comes from the package
+handlers' walk (decision 0008, R1 to R4 and R11), and the capability names that member: a
+read token is reauthorized on the member's permissions, since no permission target names a
+virtual repository, and a write token on the default deployment repository's, which takes
+Xet uploads and the commit in its own transaction (R6). JFrog's guide supports virtual
+repositories for `snapshot_download` and members on the new layout only; a member still on
+the legacy layout holds no snapshot path, so the walk passes over it [I].
+
 Primary references: [Hugging Face Xet API](https://huggingface.co/docs/xet/api),
 [xorb format](https://huggingface.co/docs/xet/xorb),
 [shard format](https://huggingface.co/docs/xet/shard),
@@ -917,7 +925,7 @@ keeps a release whose file the patterns reject (R3).
 | LuaRocks | `manifest`, `manifest-5.x` at the root, local and remote | none | A remote rock's manifest lookup checks the blackout alone (R4). |
 | Swift | none | release list `<scope>/<name>`; release info `<v>`, `<v>.json`, `<v>/Package.swift` | Archive at `<scope>/<name>/<name>-<v>.zip`, refused with no archive headers. A remote repository names the package folder `<scope>/<name>` [I]. |
 | Terraform | a remote repository's documents under `.terraform/modules/` and `.terraform/providers/` [I] | module `versions`; provider `versions`, package metadata, mirror `index.json` and `<v>.json` | A module's `<v>/download` answers as a GET of its archive would (R9): `<ns>/<name>/<system>/<v>.zip` in a local repository, its cache path in a remote. A remote caches a provider file at its URL path below the Providers URL, else at `external/<host>/<path>`, and a GitHub module at its VCS tag path (#1260, decision 0040). Signed files pass the policy's message on. |
-| Git LFS | none | none | A transfer is checked at `objects/<xx>/<yy>/<oid>`. A download batch answers a caller who may not read 403 per object. Locks are unchanged. |
+| Git LFS | none | none | A transfer is checked at `objects/<xx>/<yy>/<oid>`. A download batch answers a caller who may not read 403 per object. A virtual repository checks its own patterns first and passes over a member the caller may not read, so the object answers 404 (#1540). Locks are unchanged. |
 | Nix | `nix-cache-info`, `binary-cache/<hash>/<hash>.narinfo` (a remote cache's `<hash>.narinfo` [I]) | `channels/<name>`, a snapshot's page `channels/<name>/<flavor>/<snapshot>` [I] | A NAR is checked at its stored `binary-cache/<hash>/<file>` (a remote cache's at `nar/<file>`), so patterns on the NARs leave the narinfo served. A channel tarball is checked at `channels/<name>/<flavor>/<snapshot>/nixexprs.tar.xz` [I], and the channel still names a snapshot whose tarball the patterns reject. |
 | VCS | a remote repository's refs at `<owner>/<name>/gitrefs` | none | Read permission stays on the project folder. `downloadCommit` reads no refs. |
 | Puppet | a remote repository's `.puppet/<m>/releases.json` [I] | `v3/releases`, with or without `module`; `v3/releases/<slug>`; `v3/modules/<m>`; `v3/modules` without `query` | Module search (`v3/modules?query=`) kept (R2b). The lists of every release and module keep a release whose archive the patterns reject (R3); 7.x writes Puppet's listings as stored documents, an `all.json` among them (RTFACT-26143). A remote's module record, which it reads from its upstream's `v3/modules/<m>` (#1326), is checked with the release pages, at `.puppet/<m>/releases.json` for `v3/modules/<m>` and for the blackout alone for the search [I]. So is the upstream's `v3/releases/<slug>` record a remote reads for a release its pages leave out (#1344), at `.puppet/<m>/releases.json` after Read on the module folder [I]. Archive at `<m>/<m>-<v>.tar.gz`. |
@@ -934,7 +942,7 @@ keeps a release whose file the patterns reject (R3).
 | Agent Packages | none | version list (`<o>/<n>`) | No archive headers on a refusal. Search kept. |
 | Agent Plugins | the marketplace files at the root | none | Lists the latest version though its ZIP is refused [I]. |
 | AI Editor Extensions | none | none | The gallery checks an extension folder as a folder [I]. |
-| Hugging Face | Xet reconstruction and data at the file's snapshot path | info, tree, `xet-read-token` (`models--<o>--<n>`) | `resolve` refuses before it sets its headers. |
+| Hugging Face | Xet reconstruction and data at the file's snapshot path | info, tree, `xet-read-token` (`models--<o>--<n>`) | `resolve` refuses before it sets its headers. A virtual repository checks its own patterns at the model's folder, then passes over a member whose policy refuses that folder, before it chooses the revision's member (#1540). |
 | Skills | none | detail, versions, version, resolve; `latest` downloads (`<slug>`) | A single file takes its bundle's check. `xrayStatus`, list and search kept. |
 | NVIDIA NIM, JetBrains Plugins | remote only: the source boundary checks each read | none | |
 

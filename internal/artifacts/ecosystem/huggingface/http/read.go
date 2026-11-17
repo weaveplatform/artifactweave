@@ -111,56 +111,16 @@ func (h handler) selectResolution(
 			return selected{}, fmt.Errorf("huggingface: model folder: %w", err)
 		}
 	}
-	return h.selectRepo(r, id, rev, map[string]bool{})
+	return h.selectRepo(r, id, rev)
 }
 
 // selectRepo chooses one member for an entire revision. File reads use the
-// same choice, so a virtual cannot combine files from different models.
-func (h handler) selectRepo(
-	r *http.Request,
-	id format.Identity,
-	rev string,
-	seen map[string]bool,
-) (selected, error) {
+// same choice, so a virtual cannot combine files from different models
+// (selectMember).
+func (h handler) selectRepo(r *http.Request, id format.Identity, rev string) (selected, error) {
 	c := pkgroute.RequestFrom(r).Repo
-	if seen[c.Key] || len(seen) >= 8 {
-		return selected{}, badIdentity()
-	}
-	seen[c.Key] = true
-	defer delete(seen, c.Key)
 	if c.Class == repo.Virtual {
-		for _, key := range c.Repositories {
-			member, err := h.k.DB().Repos().Get(r.Context(), key)
-			if errors.Is(err, kernel.ErrNotFound) {
-				continue
-			}
-			if err != nil {
-				return selected{}, fmt.Errorf("huggingface: virtual member: %w", err)
-			}
-			if member.PackageType != repo.HuggingFaceML ||
-				member.Class == repo.Virtual && seen[key] {
-				return selected{}, badIdentity()
-			}
-			mr, err := h.k.MemberRequest(r, member)
-			if err != nil {
-				return selected{}, fmt.Errorf("huggingface: member request: %w", err)
-			}
-			// 7.x ignores a blacked-out repository when it resolves, so a
-			// blacked-out member, local or remote, is passed over as one
-			// without the revision is, and a later member serves it.
-			if h.k.CheckBlackedOut(mr, id.Prefix()) != nil {
-				continue
-			}
-			chosen, err := h.selectRepo(mr, id, rev, seen)
-			if errors.Is(err, kernel.ErrNotFound) || isNotFound(err) {
-				continue
-			}
-			if err != nil {
-				return selected{}, err
-			}
-			return chosen, nil
-		}
-		return selected{}, missing()
+		return h.selectMember(r, id, rev)
 	}
 	if !h.k.CanFolder(r, id.Prefix(), api.ActionRead) {
 		return selected{}, missing()
@@ -444,7 +404,7 @@ func (h handler) resolve(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, badIdentity())
 		return
 	}
-	chosen, err := h.selectRepo(r, id, rev, map[string]bool{})
+	chosen, err := h.selectRepo(r, id, rev)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return

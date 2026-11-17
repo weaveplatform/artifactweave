@@ -118,11 +118,14 @@
 // route's upstream steps, which itemkit takes in Resolve's order
 // (https://github.com/weaveplatform/artifactweave/issues/1535); and the
 // merge contract (Merger, Collect and its helpers;
-// https://github.com/weaveplatform/artifactweave/issues/1536); and the
+// https://github.com/weaveplatform/artifactweave/issues/1536); the
 // merged metadata cache (Cache;
 // https://github.com/weaveplatform/artifactweave/issues/1543), which the
-// families wire into their merges. The storage API's views and the folder
-// index of a virtual repository read its members through Stored and Walk
+// families wire into their merges; and Git LFS and Hugging Face on Members'
+// Package walk and DeployTarget, their tests in their ecosystem/<type>/http
+// packages (https://github.com/weaveplatform/artifactweave/issues/1540). The
+// storage API's views and the folder index of a virtual repository read its
+// members through Stored and Walk
 // (https://github.com/weaveplatform/artifactweave/issues/1537). The rest of
 // the package is planned for P10's other tickets
 // (https://github.com/weaveplatform/artifactweave/issues/1521).

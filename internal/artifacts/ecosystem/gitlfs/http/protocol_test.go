@@ -80,6 +80,9 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(""))
 	r.Use(accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+		if r.Header.Get("X-User") == kernel.AnonymousUser {
+			return kernel.Principal{Name: kernel.AnonymousUser, Anonymous: true}
+		}
 		return kernel.Principal{Name: r.Header.Get("X-User"), Admin: r.Header.Get("X-User") == ""}
 	}))
 	pkgroute.Mount(r, pkgroute.Options{
@@ -254,10 +257,12 @@ func TestUnitVirtualMemberGrantsAndWriteOnlyDisclosure(t *testing.T) {
 			err,
 		)
 	}
+	// A caller who may read the object in no member gets its 404, as for a
+	// member that does not hold it (decision 0008, R3), where it got 403.
 	f.user = "intruder"
 	_, deniedRead := f.batch("download", oid, int64(len(body)))
 	if deniedRead.Objects[0].Error == nil ||
-		deniedRead.Objects[0].Error.Code != http.StatusForbidden ||
+		deniedRead.Objects[0].Error.Code != http.StatusNotFound ||
 		len(deniedRead.Objects[0].Actions) != 0 {
 		t.Fatalf("ungranted virtual member disclosed object: %+v", deniedRead)
 	}

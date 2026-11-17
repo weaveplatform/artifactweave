@@ -138,8 +138,9 @@ func Protocols(d Deps) []pkgroute.Protocol {
 			Grants:        d.Access.Grants,
 			RemoteSources: d.RemoteSources,
 			Keys:          d.Keys,
+			Logger:        d.Logger,
 		}),
-		gitlfshttp.Protocol(gitlfshttp.Options{RemoteSources: d.RemoteSources}),
+		gitlfshttp.Protocol(gitlfshttp.Options{RemoteSources: d.RemoteSources, Logger: d.Logger}),
 		agentpackageshttp.Protocol(),
 		conanhttp.Protocol(conanhttp.Options{
 			RemoteSources: d.RemoteSources, Tokens: d.Access.Tokens,

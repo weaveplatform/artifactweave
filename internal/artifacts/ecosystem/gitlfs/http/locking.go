@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -147,7 +148,7 @@ func (h handler) lockTarget(r *http.Request, path string) (*http.Request, error)
 	if c.Class != repo.Virtual {
 		return r, nil
 	}
-	target, err := h.virtualDeploymentRequest(r)
+	target, err := h.deployTarget(r)
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +156,19 @@ func (h handler) lockTarget(r *http.Request, path string) (*http.Request, error)
 		return nil, kernel.ErrForbidden
 	}
 	return target, nil
+}
+
+// lockTargetError answers a lock write whose target refused it. A virtual
+// repository without a local deployment repository answers 7.x's 405 for
+// any write through it, with Allow: GET and its message (decision 0008,
+// R6); any other refusal keeps the lock route's own message.
+func lockTargetError(w http.ResponseWriter, err error, message string) {
+	var answer *apierror.Error
+	if errors.Is(err, virtual.ErrNoDeployTarget) && errors.As(err, &answer) {
+		w.Header().Set("Allow", answer.Allow)
+		message = answer.Message
+	}
+	lockError(w, lockTargetStatus(err), message)
 }
 
 func lockTargetStatus(err error) int {
@@ -193,11 +207,11 @@ func (h handler) createLock(w http.ResponseWriter, r *http.Request) {
 	}
 	target, err := h.lockTarget(r, request.Path)
 	if err != nil {
-		lockError(w, lockTargetStatus(err), "Git LFS lock create denied")
+		lockTargetError(w, err, "Git LFS lock create denied")
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
-		members, err := h.members(r)
+		members, err := h.walk(r, "")
 		if err != nil {
 			lockReadError(w, err)
 			return
@@ -422,7 +436,7 @@ func (h handler) unlockLock(w http.ResponseWriter, r *http.Request) {
 	}
 	target, err := h.lockTargetForID(r)
 	if err != nil {
-		lockError(w, lockTargetStatus(err), "Git LFS unlock denied")
+		lockTargetError(w, err, "Git LFS unlock denied")
 		return
 	}
 	repoKey := pkgroute.RequestFrom(target).Repo.Key
@@ -463,7 +477,7 @@ func (h handler) lockTargetForID(r *http.Request) (*http.Request, error) {
 	if c.Class != repo.Virtual {
 		return r, nil
 	}
-	return h.virtualDeploymentRequest(r)
+	return h.deployTarget(r)
 }
 
 func lockReadError(w http.ResponseWriter, err error) {
@@ -499,7 +513,7 @@ func (h handler) lockMembers(r *http.Request, mode string) ([]*http.Request, err
 			return nil, kernel.ErrForbidden
 		}
 	}
-	return h.members(r)
+	return h.walk(r, "")
 }
 
 func (h handler) readLockPage(
@@ -546,12 +560,12 @@ func (h handler) collectLocks(
 	if mode == "verify" {
 		want = api.ActionWrite
 	}
-	virtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
+	throughVirtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
 	if f.Path != "" {
-		if !virtual && !h.k.Can(r, f.Path, want) {
+		if !throughVirtual && !h.k.Can(r, f.Path, want) {
 			return nil, "", kernel.ErrForbidden
 		}
-	} else if !virtual && !h.k.CanFolder(r, "", want) {
+	} else if !throughVirtual && !h.k.CanFolder(r, "", want) {
 		return nil, "", kernel.ErrForbidden
 	}
 	members, err := h.lockMembers(r, mode)
@@ -561,7 +575,7 @@ func (h handler) collectLocks(
 	if len(members) == 0 {
 		return []lockWire{}, "", nil
 	}
-	virtualVerify := mode == "verify" && virtual
+	virtualVerify := mode == "verify" && throughVirtual
 	var target *http.Request
 	if virtualVerify {
 		target, err = h.lockTargetForID(r)
@@ -588,7 +602,7 @@ func (h handler) collectLocks(
 		}
 		// An unreadable virtual member must not trigger an upstream call or
 		// prevent a later readable member from contributing to the view.
-		if virtual && !virtualVerify && !h.k.CanFolder(member, "", memberWant) {
+		if throughVirtual && !virtualVerify && !h.k.CanFolder(member, "", memberWant) {
 			c.Member++
 			c.After = ""
 			continue
@@ -631,8 +645,8 @@ func (h handler) visibleLockRow(
 	r *http.Request, members []*http.Request, target *http.Request,
 	row model.GitLFSLock, memberIndex int, mode string, want api.Actions,
 ) (bool, error) {
-	virtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
-	virtualVerify := virtual && mode == "verify"
+	throughVirtual := pkgroute.RequestFrom(r).Repo.Class == repo.Virtual
+	virtualVerify := throughVirtual && mode == "verify"
 	memberWant := want
 	if virtualVerify {
 		memberWant = api.ActionRead
@@ -643,7 +657,7 @@ func (h handler) visibleLockRow(
 		}
 		return false, nil
 	}
-	if !virtual && !h.k.Can(r, row.Path, want) ||
+	if !throughVirtual && !h.k.Can(r, row.Path, want) ||
 		virtualVerify && !h.k.Can(target, row.Path, api.ActionWrite) {
 		return false, nil
 	}
