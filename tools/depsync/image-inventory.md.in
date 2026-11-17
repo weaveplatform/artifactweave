@@ -48,7 +48,8 @@ original tested versions.
 ## Download sources
 
 The images not listed below take their client from the base image or from the
-package manager they run (apk, APT, gem, npm or mix). The images below also
+package manager they run (apk, APT, gem, npm or mix). On an Ubuntu base, APT has
+a second mirror too, as the end of this section says. The images below also
 download a file while they build. Each file is pinned to the digest its upstream
 publishes: a SHA-256, or the SHA-512 that Maven Central and Eclipse publish for
 Ivy and Eclipse. Where a second host serves the same bytes, the build falls back
@@ -102,6 +103,38 @@ them with `--no-build-isolation`
 | [`sbt.Dockerfile`](../../test/acceptance/clients/sbt.Dockerfile) | sbt {{sbt}} tgz | GitHub release `sbt/sbt` | None. SDKMAN redirects to the same release, and Maven Central holds no launcher tgz |
 | [`vagrant.Dockerfile`](../../test/acceptance/clients/vagrant.Dockerfile) | Vagrant {{vagrant}} `.deb` | `releases.hashicorp.com/vagrant/` | [HashiCorp's apt repository](https://apt.releases.hashicorp.com/pool/amd64/main/vagrant_{{vagrant}}-1_amd64.deb) |
 | [`vscode.Dockerfile`](../../test/acceptance/clients/vscode.Dockerfile) | VS Code archive | `vscode.download.prss.microsoft.com` | The same URL through each delivery network that host's traffic manager hands it to, Akamai (`download.prss.microsoft.com.akamaized.net`) and Fastly (`fg.microsoft.map.fastly.net`) ([#1603](https://github.com/weaveplatform/artifactweave/issues/1603)). It covers one network failing a transfer, not Microsoft's release host being down: no other host serves the archive, `update.code.visualstudio.com` redirects to it, and the China CDN and the old Azure CDN no longer resolve |
+
+The images that install packages with APT on an Ubuntu base (Git LFS, JetBrains,
+opkg, P2, Vagrant and VS Code on 26.10, Swift on 22.04) give each Canonical host
+in the base image's sources a second mirror
+([#1632](https://github.com/weaveplatform/artifactweave/issues/1632)). Before
+the first `apt-get update` they run
+[`ubuntu-mirrors.sh`](../../test/acceptance/clients/ubuntu-mirrors.sh), which
+turns each such source, in 26.10's deb822 `ubuntu.sources` or 22.04's one-line
+`sources.list`, into a `mirror+file:` list of that host and then its second
+mirror, each with a priority, since APT otherwise tries a list's mirrors in
+random order. APT retries a file on the host three times, its default since APT
+2.3.2, and then fetches it from the second mirror. APT before 3.1.3, which
+22.04 ships, can wait for good on a file it queued again after a delay
+([LP: #2003851](https://bugs.launchpad.net/ubuntu/+source/apt/+bug/2003851),
+open for 22.04), and the Swift image's `apt-get update` hung that way with
+`archive.ubuntu.com` refused. So on such an APT the script sets
+`Acquire::Retries` to 0, and a file goes to the second mirror at its first
+failure. A second mirror can serve
+only what Canonical signed: APT checks each suite's `InRelease` against the
+Ubuntu archive key in the base image, and every index and package against the
+SHA-256 in that signed file, whichever mirror serves it, and nothing turns that
+check off. When every mirror is down, the build fails. The script fails the build
+when the base image's sources name none of the hosts below, or one it did not
+rewrite, and the `tools/depsync` tests fail when an image runs `apt-get` without
+it, other than the Debian images, whose `deb.debian.org` is Debian's own CDN.
+The Debian client image installs nothing; it reports the APT of its base image.
+
+| Source in the base image | Second mirror |
+|---|---|
+| `archive.ubuntu.com/ubuntu`, for the release and its `-updates` and `-backports` | `azure.archive.ubuntu.com/ubuntu`, the Ubuntu mirror inside Azure. GitHub's own Ubuntu runner images install from it, with `archive.ubuntu.com` as their failover ([`configure-apt-sources.sh`](https://github.com/actions/runner-images/blob/main/images/ubuntu/scripts/build/configure-apt-sources.sh)), and it is on Microsoft's network, apart from the Canonical hosts the runners could not reach on 2026-11-16. It served the same `InRelease` as `archive.ubuntu.com` for every suite when #1632 checked |
+| `security.ubuntu.com/ubuntu`, for `-security` | `azure.archive.ubuntu.com/ubuntu`, which carries `-security` too |
+| `ports.ubuntu.com/ubuntu-ports`, for every suite of an arm64 build | `mirrors.ocf.berkeley.edu/ubuntu-ports`, UC Berkeley's Open Computing Facility, a ports mirror on [Launchpad's list](https://launchpad.net/ubuntu/+archivemirrors). `azure.ports.ubuntu.com` resolves to `ports.ubuntu.com`'s own hosts, so it is no second source. It can lag `ports.ubuntu.com` by some hours, so an arm64 build that falls back to it can install the update before the latest, still one Canonical signed. CI builds only amd64 |
 
 The Puppet image stays on Ruby 3.3 through a Dependabot entry of its own,
 because the pinned Puppet cannot extract a module archive on Ruby 3.4

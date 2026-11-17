@@ -278,21 +278,25 @@ func TestAccMavenRemoteDenialsAndAdmission(t *testing.T) {
 // A remote's release and snapshot handling refuses a download from the
 // remote or its cache, a checksum's too, as a local repository's does: 409
 // with the path asked for after the reason (#1630), and without asking the
-// upstream. A cache's refusal names the remote in its reason, as it did
-// before.
+// upstream. A cache's reason names the cache, in the answer and the trace,
+// as 7.x's cache repository checks the remote's settings under its own key.
 func TestAccMavenRemotePolicyRefusalNamesThePath(t *testing.T) {
 	w := newMavenRemoteWorld(t)
 	w.c.HandleSnapshots = new(false)
 	w.update()
 	const p = "org/acme/app/1.1-SNAPSHOT/app-1.1-SNAPSHOT.jar"
-	reason := "The repository '" + w.c.Key + "' rejected the resolution of an artifact '" +
-		w.c.Key + ":" + p + "' due to conflict in the snapshot release handling policy."
 	for _, key := range []string{w.c.Key, w.c.Key + "-cache"} {
+		reason := "The repository '" + key + "' rejected the resolution of an artifact '" +
+			key + ":" + p + "' due to conflict in the snapshot release handling policy."
 		for _, asked := range []string{p, p + ".sha1"} {
 			for _, method := range []string{http.MethodGet, http.MethodHead} {
 				rec := w.request(method, "/artifactory/"+key+"/"+asked, "reader", "")
 				wantPolicyRefusal(t, rec, method, reason+"; Path: '"+key+":"+p+"'")
 			}
+		}
+		rec := w.request(http.MethodGet, "/artifactory/"+key+"/"+p+"?trace", "reader", "")
+		if step := " Download denied (" + reason + ") - returning un-found resource\n"; !strings.Contains(rec.Body.String(), step) {
+			t.Errorf("%s?trace: %s, want %q", key, rec.Body, step)
 		}
 	}
 	if w.up.Count("", "") != 0 {

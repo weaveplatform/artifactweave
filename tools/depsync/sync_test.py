@@ -554,5 +554,48 @@ class DownloadSourceTests(unittest.TestCase):
                                 "a second source that nothing tries")
 
 
+# An install or index update by APT, which needs the image's package sources.
+APT = re.compile(r"\bapt(?:-get)? (?:update|install)\b")
+# The images whose APT reads deb.debian.org, Debian's own CDN, which did not
+# fail the way Canonical's hosts did (#1632). ubuntu-mirrors.sh refuses them:
+# their sources name no Ubuntu host.
+DEBIAN_APT = [CLIENTS + "bower.Dockerfile", CLIENTS + "chef.Dockerfile", CLIENTS + "cocoapods.Dockerfile"]
+UBUNTU_MIRRORS = "COPY ubuntu-mirrors.sh /usr/local/bin/ubuntu-mirrors\nRUN ubuntu-mirrors\n"
+
+
+class UbuntuMirrorTests(unittest.TestCase):
+    """#1632. The native-clients job failed whenever GitHub's runners could not
+    reach archive.ubuntu.com, the one host the Ubuntu images' APT read.
+    ubuntu-mirrors.sh gives each Canonical host a second mirror, so an image on
+    Ubuntu that runs apt-get without it first has no second source, and an
+    inventory that names other mirrors than the script describes a fallback
+    the build does not try."""
+
+    def test_every_ubuntu_image_gives_apt_its_second_mirror_first(self):
+        catalog = json.loads(sync.CATALOG.read_text())
+        installing = [path for path in catalog["images"] if APT.search(code(sync.ROOT / path))]
+        self.assertEqual(DEBIAN_APT, [path for path in installing if path in DEBIAN_APT],
+                         "a Debian image that no longer runs apt-get")
+        for path in installing:
+            text = code(sync.ROOT / path)
+            with self.subTest(image=path):
+                if path in DEBIAN_APT:
+                    self.assertNotIn("ubuntu-mirrors", text)
+                    continue
+                self.assertTrue(UBUNTU_MIRRORS in text, "apt-get with Canonical's host as its only source")
+                self.assertLess(text.index(UBUNTU_MIRRORS), APT.search(text).start(),
+                                "apt-get runs before ubuntu-mirrors")
+
+    def test_the_inventory_names_the_mirrors_the_script_writes(self):
+        script = (sync.ROOT / CLIENTS / "ubuntu-mirrors.sh").read_text()
+        mirrors = re.findall(r"^mirror (\S+) (\S+) http://(\S+)/$", script, re.MULTILINE)
+        self.assertEqual(["archive.ubuntu.com", "security.ubuntu.com", "ports.ubuntu.com"],
+                         [host for host, _, _ in mirrors])
+        template = sync.CATALOG.with_name("image-inventory.md.in").read_text()
+        section = template[template.index("| Source in the base image | Second mirror |"):]
+        rows = re.findall(r"^\| `([^`]+)`[^|]* \| `([^`]+)`", section[:section.index("\n\n")], re.MULTILINE)
+        self.assertEqual([(host + "/" + path, second) for host, path, second in mirrors], rows)
+
+
 if __name__ == "__main__":
     unittest.main()

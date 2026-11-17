@@ -118,7 +118,11 @@
 //
 // Implemented P1 to P9c as the server root's management handlers; P9d made
 // them the ArtifactoryAPI partial (WEB-08), moved them here (WEB-12) and
-// narrowed their store to Store (ART-22).
+// narrowed their store to Store (ART-22). P10 gave a virtual repository's
+// storage views 7.161.26's answers: the item info and properties of the
+// first member's item the caller may read, 400 for the last modified and
+// permissions views, and 404 for the statistics
+// (https://github.com/weaveplatform/artifactweave/issues/1537).
 // The GET searches' logic, the upstream search's included, is in
 // artifacts/core/search; the upstream search's route and disclosure policy
 // stays here.

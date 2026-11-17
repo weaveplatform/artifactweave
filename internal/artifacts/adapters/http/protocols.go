@@ -80,6 +80,7 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 		},
 		Fault:  func(r *http.Request, err error) { httpkit.NoteCause(r.Context(), err) },
 		Logger: s.Log(),
+		Cache:  s.cfg.VirtualCache,
 	}
 }
 

@@ -193,6 +193,7 @@ func TestAccVirtualFetchesRemoteMembersUpstreams(t *testing.T) {
 			virtualRemoteChecksumsAndArchives(t, w)
 			virtualRemoteMaven(t, w)
 			virtualRemoteTrace(t, w)
+			virtualRemoteExpired(t, w)
 		})
 	}
 }
@@ -470,4 +471,142 @@ func virtualRemoteTrace(t *testing.T, w *virtualRemoteWorld) {
 		"Responding with found resource",
 		"Request succeeded",
 	)
+}
+
+// A copy a remote's cache holds that has expired is passed over in the
+// remote's cache step, as 7.161.26's DbCacheRepo.getInfo returns it as an
+// ExpiredRepoResource, which processStandard does not take for found: a
+// later member's fresh copy serves, and otherwise the remote's own upstream
+// step reads the file as a direct read of the remote does. A release never
+// expires, nor does an offline remote's copy (DbCacheRepo.isExpired).
+func virtualRemoteExpired(t *testing.T, w *virtualRemoteWorld) {
+	t.Helper()
+	upB := fakeupstream.New(t, fakeupstream.Options{})
+	// maven-remote's snapshots expire as soon as they are fetched.
+	w.update(repo.Config{
+		Key: "maven-remote", Class: repo.Remote, PackageType: repo.Maven, URL: w.upMaven.URL,
+		RetrievalCachePeriodSecs: ptr(0),
+	})
+	for _, c := range []repo.Config{
+		{Key: "maven-remote-b", Class: repo.Remote, PackageType: repo.Maven, URL: upB.URL},
+		{
+			Key: "maven-pair", Class: repo.Virtual, PackageType: repo.Maven,
+			Repositories: []string{"maven-remote", "maven-remote-b"},
+		},
+	} {
+		if err := w.rt.Store.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.rt.Store.Permissions().Create(t.Context(), accesstest.Permission{
+		Name: "maven-remote-b",
+		Resources: map[accessapi.ResourceType]accesstest.Resource{
+			accessapi.ResourceArtifact: {
+				Actions: accesstest.Grants{Users: map[string]accessapi.Actions{
+					"reader": accessapi.ActionRead | accessapi.ActionWrite,
+				}},
+				Targets: map[string]accesstest.Target{"maven-remote-b": {}},
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// snapshot is the path of artifact's non-unique snapshot jar, which
+	// Maven classifies as a mutable file.
+	snapshot := func(artifact string) string {
+		return "org/acme/" + artifact + "/1.0-SNAPSHOT/" + artifact + "-1.0-SNAPSHOT.jar"
+	}
+	fill := func(up *fakeupstream.Server, key, artifact, body string) {
+		t.Helper()
+		up.Set("/"+snapshot(artifact), fakeupstream.Resource{Body: []byte(body)})
+		wantFetched(t, key+" "+artifact, w.do(http.MethodGet,
+			"/artifactory/"+key+"/"+snapshot(artifact), "reader", ""), 200, body)
+	}
+	asked := func(up *fakeupstream.Server, artifact string) int {
+		return len(requestsFor(up, "/"+snapshot(artifact)))
+	}
+
+	// A later member's fresh copy serves, and maven-remote's upstream is
+	// not asked.
+	fill(w.upMaven, "maven-remote", "both", "a v1")
+	fill(upB, "maven-remote-b", "both", "b v1")
+	w.upMaven.Set("/"+snapshot("both"), fakeupstream.Resource{Body: []byte("a v2")})
+	before := asked(w.upMaven, "both")
+	wantFetched(t, "fresh copy", w.do(http.MethodGet, "/artifactory/maven-pair/"+snapshot("both"),
+		"reader", ""), 200, "b v1")
+	trace := w.do(http.MethodGet, "/artifactory/maven-pair/"+snapshot("both")+"?trace", "reader", "")
+	if n := asked(w.upMaven, "both"); n != before {
+		t.Fatalf("maven-remote's upstream asked %d times for an expired copy a later cache holds", n-before)
+	}
+	at := 0
+	for _, step := range []string{
+		"Searching for the resource within maven-remote-cache",
+		"Found the resource in the cache - checking for expiry",
+		"Returning resource as expired",
+		"Searching for the resource within maven-remote-b-cache",
+		"Found the resource in the cache - checking for expiry",
+		"Returning cached resource",
+		"Returning found resource from maven-remote-b-cache:" + snapshot("both"),
+	} {
+		i := strings.Index(trace.Body.String()[at:], step)
+		if i < 0 {
+			t.Fatalf("trace: no %q after offset %d in\n%s", step, at, trace.Body)
+		}
+		at += i + len(step)
+	}
+
+	// The expired copy alone: maven-remote's upstream step revalidates it
+	// with the requests a direct read of maven-remote makes, and serves the
+	// newer file.
+	for _, artifact := range []string{"alone", "alone-direct"} {
+		fill(w.upMaven, "maven-remote", artifact, "a v1")
+		w.upMaven.Set("/"+snapshot(artifact), fakeupstream.Resource{Body: []byte("a v2")})
+	}
+	filled := upstreamMethods(w.upMaven, "/"+snapshot("alone"))
+	wantFetched(t, "expired copy", w.do(http.MethodGet,
+		"/artifactory/maven-pair/"+snapshot("alone"), "reader", ""), 200, "a v2")
+	wantFetched(t, "direct expired copy", w.do(http.MethodGet,
+		"/artifactory/maven-remote/"+snapshot("alone-direct"), "reader", ""), 200, "a v2")
+	walkedAsked, directAsked := upstreamMethods(w.upMaven, "/"+snapshot("alone")),
+		upstreamMethods(w.upMaven, "/"+snapshot("alone-direct"))
+	if walkedAsked == filled || walkedAsked != directAsked {
+		t.Fatalf("expired copy: upstream asked %q through the walk, %q directly",
+			walkedAsked, directAsked)
+	}
+	if n := asked(upB, "alone"); n != 0 {
+		t.Fatalf("maven-remote-b's upstream asked %d times after maven-remote served", n)
+	}
+
+	// The upstream lacks the file now: maven-remote's upstream step finds
+	// nothing, and the walk serves the expired copy, as 7.161.26's
+	// RemoteRepoBase.internalGetInfo returns it (535-539).
+	fill(w.upMaven, "maven-remote", "gone", "a v1")
+	w.upMaven.Set("/"+snapshot("gone"), fakeupstream.Resource{Status: http.StatusNotFound})
+	before = asked(w.upMaven, "gone")
+	wantFetched(t, "upstream miss", w.do(http.MethodGet,
+		"/artifactory/maven-pair/"+snapshot("gone"), "reader", ""), 200, "a v1")
+	if asked(w.upMaven, "gone") == before {
+		t.Fatal("upstream miss: the expired copy served without asking maven-remote's upstream")
+	}
+
+	// A release never expires: its copy serves from the cache step.
+	w.upMaven.Set("/org/acme/rel/1.0/rel-1.0.jar", fakeupstream.Resource{Body: []byte("release")})
+	wantFetched(t, "release fill", w.do(http.MethodGet,
+		"/artifactory/maven-remote/org/acme/rel/1.0/rel-1.0.jar", "reader", ""), 200, "release")
+	before = len(requestsFor(w.upMaven, "/org/acme/rel/1.0/rel-1.0.jar"))
+	wantFetched(t, "release", w.do(http.MethodGet,
+		"/artifactory/maven-pair/org/acme/rel/1.0/rel-1.0.jar", "reader", ""), 200, "release")
+	if n := len(requestsFor(w.upMaven, "/org/acme/rel/1.0/rel-1.0.jar")) - before; n != 0 {
+		t.Fatalf("maven-remote's upstream asked %d times for a release", n)
+	}
+
+	// An offline remote's copy never expires.
+	fill(w.upMaven, "maven-remote", "offline", "a v1")
+	fill(upB, "maven-remote-b", "offline", "b v1")
+	w.update(repo.Config{
+		Key: "maven-remote", Class: repo.Remote, PackageType: repo.Maven, URL: w.upMaven.URL,
+		RetrievalCachePeriodSecs: ptr(0), Offline: ptr(true),
+	})
+	wantFetched(t, "offline copy", w.do(http.MethodGet,
+		"/artifactory/maven-pair/"+snapshot("offline"), "reader", ""), 200, "a v1")
 }

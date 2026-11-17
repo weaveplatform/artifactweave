@@ -46,6 +46,9 @@
 //     0008, R7), which
 //     https://github.com/weaveplatform/artifactweave/issues/1542 sets.
 //   - Options.Logger: where WarnPassedOver logs; nil means slog.Default.
+//   - Options.Cache: the server's merged virtual metadata cache
+//     (virtual.Cache), which Merged and MergedPart keep documents in;
+//     nil merges on every request.
 //
 // # Outputs
 //
@@ -74,9 +77,12 @@
 //     virtual.Package); Collect, each member's document for a format's
 //     virtual.Merger; PassedOver, whether a member read's error passes over
 //     that member; WarnPassedOver, the warning for a member passed over for
-//     a fault rather than a miss or a refusal [I]; and Virtual, the Source
+//     a fault rather than a miss or a refusal [I]; Virtual, the Source
 //     that serves a virtual repository's file from the first member that
-//     holds it.
+//     holds it; and Merged, MergedPart and EvictMerged, which keep a virtual
+//     repository's merged document, or a member's part of it, in
+//     Options.Cache for its virtualRetrievalCachePeriodSecs and drop it
+//     (decision 0008, R8).
 //   - Deploy helpers: Store, StoreOnce, StoreNew, StoreResolved, Upload,
 //     Deploy, DeployItem, Created, Annotate, Delete and DeleteTree.
 //   - Multipart helpers: ReadForm, ReadFormLimited and ReadFormWith; path
@@ -140,6 +146,13 @@
 //     error fails the merge, so it never answers short. MemberRequest keeps
 //     its 400 for a nested virtual member, for a protocol that walks a
 //     virtual repository's own list.
+//   - Merged keeps a merge only for a caller who may read the whole of
+//     every member its walk keeps, and all or none of the virtual
+//     repository itself, under a key holding those members; any other
+//     caller gets a merge of its own on every request, so a kept merge
+//     never shows a caller rows that another caller's grants admitted
+//     (decision 0006). The download policy refuses a document before the
+//     cache is read.
 //   - Remote.Read holds every format route's remote read without a format
 //     hint to 7.x's block list of upstream labels as the item route is held
 //     (source.ClientMIME, with no Accept, so the type of the URL asked for
@@ -222,7 +235,9 @@
 // followed. Moved here in P9d, which narrowed the kit's store to Store
 // (https://github.com/weaveplatform/artifactweave/issues/1089). P10 added
 // the virtual walk and the merge contract's kit side
-// (https://github.com/weaveplatform/artifactweave/issues/1536), and the
+// (https://github.com/weaveplatform/artifactweave/issues/1536), the
+// merged metadata cache's (Merged;
+// https://github.com/weaveplatform/artifactweave/issues/1543), and the
 // root gate and the warning for a failing member
 // (https://github.com/weaveplatform/artifactweave/issues/1538).
 //
@@ -239,7 +254,9 @@
 // boundary; virtual_test.go covers the virtual walk (MergeMembers'
 // nesting, pass-overs and cache-only steps, Collect with a test merge,
 // PassedOver and Virtual), and root_test.go RequireRoot and
-// WarnPassedOver; source_result_test.go tests ServeResult from inside the
+// WarnPassedOver; merged_test.go covers Merged, MergedPart and
+// EvictMerged over a cache on a fake clock (expiry, periods, visibility,
+// member lists, a document gone, parts); source_result_test.go tests ServeResult from inside the
 // package; conditional_test.go covers ServeStream's conditional answers and
 // FileNotModified, and etag_test.go a file stream's SHA-1 ETag. Every
 // native protocol's route suite under test/server/artifacts reaches it

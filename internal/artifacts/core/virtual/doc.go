@@ -1,7 +1,7 @@
 // Package virtual resolves virtual repositories: the order a virtual
 // repository's members are searched in, the repository a deploy to one
-// lands in, and, as P10 goes on, the merge cache for metadata that members
-// share (decision 0008).
+// lands in, the merge of metadata that members share, and the cache that
+// keeps a merge for virtualRetrievalCachePeriodSecs (decision 0008).
 //
 // # Role
 //
@@ -24,10 +24,15 @@
 //     hideUnauthorizedResources.
 //   - For Collect: a walk's members and the format's read of one member's
 //     document; for a Merger, the parts Collect returns.
+//   - For Cache: CacheOptions (the bounds, which the composition root takes
+//     from virtual.metadata_cache, a clock and a logger); for Get, a
+//     CacheKey, the virtual repository's period (Period, from its
+//     virtualRetrievalCachePeriodSecs) and the format's build; for
+//     MemberWritten, the written member's key and Containing, a Repos that
+//     lists the virtual repositories naming a key (port.RepoStore).
 //
-// Planned: artifactoryRequestsCanRetrieveRemoteArtifacts and
-// virtualRetrievalCachePeriodSecs (target layout, lines 659-665; decision
-// 0008).
+// Planned: artifactoryRequestsCanRetrieveRemoteArtifacts (target layout,
+// lines 659-665; decision 0008).
 //
 // # Outputs
 //
@@ -35,7 +40,8 @@
 //     effective order (decision 0008, R1 and R2): Resolve for downloads,
 //     Package for package handlers and Stored for the storage API; and
 //     Walk, every route from a virtual repository to each member, for the
-//     searches that judge a member by the route that reached it.
+//     searches and the folder index that judge a member by the route that
+//     reached it.
 //   - resolve.go: Resolution and Denial, what a download's walk over the
 //     members found and the first member that refused the caller Read
 //     (R3), and Answer, the item route's 404, 403 or 401 for a walk that
@@ -54,9 +60,16 @@
 //     virtual repository's URL a merged document points at. The formats'
 //     Mergers so far: gems.Merger, luarocks.Merger and pub.Merger
 //     (https://github.com/weaveplatform/artifactweave/issues/1538).
-//
-// Planned (target layout, lines 659-663): cache.go, merged metadata cached
-// for virtualRetrievalCachePeriodSecs.
+//   - cache.go: Cache, the process's merged metadata, each Entry kept by
+//     CacheKey (virtual repository, document, member list, the members the
+//     caller reads, base URL) and fresh for the virtual repository's period
+//     (R8): Get answers a fresh entry or builds it once for every waiting
+//     caller, drops the entry when the build finds the document gone, and
+//     answers the last entry when a rebuild fails; Evict and Zap drop or
+//     expire a document with its members' parts (PartOf); MemberWritten
+//     zaps or evicts a document in every virtual repository of the
+//     member's type that holds the member, through nesting (RTFACT-25909,
+//     Helm's rule).
 //
 // # Invariants
 //
@@ -74,6 +87,11 @@
 //     the stored configuration names.
 //   - Collect keeps the walk's order and never drops a member for a fault:
 //     only ErrPassOver and kernel.ErrNotFound leave a member out.
+//   - The cache never holds more than its entry and byte bounds, runs one
+//     build per key at a time, and never answers a build started before an
+//     Evict or Zap of its document as fresh. A period of zero or less is
+//     always expired, as 7.x's isCachedResourceExpired is for -1. Member
+//     writes invalidate nothing unless a format calls MemberWritten.
 //
 // # References
 //
@@ -85,7 +103,7 @@
 //     https://github.com/weaveplatform/artifactweave/issues/958 holds the
 //     map.
 //   - Decision 0008: docs/research/decisions/0008-virtual-repositories.md,
-//     rules R1 to R6, with their Artifactory 7.161.26 sources.
+//     rules R1 to R8, with their Artifactory 7.161.26 sources.
 //   - Decision 0044:
 //     docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Placeholders".
@@ -102,10 +120,16 @@
 // route's upstream steps, which itemkit takes in Resolve's order
 // (https://github.com/weaveplatform/artifactweave/issues/1535); and the
 // merge contract (Merger, Collect and its helpers;
-// https://github.com/weaveplatform/artifactweave/issues/1536); and the
-// RubyGems, LuaRocks and Dart pub virtual repositories on it, each with its
-// Merger in ecosystem/<type>/virtual.go
-// (https://github.com/weaveplatform/artifactweave/issues/1538). The rest of
+// https://github.com/weaveplatform/artifactweave/issues/1536); the
+// merged metadata cache (Cache;
+// https://github.com/weaveplatform/artifactweave/issues/1543), which the
+// families wire into their merges; and RubyGems, LuaRocks and Dart pub
+// virtual repositories on it, each with its Merger in
+// ecosystem/<type>/virtual.go
+// (https://github.com/weaveplatform/artifactweave/issues/1538). The storage
+// API's views and the folder index of a virtual repository read its members
+// through Stored and Walk
+// (https://github.com/weaveplatform/artifactweave/issues/1537). The rest of
 // the package is planned for P10's other tickets
 // (https://github.com/weaveplatform/artifactweave/issues/1521).
 //
@@ -120,5 +144,9 @@
 // built from the helpers alone, as a format's virtual.go would be, and
 // covers Collect's pass-overs and faults and each helper's edges. Each
 // format's Merger has its own virtual_test.go beside it (gems, luarocks and
-// pub so far).
+// pub so far). cache_test.go drives Cache on a fake clock with counting
+// builders: expiry, zero and negative periods, keys, a document gone, Evict
+// and Zap with the stale answer, MemberWritten through nesting and cycles,
+// single flight under -race, cancellation, a build that panics, late
+// builds and both bounds; export_test.go reports its usage.
 package virtual

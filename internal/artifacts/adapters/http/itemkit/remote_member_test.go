@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
@@ -23,6 +24,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
 // memberSource is a remote source whose upstream answers each read with
@@ -49,6 +51,8 @@ type memberWorld struct {
 	*kittest.World[*inmem.Store]
 	src *memberSource
 	k   *itemkit.Kit
+	// unresolved makes every remote's source fail to resolve.
+	unresolved bool
 }
 
 func newMemberWorld(t *testing.T) *memberWorld {
@@ -64,14 +68,20 @@ func newMemberWorld(t *testing.T) *memberWorld {
 			t.Fatal(err)
 		}
 	}
-	// The source remembers a label's refusal by the source's identity, in
-	// memory every world shares, so each world's source is its own.
-	generation := model.SourceGeneration(t.Name())
+	// Each remote resolves to the source the store keeps for it, as the
+	// application's do, under which a fill records its copies. The source
+	// remembers a label's refusal by the source's identity, in memory every
+	// world shares, and each stored source is new.
 	w.k = w.Kit(itemkit.Deps{RemoteSources: &source.Service{
-		Resolve: func(context.Context, repo.Config) (model.SourceIdentity, error) {
-			return model.SourceIdentity{
-				Kind: model.ExternalHTTP, Repository: "r", ID: "s", Generation: generation,
-			}, nil
+		Resolve: func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+			if w.unresolved {
+				return model.SourceIdentity{}, source.ErrUnavailable
+			}
+			id, err := w.Store.RemoteCache().Source(ctx, c.Key)
+			if err != nil {
+				return model.SourceIdentity{}, fmt.Errorf("source of %s: %w", c.Key, err)
+			}
+			return id, nil
 		},
 		HTTP: w.src,
 	}})
@@ -496,5 +506,175 @@ func TestUnitVirtualUpstreamStepTracesAPolicyRefusalOnce(t *testing.T) {
 		!strings.Contains(body, "Sending a response with the status '403'") ||
 		strings.Contains(body, "Responding with unfound resource") {
 		t.Fatalf("%d refusal lines in\n%s", n, body)
+	}
+}
+
+// cache puts body at path in the cache of the remote repository key and
+// records it as a fill under the remote's source records a copy of kind,
+// last validated at validated.
+func (w *memberWorld) cache(
+	t *testing.T, key, path, body string, kind model.RemoteKind, validated time.Time,
+) model.Item {
+	t.Helper()
+	ctx := t.Context()
+	c, err := w.Store.Repos().Get(ctx, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	it := w.Put(t, c, true, path, []byte(body))
+	token, err := w.Store.RemoteCache().Begin(ctx, model.RemoteCacheKey{RepoKey: key, Path: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = w.Store.RemoteCache().Put(ctx, token, model.RemoteCacheEntry{
+		Kind: kind, ItemID: it.ID, Blob: blob.Blob{Checksums: it.Actual}, ValidatedAt: validated,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return it
+}
+
+// update saves c over the stored repository of its key.
+func (w *memberWorld) update(t *testing.T, c repo.Config) {
+	t.Helper()
+	if err := w.Store.Repos().Update(t.Context(), *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestUnitVirtualWalkPassesOverAnExpiredCachedCopy (#1641): a remote
+// member's cache step passes over a copy that has expired by the rule a
+// direct read of the member revalidates it by, as 7.161.26's
+// DbCacheRepo.getInfo returns it as an ExpiredRepoResource: a later
+// member's fresh copy serves, without asking the first member's upstream,
+// and otherwise the member's upstream step reads the file, falling back on
+// the expired copy when it finds nothing (RemoteRepoBase.internalGetInfo
+// 535-539). A copy that has not expired, an offline member's, one no entry
+// of the current source records, and one whose source cannot be resolved
+// serve from the cache step.
+func TestUnitVirtualWalkPassesOverAnExpiredCachedCopy(t *testing.T) {
+	stale := time.Now().Add(-24 * time.Hour)
+	w := newMemberWorld(t)
+	w.src.answer = func(q source.Request) (source.Result, error) {
+		if q.Resource.Path == "newer.bin" {
+			it := w.Put(t, w.Remote, true, "newer.bin", []byte("newer"))
+			return source.Result{Item: &it}, nil
+		}
+		return source.Result{}, kernel.ErrNotFound
+	}
+	trace := func(target string, steps ...string) {
+		t.Helper()
+		body := w.get(t, http.MethodGet, target+"?trace").Body.String()
+		at := 0
+		for _, step := range steps {
+			i := strings.Index(body[at:], step)
+			if i < 0 {
+				t.Fatalf("%s: no %q after offset %d in\n%s", target, step, at, body)
+			}
+			at += i + len(step)
+		}
+	}
+
+	w.cache(t, kittest.RemoteKey, "both.bin", "stale", model.RemoteMetadata, stale)
+	w.cache(t, "other-remote", "both.bin", "fresh", model.RemoteMetadata, time.Now())
+	rec := w.get(t, http.MethodGet, "/artifactory/pair/both.bin")
+	if rec.Code != 200 || rec.Body.String() != "fresh" || len(w.src.reads) != 0 {
+		t.Fatalf("a later fresh copy: %d %q after %d reads", rec.Code, rec.Body, len(w.src.reads))
+	}
+	trace("/artifactory/pair/both.bin",
+		"Searching for the resource within libs-remote-cache",
+		"Found the resource in the cache - checking for expiry",
+		"Returning resource as expired",
+		"Searching for the resource within other-remote-cache",
+		"Found the resource in the cache - checking for expiry",
+		"Returning cached resource",
+		"Returning found resource from other-remote-cache:both.bin",
+	)
+
+	w.cache(t, kittest.RemoteKey, "newer.bin", "stale", model.RemoteMetadata, stale)
+	rec = w.get(t, http.MethodGet, "/artifactory/pair/newer.bin")
+	if rec.Code != 200 || rec.Body.String() != "newer" || len(w.src.reads) != 1 ||
+		w.src.reads[0].Repo.Key != kittest.RemoteKey {
+		t.Fatalf("the expired copy alone: %d %q after %d reads", rec.Code, rec.Body, len(w.src.reads))
+	}
+
+	w.cache(t, kittest.RemoteKey, "gone.bin", "stale", model.RemoteMetadata, stale)
+	if rec = w.get(t, http.MethodGet, "/artifactory/pair/gone.bin"); rec.Code != 200 ||
+		rec.Body.String() != "stale" {
+		t.Fatalf("an upstream miss: %d %q", rec.Code, rec.Body)
+	}
+	trace("/artifactory/pair/gone.bin",
+		"Returning resource as expired",
+		"Searching for the resource within libs-remote",
+		"Unable to find resource in libs-remote:gone.bin",
+		"Resource doesn't exist remotely but is expired in the caches - "+
+			"returning expired cached resource",
+		"Returning found resource from libs-remote-cache:gone.bin",
+	)
+
+	reads := len(w.src.reads)
+	w.cache(t, kittest.RemoteKey, "unique.bin", "kept", model.RemoteUnique, stale)
+	w.cache(t, kittest.RemoteKey, "recent.bin", "kept", model.RemoteMetadata, time.Now())
+	w.Put(t, w.Remote, true, "unrecorded.bin", []byte("kept"))
+	for _, name := range []string{"unique.bin", "recent.bin", "unrecorded.bin"} {
+		if rec = w.get(t, http.MethodGet, "/artifactory/pair/"+name); rec.Code != 200 ||
+			rec.Body.String() != "kept" || len(w.src.reads) != reads {
+			t.Fatalf("%s: %d %q after %d reads", name, rec.Code, rec.Body, len(w.src.reads)-reads)
+		}
+	}
+	w.unresolved = true
+	w.cache(t, kittest.RemoteKey, "unresolved.bin", "kept", model.RemoteMetadata, stale)
+	if rec = w.get(t, http.MethodGet, "/artifactory/pair/unresolved.bin"); rec.Code != 200 ||
+		rec.Body.String() != "kept" {
+		t.Fatalf("an unresolved source: %d %q", rec.Code, rec.Body)
+	}
+	w.unresolved = false
+	w.cache(t, kittest.RemoteKey, "offline.bin", "kept", model.RemoteMetadata, stale)
+	w.update(t, repo.Config{
+		Key: kittest.RemoteKey, Class: repo.Remote, URL: "https://remote.example", Offline: new(true),
+	})
+	if rec = w.get(t, http.MethodGet, "/artifactory/pair/offline.bin"); rec.Code != 200 ||
+		rec.Body.String() != "kept" || len(w.src.reads) != reads {
+		t.Fatalf("an offline member: %d %q after %d reads", rec.Code, rec.Body, len(w.src.reads)-reads)
+	}
+}
+
+// TestUnitVirtualWalkFallsBackOnAnExpiredArchive (#1641): an archive entry
+// read through a virtual repository looks for the archive as a download
+// of it, so an expired archive passes over to the member's upstream step,
+// which serves the entry from the archive it fetches, or from the expired
+// one when the upstream lacks it or the caller may not fill the cache. A
+// remote that stores nothing does not expire the archive its cache holds.
+func TestUnitVirtualWalkFallsBackOnAnExpiredArchive(t *testing.T) {
+	stale := time.Now().Add(-24 * time.Hour)
+	w := newMemberWorld(t)
+	w.src.answer = func(q source.Request) (source.Result, error) {
+		switch q.Resource.Path {
+		case "newer.zip":
+			it := w.Put(t, w.Remote, true, "newer.zip", zipOf(t, "in/a.txt", "newer"))
+			return source.Result{Item: &it}, nil
+		case "fill.zip":
+			return source.Result{}, &source.CacheFillDenied{User: "admin", Repo: kittest.RemoteKey, Path: "fill.zip"}
+		}
+		return source.Result{}, kernel.ErrNotFound
+	}
+	for _, name := range []string{"newer.zip", "gone.zip", "fill.zip"} {
+		w.cache(t, kittest.RemoteKey, name, string(zipOf(t, "in/a.txt", "stale")), model.RemoteMetadata, stale)
+	}
+	for name, want := range map[string]string{"newer.zip": "newer", "gone.zip": "stale", "fill.zip": "stale"} {
+		if rec := w.get(t, http.MethodGet, "/artifactory/pair/"+name+"!/in/a.txt"); rec.Code != 200 ||
+			rec.Body.String() != want {
+			t.Fatalf("%s: %d %q, want %q", name, rec.Code, rec.Body, want)
+		}
+	}
+	reads := len(w.src.reads)
+	w.cache(t, kittest.RemoteKey, "nostore.zip", string(zipOf(t, "in/a.txt", "kept")), model.RemoteMetadata, stale)
+	w.update(t, repo.Config{
+		Key: kittest.RemoteKey, Class: repo.Remote, URL: "https://remote.example",
+		StoreArtifactsLocally: new(false),
+	})
+	if rec := w.get(t, http.MethodGet, "/artifactory/pair/nostore.zip!/in/a.txt"); rec.Code != 200 ||
+		rec.Body.String() != "kept" || len(w.src.reads) != reads {
+		t.Fatalf("a remote that stores nothing: %d %q after %d reads", rec.Code, rec.Body, len(w.src.reads)-reads)
 	}
 }

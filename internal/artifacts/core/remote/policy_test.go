@@ -515,3 +515,54 @@ func TestUnitPolicyMIMEAlternativesParticipateInIdentity(t *testing.T) {
 		t.Fatal("MIME alternatives not pinned")
 	}
 }
+
+// TestUnitFreshIsTheReadRule (#1535): Fresh judges a cached entry as Read
+// does before it revalidates it, so a walk through a virtual repository
+// that judges a remote member's copy by it expires the copy when a direct
+// read does.
+func TestUnitFreshIsTheReadRule(t *testing.T) {
+	now := time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)
+	content := blob.Blob{Checksums: kernel.Checksums{SHA256: "ab"}}
+	hour := 3600
+	for _, tc := range []struct {
+		name  string
+		c     repo.Config
+		e     model.RemoteCacheEntry
+		fresh bool
+	}{
+		{"unique never expires", repo.Config{}, model.RemoteCacheEntry{
+			Kind: model.RemoteUnique, Blob: content, ValidatedAt: now.Add(-1000 * time.Hour),
+		}, true},
+		{"unique the upstream says to validate", repo.Config{}, model.RemoteCacheEntry{
+			Kind: model.RemoteUnique, Blob: content, ValidatedAt: now, CacheControl: "no-cache",
+		}, false},
+		{"mutable within the default period", repo.Config{}, model.RemoteCacheEntry{
+			Kind: model.RemoteMetadata, Blob: content, ValidatedAt: now.Add(-119 * time.Minute),
+		}, true},
+		{"mutable past the default period", repo.Config{}, model.RemoteCacheEntry{
+			Kind: model.RemoteMetadata, Blob: content, ValidatedAt: now.Add(-121 * time.Minute),
+		}, false},
+		{
+			"mutable past the remote's period",
+			repo.Config{RetrievalCachePeriodSecs: &hour},
+			model.RemoteCacheEntry{
+				Kind: model.RemoteMutable, Blob: content, ValidatedAt: now.Add(-61 * time.Minute),
+			},
+			false,
+		},
+		{"mutable past a shorter max-age", repo.Config{}, model.RemoteCacheEntry{
+			Kind: model.RemoteMutable, Blob: content, ValidatedAt: now.Add(-2 * time.Minute),
+			CacheControl: "max-age=60",
+		}, false},
+		{"no content", repo.Config{}, model.RemoteCacheEntry{
+			Kind: model.RemoteUnique, ValidatedAt: now,
+		}, false},
+		{"a recorded miss", repo.Config{}, model.RemoteCacheEntry{
+			Kind: model.RemoteUnique, Blob: content, ValidatedAt: now, NegativeUntil: now.Add(time.Hour),
+		}, false},
+	} {
+		if got := remote.Fresh(tc.c, tc.e, now); got != tc.fresh {
+			t.Errorf("%s: fresh %v, want %v", tc.name, got, tc.fresh)
+		}
+	}
+}

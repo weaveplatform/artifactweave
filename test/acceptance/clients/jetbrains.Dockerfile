@@ -2,6 +2,9 @@
 # Both vendor archives are verified with JetBrains' published SHA-256.
 FROM ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2
 
+COPY ubuntu-mirrors.sh /usr/local/bin/ubuntu-mirrors
+RUN ubuntu-mirrors
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl libgtk-3-0 libxtst6 \
     && rm -rf /var/lib/apt/lists/*

@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -122,6 +123,180 @@ func TestUnitStorageVirtualRootGateFails(t *testing.T) {
 	if err := v.admit(t.Context(), "", kernel.Principal{Name: "user"}); !errors.As(err, &e) ||
 		e.Status != http.StatusInternalServerError {
 		t.Fatalf("admit: %v, want 500", err)
+	}
+}
+
+// itemFaults fails the item store's read named by fail with errBoom: any
+// item's ("get"), any root's ("root") or any item's properties
+// ("properties").
+type itemFaults struct {
+	*inmem.Store
+	fail string
+}
+
+func (f itemFaults) Items() port.ItemStore { return faultyItemReads{f.Store.Items(), f.fail} }
+
+type faultyItemReads struct {
+	port.ItemStore
+	fail string
+}
+
+func (f faultyItemReads) Get(
+	ctx context.Context,
+	key string,
+	cached bool,
+	fullPath string,
+) (model.Item, error) {
+	if f.fail == "get" {
+		return model.Item{}, errBoom
+	}
+	return f.ItemStore.Get(ctx, key, cached, fullPath) //nolint:wrapcheck // test double
+}
+
+func (f faultyItemReads) Root(ctx context.Context, key string, cached bool) (model.Item, error) {
+	if f.fail == "root" {
+		return model.Item{}, errBoom
+	}
+	return f.ItemStore.Root(ctx, key, cached) //nolint:wrapcheck // test double
+}
+
+func (f faultyItemReads) Properties(ctx context.Context, id int64) (model.Properties, error) {
+	if f.fail == "properties" {
+		return nil, errBoom
+	}
+	return f.ItemStore.Properties(ctx, id) //nolint:wrapcheck // test double
+}
+
+// propertiesWorld is a store with the locals a-local and b-local, the
+// remote nostore, which keeps no cache, the virtual repository virt over
+// nostore, a-local and b-local, and the items p.bin (none in a-local, k=v
+// in b-local), q.bin (m=1 in a-local, k=v in b-local) and n.bin, k=v in
+// nostore's cache, which it never fills.
+func propertiesWorld(t *testing.T) (*inmem.Store, repo.Config) {
+	t.Helper()
+	ctx := t.Context()
+	db := inmem.New()
+	for _, c := range []repo.Config{
+		{Key: "a-local", Class: repo.Local},
+		{Key: "b-local", Class: repo.Local},
+		{
+			Key: "nostore", Class: repo.Remote, URL: "https://up.example",
+			StoreArtifactsLocally: new(bool),
+		},
+		{
+			Key: "virt", Class: repo.Virtual,
+			Repositories: []string{"nostore", "a-local", "b-local"},
+		},
+	} {
+		if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, it := range []struct {
+		key    string
+		cached bool
+		name   string
+		props  model.Properties
+	}{
+		{"a-local", false, "p.bin", nil},
+		{"b-local", false, "p.bin", model.Properties{"k": {"v"}}},
+		{"a-local", false, "q.bin", model.Properties{"m": {"1"}}},
+		{"b-local", false, "q.bin", model.Properties{"k": {"v"}}},
+		{"nostore", true, "n.bin", model.Properties{"k": {"v"}}},
+	} {
+		stored, err := db.Items().Put(ctx, model.Item{RepoKey: it.key, Cached: it.cached, Name: it.name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if it.props != nil {
+			if err := db.Items().SetProperties(ctx, stored.ID, it.props, stored.Modified); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	virt, err := db.Repos().Get(ctx, "virt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return db, virt
+}
+
+// TestUnitStorageVirtualPropertiesPick (#1537): a virtual repository's
+// properties are those of the first member's item, locals then caches,
+// that the caller may read and that has any, and only then are the keys
+// the request names kept (ArtifactResource.resolveProperties,
+// getPropertiesResponse); a remote member that keeps no cache is never
+// read (getResolvedLocalFederatedAndCachedRepos).
+func TestUnitStorageVirtualPropertiesPick(t *testing.T) {
+	db, virt := propertiesWorld(t)
+	admin := itemkit.Access{Decider: &accessapitest.Decider{Admin: true}}
+	notA := func(_ accessapi.ResourceType, r accessapi.Repo, _ string, _ accessapi.Actions) bool {
+		return r.Key != "a-local"
+	}
+	noA := itemkit.Access{Decider: &accessapitest.Decider{AllowsFunc: notA, AllowsFolderFunc: notA}}
+	for _, c := range []struct {
+		path, names string
+		acc         itemkit.Access
+		want        model.Properties
+	}{
+		{"p.bin", "", admin, model.Properties{"k": {"v"}}},
+		{"q.bin", "", admin, model.Properties{"m": {"1"}}},
+		{"q.bin", "k", admin, nil},
+		{"q.bin", "k", noA, model.Properties{"k": {"v"}}},
+		{"n.bin", "", admin, nil},
+		{"", "", admin, nil},
+	} {
+		v := storageView{st: db, key: "virt", repo: virt, path: c.path, acc: c.acc}
+		_, body, err := v.virtualProperties(t.Context(), c.names)
+		var e *apierror.Error
+		switch {
+		case c.want == nil:
+			if !errors.As(err, &e) || e.Status != http.StatusNotFound {
+				t.Errorf("%s?properties=%s: %v %v, want 404", c.path, c.names, body, err)
+			}
+		case err != nil ||
+			!reflect.DeepEqual(body.(map[string]any)["properties"], c.want):
+			t.Errorf("%s?properties=%s: %v %v, want %v", c.path, c.names, body, err, c.want)
+		}
+	}
+}
+
+// A store failure while a virtual repository's members are read fails
+// its item info and properties with the store's error, which answers 500,
+// rather than a miss.
+func TestUnitStorageVirtualItemFaults(t *testing.T) {
+	db, virt := propertiesWorld(t)
+	admin := itemkit.Access{Decider: &accessapitest.Decider{Admin: true}}
+	for _, c := range []struct {
+		st   Store
+		path string
+		view func(storageView) error
+	}{
+		{
+			faultyStore{Store: db, fail: map[string]bool{"get:a-local": true}},
+			"p.bin",
+			func(v storageView) error { _, err := v.virtualItem(t.Context()); return err },
+		},
+		{
+			itemFaults{db, "get"},
+			"p.bin",
+			func(v storageView) error { _, err := v.virtualItem(t.Context()); return err },
+		},
+		{
+			itemFaults{db, "root"},
+			"",
+			func(v storageView) error { _, err := v.virtualItem(t.Context()); return err },
+		},
+		{
+			itemFaults{db, "properties"},
+			"q.bin",
+			func(v storageView) error { _, _, err := v.virtualProperties(t.Context(), ""); return err },
+		},
+	} {
+		v := storageView{st: c.st, key: "virt", repo: virt, path: c.path, acc: admin}
+		if err := c.view(v); !errors.Is(err, errBoom) {
+			t.Errorf("%T %s: %v, want the store's error", c.st, c.path, err)
+		}
 	}
 }
 

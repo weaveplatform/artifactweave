@@ -262,22 +262,200 @@ func (v storageView) requestDownloadURI(ctx context.Context) string {
 // whether or not it has a record.
 func (v storageView) target(ctx context.Context) (itemkit.Found, error) {
 	if v.path == "" {
-		root := model.Item{RepoKey: v.repo.Key, Cached: v.isCached, Folder: true}
-		if v.repo.Class != repo.Virtual {
-			rec, err := v.st.Items().
-				Root(ctx, v.repo.Key, v.isCached || v.repo.Class == repo.Remote)
-			switch {
-			case err == nil:
-				root.ID, root.PropertiesModified = rec.ID, rec.PropertiesModified
-			case !errors.Is(err, kernel.ErrNotFound):
-				return itemkit.Found{}, fmt.Errorf("repository root: %w", err)
-			}
+		if v.repo.Class == repo.Virtual {
+			root := model.Item{RepoKey: v.repo.Key, Folder: true}
+			return itemkit.Found{Repo: v.repo, Item: root}, nil
 		}
-		return itemkit.Found{Repo: v.repo, Item: root}, nil
+		root, err := rootItem(ctx, v.st, v.repo.Key, v.isCached || v.repo.Class == repo.Remote)
+		return itemkit.Found{Repo: v.repo, Item: root}, err
 	}
 	// The storage API describes the item at the path as given; only
 	// downloads resolve it through the format.
 	return itemkit.Lookup(ctx, v.st, v.repo, v.isCached, v.path, v.acc, nil, virtual.Stored)
+}
+
+// rootItem is the root of the tree key and cached name: a folder that
+// carries only the ID of its record and when its properties last changed,
+// when properties have given it one.
+func rootItem(ctx context.Context, st Store, key string, cached bool) (model.Item, error) {
+	root := model.Item{RepoKey: key, Cached: cached, Folder: true}
+	rec, err := st.Items().Root(ctx, key, cached)
+	switch {
+	case err == nil:
+		root.ID, root.PropertiesModified = rec.ID, rec.PropertiesModified
+	case !errors.Is(err, kernel.ErrNotFound):
+		return root, fmt.Errorf("repository root: %w", err)
+	}
+	return root, nil
+}
+
+// getVirtualStorage answers a storage view other than the file list of the
+// virtual repository v.repo as 7.161.26's ArtifactResource does. None asks
+// Read of the virtual path but the statistics, and each answers its miss
+// and a member the caller may not read alike, so nothing tells a caller
+// what an unreadable member holds.
+func (s ArtifactoryAPI) getVirtualStorage(
+	w http.ResponseWriter,
+	r *http.Request,
+	v storageView,
+	mode string,
+	q url.Values,
+	p kernel.Principal,
+) {
+	ctx := r.Context()
+	var (
+		media string
+		body  any
+		err   error
+	)
+	switch mode {
+	case "lastModified", "permissions":
+		// prepareLastModifiedResponse and preparePermissionsResponse take
+		// only a local repository or a cache (isLocalRepo) and refuse any
+		// other key before they weigh a right.
+		err = apierror.New(http.StatusBadRequest, textNotLocal)
+	case "stats":
+		// prepareStatsResponse asks canRead of the virtual path, which only
+		// the plain ANY target's grants match, then exists, which no
+		// virtual path does: statistics are kept for the members' files
+		// alone (RTFACT-12026, "Make stats API available for virtual
+		// repositories", is deferred).
+		if !canRead(v.acc, v.repo, v.path) {
+			err = storageRefused(v.key, v.path, p)
+		} else {
+			err = apierror.New(http.StatusNotFound, textNoItemPath)
+		}
+	case "properties":
+		media, body, err = v.virtualProperties(ctx, q.Get("properties"))
+	default:
+		var f itemkit.Found
+		if f, err = v.virtualItem(ctx); err != nil {
+			break
+		}
+		if !f.Item.Folder {
+			media, body = mediaFileInfo, v.infoBody(ctx, f.Item)
+			break
+		}
+		var l *httpkit.ListStream
+		if l, err = v.folderInfo(ctx, f); err == nil {
+			_ = l.Write(w)
+			return
+		}
+	}
+	if err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(ctx, "storage "+mode, err))
+		return
+	}
+	w.Header().Set("Content-Type", media)
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+// virtualMiss is the item info's answer when no member the caller may read
+// holds the path: RepositoryBrowsingServiceImpl.getVirtualRepoItem returns
+// null, prepareStorageInfoResponse answers it with an empty 404, and
+// RestResponseFilter fills that in with the status's reason phrase.
+func virtualMiss() error {
+	return apierror.New(http.StatusNotFound, "Not Found")
+}
+
+// memberItems calls visit with the item at the view's path in each member
+// of the virtual repository v.repo that holds one the caller may read, in
+// virtual.Stored's order, until visit returns true or an error. It is
+// VirtualRepo.getVirtualRepoItem's walk of
+// getResolvedLocalFederatedAndCachedRepos, which leaves out a remote
+// member that keeps no cache, with the Read check its callers make of each
+// member that holds the item: getVirtualRepoItem's in the browsing
+// service, the properties service's in getProperties. 7.x describes the
+// first holder even when only a later one is readable, which leaks what an
+// unreadable member holds, so the first readable one is described instead.
+func (v storageView) memberItems(
+	ctx context.Context,
+	visit func(itemkit.Found) (bool, error),
+) error {
+	members, err := virtual.Members(
+		ctx,
+		v.st.Repos(),
+		v.repo,
+		virtual.Options{Order: virtual.Stored},
+	)
+	if err != nil {
+		return fmt.Errorf("members of %s: %w", v.repo.Key, err)
+	}
+	for _, m := range members {
+		cached := m.Repo.Class == repo.Remote
+		if cached && !storesLocally(m.Repo) {
+			continue
+		}
+		var it model.Item
+		if v.path == "" {
+			it, err = rootItem(ctx, v.st, m.Repo.Key, cached)
+		} else {
+			it, err = v.st.Items().Get(ctx, m.Repo.Key, cached, v.path)
+		}
+		switch {
+		case errors.Is(err, kernel.ErrNotFound):
+			continue
+		case err != nil:
+			return fmt.Errorf("item in %s: %w", m.Repo.Key, err)
+		case !v.acc.Item(m.Repo, v.path, it.Folder, api.ActionRead):
+			continue
+		}
+		if done, err := visit(itemkit.Found{Repo: m.Repo, Item: it}); done || err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// virtualItem is the item the item info describes: the first a member the
+// caller may read holds, its repo the virtual repository's (infoBody). The
+// root is the virtual repository's own, there when any member's is.
+func (v storageView) virtualItem(ctx context.Context) (itemkit.Found, error) {
+	var found *itemkit.Found
+	err := v.memberItems(ctx, func(f itemkit.Found) (bool, error) {
+		found = &f
+		return true, nil
+	})
+	switch {
+	case err != nil:
+		return itemkit.Found{}, err
+	case found == nil:
+		return itemkit.Found{}, virtualMiss()
+	case v.path == "":
+		return itemkit.Found{
+			Repo: v.repo,
+			Item: model.Item{RepoKey: v.repo.Key, Folder: true},
+		}, nil
+	}
+	return *found, nil
+}
+
+// virtualProperties is the properties view of a virtual repository's path,
+// as ArtifactResource.resolveProperties reads it: the properties of the
+// first member's item, in memberItems' order, that has any, and only then
+// the keys the request names (getPropertiesResponse), so a later member's
+// are never read for a key the first lacks.
+func (v storageView) virtualProperties(ctx context.Context, names string) (string, any, error) {
+	var (
+		at    model.Item
+		props model.Properties
+	)
+	err := v.memberItems(ctx, func(f itemkit.Found) (bool, error) {
+		if f.Item.ID == 0 {
+			return false, nil
+		}
+		got, err := v.st.Items().Properties(ctx, f.Item.ID)
+		if err != nil {
+			return true, fmt.Errorf("properties: %w", err)
+		}
+		at, props = f.Item, got
+		return len(got) > 0, nil
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	return v.propertiesView(ctx, at, props, names)
 }
 
 // trees are the repository trees a folder view reads: the repository, or a
@@ -350,6 +528,12 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, err)
 		return
 	}
+	// A virtual repository's views but the file list answer as 7.161.26's
+	// ArtifactResource answers one, none of them by the read gate below.
+	if v.repo.Class == repo.Virtual && mode != "list" {
+		s.getVirtualStorage(w, r, v, mode, q, p)
+		return
+	}
 	// 7.161.26 runs fixPathParamterIfNeededForRemoteCached before every view
 	// but the file list and the statistics (prepareResponseAccordingToType),
 	// so those views name a remote's item under its cache's key throughout:
@@ -370,8 +554,9 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "storage item", err))
 		return
 	}
-	// A virtual repository's root is the virtual repository itself, which
-	// admit has decided by its members; any other item is a member's.
+	// A virtual repository's root, which only its file list reaches here,
+	// is the virtual repository itself, which admit has decided by its
+	// members; any other item is a member's.
 	if f.Repo.Class != repo.Virtual &&
 		!v.acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, api.ActionRead) {
 		httpkit.WriteErr(w, r, v.refusal(mode, p))
@@ -584,15 +769,19 @@ func (v storageView) localKey() string {
 
 // storesLocally reports whether a remote repository keeps a cache, which
 // it does unless storeArtifactsLocally is set off.
-func (v storageView) storesLocally() bool {
-	return v.repo.StoreArtifactsLocally == nil || *v.repo.StoreArtifactsLocally
+func (v storageView) storesLocally() bool { return storesLocally(v.repo) }
+
+func storesLocally(c repo.Config) bool {
+	return c.StoreArtifactsLocally == nil || *c.StoreArtifactsLocally
 }
 
 // refusal is the view's answer to a caller without the right it needs, in
 // 7.161.26's words: the item info's and the statistics' 403 naming the
 // path and the caller, the properties service's empty answer (it returns
 // no properties for a path the caller may not read), or the add-on's
-// refusal. A virtual repository keeps its answers (P10).
+// refusal. A virtual repository's file list, the only view of one that
+// reaches here (getVirtualStorage), keeps httpkit.Denied: no source shows
+// the add-on's answer for one.
 func (v storageView) refusal(mode string, p kernel.Principal) error {
 	if v.repo.Class == repo.Virtual {
 		return httpkit.Denied(p)
@@ -610,8 +799,8 @@ func (v storageView) refusal(mode string, p kernel.Principal) error {
 // check let it through. The item info and the statistics ask for read of
 // the path itself before they look (prepareStorageInfoResponse,
 // prepareStatsResponse), so a path the caller could not read as a file is
-// refused rather than reported missing. A virtual repository keeps its
-// answers (P10).
+// refused rather than reported missing. A virtual repository's file list
+// keeps ItemNotFound, as refusal keeps its refusal.
 func (v storageView) miss(mode string, p kernel.Principal) error {
 	if v.repo.Class == repo.Virtual {
 		return itemkit.ItemNotFound()
@@ -740,7 +929,9 @@ func (v storageView) infoBody(ctx context.Context, it model.Item) map[string]any
 // from the first tree that holds an item there the caller may read, as a
 // download would resolve it. The trees are not merged by name: a virtual
 // repository lists its first member's children, then the names only a
-// later member holds.
+// later member holds, and never a Maven index folder, ".index", which
+// 7.161.26's VirtualRepo.getChildrenNamesDeeply leaves out of every
+// virtual repository's children whatever its package type.
 type childWalk struct {
 	v      storageView
 	folder string
@@ -771,6 +962,10 @@ func (m *childWalk) children(t itemkit.Found) *treeWalk {
 	)}
 }
 
+// nexusIndexDir is MavenNaming.NEXUS_INDEX_DIR, the folder a Maven
+// repository's index is published under.
+const nexusIndexDir = ".index"
+
 func (m *childWalk) readable(t itemkit.Found, it model.Item) bool {
 	return m.v.acc.Item(t.Repo, it.FullPath(), it.Folder, api.ActionRead)
 }
@@ -799,7 +994,8 @@ func (m *childWalk) read(ctx context.Context, p kernel.Page) ([]model.Item, stri
 			continue
 		}
 		m.cur.rows = m.cur.rows[1:]
-		if !m.readable(m.cur.t, it) {
+		if !m.readable(m.cur.t, it) ||
+			m.v.repo.Class == repo.Virtual && it.Name == nexusIndexDir {
 			continue
 		}
 		listed, err := m.listedBefore(ctx, it.Name)
@@ -1118,6 +1314,17 @@ func (v storageView) properties(
 	if err != nil {
 		return "", nil, fmt.Errorf("properties: %w", err)
 	}
+	return v.propertiesView(ctx, f.Item, props, names)
+}
+
+// propertiesView renders props, the properties of it, or only the keys
+// named in "k1,k2"; nothing to show is a 404.
+func (v storageView) propertiesView(
+	ctx context.Context,
+	it model.Item,
+	props model.Properties,
+	names string,
+) (string, any, error) {
 	if names != "" {
 		want := pkgroute.SplitValues(names)
 		for k := range props {
@@ -1130,7 +1337,7 @@ func (v storageView) properties(
 		return "", nil, noProperties()
 	}
 	return mediaProperties, map[string]any{
-		"uri":        v.uri(ctx, f.Item.FullPath()),
+		"uri":        v.uri(ctx, it.FullPath()),
 		"properties": props,
 	}, nil
 }
@@ -1138,12 +1345,9 @@ func (v storageView) properties(
 // stats is the download statistics view, as 7.161.26's
 // prepareStatsResponse writes it: the item named by its download URL under
 // the key as given, and for a folder or the root, which keep no
-// statistics, 200 with zero counts (new ItemStatsInfo(uri, 0, 0, null)). A
-// virtual repository keeps its answers (P10).
+// statistics, 200 with zero counts (new ItemStatsInfo(uri, 0, 0, null)).
+// A virtual repository's are getVirtualStorage's.
 func (v storageView) stats(ctx context.Context, f itemkit.Found) (string, any, error) {
-	if v.repo.Class == repo.Virtual {
-		return v.virtualStats(ctx, f)
-	}
 	var st model.ItemStats
 	if !f.Item.Folder {
 		var err error
@@ -1185,29 +1389,6 @@ func unixMilli(t time.Time) int64 {
 	return t.UnixMilli()
 }
 
-// virtualStats is a virtual repository's statistics view, which P10
-// rewrites (#1537): a member's file under the storage API URL, and 400 for
-// a folder.
-func (v storageView) virtualStats(ctx context.Context, f itemkit.Found) (string, any, error) {
-	if f.Item.Folder {
-		return "", nil, httpkit.BadRequestf("%s is a folder; statistics are kept for files",
-			f.Item.StoragePath())
-	}
-	st, err := v.st.Items().Stats(ctx, f.Item.ID)
-	if err != nil {
-		return "", nil, fmt.Errorf("stats: %w", err)
-	}
-	body := map[string]any{
-		"uri":            v.uri(ctx, f.Item.FullPath()),
-		"downloadCount":  st.DownloadCount,
-		"lastDownloaded": unixMilli(st.LastDownloaded),
-	}
-	if st.LastDownloadedBy != "" {
-		body["lastDownloadedBy"] = st.LastDownloadedBy
-	}
-	return mediaStats, body, nil
-}
-
 // lastModified renders a file's modification time, or for a folder the
 // newest item below it that the caller may read, which is what the view
 // reports.
@@ -1215,12 +1396,12 @@ func (v storageView) virtualStats(ctx context.Context, f itemkit.Found) (string,
 // A folder's is folded over the merged walk of its descendants, a store
 // page per tree at a time, rather than asked of the store as an aggregate:
 // what the caller may read is decided per path by permission patterns the
-// store does not hold, a virtual repository counts each path from its
-// first member the caller may read, and the item reported among several
-// equally new ones is the one the collected read met first. That read went
-// tree by tree, each in (path, name) order, with the folder itself before
-// them all, so a tie goes to the folder, then the earlier tree, then the
-// lesser (path, name), whatever order the walk meets them in.
+// store does not hold, and the item reported among several equally new
+// ones is the one the collected read met first. That read went in (path,
+// name) order, with the folder itself first, so a tie goes to the folder,
+// then the lesser (path, name), whatever order the walk meets them in. A
+// virtual repository, which has several trees, never gets here: 7.x
+// answers its last modified view 400 (getVirtualStorage).
 func (v storageView) lastModified(ctx context.Context, f itemkit.Found) (string, any, error) {
 	newest := f.Item
 	if f.Item.Folder {
