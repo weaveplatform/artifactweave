@@ -329,7 +329,7 @@ func (v Virtual) Item(ctx context.Context, st Store, c repo.Config, path string)
 		return Found{}, fmt.Errorf("%s: %w", v.k.p.Name, err)
 	}
 	for _, m := range steps {
-		src, ok := v.k.walkSource(ctx, c, m.Repo, path, path)
+		src, ok := v.k.walkSource(ctx, c, m.Repo, path, path, true)
 		if !ok {
 			continue
 		}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	pypifmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/pypi"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 type warehouseRemote struct {
@@ -119,12 +121,9 @@ func validateWarehouseAttributes(entry remoteDoc) error {
 	return nil
 }
 
-func (h handler) remoteWarehouse(w http.ResponseWriter, r *http.Request, name, version string) {
-	if !pypifmt.ValidName(name) {
-		h.k.Error(w, r, notFound(r))
-		return
-	}
-	name = pypifmt.Normalize(name)
+// upstreamWarehouse keeps typed source failures until the caller chooses
+// whether a missing upstream API permits a model-derived virtual response.
+func (h handler) upstreamWarehouse(r *http.Request, name, version string) (warehouseRemote, source.Result, error) {
 	target := strings.TrimRight(
 		pkgroute.RequestFrom(r).Repo.PyPIRegistryURL,
 		"/",
@@ -153,24 +152,53 @@ func (h handler) remoteWarehouse(w http.ResponseWriter, r *http.Request, name, v
 		_, err := parseWarehouse(r, metadata.BaseURL, name, version)
 		return err
 	}
-	result, err := h.k.Read(r, resource)
+	if !h.k.CanFolder(r, name, api.ActionRead) {
+		return warehouseRemote{}, source.Result{}, source.ErrDenied
+	}
+	if h.sources == nil {
+		return warehouseRemote{}, source.Result{}, source.ErrUnsupported
+	}
+	who, _ := kernel.FromContext(r.Context())
+	access, _ := api.DeciderFrom(r.Context())
+	result, err := h.sources.Read(
+		r.Context(),
+		source.Request{
+			Repo:      pkgroute.RequestFrom(r).Repo,
+			CacheOnly: pkgroute.RequestFrom(r).CacheOnly,
+			Subject:   api.SubjectOf(who),
+			Access:    access,
+			Resource:  resource,
+			Project:   pkgroute.RequestFrom(r).Repo.ProjectKey,
+		},
+	)
 	if err != nil {
-		h.k.Error(w, r, err)
-		return
+		return warehouseRemote{}, result, fmt.Errorf("pypi warehouse: %w", err)
 	}
 	if result.Stream == nil {
-		h.k.Error(w, r, remoteError())
-		return
+		return warehouseRemote{}, result, remoteError()
 	}
 	b, err := remoteBytes(result.Stream.Body)
 	_ = result.Stream.Body.Close()
 	if err != nil {
-		h.k.Error(w, r, err)
-		return
+		return warehouseRemote{}, result, fmt.Errorf("pypi warehouse: %w", err)
 	}
 	doc, err := parseWarehouse(bytes.NewReader(b), result.Metadata.BaseURL, name, version)
 	if err != nil {
-		h.k.Error(w, r, err)
+		return warehouseRemote{}, result, fmt.Errorf("pypi warehouse: %w", err)
+	}
+	return doc, result, nil
+}
+
+func (h handler) remoteWarehouse(w http.ResponseWriter, r *http.Request, name, version string) {
+	if !pypifmt.ValidName(name) {
+		h.k.Error(w, r, notFound(r))
+		return
+	}
+	name = pypifmt.Normalize(name)
+	doc, result, err := h.upstreamWarehouse(r, name, version)
+	if err != nil {
+		who, _ := kernel.FromContext(r.Context())
+		h.k.Error(w, r, pkgroute.SourceError(err, who.Anonymous || who.Name == ""))
 		return
 	}
 	paths := []string{}

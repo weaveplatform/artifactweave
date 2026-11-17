@@ -79,8 +79,9 @@
 // # Status
 //
 // Implemented P8 (PyPI local repositories), with remote repositories in
-// P9. Moved here in P9d. Roadmap: virtual.go (P10), the Merger that merges
-// PyPI simple indexes for virtual repositories.
+// P9. Moved here in P9d. P10 virtual.go merges readable project records
+// with priority and complete filename ownership; the HTTP adapter serves
+// virtual simple/Warehouse metadata, distributions and wheel metadata.
 //
 // # Testing
 //

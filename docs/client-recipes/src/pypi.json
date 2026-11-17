@@ -38,7 +38,7 @@
     ]
   },
   "install": {
-    "classes": "LR",
+    "classes": "LRV",
     "note": "Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.",
     "steps": [
       {
@@ -51,9 +51,23 @@
   "limitations": [
     "Poetry and Twine have additional tested flows in the linked acceptance files; this minimal recipe uses uv.",
     "Replacing a stored version with different bytes requires delete permission as well as write permission.",
-    "The catalog also registers virtual/federated classes, but this recipe only advertises classes with matching native-client evidence. Registered configuration support alone is not a native recipe qualification; remaining virtual/federated proof belongs to the follow-on phase."
+    "Virtual installs are qualified with pip and uv over local plus remote members in HTML and JSON modes; federated native-client qualification remains in the follow-on phase."
   ],
   "evidence": [
+    {
+      "path": "test/acceptance/features/pypi_virtual.feature",
+      "contains": [
+        "pip and uv install wheel and sdist dependencies from virtual HTML and JSON indexes",
+        "I install virtual Python packages"
+      ]
+    },
+    {
+      "path": "test/acceptance/pypi_virtual_steps_test.go",
+      "contains": [
+        "func (w *world) installVirtualPython",
+        "dependentMetadata(data, \"acme-private==1.0.0\", \"acme-source==1.0.0\")"
+      ]
+    },
     {
       "path": "test/acceptance/features/pypi_clients.feature",
       "contains": [

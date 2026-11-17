@@ -53,7 +53,7 @@ uv publish --publish-url "$AW_URL/artifactory/api/pypi/$AW_REPO/" --username "$A
 
 ## Install or resolve
 
-Classes: **local, remote**. Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.
+Classes: **local, remote, virtual**. Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.
 
 Replace example coordinates with the package published above; use a new virtual environment and no public extra-index fallback.
 
@@ -68,13 +68,15 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - Poetry and Twine have additional tested flows in the linked acceptance files; this minimal recipe uses uv.
 - Replacing a stored version with different bytes requires delete permission as well as write permission.
-- The catalog also registers virtual/federated classes, but this recipe only advertises classes with matching native-client evidence. Registered configuration support alone is not a native recipe qualification; remaining virtual/federated proof belongs to the follow-on phase.
+- Virtual installs are qualified with pip and uv over local plus remote members in HTML and JSON modes; federated native-client qualification remains in the follow-on phase.
 
 ## Verification sources
 
 These are the pinned client definitions and executable evidence from which this recipe was reviewed. Their [fingerprints](evidence-lock.json) detect subsequent source changes; a fingerprint alone is not a native-client test result. See [verification](README.md#verification) for the required run evidence.
 
 - Client pin: [test/acceptance/clients/python.Dockerfile](../../test/acceptance/clients/python.Dockerfile).
+- Evidence: [test/acceptance/features/pypi_virtual.feature](../../test/acceptance/features/pypi_virtual.feature).
+- Evidence: [test/acceptance/pypi_virtual_steps_test.go](../../test/acceptance/pypi_virtual_steps_test.go).
 - Evidence: [test/acceptance/features/pypi_clients.feature](../../test/acceptance/features/pypi_clients.feature).
 - Evidence: [test/acceptance/features/pypi_uploads.feature](../../test/acceptance/features/pypi_uploads.feature).
 - Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).

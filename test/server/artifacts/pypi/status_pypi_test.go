@@ -122,7 +122,7 @@ func pypiStatusRows() []statusCase {
 		{pypiList, pypiBase + "npm-local/simple/", "admin", "", 404},
 		// Remote and virtual PyPI repositories are P9's and P10's.
 		{pypiList, pypiBase + "pypi-remote/simple/", "admin", "", 501},
-		{pypiList, pypiBase + "pypi-virtual/simple/", "admin", "", 501},
+		{pypiList, pypiBase + "pypi-virtual/simple/", "admin", "", 200},
 		{pypiListHead, local + "simple/", "admin", "", 200},
 
 		{pypiProject, page, "admin", "", 200},
@@ -144,7 +144,7 @@ func pypiStatusRows() []statusCase {
 		{pypiFile, wheel, "user", "", 403},
 		{pypiFile, wheel, "anonymous", "", 401},
 		{pypiFile, wheel, "", "", 401},
-		{pypiFile, pypiBase + "pypi-virtual/" + pypiWheelPath, "admin", "", 501},
+		{pypiFile, pypiBase + "pypi-virtual/" + pypiWheelPath, "admin", "", 200},
 		{pypiFileHead, wheel, "admin", "", 200},
 		{pypiFileHead, wheel, "user", "", 403},
 
@@ -187,7 +187,7 @@ func pypiJSONStatusRows() []statusCase {
 				pypiBase + "pypi-virtual" + endpoint.suffix,
 				"admin",
 				"",
-				501,
+				200,
 			},
 			statusCase{
 				endpoint.route,

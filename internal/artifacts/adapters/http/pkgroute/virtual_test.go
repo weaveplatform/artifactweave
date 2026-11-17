@@ -112,23 +112,27 @@ func walkFormat(sources map[repo.Class]pkgroute.Source) pkgroute.Protocol {
 			mark(w, err)
 			k.Error(w, r, pkgroute.SourceError(err, false))
 		}
-		r.Get("/steps/*", func(w http.ResponseWriter, r *http.Request) {
-			members, err := k.MergeMembers(r, path(r))
-			if err != nil {
-				fail(w, r, err)
-				return
-			}
-			keys := make([]string, 0, len(members))
-			for _, mr := range members {
-				q := pkgroute.RequestFrom(mr)
-				key := q.Repo.Key
-				if q.CacheOnly {
-					key += "~"
+		for route, read := range map[string]func(*http.Request, string) ([]*http.Request, error){
+			"/steps/*": k.MergeMembers, "/downloads/*": k.DownloadMembers,
+		} {
+			r.Get(route, func(w http.ResponseWriter, r *http.Request) {
+				members, err := read(r, path(r))
+				if err != nil {
+					fail(w, r, err)
+					return
 				}
-				keys = append(keys, key)
-			}
-			_, _ = io.WriteString(w, strings.Join(keys, ","))
-		})
+				keys := make([]string, 0, len(members))
+				for _, mr := range members {
+					q := pkgroute.RequestFrom(mr)
+					key := q.Repo.Key
+					if q.CacheOnly {
+						key += "~"
+					}
+					keys = append(keys, key)
+				}
+				_, _ = io.WriteString(w, strings.Join(keys, ","))
+			})
+		}
 		r.Get("/collect/*", func(w http.ResponseWriter, r *http.Request) {
 			p := path(r)
 			parts, err := pkgroute.Collect(k, r, p, func(mr *http.Request) ([]string, error) {
@@ -559,4 +563,34 @@ func TestUnitPassedOver(t *testing.T) {
 			t.Errorf("%s: PassedOver(%v) = %v, want %v", tc.name, tc.err, got, tc.want)
 		}
 	}
+}
+
+// DownloadMembers leaves a remote's policy to its source while retaining
+// hosted and nested virtual patterns, authority and the cache-only binding.
+func TestAccDownloadMembersPolicyAndCacheOnly(t *testing.T) {
+	f, _ := walkFixture(t, func(o *pkgroute.Options) {
+		o.NoUpstream = func(r *http.Request, _ repo.Config) bool {
+			return r.Header.Get("X-From-Artifactory") != ""
+		}
+	})
+	f.wantBody(t, "local-a/downloads/idx/versions", "root", "local-a")
+	f.wantBody(t, "outer/downloads/idx/versions", "merger", "local-a,local-b,remote-a")
+	f.wantBody(t, "outer/downloads/idx/versions", "merger", "local-a,local-b,remote-a~", "X-From-Artifactory", "true")
+	f.patch(t, "remote-a", func(c *repo.Config) { c.ExcludesPattern = strPtr("idx/**") })
+	f.wantBody(t, "remote-a/downloads/idx/versions", "merger", "remote-a")
+	f.wantBody(t, "outer/steps/idx/versions", "merger", "local-a,local-b")
+	f.wantBody(t, "outer/downloads/idx/versions", "merger", "local-a,local-b,remote-a")
+	f.wantBody(t, "outer/downloads/idx/versions", "merger", "local-a,local-b,remote-a~", "X-From-Artifactory", "true")
+	f.wantBody(t, "outer/downloads/idx/versions", "partial", "local-a")
+	f.patch(t, "local-a", func(c *repo.Config) { c.ExcludesPattern = strPtr("idx/**") })
+	f.wantPolicy(t, "local-a/downloads/idx/versions", "root", http.StatusNotFound, "")
+	f.wantBody(t, "outer/downloads/idx/versions", "merger", "local-b,remote-a")
+	f.patch(t, "remote-a", blackOut)
+	f.wantBody(t, "outer/downloads/idx/versions", "merger", "local-b")
+	f.patch(t, "remote-a", restore)
+	f.patch(t, "inner", func(c *repo.Config) { c.ExcludesPattern = strPtr("idx/**") })
+	f.wantBody(t, "outer/downloads/idx/versions", "merger", "local-b")
+	f.patch(t, "outer", func(c *repo.Config) { c.ExcludesPattern = strPtr("idx/**") })
+	f.wantPolicy(t, "outer/downloads/idx/versions", "root", http.StatusNotFound,
+		"No repository found to serve the request for outer:idx/versions")
 }

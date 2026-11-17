@@ -76,7 +76,8 @@
 //     ServeFoundMetadata, ReadMetadata, CheckDocument, CheckBlackedOut,
 //     MergeMembers and IsRefusal; and ReadServed and ServedReadFault, a
 //     protocol's read of the copy the source service served it.
-//   - Virtual helpers: MergeMembers, the member requests of the package
+//   - Virtual helpers: DownloadMembers, the file walk leaving a remote
+//     member's own policy to its source; MergeMembers, the member requests of the package
 //     handlers' walk through a virtual repository (virtual.Members,
 //     virtual.Package); Collect, each member's document for a format's
 //     virtual.Merger; PassedOver, whether a member read's error passes over

@@ -19,6 +19,9 @@ import (
 )
 
 func (h handler) upload(w http.ResponseWriter, r *http.Request) {
+	if h.virtualWrite(w, r) {
+		return
+	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.k.Error(
 			w,
@@ -89,6 +92,9 @@ func (h handler) upload(w http.ResponseWriter, r *http.Request) {
 // put is REST deployment through the package API, including matrix properties.
 // The item service applies the same format admission as ordinary item routes.
 func (h handler) put(w http.ResponseWriter, r *http.Request) {
+	if h.virtualWrite(w, r) {
+		return
+	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.k.Error(
 			w,

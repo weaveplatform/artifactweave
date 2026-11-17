@@ -460,6 +460,10 @@ func uniqueFiles(files []remoteFile) error {
 }
 
 func remoteHTML(files []remoteFile, base string, core bool) []byte {
+	return renderRemoteHTML(files, base, core, false)
+}
+
+func renderRemoteHTML(files []remoteFile, base string, core, internal bool) []byte {
 	var b strings.Builder
 	b.WriteString(pageHead)
 	for _, f := range files {
@@ -490,6 +494,9 @@ func remoteHTML(files []remoteFile, base string, core bool) []byte {
 					v,
 				) + `"`,
 			)
+		}
+		if internal {
+			b.WriteString(` rel="internal"`)
 		}
 		b.WriteString(">" + html.EscapeString(f.name) + "</a>\n")
 	}

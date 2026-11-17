@@ -25,6 +25,10 @@ const metadataSuffix = ".metadata"
 // 6.x link form under packages/ is not served: no file can be stored
 // there (RTFACT-30372).
 func (h handler) download(w http.ResponseWriter, r *http.Request, p pkgroute.Path) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualDownload(w, r, p)
+		return
+	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.remoteDownload(w, r, p)
 		return
