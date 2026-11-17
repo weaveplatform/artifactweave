@@ -35,6 +35,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
 		repo.Federated: pkgroute.Local{},
+		repo.Virtual:   virtualSource{},
 	}
 	if o.RemoteSources != nil {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
@@ -45,7 +46,7 @@ func Protocol(o Options) pkgroute.Protocol {
 		Types:        []repo.PackageType{repo.PyPI},
 		ErrorProfile: apierror.ProfileArtifactory,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
-			routes(r, handler{k: k, format: o.Format})
+			routes(r, handler{k: k, format: o.Format, sources: o.RemoteSources})
 		},
 	}
 }
@@ -61,8 +62,9 @@ func routes(r chi.Router, h handler) {
 }
 
 type handler struct {
-	k      *pkgroute.Kit
-	format pypifmt.Settings
+	k       *pkgroute.Kit
+	format  pypifmt.Settings
+	sources *source.Service
 }
 
 // read dispatches JSON metadata, simple index pages, files and wheel metadata.

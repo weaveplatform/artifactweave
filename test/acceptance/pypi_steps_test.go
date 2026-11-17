@@ -16,6 +16,7 @@ import (
 
 func (w *world) registerPyPI(sc *godog.ScenarioContext) {
 	w.registerRemotePyPI(sc)
+	w.registerVirtualPyPI(sc)
 	sc.Step(`^a Python sdist "([^"]*)" at "([^"]*)" in "([^"]*)"$`, w.writeSdist)
 	sc.Step(
 		`^a Python wheel "([^"]*)" at "([^"]*)" in "([^"]*)" with module "([^"]*)"$`,

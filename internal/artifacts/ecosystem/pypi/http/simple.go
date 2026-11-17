@@ -54,6 +54,10 @@ func pagePath(name string) string {
 // caller may read. A caller who may read nothing in the repository is
 // refused, so pip asks for credentials (RTFACT-17764).
 func (h handler) list(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualList(w, r)
+		return
+	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.remoteList(w, r)
 		return
@@ -82,6 +86,10 @@ func (h handler) list(w http.ResponseWriter, r *http.Request) {
 // finds no file of the project it can read gets 404, so a page never shows
 // a project to a caller who could not install it (decision 0037).
 func (h handler) project(w http.ResponseWriter, r *http.Request, name string) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualProject(w, r, name)
+		return
+	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.remoteProject(w, r, name)
 		return

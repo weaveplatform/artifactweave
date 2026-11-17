@@ -309,43 +309,52 @@ func (h handler) remoteDownload(w http.ResponseWriter, r *http.Request, p pkgrou
 		h.k.Error(w, r, notFound(r))
 		return
 	}
-	path := p.String()
-	parent := strings.TrimSuffix(strings.TrimSuffix(path, metadataSuffix), ".asc")
-	suffix := strings.TrimPrefix(path, parent)
-	isMetadata := parent != path
+	parent := strings.TrimSuffix(strings.TrimSuffix(p.String(), metadataSuffix), ".asc")
 	if !h.k.Require(w, r, parent, api.ActionRead) {
 		return
 	}
-	index, _, err := h.upstreamIndex(r, p.Segments[0], parent)
+	result, err := h.remoteArtifact(r, p)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
+	}
+	h.k.ServeResult(w, r, result)
+}
+
+// remoteArtifact retains the remote's index authority and source policy when a
+// virtual reads it. The caller has checked the owner's Read permission.
+func (h handler) remoteArtifact(r *http.Request, p pkgroute.Path) (source.Result, error) {
+	if len(p.Segments) != 3 || p.Folder {
+		return source.Result{}, notFound(r)
+	}
+	path := p.String()
+	parent := strings.TrimSuffix(strings.TrimSuffix(path, metadataSuffix), ".asc")
+	suffix := strings.TrimPrefix(path, parent)
+	index, _, err := h.upstreamIndex(r, p.Segments[0], parent)
+	if err != nil {
+		return source.Result{}, err
 	}
 	for _, f := range index.files {
 		if f.path != parent {
 			continue
 		}
-		resource, hashes, e := h.remoteFileResource(r, f, path, suffix)
-		if e != nil {
-			h.k.Error(w, r, e)
-			return
+		resource, hashes, err := h.remoteFileResource(r, f, path, suffix)
+		if err != nil {
+			return source.Result{}, err
 		}
-		result, e := h.k.Read(r, resource)
-		if e != nil {
-			h.k.Error(w, r, e)
-			return
+		result, err := h.k.Read(r, resource)
+		if err != nil {
+			return source.Result{}, fmt.Errorf("pypi artifact: %w", err)
 		}
-		if e = h.checkRemoteHashes(r.Context(), result, hashes); e != nil {
-			h.k.Error(w, r, e)
-			return
+		if err = h.checkRemoteHashes(r.Context(), result, hashes); err != nil {
+			return source.Result{}, err
 		}
-		if isMetadata {
+		if parent != path {
 			fenceRemote(&result, []string{parent})
 		}
-		h.k.ServeResult(w, r, result)
-		return
+		return result, nil
 	}
-	h.k.Error(w, r, notFound(r))
+	return source.Result{}, notFound(r)
 }
 
 // remoteFileResource is the read of path, f or, after suffix, its core

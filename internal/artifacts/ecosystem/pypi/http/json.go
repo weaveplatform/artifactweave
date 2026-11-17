@@ -160,6 +160,10 @@ func distributionJSON(f pypifmt.File, base string) map[string]any {
 }
 
 func (h handler) metadataJSON(w http.ResponseWriter, r *http.Request, name, version string) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualWarehouse(w, r, name, version)
+		return
+	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.remoteWarehouse(w, r, name, version)
 		return

@@ -20,7 +20,7 @@ var pypiMatrixPart = matrixPart{
 	rows: func() []matrixRow {
 		local := pypiBase + "pypi-local/"
 		reads := holds("pypi-local", pypiWheelPath, api.ActionRead)
-		return []matrixRow{
+		rows := []matrixRow{
 			row(pypiJSONLatest, local+"pypi/status-pkg/json", "", pypiProjectReads, 200),
 			row(pypiJSONVersion, local+"pypi/status-pkg/1.0/json", "", pypiProjectReads, 200),
 			row(pypiJSONLatestHead, local+"pypi/status-pkg/json", "", pypiProjectReads, 200),
@@ -58,6 +58,27 @@ var pypiMatrixPart = matrixPart{
 			row(pypiMetadata, local+pypiWheelPath+".metadata", "", reads, 200),
 			row(pypiMetadataHead, local+pypiWheelPath+".metadata", "", reads, 200),
 		}
+		for _, r := range rows {
+			if r.method() != http.MethodGet && r.method() != http.MethodHead {
+				continue
+			}
+			r.path = strings.Replace(r.path, "/pypi-local/", "/pypi-virtual/", 1)
+			switch r.route {
+			case pypiFile, pypiFileHead, pypiMetadata, pypiMetadataHead:
+				r.who = func(p matrixPrincipal) int {
+					if status := anyone(p); status != 0 {
+						return status
+					}
+					if p.holds("pypi-local", pypiWheelPath, api.ActionRead) {
+						return 0
+					}
+					return http.StatusNotFound
+				}
+			}
+			rows = append(rows, r)
+		}
+		rows = append(rows, row(pypiUpload, pypiBase+"pypi-virtual", pypiUploadBody("work"), anyone, 501))
+		return rows
 	},
 }
 

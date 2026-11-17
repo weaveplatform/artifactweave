@@ -89,6 +89,23 @@ func (k *Kit) MergeMembers(r *http.Request, path string) ([]*http.Request, error
 	return out, err
 }
 
+// DownloadMembers returns the package walk's requests for a file at path.
+// It applies virtual and hosted members' patterns at path, including nested
+// virtual patterns, but leaves a remote member's own policy to its source
+// read. A format may map the file's canonical URL to a different upstream
+// PolicyPath, as PyPI does. Remote requests retain the walk's cache-only
+// restriction; callers must read them through the source boundary.
+func (k *Kit) DownloadMembers(r *http.Request, path string) ([]*http.Request, error) {
+	if err := k.CheckDownload(r, path); err != nil {
+		return nil, err
+	}
+	if RequestFrom(r).Repo.Class != repo.Virtual {
+		return []*http.Request{r}, nil
+	}
+	_, _, out, err := k.walkPolicy(r, path, false)
+	return out, err
+}
+
 // Collect reads the document at path from each request MergeMembers
 // returns, in order, with read, and returns what read for a format's
 // virtual.Merger, each part with the real member it came from. Through a
@@ -176,6 +193,14 @@ func (k *Kit) walk(
 	r *http.Request,
 	path string,
 ) ([]virtual.Member, []virtual.Member, []*http.Request, error) {
+	return k.walkPolicy(r, path, true)
+}
+
+func (k *Kit) walkPolicy(
+	r *http.Request,
+	path string,
+	remotePolicy bool,
+) ([]virtual.Member, []virtual.Member, []*http.Request, error) {
 	v := RequestFrom(r).Repo
 	o := virtual.Options{Order: virtual.Package, Path: path, NoPriority: k.p.NoPriority}
 	if k.o.NoUpstream != nil {
@@ -188,7 +213,7 @@ func (k *Kit) walk(
 	members := make([]virtual.Member, 0, len(steps))
 	requests := make([]*http.Request, 0, len(steps))
 	for _, m := range steps {
-		if src, ok := k.walkSource(r.Context(), v, m.Repo, path, ""); ok {
+		if src, ok := k.walkSource(r.Context(), v, m.Repo, path, "", remotePolicy); ok {
 			members = append(members, m)
 			requests = append(requests, memberRequest(r, v, m, src))
 		}
@@ -201,15 +226,19 @@ func (k *Kit) walk(
 // over silently (members): m is of a type v does not take or of a class
 // with no Source, its download policy refuses path, or the caller may read
 // nothing at or below readAt in it.
-func (k *Kit) walkSource(ctx context.Context, v, m repo.Config, path, readAt string) (Source, bool) {
+func (k *Kit) walkSource(ctx context.Context, v, m repo.Config, path, readAt string, remotePolicy bool) (Source, bool) {
 	src, ok := k.p.Sources[m.Class]
 	// A federated member is hosted for virtual resolution (R1), even
 	// when the protocol does not serve that class directly, as Hex does not.
 	if !ok && m.Class == repo.Federated {
 		src, ok = k.p.Sources[repo.Local]
 	}
+	policyPath := path
+	if m.Class == repo.Remote && !remotePolicy {
+		policyPath = ""
+	}
 	if !ok || !repo.AcceptsMember(v.PackageType, m.PackageType) ||
-		generic.CheckDownload(m, path, false) != nil || !readable(ctx, m, readAt, true) {
+		generic.CheckDownload(m, policyPath, false) != nil || !readable(ctx, m, readAt, true) {
 		return nil, false
 	}
 	return src, true
