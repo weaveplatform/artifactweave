@@ -492,7 +492,9 @@ func virtualRemoteExpired(t *testing.T, w *virtualRemoteWorld) {
 	for _, c := range []repo.Config{
 		{Key: "maven-remote-b", Class: repo.Remote, PackageType: repo.Maven, URL: upB.URL},
 		{
-			Key: "maven-pair", Class: repo.Virtual, PackageType: repo.Maven,
+			// Exercise processStandard with mutable Maven members. A Maven
+			// virtual compares snapshots across members instead (MVN-02).
+			Key: "maven-pair", Class: repo.Virtual, PackageType: repo.Generic,
 			Repositories: []string{"maven-remote", "maven-remote-b"},
 		},
 	} {
