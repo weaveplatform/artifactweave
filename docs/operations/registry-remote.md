@@ -95,5 +95,21 @@ shared metadata TTL still decides when to refresh. Offline and origin-restricted
 requests retain cache-only behavior. A missing cached digest holder triggers a
 fresh member walk; changed membership or patterns discard the virtual's hints.
 `FindParentManifestLists` searches the selected member's retained manifest tree.
-Virtual uploads, push/delete, tag/catalog listings and referrers retain 405 until
-their corresponding P10 tickets.
+Virtual pushes publish into `defaultDeploymentRepo`, an existing local or
+federated member. Deploy permission is checked on that member's image; upload
+locations and token scopes keep the virtual name. Without a DDR, publishing
+answers 405 with `Allow: GET`. Upload sessions support monolithic/chunked writes,
+status and cancellation through the virtual URL. A write-only pusher's unreadable
+HEAD probes return 404; GET still requires Read.
+
+Blob HEAD can find base layers in other readable members. Manifest PUT imports
+missing layers/config and index children into the DDR before the normal presence
+and size checks. An uncached remote uses its own permissions/source policy; an
+offline remote lends only cached content. Cross-repository mounts may name a
+virtual source or destination. Virtual and DDR write patterns apply to the image
+name, with ordinary REST item deployments retaining their full-path patterns.
+
+Manifest/blob DELETE through a virtual answers 400 with an empty body;
+`DeleteDockerTag` answers the Artifactory 400 envelope. Address the concrete member
+to delete a tag. Tag/catalog listings and referrers retain their current 405
+responses until their corresponding P10 tickets.

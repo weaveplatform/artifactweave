@@ -750,3 +750,37 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 
 **Unconfirmed for 7.x:** the **[I]** items of section 10 stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216). The **[S]** claims
 here come from the JFrog CLI and the Docker and OCI sources, not from 6.20.
+
+## P10 virtual pushes (DKR-02, 2026-11-17)
+
+- **[D]** [Deploy Artifacts](https://docs.jfrog.com/artifactory/docs/deploy-artifacts#configure-virtual-repositories-for-deployment)
+  and [Additional Docker Information](https://docs.jfrog.com/artifactory/docs/additional-docker-information)
+  describe pushing through a virtual into its configured local deployment repository.
+- **[S]** The verified 7.161.26 OSS archive's `UploadServiceUtils.getTargetRepository`
+  (248–261) resolves an existing local/federated DDR; `UploadServiceImpl.sendInvalidTargetRepositoryError`
+  (337–352) supplies the no-DDR 405, `Allow: GET`, and exact message. ENG-09's
+  existing mapping is reused without adding a runtime membership requirement.
+- **[I]** Registry responses retain the virtual's URL in every upload/manifest
+  `Location`, the original virtual token scope, and the DDR's image Write check.
+  Write alone grants push; an otherwise unauthorized HEAD by an authorized pusher
+  answers not found without disclosing member content. GET still requires Read.
+- **[I]** No-DDR uses the source-backed 405/message in the registry `UNSUPPORTED`
+  envelope. Manifest and blob DELETE through a virtual answer 400 with no body;
+  `DeleteDockerTag` answers the Artifactory 400 envelope with
+  `Unable to delete a manifest from a virtual repository`. The ticket's
+  [RTFACT-21482](https://jfrog.atlassian.net/browse/RTFACT-21482) trace records
+  manifest DELETE 400/zero bytes; current public Jira pages/API were unreadable
+  and Docker handlers are absent from OSS, so the exact current bodies remain
+  inferred. Neither current Docker deletion documentation nor the OSS addon
+  interfaces settle virtual blob/REST deletion.
+- **[I]** Referenced content absent from the DDR is resolved through readable
+  members and the remote's own source policy. A remote-only blob may be fetched
+  into the DDR; a failed fetch becomes `MANIFEST_BLOB_UNKNOWN`. Index children
+  already visible through a virtual HEAD are imported by digest with their
+  references, then checked by the existing child/blob presence and size checks.
+  The ticket cites closed-code `delegateToLocalIfPossible`/`uploadManifest`
+  synchronization traces (RTFACT-22486/22448/17630); they are not OSS evidence.
+  An OCI subject remains optional, as on a direct push.
+
+These unresolved details are tracked for P19 [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+No live or trial Artifactory instance was used.

@@ -268,7 +268,9 @@ func (g *Registry) dispatch(w http.ResponseWriter, r *http.Request, q Request) {
 			return
 		}
 	}
-	if q.Repo.Class == repo.Virtual && (!virtualPull(q.Kind, r.Method) || g.uploads == nil) {
+	if q.Repo.Class == repo.Virtual && (g.uploads == nil ||
+		!virtualPull(q.Kind, r.Method) && !virtualWrite(q.Kind, r.Method) &&
+			(r.Method != http.MethodDelete || q.Kind != KindManifest && q.Kind != KindBlob)) {
 		g.writeErr(w, r, unsupportedVirtual(q.Repo))
 		return
 	}
@@ -278,8 +280,25 @@ func (g *Registry) dispatch(w http.ResponseWriter, r *http.Request, q Request) {
 		return
 	}
 	if q.Repo.Class == repo.Virtual {
-		g.serveVirtual(w, r, q)
-		return
+		switch {
+		case virtualPull(q.Kind, r.Method):
+			g.serveVirtual(w, r, q)
+			return
+		case virtualWrite(q.Kind, r.Method):
+			var err error
+			q, err = g.virtualDeployment(r, q)
+			if err != nil {
+				g.writeErr(w, r, err)
+				return
+			}
+		case r.Method == http.MethodDelete && (q.Kind == KindManifest || q.Kind == KindBlob):
+			w.Header().Set("Content-Length", "0")
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		default:
+			g.writeErr(w, r, unsupportedVirtual(q.Repo))
+			return
+		}
 	}
 	if q.Repo.Class == repo.Remote && (q.Kind.image() || q.Kind == KindCatalog) {
 		g.serveRemote(w, r, q)

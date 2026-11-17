@@ -23,6 +23,9 @@ type Request struct {
 	RepoKey string
 	// Repo is the resolved repository, set when Kind is an image operation.
 	Repo repo.Config
+	// virtualRepo retains the addressed virtual during a DDR write. Repo then
+	// names the DDR, while base, RepoKey and scope keep the client's address.
+	virtualRepo *repo.Config
 	// Name is the image name inside the repository.
 	Name string
 	// Reference is the digest, tag or upload session the path ends in.

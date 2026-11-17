@@ -1,14 +1,61 @@
 package docker
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 )
+
+func TestUnitDockerVirtualImageWritePatterns(t *testing.T) {
+	for _, tc := range []struct {
+		name, image string
+		blackout    bool
+		status      int
+	}{
+		{"image admitted", "team/image", false, 0},
+		{"internal name refused", "team/image/_uploads/sha256__abc", false, 409},
+		{"another image refused", "team/other", false, 409},
+		{"blackout first", "team/image", true, 404},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := repo.Config{Key: "local", Class: repo.Local, IncludesPattern: new("team/image"), BlackedOut: new(tc.blackout)}
+			out, err := ImageWriteConfig(c, tc.image)
+			if tc.status == 0 {
+				if err != nil || !repo.PatternsOf(out).Accepts("team/image/_uploads/sha256__abc", false) {
+					t.Fatal("admitted image rechecked against internal names", out, err)
+				}
+			} else {
+				var refusal *format.RejectionError
+				if !errors.As(err, &refusal) || refusal.Status != tc.status || !strings.Contains(refusal.Message, tc.image) {
+					t.Fatal(err)
+				}
+			}
+			if c.IncludesPattern == nil || *c.IncludesPattern != "team/image" {
+				t.Fatal("persisted configuration changed")
+			}
+		})
+	}
+}
+
+func TestUnitDockerVirtualImportPlan(t *testing.T) {
+	config, layer, child := Descriptor{Digest: "config"}, Descriptor{Digest: "layer"}, Descriptor{Digest: "child"}
+	m := Manifest{Config: &config, Layers: []Descriptor{layer, layer, config}, Manifests: []Descriptor{child, child}, Subject: &Descriptor{Digest: "subject"}}
+	want := []VirtualImport{{Descriptor: child, Manifest: true}, {Descriptor: config}, {Descriptor: layer}}
+	if got := VirtualImports(m); !reflect.DeepEqual(got, want) {
+		t.Fatal(got, want)
+	}
+	if got := VirtualImports(Manifest{}); len(got) != 0 {
+		t.Fatal(got)
+	}
+}
 
 func TestUnitDockerVirtualMembers(t *testing.T) {
 	configs := virtual.Configs{

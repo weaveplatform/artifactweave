@@ -3,6 +3,7 @@ package docker_test
 import (
 	"bytes"
 	"encoding/json"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -165,10 +166,6 @@ func TestAccRegistryVirtualReadPoliciesAndTokens(t *testing.T) {
 func TestAccRegistryVirtualOtherKindsStayUnsupported(t *testing.T) {
 	w := virtualRegistryWorld(t, repo.Docker)
 	for _, tc := range []struct{ method, path string }{
-		{"PUT", "team/image/manifests/latest"},
-		{"DELETE", "team/image/manifests/latest"},
-		{"POST", "team/image/blobs/uploads/"},
-		{"DELETE", "team/image/blobs/sha256:" + strings.Repeat("a", 64)},
 		{"GET", "team/image/tags/list"},
 		{"GET", "_catalog"},
 		{"GET", "team/image/referrers/sha256:" + strings.Repeat("a", 64)},
@@ -179,8 +176,317 @@ func TestAccRegistryVirtualOtherKindsStayUnsupported(t *testing.T) {
 		}
 	}
 	r := w.request("DELETE", "/artifactory/api/docker/virtual/v2/delete", "admin", `{"dockerRepository":"team/image","tag":"latest"}`, "Content-Type", "application/json")
-	if r.Code != 405 {
+	if r.Code != 400 || !strings.Contains(r.Body.String(), "Unable to delete a manifest from a virtual repository") {
 		t.Fatal(r.Code, r.Body.String())
+	}
+}
+
+func virtualPushWorld(t *testing.T, kind repo.PackageType) *remoteWorld {
+	t.Helper()
+	w := virtualRegistryWorld(t, kind)
+	virtualRegistryConfig(t, w, "virtual", func(c *repo.Config) { c.DefaultDeploymentRepo = "second" })
+	return w
+}
+
+func virtualCheckDDR(t *testing.T, w *remoteWorld, manifest []byte) {
+	t.Helper()
+	m, err := layout.ParseManifest(layout.MediaTypeOCIManifest, manifest, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range m.BlobDescriptors() {
+		hex, _ := layout.SHA256Hex(d.Digest)
+		if _, err := layout.FindBlob(t.Context(), w.rt.Store.Items(), "second", "team/image", hex); err != nil {
+			t.Fatal("DDR blob absent", d.Digest, err)
+		}
+	}
+}
+
+func TestAccRegistryVirtualPushUploads(t *testing.T) {
+	for _, kind := range []repo.PackageType{repo.Docker, repo.OCI, repo.HelmOCI} {
+		t.Run(string(kind), func(t *testing.T) {
+			w := virtualPushWorld(t, kind)
+			manifest, layer := registryImage(t, w, "push")
+			var parsed layout.Manifest
+			if err := json.Unmarshal(manifest, &parsed); err != nil {
+				t.Fatal(err)
+			}
+			config := `{"os":"linux","architecture":"amd64","config":{"Labels":{"fixture":"push"}}}`
+			r := w.request("POST", "/v2/virtual/team/image/blobs/uploads/?digest="+parsed.Config.Digest, "admin", config)
+			remoteStatus(t, r, 201)
+			if !strings.Contains(r.Header().Get("Location"), "/v2/virtual/team/image/blobs/") {
+				t.Fatal(r.Header())
+			}
+			r = w.request("POST", "/v2/virtual/team/image/blobs/uploads/", "admin", "")
+			remoteStatus(t, r, 202)
+			u, err := url.Parse(r.Header().Get("Location"))
+			if err != nil || !strings.HasPrefix(u.Path, "/v2/virtual/") {
+				t.Fatal(r.Header(), err)
+			}
+			remoteStatus(t, w.request("GET", u.Path, "admin", ""), 204)
+			r = w.request("PATCH", u.Path, "admin", string(layer[:5]), "Content-Range", "0-4")
+			remoteStatus(t, r, 202)
+			if !strings.Contains(r.Header().Get("Location"), "/v2/virtual/") {
+				t.Fatal(r.Header())
+			}
+			remoteStatus(t, w.request("PUT", u.Path+"?digest="+registryDigest(layer), "admin", string(layer[5:])), 201)
+			remoteStatus(t, w.request("HEAD", "/v2/virtual/team/image/manifests/new", "admin", ""), 404)
+			r = w.request("PUT", "/v2/virtual/team/image/manifests/new", "admin", string(manifest), "Content-Type", layout.MediaTypeOCIManifest)
+			remoteStatus(t, r, 201)
+			if !strings.Contains(r.Header().Get("Location"), "/v2/virtual/team/image/manifests/") {
+				t.Fatal(r.Header())
+			}
+			virtualCheckDDR(t, w, manifest)
+			for _, key := range []string{"virtual", "second"} {
+				r = w.request("GET", "/v2/"+key+"/team/image/manifests/new", "admin", "")
+				if r.Code != 200 || !bytes.Equal(r.Body.Bytes(), manifest) || r.Header().Get(dockerhttp.RegistryHeader) != "second" {
+					t.Fatal(key, r.Code, r.Header(), r.Body.String())
+				}
+			}
+			r = w.request("HEAD", "/v2/virtual/team/image/manifests/new", "admin", "")
+			if r.Code != 200 || r.Body.Len() != 0 || r.Header().Get(dockerhttp.RegistryHeader) != "second" {
+				t.Fatal("post-push HEAD did not name DDR", r.Code, r.Header(), r.Body.String())
+			}
+			r = w.request("POST", "/v2/virtual/team/image/blobs/uploads/", "admin", "")
+			remoteStatus(t, r, 202)
+			id := r.Header().Get("Docker-Upload-UUID")
+			remoteStatus(t, w.request("DELETE", "/v2/virtual/team/image/blobs/uploads/"+id, "admin", ""), 204)
+			remoteStatus(t, w.request("GET", "/v2/virtual/team/image/blobs/uploads/"+id, "admin", ""), 404)
+		})
+	}
+}
+
+func TestAccRegistryVirtualPushImports(t *testing.T) {
+	for _, mode := range []string{"local", "federated DDR", "remote cache", "remote uncached", "remote streaming"} {
+		t.Run(mode, func(t *testing.T) {
+			w := virtualPushWorld(t, repo.Docker)
+			var manifest, layer []byte
+			if mode == "federated DDR" {
+				virtualRegistryConfig(t, w, "second", func(c *repo.Config) { c.Class = repo.Federated })
+			}
+			if mode == "local" || mode == "federated DDR" {
+				manifest, layer = virtualRegistryPush(t, w, "first", "base", "base")
+			} else {
+				manifest, layer = registryImage(t, w, "base")
+				if mode == "remote streaming" {
+					w.c.StoreArtifactsLocally = new(false)
+					w.update()
+				}
+				if mode == "remote cache" {
+					var m layout.Manifest
+					if err := json.Unmarshal(manifest, &m); err != nil {
+						t.Fatal(err)
+					}
+					for _, d := range m.BlobDescriptors() {
+						remoteStatus(t, w.request("HEAD", "/v2/virtual/team/image/blobs/"+d.Digest, "admin", ""), 200)
+					}
+					w.c.Offline = new(true)
+					w.update()
+				}
+			}
+			before := w.up.Count("GET", "/v2/team/image/blobs/"+registryDigest(layer))
+			r := w.request("PUT", "/v2/virtual/team/image/manifests/derived", "admin", string(manifest), "Content-Type", layout.MediaTypeOCIManifest)
+			remoteStatus(t, r, 201)
+			virtualCheckDDR(t, w, manifest)
+			if mode == "remote cache" && w.up.Count("GET", "/v2/team/image/blobs/"+registryDigest(layer)) != before {
+				t.Fatal("cached base fetched again")
+			}
+			remoteStatus(t, w.request("GET", "/v2/second/team/image/blobs/"+registryDigest(layer), "admin", ""), 200)
+		})
+	}
+}
+
+func TestAccRegistryVirtualPushIndexImportsChildren(t *testing.T) {
+	for _, source := range []string{"first", "remote"} {
+		t.Run(source, func(t *testing.T) {
+			w := virtualPushWorld(t, repo.OCI)
+			child, _ := registryImage(t, w, "child")
+			if source == "first" {
+				child, _ = virtualRegistryPush(t, w, "first", "child", "child")
+			}
+			remoteStatus(t, w.request("HEAD", "/v2/virtual/team/image/manifests/"+registryDigest(child), "admin", ""), 200)
+			index := registryJSON(
+				t,
+				map[string]any{
+					"schemaVersion": 2,
+					"mediaType":     layout.MediaTypeOCIIndex,
+					"manifests":     []layout.Descriptor{{MediaType: layout.MediaTypeOCIManifest, Digest: registryDigest(child), Size: int64(len(child))}},
+				},
+			)
+			r := w.request("PUT", "/v2/virtual/team/image/manifests/multi", "admin", string(index), "Content-Type", layout.MediaTypeOCIIndex)
+			remoteStatus(t, r, 201)
+			virtualCheckDDR(t, w, child)
+			remoteStatus(t, w.request("GET", "/v2/second/team/image/manifests/"+registryDigest(child), "admin", ""), 200)
+			remoteStatus(t, w.request("HEAD", "/v2/virtual/team/image/manifests/multi", "admin", ""), 200)
+		})
+	}
+}
+
+func TestAccRegistryVirtualPushPolicies(t *testing.T) {
+	w := virtualPushWorld(t, repo.Docker)
+	manifest, _ := registryImage(t, w, "patterns")
+	for _, key := range []string{"virtual", "second"} {
+		virtualRegistryConfig(t, w, key, func(c *repo.Config) { c.IncludesPattern = new("team/image") })
+	}
+	// The internal upload/manifest filenames fail this exact image pattern.
+	virtualRegistryPush(t, w, "virtual", "allowed", "patterns")
+	virtualCheckDDR(t, w, manifest)
+	r := w.request("PUT", "/artifactory/second/team/image/v1/manifest.json", "admin", "ordinary REST deployment")
+	if r.Code != 409 {
+		t.Fatal("REST item deploy bypassed the stored path policy", r.Code, r.Body.String())
+	}
+	for _, key := range []string{"virtual", "second"} {
+		c, err := w.rt.Store.Repos().Get(t.Context(), key)
+		if err != nil || c.IncludesPattern == nil || *c.IncludesPattern != "team/image" {
+			t.Fatal("configuration changed", c, err)
+		}
+		virtualRegistryConfig(t, w, key, func(c *repo.Config) { c.IncludesPattern = new("other") })
+		r := w.request("POST", "/v2/virtual/team/image/blobs/uploads/", "admin", "")
+		if r.Code != 409 || !strings.Contains(r.Body.String(), key+":team/image") || strings.Contains(r.Body.String(), "_uploads") {
+			t.Fatal(key, r.Code, r.Body.String())
+		}
+		virtualRegistryConfig(t, w, key, func(c *repo.Config) { c.IncludesPattern = nil })
+	}
+}
+
+func TestAccRegistryVirtualPushNoDDRAndDelete(t *testing.T) {
+	w := virtualPushWorld(t, repo.Docker)
+	manifest, layer := virtualRegistryPush(t, w, "first", "keep", "keep")
+	for _, target := range []string{"", "missing", "remote", "inner"} {
+		virtualRegistryConfig(t, w, "virtual", func(c *repo.Config) { c.DefaultDeploymentRepo = target })
+		for _, operation := range []struct{ method, path string }{{"POST", "blobs/uploads/"}, {"PUT", "manifests/new"}, {"GET", "blobs/uploads/abc"}} {
+			r := w.request(operation.method, "/v2/virtual/team/image/"+operation.path, "admin", "")
+			if r.Code != 405 || r.Header().Get("Allow") != "GET" || !strings.Contains(r.Body.String(), `"code":"UNSUPPORTED"`) ||
+				!strings.Contains(r.Body.String(), "No local repository was configured as local deployment repository for the (virtual) virtual repository.") {
+				t.Fatal(target, operation, r.Code, r.Header(), r.Body.String())
+			}
+		}
+	}
+	for _, path := range []string{"manifests/keep", "manifests/" + registryDigest(manifest), "blobs/" + registryDigest(layer)} {
+		r := w.request("DELETE", "/v2/virtual/team/image/"+path, "admin", "")
+		if r.Code != 400 || r.Body.Len() != 0 {
+			t.Fatal(path, r.Code, r.Body.String())
+		}
+	}
+	remoteStatus(t, w.request("HEAD", "/v2/first/team/image/manifests/keep", "admin", ""), 200)
+}
+
+func TestAccRegistryVirtualMounts(t *testing.T) {
+	for _, source := range []string{"first", "remote cache", "remote streaming"} {
+		t.Run(source, func(t *testing.T) {
+			w := virtualPushWorld(t, repo.Docker)
+			_, layer := registryImage(t, w, "mount")
+			if source == "first" {
+				_, layer = virtualRegistryPush(t, w, "first", "base", "mount")
+			} else if source == "remote streaming" {
+				w.c.StoreArtifactsLocally = new(false)
+				w.update()
+			} else {
+				remoteStatus(t, w.request("HEAD", "/v2/virtual/team/image/blobs/"+registryDigest(layer), "admin", ""), 200)
+				w.c.Offline = new(true)
+				w.update()
+			}
+			for _, dest := range []string{"second", "virtual"} {
+				path := "/v2/" + dest + "/team/" + dest + "/blobs/uploads/?mount=" + registryDigest(layer) + "&from=virtual/team/image"
+				r := w.request("POST", path, "admin", "")
+				remoteStatus(t, r, 201)
+				if !strings.Contains(r.Header().Get("Location"), "/v2/"+dest+"/") {
+					t.Fatal(r.Header())
+				}
+				remoteStatus(t, w.request("GET", "/v2/second/team/"+dest+"/blobs/"+registryDigest(layer), "admin", ""), 200)
+			}
+		})
+	}
+}
+
+func TestAccRegistryVirtualPushOnlyPermissions(t *testing.T) {
+	w := virtualPushWorld(t, repo.Docker)
+	manifest, layer := virtualRegistryPush(t, w, "first", "hidden", "hidden")
+	remoteStatus(t, w.request("HEAD", "/v2/virtual/team/image/manifests/hidden", "reader", ""), 404)
+	if err := w.rt.Store.Users().Create(t.Context(), accesstest.User{Name: "pusher", PasswordHash: support.CheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.rt.Store.Permissions().
+		Create(t.Context(), accesstest.Permission{Name: "push-ddr", Resources: map[accessapi.ResourceType]accesstest.Resource{accessapi.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"pusher": accessapi.ActionWrite}}, Targets: map[string]accesstest.Target{"second": {Include: []string{"team/**"}}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	token := w.request("GET", "/v2/token?scope=repository:virtual/team/image:pull,push,delete", "pusher", "")
+	remoteStatus(t, token, 200)
+	var issued struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(token.Body.Bytes(), &issued); err != nil {
+		t.Fatal(err)
+	}
+	verified, err := w.rt.Tokens.Verify(t.Context(), issued.Token)
+	if err != nil || verified.Registry == nil || len(verified.Registry.Grants) != 1 || strings.Join(verified.Registry.Grants[0].Actions, ",") != "push" ||
+		verified.Registry.Grants[0].Name != "virtual/team/image" {
+		t.Fatal(verified, err)
+	}
+	for _, auth := range []struct{ user, token string }{{"pusher", ""}, {"", issued.Token}} {
+		headers := []string{}
+		if auth.token != "" {
+			headers = []string{"Authorization", "Bearer " + auth.token}
+		}
+		for _, ref := range []string{"manifests/hidden", "manifests/new", "blobs/" + registryDigest(layer)} {
+			r := w.request("HEAD", "/v2/virtual/team/image/"+ref, auth.user, "", headers...)
+			remoteStatus(t, r, 404)
+			remoteStatus(t, w.request("GET", "/v2/virtual/team/image/"+ref, auth.user, "", headers...), 403)
+		}
+		remoteStatus(t, w.request("POST", "/v2/virtual/team/image/blobs/uploads/?digest="+registryDigest(layer), auth.user, string(layer), headers...), 201)
+	}
+	// Read-ineligible source config is not copied just because its digest exists.
+	r := w.request("PUT", "/v2/virtual/team/image/manifests/new", "pusher", string(manifest), "Content-Type", layout.MediaTypeOCIManifest)
+	if r.Code != 400 || !strings.Contains(r.Body.String(), "MANIFEST_BLOB_UNKNOWN") {
+		t.Fatal(r.Code, r.Body.String())
+	}
+	config := `{"os":"linux","architecture":"amd64","config":{"Labels":{"fixture":"hidden"}}}`
+	remoteStatus(t, w.request("POST", "/v2/virtual/team/image/blobs/uploads/?digest="+registryDigest([]byte(config)), "", config, "Authorization", "Bearer "+issued.Token), 201)
+	remoteStatus(
+		t,
+		w.request("PUT", "/v2/virtual/team/image/manifests/new", "", string(manifest), "Authorization", "Bearer "+issued.Token, "Content-Type", layout.MediaTypeOCIManifest),
+		201,
+	)
+	virtualCheckDDR(t, w, manifest)
+	remoteStatus(t, w.request("GET", "/v2/virtual/team/image/manifests/new", "", "", "Authorization", "Bearer "+issued.Token), 403)
+	other, _ := virtualRegistryPush(t, w, "virtual", "other", "other")
+	remoteStatus(t, w.request("PUT", "/v2/virtual/team/image/manifests/new", "pusher", string(other), "Content-Type", layout.MediaTypeOCIManifest), 403)
+	r = w.request("HEAD", "/v2/second/team/image/manifests/new", "admin", "")
+	if r.Code != 200 || r.Header().Get("Docker-Content-Digest") != registryDigest(manifest) {
+		t.Fatal("push-only overwrite changed the manifest", r.Code, r.Header())
+	}
+	remoteStatus(t, w.request("POST", "/v2/second/team/image/blobs/uploads/?digest="+registryDigest(layer), "pusher", string(layer)), 201)
+	remoteStatus(t, w.request("POST", "/v2/virtual/team/image/blobs/uploads/", "reader", ""), 403)
+	remoteStatus(t, w.request("POST", "/v2/second/team/image/blobs/uploads/", "", "", "Authorization", "Bearer "+issued.Token), 401)
+}
+
+func TestAccRegistryVirtualPushImportPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		change func(*repo.Config)
+	}{
+		{"offline", func(c *repo.Config) { c.Offline = new(true) }},
+		{"blackout", func(c *repo.Config) { c.BlackedOut = new(true) }},
+		{"patterns", func(c *repo.Config) { c.ExcludesPattern = new("team/**") }},
+		{"upstream refusal", func(*repo.Config) {}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := virtualPushWorld(t, repo.Docker)
+			manifest, layer := registryImage(t, w, "refused")
+			tc.change(&w.c)
+			w.update()
+			if tc.name == "upstream refusal" {
+				w.up.Set("/v2/team/image/blobs/"+registryDigest(layer), fakeupstream.Resource{Status: 403})
+			}
+			r := w.request("PUT", "/v2/virtual/team/image/manifests/new", "admin", string(manifest), "Content-Type", layout.MediaTypeOCIManifest)
+			if r.Code != 400 || !strings.Contains(r.Body.String(), "MANIFEST_BLOB_UNKNOWN") || !strings.Contains(r.Body.String(), registryDigest(layer)) {
+				t.Fatal(r.Code, r.Body.String())
+			}
+			remoteStatus(t, w.request("HEAD", "/v2/second/team/image/manifests/new", "admin", ""), 404)
+			if tc.name != "upstream refusal" && len(w.up.Requests()) != 0 {
+				t.Fatal("refused source used network", w.up.Requests())
+			}
+		})
 	}
 }
 
