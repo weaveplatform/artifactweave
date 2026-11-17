@@ -45,9 +45,17 @@ first (R2). A remote listed before a local is therefore searched after it, unles
 remote has `priorityResolution`. Package handlers walk the same list and leave the caches
 out while remote members remain in it, so each remote is asked once.
 
+A remote's cache step checks the copy it finds for expiry. An expired copy is not found
+there, so a later cache's fresh copy wins. Otherwise the remote's own step revalidates the
+file, and serves the expired copy when the remote does not find it. An offline remote's
+copies never expire, and neither does a release. This server judges a copy expired by the
+rule a direct read of the remote revalidates it by (`remote.Fresh`)
+([#1641](https://github.com/weaveplatform/artifactweave/issues/1641)).
+
 Sources: `repo/virtual/VirtualRepositoriesResolver.assembleSearchRepositoriesList` 104-143,
 over `VirtualRepositoryConfigResolverImpl.getRepoConfigs` 61-90, which lists every local
-and federated member before every remote one; `ph/PackageRepoServiceImpl.getSubRepositories`
+and federated member before every remote one; `repo/db/DbCacheRepo.getInfo` 127-149 and
+`isExpired` 235-245; `repo/RemoteRepoBase.internalGetInfo` 517-555; `ph/PackageRepoServiceImpl.getSubRepositories`
 318-339; JFrog's [Virtual Resolution Order](https://docs.jfrog.com/artifactory/docs/virtual-repositories#virtual-resolution-order):
 "local repositories first, then remote repository caches, and finally remote repositories
 themselves", each in "the order in which they are listed in the configuration".

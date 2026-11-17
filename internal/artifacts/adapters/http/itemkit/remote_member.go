@@ -7,9 +7,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -17,17 +20,27 @@ import (
 )
 
 // upstreamStep is a remote member's upstream step in a download's walk
-// through a virtual repository (lookupMember), once the member's download
-// policy and the caller's Read on the file have let it through: what m's
-// upstream answers for the walk's path, as a direct read of m answers it.
-// It reports exactMatch with the hit, or passedOver, recording a Read
-// refusal in res (R3); an error stops the walk.
-type upstreamStep func(
-	ctx context.Context,
-	dl *Download,
-	m repo.Config,
-	res *virtual.Resolution,
-) (Found, memberAnswer, error)
+// through a virtual repository (lookupMember).
+type upstreamStep struct {
+	// read is the step itself, once the member's download policy and the
+	// caller's Read on the file have let it through: what m's upstream
+	// answers for the walk's path, as a direct read of m answers it. It
+	// reports exactMatch with the hit, or passedOver, recording a Read
+	// refusal in res (R3); an error stops the walk.
+	read func(
+		ctx context.Context,
+		dl *Download,
+		m repo.Config,
+		res *virtual.Resolution,
+	) (Found, memberAnswer, error)
+	// expired reports whether it, the copy m's cache holds of the file the
+	// walk looks for, has expired, so that m's cache step passes over it
+	// to read, as 7.161.26's DbCacheRepo.getInfo returns an expired copy as
+	// an ExpiredRepoResource, which processStandard does not take for
+	// found. It is false wherever read would not ask m's upstream for the
+	// copy, which the cache step then serves as before.
+	expired func(ctx context.Context, m repo.Config, it model.Item) (bool, error)
+}
 
 // memberRequest is req as a direct request to the member m names it: the
 // same path and matrix parameters under m's key. A remote member reached
@@ -53,7 +66,7 @@ func (s *Kit) upstreamReads(c repo.Config, p string) bool {
 // that walk takes none: a checksum or an archive entry, whose walk looks
 // for the file it names (getSidecar, getUnfoundItem), as 7.161.26's walk
 // looks for the resource DownloadRequestContext.getResourcePath gives.
-func (s *Kit) walkStep(r *http.Request, req ItemRequest, p kernel.Principal, acc Access) upstreamStep {
+func (s *Kit) walkStep(r *http.Request, req ItemRequest, p kernel.Principal, acc Access) *upstreamStep {
 	if resourcePath(req.Path) != req.Path {
 		return nil
 	}
@@ -69,12 +82,14 @@ func (s *Kit) walkStep(r *http.Request, req ItemRequest, p kernel.Principal, acc
 // have the file says Artifactory "will download it and update the remote
 // repository cache", so the hit is what a direct read of the member gives,
 // a file its cache now holds or a stream when it stores nothing, which the
-// route then answers as that read (serveRemoteRead).
-func (s *Kit) fileStep(r *http.Request, req ItemRequest, p kernel.Principal, acc Access) upstreamStep {
+// route then answers as that read (serveRemoteRead). A copy the member's
+// cache holds is read upstream only by a type whose direct read revalidates
+// it (remoteDownloadType), so only such a member expires one.
+func (s *Kit) fileStep(r *http.Request, req ItemRequest, p kernel.Principal, acc Access) *upstreamStep {
 	if s.RemoteSources == nil {
 		return nil
 	}
-	return func(
+	return &upstreamStep{expired: s.copyExpired, read: func(
 		ctx context.Context, dl *Download, m repo.Config, res *virtual.Resolution,
 	) (Found, memberAnswer, error) {
 		if !s.upstreamReads(m, dl.path) {
@@ -96,9 +111,10 @@ func (s *Kit) fileStep(r *http.Request, req ItemRequest, p kernel.Principal, acc
 			deny(ctx, dl, res, m, dl.path)
 		default:
 			traceMiss(dl, m, read)
+			return fallBack(dl, m, res)
 		}
 		return Found{}, passedOver, nil
-	}
+	}}
 }
 
 // archiveStep is the upstream step of a walk for the archive an archive
@@ -109,14 +125,21 @@ func (s *Kit) fileStep(r *http.Request, req ItemRequest, p kernel.Principal, acc
 // one that may not fill its cache, and one that stores nothing, whose
 // cache the download cannot leave the archive in (readRemoteArchive). The
 // hit is the archive its cache now holds, which the route opens as any
-// archive it finds.
+// archive it finds. An archive the member's cache holds expires as a file
+// does, where the step would read it (readRemoteArchive).
 func (s *Kit) archiveStep(
 	r *http.Request, req ItemRequest, archive string, p kernel.Principal, acc Access,
-) upstreamStep {
+) *upstreamStep {
 	if s.RemoteSources == nil {
 		return nil
 	}
-	return func(
+	expired := func(ctx context.Context, m repo.Config, it model.Item) (bool, error) {
+		if m.StoreArtifactsLocally != nil && !*m.StoreArtifactsLocally {
+			return false, nil
+		}
+		return s.copyExpired(ctx, m, it)
+	}
+	return &upstreamStep{expired: expired, read: func(
 		ctx context.Context, dl *Download, m repo.Config, res *virtual.Resolution,
 	) (Found, memberAnswer, error) {
 		restore := keepUnfound(dl)
@@ -130,6 +153,7 @@ func (s *Kit) archiveStep(
 			deny(ctx, dl, res, m, archive)
 		case readPasses:
 			traceMiss(dl, m, read)
+			return fallBack(dl, m, res)
 		default:
 			switch {
 			case read.err == nil:
@@ -137,13 +161,77 @@ func (s *Kit) archiveStep(
 				return a, exactMatch, nil
 			case errors.As(read.cause, new(*source.CacheFillDenied)):
 				// The eager download swallows its failure, and getInfo
-				// answers the archive not found.
+				// answers the archive not found, or the expired archive
+				// the cache still holds.
 				traceMiss(dl, m, read)
+				return fallBack(dl, m, res)
 			default:
 				return Found{}, passedOver, read.err
 			}
 		}
 		return Found{}, passedOver, nil
+	}}
+}
+
+// fallBack is the remote member m's upstream step when it did not find the
+// file: the copy m's cache step passed over as expired, if any, which
+// 7.161.26's RemoteRepoBase.internalGetInfo (535-539) returns when the
+// remote resource is not found, whether the upstream lacks it or failed;
+// otherwise the walk passes over m.
+func fallBack(dl *Download, m repo.Config, res *virtual.Resolution) (Found, memberAnswer, error) {
+	kept, ok := dl.expired[m.Key]
+	if !ok {
+		return Found{}, passedOver, nil
+	}
+	dl.stepf("Resource doesn't exist remotely but is expired in the caches - " +
+		"returning expired cached resource")
+	res.Found = true
+	return kept.found, kept.served, nil
+}
+
+// copyExpired reports whether it, the copy the remote repository c's cache
+// holds of a file, has expired by the rule a direct read of c revalidates
+// it by (remote.Fresh): c reads such a copy through its source
+// (remoteDownloadType) and is online, since 7.161.26's DbCacheRepo.isExpired
+// never expires the copies of an offline remote, and no remote cache entry
+// that c's current source keeps for the copy is fresh. A copy no such entry
+// records, such as one written before the source changed, is not judged:
+// the cache step serves it, as it did before.
+func (s *Kit) copyExpired(ctx context.Context, c repo.Config, it model.Item) (bool, error) {
+	if c.Offline != nil && *c.Offline || !remoteDownloadType(c, false) ||
+		s.RemoteSources.Resolve == nil {
+		return false, nil
+	}
+	identity, err := s.RemoteSources.Resolve(ctx, c)
+	if err != nil {
+		// The upstream step's read fails the same way and passes over the
+		// member, so the copy is served from its cache step instead.
+		return false, nil //nolint:nilerr // an unknown source judges nothing
+	}
+	now := time.Now().UTC()
+	expired := false
+	page := kernel.Page{}
+	for {
+		entries, next, err := s.Store.RemoteCache().Exact(ctx, c.Key, it.FullPath(), page)
+		if err != nil {
+			return false, fmt.Errorf("remote cache entries of %s: %w", it.FullPath(), err)
+		}
+		for _, e := range entries {
+			// The entries a direct read could find for this copy:
+			// RemoteCacheStore.Read refuses one whose item now holds other
+			// content, and Policy.ReadEntry one another source recorded.
+			if e.ItemID != it.ID || e.Blob.Checksums != it.Actual || e.Token.Source != identity {
+				continue
+			}
+			if remote.Fresh(c, e, now) {
+				return false, nil
+			}
+			expired = true
+		}
+		if next == "" {
+			return expired, nil
+		}
+		page.After = next
 	}
 }
 
