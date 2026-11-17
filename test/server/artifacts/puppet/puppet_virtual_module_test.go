@@ -36,8 +36,9 @@ func askedForModules(asked []string) bool {
 // r10k reads that record and then fetches its current release's file_uri
 // from the same repository, which the virtual repository serves (#1369), so
 // r10k installs the module through it. A module a member lists keeps its
-// answer, merged from the members' releases, and Read on the virtual
-// repository is checked before the Forge is asked.
+// answer, merged from the members' releases. Read is each member's (decision
+// 0008, R3): a caller who may read no member gets Puppet's not-found, and
+// the Forge is not asked for it.
 func TestAccPuppetVirtualModuleOnlyAnUpstreamRecordHolds(t *testing.T) {
 	const v = "/artifactory/api/puppet/pvirtual"
 	up := newGroupedForge(t)
@@ -81,12 +82,12 @@ func TestAccPuppetVirtualModuleOnlyAnUpstreamRecordHolds(t *testing.T) {
 		t.Fatalf("a listed module read the Forge's module record: %q", asked)
 	}
 
-	for _, user := range []string{"denied", "reader"} {
-		remoteStatus(t, w.request("GET", v+"/v3/modules/acme-pe", user, ""), 403)
-	}
+	remoteStatus(t, w.request("GET", v+"/v3/modules/acme-pe", "denied", ""), 404)
 	if asked := up.requests(); len(asked) != 0 {
-		t.Fatalf("a refused caller reached the Forge: %q", asked)
+		t.Fatalf("a caller who may read no member reached the Forge: %q", asked)
 	}
+	// reader may read the remote member alone, with no "ANY" target.
+	remoteStatus(t, w.request("GET", v+"/v3/modules/acme-pe", "reader", ""), 200)
 	remoteStatus(t, w.request("GET", v+"/v3/modules/acme-none", "admin", ""), 404)
 }
 

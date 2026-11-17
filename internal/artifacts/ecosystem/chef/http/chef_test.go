@@ -64,6 +64,19 @@ func newFixtureStore(
 	wrap func(pkgroute.Store) pkgroute.Store,
 ) *fixture {
 	t.Helper()
+	return newFixtureOptions(t, class, tune, wrap, nil)
+}
+
+// newFixtureOptions is newFixtureStore whose kit options options tunes,
+// such as the merged metadata cache.
+func newFixtureOptions(
+	t *testing.T,
+	class repo.Class,
+	tune func(*pkgroute.Protocol),
+	wrap func(pkgroute.Store) pkgroute.Store,
+	options func(*pkgroute.Options),
+) *fixture {
+	t.Helper()
 	db := inmem.New()
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
@@ -98,7 +111,7 @@ func newFixtureStore(
 	if tune != nil {
 		tune(&p)
 	}
-	pkgroute.Mount(r, pkgroute.Options{
+	o := pkgroute.Options{
 		Store: st, Items: func() *item.Service { return items },
 		ItemError: func(_ context.Context, _ string, err error) error {
 			var refused *format.RejectionError
@@ -118,7 +131,11 @@ func newFixtureStore(
 				_, _ = io.Copy(w, rc)
 			}
 		},
-	}, p)
+	}
+	if options != nil {
+		options(&o)
+	}
+	pkgroute.Mount(r, o, p)
 	return &fixture{t: t, r: r, db: db, c: c, items: items}
 }
 
@@ -893,10 +910,15 @@ func TestAccVirtualMembersRetainPriorityAndCurrentPermissions(t *testing.T) {
 	if err := f.db.Repos().Update(t.Context(), f.c); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/api/v1/cookbooks/widget", "/api/v1/cookbooks"} {
-		if got := f.do("GET", base+path, "admin"); got.Code != 400 {
-			t.Fatal(got.Code, got.Body.String())
-		}
+	// A virtual repository that lists itself skips the cycle (decision
+	// 0008, R2), so it holds no cookbook.
+	if got := f.do("GET", base+"/api/v1/cookbooks/widget", "admin"); got.Code != 404 ||
+		!strings.Contains(got.Body.String(), "Chef cookbook or version not found") {
+		t.Fatal(got.Code, got.Body.String())
+	}
+	if got := f.do("GET", base+"/api/v1/cookbooks", "admin"); got.Code != 200 ||
+		!strings.Contains(got.Body.String(), `"total":0`) {
+		t.Fatal(got.Code, got.Body.String())
 	}
 }
 
@@ -1070,7 +1092,13 @@ func TestAccVirtualRemoteMemberPreservesSourceAuthority(t *testing.T) {
 		name string
 		err  error
 		code int
-	}{{"present", nil, 200}, {"missing", kernel.ErrNotFound, 404}, {"unavailable", source.ErrUnavailable, 502}} {
+	}{
+		{"present", nil, 200},
+		{"missing", kernel.ErrNotFound, 404},
+		// A member's fault passes over it, as a miss does (decision 0008,
+		// R3) [I], so no member serves the archive.
+		{"unavailable", source.ErrUnavailable, 404},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := upstream(t, archive(t, "widget", "1.0.0"))
 			s.readError = tc.err

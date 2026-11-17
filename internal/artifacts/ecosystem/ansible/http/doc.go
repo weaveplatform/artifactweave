@@ -74,9 +74,14 @@
 //     a valid archive (400); the archive's MANIFEST.json gives its path,
 //     and an existing version answers 409. Its import task is the archive's
 //     SHA-256.
-//   - A virtual repository merges its members in order, the first member
-//     that has a version supplying it; a member that is missing or denies
-//     the read is skipped, and any other failure stops the read.
+//   - A virtual repository merges its members (ansiblefmt.Releases) in the
+//     package handlers' walk, nested virtual repositories flattened with a
+//     cycle or duplicate skipped, the first member that has a version
+//     supplying it (decision 0008, R1, R2). Read is each member's alone; a
+//     member that misses, is refused or fails is passed over, a fault with
+//     a warning [I] (R3). The list is merged on every request [I] (R8). A
+//     publish lands in its default deployment repository, whose import task
+//     it answers, and without one answers R6's 405 (#1553).
 //   - The download policy (#1251), after the read grant: a blacked-out
 //     repository refuses the collection, version list and version reads
 //     before they are built, with the blackout's 404 naming the request's

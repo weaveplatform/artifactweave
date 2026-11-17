@@ -589,11 +589,12 @@ func TestAccVirtualPriorityTracksMemberChanges(t *testing.T) {
 	if r := f.do("GET", path, "admin"); r.Code != 200 || !bytes.Equal(r.Body.Bytes(), second) {
 		t.Fatalf("reordered winner: %d", r.Code)
 	}
+	// A member of another type is passed over (decision 0008, R11).
 	other.PackageType = repo.Generic
 	if err := f.db.Repos().Update(t.Context(), other); err != nil {
 		t.Fatal(err)
 	}
-	if r := f.do("GET", path, "admin"); r.Code != 400 {
+	if r := f.do("GET", path, "admin"); r.Code != 200 || !bytes.Equal(r.Body.Bytes(), first) {
 		t.Fatalf("changed member type: %d", r.Code)
 	}
 }
@@ -961,7 +962,8 @@ func TestAccVirtualMemberFailuresAndFiltering(t *testing.T) {
 		want                int
 	}{
 		{name: "missing member", failure: kernel.ErrNotFound, want: 200},
-		{name: "unavailable member", failure: source.ErrUnavailable, want: 502},
+		// A member's fault passes over it (decision 0008, R3) [I].
+		{name: "unavailable member", failure: source.ErrUnavailable, want: 200},
 		{name: "member store failure", repoFault: true, want: 500},
 		{name: "virtual excludes member archive", excluded: true, want: 200},
 	} {

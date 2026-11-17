@@ -273,6 +273,10 @@ over the members' documents that `pkgroute.Collect` reads in the package handler
 | PyPI | simple index and project pages, union of files; JSON only when every member can |
 | Bower | package list and search, union of names; a package's refs, union of versions, each archive from the first member that holds it |
 | CocoaPods | `all_pods.txt` and the `all_pods_versions_*` shards, union of pods and versions; a podspec from the first member that has it, its source rewritten to the virtual |
+| Ansible | Galaxy v3 version list, union of versions newest first, each version and its archive from the first member that lists it; a publish and its import task go through the default deployment repository (R6); built on every request **[I]** (R8) |
+| Chef | cookbook and version records, union of versions highest first, each from the first member that lists it, kept for the virtual's period (R8); the catalog and search are paged from the members on every request **[I]**; a share lands in the default deployment repository (R6) **[I]**; delete keeps its 405 **[I]** |
+| Puppet | release pages and module record, union of releases highest first, each from the first member that lists it whose patterns do not refuse its archive (R5); a release or module record no member lists from the first remote member whose upstream holds it; built on every request **[I]** (R8) |
+| Conda | `repodata.json` and its CEP-16 shards per subdir, union of files, each from the first member that lists it; a remote member's part kept for the virtual's period, local and federated members read on every request (R8); a member that answers 404 for the shard index makes the virtual's shard index answer 404 (JFrog's Conda page), the one exception to R3 |
 | Composer | `p2` metadata, union of releases, each version and its dist from the first member that lists it, kept for the virtual's period (R8); the order 7.x gives a merged list is **[I]** ([RTFACT-30366](https://jfrog.atlassian.net/browse/RTFACT-30366)) |
 | Swift | release list, union of versions; release metadata, `Package.swift` and the archive from the first member that has the release; a publish lands in the default deployment repository (R6) |
 | NuGet | registration pages, flat-container version lists and search results |
@@ -314,6 +318,23 @@ each process, bounded, and keys an entry by what the caller may read, so no call
 merge built from members it cannot read (Helm's index is per permission set,
 [RTFACT-25936](https://jfrog.atlassian.net/browse/RTFACT-25936)). Coordination across nodes
 is P35's ([shared remote retrieval policy](../../implementation/remote-cache-policy.md#concurrency-and-publication)).
+
+For the types [#1553](https://github.com/weaveplatform/artifactweave/issues/1553) moved onto
+the shared walk: a Chef virtual keeps its cookbook and version records, the documents it
+merges from the members (`RepoConfigDescriptorBuilder.populateVirtualChefDescriptor`
+944-950), and a member's 404 drops the entry
+(`ArtifactoryVirtualDownloadStrategy.getInfoInternal` 90-136); its catalog and search are
+paged from the members on every request **[I]**. A Conda virtual keeps each remote member's
+part of a channel index for the period and reads its local and federated members on every
+request, as JFrog's Conda page says (local members "in real-time", remote ones "renewed on
+demand" by the virtual's Retrieval Cache Period; `populateVirtualCondaDescriptor` 953-959);
+a part its source now refuses is dropped rather than served stale. An Ansible virtual merges
+on every request: JFrog's Terraform provider round-trips the field for it, but 7.161.26's
+`populateVirtualTypeSpecific` saves no period for Ansible and
+`VirtualRepositoryConfigurationImpl` 91-93 leaves it out **[I]**. A Puppet virtual merges on
+every request too: no 7.x model carries the field for it, and its reindex cache
+([RTFACT-18934](https://jfrog.atlassian.net/browse/RTFACT-18934)) is a system property's
+**[I]**.
 
 The cache (`core/virtual/cache.go`, [#1543](https://github.com/weaveplatform/artifactweave/issues/1543))
 keys an entry by virtual repository, document, member list, the members the caller may read
@@ -507,23 +528,30 @@ archive links stay relative to the requesting Forge endpoint. Each request
 resolves the current membership; no merged shared response is persisted.
 
 This delivers the Puppet-specific slice of this decision ahead of general P10.
-Nested virtual composition and cross-peer federation remain separate follow-up
-contracts. See [Puppet native evidence and connection recipe](../../testing/puppet.md).
+Since [#1553](https://github.com/weaveplatform/artifactweave/issues/1553) the
+release pages, release records and module records take their members from the
+shared walk (R1 to R3): nested virtual members are walked, a cycle or duplicate
+is skipped, the local members come before the remote ones, and a member that
+misses, is refused or fails is passed over, a fault with a warning **[I]**. Read
+is each member's alone (R3). Cross-peer federation remains a separate follow-up
+contract. See [Puppet native evidence and connection recipe](../../testing/puppet.md).
 
 ## P9c Conda CEP-16 composition (2026-10-28)
 
-Conda's opt-in shard view follows the existing ordered member resolution. It validates every source document, filters records using both member and virtual permissions, and builds new content-addressed shards from the resulting per-name records. An upstream hash never names a changed virtual representation. Shard metadata retains concrete member source-policy and revision fences; it grants no independent virtual network authority. Classic indexes remain available, and shard failures do not become successful empty member views.
+Conda's opt-in shard view follows the shared walk (R1 to R3, since [#1553](https://github.com/weaveplatform/artifactweave/issues/1553)). It validates every source document, filters records by each member's permissions, and builds new content-addressed shards from the resulting per-name records. An upstream hash never names a changed virtual representation. Shard metadata retains concrete member source-policy and revision fences; it grants no independent virtual network authority. Classic indexes remain available, and shard failures do not become successful empty member views. A member the walk reads that answers 404 for the shard index makes the virtual answer 404 for it, so the client falls back to `repodata.json`, as JFrog's Conda page says.
 
 The [Conda operations guide](../../operations/conda.md#cep-16-sharded-repodata) records the checked CEP/JFrog/client versions, opt-in setting, native proof, bounds and source URL constraints. [The native feature](../../../test/acceptance/features/conda.feature) requires shard requests through every approved class and fails on classic fallback. This format-specific P9c delivery does not change the remaining P10 general composition or P13 cross-peer work.
 
 ## P9c Ansible evidence (#782)
 
-The Ansible Galaxy v3 adapter merges versions from ordered concrete L/R/F members,
-filters both member and virtual permissions, retains the first readable duplicate
-version and rewrites archive links to the virtual URL. Missing members and upstream
-404s fall through; other source failures stop resolution. Nested virtual members
-return an explicit 400 through the current MemberRequest seam; the generic P10
-graph walk remains pending. The pinned native ansible-core client installs a collection and its
+The Ansible Galaxy v3 adapter merges versions from the shared walk's members
+(R1 to R3, since [#1553](https://github.com/weaveplatform/artifactweave/issues/1553)):
+nested virtual members are walked and a cycle or duplicate skipped. Read is each
+member's alone, the first readable duplicate version is retained and archive links
+are rewritten to the virtual URL. A member that misses, is refused or fails is passed
+over, a fault with a warning **[I]**. `ansible-galaxy collection publish` to a virtual
+lands in its default deployment repository, whose import task the virtual answers;
+without one it answers R6's 405. The pinned native ansible-core client installs a collection and its
 ranged dependency through V in the [Ansible feature](../../../test/acceptance/features/ansible.feature).
 
 ## P9c Chef evidence (#783)
@@ -532,9 +560,13 @@ Chef's Supermarket adapter unions versions from ordered concrete L/R/F members.
 The first readable member wins a duplicate version. Both virtual and member
 permissions and repository patterns filter metadata before response generation;
 links remain under the virtual URL and downloads retain the selected member's
-source authority. Missing members and upstream 404s fall through, while integrity
-and transport failures stop resolution. Nested virtual members are refused by
-the shared MemberRequest boundary. Current Knife installs a cookbook and its
+source authority. Since [#1553](https://github.com/weaveplatform/artifactweave/issues/1553)
+the members come from the shared walk (R1 to R3): nested virtual members are walked
+and a cycle or duplicate skipped; Read is each member's alone; a member that misses,
+is refused or fails is passed over, a fault with a warning **[I]**. The cookbook and
+version records are kept for the virtual's period (R8). `knife supermarket share` to
+a virtual lands in its default deployment repository (R6) **[I]**; delete keeps its
+405 **[I]**. Current Knife installs a cookbook and its
 dependency from distinct local and federated members in the
 [Chef feature](../../../test/acceptance/features/chef.feature). This delivers the
 Chef-specific part of this decision; general P10 and cross-peer P13 remain.

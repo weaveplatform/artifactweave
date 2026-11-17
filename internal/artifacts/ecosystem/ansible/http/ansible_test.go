@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -50,6 +51,9 @@ type fixture struct {
 	data   []byte
 	// faults are the errors the router kit logged as unexpected.
 	faults []error
+	// logs holds the router kit's log, such as its warnings for a virtual
+	// repository's failing member.
+	logs *bytes.Buffer
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -68,7 +72,7 @@ func newFixture(t *testing.T) *fixture {
 		t,
 		"internal/artifacts/ecosystem/ansible/testdata/weave-sample-1.2.3.tar.gz",
 	)
-	f := &fixture{t: t, db: db, items: items, repo: c, data: data}
+	f := &fixture{t: t, db: db, items: items, repo: c, data: data, logs: new(bytes.Buffer)}
 	f.mount(nil)
 	return f
 }
@@ -96,7 +100,8 @@ func (f *fixture) mount(remote *source.Service) {
 	}
 	pkgroute.Mount(router, pkgroute.Options{
 		Store: st, Items: func() *item.Service { return items },
-		Fault: func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
+		Logger: slog.New(slog.NewTextHandler(f.logs, nil)),
+		Fault:  func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 		ServeItem: func(w http.ResponseWriter, r *http.Request, _ repo.Config, it model.Item) {
 			rc, _, err := items.Blobs.Open(r.Context(), it.Actual.SHA256)
 			if err != nil {

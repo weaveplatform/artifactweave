@@ -109,7 +109,10 @@ func condaFixture(t *testing.T) []byte {
 	)
 }
 
-func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
+// A virtual repository walks a cycle and a duplicate member once and
+// answers from the members it reaches (decision 0008, R2), where main
+// answered 400.
+func TestUnitCondaChannelRejectsUnsafeRequestsAndWalksVirtualCycles(t *testing.T) {
 	w := newItemWorld(t, false)
 	excluded := "**/*.tar.bz2"
 	for _, c := range []repo.Config{
@@ -138,22 +141,25 @@ func TestUnitCondaChannelRejectsUnsafeRequestsAndVirtualCycles(t *testing.T) {
 		{base + "missing-1.0-0.tar.bz2", http.StatusNotFound},
 		{"/artifactory/api/conda/conda-empty-virtual/noarch/missing-1.0-0.tar.bz2", http.StatusNotFound},
 		{"/artifactory/api/conda/conda-excluded-virtual/noarch/missing-1.0-0.tar.bz2", http.StatusNotFound},
-		{"/artifactory/api/conda/conda-cycle-a/noarch/repodata.json", http.StatusBadRequest},
+		{"/artifactory/api/conda/conda-cycle-a/noarch/repodata.json", http.StatusOK},
 		{base + "repodata.json", http.StatusOK},
 		{"/artifactory/api/conda/conda-excluded/noarch/missing-1.0-0.tar.bz2", http.StatusNotFound},
-		{"/artifactory/api/conda/conda-duplicate/noarch/repodata.json", http.StatusBadRequest},
-		{"/artifactory/api/conda/conda-cycle/noarch/repodata.json", http.StatusBadRequest},
-		{"/artifactory/api/conda/conda-duplicate/noarch/missing-1.0-0.tar.bz2", http.StatusBadRequest},
-		{"/artifactory/api/conda/conda-cycle/noarch/missing-1.0-0.tar.bz2", http.StatusBadRequest},
+		{"/artifactory/api/conda/conda-duplicate/noarch/repodata.json", http.StatusOK},
+		{"/artifactory/api/conda/conda-cycle/noarch/repodata.json", http.StatusOK},
+		{"/artifactory/api/conda/conda-duplicate/noarch/missing-1.0-0.tar.bz2", http.StatusNotFound},
+		{"/artifactory/api/conda/conda-cycle/noarch/missing-1.0-0.tar.bz2", http.StatusNotFound},
 	} {
 		wantStatus(t, w.do(http.MethodGet, tc.path, "admin", ""), tc.expected)
 	}
 	wantStatus(t, w.do(http.MethodGet, base+"repodata.json", "user", ""), http.StatusForbidden)
+	// A caller who may read the member alone reads the virtual repository's
+	// index: no permission target can name a virtual repository (decision
+	// 0006), so its members decide (decision 0008, R3).
 	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{
-		Name: "conda-virtual-only",
+		Name: "conda-member-only",
 		Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {
 			Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}},
-			Targets: map[string]accesstest.Target{"conda-empty-virtual": {Include: []string{"**"}}},
+			Targets: map[string]accesstest.Target{"conda-empty": {Include: []string{"**"}}},
 		}},
 	}); err != nil {
 		t.Fatal(err)
@@ -321,9 +327,10 @@ func TestUnitCondaLocalIndexRejectsCorruptionAndIncompatibleMember(t *testing.T)
 		),
 		http.StatusNotFound,
 	)
+	// A member of another type is passed over (decision 0008, R11).
 	wantStatus(t, w.do(http.MethodGet,
 		"/artifactory/api/conda/conda-wrong-member/noarch/repodata.json", "admin", ""),
-		http.StatusBadRequest)
+		http.StatusOK)
 }
 
 func TestUnitCondaRemoteIndexAndArchiveTrustBoundary(t *testing.T) {
@@ -499,7 +506,10 @@ func TestUnitCondaRemoteIndexAndArchiveTrustBoundary(t *testing.T) {
 	if err := w.db.Repos().Create(t.Context(), copy); err != nil {
 		t.Fatal(err)
 	}
+	// The virtual repository keeps no remote part, so each read below asks
+	// the members' sources afresh.
 	virtual := *repo.Defaults(&repo.Config{Key: "conda-remote-virtual", Class: repo.Virtual, PackageType: repo.Conda, Repositories: []string{"missing", remote.Key, copy.Key}})
+	virtual.VirtualRetrievalCachePeriodSecs = new(-1)
 	if err := w.db.Repos().Create(t.Context(), virtual); err != nil {
 		t.Fatal(err)
 	}
@@ -567,25 +577,24 @@ func TestUnitCondaRemoteIndexAndArchiveTrustBoundary(t *testing.T) {
 	if got := w.do(http.MethodGet, base+name, "admin", ""); got.Code == http.StatusOK {
 		t.Fatal("package served after metadata source authority was revoked")
 	}
-	if got := w.do(
-		http.MethodGet,
-		virtualBase+"repodata.json",
-		"admin",
-		"",
-	); got.Code == http.StatusOK {
-		t.Fatal("virtual channel served an index after source authority was revoked")
+	// A member whose source authority is withdrawn is refused, so the
+	// virtual repository passes over it (decision 0008, R3) and lists none
+	// of its packages.
+	revoked := w.do(http.MethodGet, virtualBase+"repodata.json", "admin", "")
+	wantStatus(t, revoked, http.StatusOK)
+	if index, err := condafmt.DecodeRepodata(revoked.Body.Bytes(), virtualPath); err != nil ||
+		len(index.Packages) != 0 {
+		t.Fatalf("virtual channel listed a package after source authority was revoked: %+v %v", index, err)
 	}
 	if got := w.do(http.MethodGet, virtualBase+name, "admin", ""); got.Code == http.StatusOK {
 		t.Fatal("virtual package served after source authority was revoked")
 	}
 	mode = "late-revoked-index"
-	if got := w.do(
-		http.MethodGet,
-		virtualBase+"repodata.json",
-		"admin",
-		"",
-	); got.Code == http.StatusOK {
-		t.Fatal("virtual index leaked after source authority changed during delivery")
+	if got := w.do(http.MethodGet, virtualBase+"repodata.json", "admin", ""); got.Code == http.StatusOK {
+		if index, err := condafmt.DecodeRepodata(got.Body.Bytes(), virtualPath); err != nil ||
+			len(index.Packages) != 0 {
+			t.Fatalf("virtual index leaked after source authority changed during delivery: %+v %v", index, err)
+		}
 	}
 }
 
@@ -668,9 +677,11 @@ func TestUnitCondaLocalAndVirtualNativeChannel(t *testing.T) {
 	if err != nil || len(hiddenIndex.Packages) != 0 {
 		t.Fatalf("unreadable package leaked through virtual index: %+v %v", hiddenIndex, err)
 	}
+	// The member decides Read on the package, so a caller who may not read
+	// it there gets Conda's not-found (decision 0008, R3).
 	wantStatus(t, w.do(http.MethodGet,
 		"/artifactory/api/conda/conda-virtual/noarch/"+filename, "user", ""),
-		http.StatusForbidden)
+		http.StatusNotFound)
 	const modernName = "ca-certificates-2026.7.22-hbd8a1cb_0.conda"
 	modern := repopath.Read(t, "internal/artifacts/ecosystem/conda/testdata/"+modernName)
 	wantStatus(t, w.do(http.MethodPut, "/artifactory/conda-fed/noarch/"+modernName,
@@ -758,7 +769,7 @@ func TestAccCondaShardsLocalFederatedVirtualLifecycleAndPermissions(t *testing.T
 		),
 	}
 	w := newCondaShardWorld(t, true, sources)
-	for _, c := range []repo.Config{{Key: "shard-local", Class: repo.Local, PackageType: repo.Conda}, {Key: "shard-fed", Class: repo.Federated, PackageType: repo.Conda}, {Key: "shard-missing-remote", Class: repo.Remote, PackageType: repo.Conda, URL: "https://up.example"}, {Key: "shard-virtual", Class: repo.Virtual, PackageType: repo.Conda, Repositories: []string{"shard-missing-remote", "shard-local", "shard-fed"}}} {
+	for _, c := range []repo.Config{{Key: "shard-local", Class: repo.Local, PackageType: repo.Conda}, {Key: "shard-fed", Class: repo.Federated, PackageType: repo.Conda}, {Key: "shard-missing-remote", Class: repo.Remote, PackageType: repo.Conda, URL: "https://up.example"}, {Key: "shard-virtual", Class: repo.Virtual, PackageType: repo.Conda, Repositories: []string{"shard-local", "shard-fed"}}, {Key: "shard-missing-virtual", Class: repo.Virtual, PackageType: repo.Conda, Repositories: []string{"shard-missing-remote", "shard-local", "shard-fed"}}} {
 		if err := w.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
@@ -802,8 +813,16 @@ func TestAccCondaShardsLocalFederatedVirtualLifecycleAndPermissions(t *testing.T
 			map[bool]int{true: 409, false: 405}[key != "shard-virtual"],
 		)
 	}
+	// JFrog's Conda page: "If any member in a virtual repository returns 404
+	// for a shard index, the virtual repository also returns 404 for that
+	// shard index and falls back to repodata.json".
+	missingBase := "/artifactory/api/conda/shard-missing-virtual/noarch/"
+	wantStatus(t, w.do("GET", missingBase+condafmt.ShardIndexFilename, "admin", ""), 404)
+	wantStatus(t, w.do("GET", missingBase+"repodata.json", "admin", ""), 200)
+	wantStatus(t, w.do("GET", missingBase+filename, "admin", ""), 200)
+	// The member decides Read on each record (decision 0008, R3).
 	if err := w.db.Permissions().
-		Create(t.Context(), accesstest.Permission{Name: "shard-view", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}}, Targets: map[string]accesstest.Target{"shard-local": {Include: []string{"**"}}, "shard-virtual": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}}}}}); err != nil {
+		Create(t.Context(), accesstest.Permission{Name: "shard-view", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"user": api.ActionRead}}, Targets: map[string]accesstest.Target{"shard-local": {Include: []string{"**"}, Exclude: []string{"**/*.tar.bz2"}}}}}}); err != nil {
 		t.Fatal(err)
 	}
 	hidden := w.do(

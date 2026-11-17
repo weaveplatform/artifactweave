@@ -327,7 +327,8 @@ func TestUnitVirtualRecordMembersPassedOver(t *testing.T) {
 			message string
 		}{
 			{"refused", format.Rejectf(404, "refused"), 404, "Puppet release not found"},
-			{"upstream 503", &source.HTTPError{Status: 503}, 503, "Service Unavailable"},
+			// A member's fault passes over it (decision 0008, R3) [I].
+			{"upstream 503", &source.HTTPError{Status: 503}, 404, "Puppet release not found"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				f := tunedMembers(t, func(s *metadataSource) { s.release.readError = tc.err },

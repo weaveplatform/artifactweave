@@ -58,10 +58,17 @@
 //     whose patterns reject the requested document, and its own patterns
 //     rejecting the document refuse it; a package download passes over a
 //     member whose policy refuses the package.
-//   - A virtual repository combines its members' readable records in
-//     member order, the first member to list a file name winning. It never
-//     lends one member's rights or source permits to another, and refuses
-//     a member cycle and a chain of more than eight nested repositories.
+//   - A virtual repository combines its members' readable records
+//     (condafmt.Merger) in the package handlers' walk, nested virtual
+//     repositories flattened with a cycle or duplicate skipped, the first
+//     member to list a file name winning (decision 0008, R1, R2). Read is
+//     each member's alone, and a member that misses, is refused or fails is
+//     passed over, a fault with a warning [I] (R3), except that a member's
+//     404 for the shard index answers the virtual repository's 404 for it,
+//     as JFrog's Conda page says. A remote member's part is kept for the
+//     virtual repository's virtualRetrievalCachePeriodSecs, local and
+//     federated members read on every request (R8). It never lends one
+//     member's rights or source permits to another (#1553).
 //   - A channel document 7.x stores (repodata.json, current_repodata.json,
 //     their .zst forms, the shard index and shards) answers as a stored
 //     file in the package download service's form (serveDocument,

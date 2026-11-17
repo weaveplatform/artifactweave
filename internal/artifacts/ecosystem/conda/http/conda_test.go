@@ -65,42 +65,13 @@ func TestUnitRecordOfUsesArchiveKind(t *testing.T) {
 	}
 }
 
-func TestUnitCondaRecursionAndPathGuardsBeforeAnySourceRead(t *testing.T) {
+func TestUnitCondaPathGuardBeforeAnySourceRead(t *testing.T) {
 	r := httptest.NewRequest("GET", "/artifactory/api/conda/any/noarch/repodata.json", nil)
-	h := handler{}
-	if _, err := h.memberIndex(
-		r,
-		"../noarch/repodata.json",
-		readPolicy{},
-		map[string]bool{},
-	); !errors.Is(
+	if _, err := (handler{}).memberIndex(r, "../noarch/repodata.json", readPolicy{}); !errors.Is(
 		err,
 		kernel.ErrNotFound,
 	) {
 		t.Fatalf("unsafe index path reached a repository source: %v", err)
-	}
-	if _, err := h.memberIndex(
-		r,
-		"noarch/repodata.json",
-		readPolicy{},
-		map[string]bool{"": true},
-	); err == nil {
-		t.Fatal("recursive index lookup reached a repository source")
-	}
-	if _, err := h.members(r); err == nil {
-		t.Fatal("nonvirtual repository listed virtual members")
-	}
-	id, _ := condafmt.ParsePackagePath("noarch/demo-1-0.conda")
-	if err := h.servePackage(
-		httptest.NewRecorder(),
-		r,
-		id,
-		map[string]bool{"": true},
-	); !errors.Is(
-		err,
-		source.ErrInvalidRequest,
-	) {
-		t.Fatalf("recursive package lookup reached a repository source: %v", err)
 	}
 }
 

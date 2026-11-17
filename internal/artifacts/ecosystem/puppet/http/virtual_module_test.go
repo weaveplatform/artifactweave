@@ -180,13 +180,14 @@ func TestUnitVirtualModuleMemberOrder(t *testing.T) {
 		"Puppet module not found")
 }
 
-// Read permission is checked on the virtual repository first: a caller who
-// may not read the module folder there is refused before any member is
-// asked, as on main. Each member is then checked as the merge of the
-// release pages checks it: a member whose module folder the caller may not
-// read is passed over, and a release the caller may not read in the virtual
-// repository or in the member is left out of the record, so the newest
-// readable one is current.
+// Read permission is each member's: no permission target can name the
+// virtual repository (decision 0006), so a caller who may read the members
+// alone is served and one who may read none gets Puppet's not-found
+// (decision 0008, R3). Each member is checked as the merge of the release
+// pages checks it: a member whose module folder the caller may not read is
+// passed over, and a release the caller may not read in the member is left
+// out of the record, so the newest readable one is current. A target that
+// names the virtual repository's key decides nothing.
 func TestUnitVirtualModuleReadPermission(t *testing.T) {
 	modules := map[string]string{
 		"example.com":   peRecord(t, [2]string{"1.0.0", ""}, [2]string{"2.0.0", ""}),
@@ -200,12 +201,13 @@ func TestUnitVirtualModuleReadPermission(t *testing.T) {
 		var reads []source.Resource
 		f := unlistedMembers(t, modules, &reads, nil, "puppet-local", "other")
 		f.grant(map[string]accesstest.Target{"puppet-local": all, "other": all})
-		wantError(t, f.do("GET", virtualBase+"/v3/modules/acme-widget", "viewer"), 403,
-			"Forbidden")
-		wantError(t, f.do("GET", virtualBase+"/v3/modules/acme-widget", "denied"), 403,
-			"Forbidden")
+		wantBody(t, f.do("GET", virtualBase+"/v3/modules/acme-widget", "viewer"),
+			memberModuleJSON("example.com", "2.0.0", "2.0.0", "1.0.0"))
+		reads = nil
+		wantError(t, f.do("GET", virtualBase+"/v3/modules/acme-widget", "denied"), 404,
+			"Puppet module not found")
 		if len(reads) != 0 {
-			t.Fatalf("a refused caller reached an upstream: %+v", reads)
+			t.Fatalf("a caller who may read no member reached an upstream: %+v", reads)
 		}
 	})
 	t.Run("member module folder", func(t *testing.T) {
@@ -218,9 +220,6 @@ func TestUnitVirtualModuleReadPermission(t *testing.T) {
 		name    string
 		targets map[string]accesstest.Target
 	}{
-		{"release in the virtual repository", map[string]accesstest.Target{
-			"virtual": notNewest, "puppet-local": all,
-		}},
 		{"release in the member", map[string]accesstest.Target{
 			"virtual": all, "puppet-local": notNewest,
 		}},
@@ -241,16 +240,17 @@ func TestUnitVirtualModuleReadPermission(t *testing.T) {
 			"puppet-local": all, "other": all,
 		})
 		wantBody(t, f.do("GET", virtualBase+"/v3/modules/acme-widget", "viewer"),
-			memberModuleJSON("other.example", "3.0.0", "3.0.0"))
+			memberModuleJSON("example.com", "2.0.0", "2.0.0", "1.0.0"))
 	})
 }
 
 // A member whose record read answers 404, as a blacked-out member's does or
 // one whose patterns reject the release pages' policy path, is passed over
-// (R5), as virtualRecord passes it over; any other failure of the first
-// member that holds a record fails the answer.
+// (R5), as virtualRecord passes it over, and so is one whose upstream fails
+// or answers what fails its checks (decision 0008, R3) [I]: with every
+// member failing, no member answers the record.
 func TestUnitVirtualModuleMemberFailures(t *testing.T) {
-	const invalid = "invalid upstream Puppet metadata"
+	const missing = "Puppet module not found"
 	one := peRecord(t, [2]string{"1.0.0", ""})
 	for _, tc := range []struct {
 		name    string
@@ -263,20 +263,17 @@ func TestUnitVirtualModuleMemberFailures(t *testing.T) {
 		}, 404, "Puppet module not found"},
 		{"upstream 503", func(s *metadataSource) {
 			s.moduleReadError = &source.HTTPError{Status: 503}
-		}, 503, "Service Unavailable"},
+		}, 404, missing},
 		{"invalid record", func(s *metadataSource) {
 			s.moduleAt = func(source.Resource) (string, bool) {
 				return `{"slug":"acme-widget","releases":{}}`, false
 			}
-		}, 502, invalid},
-		{"no current record", func(s *metadataSource) { s.release.at = nil }, 502, invalid},
-		{
-			"no authority", func(s *metadataSource) { s.moduleNoAuthority = true }, 502,
-			"Bad Gateway",
-		},
+		}, 404, missing},
+		{"no current record", func(s *metadataSource) { s.release.at = nil }, 404, missing},
+		{"no authority", func(s *metadataSource) { s.moduleNoAuthority = true }, 404, missing},
 		{"authority failure", func(s *metadataSource) {
 			s.check = func(context.Context, string) error { return source.ErrUnavailable }
-		}, 502, "Bad Gateway"},
+		}, 404, missing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := unlistedMembers(t, map[string]string{"example.com": one, "other.example": one},
@@ -351,8 +348,9 @@ func (r laterReadRepos) Get(ctx context.Context, key string) (repo.Config, error
 	return r.s.then(c)
 }
 
-// A member the store fails to read fails the answer, and so does one that
-// is no longer a Puppet repository, as they fail the merge.
+// A member the store fails to read fails the answer, as it fails the
+// merge, and one that is no longer a Puppet repository is passed over
+// (decision 0008, R11), so no member answers the record.
 func TestUnitVirtualModuleMemberLookupFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -365,7 +363,7 @@ func TestUnitVirtualModuleMemberLookupFailures(t *testing.T) {
 		{"another type", func(c repo.Config) (repo.Config, error) {
 			c.PackageType = repo.Generic
 			return c, nil
-		}, 400},
+		}, 404},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			src := metadataSource{
