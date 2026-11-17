@@ -78,6 +78,8 @@ func TestUnitModuleSettingsFromConfig(t *testing.T) {
 		AllowedPrivateOrigins:          []string{"https://mirror.example.com"},
 		GCGrace:                        3 * time.Hour,
 		GCInterval:                     7 * time.Minute,
+		VirtualCacheEntries:            2000,
+		VirtualCacheBytes:              64 << 20,
 		Formats: ecosystem.Settings{
 			Conda: conda.Settings{ShardsEnabled: true},
 			// The file sets debian.metadata_validation to false.

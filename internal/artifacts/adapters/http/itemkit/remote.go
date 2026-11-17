@@ -228,7 +228,7 @@ func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
 	}
 	query, err = s.formatRemoteSourceRequest(ctx, query, acc)
 	if err != nil {
-		t.denied(err)
+		t.denied(asNamed(c, namesCache(c, req), err))
 		return failedRead(sourceAnswer(c, req, p, err), err), true
 	}
 	read := remoteRead{resource: query.Resource, sidecar: sidecar}
@@ -239,7 +239,7 @@ func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
 	t.stepf("Resolving remote source with current read authorization")
 	read.result, err = s.RemoteSources.Read(ctx, query)
 	if err != nil {
-		t.denied(err)
+		t.denied(asNamed(c, namesCache(c, req), err))
 		return failedRead(s.ItemError(ctx, "read source", sourceAnswer(c, req, p, err)), err), true
 	}
 	return read, true

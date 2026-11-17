@@ -113,6 +113,7 @@ type Config struct {
 	Remote            Remote           `yaml:"remote"`
 	API               apilimit.Options `yaml:"api"`
 	XZ                XZ               `yaml:"xz"`
+	Virtual           Virtual          `yaml:"virtual"`
 }
 
 // Remote supplies exact operator-approved private source origins.
@@ -367,6 +368,9 @@ func Default() Config {
 		Helm:  Helm{RelativeURLs: true},
 		NuGet: NuGet{SnapshotCleanupInterval: DefaultNuGetSnapshotCleanupInterval},
 		XZ:    XZ{DictionaryBudget: DefaultXZDictionaryBudget},
+		Virtual: Virtual{MetadataCache: VirtualMetadataCache{
+			MaxEntries: DefaultVirtualCacheEntries, MaxSize: DefaultVirtualCacheSize,
+		}},
 
 		// 7.x validates Debian metadata unless debian.metadata.validation
 		// is set false (ConstantValues in 6.20 defaults it true).
@@ -489,6 +493,8 @@ var keys = append(append([]string{
 	"huggingface.xet_enabled",
 	"remote.allowed_private_origins",
 	"xz.dictionary_budget",
+	"virtual.metadata_cache.max_entries",
+	"virtual.metadata_cache.max_size",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -603,6 +609,9 @@ func sections(cfg *Config) map[string]func(sub, key, value string) error {
 		"nuget.":  func(sub, key, value string) error { return setNuGet(&cfg.NuGet, sub, key, value) },
 		"remote.": func(sub, key, value string) error { return setRemote(&cfg.Remote, sub, key, value) },
 		"xz.":     func(sub, key, value string) error { return setXZ(&cfg.XZ, sub, key, value) },
+		"virtual.": func(sub, key, value string) error {
+			return setVirtual(&cfg.Virtual, sub, key, value)
+		},
 	}
 }
 
@@ -731,6 +740,7 @@ func (c Config) Validate() error {
 	errs = append(errs, c.validateCDN()...)
 	errs = append(errs, c.Maven.validate()...)
 	errs = append(errs, c.NuGet.validate()...)
+	errs = append(errs, c.Virtual.validate()...)
 	switch c.Log.Level {
 	case "debug", "info", "warn", "error":
 	default:

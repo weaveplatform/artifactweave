@@ -457,16 +457,30 @@ func (p *Policy) ReadEntry(
 }
 
 func (p *Policy) fresh(q source.Request, e model.RemoteCacheEntry) bool {
+	return Fresh(q.Repo, e, p.now())
+}
+
+// Fresh reports whether e, the remote cache entry of a copy the remote
+// repository c keeps, may be served at now without asking the upstream:
+// the rule Read applies to the entry it finds before it revalidates it. An
+// entry without content, or one that records a miss, is not fresh. A
+// unique file is, unless the upstream's Cache-Control said otherwise; any
+// other copy is for c's retrievalCachePeriodSecs (7200 when unset) after
+// it was last validated, or the shorter max-age it came with. A walk
+// through a virtual repository judges a remote member's cached copy by it
+// (itemkit), so the walk and a direct read of the member expire a copy at
+// the same moment.
+func Fresh(c repo.Config, e model.RemoteCacheEntry, now time.Time) bool {
 	if e.Blob.Checksums.SHA256 == "" || !e.NegativeUntil.IsZero() {
 		return false
 	}
 	ttl := 7200 * time.Second
-	if q.Repo.RetrievalCachePeriodSecs != nil {
-		ttl = time.Duration(*q.Repo.RetrievalCachePeriodSecs) * time.Second
+	if c.RetrievalCachePeriodSecs != nil {
+		ttl = time.Duration(*c.RetrievalCachePeriodSecs) * time.Second
 	}
 	return parseCacheRules(
 		e.CacheControl,
-	).fresh(e.Kind != model.RemoteUnique, e.ValidatedAt, p.now(), ttl)
+	).fresh(e.Kind != model.RemoteUnique, e.ValidatedAt, now, ttl)
 }
 
 func (p *Policy) negativeFresh(q source.Request, e model.RemoteCacheEntry) bool {

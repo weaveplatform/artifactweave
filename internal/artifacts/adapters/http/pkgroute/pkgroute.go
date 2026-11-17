@@ -82,6 +82,10 @@ type Options struct {
 	// https://github.com/weaveplatform/artifactweave/issues/1542). Nil
 	// takes every upstream step.
 	NoUpstream func(r *http.Request, v repo.Config) bool
+	// Cache is the server's merged virtual metadata cache, which Merged and
+	// MergedPart keep documents in for virtualRetrievalCachePeriodSecs
+	// (decision 0008, R8). Nil merges on every request.
+	Cache *virtual.Cache
 }
 
 // Protocol is one format's protocol.

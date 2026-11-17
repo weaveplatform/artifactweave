@@ -80,6 +80,12 @@ type Settings struct {
 	// GCInterval is gc.interval: the time between scheduled garbage
 	// collection passes; zero means the default.
 	GCInterval time.Duration
+	// VirtualCacheEntries is virtual.metadata_cache.max_entries: the most
+	// merged virtual metadata documents a node keeps.
+	VirtualCacheEntries int
+	// VirtualCacheBytes is virtual.metadata_cache.max_size in bytes: the
+	// most bytes they hold.
+	VirtualCacheBytes int64
 	// Formats are the formats' settings: conda.shards_enabled,
 	// debian.metadata_validation, helm.relative_urls,
 	// npm.tag_latest_by_publish, npm.enforce_path and the four pypi keys. Formats.Helm.RelativeURLs is never nil, because

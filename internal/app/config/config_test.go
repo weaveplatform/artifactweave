@@ -170,6 +170,9 @@ func TestUnitFileCoversEveryKey(t *testing.T) {
 		Maven:        Maven{SnapshotCleanupInterval: 2 * time.Minute},
 		NuGet:        NuGet{SnapshotCleanupInterval: 3 * time.Minute},
 		XZ:           XZ{DictionaryBudget: 512 << 20},
+		Virtual: Virtual{MetadataCache: VirtualMetadataCache{
+			MaxEntries: 2000, MaxSize: 64 << 20,
+		}},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -194,7 +197,8 @@ func TestUnitEnvCoversEveryKey(t *testing.T) {
 		case strings.HasSuffix(k, ".concurrency"), strings.HasSuffix(k, ".redundancy"),
 			strings.HasSuffix(k, ".write_quorum"), strings.HasPrefix(k, "search.aql."),
 			k == "search.user_query_limit", k == "work.workers", k == "work.max_attempts",
-			k == "download.folder.max_concurrent_requests", k == "environments.global_limit":
+			k == "download.folder.max_concurrent_requests", k == "environments.global_limit",
+			k == "virtual.metadata_cache.max_entries":
 			env[envName(k)] = "3"
 		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
 			strings.HasSuffix(k, ".ttl"), k == "work.lease", strings.HasPrefix(k, "aql_timeout."),
@@ -222,7 +226,8 @@ func TestUnitEnvCoversEveryKey(t *testing.T) {
 		cfg.Search.UserQueryLimit != 3 || !cfg.Search.LimitAnonymousUsersOnly ||
 		cfg.Work.Workers != 3 || cfg.Work.MaxAttempts != 3 || cfg.Work.Lease != 45*time.Second ||
 		cfg.NPM.MaxPublishSize != 8<<20 || cfg.NPM.LoginTokenExpiry != 45*time.Second ||
-		cfg.XZ.DictionaryBudget != 8<<20 ||
+		cfg.XZ.DictionaryBudget != 8<<20 || cfg.Virtual.MetadataCache.MaxEntries != 3 ||
+		cfg.Virtual.MetadataCache.MaxSize != 8<<20 ||
 		!cfg.NPM.TagLatestByPublish || !cfg.Token.AllowBasicAuth ||
 		!cfg.Deploy.EnforceIdenticalChecksumDeploy ||
 		!cfg.PyPI.EnforceLayout || !cfg.PyPI.EnforceNamingNormalization ||

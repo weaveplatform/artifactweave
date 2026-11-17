@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/usage"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
@@ -96,6 +97,10 @@ type Deps struct {
 	// NPMMaxPublishSize caps an npm publish request (npm.max_publish_size);
 	// zero means decision 0034's default.
 	NPMMaxPublishSize int64
+	// VirtualCache is the server's merged virtual metadata cache, which
+	// the router kit's Merged keeps documents in (decision 0008, R8); nil
+	// merges on every request.
+	VirtualCache *virtual.Cache
 }
 
 // New returns the artifacts partial over d with its own item kit, which the

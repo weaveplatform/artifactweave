@@ -304,6 +304,11 @@ func ValidateKeyPair(c *Config, field, name, pairType string) error {
 // both check membership by.
 var mavenGroup = []PackageType{Maven, Gradle, Ivy, SBT, P2}
 
+// InMavenGroup reports whether t is in RepoType.MAVEN_GROUP, which 7.x
+// also checks to hide Maven index paths from a virtual repository's
+// browsing (RepositoryBrowsingServiceImpl.virtualRepoAccepts).
+func InMavenGroup(t PackageType) bool { return slices.Contains(mavenGroup, t) }
+
 // ociGroup is the pair VirtualRepoConfigChangeInterceptor.isHelmOciGroup
 // lets share a virtual repository, either way round. Docker is not in it.
 var ociGroup = []PackageType{OCI, HelmOCI}

@@ -10,6 +10,9 @@ import (
 // A virtual repository may have no members, given as an absent or an empty
 // repositories (#394). It then answers as an empty repository: reads find
 // nothing, deploys have no repository to go to, and nothing answers 500.
+// Its root, which no member holds, is not found either in the browser
+// (getVirtualRepoBrowsableChildrenData's isItemNotFoundOnVirtualRepo) or
+// in the item info (getVirtualRepoItem, #1537).
 func TestAccVirtualWithoutMembers(t *testing.T) {
 	w := newItemWorld(t, false)
 	for key, body := range map[string]string{
@@ -50,12 +53,12 @@ func TestAccVirtualWithoutMembers(t *testing.T) {
 		has                string
 	}{
 		{"GET", "/artifactory/api/repositories?type=virtual", "", 200, `"key":"gen-empty"`},
-		{"GET", "/artifactory/gen-empty/", "", 200, "<pre></pre>"},
+		{"GET", "/artifactory/gen-empty/", "", 404, "Could not find resource"},
 		{"GET", "/artifactory/gen-empty/a.txt", "", 404, ""},
 		{"HEAD", "/artifactory/gen-empty/a.txt", "", 404, ""},
 		{"PUT", "/artifactory/gen-empty/a.txt", "x", 405, "No local repository was configured as local deployment repository for the (gen-empty) virtual repository."},
-		{"GET", "/artifactory/api/storage/gen-empty", "", 200, `"children":[]`},
-		{"GET", "/artifactory/api/storage/gen-empty/a", "", 404, ""},
+		{"GET", "/artifactory/api/storage/gen-empty", "", 404, `"Not Found"`},
+		{"GET", "/artifactory/api/storage/gen-empty/a", "", 404, `"Not Found"`},
 		{"GET", "/artifactory/api/storage/gen-empty?list&deep=1", "", 200, `"files":[]`},
 		{"POST", "/artifactory/api/search/aql", `items.find({"repo":"gen-empty"})`, 200, `"total": 0`},
 		{"GET", "/artifactory/api/search/artifact?name=a.txt&repos=gen-empty", "", 200, `"results":[]`},

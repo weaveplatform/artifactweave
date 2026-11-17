@@ -2,6 +2,9 @@
 # Build with --platform=linux/amd64, including on an ARM Docker Desktop host.
 FROM ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2
 
+COPY ubuntu-mirrors.sh /usr/local/bin/ubuntu-mirrors
+RUN ubuntu-mirrors
+
 # When releases.hashicorp.com does not answer, the .deb comes from HashiCorp's
 # apt repository, whose pool holds the same file under the same name (#1322).
 COPY fetch-pinned.sh /usr/local/bin/fetch-pinned

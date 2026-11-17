@@ -843,7 +843,7 @@ func TestAccCRANRefusalsAnswerTheDownloadPolicy(t *testing.T) {
 		{
 			"blacked-out remote's cache", "cran-dark-remote-cache", cranIndex, "admin",
 			http.StatusNotFound,
-			blackedOut("cran-dark-remote", "cran-dark-remote-cache", cranIndex),
+			blackedOut("cran-dark-remote-cache", "cran-dark-remote-cache", cranIndex),
 		},
 		{
 			"blacked-out remote's package", "cran-dark-remote", cranAssertthat, "admin",

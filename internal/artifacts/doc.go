@@ -14,8 +14,8 @@
 //
 //   - Settings: app/config's Artifacts accessor builds them from the
 //     configuration's download, search, aql_timeout, build, deploy, npm,
-//     cran, huggingface, maven, nuget, remote, gc, conda, helm and pypi
-//     sections.
+//     cran, huggingface, maven, nuget, remote, gc, virtual, conda, helm and
+//     pypi sections.
 //   - Deps, which app passes New: the metadata store, the hot tier's blob
 //     store, the keyring (nil without a master key), which New adds to the
 //     formats' settings for the Terraform backend, the access module's API,
