@@ -37,15 +37,7 @@ func Protocol(remotes ...*source.Service) pkgroute.Protocol {
 			reads := reads{k: k}
 			r.Get("/*", reads.serve)
 			r.Head("/*", reads.serve)
-			r.Put("/*", func(w http.ResponseWriter, r *http.Request) {
-				if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
-					k.Error(w, r, apierror.New(http.StatusNotImplemented, fmt.Sprintf(
-						"'%s' is a virtual repository, which artifactweave does not serve through the go API yet",
-						pkgroute.RequestFrom(r).Repo.Key)))
-					return
-				}
-				publisher{k}.publish(w, r)
-			})
+			r.Put("/*", publisher{k}.publish)
 			// A path that names no Go operation answers 404 to every
 			// method, and only one that does answers 405 to a method no
 			// route serves.

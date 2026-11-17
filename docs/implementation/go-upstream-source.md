@@ -46,7 +46,8 @@ files, negative TTL, 404/410 versus failure, private credentials, repository
 isolation, permission and credential fencing, cancellation, interrupted/invalid
 content and warm/offline reads. The existing
 `internal/artifacts/ecosystem/golang/http` class gate retains 501 for direct remote
-reads and virtual PUT. GOV-01 registers the remote source only for virtual member
+reads. GOV-02 now maps virtual PUT to the default deployment repository.
+GOV-01 registers the remote source only for virtual member
 reads and unions local/federated lists with authoritative upstream lists. Duplicate
 versions keep the first member's line; list ordering and cross-member latest selection
 are inferred cases for #216/P19. Member faults that the shared package walk passes over
@@ -58,8 +59,13 @@ dependencies, case escaping and a pseudo-version. After stopping the upstream an
 clearing the client's module cache, the build succeeds from the remote cache. GOPROXY
 names only artifactweave; no direct/public proxy or VCS fallback is configured.
 `test/server/artifacts/golang/virtual_test.go` covers merged versions, latest, duplicate
-precedence, missing modules/versions and the direct-remote, virtual-PUT and sumdb guards.
-Publishing through the virtual's default local repository remains GOV-02.
+precedence, missing modules/versions and the direct-remote, no-DDR and sumdb guards.
+GOV-02 also proves `jf go-config` using one virtual for resolve and deploy,
+`jf gp` with build properties, `jf rt bp`, and a cold consumer build that resolves
+the newly published module beside a private remote dependency. Identical immutable
+files are accepted again; changed content is refused with 409. Permissions apply
+to the default deployment member path. No default target answers R6's 405 with
+`Allow: GET` and the virtual-specific message [I], tracked on #216.
 
 Sumdb proxying and VCS-backed Go remotes remain P28 capabilities, with VCS machinery
 shared with P33. Disabling checksum verification in an isolated private-module fixture
@@ -87,3 +93,26 @@ scenario's `GONOSUMDB=*`, `GOTOOLCHAIN=local`, `GOFLAGS=-modcacherw` and fresh c
 `go clean -modcache` and another build with the private upstream stopped. Its ZIP
 request count remains one across both builds. This establishes native virtual read
 resolution; exact 7.x comparisons remain the inferred cases above.
+
+## GOV-02 publish-through-virtual evidence
+
+The native `@go_virtual_publish` scenario uses JFrog CLI 2.131.0 for both
+`--repo-resolve go-virtual` and `--repo-deploy go-virtual`, publishes all three files
+and build info, verifies the files in `go-local`, clears the Go module cache and
+builds a consumer with the published dependency plus a private remote pseudo-version.
+A repeat of the same publication succeeds; changed module content fails with 409.
+Local/federated DDR server cases verify target-scoped permissions, properties,
+deploy response and checksum headers, immediate virtual reads and no virtual-owned
+upload. The no-DDR response is exercised for each version-file extension.
+
+The same router probes on merged main `3232ff6a9` and GOV-02 returned:
+
+| Operation | Main | GOV-02 |
+|---|---|---|
+| Virtual PUT zip / mod / info with DDR | 501 | 201, target-member deploy body/checksums |
+| Same immutable file again | 501 | 201 |
+| Changed immutable content | 501 | 409 |
+| Caller without Deploy on DDR path | 501 | 403 |
+| Virtual PUT without DDR (each extension) | 501 | 405, `Allow: GET`, R6 message |
+| Read new version through virtual | 404 before publish | 200 immediately |
+| Direct remote read / sumdb probe | 501 / 404 | 501 / 404 |

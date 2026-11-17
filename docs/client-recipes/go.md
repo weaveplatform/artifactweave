@@ -50,7 +50,7 @@ export JFROG_CLI_HOME_DIR="$AW_GO_CACHE/jfrog"
 
 ## Publish
 
-Classes: **local**. Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.
+Classes: **local, virtual**. For a virtual Go key, configure defaultDeploymentRepo to a local or federated Go member. Use that same virtual key for --repo-resolve and --repo-deploy; deployment and replacement permissions are checked on the target member path.
 
 Run in your producer module directory. The CLI uses AW_TOKEN as the Basic password and stores credentials in its isolated home.
 
@@ -74,7 +74,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - No comma/direct GOPROXY fallback is configured, so a public origin cannot silently satisfy this check.
 - The registry does not implement a public checksum database. Keep public checksum verification enabled and scope GONOSUMDB narrowly to private namespaces.
-- Read through a virtual Go repository over local, federated and administrator-configured remote members. Direct remote Go routes and publication through a virtual still answer 501; virtual publication is GOV-02.
+- Read through a virtual Go repository over local, federated and administrator-configured remote members. Direct remote Go routes still answer 501. Publishing through the virtual uses its configured defaultDeploymentRepo; without one it answers 405.
 - Sumdb proxying and VCS-backed resolution belong to P28. This recipe does not qualify federated multi-node behavior.
 
 ## Verification sources

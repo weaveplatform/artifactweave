@@ -286,7 +286,7 @@ func TestAccPublishRefusals(t *testing.T) {
 	// The class gate and the type check are the kit's, in Go's envelope.
 	for path, want := range map[string]int{
 		"/artifactory/api/go/go-remote/example.com/m/@v/v1.0.0.zip":  http.StatusNotImplemented,
-		"/artifactory/api/go/go-virtual/example.com/m/@v/v1.0.0.zip": http.StatusNotImplemented,
+		"/artifactory/api/go/go-virtual/example.com/m/@v/v1.0.0.zip": http.StatusMethodNotAllowed,
 		"/artifactory/api/go/libs-local/example.com/m/@v/v1.0.0.zip": http.StatusNotFound,
 	} {
 		if rec := f.put(path, "deployer", "z"); rec.Code != want {
@@ -315,3 +315,61 @@ func TestAccPublishInfoReadFailure(t *testing.T) {
 type failingBody struct{}
 
 func (failingBody) Read([]byte) (int, error) { return 0, errors.New("connection reset") }
+
+func TestAccPublishThroughVirtualDDR(t *testing.T) {
+	f := newPubFixture(t)
+	v, err := f.db.Repos().Get(t.Context(), "go-virtual")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v.DefaultDeploymentRepo = goLocal
+	if err = f.db.Repos().Update(t.Context(), v); err != nil {
+		t.Fatal(err)
+	}
+	const path = "example.com/Team/Lib/@v/v1.0.0"
+	target := "/artifactory/api/go/go-virtual/" + path
+	for ext, body := range map[string]string{"zip": "immutable zip", "mod": "module example.com/Team/Lib\n", "info": `{"Version":"v1.0.0","Time":"2026-11-17T00:00:00Z"}`} {
+		rec := f.put(target+"."+ext+";build.name=virtual-build;go.version=v1.0.0", "deployer", body)
+		if rec.Code != 201 || rec.Header().Get("X-Checksum-Sha256") == "" {
+			t.Fatal(ext, rec.Code, rec.Body.String())
+		}
+		stored := f.item(t, path+"."+ext)
+		if stored.RepoKey != goLocal {
+			t.Fatal(stored)
+		}
+		props, propErr := f.db.Items().Properties(t.Context(), stored.ID)
+		if propErr != nil || !slices.Equal(props["build.name"], []string{"virtual-build"}) {
+			t.Fatal(props, propErr)
+		}
+	}
+	for _, ext := range []string{"zip", "mod"} {
+		body := map[string]string{"zip": "immutable zip", "mod": "module example.com/Team/Lib\n"}[ext]
+		if rec := f.put(target+"."+ext, "deployer", body); rec.Code != 201 {
+			t.Fatal(rec.Code, rec.Body.String())
+		}
+		if rec := f.put(target+"."+ext, "maintainer", body+"changed"); rec.Code != 409 {
+			t.Fatal(rec.Code, rec.Body.String())
+		}
+	}
+	// A stored info remains replaceable only by a caller with Delete.
+	if rec := f.put(target+".info", "deployer", `{"Version":"v1.0.0"}`); rec.Code != 403 {
+		t.Fatal(rec.Code, rec.Body.String())
+	}
+	if rec := f.put(target+".info", "maintainer", `{"Version":"v1.0.0"}`); rec.Code != 201 {
+		t.Fatal(rec.Code, rec.Body.String())
+	}
+	if rec := f.put(target+".zip", "reader", "immutable zip"); rec.Code != 403 {
+		t.Fatal(rec.Code, rec.Body.String())
+	}
+}
+
+func TestAccPublishThroughVirtualWithoutDDR(t *testing.T) {
+	f := newPubFixture(t)
+	for _, ext := range []string{"zip", "mod", "info"} {
+		rec := f.put("/artifactory/api/go/go-virtual/example.com/lib/@v/v1.0.0."+ext, "deployer", "body")
+		if rec.Code != 405 || rec.Header().Get("Allow") != "GET" ||
+			rec.Body.String() != "No local repository was configured as local deployment repository for the (go-virtual) virtual repository.\n" {
+			t.Fatal(rec.Code, rec.Header(), rec.Body.String())
+		}
+	}
+}

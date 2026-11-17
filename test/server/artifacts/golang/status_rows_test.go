@@ -80,6 +80,10 @@ var goStatusPart = statusPart{
 	seed: func(t *testing.T, db harness.Store, blobs blob.Store) {
 		t.Helper()
 		seedGoModule(t, &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}, db)
+		if err := db.Repos().
+			Create(t.Context(), *repo.Defaults(&repo.Config{Key: "go-no-ddr", Class: repo.Virtual, PackageType: repo.Go, Repositories: []string{"go-local"}})); err != nil {
+			t.Fatal(err)
+		}
 		grantOverwriter(t, db, "go-local", goModule+"/")
 	},
 	rows: func() []statusCase { return append(goStatusRows(), goPublishStatusRows()...) },
@@ -101,7 +105,7 @@ func goStatusRows() []statusCase {
 		// Another package type's repository is not Go's.
 		{goList, goBase + "libs-local/" + goModule + "/@v/list", "admin", "", 404},
 		{goList, goBase + "npm-local/" + goModule + "/@v/list", "admin", "", 404},
-		// Remote and virtual Go repositories are P9's and P10's.
+		// Direct remote reads stay unsupported; virtual reads walk the members.
 		{goList, goBase + "go-remote/" + goModule + "/@v/list", "admin", "", 501},
 		{goList, goBase + "go-virtual/" + goModule + "/@v/list", "admin", "", 200},
 		{goListHead, v + "list", "admin", "", 200},
@@ -184,9 +188,10 @@ func goPublishStatusRows() []statusCase {
 		{goPut, goBase + "go-local/" + module + "/go.mod", "admin", "", 404},
 		{goPut, goBase + "missing/" + other, "admin", "zip", 404},
 		{goPut, goBase + "libs-local/" + other, "admin", "zip", 404},
-		// Remote and virtual Go repositories are P9's and P10's.
+		// Direct remote Go access stays unsupported; virtual writes use the DDR.
 		{goPut, goBase + "go-remote/" + other, "admin", "zip", 501},
-		{goPut, goBase + "go-virtual/" + other, "admin", "zip", 501},
+		{goPut, goBase + "go-virtual/" + other, "admin", "zip", 201},
+		{goPut, goBase + "go-no-ddr/" + other, "admin", "zip", 405},
 		// Replacing goModule's stored .info needs Delete, which overwriter
 		// lacks: Artifactory's text in a plain-text line (#565).
 		{

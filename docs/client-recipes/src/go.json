@@ -28,8 +28,8 @@
     }
   ],
   "publish": {
-    "classes": "L",
-    "note": "Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
+    "classes": "LV",
+    "note": "For a virtual Go key, configure defaultDeploymentRepo to a local or federated Go member. Use that same virtual key for --repo-resolve and --repo-deploy; deployment and replacement permissions are checked on the target member path.",
     "steps": [
       {
         "language": "sh",
@@ -52,7 +52,7 @@
   "limitations": [
     "No comma/direct GOPROXY fallback is configured, so a public origin cannot silently satisfy this check.",
     "The registry does not implement a public checksum database. Keep public checksum verification enabled and scope GONOSUMDB narrowly to private namespaces.",
-    "Read through a virtual Go repository over local, federated and administrator-configured remote members. Direct remote Go routes and publication through a virtual still answer 501; virtual publication is GOV-02.",
+    "Read through a virtual Go repository over local, federated and administrator-configured remote members. Direct remote Go routes still answer 501. Publishing through the virtual uses its configured defaultDeploymentRepo; without one it answers 405.",
     "Sumdb proxying and VCS-backed resolution belong to P28. This recipe does not qualify federated multi-node behavior."
   ],
   "evidence": [
@@ -64,7 +64,8 @@
         "gp v1.0.0",
         "go mod download resolves modules through the Go API",
         "Then the response status is 401",
-        "A cold Go build resolves local and private remote modules through one virtual"
+        "A cold Go build resolves local and private remote modules through one virtual",
+        "Publish a Go build through a virtual and resolve mixed dependencies through the same virtual"
       ]
     },
     {

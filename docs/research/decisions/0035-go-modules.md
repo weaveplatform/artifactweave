@@ -149,7 +149,7 @@ Every error under `/artifactory/api/go/` is plain text, `text/plain; charset=utf
 | 404 | an unknown repository, a repository of another package type, an unknown or invisible module or version, a path that is no Go operation, and `sumdb/` |
 | 405 | another method on a Go path |
 | 409 | a `.zip` or `.mod` republished with different content |
-| 501 | a direct remote Go request or a virtual PUT, naming its class (decision 0003) |
+| 501 | a direct remote Go request, naming its class (decision 0003) |
 
 ### Permissions
 
@@ -282,10 +282,10 @@ behavior and direct remote class gates in this ADR are unchanged.
 - A version whose deploy stopped between PUTs stays invisible until its missing file is
   deployed or the version is deleted.
 - Direct remote Go routes retain 501 after the P9 source implementation; virtual Go
-  reads are served by GOV-01, while virtual PUT retains 501 until GOV-02; the sumdb proxy and
+  reads are served by GOV-01 and GOV-02 maps PUT to the default deployment repository; the sumdb proxy and
   VCS-backed remotes belong to P28, with P33 sharing VCS transport. Artifactory 7.x deploys through a virtual
   Go repository to its default deployment repository (JFrog's Go Modules page), so a
-  `PUT` to one is among what P10 adds.
+  `PUT` now follows that mapping, with the local publisher's immutable `.zip`/`.mod` rule and `.info` overwrite permission. Without a default deployment repository, the Go API answers R6's 405 and `Allow: GET` [I], recorded for #216.
 - What Artifactory stores and answers in R26 section 6 is inferred and on the live-capture
   list (#216) for P19.
 

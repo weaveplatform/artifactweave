@@ -128,7 +128,7 @@ func TestAccGoVirtualMissesAndGuards(t *testing.T) {
 		status             int
 	}{
 		{"GET", "remote/" + m + "/@v/list", "admin", 501},
-		{"PUT", "virtual/" + m + "/@v/v1.0.0.zip", "admin", 501},
+		{"PUT", "virtual/" + m + "/@v/v1.0.0.zip", "admin", 405},
 		{"GET", "virtual/sumdb/sum.golang.org/supported", "", 404},
 		{"GET", "virtual/" + m + "/@v/list", "denied", 404},
 		{"GET", "virtual/" + m + "/@v/v1.0.0.mod", "denied", 404},
