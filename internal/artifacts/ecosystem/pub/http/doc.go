@@ -22,12 +22,16 @@
 //     the handlers also reach through DB(), and which resolves the
 //     repository and the caller, checks permissions, reads the package
 //     index and items, stores a published archive through the item service,
-//     where the format's hooks admit it, builds a virtual repository's
-//     member requests, serves items and writes errors; the blob store in
+//     where the format's hooks admit it, walks a virtual repository's
+//     members (Collect) and logs a member it passes over for a fault,
+//     serves items and writes errors; the core virtual package
+//     (artifacts/core/virtual), which names a virtual repository's
+//     deployment repository; the blob store in
 //     Options, which opens a remote's cached metadata; the remote source
 //     service, which fetches a remote's upstream version documents and
 //     archives into the remote cache; and the format package, whose rules
-//     check every name, version, path and archive.
+//     check every name, version, path and archive, and whose Merger merges
+//     and orders a virtual repository's members' versions.
 //
 // # Outputs
 //
@@ -42,8 +46,13 @@
 //
 // # Invariants
 //
-//   - Only local and federated repositories publish (405), with write
-//     permission on the repository and the archive's path. An upload over
+//   - Local and federated repositories publish, with write permission on
+//     the repository and the archive's path; a remote does not (405). A
+//     publish to a virtual repository writes to its default deployment
+//     repository, local or federated, with write permission there alone,
+//     while each step hands the client the virtual repository's URLs
+//     (RTFACT-31048); without one every step answers 405 with Allow: GET
+//     and 7.x's message (decision 0008, R6). An upload over
 //     64 MiB is too large (413); any other, an empty one included, must be
 //     a valid archive (400). A published version is never replaced (409),
 //     and finalizing checks that the stored archive is still the one
@@ -51,8 +60,16 @@
 //   - Version lists show only versions the caller may read; a package with
 //     none answers 404. A hosted index entry that disagrees with its
 //     archive answers 502.
-//   - A virtual repository reads its members in order, and the first member
-//     that holds a version supplies it.
+//   - A virtual repository reads its members in the package handlers' walk
+//     (decision 0008, R1, R2): local and federated members before remote
+//     ones, priorityResolution first, nested virtual repositories
+//     flattened and a cycle skipped. The first member that holds a version
+//     supplies it (pub.Merger). The virtual repository's own read grant is
+//     never asked, since no permission target can name one: each member's
+//     versions take the caller's grant on that member, and a member the
+//     caller may not read, one without the package and one whose upstream
+//     fails or cannot be reached are passed over (R3), the last with a
+//     warning [I].
 //   - The download policy (decision 0032) refuses a package's versions
 //     document at .pub/<name>.json, where 7.x keeps it, with the policy's
 //     404, after read permission: a blacked-out repository's, a remote's
@@ -79,6 +96,8 @@
 //   - Decision 0032: docs/research/decisions/0032-package-format-handlers.md
 //     (the router kit and format handlers); decision 0007:
 //     docs/research/decisions/0007-remote-repositories.md (remote
+//     repositories); decision 0008:
+//     docs/research/decisions/0008-virtual-repositories.md (virtual
 //     repositories).
 //   - docs/testing/pub.md (connecting Dart, publishing, virtual and remote
 //     repositories, and the evidence).
@@ -113,6 +132,10 @@
 //     same-origin archive link rule.
 //   - download_policy_test.go: the download policy on local, federated,
 //     virtual and remote repositories.
+//   - virtual_test.go: a publish through a virtual repository to its
+//     local or federated deployment repository and R6's 405 without one,
+//     and reads through nested members, cycles and member-only readers.
+//   - ../virtual_test.go: the Merger.
 //
 // The @pub acceptance scenarios, with the native Dart client, drive it
 // through the whole server.

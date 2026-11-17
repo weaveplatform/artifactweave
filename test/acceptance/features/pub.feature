@@ -202,6 +202,42 @@ Feature: Dart pub uses native repositories
     Then the command succeeds
     And the file "mixed-consumer/pubspec.lock" contains "local_pub"
     And the file "mixed-consumer/pubspec.lock" contains "remote_pub"
+    # dart pub publish through the virtual repository lands in its default
+    # deployment repository (RTFACT-31048).
+    Given a file "virtual-producer/pubspec.yaml" with expanded content:
+      """
+      name: virtual_pub
+      version: 1.0.0
+      description: Dart pub package published through a virtual repository.
+      environment:
+        sdk: ^3.10.0
+      publish_to: "{darturl}/artifactory/api/pub/pub-all"
+      """
+    And a file "virtual-producer/lib/virtual_pub.dart" with content:
+      """
+      String message() => 'published through a virtual repository';
+      """
+    And a file "virtual-producer/README.md" with content:
+      """
+      Dart pub package published through a virtual repository.
+      """
+    And a file "virtual-producer/CHANGELOG.md" with content:
+      """
+      ## 1.0.0
+      Native test package.
+      """
+    And a file "virtual-producer/LICENSE" with content:
+      """
+      Test fixture only.
+      """
+    When I run dart in "virtual-producer" "pub publish --force"
+    Then the command succeeds
+    When I GET "/artifactory/api/pub/pub-local/api/packages/virtual_pub" as admin
+    Then the response status is 200
+    And the JSON field "versions.0.version" equals "1.0.0"
+    When I GET "/artifactory/api/pub/pub-all/api/packages/virtual_pub" as admin
+    Then the response status is 200
+    And the response body contains "/api/pub/pub-all/packages/virtual_pub/versions/1.0.0.tar.gz"
 
   @pub_lifecycle
   Scenario: delete, restore and reindex preserve native package metadata

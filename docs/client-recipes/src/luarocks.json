@@ -27,8 +27,8 @@
     }
   ],
   "publish": {
-    "classes": "LF",
-    "note": "Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
+    "classes": "LVF",
+    "note": "Publish only to the classes listed here. A virtual repository stores what it is sent in its default deployment repository, local or federated, and answers 405 without one. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
     "steps": [
       {
         "language": "sh",
@@ -49,7 +49,7 @@
     ]
   },
   "limitations": [
-    "Remote and virtual sources resolve rocks; target a local/federated repository for this publication recipe.",
+    "Remote sources only resolve rocks; a virtual repository publishes to its default deployment repository.",
     "The install tree, client home and caches must all start empty."
   ],
   "evidence": [
@@ -72,6 +72,13 @@
       "contains": [
         "A Basic user name must name the token's subject",
         "password of a Basic credential"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/luarocks_virtual.feature",
+      "contains": [
+        "\"defaultDeploymentRepo\":\"rocks-peer\"",
+        "install hello 1.0-1 --only-server={authurl}/api/luarocks/combined-fed"
       ]
     }
   ]

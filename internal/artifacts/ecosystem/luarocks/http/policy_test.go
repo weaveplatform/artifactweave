@@ -245,6 +245,8 @@ func TestAccVirtualManifestAndRocksFollowTheDownloadPolicy(t *testing.T) {
 	patchRepo(t, f.fixture, "combined", excludes("visible-1.0-1.rockspec"))
 	wantError(t, get("visible-1.0-1.rockspec", "admin"), http.StatusNotFound,
 		fmt.Sprintf(noMember, "combined", "visible-1.0-1.rockspec"))
-	wantDenied(t, get("visible-1.0-1.rockspec", "nobody"))
+	// No Read on the virtual repository is asked first: none can be granted.
+	wantError(t, get("visible-1.0-1.rockspec", "nobody"), http.StatusNotFound,
+		fmt.Sprintf(noMember, "combined", "visible-1.0-1.rockspec"))
 	wantBody(t, get("manifest-5.4", "admin"), []string{`["visible"]`, `"rockspec"`}, nil)
 }

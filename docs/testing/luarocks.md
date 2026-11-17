@@ -46,22 +46,31 @@ malformed Lua syntax, duplicate identities, cancellation and authorization
 revocation; they keep the LuaRocks package above the 90% coverage floor.
 
 Issue [#686](https://github.com/weaveplatform/artifactweave/issues/686) adds a
-virtual URL over configured LuaRocks local and remote members. It
-validates each member's class and package type at request time, filters every
-member manifest by that member's read rights, and merges package, version,
-revision and architecture records in configured member order. If members
-publish the same exact rock filename, the first member wins. The same order
-selects artifact bytes. Remote member reads use the P9 source policy, so a
-warm offline cache remains available without forwarding caller credentials or
+virtual URL over LuaRocks members, which
+[#1538](https://github.com/weaveplatform/artifactweave/issues/1538) moves onto
+7.x's walk. It reads the members at request time in 7.x's order: local and
+federated members before remote ones, members with `priorityResolution`
+first, nested virtual repositories flattened, and a member listed twice, a
+cycle, or a member of another package type skipped. It filters every member
+manifest by that member's read rights, and merges package, version, revision
+and architecture records in that order. If members publish the same exact
+rock filename, the first member wins. The same order selects artifact bytes.
+The virtual repository itself takes no permission, as no permission target can
+name one: a caller who can read a member reads through it, and a member the
+caller cannot read, one without the file, and a remote whose upstream fails
+are passed over. Remote member reads use the P9 source policy, so a warm
+offline cache remains available without forwarding caller credentials or
 allowing the client to fetch directly from upstream. Native upload through the
-virtual URL writes only to its configured local deployment member;
-the caller needs write rights on both the virtual path and the target path.
-Unconfigured or invalid targets are refused.
+virtual URL writes to its default deployment repository, local or federated,
+and the caller needs write rights on that repository only. Without one the
+upload answers 405 with `Allow: GET`.
 
 The [virtual native-client scenario](../../test/acceptance/features/luarocks_virtual.feature)
 installs local-only, remote-only and mixed dependencies using the virtual URL
 and `--only-server`, publishes through its local target, and repeats the mixed
-install after taking the upstream offline. The full release qualification must
+install after taking the upstream offline. A second scenario publishes through
+a virtual URL whose deployment repository is federated and installs the rock
+back through it. The full release qualification must
 run all three LuaRocks scenarios and the merged coverage gate. Cross-peer
 federation is tracked separately in P13.
 

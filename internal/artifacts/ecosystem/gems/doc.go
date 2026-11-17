@@ -29,7 +29,8 @@
 //     CompactVersions, CompactInfo, InfoMD5, Specs and QuickSpec) and
 //     checks an upstream's compact index before a remote caches it
 //     (ParseCompactVersions, ParseCompactInfo, VersionToken and
-//     MaxIndexBytes).
+//     MaxIndexBytes), and merges a virtual repository's members' gems
+//     (Merger).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold
 //     the gems, and its store holds the items and the package index
 //     (artifacts/core/pkgindex), which Reindex rebuilds from an AQL search
@@ -54,6 +55,10 @@
 //     CompareVersions, the index renderers and parsers with
 //     CompactVersionEntry, Marshal, GzipMarshal and the bounds
 //     (MaxGemBytes and MaxIndexBytes).
+//   - Merger and Release: the virtual.Merger (artifacts/core/virtual) of a
+//     virtual repository's indexes, which keeps, for each gem file, the
+//     first member's copy in the walk's order, the copy its gem download
+//     serves (decision 0008, "Per-format merges").
 //
 // # Invariants
 //
@@ -88,6 +93,8 @@
 //     https://docs.jfrog.com/artifactory/docs/rubygems-repositories, and the
 //     RubyGems compact index specification:
 //     https://guides.rubygems.org/rubygems-org-compact-index-api/.
+//   - Decision 0008: docs/research/decisions/0008-virtual-repositories.md
+//     (the walk and the per-format merges).
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 233 (ecosystem/gems), line 379 (the slice row) and line 997 (the
 //     mapping row).
@@ -100,10 +107,13 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P30 group (issues #762 to
-// #768). Moved here in P9d.
+// #768). Moved here in P9d. Merger added in P10
+// (https://github.com/weaveplatform/artifactweave/issues/1538).
 //
 // # Testing
 //
+//   - virtual_test.go: the Merger keeps the first member's copy of each gem
+//     file in the walk's order.
 //   - package_test.go: the pinned rake gem, the archive bounds, unsafe
 //     data, malformed archives and gemspecs, optional gemspec shapes,
 //     runtime dependencies, the compact index round trip and version order;

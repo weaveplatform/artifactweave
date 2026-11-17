@@ -747,6 +747,9 @@ func TestUnitPublishRejectsReadOnlyClassesAndOversizedBody(t *testing.T) {
 				if rec.Code != http.StatusMethodNotAllowed {
 					t.Fatalf("%s publish on %s: %d %s", tc.method, class, rec.Code, rec.Body)
 				}
+				if class == repo.Virtual {
+					wantNoDeployTarget(t, rec)
+				}
 			}
 		})
 	}
@@ -1010,8 +1013,8 @@ func TestUnitVirtualMergesReadableMemberVersions(t *testing.T) {
 // version is listed and its archive fetched through that member, a nested
 // virtual repository's members are listed as the outer one's, a member of
 // another package type is passed over as 7.x's save would never have kept
-// it (decision 0008, R11), and a member whose source fails fails the
-// listing.
+// it (decision 0008, R11), and a member whose source fails is passed over
+// as a member without the package is [I].
 func TestUnitVirtualRemoteMembers(t *testing.T) {
 	data := archive(t, "visible_pub", "1.0.0")
 	f := newFixtureWith(t, repo.Virtual, func(p *pkgroute.Protocol) {
@@ -1068,7 +1071,7 @@ func TestUnitVirtualRemoteMembers(t *testing.T) {
 		message string
 	}{
 		"pub-mixed":   {http.StatusNotFound, "package not found"},
-		"pub-failing": {http.StatusBadGateway, "Bad Gateway"},
+		"pub-failing": {http.StatusNotFound, "package not found"},
 	} {
 		rec := f.do(http.MethodGet, "/artifactory/api/pub/"+key+"/api/packages/visible_pub",
 			"admin", "", nil)

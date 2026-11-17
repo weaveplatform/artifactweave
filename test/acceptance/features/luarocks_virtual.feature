@@ -1,7 +1,8 @@
 @luarocks @luarocks_virtual
 Feature: Native LuaRocks resolution through a virtual repository
-  A virtual URL publishes only to its local target and resolves local-only,
-  remote-only and mixed dependencies without another rocks server.
+  A virtual URL publishes to its default deployment repository, local or
+  federated, and resolves local-only, remote-only and mixed dependencies
+  without another rocks server.
 
   Scenario: virtual publication and mixed install with offline cached member
     Given the registry is running
@@ -58,3 +59,27 @@ Feature: Native LuaRocks resolution through a virtual repository
     And the server answered no request with 500 since the last command
     And the file "virtual-offline/share/lua/5.5/hello.lua" exists
     And the file "virtual-offline/share/lua/5.5/remoteonly.lua" exists
+
+  Scenario: virtual publication to a federated deployment repository
+    Given the registry is running
+    And the LuaRocks client can reach the registry
+    When I PUT "/artifactory/api/repositories/rocks-peer" as admin with body:
+      """
+      {"rclass":"federated","packageType":"luarocks"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/combined-fed" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"luarocks","repositories":["rocks-peer"],"defaultDeploymentRepo":"rocks-peer"}
+      """
+    Then the response status is 200
+    Given a LuaRocks project for repository "combined-fed"
+    When I run luarocks "upload hello-1.0-1.rockspec"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When within 10 seconds the body of GET "/artifactory/api/luarocks/rocks-peer/manifest-5.5" as admin contains "hello"
+    And the response body contains "src"
+    When I run luarocks "install hello 1.0-1 --only-server={authurl}/api/luarocks/combined-fed --tree /work/virtual-fed"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the file "virtual-fed/share/lua/5.5/hello.lua" exists

@@ -23,6 +23,7 @@ func (w *world) registerGems(sc *godog.ScenarioContext) {
 	sc.Step(`^a RubyGems upstream serves the pinned rake gem$`, w.gemsUpstream)
 	sc.Step(`^the RubyGems source is "([^"]*)"$`, w.gemsSource)
 	sc.Step(`^I run Ruby "(gem|bundle)" "([^"]*)"$`, w.runRuby)
+	sc.Step(`^I run Ruby gem "([^"]*)" with the kept token "([^"]*)" as its API key$`, w.runGemWithKey)
 }
 
 func (w *world) copyPinnedGem() error {
@@ -107,11 +108,14 @@ func (w *world) gemsSource(key string) error {
 	if err != nil {
 		return err
 	}
-	u.User = url.UserPassword("admin", testAdminPassword)
-	source := u.String() + "/artifactory/api/gems/" + key + "/"
 	if w.vars == nil {
 		w.vars = map[string]string{}
 	}
+	// gem push sends its API key as the Authorization header, so its host
+	// carries no credentials of its own.
+	w.vars["gemhost"] = u.String() + "/artifactory/api/gems/" + key
+	u.User = url.UserPassword("admin", testAdminPassword)
+	source := u.String() + "/artifactory/api/gems/" + key + "/"
 	w.vars["gemsource"] = source
 	return os.WriteFile(
 		filepath.Join(dir, "Gemfile"),
@@ -120,7 +124,23 @@ func (w *world) gemsSource(key string) error {
 	)
 }
 
+// runGemWithKey runs gem with the token kept as name for GEM_HOST_API_KEY,
+// the API key gem push sends as its Authorization header.
+func (w *world) runGemWithKey(args, name string) error {
+	tok, ok := w.vars[name]
+	if !ok {
+		return fmt.Errorf("no token kept as %q", name)
+	}
+	return w.runRubyWith("gem", args, "GEM_HOST_API_KEY="+tok)
+}
+
 func (w *world) runRuby(client, args string) error {
+	return w.runRubyWith(client, args)
+}
+
+// runRubyWith runs client in the Ruby image with env, NAME=value pairs,
+// beside the image's own settings.
+func (w *world) runRubyWith(client, args string, env ...string) error {
 	flags := []string{
 		"--entrypoint",
 		client,
@@ -136,6 +156,9 @@ func (w *world) runRuby(client, args string) error {
 		"HTTP_PROXY=",
 		"-e",
 		"HTTPS_PROXY=",
+	}
+	for _, e := range env {
+		flags = append(flags, "-e", e)
 	}
 	return w.runContainer(w.rubyImage, flags, w.clientArgs(args))
 }

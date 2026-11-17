@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"slices"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -18,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	pubfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/pub"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -126,13 +126,28 @@ func packageName(r *http.Request) (string, error) {
 	return name, nil
 }
 
+// requireRead is RequireFolder for Read on path, or Require for a file,
+// except through a virtual repository, which no permission target can name
+// (decision 0006): there path passes, and the walk asks each member for its
+// own Read (memberReleases), as the item routes' gate passes a path in a
+// virtual repository (itemkit's Access.Admits; decision 0008, R3).
+func (h handler) requireRead(w http.ResponseWriter, r *http.Request, path string, folder bool) bool {
+	switch {
+	case pkgroute.RequestFrom(r).Repo.Class == repo.Virtual:
+		return true
+	case folder:
+		return h.k.RequireFolder(w, r, path, api.ActionRead)
+	}
+	return h.k.Require(w, r, path, api.ActionRead)
+}
+
 func (h handler) versions(w http.ResponseWriter, r *http.Request) {
 	name, err := packageName(r)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
+	if !h.requireRead(w, r, name, true) {
 		return
 	}
 	if r.URL.RawQuery != "" {
@@ -181,7 +196,7 @@ func (h handler) version(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, apierror.New(http.StatusBadRequest, "invalid Dart pub version"))
 		return
 	}
-	if !h.k.RequireFolder(w, r, name, api.ActionRead) {
+	if !h.requireRead(w, r, name, true) {
 		return
 	}
 	if err := h.k.CheckDocument(r, documentPath(name)); err != nil {
@@ -220,7 +235,7 @@ func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := pubfmt.Path(name, version)
-	if !h.k.Require(w, r, path, api.ActionRead) {
+	if !h.requireRead(w, r, path, false) {
 		return
 	}
 	class := pkgroute.RequestFrom(r).Repo.Class
@@ -254,24 +269,24 @@ func (h handler) archive(w http.ResponseWriter, r *http.Request) {
 }
 
 // virtualArchive serves the archive of version from the first member, in
-// the virtual repository's order, that holds the version and does not
-// refuse the archive: 7.x ignores a blacked-out member when it resolves
-// and passes over a member that cannot serve the file, so a member whose
-// policy refuses it leaves the archive to the next member that holds it
-// (R5). Every member's versions are still read first, as the merge reads
-// them, so a member that fails fails the download as it fails the list.
+// the package handlers' walk, that lists the version and does not refuse
+// the archive: 7.x ignores a blacked-out member when it resolves and passes
+// over a member that cannot serve the file, so a member whose policy
+// refuses it leaves the archive to the next member that lists it (R5).
+// Every member's versions are read first, as the merge reads them, so a
+// member that fails fails the download as it fails the list.
 func (h handler) virtualArchive(
 	w http.ResponseWriter,
 	r *http.Request,
 	name, version, path string,
 ) {
-	members, err := h.memberReleases(r, name, true)
+	parts, err := h.memberReleases(r, name, true)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
-	for _, found := range members {
-		for _, release := range found {
+	for _, part := range parts {
+		for _, release := range part.Doc {
 			if release.meta.Version != version {
 				continue
 			}
@@ -372,79 +387,61 @@ func (h handler) hosted(r *http.Request, name string) ([]release, error) {
 		}
 		out = append(out, release{meta: meta, item: item})
 	}
-	sortReleases(out)
+	pubfmt.SortNewestFirst(out, release.version)
 	return out, nil
 }
 
-// virtual merges the members' releases of name, an earlier member's copy
-// of a version shadowing a later member's.
+// virtual merges the members' releases of name with pubfmt.Merger: an
+// earlier member's copy of a version shadows a later member's.
 func (h handler) virtual(r *http.Request, name string, file bool) ([]release, error) {
-	members, err := h.memberReleases(r, name, file)
+	parts, err := h.memberReleases(r, name, file)
 	if err != nil {
 		return nil, err
 	}
-	byVersion := map[string]release{}
-	for _, found := range members {
-		for _, v := range found {
-			if _, exists := byVersion[v.meta.Version]; !exists {
-				byVersion[v.meta.Version] = v
-			}
-		}
-	}
-	out := make([]release, 0, len(byVersion))
-	for _, v := range byVersion {
-		out = append(out, v)
-	}
-	sortReleases(out)
-	return out, nil
+	return pubfmt.Merger[release]{Version: release.version}.Merge(r.Context(), parts) //nolint:wrapcheck // a merge never fails
 }
 
-// memberReleases returns, in the virtual repository's order, the releases
-// of name each member the caller may read holds, each with its member's
-// request. The versions document leaves out a blacked-out member, which
-// 7.x ignores when it resolves, and one whose patterns reject the
-// document's path ([I], R5); an archive download's lookup leaves out only
-// a blacked-out member, and passes over one that refuses the archive.
-func (h handler) memberReleases(r *http.Request, name string, file bool) ([][]release, error) {
+// memberReleases returns, in the package handlers' walk (pkgroute.Collect:
+// decision 0008's R1 order, nested virtual repositories flattened, a cycle
+// skipped), the releases of name each member holds that the caller may read
+// in that member, each with its member's request. The virtual repository's
+// own Read is never asked: no permission target can name one, and 7.x
+// decides a read through it by each member's (R3), so a caller with Read on
+// the members only resolves through it, and a member it may read nothing
+// of name in is not found. The versions document leaves out a blacked-out
+// member, which 7.x ignores when it resolves, and one whose patterns reject
+// the document's path ([I], R5); an archive download's lookup leaves out
+// only a blacked-out member, and passes over one that refuses the archive.
+// A member without the package is passed over, and so is one whose
+// upstream fails or cannot be reached, with a warning (WarnPassedOver) [I].
+func (h handler) memberReleases(
+	r *http.Request, name string, file bool,
+) ([]virtual.Part[[]release], error) {
 	doc := documentPath(name)
 	if file {
 		doc = ""
 	}
-	members, err := h.k.MergeMembers(r, doc)
-	if err != nil {
-		return nil, err //nolint:wrapcheck // a refusal or a protocol class refusal, answered as it is
-	}
-	var out [][]release
-	for _, mr := range members {
+	parts, err := pkgroute.Collect(h.k, r, doc, func(mr *http.Request) ([]release, error) {
 		if !h.k.CanFolder(mr, name, api.ActionRead) {
-			continue
+			return nil, kernel.ErrNotFound
 		}
 		found, err := h.lookup(mr, name, file)
 		if err != nil {
-			var response *apierror.Error
-			if errors.Is(err, kernel.ErrNotFound) ||
-				errors.As(err, &response) && response.Status == http.StatusNotFound {
-				continue
-			}
+			h.k.WarnPassedOver(mr, err)
 			return nil, err
 		}
 		for i := range found {
 			found[i].member = mr
 		}
-		out = append(out, found)
+		return found, nil
+	})
+	if err != nil {
+		return nil, err //nolint:wrapcheck // a refusal, or a member's fault, answered as it is
 	}
-	return out, nil
+	return parts, nil
 }
 
-func sortReleases(out []release) {
-	slices.SortFunc(out, func(a, b release) int {
-		cmp := semver.Compare("v"+a.meta.Version, "v"+b.meta.Version)
-		if cmp != 0 {
-			return -cmp
-		}
-		return strings.Compare(a.meta.Version, b.meta.Version)
-	})
-}
+func (r release) version() string { return r.meta.Version }
 
 func writeJSON(w http.ResponseWriter, r *http.Request, status int, doc any) {
 	w.Header().Set("Content-Type", mediaType)

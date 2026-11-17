@@ -28,7 +28,8 @@
 //     rockspec or rock before a remote caches it (ValidateContent), and
 //     maps an uploaded rockspec to the numeric version id the upload client
 //     sends back, and that id back to the rockspec (VersionID and
-//     VersionFile).
+//     VersionFile), and merges a virtual repository's members' manifests
+//     (Merger).
 //   - Driven: the format hooks' environment (format.Env): its blobs hold
 //     the files; its store holds the items, their properties and the
 //     package index (artifacts/core/pkgindex), which Reindex rebuilds from
@@ -61,6 +62,11 @@
 //     rockspec, written as Lua assignments in luarocks-admin's form.
 //   - The rules the protocol shares: Identity, Parse, ValidateContent,
 //     VersionID, VersionFile, ManifestPath and KindManifest.
+//   - Merger and Entry: the virtual.Merger (artifacts/core/virtual) of a
+//     virtual repository's manifest, which lists every file its members'
+//     manifests list and keeps, for each, the first member's record in the
+//     walk's order, the member its rock download serves the file from
+//     (decision 0008, "Per-format merges").
 //
 // # Invariants
 //
@@ -116,9 +122,13 @@
 // # Status
 //
 // Implemented P9b (newly identified Artifactory formats). Moved here in P9d.
+// Merger added in P10
+// (https://github.com/weaveplatform/artifactweave/issues/1538).
 //
 // # Testing
 //
+//   - virtual_test.go: the Merger keeps the first member's record of each
+//     file in the walk's order.
 //   - luarocks_test.go: identity and rockspec admission, and a manifest the
 //     native client reads as Lua assignments.
 //   - edge_test.go: stored-content checks, the manifest hooks' boundaries,

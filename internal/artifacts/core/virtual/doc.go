@@ -57,7 +57,9 @@
 //     member wins a key), SortVersions (stable), Latest (stable versions
 //     first), Accepts (both repositories' patterns, for a merged list
 //     filtered before it is paged, R5), and APIBase and ItemBase, the
-//     virtual repository's URL a merged document points at.
+//     virtual repository's URL a merged document points at. The formats'
+//     Mergers so far: gems.Merger, luarocks.Merger and pub.Merger
+//     (https://github.com/weaveplatform/artifactweave/issues/1538).
 //   - cache.go: Cache, the process's merged metadata, each Entry kept by
 //     CacheKey (virtual repository, document, member list, the members the
 //     caller reads, base URL) and fresh for the virtual repository's period
@@ -121,11 +123,15 @@
 // https://github.com/weaveplatform/artifactweave/issues/1536); the
 // merged metadata cache (Cache;
 // https://github.com/weaveplatform/artifactweave/issues/1543), which the
-// families wire into their merges; and Git LFS and Hugging Face on Members'
-// Package walk and DeployTarget, their tests in their ecosystem/<type>/http
-// packages (https://github.com/weaveplatform/artifactweave/issues/1540). The
-// storage API's views and the folder index of a virtual repository read its
-// members through Stored and Walk
+// families wire into their merges; RubyGems, LuaRocks and Dart pub
+// virtual repositories on it, each with its Merger in
+// ecosystem/<type>/virtual.go
+// (https://github.com/weaveplatform/artifactweave/issues/1538); and Git LFS
+// and Hugging Face on Members' Package walk and DeployTarget, their tests in
+// their ecosystem/<type>/http packages
+// (https://github.com/weaveplatform/artifactweave/issues/1540). The storage
+// API's views and the folder index of a virtual repository read its members
+// through Stored and Walk
 // (https://github.com/weaveplatform/artifactweave/issues/1537). The rest of
 // the package is planned for P10's other tickets
 // (https://github.com/weaveplatform/artifactweave/issues/1521).
@@ -139,10 +145,11 @@
 // DeployTarget for each class the defaultDeploymentRepo may name, unset and
 // missing, and a read that fails. merge_test.go merges with a test Merger
 // built from the helpers alone, as a format's virtual.go would be, and
-// covers Collect's pass-overs and faults and each helper's edges.
-// cache_test.go drives Cache on a fake clock with counting builders:
-// expiry, zero and negative periods, keys, a document gone, Evict and Zap
-// with the stale answer, MemberWritten through nesting and cycles,
+// covers Collect's pass-overs and faults and each helper's edges. Each
+// format's Merger has its own virtual_test.go beside it (gems, luarocks and
+// pub so far). cache_test.go drives Cache on a fake clock with counting
+// builders: expiry, zero and negative periods, keys, a document gone, Evict
+// and Zap with the stale answer, MemberWritten through nesting and cycles,
 // single flight under -race, cancellation, a build that panics, late
 // builds and both bounds; export_test.go reports its usage.
 package virtual

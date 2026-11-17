@@ -38,7 +38,7 @@ publish_to: "${AW_URL}/artifactory/api/pub/${AW_REPO}"
 
 ## Publish
 
-Classes: **local, federated**. Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.
+Classes: **local, virtual, federated**. Publish only to the classes listed here. A virtual repository stores what it is sent in its default deployment repository, local or federated, and answers 405 without one. A federated recipe proves one-node behavior; remote repositories are read-only client sources.
 
 Run from the producer directory.
 
@@ -69,4 +69,5 @@ These are the pinned client definitions and executable evidence from which this 
 
 - Client pin: [test/acceptance/clients/dart.Dockerfile](../../test/acceptance/clients/dart.Dockerfile).
 - Evidence: [test/acceptance/pub_steps_test.go](../../test/acceptance/pub_steps_test.go).
+- Evidence: [test/acceptance/features/pub.feature](../../test/acceptance/features/pub.feature).
 - Evidence: [test/acceptance/features/pub.feature](../../test/acceptance/features/pub.feature).

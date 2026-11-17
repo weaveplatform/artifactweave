@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"maps"
 	"net/http"
 	"net/url"
@@ -82,6 +83,10 @@ type Options struct {
 	// https://github.com/weaveplatform/artifactweave/issues/1542). Nil
 	// takes every upstream step.
 	NoUpstream func(r *http.Request, v repo.Config) bool
+	// Logger receives the warning for a virtual repository's member that
+	// a walk passed over for a fault (WarnPassedOver); nil means
+	// slog.Default.
+	Logger *slog.Logger
 	// Cache is the server's merged virtual metadata cache, which Merged and
 	// MergedPart keep documents in for virtualRetrievalCachePeriodSecs
 	// (decision 0008, R8). Nil merges on every request.
@@ -707,6 +712,40 @@ func (k *Kit) RequireFolder(
 ) bool {
 	if k.CanFolder(r, path, want) {
 		return true
+	}
+	k.Error(w, r, refusal(r))
+	return false
+}
+
+// RequireRoot is RequireFolder of the repository's root for Read, the gate
+// a protocol asks before it builds a document of the whole repository, such
+// as an index. A virtual repository is never asked itself: no permission
+// target can name one (decision 0006), and its members decide, its root
+// readable when any member's is, nested virtual repositories flattened, and
+// always to an administrator (AuthorizationServiceBase.
+// computeUserHasPermissionsOnRepositoryRoot 1047-1078, 7.161.26), as the
+// item routes' gate asks it (itemkit's Access.Admits). A caller who passes
+// still gets only what the members it may read hold: the merge's walk
+// passes over the others (decision 0008, R3).
+func (k *Kit) RequireRoot(w http.ResponseWriter, r *http.Request) bool {
+	v := RequestFrom(r).Repo
+	if v.Class != repo.Virtual {
+		return k.RequireFolder(w, r, "", accessapi.ActionRead)
+	}
+	d, ok := accessapi.DeciderFrom(r.Context())
+	if ok && d.IsAdmin() {
+		return true
+	}
+	members, err := virtual.Members(r.Context(), k.o.Store.Repos(), v,
+		virtual.Options{Order: virtual.Stored})
+	if err != nil {
+		k.Error(w, r, fmt.Errorf("%s: members of %s: %w", k.p.Name, v.Key, err))
+		return false
+	}
+	for _, m := range members {
+		if readable(r.Context(), m.Repo, "", true) {
+			return true
+		}
 	}
 	k.Error(w, r, refusal(r))
 	return false
