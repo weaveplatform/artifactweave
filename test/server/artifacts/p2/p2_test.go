@@ -411,6 +411,12 @@ func TestAccP2ArchiveReadsCachedBlobAndRejectsMissingBlob(t *testing.T) {
 	}
 }
 
+// TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild: the composite
+// leaves out a member of another type, a missing one, and a nested virtual
+// member whose only member an earlier member already reaches, as the walk
+// keeps a real member's first place (decision 0008, R2; #1552); a member's
+// file is refused by that member, and a virtual repository that is its own
+// member lists no child, where it answered 500.
 func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 	w := newItemWorld(t, false)
 	for _, c := range []repo.Config{
@@ -437,9 +443,8 @@ func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 		t.Fatal(err)
 	}
 	res := w.do(http.MethodGet, "/artifactory/p2-parent/compositeContent.xml", "admin", "")
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="2"`) ||
-		!strings.Contains(res.Body.String(),
-			"<child location=\"p2-child\"/>\n<child location=\"p2-nested\"/>\n") {
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="1"`) ||
+		!strings.Contains(res.Body.String(), "<child location=\"p2-child\"/>\n") {
 		t.Fatalf("virtual member filtering: %d %s", res.Code, res.Body)
 	}
 	for _, tc := range []struct {
@@ -451,6 +456,7 @@ func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 		{"/artifactory/p2-parent/missing/p2.index", "admin", http.StatusNotFound},
 		{"/artifactory/p2-parent/p2-child/unknown.txt", "admin", http.StatusNotFound},
 		{"/artifactory/p2-parent/p2-child", "admin", http.StatusNotFound},
+		{"/artifactory/p2-parent/p2-nested/p2.index", "admin", http.StatusNotFound},
 		{"/artifactory/p2-parent/unknown.txt", "admin", http.StatusNotFound},
 		{"/artifactory/p2-parent/p2.index", "deployer", http.StatusForbidden},
 	} {
@@ -459,9 +465,9 @@ func TestAccP2VirtualFiltersMembersAndDeniesUnpermittedChild(t *testing.T) {
 			t.Errorf("%s as %s: %d, want %d: %s", tc.path, tc.user, res.Code, tc.expected, res.Body)
 		}
 	}
-	res = w.do(http.MethodGet, "/artifactory/p2-cycle/p2.index", "admin", "")
-	if res.Code == http.StatusOK {
-		t.Fatalf("cyclic update site returned metadata: %s", res.Body)
+	res = w.do(http.MethodGet, "/artifactory/p2-cycle/compositeContent.xml", "admin", "")
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `children size="0"`) {
+		t.Fatalf("cyclic update site: %d %s, want 200 and no child", res.Code, res.Body)
 	}
 }
 

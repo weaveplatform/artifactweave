@@ -70,15 +70,21 @@
 //     permission is checked on, and the index lookup a package GET makes to
 //     find the package and pin its MD5 checks only the remote's blackout
 //     (source.Resource.BlackoutOnly).
-//   - A virtual repository merges its members' indexes in order: a missing
-//     member, or one whose index the caller may not read or the member's
-//     download policy refuses, is skipped; a member cycle, a chain of more
-//     than eight virtual repositories or a member of another package type
-//     is refused; and a package name belongs to the first member that lists
-//     it. A virtual package's GET leaves out each row whose file a member's
-//     or the virtual repository's download policy refuses before names are
-//     claimed, so it passes over that member to the next one that lists the
-//     package. It checks a member's policy at the package's own path, never
+//   - A virtual repository merges its members' indexes through the package
+//     handlers' walk (pkgroute.Collect; #1552): 7.x's order, nested virtual
+//     repositories flattened with a cycle or a self-membership skipped, and
+//     a missing member, one of another package type, one whose index the
+//     caller may not read or the member's download policy refuses, and one
+//     that fails passed over, the failure logged [I]. The caller's Read in
+//     the member that lists a row decides it, the virtual repository's read
+//     gate (itemkit.Kit.VirtualGate) only whether the caller may read
+//     through it. A package name is listed once, at the greatest version a
+//     member lists (cran.Merger), and the merged PACKAGES and PACKAGES.gz
+//     are kept for the virtual's virtualRetrievalCachePeriodSecs
+//     (pkgroute.Kit.Merged). A virtual package's GET walks the members at
+//     the package's own path and serves it from the first member that
+//     lists that file, passing over a member whose file the matrix
+//     parameters do not match to the next one. It checks a member's policy at the package's own path, never
 //     at the index it reads to find the package, so there only a
 //     blacked-out member is skipped for its index.
 //   - A virtual or remote repository serves a package only when the index
@@ -150,8 +156,8 @@
 // tests used):
 //
 //   - cran_test.go: the kit's CRAN source request checks the published
-//     index and archive, and a virtual repository refuses member cycles and
-//     members of another type.
+//     index and archive, and a local repository's -cache alias reads no
+//     index.
 //   - cran_routes_test.go: the read authority behind each listed package,
 //     the source request's compressed index and Windows binary, and an
 //     upload without a store or an authenticated caller.

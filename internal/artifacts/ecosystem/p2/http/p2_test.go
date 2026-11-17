@@ -129,7 +129,6 @@ func TestUnitP2VirtualFailsClosedWhenMemberStoreFails(t *testing.T) {
 		st,
 		c,
 		itemkit.Access{Decider: d},
-		map[string]bool{},
 	); !errors.Is(
 		err,
 		fault,
@@ -140,7 +139,8 @@ func TestUnitP2VirtualFailsClosedWhenMemberStoreFails(t *testing.T) {
 
 // A blacked-out member is left out of the virtual's members, so the
 // composite does not list it and its key's paths answer 404; a member whose
-// patterns exclude everything keeps its place.
+// patterns exclude everything keeps its place, in the walk's order, the
+// local member before the remote one (decision 0008, R1).
 func TestUnitP2VirtualLeavesOutBlackedOutMembers(t *testing.T) {
 	w := newItemWorld(t)
 	on, everything := true, "**"
@@ -162,7 +162,7 @@ func TestUnitP2VirtualLeavesOutBlackedOutMembers(t *testing.T) {
 		Key: "p2-virtual", Class: repo.Virtual, PackageType: repo.P2,
 		Repositories: []string{"p2-dark", "p2-excluding", "p2-local"},
 	}
-	members, err := p2Members(t.Context(), w.db, c, itemkit.Access{Decider: d}, map[string]bool{})
+	members, err := p2Members(t.Context(), w.db, c, itemkit.Access{Decider: d})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestUnitP2VirtualLeavesOutBlackedOutMembers(t *testing.T) {
 	for _, m := range members {
 		keys = append(keys, m.Key)
 	}
-	if !slices.Equal(keys, []string{"p2-excluding", "p2-local"}) {
+	if !slices.Equal(keys, []string{"p2-local", "p2-excluding"}) {
 		t.Errorf("members %v", keys)
 	}
 }

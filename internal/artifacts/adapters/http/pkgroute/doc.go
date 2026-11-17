@@ -248,7 +248,9 @@
 // metadata kept through Merged
 // (https://github.com/weaveplatform/artifactweave/issues/1652); and
 // ItemKit and Bind for the item routes' virtual indexes
-// (https://github.com/weaveplatform/artifactweave/issues/1551).
+// (https://github.com/weaveplatform/artifactweave/issues/1551), which
+// Debian and CRAN take too
+// (https://github.com/weaveplatform/artifactweave/issues/1552).
 //
 // Ansible, Chef, Puppet and Conda take their members from the same walk,
 // with Chef's cookbook records kept through Merged and each Conda remote

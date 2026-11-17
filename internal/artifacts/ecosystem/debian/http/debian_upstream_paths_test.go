@@ -100,7 +100,9 @@ func TestAccDebianVirtualServesItsRemoteMembersInstallerIndex(t *testing.T) {
 		debInstallerIndex: streamed(remote, nil),
 	})))
 	w.debRepos(
-		repo.Config{Key: "deb-remote", Class: repo.Remote},
+		// Priority resolution asks the remote before the local member
+		// (decision 0008, R1).
+		repo.Config{Key: "deb-remote", Class: repo.Remote, PriorityResolution: repo.Flex(true)},
 		repo.Config{Key: "deb-local", Class: repo.Local},
 		repo.Config{
 			Key: "deb-virtual", Class: repo.Virtual,

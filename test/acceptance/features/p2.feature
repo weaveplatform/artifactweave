@@ -35,13 +35,16 @@ Feature: Eclipse P2 update sites
     And the server answered no request with 500 since the last command
     And the installed P2 bundle matches the published SHA256
 
+  # The virtual lists its members in 7.x's resolution order, a local member
+  # before a remote one unless the remote has priority resolution (#1552),
+  # so the remote takes priority here to be the child the client reads first.
   Scenario: a virtual P2 repository keeps external remote and local Generic members ordered
     Given the registry is running
     And the P2 client can reach the registry
     And a composite Eclipse P2 site points to the published child upstream
     When I PUT "/artifactory/api/repositories/p2-external-member" as admin with body:
       """
-      {"rclass":"remote","packageType":"p2","url":"{upstream}","p2ChildOrigins":["{p2childorigin}"]}
+      {"rclass":"remote","packageType":"p2","url":"{upstream}","p2ChildOrigins":["{p2childorigin}"],"priorityResolution":true}
       """
     Then the response status is 200
     When I PUT "/artifactory/api/repositories/p2-local-member" as admin with body:

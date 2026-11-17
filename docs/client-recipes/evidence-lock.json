@@ -79,7 +79,7 @@
   "test/acceptance/features/cocoapods.feature": "b3fc271c2d95e8eb254e32817f4ea4b230147f468357afa8ee61a1fa717ec612",
   "test/acceptance/features/composer.feature": "16b8665e990f81180a429d57183cb653d74bebddd579ce9a611a7a674ce28b02",
   "test/acceptance/features/conda.feature": "0da6f06dedb8c3a72905f6ba059d5cdd32abeee397fe7bc0d5197f218cab93ef",
-  "test/acceptance/features/cran.feature": "5abba45ed770e182b0a6042cd6e2bbec447d537cd0a6364abc15de9a2de66e1f",
+  "test/acceptance/features/cran.feature": "b039a5408406fc336108ffbfc7d59c269adc16e220dea0fdf2ce004d7d6dbf49",
   "test/acceptance/features/debian.feature": "7457151bb6f9036cb670e148ee49a983ec0b466927aac42bf7048b17a0d95742",
   "test/acceptance/features/docker.feature": "841a88f096b370198c0379c60fd5ca77c03279b08872accb81c936708f44f7b2",
   "test/acceptance/features/gems.feature": "157a8b676e211236b6ff747c0fec060063154eedcc5d5798f8a46ee3fdfb60f0",

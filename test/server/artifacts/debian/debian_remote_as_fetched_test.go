@@ -109,6 +109,17 @@ func TestAccDebianRemoteCachesAnIndexItCannotDecodeAsFetched(t *testing.T) {
 func TestAccDebianVirtualLeavesOutAMemberIndexItCannotUse(t *testing.T) {
 	files, _ := asFetchedArchive(t)
 	w, _ := queryRemote(t, files)
+	// The virtual repository indexes a remote member only for its Indexed
+	// Remote Architectures, amd64 alone unless set (7.x's Debian
+	// repositories documentation), so the test names all three.
+	v, err := w.Runtime.Store.Repos().Get(t.Context(), "deb-virtual")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v.DebianDefaultArchitectures = "amd64,arm64,i386"
+	if err := w.Runtime.Store.Repos().Update(t.Context(), v); err != nil {
+		t.Fatal(err)
+	}
 	const virtual = "/artifactory/deb-virtual/dists/mixed/"
 	r := w.Request(http.MethodGet, virtual+"Release", "admin", "")
 	if r.Code != http.StatusOK ||

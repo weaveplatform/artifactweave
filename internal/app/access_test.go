@@ -16,7 +16,7 @@ import (
 // TestAccRuntimeAccessModule: the runtime builds the access module over its
 // own store, authenticator and token service, with the configured access
 // settings, and gives the same API to the router and to the Debian snapshot
-// work.
+// work, whose kit can walk a virtual repository's members.
 func TestAccRuntimeAccessModule(t *testing.T) {
 	var router RouterConfig
 	var snapshot *itemkit.Kit
@@ -52,6 +52,11 @@ func TestAccRuntimeAccessModule(t *testing.T) {
 	api := router.Access
 	if !reflect.DeepEqual(snapshot.Access, api) {
 		t.Error("the Debian snapshot work was given another access API than the router")
+	}
+	// A virtual repository's snapshot walks its members through the
+	// package handlers' kit, which reads this store (#1552).
+	if snapshot.PackageOptions.Store == nil {
+		t.Error("the Debian snapshot work was given no store for a virtual repository's walk")
 	}
 	want := accessapi.Settings{AllowBasicAuthTokens: true, GlobalEnvironmentLimit: 7}
 	if api.Settings != want {

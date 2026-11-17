@@ -2364,7 +2364,8 @@ components:
           type: boolean
         debianDefaultArchitectures:
           description: Optional within this object. Comma-separated architectures used when generating aggregated Debian
-            metadata. Stored only.
+            metadata. A Debian virtual repository indexes its remote members for these architectures alone, amd64
+            when unset.
           type: string
         debianTrivialLayout:
           # JFrog's Debian guide: a virtual repository includes only repositories with the

@@ -69,10 +69,16 @@
 //     copy's included. Metadata is read up to p2.MaxMetadata, and artifacts
 //     and archives up to p2.MaxArtifact; an archive entry is validated
 //     before it is cached or served.
-//   - A virtual repository lists, in order, the members the caller may
-//     traverse: P2 remotes, local Maven or Generic update sites, and
-//     acyclic nested P2 virtual repositories, leaving out a blacked-out
-//     one. A member's file is served under <member key>/, as 7.x serves
+//   - A virtual repository lists, in the package handlers' walk order
+//     (virtual.Members and virtual.Walk; #1552), its direct members that
+//     reach a member the caller may use: a P2 remote or a local Maven or
+//     Generic update site the caller may read and that is not blacked out.
+//     A nested P2 virtual member is one child; a cycle, a self-membership
+//     or a nested member whose members an earlier child reaches adds none,
+//     and a nested composite read through an outer one leaves the outer
+//     virtual repositories out (p2Outer). The virtual repository's own
+//     files are read through its read gate (itemkit.Kit.VirtualGate), a
+//     member's by that member's Read. A member's file is served under <member key>/, as 7.x serves
 //     p2-virtual/download.eclipse.org/releases/luna/p2.index from the
 //     repository keyed download.eclipse.org, so the path is the same for
 //     every caller and does not move when another member is left out. The
@@ -173,7 +179,7 @@
 //   - p2_test.go: the kit's P2 source request on the published Eclipse
 //     GLSP files, the site.zip!/ suffix, and a virtual repository that
 //     fails closed when its member store fails and leaves out a
-//     blacked-out member.
+//     blacked-out member, in the walk's order.
 //   - p2_external_helpers_test.go: child URLs and their origins, the child
 //     digest's inputs, resource paths within a site or an archive, the
 //     __p2_ext/ path parser, checksum pinning and archive suffix shapes.

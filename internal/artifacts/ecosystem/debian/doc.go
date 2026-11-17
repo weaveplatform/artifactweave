@@ -30,7 +30,7 @@
 //     caller with Read permission on every package it lists (a permission
 //     rule: a package the download policy refuses stays listed), composes
 //     and signs a virtual repository's metadata (DecodePackagesIndex,
-//     ReleasePackageIndexes, IndexForms, Release, SignRelease), copies
+//     ReleasePackageIndexes, IndexArchitecture, Merger, SignRelease), copies
 //     checksum-bound metadata into a snapshot (ReleaseIndexRefs) under
 //     WithSnapshotWrite, and queues KindReindexNoProps; the item kit
 //     (artifacts/adapters/http/itemkit), whose remote source request checks
@@ -179,6 +179,8 @@
 //     compressed indexes, upstream Release and Packages checks, by-hash
 //     paths and forged digests.
 //   - sign_test.go: SignRelease binds both apt signature forms.
+//   - virtual_test.go: Merger's union by Filename, its forms, by-hash
+//     copies and Release, no row and the size limit; IndexArchitecture.
 //   - handler_security_test.go: admission of generated metadata,
 //     snapshots and package coordinates, stale inspections, class-specific
 //     work, the source lifecycle, a malformed binary kept with its reason

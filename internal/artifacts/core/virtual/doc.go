@@ -147,6 +147,10 @@
 // it over their package rows, each in its ecosystem/<type>/virtual.go, and
 // keep Alpine's and RPM's merges in Cache
 // (https://github.com/weaveplatform/artifactweave/issues/1551).
+// Debian (its dists/ metadata) and CRAN (PACKAGES) implement it the same
+// way and keep their merges in Cache; P2's composite takes its children's
+// order and visited set from Members and Walk
+// (https://github.com/weaveplatform/artifactweave/issues/1552).
 //
 // Ansible and Chef (Releases), Puppet (Releases) and Conda (Merger, one
 // subdir's channel index) implement it, each in its

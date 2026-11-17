@@ -3,6 +3,7 @@ package cranhttp
 import (
 	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cran"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -23,8 +25,16 @@ import (
 )
 
 var (
-	errCranVirtualCycle = errors.New("server: cran virtual member cycle")
-	errCranMemberType   = errors.New("server: cran virtual member has incompatible package type")
+	// errCranNoMember is a virtual index no member serves: every member
+	// missed, refused or was passed over. It is not found to the merged
+	// metadata cache, which drops the virtual repository's entry
+	// (virtual.Cache.Get), and the overlay answers it with an empty index,
+	// as it has before.
+	errCranNoMember = fmt.Errorf("server: cran: no member serves the index: %w",
+		kernel.ErrNotFound)
+	// errCranVirtualIndex is a virtual index this server could not keep in
+	// the merged metadata cache, or read back: its fault, answered 500.
+	errCranVirtualIndex = errors.New("server: cran: virtual index")
 )
 
 type cranIndexView struct {
@@ -105,7 +115,11 @@ func (s CranAPI) serveCranIndex(
 		httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 		return
 	}
-	if !acc.Folder(c, feed, accessapi.ActionRead) || !acc.File(c, req.Path, accessapi.ActionRead) {
+	if c.Class == repo.Virtual {
+		if !s.VirtualGate(w, r, st, c, req.Path, p, acc, "CRAN virtual members") {
+			return
+		}
+	} else if !acc.Folder(c, feed, accessapi.ActionRead) || !acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
 	}
@@ -145,50 +159,22 @@ func (s CranAPI) serveCranIndex(
 			return
 		}
 	}
-	var candidates []cranCandidate
+	var packages []cran.Package
 	var err error
 	var used func(context.Context) error
 	if c.Class == repo.Virtual {
-		candidates, err = s.cranCandidates(ctx, st, c, req.Path, p, acc, false,
-			map[string]bool{})
+		packages, err = s.virtualCranIndex(r, st, c, feed, req.Path, p, acc)
+		if errors.Is(err, errCranVirtualIndex) {
+			httpkit.WriteErr(w, r, s.InternalError(ctx, "CRAN virtual index", err))
+			return
+		}
 	} else {
-		var view cranIndexView
-		view, err = s.cranIndexRead(ctx, st, c, cached, false, req.Path,
-			itemkit.RemoteResource(r, req.Path).Query, pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
-			p, acc)
-		if err == nil && view.stored != nil {
-			var matches bool
-			matches, err = itemkit.MatchesMatrix(ctx, st, *view.stored, req)
-			if err == nil && !matches {
-				err = itemkit.Mismatched(c, req)
-			}
-		}
-		if err == nil && view.revalidate != nil {
-			err = view.revalidate(ctx)
-		}
-		if err == nil {
-			for _, pkg := range view.packages {
-				allowed, checkErr := cranPackageReadable(ctx, c, pkg.Path, acc,
-					view.checkPermission)
-				if checkErr != nil {
-					err = checkErr
-					break
-				}
-				if allowed {
-					candidates = append(candidates, cranCandidate{repo: c, pkg: pkg})
-				}
-			}
-		}
-		used = view.used
+		packages, used, err = s.ownCranIndex(r, st, c, cached, req, p, acc)
 	}
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "CRAN index",
 			pkgroute.SourceError(itemkit.ReadAnswer(c, cached, req, p, err), p.Anonymous)))
 		return
-	}
-	packages := make([]cran.Package, 0, len(candidates))
-	for _, candidate := range candidates {
-		packages = append(packages, candidate.pkg)
 	}
 	generated, err := cran.EncodeIndex(packages, feed)
 	if err != nil {
@@ -206,6 +192,42 @@ func (s CranAPI) serveCranIndex(
 	if sw.Complete(r) && used != nil {
 		_ = used(ctx)
 	}
+}
+
+// ownCranIndex is the packages the index req names of the local, federated
+// or remote repository c lists for the caller, with the read's used hook.
+func (s CranAPI) ownCranIndex(
+	r *http.Request, st itemkit.Store, c repo.Config, cached bool, req itemkit.ItemRequest,
+	p kernel.Principal, acc itemkit.Access,
+) ([]cran.Package, func(context.Context) error, error) {
+	ctx := r.Context()
+	view, err := s.cranIndexRead(ctx, st, c, cached, false, req.Path,
+		itemkit.RemoteResource(r, req.Path).Query, pkgroute.UpstreamMatrix(r.URL.EscapedPath()),
+		p, acc)
+	if err == nil && view.stored != nil {
+		var matches bool
+		matches, err = itemkit.MatchesMatrix(ctx, st, *view.stored, req)
+		if err == nil && !matches {
+			err = itemkit.Mismatched(c, req)
+		}
+	}
+	if err == nil && view.revalidate != nil {
+		err = view.revalidate(ctx)
+	}
+	if err != nil {
+		return nil, view.used, err
+	}
+	var packages []cran.Package
+	for _, pkg := range view.packages {
+		allowed, err := cranPackageReadable(ctx, c, pkg.Path, acc, view.checkPermission)
+		if err != nil {
+			return nil, view.used, err
+		}
+		if allowed {
+			packages = append(packages, pkg)
+		}
+	}
+	return packages, view.used, nil
 }
 
 // cranPackageReadable reports whether the caller has Read permission on a
@@ -359,117 +381,165 @@ func (s CranAPI) readCranBlob(ctx context.Context, sha string) ([]byte, error) {
 	return body, nil
 }
 
-// cranCandidates walks ordered virtual members. A package name belongs to
-// the first member that lists a readable row for it. A member whose
-// download policy refuses its index takes no part in the index, and only a
-// blacked-out one in a package GET (cranMemberRefusesIndex). With download
-// false, for the index, a row stays when the member's or the virtual
-// repository's patterns reject its file, which the index keeps as 7.x's
-// virtual indexes do (RTFACT-30656), so the name belongs to that row. With
-// download true, for a package GET, such a row is left out before names are
-// claimed, so the GET passes over that member to the next one that lists
-// the name, as it did before the index kept the row. A package GET also
-// keeps the later members' rows for the path that claimed the name, so a GET
-// whose matrix parameters the first member's file does not match can pass
-// over to the next (serveCranPackage).
-func (s CranAPI) cranCandidates(
-	ctx context.Context, st itemkit.Store, c repo.Config, indexPath string,
-	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
-) ([]cranCandidate, error) {
-	if seen[c.Key] || len(seen) >= 8 {
-		return nil, errCranVirtualCycle
+// cranProtocol is the protocol whose kit walks a CRAN virtual repository's
+// members (itemkit.Kit.Packages): the overlay reads each member's index
+// itself, so the sources only name the classes the walk keeps, a remote
+// member as its upstream step.
+func cranProtocol(k *itemkit.Kit) pkgroute.Protocol {
+	return pkgroute.Protocol{
+		Name:  "cran",
+		Types: []repo.PackageType{repo.Cran},
+		Sources: map[repo.Class]pkgroute.Source{
+			repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},
+			repo.Remote: pkgroute.Remote{Service: k.RemoteSources},
+		},
 	}
-	seen[c.Key] = true
-	defer delete(seen, c.Key)
+}
+
+// virtualCranIndex is the packages the virtual repository c's index of
+// feed lists for the caller, its members' (cran.Merger), which
+// serveCranIndex encodes as PACKAGES and PACKAGES.gz alike.
+// The members are the package handlers' walk (pkgroute.Collect) at
+// indexPath, the file the client asked for: 7.x's order, nested virtual
+// repositories flattened with a cycle or a diamond skipped, a member of
+// another type passed over (decision 0008, R1, R2 and R11), and each
+// member that misses, refuses or fails passed over with the rest listed
+// (R3); a failure is logged (Kit.WarnPassedOver) [I]. The set is kept for
+// c's virtualRetrievalCachePeriodSecs, which 7.x carries for CRAN (R8,
+// pkgroute.Kit.Merged; RTFACT-18674), so its files keep their bytes. An
+// index no member serves drops the kept set and lists nothing, as it has
+// before.
+//
+// c's own include and exclude patterns are not asked again: the overlay
+// has checked them at the file the client asked for.
+func (s CranAPI) virtualCranIndex(
+	r *http.Request, st itemkit.Store, c repo.Config, feed, indexPath string,
+	p kernel.Principal, acc itemkit.Access,
+) ([]cran.Package, error) {
+	k, err := s.Packages(cranProtocol(s.Kit), true)
+	if err != nil {
+		return nil, fmt.Errorf("cran: virtual index: %w", err)
+	}
+	open := c
+	open.IncludesPattern, open.ExcludesPattern = nil, nil
+	e, err := k.Merged(k.Bind(r, open), indexPath, feed+"/",
+		func(r *http.Request) (virtual.Entry, error) {
+			parts, err := pkgroute.Collect(k, r, indexPath,
+				func(mr *http.Request) ([]cran.Package, error) {
+					rows, err := s.memberCranPackages(mr, st, indexPath, "", p, acc)
+					k.WarnPassedOver(mr, err)
+					return rows, err
+				})
+			if err != nil {
+				return virtual.Entry{}, err //nolint:wrapcheck // the kit names the member and its fault
+			}
+			if len(parts) == 0 {
+				return virtual.Entry{}, errCranNoMember
+			}
+			packages, _ := cran.Merger{}.Merge(r.Context(), parts)
+			var body bytes.Buffer
+			if err := gob.NewEncoder(&body).Encode(packages); err != nil {
+				return virtual.Entry{}, fmt.Errorf("%w: %s", errCranVirtualIndex, err.Error())
+			}
+			return virtual.Entry{Body: body.Bytes()}, nil
+		})
+	if errors.Is(err, errCranNoMember) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the kit's and the merge's own answers
+	}
+	var packages []cran.Package
+	if err := gob.NewDecoder(bytes.NewReader(e.Body)).Decode(&packages); err != nil {
+		return nil, fmt.Errorf("%w: %s", errCranVirtualIndex, err.Error())
+	}
+	return packages, nil
+}
+
+// virtualCranCandidates are the members of the virtual repository c whose
+// index at indexPath lists the package at path, in the walk's order, each
+// with its row, so a GET whose matrix parameters the first member's file
+// does not match passes over to the next (serveCranPackage). The walk is
+// the package handlers' at the package's own path (pkgroute.Collect), so
+// each member's policy is checked at that path, never at the index read to
+// find it, as 6.20's VirtualRepoDownloadStrategy and the patterns FAQ have
+// it ("artifacts that match an exclude pattern are not resolved from that
+// repository"): a member whose patterns reject only its index still serves
+// the package, and one that rejects the package takes no part. A file the
+// first member does not list is looked for in the next, as 7.x's virtual
+// download finds a file in the first member that holds it (decision 0008,
+// R3), whatever version an earlier member lists of the package.
+func (s CranAPI) virtualCranCandidates(
+	r *http.Request, st itemkit.Store, c repo.Config, indexPath, path string,
+	p kernel.Principal, acc itemkit.Access,
+) ([]cranCandidate, error) {
+	k, err := s.Packages(cranProtocol(s.Kit), false)
+	if err != nil {
+		return nil, fmt.Errorf("cran: virtual package: %w", err)
+	}
+	open := c
+	open.IncludesPattern, open.ExcludesPattern = nil, nil
+	parts, err := pkgroute.Collect(k, k.Bind(r, open), path,
+		func(mr *http.Request) ([]cran.Package, error) {
+			rows, err := s.memberCranPackages(mr, st, indexPath, path, p, acc)
+			k.WarnPassedOver(mr, err)
+			return rows, err
+		})
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the kit names the member and its fault
+	}
 	var out []cranCandidate
-	// selected maps a package name to the path of the row that claimed it.
-	selected := map[string]string{}
-	for _, key := range c.Repositories {
-		member, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("cran: virtual member %s: %w", key, err)
-		}
-		if !cran.Serves(member.PackageType) {
-			return nil, fmt.Errorf("%w: %s", errCranMemberType, key)
-		}
-		feed, _, _ := cran.IndexPath(indexPath)
-		if !acc.Folder(member, feed, accessapi.ActionRead) ||
-			!acc.File(member, indexPath, accessapi.ActionRead) ||
-			cranMemberRefusesIndex(member, indexPath, download) {
-			continue
-		}
-		var entries []cranCandidate
-		if member.Class == repo.Virtual {
-			entries, err = s.cranCandidates(ctx, st, member, indexPath, p, acc, download, seen)
-		} else {
-			var view cranIndexView
-			view, err = s.cranMemberIndex(ctx, st, member, false, download, indexPath, p, acc)
-			if err == nil && view.revalidate != nil {
-				err = view.revalidate(ctx)
-			}
-			if err == nil {
-				for _, pkg := range view.packages {
-					if download && generic.CheckDownload(member, pkg.Path, false) != nil {
-						continue
-					}
-					allowed, checkErr := cranPackageReadable(
-						ctx,
-						member,
-						pkg.Path,
-						acc,
-						view.checkPermission,
-					)
-					if checkErr != nil {
-						err = checkErr
-						break
-					}
-					if allowed {
-						entries = append(entries, cranCandidate{repo: member, pkg: pkg})
-					}
-				}
-			}
-		}
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("cran: member %s index: %w", key, err)
-		}
-		for _, entry := range entries {
-			if claimed, ok := selected[entry.pkg.Name]; ok &&
-				(!download || claimed != entry.pkg.Path) ||
-				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) {
-				continue
-			}
-			if download && generic.CheckDownload(c, entry.pkg.Path, false) != nil {
-				continue
-			}
-			if _, ok := selected[entry.pkg.Name]; !ok {
-				selected[entry.pkg.Name] = entry.pkg.Path
-			}
-			out = append(out, entry)
+	for _, part := range parts {
+		for _, pkg := range part.Doc {
+			out = append(out, cranCandidate{repo: part.Member, pkg: pkg})
 		}
 	}
 	return out, nil
 }
 
-// cranMemberRefusesIndex reports whether a virtual repository's member
-// takes no part because its download policy refuses the index at
-// indexPath. The virtual index leaves out a member that refuses the
-// document. A package GET checks each member at the package's own path, as
-// 6.20's VirtualRepoDownloadStrategy does and as the patterns FAQ puts it
-// ("artifacts that match an exclude pattern are not resolved from that
-// repository"), so there the index is only the lookup that finds the file:
-// a blacked-out member, which refuses every file, takes no part, and
-// patterns that reject only the index leave the member's packages served.
-func cranMemberRefusesIndex(member repo.Config, indexPath string, download bool) bool {
-	if !download {
-		return generic.CheckDownload(member, indexPath, false) != nil
+// memberCranPackages reads the packages one member of a virtual repository
+// lists in its index at indexPath, through the member request mr, filtered
+// by the caller's Read in that member alone: no permission target can name
+// the virtual repository (decision 0006), so the member that serves a row
+// decides it (decision 0008, R3). A member whose index the caller may not
+// read is passed over as not found. For the virtual index (pkg "") a row
+// whose file the patterns reject stays, as 7.x's virtual indexes keep such
+// a package and refuse only its GET (RTFACT-30656); for a package GET (pkg
+// its path) only that package's row is kept, and the index is only the
+// lookup that finds it, so only a remote member's blackout refuses the
+// read (cranMemberIndex).
+func (s CranAPI) memberCranPackages(
+	mr *http.Request, st itemkit.Store, indexPath, pkg string, p kernel.Principal, acc itemkit.Access,
+) ([]cran.Package, error) {
+	ctx := mr.Context()
+	q := pkgroute.RequestFrom(mr)
+	m := q.Repo
+	feed, _, _ := cran.IndexPath(indexPath)
+	if !acc.Folder(m, feed, accessapi.ActionRead) || !acc.File(m, indexPath, accessapi.ActionRead) {
+		return nil, kernel.ErrForbidden
 	}
-	return member.Class != repo.Virtual && generic.CheckBlackedOut(member, indexPath) != nil
+	lookup := pkg != ""
+	view, err := s.cranMemberIndex(ctx, st, m, q.CacheOnly, lookup, indexPath, p, acc)
+	if err == nil && view.revalidate != nil {
+		err = view.revalidate(ctx)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("cran: member %s index: %w", m.Key, err)
+	}
+	var rows []cran.Package
+	for _, row := range view.packages {
+		if lookup && row.Path != pkg {
+			continue
+		}
+		allowed, err := cranPackageReadable(ctx, m, row.Path, acc, view.checkPermission)
+		if err != nil {
+			return nil, err
+		}
+		if allowed {
+			rows = append(rows, row)
+		}
+	}
+	return rows, nil
 }
 
 func (s CranAPI) serveCranPackage(
@@ -480,7 +550,11 @@ func (s CranAPI) serveCranPackage(
 		httpkit.WriteErr(w, r, itemkit.Missed(c, cached, req))
 		return
 	}
-	if !acc.File(c, req.Path, accessapi.ActionRead) {
+	if c.Class == repo.Virtual {
+		if !s.VirtualGate(w, r, st, c, req.Path, p, acc, "CRAN virtual members") {
+			return
+		}
+	} else if !acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
 	}
@@ -515,8 +589,7 @@ func (s CranAPI) serveCranPackage(
 	var candidates []cranCandidate
 	var err error
 	if c.Class == repo.Virtual {
-		candidates, err = s.cranCandidates(r.Context(), st, c, indexPath, p, acc, true,
-			map[string]bool{})
+		candidates, err = s.virtualCranCandidates(r, st, c, indexPath, req.Path, p, acc)
 	} else {
 		var view cranIndexView
 		view, err = s.cranMemberIndex(r.Context(), st, c, cached, true, indexPath, p, acc)

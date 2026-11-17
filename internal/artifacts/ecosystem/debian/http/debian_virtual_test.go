@@ -215,12 +215,14 @@ func TestAccDebianVirtualMetadataMergesReadableMembers(t *testing.T) {
 }
 
 // TestAccDebianVirtualMetadataFailsClosed: a virtual distribution is never
-// composed from part of its members, nor left unsigned when a key is
-// named. A member that cannot be looked up, is of another type, is itself
-// virtual, or whose Release or Packages is unreadable, malformed or
-// disagrees with its Release, a remote member with no source, and a
-// signing key that is not GPG or unusable each answer 500; a signing key
-// that is absent answers 404, as the key's lookup reports it not found.
+// composed from part of its members for a fault of this server's own, nor
+// left unsigned when a key is named. A member that cannot be looked up, or
+// whose Release or Packages is unreadable, malformed or disagrees with its
+// Release, a remote member with no source, and a signing key that is not
+// GPG or unusable each answer 500; a signing key that is absent answers
+// 404, as the key's lookup reports it not found. A member of another type
+// and a nested virtual repository are the walk's to pass over or flatten
+// (TestAccDebianVirtualWalksNestedMembersOnce).
 func TestAccDebianVirtualMetadataFailsClosed(t *testing.T) {
 	index := packagesIndex("alpha 1.0 " + debAlpha)
 	notAnIndex := []byte("not an index")
@@ -238,8 +240,6 @@ func TestAccDebianVirtualMetadataFailsClosed(t *testing.T) {
 				return faulty{serverStore: s, repo: "deb-local"}
 			})},
 		},
-		{name: "member of another package type", members: []string{kittest.LocalKey}},
-		{name: "virtual member", members: []string{"deb-inner"}},
 		{
 			name: "member Release does not parse", members: []string{"deb-other"},
 			seed: func(w *overlayWorld) { w.put("deb-other", debRelease, false, notAnIndex) },
@@ -281,9 +281,6 @@ func TestAccDebianVirtualMetadataFailsClosed(t *testing.T) {
 				repo.Config{Key: "deb-other", Class: repo.Local},
 				repo.Config{Key: "deb-remote", Class: repo.Remote},
 				repo.Config{
-					Key: "deb-inner", Class: repo.Virtual, Repositories: []string{"deb-local"},
-				},
-				repo.Config{
 					Key: "deb-virtual", Class: repo.Virtual, Repositories: tc.members,
 					KeyPair: tc.keyPair,
 				},
@@ -310,11 +307,13 @@ func TestAccDebianVirtualMetadataFailsClosed(t *testing.T) {
 }
 
 // TestAccDebianVirtualMetadataFromARemoteMember: a remote member's Release
-// and Packages come through its source. A Release the upstream lacks
-// leaves the member out, one it cannot serve answers its 502, and a stream
-// that fails is a server fault; a cached Release is read from the cache. A
-// listed package the source refuses is left out of the index, and one it
-// cannot check is a server fault.
+// and Packages come through its source. A Release the upstream lacks or
+// cannot serve leaves the member out, as the walk passes over a member
+// that fails (decision 0008, R3) [I], so with no other member the
+// distribution is not found; a stream that fails is a server fault; a
+// cached Release is read from the cache. A listed package the source
+// refuses is left out of the index, and a member whose listed package the
+// source cannot check is passed over as one that fails [I].
 func TestAccDebianVirtualMetadataFromARemoteMember(t *testing.T) {
 	index := packagesIndex("alpha 1.0 "+debAlpha, "beta 1.0 "+debBeta)
 	release := streamed(releaseFor(index), nil)
@@ -341,7 +340,7 @@ func TestAccDebianVirtualMetadataFromARemoteMember(t *testing.T) {
 			release: func(*overlayWorld) func() (source.Result, error) {
 				return failing(source.ErrUnavailable)
 			},
-			status: http.StatusBadGateway, message: "Bad Gateway",
+			status: http.StatusNotFound, message: "Could not find resource",
 		},
 		{
 			name: "Release stream fails",
@@ -376,7 +375,7 @@ func TestAccDebianVirtualMetadataFromARemoteMember(t *testing.T) {
 			name:     "listed package cannot be checked",
 			release:  func(*overlayWorld) func() (source.Result, error) { return release },
 			packages: streamed(index, checkFails(source.ErrUnavailable)),
-			status:   http.StatusInternalServerError, message: "internal error",
+			status:   http.StatusNotFound, message: "Could not find resource",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -455,9 +454,10 @@ func TestUnitDebianMemberBytesRefusesAPathTheSourceCannotName(t *testing.T) {
 // TestAccDebianVirtualPackage: a virtual repository serves a package from
 // the first member, in order, that may serve it and holds it as a file,
 // skipping members that are absent, blacked out, hold a folder there or
-// whose upstream lacks it. A caller who may not read it is refused; a
-// member that cannot be looked up or read, is of another type,
-// or is remote on a server without remote sources is a server fault; a
+// whose upstream lacks it, and one of another type, which the walk passes
+// over (decision 0008, R11). A caller who may not read it is refused; a
+// member that cannot be looked up or read, or is remote on a server
+// without remote sources, is a server fault; a
 // remote member's upstream fault answers 502, its stream is relayed and its
 // revoked cached copy is refused.
 func TestAccDebianVirtualPackage(t *testing.T) {
@@ -492,7 +492,7 @@ func TestAccDebianVirtualPackage(t *testing.T) {
 		},
 		{
 			name: "member of another package type", members: []string{kittest.LocalKey},
-			status: http.StatusInternalServerError, message: "internal error",
+			status: http.StatusNotFound, message: "Could not find resource",
 		},
 		{
 			name: "member item read fails", members: []string{"deb-local"},
@@ -603,7 +603,9 @@ func TestUnitDebianRemoteVirtualPackageRefusesAPathTheSourceCannotName(t *testin
 func TestUnitDebianRemoteReadsWithoutRemoteSources(t *testing.T) {
 	w := newOverlayWorld(t)
 	w.debRepos(
-		repo.Config{Key: "deb-remote", Class: repo.Remote},
+		// Priority resolution asks the remote before the local member
+		// (decision 0008, R1).
+		repo.Config{Key: "deb-remote", Class: repo.Remote, PriorityResolution: repo.Flex(true)},
 		repo.Config{Key: "deb-local", Class: repo.Local},
 		repo.Config{
 			Key: "deb-virtual", Class: repo.Virtual,
