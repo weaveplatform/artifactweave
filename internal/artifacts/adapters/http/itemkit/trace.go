@@ -240,6 +240,7 @@ func (s *Kit) traceDownload(
 		}
 	}
 	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
+	dl.selectVirtual = s.Items(st).SelectVirtual
 	dl.trace = t
 	dl.upstream = s.walkStep(r, req, p, acc)
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, virtual.Resolve)
