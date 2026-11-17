@@ -89,12 +89,14 @@ func TestAccVirtualMetadataCache(t *testing.T) {
 		c.Protocols = append(c.Protocols, mergeProtocol(&mu, &builds))
 		c.VirtualCache = cache
 	})
-	for key, body := range map[string]string{
-		"gen-b": `{"rclass":"local"}`,
-		"inner": `{"rclass":"virtual","repositories":["libs-local"]}`,
-		"outer": `{"rclass":"virtual","repositories":["inner","gen-b"]}`,
+	// A slice, not a map: outer names inner and gen-b, so they must exist
+	// before it, and a map's random order fails the PUT with a 400.
+	for _, repo := range []struct{ key, body string }{
+		{"gen-b", `{"rclass":"local"}`},
+		{"inner", `{"rclass":"virtual","repositories":["libs-local"]}`},
+		{"outer", `{"rclass":"virtual","repositories":["inner","gen-b"]}`},
 	} {
-		wantStatus(t, w.do(http.MethodPut, "/artifactory/api/repositories/"+key, "admin", body,
+		wantStatus(t, w.do(http.MethodPut, "/artifactory/api/repositories/"+repo.key, "admin", repo.body,
 			"Content-Type", "application/json"), http.StatusOK)
 	}
 	w.put("/artifactory/libs-local/idx/versions", "1.0")
