@@ -238,15 +238,22 @@ func (h handler) remoteTarball(w http.ResponseWriter, r *http.Request, name, pat
 	if !h.k.Require(w, r, path, api.ActionRead) {
 		return
 	}
-	doc, _, err := h.upstreamPackage(r, name, jsonType, path)
+	result, err := h.remoteTarballResult(r, name, path)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
+	h.k.ServeResult(w, r, result)
+}
+
+func (h handler) remoteTarballResult(r *http.Request, name, path string) (source.Result, error) {
+	doc, _, err := h.upstreamPackage(r, name, jsonType, path)
+	if err != nil {
+		return source.Result{}, err
+	}
 	var versions map[string]remoteDocument
 	if json.Unmarshal(doc["versions"], &versions) != nil {
-		h.k.Error(w, r, remoteProtocolError())
-		return
+		return source.Result{}, remoteProtocolError()
 	}
 	for v, manifest := range versions {
 		if npmfmt.CanonicalPath(name, v) != path {
@@ -254,8 +261,7 @@ func (h handler) remoteTarball(w http.ResponseWriter, r *http.Request, name, pat
 		}
 		dist, distErr := remoteDist(pkgroute.RequestFrom(r).Repo, name, v, manifest)
 		if distErr != nil {
-			h.k.Error(w, r, distErr)
-			return
+			return source.Result{}, distErr
 		}
 		resource := pkgroute.Resource(r, path, escapePath(path))
 		resource.Accept = "application/octet-stream"
@@ -269,17 +275,17 @@ func (h handler) remoteTarball(w http.ResponseWriter, r *http.Request, name, pat
 		resource.EscapedPath = ""
 		result, readErr := h.k.Read(r, resource)
 		if readErr != nil {
-			h.k.Error(w, r, readErr)
-			return
+			return result, fmt.Errorf("npm tarball read: %w", readErr)
 		}
 		if err = dist.integrity.checkResult(r.Context(), h.k, result); err != nil {
-			h.k.Error(w, r, err)
-			return
+			if result.Stream != nil {
+				_ = result.Stream.Body.Close()
+			}
+			return source.Result{}, err
 		}
-		h.k.ServeResult(w, r, result)
-		return
+		return result, nil
 	}
-	h.k.Error(w, r, notFound(r))
+	return source.Result{}, notFound(r)
 }
 
 func (h handler) remoteSearch(w http.ResponseWriter, r *http.Request) {

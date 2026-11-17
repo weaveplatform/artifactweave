@@ -33,12 +33,12 @@
     ]
   },
   "install": {
-    "classes": "LR",
+    "classes": "LRV",
     "note": "Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.",
     "steps": [
       {
         "language": "sh",
-        "code": "npm ping\nnpm view acme-pub dist-tags.latest\nnpm install acme-pub@1.0.0",
+        "code": "npm view acme-pub dist-tags.latest\nnpm install acme-pub@1.0.0",
         "note": "Replace the package coordinates with a package available in this repository."
       }
     ]
@@ -46,7 +46,7 @@
   "limitations": [
     "For verification, use a new project with no node_modules/lockfile and a new npm cache.",
     "A repeated publish of an existing version is refused; --force does not make publication idempotent.",
-    "The catalog also registers virtual/federated classes, but this recipe only advertises classes with matching native-client evidence. Registered configuration support alone is not a native recipe qualification; remaining virtual/federated proof belongs to the follow-on phase."
+    "Virtual npm supports packuments, version documents, dist-tag lists and immutable tarballs over readable members. Virtual publication/authentication, ping/whoami, search and signing keys remain separate tickets and answer 501. Federated native-client qualification remains follow-on work."
   ],
   "evidence": [
     {
@@ -75,6 +75,15 @@
       "contains": [
         "npm",
         "remote"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/npm_virtual.feature",
+      "contains": [
+        "cold mixed dependency tree",
+        "npm ci",
+        "local winner",
+        "npm 12"
       ]
     }
   ]

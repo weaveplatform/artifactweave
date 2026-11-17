@@ -227,7 +227,7 @@ stale, so 7.x cannot refuse one either ([J] RTFACT-30472, RTFACT-29708).
 | What 7.x does with the dist-tags and deprecation of a tarball overwritten with other content. artifactweave clears every property of a file overwritten with other content, for every package type, as 6.20's `DbStoringRepoMixin.clearOldFileData` does (decision [0004](decisions/0004-storage-sql-metadata-and-blobs.md)), so the dropped version's `npm.disttag` and `npm.deprecated` go unless the write brings its own, and a later conversion hands none of them on ([#515](https://github.com/weaveplatform/artifactweave/issues/515), [#518](https://github.com/weaveplatform/artifactweave/issues/518)) | [I] |
 | In a local repository a pre-release does not become `latest` while a stable version exists: with 1.0.0 and 1.0.1-2 published, `latest` is 1.0.0 | [J] RTFACT-30783 (a local repository on 7.94.1), RTFACT-17732 (6.5.1) |
 | Virtual repositories merge `latest` by the same stable-first rule from 7.120.0; the release notes do not list it | [KB] 000007043 (virtual repositories only) |
-| In a virtual repository a custom dist-tag resolves to the first member, in resolution order, that has it; `artifactory.npm.merge.latest.dist.tag.base.strategy.enabled=true` (from 7.75.3) takes the highest SemVer version across members instead, or the newest with `tagLatestByPublish` | [D] npm-repositories, "Configure Distribution Tag Behavior" |
+| In a virtual repository a custom dist-tag resolves to the first member, in resolution order, that has it; `artifactory.npm.merge.latest.dist.tag.base.strategy.enabled=true` (from 7.75.3) takes the highest SemVer version across members instead, independently of `tagLatestByPublish` | [D] npm-repositories, "Configure Distribution Tag Behavior" |
 
 ## 8. What the JFrog CLI sends
 
@@ -403,3 +403,33 @@ property following and `package.json` validation. They stay on
 section 10 added. The audit confirmed the other two 6.20 claims: the four `npm.*` property
 keys and the keyword format ([J] RTFACT-30834), and anonymous access to `-/user/` ([KB]
 000004147).
+
+### P10 NPM-01 virtual reads (2026-11-17)
+
+The official [npm repository documentation](https://docs.jfrog.com/artifactory/docs/npm-repositories),
+"Configure Distribution Tag Behavior", identifies the optional custom-tag strategy
+introduced in 7.75.3: first member by default, highest SemVer when enabled. It does
+not rank custom tags by publish date. The verified official 7.161.26 OSS archive's
+`base/config/src/main/java/org/artifactory/common/ConstantValues.java` records both
+`npmTagLatestByPublish` (line 281) and `npmMergeLatestDistTagBaseStrategyEnabled`
+(line 722) as false [S]. Artifactweave exposes the latter as the server setting
+`npm.merge_dist_tags_by_version`, alongside the existing publish-date setting.
+
+The [priority-resolution support article](https://jfrog.com/help/r/artifactory-virtual-repository-returns-older-package-version-when-priority-resolution-is-enabled)
+(KB000007043) describes stable-first latest selection in 7.120.0 and later [D].
+Package-level priority therefore filters contributors before computing latest.
+Whole winning manifests retain upstream JSON types and unknown fields; rendering
+changes the tarball URL per request without mutating cached models.
+
+The OSS distribution omits the closed npm merger, so these remain explicit
+inferences pending P19 and are tracked on #216 [I]: earliest valid `time.created`,
+latest valid `time.modified`, other top-level fields from the first contributing
+member; remote 502/504 and remote-owned upstream 401/403 are logged and passed over;
+package-folder Read derives from flattened real members before document policy,
+with each version still separately filtered. Equivalent SemVer spellings tied on
+publish time retain first-member order and lexical order within a member, giving
+stable latest and ETags without discarding raw versions. A cached advertised
+version retains its winning digest until expiry; a contributing file 404 evicts
+the model, while a later readable duplicate may serve only identical bytes.
+Direct strict-layout file reads remain independent of packument policy or absence;
+a metadata storage failure remains a server fault.

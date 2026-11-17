@@ -51,6 +51,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
 		repo.Federated: pkgroute.Local{},
+		repo.Virtual:   virtualSource{},
 	}
 	if o.RemoteSources != nil {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}
@@ -75,6 +76,7 @@ func Protocol(o Options) pkgroute.Protocol {
 }
 
 func routes(r chi.Router, h handler) {
+	r.Use(h.virtualRouteGate)
 	r.Get("/-/ping", h.ping)
 	r.Get("/-/whoami", h.whoami)
 	r.Get("/-/v1/search", h.search)
@@ -124,6 +126,10 @@ func (h handler) whoami(w http.ResponseWriter, r *http.Request) {
 // of a version or dist-tag, and a path with a "-" segment a tarball, served
 // as the item at that path.
 func (h handler) read(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualRead(w, r)
+		return
+	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.remoteRead(w, r)
 		return

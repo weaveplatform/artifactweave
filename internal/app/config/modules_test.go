@@ -28,6 +28,7 @@ func TestUnitModuleSettingsFromConfig(t *testing.T) {
 		Flags: map[string]string{
 			"gc.interval":                       "7m",
 			"gc.grace_period":                   "3h",
+			"npm.merge_dist_tags_by_version":    "true",
 			"npm.enforce_path":                  "true",
 			"cran.archive_mover_enabled":        "true",
 			"huggingface.xet_enabled":           "true",
@@ -86,7 +87,7 @@ func TestUnitModuleSettingsFromConfig(t *testing.T) {
 			Debian: debian.Settings{DisableMetadataValidation: true},
 			// relative_urls: false, which only a non-nil pointer carries.
 			Helm: helm.Settings{RelativeURLs: &relativeURLs},
-			NPM:  npm.Settings{TagLatestByPublish: true, EnforcePath: true},
+			NPM:  npm.Settings{TagLatestByPublish: true, MergeDistTagsByVersion: true, EnforcePath: true},
 			PyPI: pypi.Settings{
 				EnforceLayout:              true,
 				EnforceNamingNormalization: true,

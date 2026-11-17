@@ -49,12 +49,11 @@ npm publish ./producer
 
 ## Install or resolve
 
-Classes: **local, remote**. Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.
+Classes: **local, remote, virtual**. Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.
 
 Replace the package coordinates with a package available in this repository.
 
 ```sh
-npm ping
 npm view acme-pub dist-tags.latest
 npm install acme-pub@1.0.0
 ```
@@ -65,7 +64,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - For verification, use a new project with no node_modules/lockfile and a new npm cache.
 - A repeated publish of an existing version is refused; --force does not make publication idempotent.
-- The catalog also registers virtual/federated classes, but this recipe only advertises classes with matching native-client evidence. Registered configuration support alone is not a native recipe qualification; remaining virtual/federated proof belongs to the follow-on phase.
+- Virtual npm supports packuments, version documents, dist-tag lists and immutable tarballs over readable members. Virtual publication/authentication, ping/whoami, search and signing keys remain separate tickets and answer 501. Federated native-client qualification remains follow-on work.
 
 ## Verification sources
 
@@ -77,3 +76,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/npm_search_auth.feature](../../test/acceptance/features/npm_search_auth.feature).
 - Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).
 - Evidence: [test/acceptance/features/npm_remote.feature](../../test/acceptance/features/npm_remote.feature).
+- Evidence: [test/acceptance/features/npm_virtual.feature](../../test/acceptance/features/npm_virtual.feature).
