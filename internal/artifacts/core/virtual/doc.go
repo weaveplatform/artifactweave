@@ -40,7 +40,8 @@
 //     effective order (decision 0008, R1 and R2): Resolve for downloads,
 //     Package for package handlers and Stored for the storage API; and
 //     Walk, every route from a virtual repository to each member, for the
-//     searches that judge a member by the route that reached it.
+//     searches and the folder index that judge a member by the route that
+//     reached it.
 //   - resolve.go: Resolution and Denial, what a download's walk over the
 //     members found and the first member that refused the caller Read
 //     (R3), and Answer, the item route's 404, 403 or 401 for a walk that
@@ -120,7 +121,9 @@
 // https://github.com/weaveplatform/artifactweave/issues/1536); and the
 // merged metadata cache (Cache;
 // https://github.com/weaveplatform/artifactweave/issues/1543), which the
-// families wire into their merges. The rest of
+// families wire into their merges. The storage API's views and the folder
+// index of a virtual repository read its members through Stored and Walk
+// (https://github.com/weaveplatform/artifactweave/issues/1537). The rest of
 // the package is planned for P10's other tickets
 // (https://github.com/weaveplatform/artifactweave/issues/1521).
 //

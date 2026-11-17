@@ -167,11 +167,12 @@ func TestAccStorageAnswersMissAndRefusal(t *testing.T) {
 		{"admin", "nostore/pkg/x?list", 404, "Could not find resource"},
 		{"", "missing/x?list", 403, "This resource is available to authenticated users only."},
 		// A virtual repository is never asked itself: its members decide
-		// (#1533), so deployer, who reads libs-local, gets its item, and
-		// anonymous, who reads only the remote, is answered the miss. The
-		// answers themselves are #1537's.
-		{"reader", "virt/a/missing.bin", 404, "Could not find resource"},
-		{"", "virt/a/file.bin", 404, "Could not find resource"},
+		// (#1533). An item no member the caller may read holds is
+		// getVirtualRepoItem's null, 404 with RestResponseFilter's reason
+		// phrase, so anonymous, who reads only the remote, learns nothing
+		// of libs-local's file (#1537).
+		{"reader", "virt/a/missing.bin", 404, "Not Found"},
+		{"", "virt/a/file.bin", 404, "Not Found"},
 		{"admin", "virt/a/file.bin?list", 400, "/a/file.bin is a file; list needs a folder"},
 	})
 }
@@ -272,7 +273,8 @@ func storageBody(t *testing.T, w *itemWorld, as, target, media string) map[strin
 // local and remote counts, and a file never downloaded, a folder and a root
 // with zero counts, each under its download URL as the request named it,
 // trailing "/" and a remote's own key included, in a local repository, a
-// remote's cache by either key and the trash can.
+// remote's cache by either key and the trash can. A virtual repository's
+// path is refused or not found, as 7.x keeps no statistics for one.
 func TestAccStorageAnswersStats(t *testing.T) {
 	w := storageAnswersWorld(t, true)
 	setTrashcan(t, w.db, true)
@@ -320,21 +322,17 @@ func TestAccStorageAnswersStats(t *testing.T) {
 			t.Errorf("%s?stats: %v, want %v", c.target, got, want)
 		}
 	}
-	// A virtual repository keeps its statistics body until P10 rewrites it
-	// (#1537): a member's file under the storage API URL, 400 for a folder.
-	got := storageBody(t, w, "admin", "virt/a/file.bin?stats", mediaStats)
-	if want := decodeObject(
-		t,
-		`{"uri":"https://reg.example/artifactory/api/storage/virt/a/file.bin",`+
-			`"downloadCount":3,"lastDownloaded":1700000000000,"lastDownloadedBy":"admin"}`,
-	); !reflect.DeepEqual(
-		got,
-		want,
-	) {
-		t.Errorf("virt/a/file.bin?stats: %v, want %v", got, want)
-	}
+	// A virtual repository keeps no statistics: prepareStatsResponse asks
+	// canRead of the virtual path, which only plain ANY's grants match
+	// (reader's group), then finds no such path (RTFACT-12026), whatever a
+	// member's file has counted (#1537).
 	wantStorageAnswers(t, w, []storageAnswer{
-		{"admin", "virt/a?stats", 400, "/a is a folder; statistics are kept for files"},
+		{"admin", "virt/a/file.bin?stats", 404, "Unable to find item path"},
+		{"reader", "virt/a/file.bin?stats", 404, "Unable to find item path"},
+		{"admin", "virt/a?stats", 404, "Unable to find item path"},
+		{"admin", "virt?stats", 404, "Unable to find item path"},
+		{"deployer", "virt/a/file.bin?stats", 403, refusedAs("virt:a/file.bin", "deployer")},
+		{"deployer", "virt?stats", 403, refusedAs("virt:", "deployer")},
 	})
 }
 
