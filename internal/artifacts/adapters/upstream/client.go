@@ -304,6 +304,7 @@ func (c *Client) Do(ctx context.Context, r remote.Request) (*http.Response, erro
 		cancel()
 		return nil, remote.ErrSecurity
 	}
+	remote.SetOriginHeaders(req)
 	client := c.requestClient(ctx, r)
 
 	res, err := client.Do(req)
@@ -496,6 +497,7 @@ func (c *Client) requestClient(ctx context.Context, r remote.Request) *http.Clie
 		if out.Header != nil && remote.Origin(next.URL) == remote.Origin(via[0].URL) {
 			out.Header(next)
 		}
+		remote.SetOriginHeaders(next)
 		return nil
 	}
 	return &client
@@ -531,6 +533,7 @@ func (c *Client) Prepare(req *http.Request) error {
 // and prepares req first. The error is the HTTP client's own, unwrapped and
 // not classified, and a successful call transfers response-body ownership.
 func (c *Client) Send(req *http.Request) (*http.Response, error) {
+	remote.SetOriginHeaders(req)
 	transport := *c.http
 	transport.CheckRedirect = func(*http.Request, []*http.Request) error { return remote.ErrRedirect }
 	// gosec's taint analysis cannot see that the caller checks req's target

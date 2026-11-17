@@ -107,3 +107,35 @@ reserved-header rules are deliberate security restrictions, not observed Artifac
 responses. RC-6/#216 retains comparative captures for these differences. The loopback
 Basic/Bearer/mTLS/HTTP(S)-proxy tests prove this implementation, including sealed-store
 reads, denied redirects, malicious token realms, mixed DNS answers, rotation and redaction.
+
+## Virtual origin requests (P10, #1542)
+
+Every repository upstream request sends `X-Artifactory-Originated` with the incoming
+trace followed by this process's host identity, and `Origin-Artifactory` with that
+identity. Both names are reserved: configured headers cannot override them. These
+markers grant no permissions. Smart Remote adds its own node/repository trace and
+retains its separate eight-hop loop guard.
+
+When either marker is present, a virtual whose
+`artifactoryRequestsCanRetrieveRemoteArtifacts` is false (the default) searches
+remote caches without contacting upstreams, including when cached copies have aged
+out. The requested virtual's flag governs the whole walk. Native Swift, Terraform
+and Composer routes are exempt; item routes apply the restriction to every type.
+An item download with more than one origin value including this host answers 404
+`Recursive call detected for '<request URI>'. Returning nothing.` before lookup.
+
+Source: Artifactory 7.161.26 `HttpRepo.addDefaultHeadersAndQueryParams`,
+`HttpArtifactoryRequest.isRecursive` and `VirtualRepositoriesResolver.addRemoteRepo`;
+decision 0008 R7. **[I], P19/#216:** the host identity is 24 hexadecimal characters
+from a SHA-256 hash of process-random identity material. It lasts until process
+restart, matching the lifecycle of the source's permitted JVM VMID; no configured
+node identity exists yet. The native-route exemptions remain inferred.
+
+Concurrent retrievals with different origin traces use separate in-flight work,
+while retaining the same persistent cache keys. This prevents a returning hop
+from waiting on its own original fill before the recursion guard can answer.
+
+`TestAccVirtualOriginLoopbackChain` exercises real loopback HTTP requests with
+the flag disabled and enabled, then a recursive source. `TestUnitOriginTrace`
+checks both markers and reserved-header assembly; the transport and Smart suites
+cover hook coexistence. Ordinary requests keep their existing retrieval behavior.

@@ -37,6 +37,7 @@ Feature: Generic remote retrieval through native clients
     Then the command succeeds
     And the server answered no request with 500 since the last command
     And the generic upstream received 1 GET requests for "/jf.bin"
+    And the generic upstream received a GET for "/jf.bin" with origin headers
     When I GET "/artifactory/api/storage/remote-cache/curl.bin" as "reader" with password "Reader-pass1"
     Then the response status is 200
     And the JSON field "repo" equals "remote-cache"
@@ -249,3 +250,22 @@ Feature: Generic remote retrieval through native clients
     And the output contains "browse-local/local.bin"
     And the output does not contain "live.bin"
     And the generic upstream received 0 GET requests for "/live.bin"
+
+  Scenario: curl origin markers restrict a virtual to cached remote content
+    When I PUT "/artifactory/api/repositories/origin-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"generic","repositories":["remote"]}
+      """
+    Then the response status is 200
+    When I run curl "--silent --show-error --user admin:{password} --header Origin-Artifactory:peer {url}/origin-virtual/curl.bin"
+    Then the command succeeds
+    And the generic upstream received 0 GET requests for "/curl.bin"
+    When I POST "/artifactory/api/repositories/origin-virtual" as admin with body:
+      """
+      {"artifactoryRequestsCanRetrieveRemoteArtifacts":true}
+      """
+    Then the response status is 200
+    When I run curl "--fail --silent --show-error --user admin:{password} --header Origin-Artifactory:peer {url}/origin-virtual/curl.bin"
+    Then the command succeeds
+    And the output contains "curl remote bytes"
+    And the generic upstream received 1 GET requests for "/curl.bin"
