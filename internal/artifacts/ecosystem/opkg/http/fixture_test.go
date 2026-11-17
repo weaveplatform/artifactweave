@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
@@ -22,9 +23,12 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit/kittest"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/opkg"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
@@ -36,12 +40,16 @@ type Config struct {
 	Blobs         blob.Store
 	RemoteSources *source.Service
 	Access        accessapi.API
+	// Cache is the merged virtual metadata cache, a fresh one per world
+	// as the router holds one per server.
+	Cache *virtual.Cache
 }
 
 // serverStore is the store the router's worlds hold: the item kit's, and
 // the access module's, which the router binds over the same store.
 type serverStore interface {
 	itemkit.Store
+	pkgroute.Store
 	accesstest.Store
 }
 
@@ -49,11 +57,12 @@ type serverStore interface {
 // of the router's overlays, only it serves an Opkg repository.
 func newKit(c Config) *itemkit.Kit {
 	return itemkit.New(itemkit.Deps{
-		Store:         c.Store,
-		Blobs:         c.Blobs,
-		RemoteSources: c.RemoteSources,
-		Access:        c.Access,
-		Overlays:      []itemkit.Overlay{TryOpkgItem},
+		Store:          c.Store,
+		Blobs:          c.Blobs,
+		RemoteSources:  c.RemoteSources,
+		Access:         c.Access,
+		Overlays:       []itemkit.Overlay{TryOpkgItem},
+		PackageOptions: pkgroute.Options{Store: c.Store, Cache: c.Cache},
 	})
 }
 
@@ -86,7 +95,7 @@ type itemWorld struct {
 func newItemWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 	t.Helper()
 	k := kittest.New(t, inmem.New())
-	c := Config{Store: k.Store, Blobs: k.Blobs}
+	c := Config{Store: k.Store, Blobs: k.Blobs, Cache: virtual.NewCache(virtual.CacheOptions{})}
 	for _, f := range tune {
 		f(&c)
 	}
@@ -156,3 +165,19 @@ type sourceBody struct {
 }
 
 func (b *sourceBody) Close() error { b.closes.Add(1); return nil }
+
+// virtualFeedOf is the packages the virtual repository c's feed at
+// opkgFeed lists to an administrator, as the overlay builds it.
+func virtualFeedOf(
+	t *testing.T, svc opkgItems, st itemkit.Store, c repo.Config,
+) ([]opkg.Package, error) {
+	t.Helper()
+	p, acc := kittest.Admin, kittest.AdminAccess()
+	r := httptest.NewRequestWithContext(
+		accessapi.WithCaller(t.Context(), p, acc.Decider), http.MethodGet, "/", nil)
+	files, err := svc.virtualOpkgFeed(r, st, c, "feed", p, acc)
+	if err != nil {
+		return nil, err
+	}
+	return opkg.DecodeIndex(files[opkg.PackagesName], opkgFeed)
+}

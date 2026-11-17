@@ -148,7 +148,7 @@ Feature: Native Alpine repository indexes and apk installs
     Then the command succeeds
     And the file "alpine-root/usr/share/hello/message.txt" contains "second member"
 
-  Scenario: apk installs a remote member through a signed virtual repository offline
+  Scenario: apk installs a local and a remote member through a signed virtual repository offline
     Given the registry is running
     And the Alpine client can reach the registry
     When I create an Alpine signing pair "apk-sign" with alias "test"
@@ -160,22 +160,34 @@ Feature: Native Alpine repository indexes and apk installs
       {"rclass":"remote","packageType":"alpine","url":"{upstream}"}
       """
     Then the response status is 200
+    When I PUT "/artifactory/api/repositories/apk-local-member" as admin with body:
+      """
+      {"rclass":"local","packageType":"alpine","primaryKeyPairRef":"apk-sign"}
+      """
+    Then the response status is 200
+    Given a signed Alpine package "local-hello" at "1.0-r0" under "apk-local"
+    When I deploy the file "apk-local/local-hello-1.0-r0.apk" to "/artifactory/apk-local-member/v3.20/main/x86_64/local-hello-1.0-r0.apk" as admin
+    Then the response status is 201
+    When I GET "/artifactory/apk-local-member/v3.20/main/x86_64/APKINDEX.tar.gz" as admin until the response status is 200
+    Then the response status is 200
     When I PUT "/artifactory/api/repositories/apk-remote-virtual" as admin with body:
       """
-      {"rclass":"virtual","packageType":"alpine","repositories":["apk-remote-member"],"keyPair":"apk-sign"}
+      {"rclass":"virtual","packageType":"alpine","repositories":["apk-local-member","apk-remote-member"],"keyPair":"apk-sign"}
       """
     Then the response status is 200
     When I GET "/artifactory/apk-remote-virtual/v3.20/main/x86_64/hello-1.0-r0.apk" as admin
     Then the response status is 200
     Given the apk repository is "apk-remote-virtual"
-    When I run apk "add hello"
+    When I run apk "add hello local-hello"
     Then the command succeeds
     And the file "alpine-root/usr/share/hello/message.txt" contains "installed hello"
+    And the file "alpine-root/usr/share/local-hello/message.txt" contains "installed local-hello"
     Given the generic upstream stops
     When I clear the apk installation root
-    And I run apk "add hello"
+    And I run apk "add hello local-hello"
     Then the command succeeds
     And the file "alpine-root/usr/share/hello/message.txt" contains "installed hello"
+    And the file "alpine-root/usr/share/local-hello/message.txt" contains "installed local-hello"
 
   Scenario: delete, restore and reindex track the signed local package set
     Given the registry is running

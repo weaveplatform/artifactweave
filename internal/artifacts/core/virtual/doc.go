@@ -140,6 +140,10 @@
 // (Index), Composer (Releases) and Swift (Releases), each in its
 // ecosystem/<type>/virtual.go
 // (https://github.com/weaveplatform/artifactweave/issues/1539).
+// Alpine (APKINDEX.tar.gz), RPM (repodata) and Opkg (the feed) implement
+// it over their package rows, each in its ecosystem/<type>/virtual.go, and
+// keep Alpine's and RPM's merges in Cache
+// (https://github.com/weaveplatform/artifactweave/issues/1551).
 //
 // # Testing
 //

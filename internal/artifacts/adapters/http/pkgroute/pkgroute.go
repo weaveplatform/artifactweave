@@ -355,16 +355,7 @@ type Kit struct {
 // before the generated servers are mounted (decision 0032), and returns the
 // kit p's routes were given.
 func Mount(r chi.Router, o Options, p Protocol) *Kit {
-	k := &Kit{o: o, p: p, prefix: "/artifactory/api/" + p.Name}
-	if k.p.Sources == nil {
-		k.p.Sources = map[repo.Class]Source{repo.Local: Local{}, repo.Federated: Local{}}
-	}
-	if _, ok := k.p.Sources[repo.Virtual].(Virtual); ok {
-		// A copy, so binding never reaches into a map the protocol mounts
-		// elsewhere too.
-		k.p.Sources = maps.Clone(k.p.Sources)
-		k.p.Sources[repo.Virtual] = Virtual{k: k}
-	}
+	k := newKit(o, p)
 	for _, path := range p.Reserved {
 		k.reserved = append(k.reserved, strings.Split(path, "/"))
 	}
@@ -405,6 +396,22 @@ func Mount(r chi.Router, o Options, p Protocol) *Kit {
 			}
 			h.Serve(w, r, k)
 		})
+	}
+	return k
+}
+
+// newKit is the kit of p over o, its Sources defaulted and its Virtual
+// source bound to it, before any route is claimed.
+func newKit(o Options, p Protocol) *Kit {
+	k := &Kit{o: o, p: p, prefix: "/artifactory/api/" + p.Name}
+	if k.p.Sources == nil {
+		k.p.Sources = map[repo.Class]Source{repo.Local: Local{}, repo.Federated: Local{}}
+	}
+	if _, ok := k.p.Sources[repo.Virtual].(Virtual); ok {
+		// A copy, so binding never reaches into a map the protocol mounts
+		// elsewhere too.
+		k.p.Sources = maps.Clone(k.p.Sources)
+		k.p.Sources[repo.Virtual] = Virtual{k: k}
 	}
 	return k
 }

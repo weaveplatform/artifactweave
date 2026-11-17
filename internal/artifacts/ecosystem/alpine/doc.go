@@ -21,8 +21,8 @@
 //     queue, which runs the index rebuild (KindIndex) through Handler.Work
 //     and every format's reindex, the reindex operation's included,
 //     through Handler.Reindex; the protocol (alpinehttp), which reads
-//     member indexes (DecodeIndex) and writes a virtual repository's
-//     (EncodeIndex, SigningKey); and the item kit
+//     member indexes (DecodeIndex), merges them (Merger) and writes a
+//     virtual repository's (EncodeIndex, SigningKey); and the item kit
 //     (artifacts/adapters/http/itemkit), whose remote source request checks
 //     an upstream index or package before a remote caches it
 //     (ParseIndexPath, DecodeIndex, ParsePath, ReadPackage), and whose item
@@ -53,6 +53,10 @@
 //   - The index rules: ParseIndexPath, DecodeIndex, EncodeIndex,
 //     Package.IndexRecord and SigningKey.
 //   - The stored names: KindIndex, IndexName and the Prop* property names.
+//   - Merger: the virtual.Merger (artifacts/core/virtual) of a virtual
+//     repository's APKINDEX.tar.gz, which the protocol builds through the shared
+//     engine: its members' packages, one per path, the first member's row
+//     first.
 //
 // # Invariants
 //
@@ -103,7 +107,8 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P29 group (issues #757 to
-// #760). Moved here in P9d.
+// #760). Moved here in P9d. Merger added in P10
+// (https://github.com/weaveplatform/artifactweave/issues/1551).
 //
 // # Testing
 //
@@ -123,6 +128,8 @@
 //     derive and removal failures.
 //   - contract_test.go: the format contract suite (artifacts/core/formattest)
 //     with KindIndex as the repository's work.
+//   - virtual_test.go: the Merger keeps the first member's row of each
+//     package path, in the walk's order.
 //
 // The protocol's native apk evidence is the @alpine acceptance partition
 // (test/acceptance/features/alpine.feature).

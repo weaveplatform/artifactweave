@@ -146,7 +146,12 @@ func TestAccRPMSourceValidationUsesIndependentUpstreamMetadata(t *testing.T) {
 	}
 }
 
-func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t *testing.T) {
+// TestAccRPMVirtualMemberGraphPassesOverCyclesAndWrongTypes: the virtual
+// repodata walks its members as the package handlers do (decision 0008):
+// a cycle is skipped and a member of another type passed over, so both
+// answer the empty repodata, while a remote member on a server with no
+// source service is this server's fault and answers 500.
+func TestAccRPMVirtualMemberGraphPassesOverCyclesAndWrongTypes(t *testing.T) {
 	w := newItemWorld(t)
 	for _, c := range []repo.Config{
 		{Key: "rpm-wrong", Class: repo.Local, PackageType: repo.Maven},
@@ -169,33 +174,6 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 	}
 	svc := RPMAPI{newKit(Config{Store: w.db, Blobs: w.blobs})}
 	for _, tc := range []struct {
-		key      string
-		expected error
-	}{
-		{"rpm-missing", nil},
-		{"rpm-cycle", errRPMVirtualCycle},
-		{"rpm-mixed", errRPMMemberType},
-		{"rpm-offline", source.ErrUnavailable},
-	} {
-		c, err := w.db.Repos().Get(t.Context(), tc.key)
-		if err != nil {
-			t.Fatal(err)
-		}
-		packages, err := svc.rpmCandidates(
-			t.Context(),
-			w.db,
-			c,
-			"",
-			p,
-			acc,
-			false,
-			map[string]bool{},
-		)
-		if !errors.Is(err, tc.expected) || (tc.expected == nil && len(packages) != 0) {
-			t.Errorf("%s: packages=%v error=%v, want %v", tc.key, packages, err, tc.expected)
-		}
-	}
-	for _, tc := range []struct {
 		path   string
 		user   string
 		status int
@@ -204,13 +182,15 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 		{"/artifactory/rpm-missing/repodata/not-published.xml", "admin", http.StatusNotFound},
 		{"/artifactory/rpm-missing/repodata/repomd.xml?download=1", "admin", http.StatusOK},
 		{"/artifactory/rpm-missing/repodata/repomd.xml", "user", http.StatusForbidden},
-		{"/artifactory/rpm-cycle/repodata/repomd.xml", "admin", http.StatusInternalServerError},
-		{"/artifactory/rpm-mixed/repodata/repomd.xml", "admin", http.StatusInternalServerError},
+		{"/artifactory/rpm-cycle/repodata/repomd.xml", "admin", http.StatusOK},
+		{"/artifactory/rpm-mixed/repodata/repomd.xml", "admin", http.StatusOK},
+		{"/artifactory/rpm-offline/repodata/repomd.xml", "admin", http.StatusInternalServerError},
+		{"/artifactory/rpm-offline/pool/absent-1-1.noarch.rpm", "admin", http.StatusInternalServerError},
 		{"/artifactory/rpm-missing/pool/absent-1-1.noarch.rpm", "admin", http.StatusNotFound},
 		{"/artifactory/rpm-missing/pool/absent-1-1.noarch.rpm?download=1", "admin", http.StatusNotFound},
 		{"/artifactory/rpm-missing/pool/absent-1-1.noarch.rpm", "user", http.StatusForbidden},
 		{"/artifactory/rpm-deep/pool/absent-1-1.noarch.rpm", "admin", http.StatusNotFound},
-		{"/artifactory/rpm-cycle/pool/absent-1-1.noarch.rpm", "admin", http.StatusInternalServerError},
+		{"/artifactory/rpm-cycle/pool/absent-1-1.noarch.rpm", "admin", http.StatusNotFound},
 	} {
 		res := w.do(http.MethodGet, tc.path, tc.user, "")
 		if res.Code != tc.status {
@@ -223,21 +203,6 @@ func TestAccRPMVirtualMemberGraphRejectsCyclesWrongTypesAndUnavailableSources(t 
 				res.Body,
 			)
 		}
-	}
-	if _, err := svc.rpmCandidates(
-		t.Context(),
-		w.db,
-		repo.Config{Key: "rpm-cycle"},
-		"",
-		p,
-		acc,
-		false,
-		map[string]bool{"rpm-cycle": true},
-	); !errors.Is(
-		err,
-		errRPMVirtualCycle,
-	) {
-		t.Errorf("previsited virtual member was accepted: %v", err)
 	}
 	if _, err := boundedRPMMetadata(
 		strings.NewReader(strings.Repeat("x", rpmMetadataLimit+1)),

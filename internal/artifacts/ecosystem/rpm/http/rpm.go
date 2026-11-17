@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/rpm"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -29,9 +31,20 @@ const rpmMetadataLimit = 36 << 20
 
 var (
 	errRPMVirtualKey       = errors.New("server: rpm: virtual signing key must be gpg")
-	errRPMVirtualCycle     = errors.New("server: rpm: virtual repository cycle")
-	errRPMMemberType       = errors.New("server: rpm: incompatible virtual member")
 	errRPMMetadataTooLarge = errors.New("server: rpm: metadata too large")
+	// errRPMNoSources is a remote member read on a server built without a
+	// remote source service: this server's fault, which no walk passes
+	// over, so the virtual repodata answers 500 as it always has.
+	errRPMNoSources = errors.New("server: rpm: remote member read without a source service")
+	// errRPMNoMember is virtual repodata no member serves: every member
+	// missed, refused or was passed over. It is not found to the merged
+	// metadata cache, which drops the virtual repository's entry
+	// (virtual.Cache.Get), and the overlay answers it with empty repodata.
+	errRPMNoMember = fmt.Errorf("server: rpm: no member serves the repodata: %w",
+		kernel.ErrNotFound)
+	// errRPMVirtualMetadata is virtual repodata this server could not
+	// encode or sign: its fault, answered 500 whatever the key store said.
+	errRPMVirtualMetadata = errors.New("server: rpm: virtual repodata")
 )
 
 type rpmCandidate struct {
@@ -77,9 +90,7 @@ func (s RPMAPI) serveVirtualRPMMetadata(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
-		!acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+	if !s.VirtualGate(w, r, st, c, req.Path, p, acc, "RPM virtual members") {
 		return
 	}
 	// 7.x stores a virtual repository's repodata in the virtual repository
@@ -100,25 +111,12 @@ func (s RPMAPI) serveVirtualRPMMetadata(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	candidates, err := s.rpmCandidates(r.Context(), st, c, root, p, acc, false, map[string]bool{})
+	files, err := s.virtualRPMFiles(r, st, c, root, p, acc, false)
 	if err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual members", err))
+		httpkit.WriteErr(w, r, s.virtualRPMError(r.Context(), "RPM virtual metadata", err))
 		return
 	}
-	packages := make([]rpm.Package, 0, len(candidates))
-	for _, candidate := range candidates {
-		packages = append(packages, candidate.pkg)
-	}
-	meta, err := rpm.EncodeMetadata(packages, root, time.Unix(0, 0))
-	if err != nil {
-		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "RPM virtual metadata", err))
-		return
-	}
-	if err := signVirtualRPM(r.Context(), s.Access.Keys, c, meta.Files); err != nil {
-		httpkit.WriteErr(w, r, s.InternalError(r.Context(), "RPM virtual signature", err))
-		return
-	}
-	body, ok := meta.Files["repodata/"+name]
+	body, ok := files["repodata/"+name]
 	if !ok {
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
@@ -157,9 +155,7 @@ func (s RPMAPI) serveVirtualRPMPackage(
 	w http.ResponseWriter, r *http.Request, st itemkit.Store, c repo.Config,
 	req itemkit.ItemRequest, p kernel.Principal, acc itemkit.Access,
 ) {
-	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
-		!acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+	if !s.VirtualGate(w, r, st, c, req.Path, p, acc, "RPM virtual members") {
 		return
 	}
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
@@ -175,7 +171,7 @@ func (s RPMAPI) serveVirtualRPMPackage(
 		}
 		root = strings.Join(parts[:*c.YumRootDepth], "/") + "/"
 	}
-	candidates, err := s.rpmCandidates(r.Context(), st, c, root, p, acc, true, map[string]bool{})
+	candidates, err := s.virtualRPMCandidates(r, st, c, root, req.Path, p, acc)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "RPM virtual members", err))
 		return
@@ -295,78 +291,187 @@ func (s RPMAPI) serveVirtualRemoteRPMPackage(
 	s.ServeItemFile(w, r, s.Store, itemkit.Found{Repo: c, Item: *result.Item, Used: result.Used}, p)
 }
 
-// rpmCandidates returns the packages the members of the virtual repository
-// c list below root, the first member's row for each path; for a package GET
-// (download true) the later members' rows for it follow, so a GET whose
-// matrix parameters the first member's file does not match can pass over to
-// the next (serveVirtualRPMPackage). A member whose
-// download policy refuses its repodata takes no part in the repodata, and
-// only a blacked-out one in a package GET (rpmMemberRefusesMetadata). With
-// download false, for repodata, a row stays when the member's or the
-// virtual repository's patterns reject its file: 7.x keeps such a package
-// in a virtual repository's primary.xml.gz and refuses only its GET
-// (RTFACT-30656, RTFACT-5000). With download true, for a package GET, a
-// row whose file the policy refuses is left out, so the GET passes over
-// that member to the next one that lists the path.
-func (s RPMAPI) rpmCandidates(
-	ctx context.Context, st itemkit.Store, c repo.Config, root string,
-	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
-) ([]rpmCandidate, error) {
-	if seen[c.Key] || len(seen) >= 8 {
-		return nil, errRPMVirtualCycle
+// rpmProtocol is the protocol whose kit walks an RPM virtual repository's
+// members (itemkit.Kit.Packages): the overlay reads each member's repodata
+// itself, so the sources only name the classes the walk keeps, a remote
+// member as its upstream step.
+func rpmProtocol(k *itemkit.Kit) pkgroute.Protocol {
+	return pkgroute.Protocol{
+		Name:  "rpm",
+		Types: []repo.PackageType{repo.RPM},
+		Sources: map[repo.Class]pkgroute.Source{
+			repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},
+			repo.Remote: pkgroute.Remote{Service: k.RemoteSources},
+		},
 	}
-	seen[c.Key] = true
-	defer delete(seen, c.Key)
-	selected := map[string]bool{}
+}
+
+// virtualRPMFiles is the virtual repository c's repodata below root for
+// the caller, every file by its path below root: its members' packages
+// (rpm.Merger) encoded as one set, so repomd.xml always names the
+// primary.xml.gz served beside it, and signed with c's own GPG key pair
+// when it names one (signVirtualRPM). The members are the package
+// handlers' walk (pkgroute.Collect) at root's repomd.xml: 7.x's order,
+// nested virtual repositories flattened with a cycle or a diamond
+// skipped, a member of another type passed over (decision 0008, R1, R2
+// and R11), and each member that misses, refuses or fails passed over
+// with the rest listed (R3): RTFACT-30422's YUM virtual still serves
+// repomd.xml, without the packages of a remote member that fails [I].
+// The set is kept for c's virtualRetrievalCachePeriodSecs, which 7.x
+// carries for RPM (R8, pkgroute.Kit.Merged), unless fresh asks for a new
+// one (the YUM calculation). Repodata no member serves drops the kept set
+// and answers empty, as it has before [I].
+//
+// c's own include and exclude patterns are not asked again at repomd.xml:
+// the overlay has checked them at the file the client asked for, as 7.x
+// serves its stored virtual repodata through its download path, file by
+// file (RTFACT-14054), and the calculation never asked them.
+func (s RPMAPI) virtualRPMFiles(
+	r *http.Request, st itemkit.Store, c repo.Config, root string,
+	p kernel.Principal, acc itemkit.Access, fresh bool,
+) (map[string][]byte, error) {
+	k, err := s.Packages(rpmProtocol(s.Kit), true)
+	if err != nil {
+		return nil, fmt.Errorf("rpm: virtual repodata: %w", err)
+	}
+	open := c
+	open.IncludesPattern, open.ExcludesPattern = nil, nil
+	bound := k.Bind(r, open)
+	repomd, document := root+"repodata/repomd.xml", root+"repodata/"
+	if fresh {
+		k.EvictMerged(bound, document)
+	}
+	e, err := k.Merged(bound, repomd, document, func(r *http.Request) (virtual.Entry, error) {
+		parts, err := pkgroute.Collect(k, r, repomd, func(mr *http.Request) ([]rpm.Package, error) {
+			rows, err := s.memberRPMPackages(mr, st, root, "", p, acc)
+			k.WarnPassedOver(mr, err)
+			return rows, err
+		})
+		if err != nil {
+			return virtual.Entry{}, err //nolint:wrapcheck // the kit names the member and its fault
+		}
+		if len(parts) == 0 {
+			return virtual.Entry{}, errRPMNoMember
+		}
+		packages, _ := rpm.Merger{}.Merge(r.Context(), parts)
+		files, err := s.signedRPMFiles(r.Context(), c, root, packages)
+		if err != nil {
+			return virtual.Entry{}, err
+		}
+		var body bytes.Buffer
+		if err := gob.NewEncoder(&body).Encode(files); err != nil {
+			return virtual.Entry{}, fmt.Errorf("%w: %s", errRPMVirtualMetadata, err.Error())
+		}
+		return virtual.Entry{Body: body.Bytes()}, nil
+	})
+	if errors.Is(err, errRPMNoMember) {
+		return s.signedRPMFiles(r.Context(), c, root, nil)
+	}
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the kit's and the merge's own answers
+	}
+	var files map[string][]byte
+	if err := gob.NewDecoder(bytes.NewReader(e.Body)).Decode(&files); err != nil {
+		return nil, fmt.Errorf("%w: %s", errRPMVirtualMetadata, err.Error())
+	}
+	return files, nil
+}
+
+// signedRPMFiles encodes packages as the virtual repository c's repodata
+// below root, signed with c's key pair (signVirtualRPM).
+func (s RPMAPI) signedRPMFiles(
+	ctx context.Context, c repo.Config, root string, packages []rpm.Package,
+) (map[string][]byte, error) {
+	meta, err := rpm.EncodeMetadata(packages, root, time.Unix(0, 0))
+	if err == nil {
+		err = signVirtualRPM(ctx, s.Access.Keys, c, meta.Files)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errRPMVirtualMetadata, err.Error())
+	}
+	return meta.Files, nil
+}
+
+// virtualRPMError answers err from the virtual repodata: 500 for repodata
+// this server could not encode or sign, and the item answers otherwise.
+func (s RPMAPI) virtualRPMError(ctx context.Context, op string, err error) error {
+	if errors.Is(err, errRPMVirtualMetadata) {
+		return s.InternalError(ctx, op, err)
+	}
+	return s.ItemError(ctx, op, err)
+}
+
+// virtualRPMCandidates are the members of the virtual repository c whose
+// repodata below root lists the package at path, in the walk's order,
+// each with its row, so a GET whose matrix parameters the first member's
+// file does not match passes over to the next (serveVirtualRPMPackage).
+// The walk is the package handlers' at the package's own path
+// (pkgroute.Collect), so each member's policy is checked at that path,
+// never at the repodata read to find it, as 6.20's
+// VirtualRepoDownloadStrategy and the patterns FAQ have it ("artifacts
+// that match an exclude pattern are not resolved from that repository"):
+// a member whose patterns reject only its repodata still serves the
+// package, and one that rejects the package takes no part.
+func (s RPMAPI) virtualRPMCandidates(
+	r *http.Request, st itemkit.Store, c repo.Config, root, path string,
+	p kernel.Principal, acc itemkit.Access,
+) ([]rpmCandidate, error) {
+	k, err := s.Packages(rpmProtocol(s.Kit), true)
+	if err != nil {
+		return nil, fmt.Errorf("rpm: virtual package: %w", err)
+	}
+	parts, err := pkgroute.Collect(k, k.Bind(r, c), path, func(mr *http.Request) ([]rpm.Package, error) {
+		rows, err := s.memberRPMPackages(mr, st, root, path, p, acc)
+		k.WarnPassedOver(mr, err)
+		return rows, err
+	})
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the kit names the member and its fault
+	}
 	var out []rpmCandidate
-	indexPath := root + "repodata/repomd.xml"
-	for _, key := range c.Repositories {
-		member, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("rpm: member %s: %w", key, err)
-		}
-		if member.PackageType != repo.RPM {
-			return nil, fmt.Errorf("%w: %s", errRPMMemberType, key)
-		}
-		if !acc.Folder(member, indexPath, accessapi.ActionRead) ||
-			!acc.File(member, indexPath, accessapi.ActionRead) ||
-			rpmMemberRefusesMetadata(member, indexPath, download) {
-			continue
-		}
-		var entries []rpmCandidate
-		if member.Class == repo.Virtual {
-			entries, err = s.rpmCandidates(ctx, st, member, root, p, acc, download, seen)
-		} else {
-			var packages []rpm.Package
-			packages, err = s.rpmMemberPackages(ctx, st, member, root, p, acc, download)
-			for _, pkg := range packages {
-				entries = append(entries, rpmCandidate{repo: member, pkg: pkg})
-			}
-		}
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("rpm: member %s index: %w", key, err)
-		}
-		for _, entry := range entries {
-			if !download && selected[entry.pkg.Path] ||
-				!acc.File(c, entry.pkg.Path, accessapi.ActionRead) ||
-				!acc.File(entry.repo, entry.pkg.Path, accessapi.ActionRead) {
-				continue
-			}
-			if download && (generic.CheckDownload(c, entry.pkg.Path, false) != nil ||
-				generic.CheckDownload(entry.repo, entry.pkg.Path, false) != nil) {
-				continue
-			}
-			selected[entry.pkg.Path] = true
-			out = append(out, entry)
+	for _, part := range parts {
+		for _, pkg := range part.Doc {
+			out = append(out, rpmCandidate{repo: part.Member, pkg: pkg})
 		}
 	}
 	return out, nil
+}
+
+// memberRPMPackages reads the packages one member of a virtual repository
+// lists in its repodata below root, through the member request mr,
+// filtered by the caller's Read in that member alone: no permission
+// target can name the virtual repository (decision 0006), so the member
+// that serves a row decides it (decision 0008, R3). A member whose
+// repodata the caller may not read is passed over as not found. For the
+// virtual repodata (pkg "") a row whose file the patterns reject stays,
+// as 7.x keeps such a package in a virtual repository's primary.xml.gz and
+// refuses only its GET (RTFACT-30656, RTFACT-5000); for a package GET
+// (pkg its path) only that package's row is kept, and the repodata is
+// only the lookup that finds it, so only the member's blackout refuses it
+// (rpmMemberRefusesMetadata).
+func (s RPMAPI) memberRPMPackages(
+	mr *http.Request, st itemkit.Store, root, pkg string, p kernel.Principal, acc itemkit.Access,
+) ([]rpm.Package, error) {
+	m := pkgroute.RequestFrom(mr).Repo
+	repomd := root + "repodata/repomd.xml"
+	if !acc.Folder(m, repomd, accessapi.ActionRead) || !acc.File(m, repomd, accessapi.ActionRead) {
+		return nil, kernel.ErrForbidden
+	}
+	if m.Class == repo.Remote && s.RemoteSources == nil {
+		return nil, errRPMNoSources
+	}
+	download := pkg != ""
+	packages, err := s.rpmMemberPackages(mr.Context(), st, m, root, p, acc, download)
+	if err != nil {
+		return nil, err
+	}
+	var rows []rpm.Package
+	for _, row := range packages {
+		if (!download || row.Path == pkg) && acc.File(m, row.Path, accessapi.ActionRead) {
+			rows = append(rows, row)
+		}
+	}
+	return rows, nil
 }
 
 // rpmMemberRefusesMetadata reports whether a virtual repository's member
@@ -538,20 +643,17 @@ func (s RPMAPI) CalculateYumRepositoryMetadata(
 		if err != nil {
 			return nil, s.InternalError(ctx, "RPM virtual rights", err)
 		}
-		candidates, err := s.rpmCandidates(ctx, st, c, root, p, acc, false, map[string]bool{})
+		// 7.x calculates a virtual repository's repodata on this call and
+		// stores it for later reads (Calculate YUM Repository Metadata:
+		// "Supported by local, virtual, and Federated"; RTFACT-14054), so
+		// the kept set is dropped and built again, and the next read gets
+		// the new one [I].
+		r, err := http.NewRequestWithContext(ctx, http.MethodGet, "/", http.NoBody)
 		if err != nil {
-			return nil, s.ItemError(ctx, "RPM virtual calculation", err)
+			return nil, s.InternalError(ctx, "RPM virtual calculation", err)
 		}
-		packages := make([]rpm.Package, 0, len(candidates))
-		for _, candidate := range candidates {
-			packages = append(packages, candidate.pkg)
-		}
-		meta, err := rpm.EncodeMetadata(packages, root, time.Unix(0, 0))
-		if err != nil {
-			return nil, s.InternalError(ctx, "RPM virtual metadata", err)
-		}
-		if err := signVirtualRPM(ctx, s.Access.Keys, c, meta.Files); err != nil {
-			return nil, s.InternalError(ctx, "RPM virtual metadata signing", err)
+		if _, err := s.virtualRPMFiles(r, st, c, root, p, acc, true); err != nil {
+			return nil, s.virtualRPMError(ctx, "RPM virtual calculation", err)
 		}
 		// [I] The archived sample answers a local calculation only (#216).
 		return artgen.CalculateYumRepositoryMetadata200TextResponse(

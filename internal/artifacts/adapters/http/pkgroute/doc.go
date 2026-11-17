@@ -53,6 +53,10 @@
 // # Outputs
 //
 //   - The mounted routes, and the Kit each handler receives.
+//   - ItemKit, a Kit that claims no route, for a format the item routes
+//     serve whose virtual index merges through the kit (itemkit's Alpine,
+//     RPM and Opkg overlays), and Bind, which hands its helpers a request
+//     for the repository the item route resolved.
 //   - Store, the store the kit resolves repositories and reads items in, and
 //     DB() returns. Each composite store in app satisfies it, so the server
 //     passes the store it holds.
@@ -239,7 +243,9 @@
 // merged metadata cache's (Merged;
 // https://github.com/weaveplatform/artifactweave/issues/1543), and the
 // root gate and the warning for a failing member
-// (https://github.com/weaveplatform/artifactweave/issues/1538).
+// (https://github.com/weaveplatform/artifactweave/issues/1538), and
+// ItemKit and Bind for the item routes' virtual indexes
+// (https://github.com/weaveplatform/artifactweave/issues/1551).
 //
 // # Testing
 //
@@ -256,7 +262,8 @@
 // PassedOver and Virtual), and root_test.go RequireRoot and
 // WarnPassedOver; merged_test.go covers Merged, MergedPart and
 // EvictMerged over a cache on a fake clock (expiry, periods, visibility,
-// member lists, a document gone, parts); source_result_test.go tests ServeResult from inside the
+// member lists, a document gone, parts); item_test.go covers ItemKit and
+// Bind; source_result_test.go tests ServeResult from inside the
 // package; conditional_test.go covers ServeStream's conditional answers and
 // FileNotModified, and etag_test.go a file stream's SHA-1 ETag. Every
 // native protocol's route suite under test/server/artifacts reaches it

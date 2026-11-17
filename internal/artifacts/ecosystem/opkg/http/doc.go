@@ -25,9 +25,13 @@
 //     and IPKs under the kit's Opkg source request
 //     (itemkit.OpkgSourceRequest); access/api's Keys, through which the
 //     format's SignFeed reads a virtual repository's GPG key pair; the
-//     generic download policy (artifacts/ecosystem/generic); and the format
-//     package (artifacts/ecosystem/opkg), whose rules parse every feed path,
-//     decode member feeds and encode and sign the virtual feed.
+//     generic download policy (artifacts/ecosystem/generic); the router
+//     kit the item kit builds for the overlay (itemkit.Kit.Packages,
+//     pkgroute.ItemKit), without the merged metadata cache, whose walk and
+//     Merged a virtual feed is built through; and the format package
+//     (artifacts/ecosystem/opkg), whose rules parse every feed path, decode
+//     member feeds, merge them (opkg.Merger) and encode and sign the
+//     virtual feed.
 //
 // # Outputs
 //
@@ -41,9 +45,13 @@
 //
 //   - A caller receives a local, federated or remote repository's feed only
 //     when they have Read permission on every IPK it lists. A virtual feed
-//     lists only the IPKs the caller has Read permission on, both in the
-//     virtual repository and in the member that holds them, and an IPK path
-//     belongs to the first member that lists it. The download policy does
+//     lists only the IPKs the caller has Read permission on in the member
+//     that holds them, and an IPK path belongs to the first member that
+//     lists it. A caller reads a feed or an IPK through a virtual repository
+//     when they may read it there or in a member the walk reaches
+//     (itemkit.Access.VirtualReads; decision 0008, R3), and one refused is
+//     answered 404 "Resource not found" while the virtual repository hides
+//     unauthorized resources (R4). The download policy does
 //     not filter or refuse a feed for the IPKs it lists: an IPK the include
 //     and exclude patterns reject stays listed and only its GET is refused,
 //     as in 7.x's Debian and RPM indexes (RTFACT-30830, RTFACT-30656).
@@ -54,13 +62,16 @@
 //     answer that no repository serves the request. A virtual IPK's GET
 //     passes over a member whose download policy refuses the file to the
 //     next member that lists it.
-//   - A missing member, or one whose feed is unpublished, unreadable to the
-//     caller or refused by the member's download policy, is skipped; a
-//     member of another package type, a member cycle or a chain of more
-//     than eight nested repositories is refused. A virtual IPK's GET checks
-//     a member's policy at the IPK's own path, never at the feed it reads
-//     to find the IPK, so there only a blacked-out member is skipped for
-//     its feed.
+//   - A virtual feed walks its members as the package handlers do
+//     (pkgroute.Collect; decision 0008): nested virtual repositories are
+//     flattened in 7.x's order with a cycle skipped, and a missing member,
+//     one of another package type, one whose feed is unpublished,
+//     unreadable to the caller or refused by its download policy, and a
+//     remote whose upstream misses or fails are passed over, a failure with
+//     a warning [I]. A virtual IPK's GET checks a member's policy at the
+//     IPK's own path, never at the feed it reads to find the IPK.
+//   - A virtual feed is built on every request: Opkg's virtual repositories
+//     carry no virtualRetrievalCachePeriodSecs (R8).
 //   - An IPK is served only when a feed the caller can see lists it, and
 //     only with the SHA-256 that feed gives.
 //   - A feed is read up to 36 MiB, a remote's is validated before it is
@@ -107,7 +118,9 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P29 group (issues #757 to
-// #760), as the server root's opkg.go. P9d moved it here (WEB-13).
+// #760), as the server root's opkg.go. P9d moved it here (WEB-13). P10
+// built the virtual feed from the shared engine's walk and merge
+// (https://github.com/weaveplatform/artifactweave/issues/1551).
 //
 // # Testing
 //
@@ -122,10 +135,15 @@
 // IPK the patterns reject kept in a local, remote or virtual feed while
 // its GET is refused or passed over to the next member; a virtual IPK
 // served from a member whose patterns reject only its feed; and remote
-// feed and IPK reads on a server built without remote sources. Its item
-// GETs run through the kit with TryOpkgItem as the only overlay. The route
-// suite test/server/artifacts/opkg checks through the router that a
-// virtual feed is signed only with the configured GPG key, and the @opkg
+// feed and IPK reads on a server built without remote sources.
+// virtual_test.go covers the shared engine's walk: nested members and
+// cycles with the feed built on every read, members passed over (another
+// type, a remote that misses, fails or may not be read), and a reader of
+// the members alone and the hidden refusal. Its item GETs run through the
+// kit with TryOpkgItem as the only overlay. The route suite
+// test/server/artifacts/opkg checks through the router that a virtual feed
+// is signed only with the configured GPG key and walks a remote and a
+// nested member, and the @opkg
 // acceptance partition (test/acceptance/features/opkg.feature) is the
 // native opkg evidence.
 package opkghttp

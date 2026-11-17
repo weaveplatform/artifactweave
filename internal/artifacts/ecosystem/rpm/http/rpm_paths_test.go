@@ -489,9 +489,10 @@ func TestUnitRPMVirtualRemotePackageRefusesBadBytesAndRevokedCopies(t *testing.T
 
 // TestUnitRPMCalculateYumRepositoryMetadataChecksPathAndVirtualView: the
 // YUM calculation takes a path only for a virtual repository, and only as a
-// repository-relative repodata directory, and it verifies the virtual view
-// that path names: a member cycle or an absent signing key is a server
-// fault, never a calculation reported as done.
+// repository-relative repodata directory, and it builds the virtual
+// repodata that path names: an absent signing key is a server fault, never
+// a calculation reported as done, while a member cycle is skipped as any
+// walk skips it (decision 0008, R2).
 func TestUnitRPMCalculateYumRepositoryMetadataChecksPathAndVirtualView(t *testing.T) {
 	w := newItemWorld(t)
 	w.rpmRepos(
@@ -514,7 +515,10 @@ func TestUnitRPMCalculateYumRepositoryMetadataChecksPathAndVirtualView(t *testin
 		},
 		{"rpm-virtual", "/el/9/repodata", http.StatusBadRequest, badPath},
 		{"rpm-virtual", "el/9/pool", http.StatusBadRequest, badPath},
-		{"rpm-cycle", "", http.StatusInternalServerError, "internal error"},
+		{
+			"rpm-cycle", "", http.StatusOK,
+			"YUM metadata for virtual repository rpm-cycle was calculated.",
+		},
 		{"rpm-unsigned", "", http.StatusInternalServerError, "internal error"},
 		{
 			"rpm-member", "repodata", http.StatusBadRequest,

@@ -111,7 +111,7 @@ type Deps struct {
 func New(d Deps) ArtifactoryAPI {
 	kit := d.Deps
 	kit.Store = d.Store
-	return ArtifactoryAPI{
+	api := ArtifactoryAPI{
 		Kit: itemkit.New(kit),
 		cfg: d,
 		folderSlots: make(
@@ -119,6 +119,11 @@ func New(d Deps) ArtifactoryAPI {
 			cmp.Or(d.FolderDownloadMaxConcurrent, defaultFolderSlots),
 		),
 	}
+	// The overlays that merge a virtual repository's index walk its members
+	// and keep the merge as the protocols do, so their kit takes the
+	// protocols' options, cache included.
+	api.PackageOptions = api.ProtocolOptions()
+	return api
 }
 
 // content returns the handlers' store. A partial built without one (tests of

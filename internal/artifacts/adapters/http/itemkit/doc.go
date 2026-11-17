@@ -25,7 +25,9 @@
 //     registry service keeps. Then the blob store, the remote sources, the
 //     work queue, the formats and their settings, the access module's API,
 //     the redirect policy and the descriptor's minimum size, the logger,
-//     the overlays and the private-path predicate.
+//     the overlays and the private-path predicate, and PackageOptions, the
+//     router kit's options, over which Packages builds an overlay's walk
+//     through a virtual repository.
 //   - The request's principal and decider in its context, which the
 //     authentication middleware put there.
 //
@@ -57,6 +59,13 @@
 //     ErrFolderAtPath.
 //   - Access, Target and AccessFor: the questions handlers ask the
 //     request's permission decider.
+//   - Virtual index helpers for the format overlays: Packages, the router
+//     kit (pkgroute.ItemKit) whose walk, merge and cache an overlay builds a
+//     virtual repository's index with; Access.VirtualReads and VirtualGate,
+//     the read through a virtual repository that a caller who may read the
+//     path in it or in a member passes (decision 0008, R3); and
+//     VirtualRefused, its refusal, hidden as 404 while the repository hides
+//     unauthorized resources (R4).
 //   - The per-format remote source requests (AlpineSourceRequest and the
 //     others), RemoteResource, and ReindexOps, the reindex operations by
 //     package type.
@@ -297,8 +306,10 @@
 // to Store (ART-22). P10 gave DeployTarget 7.x's answers for a virtual
 // repository and the item routes' PUT its own for a remote one (#1534),
 // the walk through a virtual repository its remote members' upstream
-// steps (#1535) and their caches' expiry (#1641), and a virtual repository's
-// folder index every member's children (#1537).
+// steps (#1535) and their caches' expiry (#1641), a virtual repository's
+// folder index every member's children (#1537), and the format overlays
+// the walk, merge and cache of the package handlers for a virtual
+// repository's index (Packages, VirtualGate; #1551).
 //
 // # Testing
 //
@@ -316,6 +327,8 @@
 // file, a checksum and an archive (upstreamMiss, fileStep, archiveStep,
 // remoteArchive); virtual_listing_test.go a virtual
 // repository's folder index, its merge, filters, misses and store faults;
+// virtual_read_test.go the read gate through a virtual repository, its
+// refusals and Packages;
 // redirect_test.go the signing-failure
 // throttle, the descriptor's minimum redirect size, the request copy
 // without the preconditions a download ignores, the request the download

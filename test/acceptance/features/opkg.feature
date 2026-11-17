@@ -171,6 +171,41 @@ Feature: Native Opkg feeds and client installs
     Then the command succeeds
     And the file "opkg-root/usr/share/artifactweave/alpha.txt" contains "alpha 1.0 variant 1"
 
+  Scenario: opkg installs from a local and a remote member of a virtual feed
+    Given the registry is running
+    And the Opkg client can reach the registry
+    Given an Opkg package "alpha" version "1.0" variant "0" under "ipk"
+    And an Opkg upstream serves "alpha" version "1.0"
+    When I PUT "/artifactory/api/repositories/opkg-remote-member" as admin with body:
+      """
+      {"rclass":"remote","packageType":"opkg","url":"{upstream}"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/opkg-local-member" as admin with body:
+      """
+      {"rclass":"local","packageType":"opkg"}
+      """
+    Then the response status is 200
+    Given an Opkg package "beta" version "1.0" variant "0" under "local"
+    When I deploy the file "local/beta_1.0_all.ipk" to "/artifactory/opkg-local-member/feed/beta_1.0_all.ipk" as admin
+    Then the response status is 201
+    When I GET "/artifactory/opkg-local-member/feed/Packages" as admin until the response status is 200
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/opkg-mixed-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"opkg","repositories":["opkg-local-member","opkg-remote-member"]}
+      """
+    Then the response status is 200
+    Given the opkg feed is "opkg-mixed-virtual"
+    When I run opkg "update"
+    Then the command succeeds
+    When I run opkg "install alpha"
+    Then the command succeeds
+    And the file "opkg-root/usr/share/artifactweave/alpha.txt" contains "alpha 1.0 variant 0"
+    When I run opkg "install beta"
+    Then the command succeeds
+    And the file "opkg-root/usr/share/artifactweave/beta.txt" contains "beta 1.0 variant 0"
+
   Scenario: delete, restore and explicit reindex rebuild the feed
     Given the registry is running
     And the Opkg client can reach the registry

@@ -25,8 +25,8 @@
 //     repository's Yum calculation (POST /api/yum/{repoKey}) included; the
 //     protocol (rpmhttp), which reads member repodata (DecodeRepomd,
 //     DecodePrimary) and writes a virtual repository's (EncodeMetadata,
-//     SignRepomd), and whose Yum calculation of a virtual repository checks
-//     that its view still composes (EncodeMetadata); and the item kit
+//     SignRepomd) from its members' (Merger), which its Yum calculation of
+//     a virtual repository builds again; and the item kit
 //     (artifacts/adapters/http/itemkit), whose remote source request checks
 //     upstream repodata or a package before a remote caches it
 //     (DecodeRepomd, IsPrimaryMetadataPath, DecodePrimary, ReadPackage),
@@ -63,6 +63,10 @@
 //   - The repodata rules: Metadata, EncodeMetadata, DecodeRepomd,
 //     IsPrimaryMetadataPath, DecodePrimary and SignRepomd.
 //   - The stored names: KindIndex and the Prop* property names.
+//   - Merger: the virtual.Merger (artifacts/core/virtual) of a virtual
+//     repository's repodata, which the protocol builds through the shared
+//     engine: its members' packages, one per path, the first member's row
+//     first.
 //
 // # Invariants
 //
@@ -123,7 +127,8 @@
 // # Status
 //
 // Implemented P9c, which delivered the plan's P29 group (issues #757 to
-// #760). Moved here in P9d.
+// #760). Moved here in P9d. Merger added in P10
+// (https://github.com/weaveplatform/artifactweave/issues/1551).
 //
 // # Testing
 //
@@ -142,6 +147,8 @@
 //     types, storage failures, missing content and stale inspections.
 //   - contract_test.go: the format contract suite (artifacts/core/formattest)
 //     with KindIndex as the repository's work.
+//   - virtual_test.go: the Merger keeps the first member's row of each
+//     package path, in the walk's order.
 //
 // testdata holds the contract RPMs that build-contract-fixtures.sh makes in
 // the pinned Fedora 42 image, and the genuine Fedora 42 package
