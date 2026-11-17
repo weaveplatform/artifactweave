@@ -24,8 +24,8 @@
 //     item service's hooks for Go repositories to Handler; the protocol
 //     package (golang/http), which parses request paths (ParseRequest,
 //     ParseFile), checks a .info (CheckInfo) and chooses versions (Listed,
-//     Latest); and the P10 virtual resolver, which will read remote Go
-//     repositories through GoSource (no caller yet).
+//     Latest); and the virtual resolver, which reads remote Go
+//     repositories through GoSource.
 //   - Driven: the format hooks' environment (format.Env), through which
 //     Handler reads items and their properties and keeps the package index;
 //     and the application's authority-fenced source service
@@ -85,9 +85,9 @@
 //
 // # Status
 //
-// Implemented P7, with remote retrieval in P9. Moved here in P9d. Roadmap:
-// virtual.go (P10), the Merger that merges the Go module version list
-// (@v/list) for virtual repositories.
+// Implemented P7, with remote retrieval in P9. Moved here in P9d. P10
+// virtual.go merges Go module version lists; golang/http serves virtual
+// reads over local, federated and remote members. Virtual publishing is GOV-02.
 //
 // # Testing
 //

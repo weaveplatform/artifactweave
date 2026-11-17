@@ -9,17 +9,27 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	goformat "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/golang"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
 // Protocol is the Go module protocol. Its errors are plain text: the go
 // command shows an error's body only when it is (research 26 section 1.1).
-func Protocol() pkgroute.Protocol {
+func Protocol(remotes ...*source.Service) pkgroute.Protocol {
+	sources := map[repo.Class]pkgroute.Source{
+		repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},
+		repo.Virtual: pkgroute.Virtual{},
+	}
+	if len(remotes) > 0 && remotes[0] != nil {
+		sources[repo.Remote] = pkgroute.Remote{Service: goformat.GoSource{Source: remotes[0]}}
+	}
 	return pkgroute.Protocol{
 		Name:         "go",
 		Types:        []repo.PackageType{repo.Go},
 		ErrorProfile: apierror.ProfileText,
+		Sources:      sources,
+		MemberOnly:   []repo.Class{repo.Remote},
 		// The first element of a module path contains a dot, so "sumdb"
 		// never names a module.
 		Absent: []string{"sumdb/"},
@@ -27,7 +37,15 @@ func Protocol() pkgroute.Protocol {
 			reads := reads{k: k}
 			r.Get("/*", reads.serve)
 			r.Head("/*", reads.serve)
-			r.Put("/*", publisher{k}.publish)
+			r.Put("/*", func(w http.ResponseWriter, r *http.Request) {
+				if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+					k.Error(w, r, apierror.New(http.StatusNotImplemented, fmt.Sprintf(
+						"'%s' is a virtual repository, which artifactweave does not serve through the go API yet",
+						pkgroute.RequestFrom(r).Repo.Key)))
+					return
+				}
+				publisher{k}.publish(w, r)
+			})
 			// A path that names no Go operation answers 404 to every
 			// method, and only one that does answers 405 to a method no
 			// route serves.

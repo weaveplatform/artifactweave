@@ -23,7 +23,11 @@ import (
 // Remote opts one protocol into the common source boundary. It is never
 // installed by default; each adapter must first support remote metadata and
 // transient results. Docker keeps its separate routing seam.
-type Remote struct{ Service *source.Service }
+type Remote struct {
+	Service interface {
+		Read(context.Context, source.Request) (source.Result, error)
+	}
+}
 
 // Item cannot represent transient content. A protocol using Remote must consume
 // Read instead of assuming that every successful download has a stored item.

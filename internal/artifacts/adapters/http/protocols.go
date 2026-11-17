@@ -181,7 +181,7 @@ func Protocols(d Deps) []pkgroute.Protocol {
 		),
 		nimmodelhttp.Protocol(d.RemoteSources),
 		jetbrainspluginshttp.Protocol(d.RemoteSources),
-		golanghttp.Protocol(),
+		golanghttp.Protocol(d.RemoteSources),
 		npmhttp.Protocol(npmhttp.Options{
 			RemoteSources:  d.RemoteSources,
 			Accounts:       npmAccounts(d),

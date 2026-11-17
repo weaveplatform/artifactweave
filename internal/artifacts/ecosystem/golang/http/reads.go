@@ -12,6 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	goformat "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/golang"
@@ -31,6 +32,10 @@ func (h reads) serve(w http.ResponseWriter, r *http.Request) {
 	q, err := parse(r)
 	if err != nil {
 		h.k.Error(w, r, err)
+		return
+	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtual(w, r, q)
 		return
 	}
 	switch q.Kind {
