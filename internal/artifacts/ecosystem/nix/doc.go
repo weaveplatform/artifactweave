@@ -123,6 +123,10 @@
 // layout by #1296 and the whole xz stream by #1297, whose reader #1331
 // moved to platform/xzfile, where #1332 bounded its dictionary.
 //
+// P10 (#1554): virtual reads use the shared engine, including nesting, cycles,
+// duplicates, member permissions and pass-over warnings. Native publication
+// reaches the default deployment target; reads retain member signatures.
+//
 // # Testing
 //
 //   - metadata_test.go: narinfo round trips, signing and verification,

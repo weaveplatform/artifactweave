@@ -133,6 +133,10 @@
 // #788). Moved here in P9d. Channels added by #1263, the binary-cache
 // layout by #1296.
 //
+// P10 (#1554): virtual reads use the shared engine, including nesting, cycles,
+// duplicates, member permissions and pass-over warnings. Native publication
+// reaches the default deployment target; reads retain member signatures.
+//
 // # Testing
 //
 //   - nix_test.go: publication, signing and the lifecycle; denials and

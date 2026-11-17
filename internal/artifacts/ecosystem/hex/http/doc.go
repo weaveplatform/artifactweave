@@ -62,11 +62,12 @@
 //     name the serving repository, so transitive resolution stays behind
 //     its permissions; a dependency on another registry keeps its
 //     destination.
-//   - A virtual repository's members are distinct Hex local or remote
-//     repositories, and the first member that holds a version supplies it.
+//   - A virtual repository walks local, federated and remote members through
+//     the shared engine, flattening nested virtuals and skipping duplicates.
+//     The first member that holds a version supplies it.
 //     A member the caller may not read, or one that lacks the resource
 //     (a remote whose upstream answers 404 included), is passed over; any
-//     other member failure fails the request.
+//     qualifying upstream failures pass over with a warning [I] (#1554).
 //   - The download policy (decision 0032), after read permission: the
 //     blackout and the patterns refuse names, versions and packages/NAME
 //     at those paths, where 7.x keeps them, a remote's included, with the
@@ -110,6 +111,10 @@
 //
 // Implemented P9c, which delivered the plan's P30 group (issues #762 to
 // #768). Moved here in P9d.
+//
+// P10 (#1554): virtual walks use the shared engine, including nested virtuals
+// and federated members. The ecosystem Merger retains winning releases and
+// advisory associations, and the protocol signs the resulting registry.
 //
 // # Testing
 //

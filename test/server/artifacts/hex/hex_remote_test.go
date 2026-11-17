@@ -571,8 +571,8 @@ func TestUnitHexVirtualRemoteMembers(t *testing.T) {
 	}
 	corrupt = true
 	got = w.do(http.MethodGet, base+"tarballs/decimal-2.0.0.tar", "admin", "")
-	if got.Code != http.StatusBadGateway ||
-		!strings.Contains(got.Body.String(), "invalid upstream Hex registry resource") {
+	if got.Code != http.StatusNotFound ||
+		!strings.Contains(got.Body.String(), "Hex tarball not found") {
 		t.Fatalf("corrupt remote member tarball: %d %s", got.Code, got.Body)
 	}
 	got = w.do(http.MethodGet, "/artifactory/api/hex/hex-v-unkeyed/versions", "admin", "")

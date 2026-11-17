@@ -31,7 +31,15 @@ func TestAccConanRemoteClient(t *testing.T) {
 			defer srv.Close()
 			origin := *repo.Defaults(&repo.Config{Key: "conan-origin", Class: repo.Local, PackageType: repo.Conan})
 			proxy := *repo.Defaults(&repo.Config{Key: "conan-proxy", Class: repo.Remote, PackageType: repo.Conan, URL: srv.URL + "/artifactory/api/conan/conan-origin", Username: "admin", Password: "pw"})
-			for _, c := range []repo.Config{origin, proxy} {
+			local := repo.Config{Key: "conan-ddr", Class: repo.Local, PackageType: repo.Conan}
+			aggregate := repo.Config{
+				Key:                   "conan-aggregate",
+				Class:                 repo.Virtual,
+				PackageType:           repo.Conan,
+				Repositories:          []string{proxy.Key, local.Key},
+				DefaultDeploymentRepo: local.Key,
+			}
+			for _, c := range []repo.Config{origin, proxy, *repo.Defaults(&local), *repo.Defaults(&aggregate)} {
 				if err := w.rt.Store.Repos().Create(t.Context(), c); err != nil {
 					t.Fatal(err)
 				}
@@ -73,16 +81,30 @@ func TestAccConanRemoteClient(t *testing.T) {
 			}
 			run("remote", "add", "origin", srv.URL+"/artifactory/api/conan/conan-origin")
 			run("remote", "add", "proxy", srv.URL+"/artifactory/api/conan/conan-proxy")
+			run("remote", "add", "virtual", srv.URL+"/artifactory/api/conan/conan-aggregate")
 			if tc.name == "v2" {
 				run("remote", "login", "origin", "admin", "-p", "pw")
 				run("remote", "login", "proxy", "admin", "-p", "pw")
+				run("remote", "login", "virtual", "admin", "-p", "pw")
 				run("profile", "detect", "--force")
 			} else {
 				run("user", "admin", "-p", "pw", "-r", "origin")
 				run("user", "admin", "-p", "pw", "-r", "proxy")
+				run("user", "admin", "-p", "pw", "-r", "virtual")
 			}
 			run(tc.create...)
 			run(tc.upload...)
+			run(tc.remove...)
+			virtualDownload := append([]string(nil), tc.download...)
+			virtualDownload[len(virtualDownload)-1] = "virtual"
+			run(virtualDownload...)
+			virtualUpload := append([]string(nil), tc.upload...)
+			for i, arg := range virtualUpload {
+				if arg == "origin" {
+					virtualUpload[i] = "virtual"
+				}
+			}
+			run(virtualUpload...)
 			run(tc.remove...)
 			run(tc.download...)
 		})

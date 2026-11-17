@@ -78,3 +78,36 @@ The protocol and class map follow the [JFrog Conan repository guide](https://doc
 and [repository client support matrix](https://docs.jfrog.com/artifactory/docs/repository-support-for-package-clients).
 Both current Artifactory 7.x pages were checked on 2026-10-25. That qualification used
 Conan 2.33.0 and legacy Conan 1.66.0; the generated inventory records current pins.
+
+## P10 shared virtual engine (#1554)
+
+Virtual repositories use the shared effective member order and flatten nested
+virtuals. Cycles, self-members and duplicate members are skipped. Unreadable,
+excluded, offline and missing members pass over; upstream failures that qualify
+as pass-over are logged as warnings. Member permissions govern reads and the
+local/federated default deployment target governs writes, without requiring an
+`ANY` permission target on the virtual key.
+
+Conan caches merged revision and search metadata for
+`virtualRetrievalCachePeriodSecs`; writes to a member do not invalidate it.
+Bazel, Hex and Nix merge per request. Hex preserves the winning releases'
+advisories and re-signs its registry; Nix preserves the serving member's signature.
+
+**[I], P19/#216:** cache all merged Conan metadata, pass over qualifying upstream
+faults with warnings, retain Conan's native remove 405, and route native Nix
+publication to the default deployment target. These are controlled-fixture
+implementation choices, not live Artifactory observations.
+
+The P10 regression scenarios include `TestAccConanVirtualCacheAndMemberGrants`
+(member-only Read/Deploy, nested cycles, age-based caching and virtual patterns),
+`TestAccConanVirtualMemberOrderAndValidation` (nested/duplicate members), and
+`TestAccConanRemoteClient` (both pinned Conan generations, cold remote reads
+through a virtual over local plus remote members and deployment to its local target).
+
+| Request | Before P10 | With #1554 |
+|---|---|---|
+| Nested or duplicate Conan member | 400 | Shared walk; first readable revision |
+| Member-only Deploy through a virtual | Virtual-key permission required | Deployment-target permission |
+| No usable deployment target | Adapter-specific errors | R6 405 with `Allow: GET` |
+| Repeated revision/search metadata | Recomputed | Visibility-aware age-based cache |
+| Qualifying upstream fault | Whole virtual fails | Member passed over with warning [I] |

@@ -511,7 +511,7 @@ func TestAccBazelClient(t *testing.T) {
 		[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
 	)
 	f.publish(federated, "modules/hello/1.0.0/hello-1.0.0.tar.gz", packageArchive)
-	remoteRepo := *repo.Defaults(&repo.Config{Key: "bazel-remote", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL + "/registry/"})
+	remoteRepo := *repo.Defaults(&repo.Config{Key: "bazel-remote", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL + "/registry/", PriorityResolution: repo.Flex(true)})
 	if err := f.db.Repos().Create(t.Context(), remoteRepo); err != nil {
 		t.Fatal(err)
 	}
@@ -668,4 +668,24 @@ func TestAccBazelClient(t *testing.T) {
 		}
 		t.Logf("Bazel rejected yanked module via %s", registry)
 	})
+}
+
+func TestAccBazelSharedVirtualGraph(t *testing.T) {
+	f := newFixture(t)
+	f.publish(f.local, "modules/hello/1.0.0/MODULE.bazel", []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+	f.publish(f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", archive(t))
+	for _, c := range []repo.Config{
+		{Key: "inner", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{"outer", f.local.Key, f.local.Key}},
+		{Key: "outer", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{"inner", "outer"}},
+	} {
+		if err := f.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tail := range []string{"metadata.json", "1.0.0/MODULE.bazel", "1.0.0/source.json"} {
+		w := f.request("GET", "/artifactory/api/bazelmodules/outer/modules/hello/"+tail)
+		if w.Code != 200 {
+			t.Fatal(w.Code, w.Body)
+		}
+	}
 }

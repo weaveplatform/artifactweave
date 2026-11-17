@@ -285,5 +285,5 @@ func TestAccConanDownloadPolicyRemote(t *testing.T) {
 	conanRefused(t, get("conan-up", recipe+"/revisions/abc/files/conanmanifest.txt"),
 		conanRejected("conan-up", stored("conanmanifest.txt")))
 	conanServed(t, get("conan-up", recipe+"/revisions/abc/files/conanfile.py"), "remote recipe")
-	conanServed(t, get("conan-virt", recipe+"/revisions/abc/files/conanfile.py"), "remote recipe")
+	conanServed(t, get("conan-virt", recipe+"/revisions/abc/files/conanfile.py"), "local recipe")
 }

@@ -439,3 +439,22 @@ func TestAccNixVirtualReevaluatesMemberPriority(t *testing.T) {
 		t.Fatal("old member selection retained")
 	}
 }
+
+func TestAccNixSharedVirtualGraphAndDeployment(t *testing.T) {
+	f := newFixture(t)
+	f.publish()
+	for _, c := range []repo.Config{
+		{Key: "inner", Class: repo.Virtual, PackageType: repo.Nix, Repositories: []string{"outer", "local", "local"}},
+		{Key: "outer", Class: repo.Virtual, PackageType: repo.Nix, Repositories: []string{"inner", "outer"}, DefaultDeploymentRepo: "local"},
+	} {
+		if err := f.db.Repos().Create(t.Context(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := "/artifactory/api/nix/outer/"
+	w := f.do("GET", base+infoPath, nil, "")
+	status(t, w, 200)
+	status(t, f.do("GET", base+downloadURL(w.Body.Bytes()), nil, ""), 200)
+	status(t, f.do("PUT", base+f.info.URL, f.data, ""), 201)
+	status(t, f.do("PUT", base+infoPath, f.meta, ""), 201)
+}
