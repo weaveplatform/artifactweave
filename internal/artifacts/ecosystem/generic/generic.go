@@ -49,8 +49,8 @@ func CheckBlackedOut(c repo.Config, path string) error {
 	if c.BlackedOut == nil || !*c.BlackedOut {
 		return nil
 	}
-	return refuse(http.StatusNotFound,
-		"The repository '%s' is blacked out and cannot serve artifact '%s:%s'.", c.Key, c.Key, path)
+	return format.PolicyRefusal(http.StatusNotFound,
+		"The repository '%[1]s' is blacked out and cannot serve artifact '%[1]s:%[2]s'.", c.Key, path)
 }
 
 // CheckPatterns refuses a file path outside c's includesPattern or inside
@@ -60,19 +60,12 @@ func CheckPatterns(c repo.Config, path string) error {
 	if repo.PatternsOf(c).Accepts(path, false) {
 		return nil
 	}
-	return refuse(http.StatusConflict, rejectedByPatterns, c.Key, c.Key, path)
+	return format.PolicyRefusal(http.StatusConflict, rejectedByPatterns, c.Key, path)
 }
 
-// refuse is the refusal of c's own policy for a path, marked as one
-// (format.RejectionError.Policy).
-func refuse(status int, message string, args ...any) error {
-	refusal := format.Rejectf(status, message, args...)
-	refusal.Policy = true
-	return refusal
-}
-
-// rejectedByPatterns is IncludeExcludeException's message.
-const rejectedByPatterns = "The repository '%s' rejected the artifact '%s:%s' due to its " +
+// rejectedByPatterns is IncludeExcludeException's message, a
+// format.PolicyRefusal template.
+const rejectedByPatterns = "The repository '%[1]s' rejected the artifact '%[1]s:%[2]s' due to its " +
 	"include/exclude pattern settings."
 
 // CheckDownload refuses what Artifactory refuses before it looks for the
@@ -104,10 +97,10 @@ func CheckDownload(c repo.Config, path string, folder bool) error {
 		return nil
 	}
 	if c.Class == repo.Virtual {
-		return refuse(http.StatusNotFound,
-			"No repository found to serve the request for %s:%s", c.Key, path)
+		return format.PolicyRefusal(http.StatusNotFound,
+			"No repository found to serve the request for %[1]s:%[2]s", c.Key, path)
 	}
-	return refuse(http.StatusNotFound, rejectedByPatterns, c.Key, c.Key, path)
+	return format.PolicyRefusal(http.StatusNotFound, rejectedByPatterns, c.Key, path)
 }
 
 // Classify reports every generic file as unique content.

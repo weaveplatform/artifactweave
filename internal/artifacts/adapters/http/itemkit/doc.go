@@ -140,9 +140,12 @@
 //     included (#1630, lookupRefusal): 7.161.26's createUnfoundRepoResource
 //     makes an unfound resource of every such refusal. The policy is
 //     checked on the file a checksum or an archive entry names, so a
-//     refused file's checksum or entry is refused with it. A folder
-//     request keeps the refusal without a suffix, as 7.x answers it
-//     through its directory listing.
+//     refused file's checksum or entry is refused with it. A request that
+//     named a remote's cache takes the reason in the cache's words
+//     (asNamed, format.RejectionError.Named), in its answer and its trace,
+//     as 7.x's cache repository checks the remote's settings under its own
+//     key. A folder request keeps the refusal without a suffix, and in the
+//     remote's words, as 7.x answers it through its directory listing.
 //   - A read through a virtual repository never asks Read of the virtual
 //     repository itself (Access.Admits): its members decide, and its root
 //     is readable where any member's is (#1533). The walk (lookupMember)

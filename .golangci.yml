@@ -172,6 +172,7 @@ linters:
       extra-ignore-sigs:
         - apierror.New(
         - format.Rejectf(
+        - format.PolicyRefusal(
         - dialect.Store).
         - memtx.Store).
         - dialect.ToJSON(

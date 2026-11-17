@@ -361,6 +361,42 @@ func TestUnitPolicyRefusalNamesThePath(t *testing.T) {
 	wantAnswer(t, containedRefusal(local, file, other), http.StatusNotFound, "Could not find resource")
 	wantAnswer(t, containedRefusal(local, ItemRequest{Key: "libs-local", Path: "a/f.jar", member: true},
 		policy), http.StatusNotFound, "Could not find resource")
+
+	// A request that named a remote's cache takes the reason in the cache's
+	// words, as 7.161.26's cache repository states its own refusal; the
+	// remote's key keeps the remote's, and so does a local repository whose
+	// key ends in "-cache".
+	named := format.PolicyRefusal(http.StatusNotFound, "'%[1]s' refuses '%[1]s:%[2]s'", "up", "f.bin")
+	for _, tc := range []struct {
+		c       repo.Config
+		key     string
+		message string
+	}{
+		{remote, "up", "'up' refuses 'up:f.bin'; Path: 'up:f.bin'"},
+		{remote, "up-cache", "'up-cache' refuses 'up-cache:f.bin'; Path: 'up-cache:f.bin'"},
+		{repo.Config{Key: "up", Class: repo.Local}, "up-cache", "'up' refuses 'up:f.bin'; Path: 'up-cache:f.bin'"},
+	} {
+		req := ItemRequest{Key: tc.key, Path: "f.bin"}
+		wantAnswer(t, lookupRefusal(tc.c, req, named), http.StatusNotFound, tc.message)
+		wantAnswer(t, sourceAnswer(tc.c, req, user, errors.Join(kernel.ErrNotFound, named)),
+			http.StatusNotFound, tc.message)
+	}
+	if got := asNamed(remote, true, named); got.Error() != "'up-cache' refuses 'up-cache:f.bin'" {
+		t.Errorf("the cache's trace names %q", got)
+	}
+	for name, kept := range map[string]struct {
+		c      repo.Config
+		cached bool
+		err    error
+	}{
+		"the remote":    {remote, false, named},
+		"a local":       {local, true, named},
+		"other refusal": {remote, true, other},
+	} {
+		if got := asNamed(kept.c, kept.cached, kept.err); got != kept.err { //nolint:errorlint // the same error
+			t.Errorf("%s: named %v, want it kept", name, got)
+		}
+	}
 }
 
 // TestUnitTraceNamesTheDenial (#1630): a traced direct request's refusal is

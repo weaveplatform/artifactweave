@@ -402,7 +402,7 @@ func Lookup(
 ) (Found, error) {
 	if dl != nil {
 		if err := generic.CheckDownload(c, dl.path, dl.isFolder); err != nil {
-			dl.denied(c, err)
+			dl.denied(c, asNamed(c, cached, err))
 			return Found{}, err //nolint:wrapcheck // a RejectionError is the answer
 		}
 	}
@@ -413,7 +413,7 @@ func Lookup(
 	if policyRefusal(err) != nil {
 		// Maven's release and snapshot handling, which the format checks
 		// on the path it resolves.
-		dl.denied(c, err)
+		dl.denied(c, asNamed(c, cached, err))
 	}
 	return f, err
 }

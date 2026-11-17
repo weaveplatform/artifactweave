@@ -218,7 +218,7 @@ func TestAccAlpineRefusesCallersWhoMayNotDownload(t *testing.T) {
 		{
 			"blacked-out remote's cache", "alpine-dark-remote-cache", apkIndexPath,
 			kittest.Admin.Name, http.StatusNotFound,
-			blackedOut("alpine-dark-remote", "alpine-dark-remote-cache"),
+			blackedOut("alpine-dark-remote-cache", "alpine-dark-remote-cache"),
 		},
 		{
 			"index the patterns reject", "alpine-hidden", apkIndexPath, kittest.Admin.Name,
