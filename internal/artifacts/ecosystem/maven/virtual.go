@@ -311,13 +311,14 @@ func normalizedPOMAttributes(original xml.StartElement, raw []byte) xml.StartEle
 	changed := false
 	for i := 0; i < len(raw); i++ {
 		c := raw[i]
-		if quote == 0 {
+		switch {
+		case quote == 0:
 			if c == '\'' || c == '"' {
 				quote = c
 			}
-		} else if c == quote {
+		case c == quote:
 			quote = 0
-		} else if c == '\r' || c == '\n' || c == '\t' {
+		case c == '\r' || c == '\n' || c == '\t':
 			if c == '\r' && i+1 < len(raw) && raw[i+1] == '\n' {
 				i++
 			}
