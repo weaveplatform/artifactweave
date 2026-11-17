@@ -776,8 +776,8 @@ turn a hint into authority: the next request checks its current revision again.
 only that member for parents. A remote contributes its retained manifest tree,
 without enumerating unknown upstream tags; transient child reads are closed and
 are not counted as downloads. Existing direct REST behavior is retained.
-DeleteDockerTag, uploads/push/delete, tags, catalog and referrers keep their existing
-405 responses. Promotion's existing virtual-target 400 remains unchanged.
+DKR-02 adds publishing and researched deletion refusals below. Tags, catalog and
+referrers retain 405. Promotion's existing virtual-target 400 remains unchanged.
 
 Primary sources checked 2026-11-17:
 [Additional Docker Information](https://docs.jfrog.com/artifactory/docs/additional-docker-information)
@@ -812,3 +812,64 @@ The same router probe on main `dbd75b7f7` and DKR-01 produces:
 | Push / catalog / tags / referrers | 405 | Same 405 and refusal text |
 | DeleteDockerTag | 405 | Same 405 and refusal text |
 | FindParentManifestLists, local child without parents | 405 | 200, empty parent list |
+
+## P10 virtual pushes (DKR-02)
+
+Docker, OCI and Helm OCI uploads and manifest PUT map through ENG-09's existing
+`virtual.DeployTarget` to an existing local/federated DDR. Write and overwrite
+Delete are checked on that member's image. The original virtual URL, realm and
+token scope remain in use; upload status/cancel and every `Location` keep that
+address. A virtual without a valid DDR answers 405 `UNSUPPORTED`, `Allow: GET`,
+with the shared R6 message. Runtime mapping retains ENG-09's class/existence
+contract; configuration saving enforces membership.
+
+Virtual patterns apply before DDR patterns, including to administrators, against
+the image name. `ImageWriteConfig` then supplies a per-request configuration copy
+whose already-checked patterns cannot reject generated `_uploads`/digest files.
+No persisted descriptor changes, and ordinary REST item writes still check their
+full paths. Blackout and all other repository settings remain in effect.
+
+Blob/tag HEAD uses the existing read walk. A caller authorized only to push into
+the DDR receives not found for an otherwise unauthorized HEAD, including when an
+unreadable member holds the tag; GET retains its authorization refusal. Only
+401/403 authorization failures may become this probe miss; lookup faults remain
+server errors. A push token grants only the requested virtual image's push action
+with DDR Write alone, and grants neither member scopes nor read disclosure.
+
+Before committing a manifest, missing referenced content is imported through the
+same readable-member walk. Stored local/cache items are linked by checksum;
+remote streams are verified as uploads, with the source revalidated at publication.
+Remote cache-fill, offline, origin and download policies remain the remote's own.
+Failed/forbidden imports leave the existing `MANIFEST_BLOB_UNKNOWN` check to refuse
+the manifest. Index children already visible through HEAD are recursively imported
+by digest with their references; the existing child/blob presence and size checks
+are retained. Optional subjects and foreign layers retain their direct-push rules.
+Import traversal is bounded to eight levels and 256 distinct references, with the
+budget checked for every addition. A virtual `from` mount resolves through its
+members; a virtual mount destination stores the blob in its DDR.
+
+Manifest/blob DELETE through a virtual returns 400 with no body and changes no
+member. `DeleteDockerTag` returns Artifactory's 400 envelope with
+`Unable to delete a manifest from a virtual repository`.
+
+Primary research and unresolved **[I]** choices are recorded in
+[research 23](../23-docker-oci-registry.md#p10-virtual-pushes-dkr-02-2026-11-17) and
+[#216](https://github.com/weaveplatform/artifactweave/issues/216): virtual locations,
+registry no-DDR envelope, current deletion bodies, remote-only imports, index-child
+import details, and write-only push/probe behavior. No live/trial capture was used.
+
+The identical router probe on main `75090fe97` and DKR-02 produces:
+
+| Request | Main | DKR-02 |
+|---|---|---|
+| Upload POST | 405 | 202; virtual Location |
+| Upload GET / PATCH / PUT | 405 / 405 / 405 | 204 / 202 / 201; virtual Locations |
+| Upload cancellation DELETE | 405 | 204 |
+| Tag HEAD before final PUT | 404 `MANIFEST_UNKNOWN` | Same 404 |
+| Manifest PUT, blobs in another member | 405 | 201; complete image in DDR |
+| Manifest HEAD after PUT | 404 | 200, registry header names DDR |
+| Manifest / blob DELETE | 405 / 405 | 400 / 400, empty bodies |
+| DeleteDockerTag | 405 | 400, Artifactory refusal |
+| Mount from virtual to local | 202 upload fallback | 201 mounted |
+| Push with no DDR | 405 generic virtual refusal | 405 R6 message, `Allow: GET` |
+| Existing pull / catalog / tags / referrers | 200 / 405 / 405 / 405 | Same statuses and bodies |

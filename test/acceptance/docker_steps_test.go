@@ -46,10 +46,44 @@ func (w *world) registerDocker(sc *godog.ScenarioContext) {
 	sc.Step(`^I run (crane|oras|cosign) "([^"]*)"$`, w.runTool)
 	sc.Step(`^I keep the output as "([^"]*)"$`, w.keepOutput)
 	sc.Step(`^the output is the kept value "([^"]*)"$`, w.outputIsKept)
+	sc.Step(`^I keep the first layer digest as "([^"]*)"$`, w.keepFirstLayer)
+	sc.Step(`^the push reused the kept layer "([^"]*)"$`, w.pushReusedLayer)
 	sc.Step(`^the auth entry is keyed by the registry URL$`, w.authEntryKeyed)
 	sc.Step(`^a layer "([^"]*)" holding "([^"]*)" with content "([^"]*)"$`, w.writeLayer)
 	sc.Step(`^a file "([^"]*)" with expanded content:$`, w.writeExpandedFile)
 	sc.Step(`^the JFrog CLI runs the pinned helm$`, w.jfRunsHelm)
+}
+
+func (w *world) keepFirstLayer(name string) error {
+	var manifest struct{ Layers []struct{ Digest string } }
+	if err := json.Unmarshal(w.body, &manifest); err != nil || len(manifest.Layers) == 0 {
+		return fmt.Errorf("expected an image manifest with a layer: %s", w.body)
+	}
+	if w.vars == nil {
+		w.vars = map[string]string{}
+	}
+	w.vars[name] = manifest.Layers[0].Digest
+	return nil
+}
+
+func (w *world) pushReusedLayer(name string) error {
+	digest := w.vars[name]
+	if digest == "" {
+		return fmt.Errorf("no layer digest was kept as %q", name)
+	}
+	if err := w.awaitLoggedSoFar(); err != nil {
+		return err
+	}
+	for line := range strings.Lines(w.stderr.String()[w.commandLog:]) {
+		var rec struct {
+			Msg, Method, Path string
+			Status            int
+		}
+		if json.Unmarshal([]byte(line), &rec) == nil && rec.Msg == "request" && rec.Method == "HEAD" && rec.Status == 200 && strings.HasSuffix(rec.Path, "/blobs/"+digest) {
+			return nil
+		}
+	}
+	return fmt.Errorf("push did not reuse layer %s through a successful blob HEAD", digest)
 }
 
 // jfRunsHelm puts the pinned helm first on the JFrog CLI's PATH, since jf

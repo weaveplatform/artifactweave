@@ -200,6 +200,33 @@ func (g *Registry) mount(w http.ResponseWriter, r *http.Request, q Request, o re
 		return false
 	}
 	for _, src := range g.mountSources(r, q, query.Get("from")) {
+		if src.Repo.Class == repo.Virtual {
+			src.Kind, src.Reference = KindBlob, "sha256:"+hex
+			if g.requireVirtual(r, src) != nil {
+				continue
+			}
+			read, err := g.virtualSource(r, src, src.storagePath())
+			if err != nil {
+				if virtualPassedOver(err) || read.remote && retrievalFailed(err) {
+					continue
+				}
+				g.uploadErr(w, r, q, err)
+				return true
+			}
+			copied, err := g.copyVirtualBlob(r, q, read, hex)
+			if err != nil {
+				if read.remote && (virtualPassedOver(err) || retrievalFailed(err)) {
+					continue
+				}
+				g.uploadErr(w, r, q, err)
+				return true
+			}
+			if copied {
+				created(w, r, q, hex)
+				return true
+			}
+			continue
+		}
 		if src.Require(r, src.Name+"/", api.ActionRead) != nil {
 			continue
 		}
@@ -258,11 +285,14 @@ func (g *Registry) mountSources(r *http.Request, q Request, from string) []Reque
 	same := Request{
 		RepoKey: q.RepoKey, Repo: q.Repo, Name: from, base: q.base, authenticated: q.authenticated,
 	}
+	if q.virtualRepo != nil {
+		same.Repo = *q.virtualRepo
+	}
 	var out []Request
 	if q.base != "/v2" {
 		if key, name, ok := strings.Cut(from, "/"); ok {
 			c, found, err := g.lookup(r.Context(), key)
-			if err == nil && found && c.Class != repo.Remote && c.Class != repo.Virtual {
+			if err == nil && found && c.Class != repo.Remote {
 				src := Request{
 					RepoKey: key, Repo: c, Name: name, base: "/v2/" + key,
 					authenticated: q.authenticated,

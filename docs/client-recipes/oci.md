@@ -37,7 +37,7 @@ oras login "$AW_REGISTRY" -u "$AW_USER" -p "$AW_TOKEN"
 
 ## Publish
 
-Classes: **local, federated**. Remote repositories reject writes; use a local or one-node federated target.
+Classes: **local, virtual, federated**. A virtual publishes to its configured local or federated defaultDeploymentRepo. DEPLOY is checked on that member; virtual upload URLs and token scopes retain the virtual key. Remote repositories reject writes.
 
 ```sh
 oras push "$AW_REGISTRY/$AW_REPO/team/notes:v1" --artifact-type application/vnd.example.notes notes.txt:text/plain
@@ -58,6 +58,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - Examples use HTTPS. CI alone adds --plain-http for its isolated loopback listener.
 - Cosign can use the same registry, but key creation and signature trust policy are separate from this basic connection recipe.
+- Manifest/blob DELETE through a virtual is refused with HTTP 400; delete through the concrete member. A virtual without a default deployment repository refuses publishing with HTTP 405.
 
 ## Verification sources
 
@@ -67,4 +68,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/registry_clients.feature](../../test/acceptance/features/registry_clients.feature).
 - Evidence: [test/acceptance/features/registry_remote.feature](../../test/acceptance/features/registry_remote.feature).
 - Evidence: [test/acceptance/docker_steps_test.go](../../test/acceptance/docker_steps_test.go).
+- Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).
 - Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).

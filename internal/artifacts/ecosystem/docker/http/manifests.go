@@ -262,6 +262,12 @@ func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request
 			return
 		}
 	}
+	if q.virtualRepo != nil {
+		if err = g.syncVirtual(r, q, m, map[string]bool{}, 0); err != nil {
+			g.manifestErr(w, r, q, err)
+			return
+		}
+	}
 	err = g.uploads.PutManifest(r.Context(), registry.Push{
 		Owner: o, Manifest: m, Body: body, Folders: folders,
 	})

@@ -81,6 +81,18 @@ type virtualRead struct {
 
 func (g *Registry) serveVirtual(w http.ResponseWriter, r *http.Request, q Request) {
 	if err := g.requireVirtual(r, q); err != nil {
+		// A write-only pusher must be able to probe before uploading (Docker
+		// 29/containerd). Hide unreadable content instead of disclosing it.
+		var denied *apierror.Error
+		if errors.As(err, &denied) && (denied.Status == http.StatusUnauthorized || denied.Status == http.StatusForbidden) &&
+			r.Method == http.MethodHead && g.virtualPushProbe(r, q) {
+			if q.Kind == KindBlob {
+				Write(w, blobUnknown(q.Reference))
+			} else {
+				Write(w, manifestUnknown(q))
+			}
+			return
+		}
 		g.writeErr(w, r, err)
 		return
 	}

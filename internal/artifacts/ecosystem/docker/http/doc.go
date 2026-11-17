@@ -98,7 +98,11 @@
 //     allowed.
 //   - A remote repository answers reads only. A virtual repository walks
 //     flattened members for manifest/blob GET and HEAD, retaining each
-//     member's permissions and source policy. Other kinds remain 405
+//     member's permissions and source policy. Virtual writes map to the DDR;
+//     generated file policies use the admitted image name. Upload locations and
+//     scopes keep the virtual address. Missing blobs/index children are imported
+//     before the existing manifest validation; virtual deletes are refused.
+//     Listings and referrers remain 405
 //     UNSUPPORTED until their P10 tickets. Digest location hints are bounded
 //     and recheck authority; tags always use the effective member order.
 //   - The JFrog operations under the Artifactory prefix (promote,

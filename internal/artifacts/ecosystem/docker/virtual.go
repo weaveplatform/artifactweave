@@ -12,7 +12,50 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 )
+
+// ImageWriteConfig admits an image write before the registry expands it into
+// upload and digest files. Internal names must not be checked as image names
+// again (RTFACT-17858). The returned copy is only for this admitted write;
+// persisted configuration and every other repository policy stay unchanged.
+func ImageWriteConfig(c repo.Config, image string) (repo.Config, error) {
+	if err := generic.CheckBlackedOut(c, image); err != nil {
+		return c, err //nolint:wrapcheck // the policy owns its refusal
+	}
+	if err := generic.CheckPatterns(c, image); err != nil {
+		return c, err //nolint:wrapcheck // the policy owns its refusal
+	}
+	c.IncludesPattern, c.ExcludesPattern = nil, nil
+	return c, nil
+}
+
+// VirtualImport is a reference a virtual push must also hold in its DDR.
+// A subject is deliberately absent: OCI permits pushing it before its subject.
+type VirtualImport struct {
+	Descriptor
+	Manifest bool
+}
+
+// VirtualImports plans children before blobs, once per digest and kind. The
+// registry's existing presence/size validation remains authoritative afterwards.
+func VirtualImports(m Manifest) []VirtualImport {
+	var out []VirtualImport
+	seen := map[string]bool{}
+	for _, group := range []struct {
+		descriptors []Descriptor
+		manifest    bool
+	}{{m.Manifests, true}, {m.BlobDescriptors(), false}} {
+		for _, d := range group.descriptors {
+			key := fmt.Sprintf("%t:%s", group.manifest, d.Digest)
+			if !seen[key] {
+				out = append(out, VirtualImport{Descriptor: d, Manifest: group.manifest})
+				seen[key] = true
+			}
+		}
+	}
+	return out
+}
 
 // VirtualMembers retains the engine's download order, including separate remote
 // cache/upstream steps. The revision includes nested configuration so changing

@@ -1258,7 +1258,7 @@ func TestAccMultiArchDelete(t *testing.T) {
 	}
 	for key, want := range map[string]string{
 		"docker-remote":  `{"errors":[{"status":405,"message":"docker-remote is a remote repository, which the registry does not serve yet"}]}`,
-		"docker-virtual": `{"errors":[{"status":405,"message":"docker-virtual is a virtual repository, which the registry does not serve yet"}]}`,
+		"docker-virtual": `{"errors":[{"status":400,"message":"Unable to delete a manifest from a virtual repository"}]}`,
 		"libs-local":     `{"errors":[{"status":404,"message":"Repository 'libs-local' does not exist"}]}`,
 	} {
 		rec := w.do(http.MethodDelete, "/artifactory/api/docker/"+key+"/v2/delete", "admin", body,

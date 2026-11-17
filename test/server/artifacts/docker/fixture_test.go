@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -12,11 +13,13 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	"github.com/weaveplatform/artifactweave/internal/app"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 	"github.com/weaveplatform/artifactweave/test/server/support/registryfixture"
@@ -174,7 +177,14 @@ type remoteWorld struct {
 
 func newRemoteWorld(t *testing.T) *remoteWorld {
 	t.Helper()
-	w := harness.NewRemoteWorld(t)
+	var mutate []func(*config.Config)
+	if dsn := os.Getenv("ARTIFACTWEAVE_TEST_POSTGRES_DSN"); dsn != "" {
+		// A protocol runtime owns its schema; other test processes may share
+		// the same PostgreSQL server while this runtime's workers run.
+		scratch := sqltest.ScratchDSN(t, dsn)
+		mutate = append(mutate, func(c *config.Config) { c.Database = config.Database{Driver: "postgres", DSN: scratch} })
+	}
+	w := harness.NewRemoteWorld(t, mutate...)
 	return &remoteWorld{t: w.T, rt: w.Runtime, h: w.H, up: w.Upstream, c: w.Repo}
 }
 

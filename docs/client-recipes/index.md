@@ -21,14 +21,14 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Conda channels with micromamba](conda.md) | micromamba 2.10.0 (Conda package protocol) | local, federated | local, remote, virtual, federated |
 | [CRAN source repositories](cran.md) | R 4.6.2 | local, federated | local, remote, virtual, federated |
 | [Debian APT](debian.md) | APT bundled with Ubuntu 26.10 (immutable image) | local, federated | local, remote, virtual, federated |
-| [Docker images](docker.md) | Docker CLI/daemon supplied by the CI runner; crane 0.22.1 | local, federated | local, remote, virtual, federated |
+| [Docker images](docker.md) | Docker CLI/daemon supplied by the CI runner; crane 0.22.1 | local, virtual, federated | local, remote, virtual, federated |
 | [RubyGems and Bundler](gems.md) | RubyGems 4.0.23 and Bundler 4.0.23 on Ruby 4.0.9 | local, federated | local, remote, virtual, federated |
 | [Generic files](generic.md) | JFrog CLI 2.131.0 | local, federated | local, remote, virtual, federated |
 | [Git LFS](gitlfs.md) | Git LFS 3.8.1 | local, federated | local, remote, virtual, federated |
 | [Go modules](go.md) | Go 1.27 (module toolchain); JFrog CLI 2.131.0 | local, virtual | local, virtual |
 | [Gradle Maven-layout repositories](gradle.md) | Gradle 9.8.2 on Temurin 27; optional JFrog CLI 2.131.0 wrapper | local, federated | local, remote, virtual, federated |
 | [Classic Helm charts](helm.md) | Helm 4.3.1 | local, federated | local, remote, virtual, federated |
-| [Helm OCI charts](helmoci.md) | Helm 4.3.1; JFrog CLI 2.131.0 | local, federated | local, remote, virtual, federated |
+| [Helm OCI charts](helmoci.md) | Helm 4.3.1; JFrog CLI 2.131.0 | local, virtual, federated | local, remote, virtual, federated |
 | [Signed Hex repositories](hex.md) | Hex 2.6.0; Elixir 1.20.5; OTP 29.1.2 | local | local, remote, virtual |
 | [Hugging Face models and datasets](huggingfaceml.md) | huggingface_hub 2.4.0; hf-xet 1.8.0 | local, federated | local, remote, virtual, federated |
 | [Apache Ivy](ivy.md) | Apache Ivy 2.6.0 on the pinned Maven/Temurin image | local, federated | local, remote, virtual, federated |
@@ -40,7 +40,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Nix binary caches](nix.md) | Nix 2.35.6 | local, federated | local, remote, virtual, federated |
 | [npm](npm.md) | Bundled npm on Node 26.13.1; npm 12.2.1 on Node 24.22.3 | local | local, remote |
 | [NuGet v3 with dotnet](nuget.md) | NuGet bundled with .NET SDK 10.0 image; .NET 11.0 image also exercised (exact SDK versions in CI logs) | local | local, remote |
-| [OCI artifacts](oci.md) | ORAS 1.3.6; crane 0.22.1; Cosign 3.1.4 | local, federated | local, remote, virtual, federated |
+| [OCI artifacts](oci.md) | ORAS 1.3.6; crane 0.22.1; Cosign 3.1.4 | local, virtual, federated | local, remote, virtual, federated |
 | [Opkg feeds](opkg.md) | opkg 0.10.0 | local, federated | local, remote, virtual, federated |
 | [Eclipse P2 update sites](p2.md) | Eclipse Platform / Equinox P2 4.41, Java 21 | none | remote, virtual |
 | [Dart pub hosted registry](pub.md) | Dart/pub 3.14.0 | local, virtual, federated | local, remote, virtual, federated |
