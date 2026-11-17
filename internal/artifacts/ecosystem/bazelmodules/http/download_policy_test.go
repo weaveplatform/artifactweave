@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -243,5 +245,57 @@ func TestAccBazelDownloadPolicyRemote(t *testing.T) {
 	f.served(root+"modules/hello/1.0.0/source.json", integrity(archiveBytes))
 	if w := f.served(root+archiveRoute, ""); !bytes.Equal(w.Body.Bytes(), archiveBytes) {
 		t.Fatal("the remote archive changed")
+	}
+}
+
+func TestAccBazelVirtualMemberOnlyGrants(t *testing.T) {
+	f := newFixture(t)
+	f.publish(f.local, "modules/hello/1.0.0/MODULE.bazel", []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+	f.publish(f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", archive(t))
+	v := *repo.Defaults(&repo.Config{Key: "virtual", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{f.local.Key}})
+	if err := f.db.Repos().Create(t.Context(), v); err != nil {
+		t.Fatal(err)
+	}
+	for _, grant := range []struct{ user, path string }{{"member", "modules/hello/**"}, {"other-module", "modules/other/**"}} {
+		if err := f.db.Permissions().
+			Create(t.Context(), accesstest.Permission{Name: grant.user, Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{grant.user: api.ActionRead}}, Targets: map[string]accesstest.Target{f.local.Key: {Include: []string{grant.path}}}}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tail := range []string{"modules/hello/metadata.json", "modules/hello/1.0.0/MODULE.bazel", "modules/hello/1.0.0/source.json"} {
+		for _, tc := range []struct {
+			user string
+			want int
+		}{{"member", 200}, {"other-module", 404}} {
+			rec := f.requestAs("GET", "/artifactory/api/bazelmodules/virtual/"+tail, tc.user)
+			if rec.Code != tc.want {
+				t.Fatal(tc.user, tail, rec.Code, rec.Body)
+			}
+		}
+	}
+	rec := f.requestAs("GET", "/artifactory/api/bazelmodules/virtual/bazel_registry.json", "member")
+	if rec.Code != 200 {
+		t.Fatal(rec.Code, rec.Body)
+	}
+}
+
+func TestAccBazelVirtualMetadataKeepsVersionsWhoseFileIsExcluded(t *testing.T) {
+	f := newFixture(t)
+	f.publish(f.local, "modules/hello/1.0.0/MODULE.bazel", []byte("module(name = \"hello\", version = \"1.0.0\")\n"))
+	f.publish(f.local, "modules/hello/1.0.0/hello-1.0.0.tar.gz", archive(t))
+	exclude := "modules/hello/1.0.0/MODULE.bazel"
+	v := *repo.Defaults(&repo.Config{Key: "virtual", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{f.local.Key}, ExcludesPattern: &exclude})
+	if err := f.db.Repos().Create(t.Context(), v); err != nil {
+		t.Fatal(err)
+	}
+	root := "/artifactory/api/bazelmodules/virtual/modules/hello/"
+	for _, tc := range []struct {
+		path string
+		want int
+	}{{"metadata.json", 200}, {"1.0.0/source.json", 200}, {"1.0.0/MODULE.bazel", 404}} {
+		rec := f.request("GET", root+tc.path)
+		if rec.Code != tc.want {
+			t.Fatal(tc.path, rec.Code, rec.Body)
+		}
 	}
 }

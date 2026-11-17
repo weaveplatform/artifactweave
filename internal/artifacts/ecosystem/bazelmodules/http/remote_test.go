@@ -178,6 +178,10 @@ func TestAccYankedMetadataFollowsSelectedMember(t *testing.T) {
 		{"bazel-yanked-remote-first", []string{x.c.Key, x.f.local.Key}, true},
 		{"bazel-yanked-local-first", []string{x.f.local.Key, x.c.Key}, false},
 	} {
+		x.c.PriorityResolution = repo.Flex(tc.yanked)
+		if err := x.f.db.Repos().Update(t.Context(), x.c); err != nil {
+			t.Fatal(err)
+		}
 		v := *repo.Defaults(&repo.Config{Key: tc.key, Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: tc.members})
 		if err := x.f.db.Repos().Create(t.Context(), v); err != nil {
 			t.Fatal(err)

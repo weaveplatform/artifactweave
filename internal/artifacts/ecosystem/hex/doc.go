@@ -80,6 +80,10 @@
 // Implemented P9c, which delivered the plan's P30 group (issues #762 to
 // #768). Moved here in P9d.
 //
+// P10 (#1554): virtual walks use the shared engine, including nested virtuals
+// and federated members. The ecosystem Merger retains winning releases and
+// advisory associations, and the protocol signs the resulting registry.
+//
 // # Testing
 //
 //   - package_test.go and terms_test.go: the public decimal and ecto

@@ -201,7 +201,7 @@ func TestAccVirtualFailsClosedOnMalformedRemoteMember(t *testing.T) {
 	}
 }
 
-func TestAccVirtualRemoteMissingMetadataFallsBackButMalformedSourceStops(t *testing.T) {
+func TestAccVirtualRemoteMissingOrMalformedMemberFallsBack(t *testing.T) {
 	for _, tc := range []struct {
 		name, failedPath, request string
 		invalid                   bool
@@ -222,15 +222,16 @@ func TestAccVirtualRemoteMissingMetadataFallsBackButMalformedSourceStops(t *test
 			} else {
 				x.up.Delete(tc.failedPath)
 			}
+			x.c.PriorityResolution = repo.Flex(true)
+			if err := x.f.db.Repos().Update(t.Context(), x.c); err != nil {
+				t.Fatal(err)
+			}
 			v := *repo.Defaults(&repo.Config{Key: "bazel-virtual-failclosed", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{x.c.Key, x.f.local.Key}})
 			if err := x.f.db.Repos().Create(t.Context(), v); err != nil {
 				t.Fatal(err)
 			}
 			w := x.f.request(http.MethodGet, "/artifactory/api/bazelmodules/"+v.Key+"/"+tc.request)
-			if tc.invalid && w.Code == 200 {
-				t.Fatalf("malformed first member was silently bypassed: %s", w.Body.String())
-			}
-			if !tc.invalid && (w.Code != 200 || !strings.Contains(w.Body.String(), "1.0.0")) {
+			if w.Code != 200 || !strings.Contains(w.Body.String(), "1.0.0") {
 				t.Fatalf("missing first member did not fall back: %d %s", w.Code, w.Body.String())
 			}
 		})
@@ -323,6 +324,26 @@ func TestAccLocalMetadataRequiresReadableCompletePublication(t *testing.T) {
 		w := f.requestAs(http.MethodGet, root+"/"+tail, "reader")
 		if w.Code == http.StatusOK || strings.Contains(w.Body.String(), "1.0.0") {
 			t.Fatalf("archive-denied reader saw %s: %d %s", tail, w.Code, w.Body.String())
+		}
+	}
+}
+
+func TestAccBazelVirtualDoesNotHideUpstreamAuthenticationFailure(t *testing.T) {
+	x := newRemoteCase(t)
+	x.c.PriorityResolution = repo.Flex(true)
+	if err := x.f.db.Repos().Update(t.Context(), x.c); err != nil {
+		t.Fatal(err)
+	}
+	x.up.Set("/registry/modules/hello/metadata.json", fakeupstream.Resource{Status: 401})
+	x.up.Set("/registry/modules/hello/1.0.0/source.json", fakeupstream.Resource{Status: 401})
+	v := *repo.Defaults(&repo.Config{Key: "virtual", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{x.c.Key, x.f.local.Key}})
+	if err := x.f.db.Repos().Create(t.Context(), v); err != nil {
+		t.Fatal(err)
+	}
+	for _, tail := range []string{"metadata.json", "1.0.0/source.json"} {
+		rec := x.f.request("GET", "/artifactory/api/bazelmodules/virtual/modules/hello/"+tail)
+		if rec.Code != 401 {
+			t.Fatal(tail, rec.Code, rec.Body)
 		}
 	}
 }

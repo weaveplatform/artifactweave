@@ -80,6 +80,10 @@
 // Implemented P9c, which delivered the plan's P31 group (issues #770 to
 // #775). Moved here in P9d.
 //
+// P10 (#1554): virtual walks use the shared engine, including nesting, cycles,
+// duplicates, member permissions and pass-over warnings. The ecosystem Merger
+// unions authorized version metadata per request.
+//
 // # Testing
 //
 //   - bazelmodules_test.go: paths and module identity, the integrity
