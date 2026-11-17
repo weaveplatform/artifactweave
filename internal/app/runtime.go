@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
@@ -227,9 +228,14 @@ func OpenRuntime(
 		stop()
 		return nil, errors.Join(err, st.Close())
 	}
+	// A snapshot of a virtual repository walks its members as the package
+	// handlers do (itemkit.Kit.Packages), so the work's kit needs the
+	// store that walk reads; it keeps no merge, as a snapshot builds its
+	// own copy (#1552).
 	if err := registerDebianSnapshotWork(queue, itemkit.New(itemkit.Deps{
 		Store: st, Blobs: hot.store, Access: mods.access.API(), Work: queue,
 		RemoteSources: art.RemoteSources(), FormatSettings: art.FormatSettings(),
+		PackageOptions: pkgroute.Options{Store: st},
 	})); err != nil {
 		stop()
 		return nil, errors.Join(err, st.Close())
