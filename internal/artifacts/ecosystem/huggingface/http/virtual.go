@@ -1,7 +1,6 @@
 package huggingfacehttp
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	formatapi "github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	format "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/huggingface"
@@ -150,11 +148,11 @@ func (h handler) deployTarget(r *http.Request, id format.Identity) (*http.Reques
 // over as it passes over a miss (decision 0008, R3) [I]: only the log tells
 // an operator why the revision came from a later member or from none.
 func (h handler) logFault(r, member *http.Request, folder string, err error) {
+	// Every remote read passes through pkgroute.SourceError, which answers
+	// an upstream's 5xx, an unreachable upstream and a timeout with 500 or
+	// more; anything else the walk passed over is a miss or a refusal.
 	var answer *apierror.Error
-	var upstream *source.HTTPError
-	if !(errors.As(err, &answer) && answer.Status >= http.StatusInternalServerError ||
-		errors.As(err, &upstream) && upstream.Status >= http.StatusInternalServerError ||
-		errors.Is(err, source.ErrUnavailable) || errors.Is(err, context.DeadlineExceeded)) {
+	if !errors.As(err, &answer) || answer.Status < http.StatusInternalServerError {
 		return
 	}
 	h.o.Logger.WarnContext(r.Context(), "huggingface: virtual repository member passed over",

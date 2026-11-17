@@ -1,7 +1,6 @@
 package gitlfshttp
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,7 +8,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	format "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/gitlfs"
@@ -162,11 +160,11 @@ func (h handler) deployTarget(r *http.Request) (*http.Request, error) {
 // an operator why the object came from a later member or from none. A miss
 // or a refusal is the walk's ordinary answer and is not logged.
 func (h handler) logFault(r, member *http.Request, path string, err error) {
+	// Every remote read passes through pkgroute.SourceError, which answers
+	// an upstream's 5xx, an unreachable upstream and a timeout with 500 or
+	// more; anything else the walk passed over is a miss or a refusal.
 	var answer *apierror.Error
-	var upstream *source.HTTPError
-	if !(errors.As(err, &answer) && answer.Status >= http.StatusInternalServerError ||
-		errors.As(err, &upstream) && upstream.Status >= http.StatusInternalServerError ||
-		errors.Is(err, source.ErrUnavailable) || errors.Is(err, context.DeadlineExceeded)) {
+	if !errors.As(err, &answer) || answer.Status < http.StatusInternalServerError {
 		return
 	}
 	h.o.Logger.WarnContext(r.Context(), "gitlfs: virtual repository member passed over",
