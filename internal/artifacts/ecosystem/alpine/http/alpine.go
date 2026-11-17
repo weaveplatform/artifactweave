@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/alpine"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -26,10 +27,20 @@ const alpineIndexLimit = 36 << 20
 
 var (
 	errAlpineIndexTooLarge = errors.New("server: alpine index exceeds limit")
-	errAlpineVirtualCycle  = errors.New("server: alpine virtual member cycle")
-	errAlpineMemberType    = errors.New(
-		"server: alpine virtual member has incompatible package type",
-	)
+	// errAlpineNoSources is a remote member read on a server built without
+	// a remote source service: this server's fault, which no walk passes
+	// over, so the virtual index answers 500 as the remote's own index does.
+	errAlpineNoSources = errors.New("server: alpine remote member read without a source service")
+	// errAlpineNoMemberIndex is a virtual index no member serves: every
+	// member missed, refused or was passed over. It is not found to the
+	// merged metadata cache, which drops the virtual repository's entry
+	// (virtual.Cache.Get), and the overlay answers it with an empty index.
+	errAlpineNoMemberIndex = fmt.Errorf("server: no alpine member serves the index: %w",
+		kernel.ErrNotFound)
+	// errAlpineSign is a virtual index this server could not encode or sign
+	// with its key pair: this server's fault, answered 500 whatever the key
+	// store said, so an absent key pair is never taken for a member's miss.
+	errAlpineSign = errors.New("server: alpine virtual index signing")
 )
 
 type alpineIndexView struct {
@@ -96,7 +107,11 @@ func (s alpineItems) serveAlpineIndex(
 		httpkit.WriteErr(w, r, itemkit.NotServed(c, cached, req, p, acc))
 		return
 	}
-	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
+	if c.Class == repo.Virtual {
+		if !s.VirtualGate(w, r, st, c, req.Path, p, acc, "Alpine virtual members") {
+			return
+		}
+	} else if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
 		!acc.File(c, req.Path, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, itemkit.Refused(c, req, p))
 		return
@@ -144,24 +159,14 @@ func (s alpineItems) serveAlpineIndex(
 	var body []byte
 	var used func(context.Context) error
 	if c.Class == repo.Virtual {
-		candidates, err := s.alpineCandidates(ctx, st, c, req.Path, p, acc, false,
-			map[string]bool{})
-		if err != nil {
-			httpkit.WriteErr(w, r, s.ItemError(ctx, "Alpine virtual index", err))
-			return
-		}
-		packages := make([]alpine.Package, 0, len(candidates))
-		for _, candidate := range candidates {
-			packages = append(packages, candidate.packageInfo)
-		}
-		keyName, key, err := alpine.SigningKey(ctx, s.Access.Keys, c)
-		if err != nil {
-			httpkit.WriteErr(w, r, s.InternalError(ctx, "Alpine virtual signing key", err))
-			return
-		}
-		body, err = alpine.EncodeIndex(packages, "alpine "+c.Key, keyName, key)
-		if err != nil {
+		var err error
+		body, err = s.virtualAlpineIndex(r, st, c, req.Path, p, acc)
+		switch {
+		case errors.Is(err, errAlpineSign):
 			httpkit.WriteErr(w, r, s.InternalError(ctx, "Alpine virtual index", err))
+			return
+		case err != nil:
+			httpkit.WriteErr(w, r, s.ItemError(ctx, "Alpine virtual index", err))
 			return
 		}
 	} else {
@@ -238,21 +243,12 @@ func alpinePackageReadable(
 	return true, nil
 }
 
-// alpineMemberIndex reads the index at path of a local, federated or
-// remote repository as a lookup: a virtual index's member, which the client
-// did not ask for, so nothing of the client's request goes to a remote's
-// upstream.
-func (s alpineItems) alpineMemberIndex(
-	ctx context.Context, st itemkit.Store, c repo.Config, cached bool, path string,
-	p kernel.Principal, acc itemkit.Access,
-) (alpineIndexView, error) {
-	return s.alpineIndexRead(ctx, st, c, cached, path, "", "", p, acc)
-}
-
-// alpineIndexRead reads the index at path as alpineMemberIndex does, and
-// passes a remote's upstream the client's query (only under Propagate
-// Query Params, which the source boundary applies) and its matrix
-// parameters (source.Request.MatrixParams), as for any remote file.
+// alpineIndexRead reads the index at path of a local, federated or remote
+// repository, and passes a remote's upstream the client's query (only
+// under Propagate Query Params, which the source boundary applies) and its
+// matrix parameters (source.Request.MatrixParams), as for any remote file.
+// A virtual index's member read passes neither: the client did not ask
+// that member for anything (memberPackages).
 func (s alpineItems) alpineIndexRead(
 	ctx context.Context, st itemkit.Store, c repo.Config, cached bool,
 	path, rawQuery, matrix string, p kernel.Principal, acc itemkit.Access,
@@ -332,105 +328,155 @@ func (s alpineItems) readAlpineBlob(ctx context.Context, sha string) ([]byte, er
 	return body, nil
 }
 
-// alpineCandidates walks ordered virtual members. A duplicate path belongs to
-// the first readable member; for a package GET (download true) the later
-// members' rows for it follow, so a GET whose matrix parameters the first
-// member's file does not match can pass over to the next
-// (serveVirtualAlpinePackage). A member whose download policy refuses its
-// index takes no part in the index, and only a blacked-out one in a package
-// GET (alpineMemberRefusesIndex). With download false, for the index, a row
-// stays when the member's or the virtual repository's patterns reject its
-// file, which the index keeps as 7.x's virtual indexes do (RTFACT-30656).
-// With download true, for a package GET, such a row is left out, so the GET
-// passes over that member to the next one that lists the path.
-func (s alpineItems) alpineCandidates(
-	ctx context.Context, st itemkit.Store, c repo.Config, indexPath string,
-	p kernel.Principal, acc itemkit.Access, download bool, seen map[string]bool,
-) ([]alpineCandidate, error) {
-	if seen[c.Key] || len(seen) >= 8 {
-		return nil, errAlpineVirtualCycle
+// alpineProtocol is the protocol whose kit walks an Alpine virtual
+// repository's members (itemkit.Kit.Packages): the overlay reads each
+// member's index itself, so the sources only name the classes the walk
+// keeps, a remote member as its upstream step.
+func alpineProtocol(k *itemkit.Kit) pkgroute.Protocol {
+	return pkgroute.Protocol{
+		Name:  "alpine",
+		Types: []repo.PackageType{repo.Alpine},
+		Sources: map[repo.Class]pkgroute.Source{
+			repo.Local: pkgroute.Local{}, repo.Federated: pkgroute.Local{},
+			repo.Remote: pkgroute.Remote{Service: k.RemoteSources},
+		},
 	}
-	seen[c.Key] = true
-	defer delete(seen, c.Key)
+}
+
+// virtualAlpineIndex is the virtual repository c's index at indexPath for
+// the caller: its members' packages (alpine.Merger), encoded and signed
+// with c's own key pair, which the docs name for a virtual index while the
+// members' keys are ignored (alpine-linux-repositories.md); with none the
+// index is unsigned, as the docs' --allow-untrusted note says. The members
+// are the package handlers' walk (pkgroute.Collect): 7.x's order, nested
+// virtual repositories flattened with a cycle or a diamond skipped, a
+// member of another type passed over (decision 0008, R1, R2 and R11), and
+// each member that misses, refuses or fails passed over with the rest
+// listed (R3; RTFACT-30422 shows a YUM virtual merging without its failing
+// remote) [I]. The merge is kept for c's virtualRetrievalCachePeriodSecs,
+// which JFrog's page lists for Alpine (R8, pkgroute.Kit.Merged). An index
+// no member serves drops the kept one and answers empty, as it has before
+// [I].
+func (s alpineItems) virtualAlpineIndex(
+	r *http.Request, st itemkit.Store, c repo.Config, indexPath string,
+	p kernel.Principal, acc itemkit.Access,
+) ([]byte, error) {
+	k, err := s.Packages(alpineProtocol(s.Kit), true)
+	if err != nil {
+		return nil, fmt.Errorf("alpine virtual index: %w", err)
+	}
+	e, err := k.Merged(k.Bind(r, c), indexPath, indexPath,
+		func(r *http.Request) (virtual.Entry, error) {
+			parts, err := pkgroute.Collect(k, r, indexPath, func(mr *http.Request) ([]alpine.Package, error) {
+				rows, err := s.memberPackages(mr, st, indexPath, p, acc)
+				k.WarnPassedOver(mr, err)
+				return rows, err
+			})
+			if err != nil {
+				return virtual.Entry{}, err //nolint:wrapcheck // the kit names the member and its fault
+			}
+			if len(parts) == 0 {
+				return virtual.Entry{}, errAlpineNoMemberIndex
+			}
+			packages, _ := alpine.Merger{}.Merge(r.Context(), parts)
+			body, err := s.signedAlpineIndex(r.Context(), c, packages)
+			return virtual.Entry{Body: body}, err
+		})
+	if errors.Is(err, errAlpineNoMemberIndex) {
+		return s.signedAlpineIndex(r.Context(), c, nil)
+	}
+	return e.Body, err //nolint:wrapcheck // the kit's and the merge's own answers
+}
+
+// signedAlpineIndex encodes packages as the virtual repository c's index,
+// signed with c's key pair (alpine.SigningKey).
+func (s alpineItems) signedAlpineIndex(
+	ctx context.Context, c repo.Config, packages []alpine.Package,
+) ([]byte, error) {
+	keyName, key, err := alpine.SigningKey(ctx, s.Access.Keys, c)
+	if err == nil {
+		var body []byte
+		if body, err = alpine.EncodeIndex(packages, "alpine "+c.Key, keyName, key); err == nil {
+			return body, nil
+		}
+	}
+	return nil, fmt.Errorf("%w: %s", errAlpineSign, err.Error())
+}
+
+// memberPackages reads the packages the index at indexPath of one member
+// of a virtual repository lists, through the member request mr, filtered by
+// the caller's Read in that member alone: no permission target can name
+// the virtual repository (decision 0006), so the member that serves a row
+// decides it (decision 0008, R3). A member whose index the caller may not
+// read is passed over as not found. A row whose file the patterns reject
+// stays, as 7.x's virtual indexes keep it and refuse only its GET
+// (RTFACT-30656).
+func (s alpineItems) memberPackages(
+	mr *http.Request, st itemkit.Store, indexPath string, p kernel.Principal, acc itemkit.Access,
+) ([]alpine.Package, error) {
+	ctx := mr.Context()
+	q := pkgroute.RequestFrom(mr)
+	m := q.Repo
+	if !acc.Folder(m, indexPath, accessapi.ActionRead) ||
+		!acc.File(m, indexPath, accessapi.ActionRead) {
+		return nil, kernel.ErrForbidden
+	}
+	if m.Class == repo.Remote && s.RemoteSources == nil {
+		return nil, errAlpineNoSources
+	}
+	view, err := s.alpineIndexRead(ctx, st, m, q.CacheOnly, indexPath, "", "", p, acc)
+	if err == nil && view.revalidate != nil {
+		err = view.revalidate(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	var rows []alpine.Package
+	for _, pkg := range view.packages {
+		allowed, err := alpinePackageReadable(ctx, m, pkg.Path, acc, view.checkPermission)
+		if err != nil {
+			return nil, err
+		}
+		if allowed {
+			rows = append(rows, pkg)
+		}
+	}
+	return rows, nil
+}
+
+// virtualAlpineCandidates are the members of the virtual repository c that
+// list the package at path, in the walk's order, each with its row: the
+// package handlers' walk for the package's own path (pkgroute.Collect), so
+// each member is checked at the package's path, never at the index it
+// reads to find it, as 6.20's VirtualRepoDownloadStrategy and the patterns
+// FAQ have it ("artifacts that match an exclude pattern are not resolved
+// from that repository"): a member whose patterns reject only its index
+// still serves the package.
+func (s alpineItems) virtualAlpineCandidates(
+	r *http.Request, st itemkit.Store, c repo.Config, path, indexPath string,
+	p kernel.Principal, acc itemkit.Access,
+) ([]alpineCandidate, error) {
+	k, err := s.Packages(alpineProtocol(s.Kit), true)
+	if err != nil {
+		return nil, fmt.Errorf("alpine virtual package: %w", err)
+	}
+	parts, err := pkgroute.Collect(k, k.Bind(r, c), path, func(mr *http.Request) ([]alpine.Package, error) {
+		rows, err := s.memberPackages(mr, st, indexPath, p, acc)
+		k.WarnPassedOver(mr, err)
+		return rows, err
+	})
+	if err != nil {
+		return nil, err //nolint:wrapcheck // the kit names the member and its fault
+	}
 	var out []alpineCandidate
-	selected := map[string]bool{}
-	for _, key := range c.Repositories {
-		member, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("alpine virtual member %s: %w", key, err)
-		}
-		if member.PackageType != repo.Alpine {
-			return nil, fmt.Errorf("%w: %s", errAlpineMemberType, key)
-		}
-		if !acc.Folder(member, indexPath, accessapi.ActionRead) ||
-			!acc.File(member, indexPath, accessapi.ActionRead) ||
-			alpineMemberRefusesIndex(member, indexPath, download) {
-			continue
-		}
-		var entries []alpineCandidate
-		if member.Class == repo.Virtual {
-			entries, err = s.alpineCandidates(ctx, st, member, indexPath, p, acc, download, seen)
-		} else {
-			var view alpineIndexView
-			view, err = s.alpineMemberIndex(ctx, st, member, false, indexPath, p, acc)
-			if err == nil && view.revalidate != nil {
-				err = view.revalidate(ctx)
+	for _, part := range parts {
+		for _, pkg := range part.Doc {
+			if pkg.Path == path {
+				out = append(out, alpineCandidate{repo: part.Member, packageInfo: pkg})
 			}
-			if err == nil {
-				for _, pkg := range view.packages {
-					if download && generic.CheckDownload(member, pkg.Path, false) != nil {
-						continue
-					}
-					allowed, checkErr := alpinePackageReadable(
-						ctx, member, pkg.Path, acc, view.checkPermission)
-					if checkErr != nil {
-						err = checkErr
-						break
-					}
-					if allowed {
-						entries = append(entries, alpineCandidate{repo: member, packageInfo: pkg})
-					}
-				}
-			}
-		}
-		if errors.Is(err, kernel.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("alpine member %s index: %w", key, err)
-		}
-		for _, entry := range entries {
-			if !download && selected[entry.packageInfo.Path] ||
-				!acc.File(c, entry.packageInfo.Path, accessapi.ActionRead) {
-				continue
-			}
-			if download && generic.CheckDownload(c, entry.packageInfo.Path, false) != nil {
-				continue
-			}
-			selected[entry.packageInfo.Path] = true
-			out = append(out, entry)
 		}
 	}
 	return out, nil
-}
-
-// alpineMemberRefusesIndex reports whether a virtual repository's member
-// takes no part because its download policy refuses the index at
-// indexPath. The virtual index leaves out a member that refuses the
-// document. A package GET checks each member at the package's own path, as
-// 6.20's VirtualRepoDownloadStrategy does and as the patterns FAQ puts it
-// ("artifacts that match an exclude pattern are not resolved from that
-// repository"), so there the index is only the lookup that finds the file:
-// a blacked-out member, which refuses every file, takes no part, and
-// patterns that reject only the index leave the member's packages served.
-func alpineMemberRefusesIndex(member repo.Config, indexPath string, download bool) bool {
-	if !download {
-		return generic.CheckDownload(member, indexPath, false) != nil
-	}
-	return member.Class != repo.Virtual && generic.CheckBlackedOut(member, indexPath) != nil
 }
 
 func (s alpineItems) serveVirtualAlpinePackage(
@@ -441,8 +487,7 @@ func (s alpineItems) serveVirtualAlpinePackage(
 		httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 		return
 	}
-	if !acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+	if !s.VirtualGate(w, r, st, c, req.Path, p, acc, "Alpine virtual members") {
 		return
 	}
 	if err := generic.CheckDownload(c, req.Path, false); err != nil {
@@ -450,8 +495,7 @@ func (s alpineItems) serveVirtualAlpinePackage(
 		return
 	}
 	indexPath := req.Path[:strings.LastIndexByte(req.Path, '/')+1] + alpine.IndexName
-	candidates, err := s.alpineCandidates(r.Context(), st, c, indexPath, p, acc, true,
-		map[string]bool{})
+	candidates, err := s.virtualAlpineCandidates(r, st, c, req.Path, indexPath, p, acc)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "Alpine virtual package", err))
 		return

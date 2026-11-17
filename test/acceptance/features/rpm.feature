@@ -187,7 +187,7 @@ Feature: Native RPM repository metadata and dnf install
     When I run dnf "install artifactweave-alpha"
     Then the command succeeds
 
-  Scenario: dnf installs through a virtual RPM repository backed by a remote member
+  Scenario: dnf installs through a virtual RPM repository backed by a remote and a local member
     Given the registry is running
     And the Fedora client can reach the registry
     And a genuine RPM package is available
@@ -197,9 +197,18 @@ Feature: Native RPM repository metadata and dnf install
       {"rclass":"remote","packageType":"rpm","url":"{upstream}"}
       """
     Then the response status is 200
+    When I PUT "/artifactory/api/repositories/rpm-local-member" as admin with body:
+      """
+      {"rclass":"local","packageType":"rpm","calculateYumMetadata":true}
+      """
+    Then the response status is 200
+    When I deploy the file "artifactweave-alpha-1.0-1.fc42.noarch.rpm" to "/artifactory/rpm-local-member/pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm" as admin
+    Then the response status is 201
+    When I GET "/artifactory/rpm-local-member/repodata/repomd.xml" as admin until the response status is 200
+    Then the response status is 200
     When I PUT "/artifactory/api/repositories/rpm-virtual-remote" as admin with body:
       """
-      {"rclass":"virtual","packageType":"rpm","repositories":["rpm-remote-member"]}
+      {"rclass":"virtual","packageType":"rpm","repositories":["rpm-remote-member","rpm-local-member"]}
       """
     Then the response status is 200
     Given the dnf repository is "rpm-virtual-remote"

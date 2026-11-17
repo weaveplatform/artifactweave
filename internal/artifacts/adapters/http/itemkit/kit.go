@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
@@ -81,6 +82,12 @@ type Deps struct {
 	// transfer test the format predicates themselves, because each one
 	// relocates and archives its paths by its own rule.
 	Private func(c repo.Config, path string) bool
+	// PackageOptions are the router kit's options, which an overlay that
+	// merges a virtual repository's index builds its kit over (Packages):
+	// the store the walk reads members in, the merged metadata cache and
+	// the logger. The artifacts partial sets them to its protocols'
+	// (artifactshttp.New); without a store Packages fails.
+	PackageOptions pkgroute.Options
 }
 
 // Overlay answers an item GET that a format serves itself, such as a

@@ -652,8 +652,8 @@ func TestUnitAlpineMemberIndexRefusesWhatHasNoIndex(t *testing.T) {
 		{"local repository's cache", alpineRepo(alpineLocal, repo.Local), true, apkIndexPath},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := alpineItems{w.kit}.alpineMemberIndex(
-				t.Context(), w.db, tc.c, tc.cached, tc.path, kittest.Admin, kittest.AdminAccess())
+			_, err := alpineItems{w.kit}.alpineIndexRead(t.Context(), w.db, tc.c, tc.cached,
+				tc.path, "", "", kittest.Admin, kittest.AdminAccess())
 			if !errors.Is(err, kernel.ErrNotFound) {
 				t.Errorf("read returned %v, want not found", err)
 			}
@@ -689,18 +689,13 @@ func TestAccAlpineVirtualIndexSkipsMembersWithoutAReadableIndex(t *testing.T) {
 }
 
 // TestAccAlpineVirtualIndexFailsClosed: a virtual index is never built
-// from part of its member graph, nor left unsigned when a key is named. A
-// member cycle, a member of another package type, a member that cannot be
-// looked up or whose index is malformed, a remote member whose listed
-// package cannot be checked, and a signing key that is absent or whose
-// name apk cannot use each answer 500.
+// from part of its member graph for a fault of this server, nor left
+// unsigned when a key is named. A member that cannot be looked up or whose
+// stored index is malformed, and a signing key that is absent or whose
+// name apk cannot use, each answer 500. A cycle, a member of another type
+// and a remote member that fails are passed over instead
+// (alpine_virtual_test.go).
 func TestAccAlpineVirtualIndexFailsClosed(t *testing.T) {
-	index := apkIndex(t, "hello")
-	unknownPackage := withSource(upstream(map[string]func() (source.Result, error){
-		apkIndexPath: streamed(index, func() func(context.Context) error {
-			return failsOnCall(3, source.ErrUnavailable)
-		}),
-	}))
 	signedBy := func(pair string) repo.Config {
 		c := alpineRepo(alpineVirtual, repo.Virtual)
 		c.KeyPair = pair
@@ -712,11 +707,6 @@ func TestAccAlpineVirtualIndexFailsClosed(t *testing.T) {
 		virtual repo.Config
 		seed    func(*itemWorld)
 	}{
-		{name: "member cycle", virtual: alpineRepo(alpineVirtual, repo.Virtual, alpineVirtual)},
-		{
-			name:    "member of another package type",
-			virtual: alpineRepo(alpineVirtual, repo.Virtual, kittest.LocalKey),
-		},
 		{
 			name: "member lookup fails",
 			tune: []func(*Config){func(c *Config) {
@@ -730,11 +720,6 @@ func TestAccAlpineVirtualIndexFailsClosed(t *testing.T) {
 			seed: func(w *itemWorld) {
 				w.put(alpineLocal, apkIndexPath, []byte("not an index"))
 			},
-		},
-		{
-			name:    "remote member's package cannot be checked",
-			tune:    []func(*Config){unknownPackage},
-			virtual: alpineRepo(alpineVirtual, repo.Virtual, alpineRemote),
 		},
 		{name: "signing key absent", virtual: signedBy("absent")},
 		{
@@ -766,8 +751,8 @@ func TestAccAlpineVirtualIndexFailsClosed(t *testing.T) {
 // TestAccAlpineVirtualPackageNeedsAListedStoredFile: a virtual repository
 // serves a package from the first member whose index lists it and which
 // stores it as a file. A package no member lists, one listed but not
-// stored, and a folder at its path are not found; a member cycle is a
-// server fault.
+// stored, a folder at its path, and a virtual repository whose only member
+// is itself, which the walk skips (decision 0008, R2), are not found.
 func TestAccAlpineVirtualPackageNeedsAListedStoredFile(t *testing.T) {
 	other := "v3.20/main/x86_64/other-1.0-r0.apk"
 	for _, tc := range []struct {
@@ -799,7 +784,7 @@ func TestAccAlpineVirtualPackageNeedsAListedStoredFile(t *testing.T) {
 		},
 		{
 			name: "member cycle", members: []string{alpineVirtual}, path: apkHelloPath,
-			status: http.StatusInternalServerError, message: "internal error",
+			status: http.StatusNotFound, message: "Could not find resource",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

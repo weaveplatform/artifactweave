@@ -45,8 +45,15 @@ the index; the index's SHA256sum fields bind downloaded IPKs.
 
 Remote feeds follow same-origin package redirects through the shared source
 policy and validate bounded index and package bodies before caching. A
-virtual feed combines readable member records in configured order and
-excludes packages that the caller cannot read; a package whose IPK a
+virtual feed walks its members as the package handlers do (decision 0008):
+nested virtual repositories are flattened in 7.x's order, a cycle is
+skipped, and a member of another type, one that misses, one the caller may
+not read and one whose upstream fails are passed over. It combines the
+remaining members' records first member first and excludes packages the
+caller cannot read in the member that lists them. A caller who may read only
+the members reads the feed and IPKs through the virtual repository. Opkg's
+virtual repositories carry no `virtualRetrievalCachePeriodSecs`, so the feed
+is built on every read. A package whose IPK a
 member's or the virtual repository's patterns reject stays listed. An IPK
 download is served by the first member that lists it and whose download
 policy accepts the IPK's path, so it passes over a member that refuses the
@@ -84,8 +91,9 @@ in the [client image](../../test/acceptance/clients/opkg.Dockerfile). The
 controlled IPKs use OpenWrt 24.10's gzip(tar) layout and are installed by
 that client. The remote acceptance case serves an authentic OpenWrt 24.10.0
 IPK and published `Packages` records, without using the adapter's index
-encoder, and downloads it with the same client. Keep these fixtures valid when
-server validation exposes a defect.
+encoder, and downloads it with the same client. A virtual feed over a local
+and a remote member installs a package from each with the same client.
+Keep these fixtures valid when server validation exposes a defect.
 
 The fixture records are the first two entries of the published
 [OpenWrt 24.10.0 x86_64/base Packages feed](https://downloads.openwrt.org/releases/24.10.0/packages/x86_64/base/Packages).

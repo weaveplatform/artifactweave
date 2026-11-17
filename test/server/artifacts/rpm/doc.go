@@ -21,6 +21,10 @@
 //
 // Assertions only:
 //   - rpm_test.go: virtual metadata is signed with the configured GPG key.
+//   - rpm_virtual_test.go: virtual repodata over [remote, nested virtual ->
+//     local] with a cycle, through the harness's remote world, read by an
+//     administrator, the remote's reader alone, and a user who may read no
+//     member (#1551).
 //   - rpm_remote_cache_alias_test.go: a remote repository's cached
 //     repodata served by its -cache alias without asking the upstream
 //     (#1382), through the harness's remote world

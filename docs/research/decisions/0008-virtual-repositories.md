@@ -280,6 +280,9 @@ over the members' documents that `pkgroute.Collect` reads in the package handler
 | Go | `@v/list` union; remote Go members are only reachable this way |
 | Terraform | provider and module version lists |
 | Docker, OCI | `tags/list` union, `_catalog` union; `resolveDockerTagsByTimestamp` picks the newest manifest for a tag |
+| Alpine | `APKINDEX.tar.gz`, union of packages, each from the first member that lists it, signed with the virtual's own `keyPair` (members' keys ignored; unsigned without one, per alpine-linux-repositories.md); a member that fails is passed over **[I]** ([RTFACT-30422](https://jfrog.atlassian.net/browse/RTFACT-30422)) |
+| RPM (YUM) | `repodata` (`repomd.xml`, primary, filelists, other) as one set, union of packages, each from the first member that lists it, signed with the virtual's GPG `keyPair`; `POST /api/yum/<virtual>` builds the set again **[I]**; a member that fails is passed over **[I]** (RTFACT-30422) |
+| Opkg | `Packages`, `Packages.gz` and `Packages.sig`, union of packages, each from the first member that lists it, signed with the virtual's GPG `keyPair`; built on every request, as Opkg has no `virtualRetrievalCachePeriodSecs` |
 
 ### R8. Merged metadata cache
 
@@ -296,7 +299,7 @@ because the 7.161.26 model leaves OCI out. Whether 7.x stores a negative period 
 REST API is **[I]**. 7.161.26's UI also saves a period for a Composer virtual
 (`RepoConfigDescriptorBuilder.populateVirtualComposerDescriptor` 897-903), so artifactweave
 keeps a Composer virtual's `p2` metadata, the document it merges from the members; which of
-Composer's documents 7.x keeps is **[I]**. Its pub model has the field
+Composer's documents 7.x keeps is **[I]**. The UI's pub model has the field
 (`PubTypeSpecificConfigModel` line 22) but `populateVirtualTypeSpecific` never saves it, and
 RubyGems, LuaRocks, Bower, CocoaPods and Swift have none in the model, the UI, JFrog's page or
 JFrog's Terraform provider. A RubyGems virtual's index is built by a reindex job

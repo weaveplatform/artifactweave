@@ -21,6 +21,11 @@
 // Assertions only:
 //   - opkg_test.go: a virtual feed is signed only with the configured GPG
 //     key.
+//   - opkg_virtual_test.go: a virtual feed over [remote, nested virtual ->
+//     local] with a cycle, through the harness's remote world, read by an
+//     administrator and the remote's reader alone, who also installs the
+//     remote's IPK through it, and refused to a user who may read no member
+//     (#1551).
 //   - opkg_reindex_async_test.go: Calculate Opkg Repository Metadata with
 //     each async value, queued or run before it answers, or refused.
 //
