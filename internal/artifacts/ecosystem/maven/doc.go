@@ -141,9 +141,10 @@
 //
 // # Status
 //
-// Implemented P7, with remote retrieval in P9. Moved here in P9d. Roadmap:
-// virtual.go (P10), the Merger that merges maven-metadata.xml for virtual
-// repositories.
+// Implemented P7, with remote retrieval in P9. Moved here in P9d. P10
+// virtual.go implements POM repository-reference cleanup, called before an
+// item route returns a Maven-family or generic virtual POM. Roadmap:
+// MVN-01 adds the Merger of virtual maven-metadata.xml.
 //
 // # Testing
 //

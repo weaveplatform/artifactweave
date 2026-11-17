@@ -813,7 +813,8 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
-	dl.upstream = s.walkStep(r, req, p, acc)
+	lookupRequest, _ := pomLookupRequest(ctx, r, c, req)
+	dl.upstream = s.walkStep(lookupRequest, req, p, acc)
 	if req.Path == "" {
 		if err := generic.CheckDownload(c, "", true); err != nil {
 			httpkit.WriteErr(w, r, s.ItemError(ctx, "download check", err))
@@ -841,9 +842,10 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if f.remote != nil {
-		s.serveRemoteRead(w, r, f.Repo, c, memberRequest(req, f.Repo), p, *f.remote)
+		s.serveReturnedPOM(w, r, st, c, req, f, p)
 		return
 	}
+
 	if !acc.Item(f.Repo, f.Item.FullPath(), f.Item.Folder, accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, refused(c, req, p))
 		return
@@ -859,7 +861,7 @@ func (s *Kit) GetItem(w http.ResponseWriter, r *http.Request) {
 		s.listFolder(w, r, st, c, f, acc)
 		return
 	}
-	s.ServeItemFile(w, r, st, f, p)
+	s.serveReturnedPOM(w, r, st, c, req, f, p)
 }
 
 // getUnfoundItem answers req, a path the lookup did not find in c: a cold
@@ -966,7 +968,8 @@ func (s *Kit) getSidecar(
 	// The file the checksum names is looked for as the file itself is:
 	// through a virtual repository, a remote member's upstream step reads
 	// the checksum as a direct read of the member would (#1535).
-	dl.upstream = s.fileStep(r, req, caller, acc)
+	lookupRequest, lookupItem := pomLookupRequest(r.Context(), r, c, req)
+	dl.upstream = s.fileStep(lookupRequest, lookupItem, caller, acc)
 	f, err := Lookup(r.Context(), st, c, cached, artifact, acc, dl, virtual.Resolve)
 	if errors.Is(err, kernel.ErrNotFound) {
 		httpkit.WriteErr(w, r, unfound(c, cached, req, caller, err))
@@ -976,17 +979,24 @@ func (s *Kit) getSidecar(
 		httpkit.WriteErr(w, r, containedRefusal(c, req, err))
 		return
 	}
-	if f.remote != nil {
-		s.serveRemoteRead(w, r, f.Repo, c, memberRequest(req, f.Repo), caller, *f.remote)
-		return
-	}
-	if f.Item.Folder {
+	if f.remote == nil && f.Item.Folder {
 		httpkit.WriteErr(w, r, ItemNotFound())
 		return
 	}
-	// A file the caller may not read has no visible checksum either.
-	if !acc.File(f.Repo, f.Item.FullPath(), accessapi.ActionRead) {
+	if f.remote == nil && !acc.File(f.Repo, f.Item.FullPath(), accessapi.ActionRead) {
 		httpkit.WriteErr(w, r, checksumRefused(c, req, caller))
+		return
+	}
+	f, err = s.pomBeforeReturn(r, st, c, artifact, f)
+	if err != nil {
+		httpkit.WriteErr(w, r, err)
+		return
+	}
+	if f.remote != nil {
+		if _, clean := maven.POMCleanupPolicy(c, artifact); clean {
+			f.remote.sidecar = string(alg)
+		}
+		s.serveRemoteRead(w, r, f.Repo, c, memberRequest(req, f.Repo), caller, *f.remote)
 		return
 	}
 	value := item.ServedChecksum(f.Repo, f.Item, alg)

@@ -49,6 +49,10 @@
 //   - deploy.go: DeployTarget, the local or federated repository a deploy
 //     to a virtual repository lands in, or ErrNoDeployTarget, which the
 //     item routes answer with 7.x's 405 (decision 0008, R6).
+//   - copies.go: Copy and CopyStore, durable virtual-owned transformed
+//     representations, separate from the member items and their listings.
+//     Each copy owns a blob reference released on replacement or repository
+//     deletion. MVN-03 uses them for cleaned POMs.
 //   - merge.go: Merger, the contract a format implements in its
 //     ecosystem/<type>/virtual.go to merge its members' metadata, with
 //     Part, one member's document; Collect, the members' documents in the

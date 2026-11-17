@@ -90,6 +90,9 @@ func (r repos) Delete(ctx context.Context, key string) error {
 		if !r.t().Has(key) {
 			return memtx.NotFound("repository", key)
 		}
+		if err := r.s.VirtualCopies().DeleteRepo(ctx, key); err != nil {
+			return fmt.Errorf("remove virtual copies: %w", err)
+		}
 		if _, err := r.s.RemoteCache().Invalidate(ctx, key, "", false); err != nil {
 			return err //nolint:wrapcheck // the remote cache names the operation
 		}

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--before--><project xmlns="urn:maven" xmlns:x="urn:extra" title="a &amp; &quot;b&quot;">
+  
+  <!--keep--><x:extra x:attr="first" empty="" /><empty />
+  <name> café &lt; &gt; &amp; ' " </name>
+  <description><![CDATA[a < b & c]]></description>
+  <?keep value?>
+</project><!--after-->

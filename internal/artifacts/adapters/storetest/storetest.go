@@ -30,6 +30,7 @@ func Run(t *testing.T, newStore Factory) {
 	runBowerRegistrations(t, newStore)
 	runUploadDigests(t, newStore)
 	runRemoteCache(t, newStore)
+	runVirtualCopies(t, newStore)
 	runArchivedItems(t, newStore)
 	runBuilds(t, newStore)
 }

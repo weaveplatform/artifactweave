@@ -21,13 +21,17 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	appsqlite "github.com/weaveplatform/artifactweave/internal/app/adapters/sql/sqlite"
 	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/usage"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	tfbe "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
@@ -623,15 +627,15 @@ func TestAccMigrateCommand(t *testing.T) {
 	}
 
 	// --module limits each action to one stream.
-	const applied = "applied 5 migration(s): [artifacts:1 artifacts:2 artifacts:3 artifacts:4 artifacts:5]\n"
+	const applied = "applied 6 migration(s): [artifacts:1 artifacts:2 artifacts:3 artifacts:4 artifacts:5 artifacts:6]\n"
 	if got := run("up", 0, "artifacts"); got != applied {
 		t.Fatalf("up --module artifacts: %q", got)
 	}
-	if got := run("version", 0, "artifacts"); got != "schema version 5 of 5 (sqlite, artifacts)\n" {
+	if got := run("version", 0, "artifacts"); got != "schema version 6 of 6 (sqlite, artifacts)\n" {
 		t.Fatalf("version --module artifacts: %q", got)
 	}
 	want := "schema version 0 of 1 (sqlite, platform)\n" +
-		"schema version 5 of 5 (sqlite, artifacts)\n"
+		"schema version 6 of 6 (sqlite, artifacts)\n"
 	for _, m := range []string{"access", "notifications", "retention", "federation", "releases", "workers"} {
 		want += "schema version 0 of 1 (sqlite, " + m + ")\n"
 	}
@@ -641,7 +645,7 @@ func TestAccMigrateCommand(t *testing.T) {
 	if got := run("down", -1, "platform"); got != "reverted 0 migration(s): []\n" {
 		t.Fatalf("down --module platform with nothing applied: %q", got)
 	}
-	if got := run("down", -1, "artifacts"); got != "reverted 1 migration(s): [artifacts:5]\n" {
+	if got := run("down", -1, "artifacts"); got != "reverted 1 migration(s): [artifacts:6]\n" {
 		t.Fatalf("down --module artifacts: %q", got)
 	}
 	for _, action := range []string{"up", "down", "version"} {
@@ -965,5 +969,46 @@ func TestAccLocation(t *testing.T) {
 		if got.Type != tc.kind || got.Directory != tc.dir || got.Root != tc.local {
 			t.Errorf("%s: %+v", name, got)
 		}
+	}
+}
+
+func TestAccVirtualCopyDowngradeReleasesContent(t *testing.T) {
+	ctx := t.Context()
+	cfg := config.Default()
+	cfg.DataDir = t.TempDir()
+	var out bytes.Buffer
+	if err := Migrate(ctx, cfg, "up", 0, "", &out); err != nil {
+		t.Fatal(err)
+	}
+	db, err := appsqlite.Open(ctx, cfg.SQLitePath(), appsqlite.Options{Options: appsql.Options{SkipMigrate: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	if err = db.Repos().Create(ctx, repo.Config{Key: "v", Class: repo.Virtual, PackageType: repo.Maven}); err != nil {
+		t.Fatal(err)
+	}
+	copy := virtual.Copy{
+		Virtual:      "v",
+		Path:         "a.pom",
+		Member:       "local",
+		SourceSHA256: strings.Repeat("1", 64),
+		Item:         artmodel.Item{Actual: kernel.Checksums{SHA256: strings.Repeat("a", 64)}, Size: 10},
+	}
+	if err = db.VirtualCopies().Put(ctx, copy); err != nil {
+		t.Fatal(err)
+	}
+	if err = Migrate(ctx, cfg, "down", 5, "artifacts", &out); err != nil {
+		t.Fatal(err)
+	}
+	b, err := db.Blobs().Get(ctx, copy.Item.Actual.SHA256)
+	if err != nil || b.Refs != 0 {
+		t.Fatal("downgrade leaked copy reference", b, err)
+	}
+	if err = Migrate(ctx, cfg, "up", 0, "artifacts", &out); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.VirtualCopies().Get(ctx, "v", "a.pom"); !errors.Is(err, kernel.ErrNotFound) {
+		t.Fatal("derived copy survived downgrade", err)
 	}
 }

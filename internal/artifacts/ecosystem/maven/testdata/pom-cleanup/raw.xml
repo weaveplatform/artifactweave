@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!--before-->
+<project title='a &amp; &quot;b&quot;' xmlns='urn:maven' xmlns:x='urn:extra'>
+  <repositories><repository><url>https://bypass.example</url></repository></repositories>
+  <!--keep--><x:extra x:attr='first' empty=''/><empty></empty>
+  <name> café &lt; &gt; &amp; ' " </name>
+  <description><![CDATA[a < b & c]]></description>
+  <?keep value?>
+</project>
+<!--after-->
