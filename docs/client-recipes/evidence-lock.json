@@ -75,7 +75,7 @@
   "test/acceptance/features/bazelmodules.feature": "4707142f7a05347d0eaa03252b8ed19be1f032d3917b7f5fb6539a8a5be4eba3",
   "test/acceptance/features/bower.feature": "0582c2643024460baef170b18f1904b069d866844b4767451fb124fe5011d03b",
   "test/acceptance/features/cargo.feature": "5a01d004374a9ab3dd86506901178624b8531b6b99bdf5c6b8e75852dcbe8cdc",
-  "test/acceptance/features/chef.feature": "745d115baf4fbf8ebd28d6cd4e601e731b07b1d6d19a2be115534251b58bb89b",
+  "test/acceptance/features/chef.feature": "98b60821b0b31c4109f126815228abf1bbb42091351901749b71d51690943080",
   "test/acceptance/features/cocoapods.feature": "b3fc271c2d95e8eb254e32817f4ea4b230147f468357afa8ee61a1fa717ec612",
   "test/acceptance/features/composer.feature": "16b8665e990f81180a429d57183cb653d74bebddd579ce9a611a7a674ce28b02",
   "test/acceptance/features/conda.feature": "0da6f06dedb8c3a72905f6ba059d5cdd32abeee397fe7bc0d5197f218cab93ef",

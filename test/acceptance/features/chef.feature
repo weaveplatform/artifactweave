@@ -94,7 +94,7 @@ Feature: Knife publishes and installs Chef cookbooks through native Supermarket 
       {"rclass":"local","packageType":"chef"}
       """
     Then the response status is 200
-    When I publish Chef cookbook "helper" to "chef-seed"
+    When I publish the Chef cookbooks to "chef-seed"
     Given a Chef upstream serves the cookbooks published in "chef-seed"
     When I PUT "/artifactory/api/repositories/chef-supermarket" as admin with body:
       """
