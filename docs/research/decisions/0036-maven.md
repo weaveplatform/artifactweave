@@ -357,8 +357,7 @@ The local behavior in this ADR is unchanged.
   come from 6.20 only and are on #216.
 - Without the 60-second quiet period, a job that falls while a build is being deployed counts
   the files of it already stored; the floor of two keeps the build before it.
-- Remote retrieval is implemented by #625; virtual Maven resolution and metadata merging
-  remain P10 (decision [0008](0008-virtual-repositories.md)).
+- Remote retrieval is implemented by #625; cross-member Maven snapshot/token resolution remains P10 (decision [0008](0008-virtual-repositories.md)).
 
 ## Owned follow-up
 
@@ -461,3 +460,65 @@ Unit fixtures, real-router tests, SQLite/PostgreSQL store contracts, restart and
 fault rollback checks cover these changes. A remote POM with consistency checks
 suppressed exercises unparsable pass-through without changing the member's own
 validation rules.
+
+## P10 merged virtual metadata (MVN-01)
+
+A request through any virtual repository for `maven-metadata.xml` (or its
+SHA1, MD5 or SHA256 sidecar) now walks the flattened members in package order.
+Remote members are read once through their source policy, including its metadata
+cache and offline rules. Origin restrictions retain cache-only reads. Snapshot
+metadata skips members with `handleSnapshots=false`. A successful priority member
+limits the merge to the priority group. Permission refusals fall through; with
+no successful document the first refusal determines the virtual 401/403/hidden
+404. Other missing metadata answers `Maven metadata not found for '<path>'.`.
+Malformed documents are logged with the member key and skipped. `.index/` and
+direct local/remote item responses retain their existing paths.
+
+The pure merger keeps the first document's coordinates and `modelVersion`,
+unions versions and plugin prefixes (first plugin wins), applies non-older
+`lastUpdated`, then sorts versions in Mercury order and derives latest/release.
+One member is still parsed and serialized, without sorting its versions.
+Snapshot build number wins independently of document modification time.
+SnapshotVersions are retained only on snapshot metadata for an M3-capable client
+while `maven.metadata_version3_enabled` is enabled (default true). A later member
+can replace an existing classifier/extension pair with a higher build; it does
+not append new pairs to a nonempty list. An empty list adopts the later list.
+The member documents remain unchanged. There is no merged Maven cache.
+
+**[S]** Artifactory OSS 7.161.26 `MavenMetadataInterceptor`,
+`MergeableMavenMetadata`, `BuildNumberSnapshotComparator`,
+`MavenModelUtils` and `RequestResponseHelper.clientSupportsM3SnapshotVersions`
+establish the walk, merge, raw-ampersand tolerance and legacy-client gate.
+The [Maven 3.9.0 metadata model](https://github.com/apache/maven/blob/maven-3.9.0/maven-repository-metadata/src/main/mdo/metadata.mdo)
+establishes the fallback base merge of versions, plugin prefixes and timestamps.
+The precise bundled dependency version could not be established from the OSS
+parent POM; 3.9.0 is the ticket's 3.9.x fallback **[I], #216/P19**.
+
+**[I], #216/P19:** the explicit interceptor rules and ticket's intended behavior
+control snapshot merging: a higher build remains authoritative even when its
+lastUpdated is older, and new classifier/extension pairs are not appended to a
+nonempty list. This avoids the conflicting incidental snapshotVersions union in
+the fallback Maven model. Raw ampersands are escaped without double-escaping
+valid XML references. The existing bounded metadata writer supplies the virtual
+serialization, retaining its established field order; exact bundled writer bytes
+remain an inference. Go's sorter cannot throw Java's comparator-contract
+exception; a contradictory sorted order falls back to lexical order.
+
+Merged GET, HEAD and sidecars use the serialized bytes' length, checksum headers,
+bare SHA1 ETag and maximum member Last-Modified. Conditional delivery and remote
+authority/use hooks go through the existing item stream helper. Native Maven
+qualification and cross-member snapshot/token resolution remain MVN-04/MVN-02.
+
+The same controlled route probe ran on main `7a200365c` and MVN-01, without a
+live Artifactory instance:
+
+| Probe | Main | MVN-01 |
+|---|---|---|
+| Maven virtual, two locals plus remote | Only first member's 1.0 | Merged 1.0, 2.0, 3.0 |
+| Generic virtual, same members | Only first member's 1.0 | Merged 1.0, 2.0, 3.0 |
+
+`TestAccMavenVirtualMetadataMergeAndSidecars` fails on main and passes here;
+its passing continuation verifies HEAD, conditional GET, checksum headers and
+all three merged sidecars. Additional unit and route checks cover timestamps,
+plugins, snapshot gates, malformed members, priority, indexer bypass, exact
+misses, permission fall-through and hidden denials.

@@ -54,3 +54,31 @@ func TestUnitMavenSnapshotCleanupInterval(t *testing.T) {
 		t.Errorf("maven.nosuch: %v", err)
 	}
 }
+
+func TestUnitMavenMetadataVersion3(t *testing.T) {
+	if Default().Maven.MetadataVersion3Enabled != nil {
+		t.Fatal("default must enable M3 metadata")
+	}
+	file := filepath.Join(t.TempDir(), "maven.yaml")
+	if err := os.WriteFile(file, []byte("maven:\n  metadata_version3_enabled: false\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(LoadOptions{File: file})
+	if err != nil || cfg.Maven.MetadataVersion3Enabled == nil || *cfg.Maven.MetadataVersion3Enabled {
+		t.Fatal(cfg.Maven, err)
+	}
+	if got := cfg.Artifacts().Formats.Maven.MetadataVersion3Enabled; got == nil || *got {
+		t.Fatal("setting lost at composition")
+	}
+	cfg, err = Load(LoadOptions{File: file, Env: func(k string) (string, bool) { return "true", k == "ARTIFACTWEAVE_MAVEN_METADATA_VERSION3_ENABLED" }})
+	if err != nil || !*cfg.Maven.MetadataVersion3Enabled {
+		t.Fatal(cfg.Maven, err)
+	}
+	cfg, err = Load(LoadOptions{Flags: map[string]string{"maven.metadata_version3_enabled": "false"}})
+	if err != nil || *cfg.Maven.MetadataVersion3Enabled {
+		t.Fatal(cfg.Maven, err)
+	}
+	if _, err := Load(LoadOptions{Flags: map[string]string{"maven.metadata_version3_enabled": "bad"}}); !errors.Is(err, ErrInvalidValue) {
+		t.Fatal(err)
+	}
+}

@@ -75,7 +75,9 @@
 // # Status
 //
 // Implemented P7 (issue #282), as the server root's maven.go. P9d moved it
-// here (WEB-17).
+// here (WEB-17). P10 MVN-01 adds the virtual metadata item overlay: every
+// virtual package type merges member maven-metadata.xml documents, preserving
+// permission fall-through and serving checksums of the merged bytes.
 //
 // # Testing
 //

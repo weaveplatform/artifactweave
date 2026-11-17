@@ -39,12 +39,13 @@ const maxMetadata = 1 << 20
 
 // metadata is one maven-metadata.xml, in Maven's repository metadata model.
 type metadata struct {
-	XMLName    xml.Name    `xml:"metadata"`
-	GroupID    string      `xml:"groupId"`
-	ArtifactID string      `xml:"artifactId"`
-	Version    string      `xml:"version"`
-	Versioning *versioning `xml:"versioning"`
-	Plugins    []plugin    `xml:"plugins>plugin"`
+	XMLName      xml.Name    `xml:"metadata"`
+	ModelVersion string      `xml:"modelVersion,attr"`
+	GroupID      string      `xml:"groupId"`
+	ArtifactID   string      `xml:"artifactId"`
+	Version      string      `xml:"version"`
+	Versioning   *versioning `xml:"versioning"`
+	Plugins      []plugin    `xml:"plugins>plugin"`
 }
 
 type versioning struct {
@@ -59,6 +60,7 @@ type versioning struct {
 type snapshot struct {
 	Timestamp   string `xml:"timestamp"`
 	BuildNumber int    `xml:"buildNumber"`
+	LocalCopy   bool   `xml:"localCopy"`
 }
 
 type snapshotVersion struct {
@@ -77,10 +79,18 @@ type plugin struct {
 // bytes writes m as Maven's MetadataXpp3Writer does, which is what
 // Artifactory serves: its elements in the model's order, empty ones left
 // out, a childless element closed in place, two-space indents.
-func (m metadata) bytes() []byte {
+func (m metadata) bytes() []byte { return m.write(modelVersion) }
+
+func (m metadata) write(version string) []byte {
 	w := &xmlWriter{}
 	w.b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
-	w.b.WriteString(`<metadata modelVersion="` + modelVersion + `">` + "\n")
+	w.b.WriteString("<metadata")
+	if version != "" {
+		w.b.WriteString(` modelVersion="`)
+		_ = xml.EscapeText(&w.b, []byte(version))
+		w.b.WriteString(`"`)
+	}
+	w.b.WriteString(">\n")
 	w.text(1, "groupId", m.GroupID)
 	w.text(1, "artifactId", m.ArtifactID)
 	w.text(1, "version", m.Version)
@@ -89,13 +99,16 @@ func (m metadata) bytes() []byte {
 		w.text(2, "latest", v.Latest)
 		w.text(2, "release", v.Release)
 		if s := v.Snapshot; s != nil {
-			if s.Timestamp == "" && s.BuildNumber == 0 {
+			if s.Timestamp == "" && s.BuildNumber == 0 && !s.LocalCopy {
 				w.empty(2, "snapshot")
 			} else {
 				w.open(2, "snapshot")
 				w.text(3, "timestamp", s.Timestamp)
 				if s.BuildNumber != 0 {
 					w.text(3, "buildNumber", strconv.Itoa(s.BuildNumber))
+				}
+				if s.LocalCopy {
+					w.text(3, "localCopy", "true")
 				}
 				w.close(2, "snapshot")
 			}

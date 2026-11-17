@@ -478,6 +478,7 @@ var keys = append(append([]string{
 	"aql_timeout.query",
 	"aql_timeout.streamed",
 	"maven.snapshot_cleanup_interval",
+	"maven.metadata_version3_enabled",
 	"npm.login_token_expiry",
 	"npm.tag_latest_by_publish",
 	"npm.enforce_path",
