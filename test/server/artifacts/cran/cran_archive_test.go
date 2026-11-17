@@ -293,6 +293,9 @@ func (s cranMigrationItems) Get(
 	if s.owner.mode == "destination" && p == cranArchivePath {
 		return model.Item{}, errors.New("archive destination unavailable")
 	}
+	if s.owner.mode == "index" && p == cranIndex {
+		return model.Item{}, errors.New("index unavailable")
+	}
 	return s.ItemStore.Get(ctx, key, cached, p)
 }
 

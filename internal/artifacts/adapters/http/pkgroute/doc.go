@@ -248,7 +248,9 @@
 // metadata kept through Merged
 // (https://github.com/weaveplatform/artifactweave/issues/1652); and
 // ItemKit and Bind for the item routes' virtual indexes
-// (https://github.com/weaveplatform/artifactweave/issues/1551).
+// (https://github.com/weaveplatform/artifactweave/issues/1551), which
+// Debian and CRAN take too
+// (https://github.com/weaveplatform/artifactweave/issues/1552).
 //
 // # Testing
 //

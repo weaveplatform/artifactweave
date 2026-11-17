@@ -21,14 +21,13 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/p2"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 )
-
-var errP2VirtualCycle = errors.New("server: p2 virtual repository cycle")
 
 // p2Items serves P2's virtual and composite repositories over the item
 // kit.
@@ -236,20 +235,7 @@ func (s p2Items) serveP2Virtual(
 	p kernel.Principal,
 	acc itemkit.Access,
 ) {
-	if !acc.Folder(c, req.Path, accessapi.ActionRead) ||
-		!acc.File(c, req.Path, accessapi.ActionRead) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
-		return
-	}
-	// The virtual repository's own patterns refuse a path with "No
-	// repository found to serve the request", as on the generic route
-	// (VirtualRepoDownloadStrategy.getInfoFromSearchableRepositories in
-	// 6.20). p2.index ends in .index, which the patterns never refuse.
-	if err := generic.CheckDownload(c, req.Path, false); err != nil {
-		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "P2 virtual download check", err))
-		return
-	}
-	members, err := p2Members(r.Context(), st, c, acc, map[string]bool{})
+	members, err := p2Members(r.Context(), st, c, acc)
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "P2 virtual members", err))
 		return
@@ -259,20 +245,44 @@ func (s p2Items) serveP2Virtual(
 	// files under its key and the update site's sub-path, as in
 	// p2-virtual/download.eclipse.org/releases/luna/p2.index (RTFACT-7631,
 	// RTFACT-29198), so a member's path names the member, never its place
-	// among the members the caller may read, and the patterns above saw
+	// among the members the caller may read, and the patterns below see
 	// the path a 7.x client asks for. A member the caller may not traverse,
 	// or a blacked-out one, is not among members, so its key answers 404.
-	if key, name, ok := strings.Cut(req.Path, "/"); ok {
-		i := slices.IndexFunc(members, func(m repo.Config) bool { return m.Key == key })
-		if i < 0 || p2.Classify(name) == p2.KindInvalid {
+	key, name, memberPath := strings.Cut(req.Path, "/")
+	i := slices.IndexFunc(members, func(m repo.Config) bool { return m.Key == key })
+	listed := memberPath && i >= 0 && p2.Classify(name) != p2.KindInvalid
+	// The read permission is asked before the download policy (DV-057). A
+	// listed member's file is decided by that member, as the member that
+	// serves a file decides it (decision 0008, R3), and a nested virtual
+	// member decides its own in the clone below, by its own members; any
+	// other path by the virtual repository's read gate, which asks its
+	// members, since no permission target can name a virtual repository
+	// (decision 0006).
+	switch {
+	case listed && members[i].Class != repo.Virtual:
+		if !acc.File(members[i], name, accessapi.ActionRead) {
+			httpkit.WriteErr(w, r, itemkit.VirtualRefused(c, req.Path, p))
+			return
+		}
+	case !listed:
+		if !s.VirtualGate(w, r, st, c, req.Path, p, acc, "P2 virtual members") {
+			return
+		}
+	}
+	// The virtual repository's own patterns refuse a path with "No
+	// repository found to serve the request", as on the generic route
+	// (VirtualRepoDownloadStrategy.getInfoFromSearchableRepositories in
+	// 6.20). p2.index ends in .index, which the patterns never refuse.
+	if err := generic.CheckDownload(c, req.Path, false); err != nil {
+		httpkit.WriteErr(w, r, s.ItemError(r.Context(), "P2 virtual download check", err))
+		return
+	}
+	if memberPath {
+		if !listed {
 			httpkit.WriteErr(w, r, itemkit.ItemNotFound())
 			return
 		}
 		member := members[i]
-		if !acc.File(member, name, accessapi.ActionRead) {
-			httpkit.WriteErr(w, r, httpkit.Denied(p))
-			return
-		}
 		// A member whose patterns refuse the path is passed over, as a
 		// virtual repository's search passes over it (processStandard in
 		// 6.20), and no other member serves its paths, so the answer is the
@@ -293,7 +303,13 @@ func (s p2Items) serveP2Virtual(
 		// forceP2Authentication does not apply: 7.x's filter checks only the
 		// repository the request's path names [I]. Its miss and refusal stay
 		// the virtual's (itemkit.MemberRead).
-		clone := r.Clone(itemkit.MemberRead(r.Context()))
+		// A nested virtual member walks on with this one's visited set
+		// (p2Outer), so a cycle back to it is skipped there too.
+		ctx := itemkit.MemberRead(r.Context())
+		if member.Class == repo.Virtual {
+			ctx = context.WithValue(ctx, p2OuterKey{}, append(slices.Clip(p2Outer(ctx)), c.Key))
+		}
+		clone := r.Clone(ctx)
 		uri := *r.URL
 		uri.RawPath = "/artifactory/" + url.PathEscape(member.Key) + "/" +
 			p2EscapePath(name) + pkgroute.UpstreamMatrix(r.URL.EscapedPath())
@@ -375,47 +391,100 @@ func (s p2Items) p2CopyMatches(
 	return true
 }
 
-// p2Members keeps the virtual order and removes members a caller cannot
-// traverse. Only a P2 remote or a local Maven/Generic update site can supply
-// native metadata. A nested P2 virtual is permitted if its graph is acyclic.
-// A blacked-out member is left out: 7.x builds the composite from the
-// members a caller can use (RTFACT-29198) and ignores a blacked-out
-// repository "when trying to resolve artifacts" (local-repositories), so
-// listing it would only send the client to files that all refuse. A
-// member's patterns refuse its files, not its place in the composite.
-func p2Members(ctx context.Context, st itemkit.Store, c repo.Config, acc itemkit.Access,
-	visited map[string]bool,
-) ([]repo.Config, error) {
-	if visited[c.Key] {
-		return nil, errP2VirtualCycle
+// p2OuterKey is the request context key of the virtual repositories a P2
+// virtual repository's member path passed through (p2Outer).
+type p2OuterKey struct{}
+
+// p2Outer is the keys of the virtual repositories whose member path led to
+// this request, outermost first: a nested P2 virtual member's own
+// composite leaves them out as the outer walk's visited set does, so a
+// cycle back to one is skipped rather than followed (decision 0008, R2).
+func p2Outer(ctx context.Context) []string {
+	keys, _ := ctx.Value(p2OuterKey{}).([]string)
+	return keys
+}
+
+// p2Repos is the store's repositories with the keys of skip missing, so a
+// walk that meets one passes over it as a member no repository has.
+type p2Repos struct {
+	virtual.Repos
+	skip []string
+}
+
+// Get returns the configuration of key, or kernel.ErrNotFound for a key
+// of skip.
+func (r p2Repos) Get(ctx context.Context, key string) (repo.Config, error) {
+	if slices.Contains(r.skip, key) {
+		return repo.Config{}, kernel.ErrNotFound
 	}
-	visited[c.Key] = true
-	defer delete(visited, c.Key)
-	out := make([]repo.Config, 0, len(c.Repositories))
-	for _, key := range c.Repositories {
-		m, err := st.Repos().Get(ctx, key)
-		if errors.Is(err, kernel.ErrNotFound) {
+	return r.Repos.Get(ctx, key) //nolint:wrapcheck // the store's own answer
+}
+
+// p2Members returns the composite children of the virtual repository c the
+// caller may use, as configurations: each direct member, a nested P2
+// virtual one as a single child that a P2 client reads through its own
+// composite. 7.x deferred nested P2 virtual repositories (RTFACT-9481,
+// Deferred) but its member list offers them, so the nested one stays one
+// child [I]. The order and the visited set are the package handlers' walk
+// (virtual.Members in package order): a direct member is listed at the
+// place of the first real member it reaches, a real member belongs to the
+// direct member the walk first reaches it through, and a virtual reached
+// again, through a cycle or as its own member, adds nothing, where a cycle
+// answered 500 (decision 0008, R1 and R2). A direct member that reaches no
+// real member the caller may use is left out.
+//
+// A real member is usable when it can supply native metadata, a P2 remote
+// or a local Maven or Generic update site, the caller may read it, and it
+// is not blacked out: 7.x builds the composite from the members a caller
+// can use (RTFACT-29198) and ignores a blacked-out repository "when trying
+// to resolve artifacts" (local-repositories), so listing it would only
+// send the client to files that all refuse. A member's patterns refuse its
+// files, not its place in the composite. A nested virtual member of
+// another type is never a child.
+func p2Members(ctx context.Context, st itemkit.Store, c repo.Config, acc itemkit.Access,
+) ([]repo.Config, error) {
+	rs := p2Repos{Repos: st.Repos(), skip: p2Outer(ctx)}
+	steps, err := virtual.Members(ctx, rs, c, virtual.Options{Order: virtual.Package})
+	if err != nil {
+		return nil, fmt.Errorf("p2 members of %s: %w", c.Key, err)
+	}
+	owner := map[string]repo.Config{}
+	if err := virtual.Walk(ctx, rs, c, func(chain []repo.Config, m repo.Config) error {
+		if _, ok := owner[m.Key]; ok || m.Class == repo.Virtual {
+			return nil
+		}
+		owner[m.Key] = m
+		if len(chain) > 1 {
+			owner[m.Key] = chain[1]
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("p2 members of %s: %w", c.Key, err)
+	}
+	listed := map[string]bool{}
+	var out []repo.Config
+	for _, step := range steps {
+		m, o := step.Repo, owner[step.Repo.Key]
+		if listed[o.Key] || !p2Usable(m, acc) ||
+			o.Class == repo.Virtual && o.PackageType != repo.P2 {
 			continue
 		}
-		if err != nil {
-			return nil, fmt.Errorf("p2 member %s: %w", key, err)
-		}
-		if !acc.Folder(m, "", accessapi.ActionRead) || generic.CheckDownload(m, "", true) != nil {
-			continue
-		}
-		switch {
-		case m.Class == repo.Remote && m.PackageType == repo.P2:
-		case m.Class == repo.Local && (m.PackageType == repo.Generic || maven.Serves(m.PackageType)):
-		case m.Class == repo.Virtual && m.PackageType == repo.P2:
-			if _, err := p2Members(ctx, st, m, acc, visited); err != nil {
-				return nil, err
-			}
-		default:
-			continue
-		}
-		out = append(out, m)
+		listed[o.Key] = true
+		out = append(out, o)
 	}
 	return out, nil
+}
+
+// p2Usable reports whether the real member m can supply a P2 composite
+// child the caller may use (p2Members).
+func p2Usable(m repo.Config, acc itemkit.Access) bool {
+	switch {
+	case m.Class == repo.Remote && m.PackageType == repo.P2:
+	case m.Class == repo.Local && (m.PackageType == repo.Generic || maven.Serves(m.PackageType)):
+	default:
+		return false
+	}
+	return acc.Folder(m, "", accessapi.ActionRead) && generic.CheckDownload(m, "", true) == nil
 }
 
 // p2Children returns the composite children of the virtual repository c

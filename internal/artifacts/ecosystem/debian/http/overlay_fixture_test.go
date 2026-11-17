@@ -24,10 +24,12 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit/kittest"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -53,6 +55,9 @@ type overlayConfig struct {
 	Store         serverStore
 	Blobs         blob.Store
 	RemoteSources *source.Service
+	// Cache is the merged virtual metadata cache, a fresh one per world
+	// as the router holds one per server.
+	Cache *virtual.Cache
 }
 
 // overlayWorld is an item world with the item kit that serves its item
@@ -68,16 +73,17 @@ type overlayWorld struct {
 func newOverlayWorld(t *testing.T, tune ...func(*overlayConfig)) *overlayWorld {
 	t.Helper()
 	w := newItemWorld(t)
-	c := overlayConfig{Store: w.db, Blobs: w.blobs}
+	c := overlayConfig{Store: w.db, Blobs: w.blobs, Cache: virtual.NewCache(virtual.CacheOptions{})}
 	for _, f := range tune {
 		f(&c)
 	}
 	return &overlayWorld{itemWorld: w, kit: itemkit.New(itemkit.Deps{
-		Store:         c.Store,
-		Blobs:         c.Blobs,
-		RemoteSources: c.RemoteSources,
-		Access:        withAccess(t, Config{Store: c.Store}).Access,
-		Overlays:      []itemkit.Overlay{TryDebianItem},
+		Store:          c.Store,
+		Blobs:          c.Blobs,
+		RemoteSources:  c.RemoteSources,
+		Access:         withAccess(t, Config{Store: c.Store}).Access,
+		Overlays:       []itemkit.Overlay{TryDebianItem},
+		PackageOptions: pkgroute.Options{Store: c.Store, Cache: c.Cache},
 	})}
 }
 

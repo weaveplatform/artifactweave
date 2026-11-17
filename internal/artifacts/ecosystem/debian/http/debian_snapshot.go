@@ -309,8 +309,7 @@ func (s DebianAPI) debianSnapshotFiles(
 	p kernel.Principal, acc itemkit.Access,
 ) (map[string][]byte, error) {
 	if c.Class == repo.Virtual {
-		view, err := s.buildVirtualDebianView(ctx, st, c, distribution, p, acc)
-		return view.files, err
+		return s.snapshotVirtualDebian(ctx, st, c, distribution, p, acc)
 	}
 	base := "dists/" + distribution + "/"
 	release, _, err := s.debianMemberBytes(ctx, st, c, base+"Release", p, acc)
@@ -384,6 +383,33 @@ func (s DebianAPI) debianSnapshotFiles(
 		files[base+suffix] = body
 	}
 	return files, nil
+}
+
+// snapshotVirtualDebian is the metadata of distribution that a snapshot of
+// the virtual repository c copies: its members merged and signed as a read
+// of c composes them (buildVirtualDebian), built for the snapshot rather
+// than taken from the merged metadata cache, since a snapshot keeps its
+// own immutable copy of the state it records (JFrog's Debian Snapshots).
+// A queued snapshot runs outside a request, so the walk gets one that
+// carries the caller and its decider.
+func (s DebianAPI) snapshotVirtualDebian(
+	ctx context.Context, st itemkit.Store, c repo.Config, distribution string,
+	p kernel.Principal, acc itemkit.Access,
+) (map[string][]byte, error) {
+	k, err := s.Packages(debianProtocol(s.Kit), false)
+	if err != nil {
+		return nil, fmt.Errorf("snapshot virtual metadata: %w", err)
+	}
+	r, err := http.NewRequestWithContext(accessapi.WithCaller(ctx, p, acc.Decider),
+		http.MethodGet, "/", nil)
+	if err != nil {
+		return nil, fmt.Errorf("snapshot virtual metadata: %w", err)
+	}
+	// The snapshot has always read c's members whatever c's own patterns
+	// say, so the walk does not check them.
+	open := c
+	open.IncludesPattern, open.ExcludesPattern = nil, nil
+	return s.buildVirtualDebian(k.Bind(r, open), k, st, c, distribution, p, acc)
 }
 
 // snapshotReadError answers a read of the source that the caller may not

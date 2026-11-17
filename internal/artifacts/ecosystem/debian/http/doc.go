@@ -146,11 +146,20 @@
 //     is asked, and the upstream is asked with them, as 7.x appends them
 //     to the remote request URL (RTFACT-26349). A virtual repository's
 //     remote member takes both for its Sources index and its other files.
-//   - A virtual repository's metadata is composed for each request from its
-//     members in order, at most 128. A member of another type, a virtual
-//     member or one with the trivial layout is refused, a member that
-//     refuses its Release or index (blacked out, for one) is left out, and a
-//     package path belongs to the first member that lists it. A local or
+//   - A virtual repository's metadata is composed from its members through
+//     the package handlers' walk (pkgroute.Collect; #1552): 7.x's order,
+//     nested virtual repositories flattened with a cycle or a
+//     self-membership skipped, and a member of another type, one with the
+//     trivial layout, one that refuses its Release or index (blacked out,
+//     for one) and one that fails passed over, the failure logged [I]. A
+//     remote member is indexed only for the virtual's Indexed Remote
+//     Architectures (debianDefaultArchitectures, amd64 when unset) [I]. A
+//     package path belongs to the first member that lists it
+//     (debian.Merger). The signed set is kept for the virtual's
+//     virtualRetrievalCachePeriodSecs (pkgroute.Kit.Merged); a snapshot
+//     builds its own. The virtual repository's read gate
+//     (itemkit.Kit.VirtualGate) decides whether the caller may read
+//     through it, and the caller's Read in each member what it lists. A local or
 //     federated member's index must match the size and SHA-256 its Release
 //     gives and decode; a remote member's index that does not is left out,
 //     as a missing one is, since the remote caches it as fetched (#1356)
@@ -239,10 +248,15 @@
 //     index; local index content that is a folder, unreadable or malformed;
 //     and remote indexes streamed, cached, over the size bound, or listing a
 //     package the source refuses or cannot check.
+//   - virtual_test.go: the walk over nested members, cycles, a Generic and
+//     a Trivial-layout member; remote members that miss, fail or are
+//     refused passed over; reads by a member's reader, refusals and the
+//     hidden virtual's 404; the kept metadata over a period, -1, callers
+//     who read different members and a snapshot; the Indexed Remote
+//     Architectures; and a kit without the router's store.
 //   - debian_virtual_test.go: virtual metadata refused, including by the
 //     virtual repository's own patterns, merged from the readable members,
-//     and failing closed on store faults, wrong member types and unusable
-//     signing keys; packages a local or remote member's patterns, or the
+//     and failing closed on store faults and unusable signing keys; packages a local or remote member's patterns, or the
 //     virtual repository's own, reject kept listed while their GET passes
 //     over the refusing member; a remote member's Release and Packages
 //     through its source; virtual packages served from the first member

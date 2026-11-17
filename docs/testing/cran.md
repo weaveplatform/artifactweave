@@ -34,9 +34,15 @@ Local and federated writes, deletes, and trash restores refresh derived
 version in each terminal feed. `POST /artifactory/api/cran/reindex/<repo>`
 rebuilds a local repo synchronously by default or queues it with `async=true`.
 Remote reads validate upstream metadata and package content before caching,
-and cached content is reusable offline. Virtual indexes merge members in
-order and omit packages the caller cannot read from both the member and the
-virtual repository. Archive files under `src/contrib/Archive/<name>/` remain
+and cached content is reusable offline. Virtual indexes walk the members in 7.x's resolution order, nested virtual
+members once each, so a cycle or a virtual that lists itself adds nothing,
+and list each package name once, at the greatest version any member lists
+(#1552). A member the caller may read decides what it lists, without a grant
+on the virtual repository; a member of another type, or one that misses,
+refuses or fails, is passed over, the failure logged. The merged
+`PACKAGES` and `PACKAGES.gz` are kept for the virtual's
+`virtualRetrievalCachePeriodSecs` (`-1` builds them on every read), and an
+archive comes from the first member that holds it. Archive files under `src/contrib/Archive/<name>/` remain
 addressable without appearing in the latest version index.
 
 A GET of a `PACKAGES` index or a package archive takes the query parameters Artifactory documents for any
@@ -97,7 +103,7 @@ Cross-peer federation remains P13.
 ## Evidence
 
 [`@cran` acceptance](../../test/acceptance/features/cran.feature) uses
-`r-base:4.6.1` pinned by digest and the unchanged official CRAN
+`r-base:4.6.2` pinned by digest and the unchanged official CRAN
 `assertthat_0.2.1.tar.gz` archive. A real `Rscript` calls
 `install.packages()` through local, one-node federated, remote and virtual
 repositories, then repeats remote installation after the upstream stops.

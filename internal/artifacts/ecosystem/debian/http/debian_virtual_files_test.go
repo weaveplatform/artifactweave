@@ -136,7 +136,9 @@ func TestAccDebianVirtualDistsFileFromTheFirstMemberThatServesIt(t *testing.T) {
 					),
 				},
 				repo.Config{Key: "deb-folder", Class: repo.Local},
-				repo.Config{Key: "deb-remote", Class: repo.Remote},
+				// Priority resolution asks the remote before the local member
+				// (decision 0008, R1).
+				repo.Config{Key: "deb-remote", Class: repo.Remote, PriorityResolution: repo.Flex(true)},
 				repo.Config{Key: "deb-first", Class: repo.Local},
 				repo.Config{Key: "deb-second", Class: repo.Local},
 				repo.Config{Key: "deb-virtual", Class: repo.Virtual, Repositories: []string{
@@ -171,7 +173,9 @@ func TestAccDebianVirtualDistsFileRefusals(t *testing.T) {
 	})))
 	w.debRepos(
 		repo.Config{Key: "deb-local", Class: repo.Local},
-		repo.Config{Key: "deb-remote", Class: repo.Remote},
+		// Priority resolution asks the remote before the local member
+		// (decision 0008, R1).
+		repo.Config{Key: "deb-remote", Class: repo.Remote, PriorityResolution: repo.Flex(true)},
 		repo.Config{Key: "deb-virtual", Class: repo.Virtual, Repositories: []string{"deb-local"}},
 		repo.Config{
 			Key: "deb-closed", Class: repo.Virtual, Repositories: []string{"deb-local"},
@@ -229,8 +233,9 @@ func TestAccDebianVirtualDistsFileRefusals(t *testing.T) {
 
 // TestAccDebianVirtualSourcesNeedsReadPermissionOnEveryListedFile: a
 // member's Sources index reaches a caller through the virtual repository
-// only when the caller may read every file it lists, in the member and in
-// the virtual repository, and, for a remote member, by its source's check;
+// only when the caller may read every file it lists in the member, whose
+// permissions decide a read through the virtual repository (decision
+// 0008, R3), and, for a remote member, by its source's check;
 // otherwise it is refused, not passed to the next member. A member's index
 // that cannot be read, does not parse or is over the size bound, and a
 // check the source cannot make, are server faults; an upstream fault
@@ -261,11 +266,6 @@ func TestAccDebianVirtualSourcesNeedsReadPermissionOnEveryListedFile(t *testing.
 		{
 			name: "descriptor the caller may not read in the member", member: repo.Local,
 			as: notIn("deb-member"), status: http.StatusForbidden, message: "Forbidden",
-		},
-		{
-			name:   "descriptor the caller may not read in the virtual repository",
-			member: repo.Local, as: notIn("deb-virtual"),
-			status: http.StatusForbidden, message: "Forbidden",
 		},
 		{
 			name: "listed file the source refuses", member: repo.Remote,
@@ -315,7 +315,12 @@ func TestAccDebianVirtualSourcesNeedsReadPermissionOnEveryListedFile(t *testing.
 			}
 			w := newOverlayWorld(t, tune...)
 			w.debRepos(
-				repo.Config{Key: "deb-member", Class: tc.member},
+				// Priority resolution asks a remote member before the
+				// later local one (decision 0008, R1).
+				repo.Config{
+					Key: "deb-member", Class: tc.member,
+					PriorityResolution: repo.Flex(tc.member == repo.Remote),
+				},
 				repo.Config{Key: "deb-later", Class: repo.Local},
 				repo.Config{
 					Key: "deb-virtual", Class: repo.Virtual,
