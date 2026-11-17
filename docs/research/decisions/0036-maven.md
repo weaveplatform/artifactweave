@@ -404,3 +404,60 @@ These assignments describe planned work, not current runtime support.
   <https://maven.apache.org/ref/3-LATEST/maven-repository-metadata/repository-metadata.html>
 - [Deviations register](../../implementation/deviations.md): DV-050, DV-051, DV-053, DV-054,
   DV-060, DV-063, DV-064
+
+## P10 virtual POM cleanup (MVN-03)
+
+A Maven, Gradle, Ivy, sbt or generic virtual runs `maven.CleanPOM` after the
+serving member's read permission and download policy. The virtual's
+`pomRepositoryReferencesCleanupPolicy` controls cleanup; generic uses
+`discard_active_reference`. `nothing` preserves the member's representation.
+Top-level repositories and plugin repositories are removed; the default also
+removes them from profiles whose `activeByDefault` text is case-insensitively
+`true` without trimming. `discard_any_reference` covers every profile. An
+unchanged or unparsable POM keeps its exact input bytes.
+
+**[S]** Artifactory OSS 7.161.26 `PomInterceptor.onBeforeReturn`,
+`PomTransformer.transform`, `XmlUtils.outputString` and
+`ArtifactoryVirtualDownloadStrategy.getInfoInternal` establish this path and the
+stored-copy behavior. JDOM2's [raw format](https://hunterhacker.github.io/jdom/jdom2/apidocs/org/jdom2/output/Format.html)
+and [2.0.6 output processor](https://github.com/hunterhacker/jdom/blob/JDOM-2.0.6/core/src/java/org/jdom2/output/support/AbstractXMLOutputProcessor.java)
+establish UTF-8 declaration, CRLF text line separators, double-quoted attributes,
+` />` empty elements, entity escaping and retained comments/CDATA. The fixtures
+in `ecosystem/maven/testdata/pom-cleanup` were generated with JDOM 2.0.6 and are
+compared byte for byte. **[I]** The precise JDOM dependency version bundled with
+7.161.26 was not established; 2.0.6 is the ticket's specified fallback for #216.
+
+Changed POMs are durable virtual-owned copies at the original path, with transform
+time for Created/Last-Modified and checksums and length of the actual UTF-8 bytes.
+The new `virtual.CopyStore` keeps metadata in `virtual_copies` and content in the
+existing blob store. Shared store logic owns one blob reference per copy,
+atomically releases replacements/deletions, and rolls back failed writes.
+Copies are reused while their local member's file is unchanged and not newer;
+remote members are inspected again under their own cache and upstream rules.
+Policy, member identity and source digest also fence reuse. Member bytes stay
+unchanged. HEAD, ranges, conditionals and sidecars describe the resulting copy;
+remote authority and usage hooks survive the transformation.
+
+**[I], #216/P19:** stored copies are hidden from storage listings and searches;
+the storage API continues to resolve members. A sidecar requested before its POM
+transforms the owner first, so its checksum matches the POM a later read receives.
+The local unchanged-POM parse optimization (12 hours / 100,000 entries in 7.x)
+is omitted; it changes no response. Native Maven qualification remains MVN-04.
+
+The same router probes ran against main `dcd46bf91` and this implementation,
+using controlled members and no live Artifactory instance:
+
+| Probe | Main | MVN-03 |
+|---|---|---|
+| Default Maven policy | All references kept | Top-level and active-default removed; optional profile kept |
+| `discard_any_reference` | All references kept | All profile references removed |
+| `nothing` | Original bytes/checksums | Same original bytes/checksums |
+| Generic virtual | All references kept | Default cleanup |
+| npm virtual / JAR | Original bytes | Same original bytes |
+| Sidecar first / checksum headers | Match member bytes | Match cleaned bytes |
+| Changed POM Last-Modified | Member time (2020-01-01 fixture) | Transform time, stable on repeated local reads |
+
+Unit fixtures, real-router tests, SQLite/PostgreSQL store contracts, restart and
+fault rollback checks cover these changes. A remote POM with consistency checks
+suppressed exercises unparsable pass-through without changing the member's own
+validation rules.

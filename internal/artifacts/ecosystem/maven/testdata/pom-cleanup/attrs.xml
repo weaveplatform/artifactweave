@@ -1,0 +1,6 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xsi:schemaLocation="urn:maven
+ urn:maven.xsd" title="literal
+	whitespace&#xA;reference&#x9;tab&#xD;carriage">
+ <repositories />
+</project>

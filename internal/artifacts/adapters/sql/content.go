@@ -224,6 +224,9 @@ func (r repos) Update(ctx context.Context, c repo.Config) error {
 
 func (r repos) Delete(ctx context.Context, key string) error {
 	return r.s.Tx(ctx, func(ctx context.Context) error {
+		if err := r.s.VirtualCopies().DeleteRepo(ctx, key); err != nil {
+			return fmt.Errorf("remove virtual copies: %w", err)
+		}
 		if _, err := r.s.RemoteCache().Invalidate(ctx, key, "", false); err != nil {
 			return fmt.Errorf("remove remote cache: %w", err)
 		}

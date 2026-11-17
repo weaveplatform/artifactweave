@@ -23,3 +23,5 @@ internal/artifacts/ecosystem/nix/testdata/cache/nix-cache-info text eol=lf
 # txtar fixture archives: a file marker line that ends in CRLF is not a
 # marker, so a CRLF checkout on Windows would parse as an archive with no files.
 *.txtar text eol=lf
+# JDOM raw POM output uses CRLF, which is part of the checksum fixture.
+internal/artifacts/ecosystem/maven/testdata/pom-cleanup/*.expected.xml -text whitespace=-blank-at-eol,cr-at-eol

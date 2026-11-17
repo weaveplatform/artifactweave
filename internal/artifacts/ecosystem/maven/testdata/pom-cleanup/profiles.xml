@@ -1,0 +1,9 @@
+<project>
+ <repositories />
+ <pluginRepositories />
+ <profiles>
+  <profile><activation><activeByDefault>true</activeByDefault></activation><repositories /><pluginRepositories /></profile>
+  <profile><activation><activeByDefault> true </activeByDefault></activation><repositories /></profile>
+  <profile><id>opt-in</id><repositories /><pluginRepositories /></profile>
+ </profiles>
+</project>

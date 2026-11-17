@@ -1,6 +1,9 @@
 package port
 
-import "github.com/weaveplatform/artifactweave/internal/platform/tx"
+import (
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
+	"github.com/weaveplatform/artifactweave/internal/platform/tx"
+)
 
 // Store is every store the artifacts module owns. All of them take part in
 // the caller's unit of work (tx.Runner); ColdBlobs and ColdReplicas index
@@ -9,6 +12,7 @@ type Store interface {
 	tx.Runner
 	Repos() RepoStore
 	RemoteCache() RemoteCacheStore
+	VirtualCopies() virtual.CopyStore
 	Items() ItemStore
 	Blobs() BlobIndex
 	Replicas() ReplicaIndex

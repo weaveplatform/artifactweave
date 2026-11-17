@@ -23,6 +23,9 @@
 //     changed or deleted.
 //   - The context of the caller's transaction, if there is one.
 //
+// VirtualCopies adds the shared atomic blob-reference transaction for
+// durable virtual-owned files, over each backend's CopyRecords.
+//
 // # Outputs
 //
 //   - Stores and RemoteCacheRecords, what an adapter supplies.

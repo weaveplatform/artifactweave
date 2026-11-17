@@ -145,6 +145,7 @@ index sqlite_autoindex_upload_digests_1 upload_digests
 index sqlite_autoindex_uploads_1 uploads
 index sqlite_autoindex_user_groups_1 user_groups
 index sqlite_autoindex_users_1 users
+index sqlite_autoindex_virtual_copies_1 virtual_copies
 index sqlite_autoindex_webhook_secrets_1 webhook_secrets
 index sqlite_autoindex_webhooks_1 webhooks
 index sqlite_autoindex_work_items_1 work_items
@@ -256,6 +257,7 @@ table upload_digests upload_digests CREATE TABLE upload_digests(sha256 TEXT PRIM
 table uploads uploads CREATE TABLE uploads(id TEXT PRIMARY KEY,backend TEXT NOT NULL DEFAULT '',repo_key TEXT NOT NULL DEFAULT '',path TEXT NOT NULL DEFAULT '',state BLOB,bytes BIGINT NOT NULL DEFAULT 0,started_at BIGINT,updated_at BIGINT)
 table user_groups user_groups CREATE TABLE user_groups(name TEXT PRIMARY KEY,description TEXT NOT NULL DEFAULT '',auto_join BOOLEAN NOT NULL DEFAULT FALSE,admin_privileges BOOLEAN NOT NULL DEFAULT FALSE,realm TEXT NOT NULL DEFAULT '',realm_attributes TEXT NOT NULL DEFAULT '',external_id TEXT NOT NULL DEFAULT '',roles TEXT,search_name TEXT)
 table users users CREATE TABLE users(name TEXT PRIMARY KEY,email TEXT NOT NULL DEFAULT '',password_hash BLOB,admin BOOLEAN NOT NULL DEFAULT FALSE,profile_updatable BOOLEAN NOT NULL DEFAULT FALSE,internal_password_disabled BOOLEAN NOT NULL DEFAULT FALSE,disable_ui_access BOOLEAN NOT NULL DEFAULT FALSE,realm TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT '',mfa TEXT NOT NULL DEFAULT '',last_logged_in_at BIGINT,created_at BIGINT,roles TEXT,failed_logins INTEGER NOT NULL DEFAULT 0,password_changed_at BIGINT,password_expired BOOLEAN NOT NULL DEFAULT FALSE,search_name TEXT)
+table virtual_copies virtual_copies CREATE TABLE virtual_copies(virtual_key TEXT NOT NULL REFERENCES repositories(key)ON DELETE CASCADE,path TEXT NOT NULL,document TEXT NOT NULL,PRIMARY KEY(virtual_key,path))
 table webhook_deliveries webhook_deliveries CREATE TABLE webhook_deliveries(id INTEGER PRIMARY KEY AUTOINCREMENT,webhook_key TEXT NOT NULL REFERENCES webhooks(key)ON DELETE CASCADE,event_id TEXT NOT NULL DEFAULT '',event_type TEXT NOT NULL DEFAULT '',attempted_at BIGINT,status INTEGER NOT NULL DEFAULT 0,elapsed_ms BIGINT NOT NULL DEFAULT 0,request TEXT,response TEXT)
 table webhook_secrets webhook_secrets CREATE TABLE webhook_secrets(webhook_key TEXT NOT NULL REFERENCES webhooks(key)ON DELETE CASCADE,handler_index INTEGER NOT NULL,name TEXT NOT NULL,value BLOB,PRIMARY KEY(webhook_key,handler_index,name))
 table webhooks webhooks CREATE TABLE webhooks(key TEXT PRIMARY KEY,project_key TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',enabled BOOLEAN NOT NULL DEFAULT FALSE,debug BOOLEAN NOT NULL DEFAULT FALSE,domain TEXT NOT NULL DEFAULT '',created_at BIGINT,updated_at BIGINT,doc TEXT)

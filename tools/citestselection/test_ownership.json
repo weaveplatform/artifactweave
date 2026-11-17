@@ -166,6 +166,7 @@
       "disposition_test.go",
       "items_test.go",
       "kit_test.go",
+      "pom_cleanup_test.go",
       "redirect_test.go",
       "remote_fill_test.go",
       "remote_matrix_test.go",

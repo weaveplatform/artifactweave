@@ -5,6 +5,7 @@ import (
 	accport "github.com/weaveplatform/artifactweave/internal/access/core/port"
 	artinmem "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/inmem"
 	artport "github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	fedinmem "github.com/weaveplatform/artifactweave/internal/federation/adapters/inmem"
 	fedport "github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	ntfinmem "github.com/weaveplatform/artifactweave/internal/notifications/adapters/inmem"
@@ -184,3 +185,6 @@ func (s *Store) Distribution() relport.DistributionStore { return s.releases.Dis
 
 // Workers is the workers module's worker store.
 func (s *Store) Workers() wrkport.WorkerStore { return s.workers.Workers() }
+
+// VirtualCopies returns the artifacts module's transformed virtual files.
+func (s *Store) VirtualCopies() virtual.CopyStore { return s.artifacts.VirtualCopies() }

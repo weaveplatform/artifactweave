@@ -3,6 +3,7 @@ package sql_test
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
@@ -159,5 +161,38 @@ func TestAccBowerRegistrationsSurviveRestart(t *testing.T) {
 		kernel.ErrNotFound,
 	) {
 		t.Fatalf("recreated repository inherited registration: %v", err)
+	}
+}
+
+func TestAccVirtualCopiesSurviveRestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "virtual-copies.db")
+	s := mustOpenFile(t, path, nil)
+	ctx := t.Context()
+	if err := s.Repos().Create(ctx, repo.Config{Key: "v", Class: repo.Virtual, PackageType: repo.Maven}); err != nil {
+		t.Fatal(err)
+	}
+	c := virtual.Copy{
+		Virtual:      "v",
+		Path:         "a.pom",
+		Member:       "local",
+		SourceSHA256: strings.Repeat("1", 64),
+		Policy:       "discard_active_reference",
+		Item:         model.Item{Actual: kernel.Checksums{SHA256: strings.Repeat("a", 64)}, Size: 10},
+	}
+	if err := s.VirtualCopies().Put(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s = mustOpenFile(t, path, nil)
+	defer func() { _ = s.Close() }()
+	got, err := s.VirtualCopies().Get(ctx, "v", "a.pom")
+	if err != nil || got != c {
+		t.Fatal(got, err)
+	}
+	b, err := s.Blobs().Get(ctx, c.Item.Actual.SHA256)
+	if err != nil || b.Refs != 1 {
+		t.Fatal(b, err)
 	}
 }

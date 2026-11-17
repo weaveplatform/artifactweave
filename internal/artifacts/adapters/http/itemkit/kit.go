@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -32,6 +33,7 @@ import (
 type Store interface {
 	item.Store
 	Uploads() session.UploadStore
+	VirtualCopies() virtual.CopyStore
 }
 
 // Deps is what the item kit reads: the stores and services an item request
