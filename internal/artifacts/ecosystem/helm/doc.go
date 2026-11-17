@@ -93,8 +93,8 @@
 // # Status
 //
 // Implemented P8 (Helm local repositories), with remote repositories in P9.
-// Moved here in P9d. Roadmap: virtual.go (P10), the Merger that merges the
-// Helm index.yaml for virtual repositories.
+// Moved here in P9d. P10 HLM-01 adds the pure virtual index Merger and
+// post-commit invalidation of containing virtual indexes, including nesting.
 //
 // # Testing
 //

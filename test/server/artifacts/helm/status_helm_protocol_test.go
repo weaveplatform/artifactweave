@@ -41,7 +41,7 @@ var helmProtocolStatusPart = statusPart{
 			{helmIndex, "/artifactory/api/helm/missing/index.yaml", "admin", "", 404},
 			{helmIndex, "/artifactory/api/helm/libs-local/index.yaml", "admin", "", 404},
 			{helmIndex, "/artifactory/api/helm/helm-remote/index.yaml", "admin", "", 501},
-			{helmIndex, "/artifactory/api/helm/helm-virtual/index.yaml", "admin", "", 501},
+			{helmIndex, "/artifactory/api/helm/helm-virtual/index.yaml", "admin", "", 200},
 			{helmIndexHead, root + "index.yaml", "admin", "", 200},
 			{helmIndexHead, root + "index.yaml", "user", "", 403},
 			{helmDownload, root + "protocol/web-1.0.0.tgz", "admin", "", 200},

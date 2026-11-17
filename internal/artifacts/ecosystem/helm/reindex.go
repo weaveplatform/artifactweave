@@ -21,8 +21,8 @@ import (
 // it, a remote repository's from its cache, and queues its index.yaml.
 // Which repositories the JFrog reindex operation accepts is the API's rule,
 // not the index's (the item kit's ReindexOps).
-func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
-	return reindex(ctx, env, c, "")
+func (h Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
+	return h.reindex(ctx, env, c, "")
 }
 
 // ReindexPath rebuilds the part of the index that the chart archives under
@@ -31,8 +31,8 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 // Charts Partial Re-Indexing"). A version some of whose archives lie
 // elsewhere keeps them, as the index holds them. An empty path is the whole
 // repository.
-func (Handler) ReindexPath(ctx context.Context, env format.Env, c repo.Config, p string) error {
-	return reindex(ctx, env, c, strings.Trim(p, "/"))
+func (h Handler) ReindexPath(ctx context.Context, env format.Env, c repo.Config, p string) error {
+	return h.reindex(ctx, env, c, strings.Trim(p, "/"))
 }
 
 // found is a chart archive a reindex read, with the chart it holds.
@@ -46,7 +46,7 @@ type found struct {
 // archives are read first, outside any transaction, so no decompression
 // holds the store's write lock; the transaction then reads the tree again
 // and reads only content that changed in between.
-func reindex(ctx context.Context, env format.Env, c repo.Config, under string) error {
+func (h Handler) reindex(ctx context.Context, env format.Env, c repo.Config, under string) error {
 	st := env.Store
 	hits, err := archivesUnder(ctx, st, c, under)
 	if err != nil {
@@ -85,7 +85,7 @@ func reindex(ctx context.Context, env format.Env, c repo.Config, under string) e
 		if err != nil {
 			return err //nolint:wrapcheck // pkgindex wraps its own; reindexPart is ours
 		}
-		return queueIndex(ctx, env, c, pkgindex.Stored(c).Cached)
+		return h.queueIndex(ctx, env, c, pkgindex.Stored(c).Cached)
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // the transaction returns ours

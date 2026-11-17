@@ -22,9 +22,11 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cocoapods"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/helm"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraformbackend"
@@ -108,7 +110,8 @@ type Module struct {
 	api                   artifactsapi.API
 	// items runs the formats' derived work, and the remote policies ingest
 	// through it.
-	items *item.Service
+	items        *item.Service
+	virtualCache *virtual.Cache
 	// formats are the formats' options, which the server and the item
 	// service share, so a write applies them whether a client or derived
 	// work makes it.
@@ -141,7 +144,13 @@ func New(d Deps) (*Module, error) {
 	if log == nil {
 		log = slog.Default()
 	}
+	cache := virtual.NewCache(virtual.CacheOptions{MaxEntries: d.Settings.VirtualCacheEntries, MaxBytes: d.Settings.VirtualCacheBytes, Log: log})
 	formats := d.Settings.Formats
+	formats.Helm.IndexChanged = func(ctx context.Context, key string) {
+		if err := cache.MemberWritten(ctx, d.Store.Repos(), key, helm.IndexPath, false); err != nil {
+			log.ErrorContext(ctx, "Helm virtual index invalidation failed", "member", key, "error", err)
+		}
+	}
 	formats.TerraformBackend = terraformbackend.Settings{Keys: d.Keys}
 	m := &Module{
 		store:                 d.Store,
@@ -158,7 +167,8 @@ func New(d Deps) (*Module, error) {
 			Repositories: repos.NewRepositories(d.Store, d.Access.Keys, d.Access.Projects),
 			Layouts:      layout.Checker{},
 		},
-		formats: formats,
+		formats:      formats,
+		virtualCache: cache,
 	}
 	// The maxUniqueSnapshots cleanups wait for their timers, as 7.x's do.
 	m.items = &item.Service{
@@ -181,6 +191,9 @@ func New(d Deps) (*Module, error) {
 // API returns the module's published surface: Repositories and Layouts,
 // bound by New.
 func (m *Module) API() artifactsapi.API { return m.api }
+
+// VirtualCache is shared by protocol reads and member-write invalidation.
+func (m *Module) VirtualCache() *virtual.Cache { return m.virtualCache }
 
 // FormatSettings returns the formats' options that New built, which the
 // server writes with and the Debian snapshot work takes.
@@ -409,14 +422,19 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 		}
 	}
 	policy := &remote.Policy{
-		Store:           m.store,
-		Blobs:           m.blobs,
-		Items:           m.items,
-		Pool:            &m.remoteHTTP,
-		Options:         resolver.Options,
-		Key:             key,
-		CheckCurrent:    checkCurrent(false),
-		GitFetch:        cocoapods.FetchCocoaPodsGit,
+		Store:        m.store,
+		Blobs:        m.blobs,
+		Items:        m.items,
+		Pool:         &m.remoteHTTP,
+		Options:      resolver.Options,
+		Key:          key,
+		CheckCurrent: checkCurrent(false),
+		GitFetch:     cocoapods.FetchCocoaPodsGit,
+		MetadataChanged: func(ctx context.Context, c repo.Config, path string) {
+			if c.PackageType == repo.Helm && path == helm.IndexPath {
+				m.formats.Helm.IndexChanged(context.WithoutCancel(ctx), c.Key)
+			}
+		},
 		ProjectResponse: nuget.ProjectEmptyFeed,
 	}
 	registryPolicy := &remote.Policy{

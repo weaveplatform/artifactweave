@@ -447,6 +447,13 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	if cfg.VirtualCache == nil {
 		cfg.VirtualCache = virtual.NewCache(virtual.CacheOptions{Log: logger})
 	}
+	if cfg.FormatSettings.Helm.IndexChanged == nil && cfg.Store != nil {
+		cfg.FormatSettings.Helm.IndexChanged = func(ctx context.Context, key string) {
+			if err := cfg.VirtualCache.MemberWritten(ctx, cfg.Store.Repos(), key, "index.yaml", false); err != nil {
+				logger.ErrorContext(ctx, "Helm virtual index invalidation failed", "member", key, "error", err)
+			}
+		}
+	}
 	r := chi.NewRouter()
 	artAPI := newArtifactoryAPI(cfg)
 	// Every partial embeds the kit newArtifactoryAPI built, so the routes of

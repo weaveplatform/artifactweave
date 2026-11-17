@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -95,6 +96,9 @@ type Options struct {
 
 // Protocol is one format's protocol.
 type Protocol struct {
+	// MergeWait bounds waiting on another merge; an expired waiter builds its
+	// own answer. Zero keeps the existing unbounded wait.
+	MergeWait time.Duration
 	// Name is the segment after /artifactory/api/, such as "npm" or "go".
 	Name string
 	// Types are the package types whose repositories the protocol serves.

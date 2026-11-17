@@ -2,6 +2,7 @@ package helm
 
 import (
 	"context"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
@@ -43,6 +44,7 @@ type Handler struct {
 	// The generic format's hooks for what Helm leaves alone. Admit adds
 	// Enforce Layout to its deploy policy (enforce.go).
 	generic.Handler
+	IndexChanged func(context.Context, string)
 }
 
 // inspection is what Inspect read for a write of a chart-named file.
@@ -93,7 +95,7 @@ func chartOf(ctx context.Context, env format.Env, it model.Item) (*Chart, error)
 // queues the repository's index.yaml when the charts changed, and when a
 // client stored the root index.yaml, which the next run replaces
 // (RTFACT-18128).
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Cached != pkgindex.Stored(c).Cached {
 		return nil
 	}
@@ -111,7 +113,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it m
 		return err
 	}
 	if changed || it.FullPath() == IndexPath {
-		return queueIndex(ctx, env, c, it.Cached)
+		return h.queueIndex(ctx, env, c, it.Cached)
 	}
 	return nil
 }
@@ -121,12 +123,12 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it m
 // that keeps another archive takes that one's Chart.yaml when the newest
 // goes (handOver). A chart's delete, or a client's delete of the root
 // index.yaml, queues the repository's index.yaml.
-func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
+func (h Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it model.Item) error {
 	if it.Folder || it.Cached != pkgindex.Stored(c).Cached {
 		return nil
 	}
 	if it.FullPath() == IndexPath {
-		return queueIndex(ctx, env, c, it.Cached)
+		return h.queueIndex(ctx, env, c, it.Cached)
 	}
 	pv, ok, err := pkgindex.VersionOf(ctx, env.Store, it.ID)
 	if err != nil || !ok {
@@ -135,7 +137,7 @@ func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it m
 	if err := handOver(ctx, env, pv, it); err != nil {
 		return err
 	}
-	return queueIndex(ctx, env, c, it.Cached)
+	return h.queueIndex(ctx, env, c, it.Cached)
 }
 
 // Sidecars names a chart's provenance file, <chart>.prov beside it, which
@@ -156,11 +158,17 @@ func derives(c repo.Config, cached bool) bool {
 }
 
 // queueIndex asks for c's index.yaml in the current transaction.
-func queueIndex(ctx context.Context, env format.Env, c repo.Config, cached bool) error {
+func (h Handler) queueIndex(ctx context.Context, env format.Env, c repo.Config, cached bool) error {
 	if !derives(c, cached) {
 		return nil
 	}
-	return env.Enqueue(ctx, KindIndex, c.Key, nil) //nolint:wrapcheck // the queue names its own
+	if err := env.Enqueue(ctx, KindIndex, c.Key, nil); err != nil {
+		return err //nolint:wrapcheck // the queue names its own
+	}
+	if h.IndexChanged != nil {
+		env.Store.AfterCommit(ctx, func() { h.committedIndex(c.Key) })
+	}
+	return nil
 }
 
 // WorkKinds are the kinds the Helm format queues.
@@ -174,4 +182,14 @@ func (Handler) Owed(c repo.Config, cached bool, p string) []format.WorkRef {
 		return nil
 	}
 	return []format.WorkRef{{Kind: KindIndex, Key: c.Key}}
+}
+
+// A hook context carries a transaction that has already committed. Use a fresh,
+// bounded context so the notification can safely read every store.
+//
+//nolint:contextcheck // retaining a committed transaction context is unsafe
+func (h Handler) committedIndex(key string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	h.IndexChanged(ctx, key)
 }

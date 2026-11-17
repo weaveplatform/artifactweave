@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"gopkg.in/yaml.v3"
@@ -29,6 +30,7 @@ type Options struct {
 func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
+		repo.Virtual:   pkgroute.Virtual{},
 		repo.Federated: pkgroute.Local{},
 	}
 	if o.RemoteSources != nil {
@@ -36,6 +38,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	}
 	return pkgroute.Protocol{
 		Sources:      sources,
+		MergeWait:    6 * time.Minute,
 		Name:         "helm",
 		Types:        []repo.PackageType{repo.Helm},
 		ErrorProfile: apierror.ProfileArtifactory,
@@ -59,6 +62,10 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil {
 		h.k.Error(w, r, err)
+		return
+	}
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtual(w, r, p.String())
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {

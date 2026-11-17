@@ -22,7 +22,11 @@ import (
 
 // Settings controls how the protocol serves the stored index. Nil retains
 // Artifactory's default: chart URLs relative to the repository URL.
-type Settings struct{ RelativeURLs *bool }
+type Settings struct {
+	RelativeURLs *bool
+	// IndexChanged is composition's post-commit merged-index invalidation hook.
+	IndexChanged func(context.Context, string) `json:"-" yaml:"-"`
+}
 
 // IsRelative reports whether chart URLs remain relative.
 func (s Settings) IsRelative() bool { return s.RelativeURLs == nil || *s.RelativeURLs }
@@ -171,7 +175,7 @@ func (Handler) Work(ctx context.Context, env format.Env, work work.WorkItem) err
 // Resolve seeds work for a cold index before the item service calls
 // EnsureFresh. A parked item is deliberately left parked: reading must
 // surface its failure, not silently reset its retry budget.
-func (Handler) Resolve(
+func (h Handler) Resolve(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
@@ -194,7 +198,7 @@ func (Handler) Resolve(
 	case !errors.Is(err, kernel.ErrNotFound):
 		return "", fmt.Errorf("helm: index work: %w", err)
 	}
-	if err := queueIndex(ctx, env, c, false); err != nil {
+	if err := h.queueIndex(ctx, env, c, false); err != nil {
 		return "", err
 	}
 	return d.Path, nil

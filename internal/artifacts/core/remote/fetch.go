@@ -305,6 +305,8 @@ func (p *Policy) directOnce(
 			if err = p.negative(ctx, q, permit, opts.Revision, token); err != nil {
 				return source.Result{}, err
 			}
+		} else {
+			p.metadataChanged(ctx, q)
 		}
 		return source.Result{}, kernel.ErrNotFound
 	case http.StatusNotModified:
@@ -406,6 +408,7 @@ func (p *Policy) negative(
 		seconds = *q.Repo.MissedRetrievalCachePeriodSecs
 	}
 	if seconds <= 0 {
+		p.metadataChanged(ctx, q)
 		return nil
 	}
 	err := p.Store.Tx(ctx, func(tx context.Context) error {
@@ -418,6 +421,7 @@ func (p *Policy) negative(
 	if err != nil {
 		return PolicyError(err)
 	}
+	p.metadataChanged(ctx, q)
 	return nil
 }
 
@@ -770,6 +774,7 @@ func (p *Policy) revalidate(
 	if err != nil {
 		return model.RemoteCacheEntry{}, PolicyError(err)
 	}
+	p.metadataChanged(ctx, q)
 	return updated, nil
 }
 
@@ -833,5 +838,12 @@ func (p *Policy) cache(
 	if err != nil {
 		return out, fmt.Errorf("cache adapter representation: %w", err)
 	}
+	p.metadataChanged(ctx, q)
 	return out, nil
+}
+
+func (p *Policy) metadataChanged(ctx context.Context, q source.Request) {
+	if p.MetadataChanged != nil && q.Resource.Kind == source.ResourceKindMetadata {
+		p.MetadataChanged(ctx, q.Repo, q.Resource.Path)
+	}
 }

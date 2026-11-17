@@ -69,4 +69,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [.github/actions/registry-clients/action.yml](../../.github/actions/registry-clients/action.yml).
 - Evidence: [test/acceptance/features/helm_classic.feature](../../test/acceptance/features/helm_classic.feature).
 - Evidence: [test/acceptance/features/helm_remote.feature](../../test/acceptance/features/helm_remote.feature).
+- Evidence: [test/acceptance/features/helm_virtual.feature](../../test/acceptance/features/helm_virtual.feature).
 - Evidence: [test/acceptance/client_steps_test.go](../../test/acceptance/client_steps_test.go).

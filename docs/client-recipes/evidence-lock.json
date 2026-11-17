@@ -88,6 +88,7 @@
   "test/acceptance/features/helm_classic.feature": "7054049d633da485fd581177aa711cc3486bcc5f41669ed18b6c5406b3e11bdd",
   "test/acceptance/features/helm_oci.feature": "d2a0b9b2c7d792df465d91108c93280ff93582f77b9fc5937ba4bb116924e9bd",
   "test/acceptance/features/helm_remote.feature": "e76ebaa07dc536b3b7629787ac784179ef51c09462cd8bc5ebc9d87a67c0be55",
+  "test/acceptance/features/helm_virtual.feature": "5721fcb9ca52ca82852ea3a405dc547305274b473aff48bb1acaf9ffc961e677",
   "test/acceptance/features/hex.feature": "aa0bd2fe650188f283e501f6434956706e31c6fa2b17262850dc3deb738c6c10",
   "test/acceptance/features/huggingface.feature": "d686d960a4611cc19642ed254eb030ca175670f079a927dca39bc5f303069fe0",
   "test/acceptance/features/huggingface_xet.feature": "498a5bb38366b5a62e4e492e34355c7cb9ea00a29284612f88ad4be50d50a01e",
