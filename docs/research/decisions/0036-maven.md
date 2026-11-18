@@ -504,6 +504,33 @@ serialization, retaining its established field order; exact bundled writer bytes
 remain an inference. Go's sorter cannot throw Java's comparator-contract
 exception; a contradictory sorted order falls back to lexical order.
 
+Metadata errors retain their phase (#1686). A genuine item/configuration lookup
+or member-source authority failure already marked `kernel.ErrStore` or
+`format.ErrStorageFault` aborts through the router's sanitized 500 handling,
+even if another member supplied metadata. True missing items and source/policy
+pass-overs remain unchanged. The marker is attached at those lookup/authority
+boundaries, rather than inferred from every error returned by the content reader.
+A remote cached-content open has a narrow `ContentOpenError` origin marker;
+its ordinary direct-source error text, cause and HTTP classification stay the
+same. Only this interceptor excludes that content origin from lookup tagging.
+Shared source normalization can already have erased an unmarked SQL lookup
+cause before the interceptor sees it; [#1692](https://github.com/weaveplatform/artifactweave/issues/1692)
+tracks that separate cross-kind limitation. This fix does not globally change
+`safeError` or reconstruct a lost cause from an arbitrary gateway response.
+
+Content acquisition and reads deliberately retain their tolerant merge behavior:
+a failed member contributes nothing, allowing a partial merge from healthy
+members or the normal no-usable-member answer, including any retained denial.
+This includes a content reader's typed storage cause. The verified 7.161.26
+`MavenMetadataInterceptor` catches content `IOException`/`StorageException` and
+closes the handle; its initial resource lookup is outside that catch. A real
+deleted-blob fixture is retained as an unchanged Artifactweave control, because
+the external vendor missing-binary exception hierarchy is unavailable. Current
+7.173.21 public documentation supplies no newer content-error rule. **[I], #216:**
+exact modern status, layout-config details, sidecars and authority behavior remain
+qualified in [the source audit](../virtual-metadata-faults-source-audit.md). No
+trial/live Artifactory capture was used.
+
 Merged GET, HEAD and sidecars use the serialized bytes' length, checksum headers,
 bare SHA1 ETag and maximum member Last-Modified. Conditional delivery and remote
 authority/use hooks go through the existing item stream helper. Native Maven

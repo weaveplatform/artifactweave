@@ -18,6 +18,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -918,5 +919,14 @@ func TestUnitRefreshMetadataIsTrustedAndPreservesCacheOnly(t *testing.T) {
 	}
 	if reads != 1 {
 		t.Fatal(reads)
+	}
+}
+
+func TestUnitContentOpenMarkerPreservesErrorIdentity(t *testing.T) {
+	for _, cause := range []error{fmt.Errorf("cached file: %w", format.ErrStorageFault), source.ErrUnavailable, context.DeadlineExceeded, &source.HTTPError{Status: 503, RetryAfter: time.Second}} {
+		marked := &source.ContentOpenError{Err: cause}
+		if marked.Error() != cause.Error() || !errors.Is(marked, cause) {
+			t.Fatal("content marker lost cause", marked, cause)
+		}
 	}
 }
