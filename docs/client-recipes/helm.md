@@ -49,9 +49,12 @@ curl --fail --user "$AW_USER:$AW_TOKEN" --upload-file "$AW_WORK/charts/acme-0.1.
 
 Classes: **local, remote, virtual, federated**. The repository alias aw refers to the selected local, remote, virtual or federated repository.
 
+Client-side install dry-run renders the repository chart without connecting to Kubernetes.
+
 ```sh
 helm search repo aw/acme --versions
 helm pull aw/acme --version 0.1.0 --destination "$AW_WORK/pulled"
+helm install preview aw/acme --version 0.1.0 --dry-run=client
 ```
 
 ## Limits

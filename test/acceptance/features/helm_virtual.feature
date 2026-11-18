@@ -53,6 +53,22 @@ Feature: Helm resolves local and remote charts through one virtual repository
     Then the command succeeds
     And the output contains "aw/acme"
     And the output contains "aw/web"
+    # Install before any pull so the download assertions cannot match an earlier archive GET.
+    # Separate install content caches also keep the original pulls cold.
+    When I run helm "install preview-remote aw/acme --version 0.1.0 --dry-run=client --content-cache .cache/helm/install-remote"
+    Then the command succeeds
+    And the output contains "NAME: preview-remote"
+    And the output contains "# Source: acme/templates/deployment.yaml"
+    And the output contains "kind: Deployment"
+    And the server answered no request with 500 since the last command
+    And the server answered 200 to GET "/artifactory/<download>/acme-0.1.0.tgz"
+    When I run helm "install preview-local aw/web --version 0.1.0 --dry-run=client --content-cache .cache/helm/install-local"
+    Then the command succeeds
+    And the output contains "NAME: preview-local"
+    And the output contains "# Source: web/templates/deployment.yaml"
+    And the output contains "kind: Deployment"
+    And the server answered no request with 500 since the last command
+    And the server answered 200 to GET "/artifactory/<localdownload>/web-0.1.0.tgz"
     When I run helm "pull aw/acme --version 0.1.0 --verify --keyring signing/public.gpg"
     Then the command succeeds
     And the server answered no request with 500 since the last command
@@ -111,8 +127,8 @@ Feature: Helm resolves local and remote charts through one virtual repository
     And the server answered no request with 500 since the last command
 
     Examples:
-      | relative | namespaces | download                         | member       | selected |
-      | true     | false      | api/helm/helm-virtual             |              | local    |
-      | false    | false      | helm-virtual                     |              | local    |
-      | true     | true       | api/helm/helm-virtual/helm-remote | helm-remote/ | charts   |
-      | false    | true       | helm-virtual/helm-remote          | helm-remote/ | charts   |
+      | relative | namespaces | download                         | localdownload                   | member       | selected |
+      | true     | false      | api/helm/helm-virtual             | api/helm/helm-virtual            |              | local    |
+      | false    | false      | helm-virtual                     | helm-virtual                    |              | local    |
+      | true     | true       | api/helm/helm-virtual/helm-remote | api/helm/helm-virtual/helm-local | helm-remote/ | charts   |
+      | false    | true       | helm-virtual/helm-remote          | helm-virtual/helm-local          | helm-remote/ | charts   |
