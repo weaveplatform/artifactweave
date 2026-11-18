@@ -28,7 +28,8 @@ type RegistryClient interface {
 	// characters.
 	Image(name string) (string, error)
 	// Do sends r for image; r.Path is relative to the image, such as
-	// "manifests/latest". The caller owns the response body.
+	// "manifests/latest". An empty image permits GET "_catalog" only, under
+	// its separate registry:catalog:* scope. The caller owns the response body.
 	// ErrRegistryDenied reports a request the registry refused.
 	Do(ctx context.Context, image string, r Request) (*http.Response, error)
 	// Base returns a copy of the registry's base URL, under which a

@@ -461,10 +461,9 @@ its status alone.
   ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md), "Repository Metadata and
   Permissions"). Pulling an image still needs Read on it. A repository the caller can read
   nothing in is left out. The registry-wide catalog prefixes each with its repository key
-  (decision 0003). **[I]** 7.x also has a system property,
-  `artifactory.docker.filter.catalog.by.user.permission`
-  ([RTFACT-30175](https://jfrog.atlassian.net/browse/RTFACT-30175)), whose default no source
-  gives.
+  (decision 0003). The verified official 7.161.26 OSS distribution sets
+  `artifactory.docker.filter.catalog.by.user.permission` to false
+  (`ConstantValues.java:753`), settling the former [I] default (DKR-03).
 - **Referrers.** `GET .../referrers/<digest>` answers 200 with an OCI image index of the
   manifests in `<name>` whose `oci.subject` is the digest, each descriptor carrying
   `mediaType`, `digest`, `size`, `artifactType` and the manifest's annotations. An unknown
@@ -873,3 +872,45 @@ The identical router probe on main `75090fe97` and DKR-02 produces:
 | Mount from virtual to local | 202 upload fallback | 201 mounted |
 | Push with no DDR | 405 generic virtual refusal | 405 R6 message, `Allow: GET` |
 | Existing pull / catalog / tags / referrers | 200 / 405 / 405 / 405 | Same statuses and bodies |
+
+## P10 virtual listings (DKR-03)
+
+Docker, OCI and Helm OCI virtual repositories merge sorted member tag and image
+streams in `Compare` order, keeping each name once. Each merger retains one pending
+name per member. A page reads only the names it returns and the next visible name;
+filtered/invalid folders can require additional store rows. Long pages keep the
+existing bounded buffering and reopen streams after the buffered cursor. `Link`
+retains the virtual address. Zero-sized pages and beyond-end tag cursors return
+empty arrays; image existence is independent of the cursor, and probes stop after
+the first qualifying member. Direct local response semantics remain unchanged.
+
+Virtual and member patterns filter names before paging. Catalog permission is Read
+on any path of each real member, including a caller whose Read is scoped to another
+image; catalog names are metadata, while pulls retain their own permission checks.
+Virtual tag candidates retain per-tag member authorization and canonical manifest
+pattern checks. A member that no longer permits delivery is omitted before headers;
+a real storage fault remains 500. Registry token scopes retain the original virtual
+image, and catalog requests require `registry:catalog:*`.
+
+A remote's own `_catalog` now reads its upstream through the normal source policy,
+root-folder Read scope, cache and late authority fences. The upstream transport
+allows an empty image only for GET `_catalog`, under a separate catalog bearer
+scope; repository pull scopes cannot reuse its token. Upstream pages are bounded
+and joined as existing remote tags pages are (16 MiB/128 pages). The decoded immutable
+catalog shares the 64 MiB listing budget, keyed separately from tags by source-body
+digest. A remote `dockerProjectId` is a pull namespace: only matching catalog names
+are exposed, with the project prefix removed, using logarithmic interval/cursor
+seeks rather than per-page scans. It does not create a merged virtual-list cache.
+
+The registry-wide catalog now includes virtual images under `<virtual>/<image>`;
+remotes remain addressable through their own catalog and stay out of that aggregate
+[I]. Remote failures contribute no names to a virtual; with no qualifying tag
+member, tags answer 404 `NAME_UNKNOWN` [I]. No local cache-item enumeration replaces a
+failed upstream catalog. Source-policy behavior for cached metadata remains intact.
+
+Primary sources and remaining inferences are in research 23's DKR-03 section and #216.
+Cold/refresh cache-fill permissions retain the intended contract recorded in
+#1587: the cold scoped-Read test grants separate cache-fill authority, while the
+fresh-cache test grants only path-scoped Read after an administrator primes it.
+This permission rule is distinct from #1670's trusted-policy-path publication
+defect; that shared defect remains in its existing cross-kind ticket.

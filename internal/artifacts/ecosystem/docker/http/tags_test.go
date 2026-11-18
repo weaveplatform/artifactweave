@@ -174,7 +174,7 @@ func TestAccCatalogs(t *testing.T) {
 		w.deploy(c.key, c.path, manifest)
 	}
 	all := []string{
-		"docker-local/base", "docker-local/team/app", "fed-docker/mirror", "helm-oci/charts/web",
+		"docker-local/base", "docker-local/team/app", "docker-virtual/base", "docker-virtual/team/app", "fed-docker/mirror", "helm-oci/charts/web",
 		"oci-local/tools",
 	}
 	if diff := cmp.Diff(
@@ -215,7 +215,7 @@ func TestAccCatalogs(t *testing.T) {
 	expect(t, w.do(http.MethodGet, "/v2/generic-local/_catalog", "", nil),
 		http.StatusNotFound, CodeNameUnknown)
 	expect(t, w.do(http.MethodGet, "/v2/docker-virtual/_catalog", "", nil),
-		http.StatusMethodNotAllowed, CodeUnsupported)
+		http.StatusOK, "")
 	expect(t, w.do(http.MethodPost, "/artifactory/api/docker/docker-local/v2/_catalog", "", nil),
 		http.StatusMethodNotAllowed, CodeUnsupported)
 }
@@ -241,7 +241,7 @@ func TestAccListingPermissions(t *testing.T) {
 	}
 	as := func(name string) http.Handler { return principalAs(t, w.db, w.h, name) }
 	for target, want := range map[string][]string{
-		"/v2/_catalog":              {"docker-local/other", "docker-local/team/app"},
+		"/v2/_catalog":              {"docker-local/other", "docker-local/team/app", "docker-virtual/other", "docker-virtual/team/app"},
 		"/v2/docker-local/_catalog": {"other", "team/app"},
 		"/v2/oci-local/_catalog":    {},
 	} {

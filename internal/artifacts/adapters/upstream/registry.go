@@ -153,6 +153,9 @@ func (r *Registry) prepare(opts RegistryOptions) func(*http.Request) error {
 				permitted := req.URL.Path == prefix
 				if auth.image != "" {
 					permitted = strings.HasPrefix(req.URL.Path, prefix+auth.image+"/")
+					if auth.image == "_catalog" {
+						permitted = req.URL.Path == prefix+"_catalog"
+					}
 				}
 				if permitted {
 					req.Header.Set("Authorization", "Bearer "+auth.token)
@@ -218,6 +221,10 @@ func (r *Registry) Probe(ctx context.Context) (*http.Response, error) {
 // A request retries authentication at most once. All returned bodies are owned
 // by the caller, including terminal non-authentication error statuses.
 func (r *Registry) Do(ctx context.Context, image string, q remote.Request) (*http.Response, error) {
+	if image == "" && q.Path == "_catalog" && q.ExternalURL == "" && q.Method == http.MethodGet {
+		q.Path = "v2/_catalog"
+		return r.do(ctx, "_catalog", q)
+	}
 	image, err := r.Image(image)
 	if err != nil {
 		return nil, err

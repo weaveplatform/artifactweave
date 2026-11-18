@@ -216,7 +216,8 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md), "Repository Metadata and Permissions", updatedAt
   2026-09-21). **[J]** [RTFACT-26945](https://jfrog.atlassian.net/browse/RTFACT-26945) (affects 7.33.6, Done) had a path-scoped
   user refused with 403, and [RTFACT-30175](https://jfrog.atlassian.net/browse/RTFACT-30175) names a system property,
-  `artifactory.docker.filter.catalog.by.user.permission`, whose default no source gives.
+  `artifactory.docker.filter.catalog.by.user.permission`. The verified 7.161.26 OSS
+  `ConstantValues.java:753` defaults it to false [S], resolving this [I] in DKR-03.
 - **[D]** The `auth` endpoints answer the `config.json` entry keyed by the registry's URL,
   scheme and host only: `{"https://artprod.company.com": {"auth": "<base64>", "email":
   "admin@email.com"}}` ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information.md), "Set Your Docker
@@ -784,3 +785,37 @@ here come from the JFrog CLI and the Docker and OCI sources, not from 6.20.
 
 These unresolved details are tracked for P19 [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 No live or trial Artifactory instance was used.
+
+## P10 virtual listings (DKR-03, 2026-11-18)
+
+[D] [Docker metadata permissions](https://docs.jfrog.com/artifactory/docs/docker-repositories)
+state repository-level name visibility, including path-scoped readers, and member
+visibility behind a virtual. [List Docker Repositories](https://docs.jfrog.com/artifactory/reference/listdockerrepositories)
+and [List Docker Tags](https://docs.jfrog.com/artifactory/reference/listdockertags)
+document string cursors, pagination and 7.90.1+ digest-tag filtering.
+
+[S] The verified official 7.161.26 OSS archive's `ConstantValues.java` defaults
+catalog-by-user-path filtering to false (line 753), integer cursors to false (line 812), digest
+filtering to true (line 815), remote cache-URL exclusions to empty (line 792), and local cache-list
+fallback to false (line 1256). Closed Docker merge implementations are absent.
+
+[D] [KB000005264](https://jfrog.com/help/r/artifactory-how-to-stop-unable-to-fetch-catalog-errors-in-the-artifactory-logs)
+confirms upstream `_catalog` attempts on a remote or a containing virtual; the
+`docker.cache.remote.repo.tags.and.catalog` property names upstream URLs excluded
+from those attempts. It is not a merged-list cache switch. The implementation uses
+the default upstream behavior, retaining the existing bounded metadata source cache.
+
+[I] Pending #216/P19: skip failed remote contributions; beyond-end tags return exact
+`name` plus an empty tags array with 200; registry-wide enumeration adds virtuals but
+continues excluding direct remotes; merged pages are per request. Names under a
+remote's configured project prefix are stripped to preserve the transport's pull
+name mapping. Virtual tag-pattern filtering follows P10 R5 on canonical manifest
+paths while direct concrete listing semantics remain unchanged.
+
+Local qualification includes nested/duplicate members, pagination and long-page
+reopening, one pending name per member, logarithmic project interval seeking,
+member-level catalog Read, per-tag authorization, safe source-page links and final
+source revocation/storage faults. Native proof is implementation evidence, not a
+vendor capture. Cold/refresh cache-fill authority follows the intended behavior
+recorded in #1587; fresh cached metadata needs only the caller's Read permission.
+The separate trusted-policy-path publication defect remains tracked in #1670.

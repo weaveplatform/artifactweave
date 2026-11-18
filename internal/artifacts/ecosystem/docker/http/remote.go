@@ -20,7 +20,7 @@ import (
 
 func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request) {
 	if (r.Method != http.MethodGet && r.Method != http.MethodHead) ||
-		(q.Kind != KindManifest && q.Kind != KindBlob && q.Kind != KindTags && q.Kind != KindReferrers) {
+		(q.Kind != KindManifest && q.Kind != KindBlob && q.Kind != KindTags && q.Kind != KindReferrers && q.Kind != KindCatalog) {
 		Write(
 			w,
 			Errorf(
@@ -29,6 +29,10 @@ func (g *Registry) serveRemote(w http.ResponseWriter, r *http.Request, q Request
 				"remote registries support content reads only",
 			),
 		)
+		return
+	}
+	if q.Kind == KindCatalog {
+		g.catalog(w, r, q)
 		return
 	}
 	if err := q.Require(r, q.Name+"/", accessapi.ActionRead); err != nil {
@@ -50,6 +54,9 @@ func (g *Registry) readRegistry(r *http.Request, q Request, cached bool) (source
 		ref = "list"
 	}
 	resource, err := layout.RegistryResource(q.Name, op, ref)
+	if q.Kind == KindCatalog {
+		resource, err = layout.RegistryCatalogResource(), nil
+	}
 	if err != nil {
 		return source.Result{}, Errorf(http.StatusBadRequest, CodeNameInvalid, "invalid registry reference")
 	}

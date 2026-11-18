@@ -140,6 +140,9 @@ func TestAccRegistryCatalogMergesRepositories(t *testing.T) {
 			w.putManifests(key, im+"/v1")
 			if ValidName(im) {
 				all = append(all, key+"/"+im)
+				if key == "docker-local" {
+					all = append(all, "docker-virtual/"+im)
+				}
 			}
 		}
 	}
@@ -335,8 +338,8 @@ func TestAccListingReadsOnlyItsPage(t *testing.T) {
 		{"/v2/docker-local/big/tags/list?n=2&last=v0900", 3},
 		{"/v2/docker-local/big/tags/list?n=2&last=v1003", 1},
 		// n=0 reads no page; whether the image exists takes one query of
-		// Found's 16 folders.
-		{"/v2/docker-local/big/tags/list?n=0", 16},
+		// Found's one-folder probe.
+		{"/v2/docker-local/big/tags/list?n=0", 1},
 		// The first image, big, holds 1005 manifests: one query reads three
 		// of them, and the next starts after the image.
 		{"/v2/docker-local/_catalog?n=2", 6},

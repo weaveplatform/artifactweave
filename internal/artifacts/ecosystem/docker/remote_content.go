@@ -64,6 +64,9 @@ func (c *RegistryContent) fetch(
 		return nil, err
 	}
 	request.Path = operation + "/" + reference
+	if operation == "_catalog" {
+		request.Path = "_catalog"
+	}
 	// A native HEAD resolves a verified complete representation. Shared ingestion
 	// bounds metadata and spools blobs; a header alone cannot prove digest integrity.
 	request.Method = http.MethodGet
@@ -96,7 +99,7 @@ func (c *RegistryContent) fetch(
 		}
 		res.Header.Set("X-Checksum-Sha256", value)
 	}
-	if res.StatusCode == http.StatusOK && (operation == "tags" || operation == "referrers") {
+	if res.StatusCode == http.StatusOK && (operation == "tags" || operation == "referrers" || operation == "_catalog") {
 		return c.pages(ctx, client, image, operation, reference, res)
 	}
 	return res, nil
@@ -121,6 +124,9 @@ var registryName = regexp.MustCompile(
 // registry path parser (smart.NewSmart), so that core remote never imports
 // this package. It reads neither store nor network.
 func ParseRegistryPath(path string) (image, operation, reference string, err error) {
+	if path == "_catalog" {
+		return "", "_catalog", "", nil
+	}
 	parts := strings.Split(path, "/")
 	if len(parts) < 3 {
 		return "", "", "", remote.ErrRequest
@@ -167,7 +173,7 @@ func (c *RegistryContent) prepare(
 		return c.prepareBlob(permit, opts.Revision, image, reference, u)
 	}
 	limit := int64(MaxManifestSize)
-	if operation == "tags" {
+	if operation == "tags" || operation == "_catalog" {
 		limit = 16 << 20
 	}
 	body, err := io.ReadAll(io.LimitReader(u.Body, limit+1))
@@ -188,21 +194,10 @@ func (c *RegistryContent) prepare(
 		return item.ErrChecksumMismatch
 	}
 	u.Expected.SHA256 = digest
-	if operation == "tags" {
-		var list struct {
-			Name string   `json:"name"`
-			Tags []string `json:"tags"`
-		}
-		if err = json.Unmarshal(body, &list); err != nil {
-			return remote.ErrRequest
-		}
-		for _, tag := range list.Tags {
-			if !ValidTag(tag) || ReservedTag(tag) {
-				return remote.ErrRequest
-			}
-		}
-		return nil
+	if operation == "_catalog" || operation == "tags" {
+		return validateRegistryNames(body, operation)
 	}
+
 	manifest, err := ParseManifest(u.ContentType, body, digest)
 	if err != nil {
 		return remote.ErrRequest
@@ -348,4 +343,62 @@ func RegistryResource(image, operation, reference string) (source.Resource, erro
 		r.Accept = MediaTypeOCIIndex
 	}
 	return r, nil
+}
+
+// RegistryCatalogResource is repository metadata: any Read in this real member
+// admits its names. Per-image patterns filter the catalog after discovery; the
+// source retains root-folder permission and blackout checks at final delivery.
+func RegistryCatalogResource() source.Resource {
+	return source.Resource{
+		Method:           http.MethodGet,
+		UpstreamPath:     "_catalog",
+		Path:             "_remote/catalog.json",
+		Variant:          "registry-catalog-v1",
+		Kind:             source.ResourceKindVersions,
+		PermissionFolder: true,
+		BlackoutOnly:     true,
+	}
+}
+
+func validateRegistryNames(body []byte, operation string) error {
+	var err error
+	if operation == "_catalog" {
+		_, err := catalogNames(body)
+		return err
+	}
+
+	if operation == "tags" {
+		var list struct {
+			Name string   `json:"name"`
+			Tags []string `json:"tags"`
+		}
+		if err = json.Unmarshal(body, &list); err != nil {
+			return remote.ErrRequest
+		}
+		for _, tag := range list.Tags {
+			if _, digest := SHA256Hex(tag); digest {
+				continue
+			}
+			if !ValidTag(tag) || ReservedTag(tag) {
+				return remote.ErrRequest
+			}
+		}
+		return nil
+	}
+	return remote.ErrRequest
+}
+
+func catalogNames(body []byte) ([]string, error) {
+	var list struct {
+		Repositories *[]string `json:"repositories"`
+	}
+	if err := json.Unmarshal(body, &list); err != nil || list.Repositories == nil {
+		return nil, remote.ErrRequest
+	}
+	for _, name := range *list.Repositories {
+		if !registryName.MatchString(name) || len(name) > 255 {
+			return nil, remote.ErrRequest
+		}
+	}
+	return *list.Repositories, nil
 }

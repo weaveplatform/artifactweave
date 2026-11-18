@@ -3,6 +3,7 @@ package dockerhttp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"slices"
@@ -38,7 +39,7 @@ func (g *Registry) listTags(w http.ResponseWriter, r *http.Request, q Request) {
 	}
 	pages := g.store.Items().DockerPages()
 	var first *layout.TagPages
-	open := func(last string, batch int) names {
+	open := func(ctx context.Context, last string, batch int) names {
 		src := layout.TagsAfter(pages, q.Repo.Key, q.Name, last, batch)
 		if first == nil {
 			first = src
@@ -93,91 +94,62 @@ func (g *Registry) catalog(w http.ResponseWriter, r *http.Request, q Request) {
 			return
 		}
 	}
-	pages := g.store.Items().DockerPages()
-	var readable []repo.Config
+	var walks []*listingWalk
 	for _, c := range repos {
-		if g.readsAnything(r, c) {
-			readable = append(readable, c)
+		members, err := g.listingMembers(r, c)
+		if err != nil {
+			g.listingError(w, r, q, err)
+			return
 		}
+		cq := q
+		cq.Repo = c
+		walks = append(walks, &listingWalk{g: g, r: r, q: cq, members: members, docs: map[string]*listingDocument{}, locals: map[string]*layout.TagPages{}})
 	}
-	open := func(last string, batch int) names {
-		sources := make([]catalogSource, 0, len(readable))
-		for _, c := range readable {
-			// An image whose folder its repository's include and exclude
-			// patterns reject is left out, before the page is cut, as 7.x
-			// filters its catalog (RTFACT-26524, fixed). An image the
-			// patterns reject only some tags of stays, as its tags list
-			// keeps those tags (RTFACT-27234).
-			patterns := repo.PatternsOf(c)
-			accept := func(name string) bool { return ValidName(name) && patterns.Accepts(name, true) }
+	open := func(ctx context.Context, last string, batch int) names {
+		streams := make([]layout.NameStream, 0, len(walks))
+		for _, s := range walks {
 			prefix := ""
 			if q.RepoKey == "" {
-				prefix = c.Key + "/"
+				prefix = s.q.Repo.Key + "/"
 			}
-			sources = append(sources, catalogSource{
-				prefix: prefix,
-				images: layout.ImagesAfter(pages, c.Key, prefix, last, accept, batch),
-			})
+			streams = append(streams, s.open(ctx, prefix, last, batch))
 		}
-		return &catalogMerge{sources: sources}
+		return layout.MergeNames(streams...)
 	}
-	page, err := readPage(r, open)
-	if err != nil {
-		g.writeErr(w, r, err)
+	for {
+		page, err := readPage(r, open)
+		if err != nil {
+			g.listingError(w, r, q, err)
+			return
+		}
+		changed := false
+		for _, s := range walks {
+			drop, err := s.fence(r.Context())
+			if err != nil {
+				g.listingError(w, r, q, err)
+				return
+			}
+			changed = changed || drop
+		}
+		if changed {
+			continue
+		}
+		g.writePage(w, r, `{"repositories":`, page)
+		for _, s := range walks {
+			s.used(r.Context())
+		}
 		return
 	}
-	g.writePage(w, r, `{"repositories":`, page)
 }
 
-// catalogSource is one repository's images, named as the catalog names
-// them, with the next one read ahead.
-type catalogSource struct {
-	prefix string
-	images *layout.ImagePages
-	head   string
-	ready  bool
-	done   bool
-}
-
-// catalogMerge merges the repositories' images, each source in Compare's
-// order, into one listing in that order: a repository's images are its
-// sorted page, and the merge reads one more from a source only when it has
-// listed the one before.
-type catalogMerge struct{ sources []catalogSource }
-
-func (m *catalogMerge) Next(ctx context.Context) (string, bool, error) {
-	best := -1
-	for n := range m.sources {
-		s := &m.sources[n]
-		if !s.ready && !s.done {
-			image, ok, err := s.images.Next(ctx)
-			if err != nil {
-				return "", false, err //nolint:wrapcheck // the layout names itself
-			}
-			s.head, s.ready, s.done = s.prefix+image, ok, !ok
-		}
-		if s.ready && (best < 0 || layout.Compare(s.head, m.sources[best].head) < 0) {
-			best = n
-		}
-	}
-	if best < 0 {
-		return "", false, nil
-	}
-	m.sources[best].ready = false
-	return m.sources[best].head, true, nil
-}
-
-// served lists the repositories the registry-wide catalog covers: the
-// Docker, OCI and Helm OCI repositories that hold their own images. Remote
-// and virtual repositories are left out until the registry serves them.
+// Registry-wide catalogs keep remotes out: their upstream enumeration is
+// available through the addressed remote, while virtuals expose readable members.
 func (g *Registry) served(r *http.Request) ([]repo.Config, error) {
 	all, err := g.store.Repos().List(r.Context(), port.RepoFilter{})
 	if err != nil {
-		return nil, err //nolint:wrapcheck // store errors name themselves
+		return nil, fmt.Errorf("registry catalog repositories: %w", err)
 	}
-	return slices.DeleteFunc(all, func(c repo.Config) bool {
-		return !Serves(c.PackageType) || c.Class == repo.Remote || c.Class == repo.Virtual
-	}), nil
+	return slices.DeleteFunc(all, func(c repo.Config) bool { return !Serves(c.PackageType) || c.Class == repo.Remote }), nil
 }
 
 // nextLink is the Link to the page of n names after last.

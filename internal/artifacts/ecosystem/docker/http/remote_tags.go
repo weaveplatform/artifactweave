@@ -144,6 +144,7 @@ func (g *Registry) remoteTagList(stream *source.Stream) (*sortedTags, bool) {
 		Decode(&listing); err != nil {
 		return nil, false
 	}
+	listing.Tags = slices.DeleteFunc(listing.Tags, func(tag string) bool { return !layout.ValidTag(tag) || layout.ReservedTag(tag) })
 	slices.SortFunc(listing.Tags, layout.Compare)
 	tags := packTags(slices.Compact(listing.Tags))
 	g.tagLists.put(key, tags)

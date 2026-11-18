@@ -615,12 +615,9 @@ func TestAccRoutingErrors(t *testing.T) {
 			message: "docker-remote is a remote repository, which the registry does not serve yet",
 		},
 		{
-			name:    "remote catalog",
-			method:  "GET",
-			target:  "/v2/docker-virtual/_catalog",
-			status:  405,
-			code:    CodeUnsupported,
-			message: "docker-virtual is a virtual repository, which the registry does not serve yet",
+			name:   "virtual referrers",
+			method: "GET", target: "/v2/docker-virtual/app/referrers/sha256:" + strings.Repeat("a", 64),
+			status: 405, code: CodeUnsupported, message: "docker-virtual is a virtual repository, which the registry does not serve yet",
 		},
 		{
 			name: "no image name", method: "GET", target: "/v2/docker-local/manifests/latest",

@@ -53,6 +53,14 @@ Feature: Virtual Docker, OCI and Helm OCI repositories resolve local and remote 
     Then the command succeeds
     And the server answered no request with 500 since the last command
 
+    When I run crane "ls {host}/registry-virtual/team/image"
+    Then the command succeeds
+    And the output contains "local"
+    And the output contains "remote"
+    When I GET "/artifactory/api/docker/registry-virtual/v2/_catalog?n=100" as admin
+    Then the response status is 200
+    And the JSON field "repositories.0" equals "team/image"
+
   Scenario: oras pulls both OCI members through a virtual repository
     Given oras is available
     And a file "notes.txt" with content:
@@ -87,6 +95,13 @@ Feature: Virtual Docker, OCI and Helm OCI repositories resolve local and remote 
     Then the command succeeds
     And the files "notes.txt" and "remote/notes.txt" are identical
     And the server answered no request with 500 since the last command
+
+    When I run oras "push {host}/registry-upstream/team/local:v2 --plain-http --artifact-type application/vnd.example.notes notes.txt:text/plain"
+    Then the command succeeds
+    When I run oras "repo tags {host}/oci-virtual/team/local --plain-http"
+    Then the command succeeds
+    And the output contains "v1"
+    And the output contains "v2"
 
   Scenario: Helm pulls local and remote chart versions through a Helm OCI virtual
     Given helm is available
@@ -133,6 +148,14 @@ Feature: Virtual Docker, OCI and Helm OCI repositories resolve local and remote 
     Then the command succeeds
     And the files "acme-0.2.0.tgz" and "pulled/acme-0.2.0.tgz" are identical
     And the server answered no request with 500 since the last command
+
+    Given a file "latest/.keep" with content:
+      """
+      output directory
+      """
+    When I run helm "pull oci://{host}/helm-virtual/acme --plain-http --destination latest"
+    Then the command succeeds
+    And the files "acme-0.2.0.tgz" and "latest/acme-0.2.0.tgz" are identical
 
   @docker
   Scenario: docker pulls a remote image through a virtual repository

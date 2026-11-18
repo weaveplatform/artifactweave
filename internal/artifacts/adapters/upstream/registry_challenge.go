@@ -157,6 +157,12 @@ func parseRegistryChallenge(values []string, image string, tokens bool) (registr
 
 func registryScope(challenged, image string) (string, error) {
 	expected := ""
+	if image == "_catalog" {
+		if challenged != "" && challenged != "registry:catalog:*" {
+			return "", remote.ErrRegistryDenied
+		}
+		return "registry:catalog:*", nil
+	}
 	if image != "" {
 		expected = "repository:" + image + ":pull"
 	}
