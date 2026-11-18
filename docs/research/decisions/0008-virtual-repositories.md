@@ -480,27 +480,39 @@ Helm OCI ([#1520](https://github.com/weaveplatform/artifactweave/issues/1520)), 
 native adapters ([EPIC-ADP #1519](https://github.com/weaveplatform/artifactweave/issues/1519))
 and conformance and sign-off
 ([EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528)). Each family
-epic amends its own row of the format table when it lands, and
-[QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571) marks this
-decision Accepted at sign-off.
+epic amends its own row of the format table when it lands. GitHub closed
+[QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571) with
+documentation PR #1708; the remaining decision acceptance and final combined-main
+qualification are recorded in
+[EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528).
 
 The P9c sections below describe the adapters before P10 adoption, including
 Ansible's earlier failure and nested-member answers. All seven
 [EPIC-ADP](https://github.com/weaveplatform/artifactweave/issues/1519) delivery tickets
 are now closed and merged. R1 to R11 and the current operations guides apply to
-those adapters, R3's fall-through included. Status remains Proposed until #1571
-records the required final qualification; child-ticket completion alone does not
-claim that gate has passed.
+those adapters, R3's fall-through included. The later
+[23-adapter conformance table](../../implementation/virtual-adapter-conformance.md)
+adds the guarded member-order/nesting/cycle qualification in merged #1715; the
+[shared traversal](../../implementation/virtual-traversal.md) records the two
+resolution contracts consolidated in merged #1718. Status remains Proposed until
+#1528 records the remaining acceptance and required final combined-main
+qualification; closed child tickets alone do not establish that gate.
 
-P10's **[I]** items, grouped by ticket with the source and the inferred answer of each, are
-in the comment headed "From #1530" on
-[#216](https://github.com/weaveplatform/artifactweave/issues/216), for the comparison in P19.
+The current [P10 inference register](../../operations/virtual-repositories.md#inference-register)
+links each **[I]** answer to its comparison entry on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216), including the
+original "From #1530" entry and the
+[published closeout update](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6991066992).
+Each retains its checked source version and capture limits. These questions are
+registered for P19; their publication is not a live Artifactory observation.
 
-P28 adds remaining existing-format operations, such as npm audit and private PyPI search;
-P29 to P33 add format-specific virtual adapters where the target permits that class; P35
-coordinates the merged metadata cache across nodes (R8). Each must prove member ordering,
-upstream failure, visibility and native-client behavior. A generic file lookup alone does
-not satisfy a native metadata contract.
+P28 and the named format owners retain remaining protocol/client compatibility,
+such as npm audit and private PyPI search. P29 to P33 retain the original
+requirements for formats delivered through P9c and adopted here; they do not
+count those adapters as new delivery. P35 coordinates the merged metadata cache
+across nodes (R8). Any further virtual protocol work must prove member ordering,
+upstream failure, visibility and native-client behavior. A generic file lookup
+alone does not satisfy a native metadata contract.
 
 The [capability roadmap](../../implementation/capability-roadmap.md) records the
 phase boundaries under decision [0042](0042-capability-scope-and-supersession.md).
@@ -509,8 +521,17 @@ These assignments describe planned work, not current runtime support.
 ## Verification
 
 - Merge unit tests per format with fixture member sets.
-- Acceptance: each client resolves and publishes through a virtual over a local and a
-  remote member; `artifactory_virtual_*_repository` resources for every in-scope type.
+- Native acceptance: each supported virtual consumer resolves through local and remote
+  members, including Go. Publication follows the family
+  [DDR contract](../../operations/virtual-repositories.md#r6-deployment-deletion-and-transfers); exercise the
+  native publication flow where supported and its intentional mutation refusals
+  otherwise. Generic item deployment does not establish a native publishing API.
+- Package-consumer proof is separate from provider configuration: the
+  [33-resource scenario](../../../deploy/artifactweave/terraform/virtual-repositories)
+  applies, updates, obtains a clean plan and destroys every in-scope
+  `artifactory_virtual_*_repository` resource. The
+  [qualification ledger](../../testing/phase10-signoff.md) records native workflows,
+  the four provider absences and the final combined-main gate in #1528.
 
 ## References
 
