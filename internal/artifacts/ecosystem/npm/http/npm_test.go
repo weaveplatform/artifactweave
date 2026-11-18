@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +27,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	artmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -801,4 +803,11 @@ func (p failingPackages) Versions(
 		return nil, errBroken
 	}
 	return p.PackageStore.Versions(ctx, id) //nolint:wrapcheck // a test's pass-through
+}
+
+func (p failingPackages) SearchNpm(ctx context.Context, q port.NpmSearch, page kernel.Page) ([]port.SearchCandidate, string, error) {
+	if p.failing == "search" {
+		return nil, "", fmt.Errorf("package search: %w", format.ErrStorageFault)
+	}
+	return p.PackageStore.SearchNpm(ctx, q, page)
 }

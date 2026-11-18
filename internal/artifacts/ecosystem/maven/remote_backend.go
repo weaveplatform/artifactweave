@@ -29,6 +29,12 @@ type MavenBackend struct {
 	Eager  func(context.Context, source.Request, source.Permit)
 }
 
+// BindAuthority passes the shared policy's no-network options fence through
+// the runtime's format wrapper, including non-Maven metadata adapters.
+func (m *MavenBackend) BindAuthority(ctx context.Context, q source.Request, permit source.Permit) (source.AuthorityBinding, error) {
+	return m.Policy.BindAuthority(ctx, q, permit) //nolint:wrapcheck // source authority identity
+}
+
 // Read answers q through the shared policy. For a Maven-family repository
 // it first prepares the request: maven-metadata.xml is fetched as metadata
 // and a non-unique snapshot as mutable, the path is mapped to the

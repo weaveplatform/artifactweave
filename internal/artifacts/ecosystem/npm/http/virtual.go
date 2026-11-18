@@ -27,7 +27,7 @@ func (virtualSource) Item(context.Context, pkgroute.Store, repo.Config, string) 
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
-// Deferred search and signing-key routes keep their class refusal before any
+// Deferred signing-key routes keep their class refusal before any
 // handler-specific validation. Writes and account operations now use NPM-02.
 func (h handler) virtualRouteGate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +50,9 @@ func virtualRouteAllowed(r *http.Request) bool {
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil || len(p.Segments) == 0 {
 		return false
+	}
+	if !p.Folder && len(p.Props) == 0 && len(p.Segments) == 3 && p.Segments[0] == "-" && p.Segments[1] == "v1" && p.Segments[2] == "search" && r.Method == http.MethodGet {
+		return true
 	}
 	read := r.Method == http.MethodGet || r.Method == http.MethodHead
 	mutate := r.Method == http.MethodPut || r.Method == http.MethodDelete

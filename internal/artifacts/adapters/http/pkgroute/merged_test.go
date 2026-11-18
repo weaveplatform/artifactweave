@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -173,6 +174,24 @@ func (w *cacheWorld) format(sources map[repo.Class]pkgroute.Source) pkgroute.Pro
 				})
 				if err != nil {
 					return nil, err //nolint:wrapcheck // the kit's own answer
+				}
+				return strings.Split(string(part.Body), ","), nil
+			})
+			answer(rw, r, e, err)
+		})
+		r.Get("/rawparts/*", func(rw http.ResponseWriter, r *http.Request) {
+			p := path(r)
+			e, err := merge(r, p, func(mr *http.Request) ([]string, error) {
+				if pkgroute.RequestFrom(mr).Repo.Class != repo.Remote {
+					return read(mr, p)
+				}
+				caller, _ := kernel.FromContext(r.Context())
+				part, err := k.MergedRawPart(mr, p, caller.Name, func(mr *http.Request) (virtual.Entry, error) {
+					versions, err := read(mr, p)
+					return virtual.Entry{Body: []byte(strings.Join(versions, ","))}, err
+				})
+				if err != nil {
+					return nil, err
 				}
 				return strings.Split(string(part.Body), ","), nil
 			})
@@ -389,5 +408,38 @@ func TestAccMergedParts(t *testing.T) {
 	plain.get(t, doc, "merger")
 	if len(plain.remote.reads) != 2 {
 		t.Fatalf("no cache: remote reads %v", plain.remote.reads)
+	}
+}
+
+func TestAccMergedRawPartsCacheScopedCallersSeparately(t *testing.T) {
+	w := cacheFixture(t, true, nil)
+	doc := "outer/rawparts/idx/versions"
+	w.get(t, doc, "remotescoped")
+	w.get(t, doc, "remotescoped")
+	if len(w.remote.reads) != 1 {
+		t.Fatal("scoped raw part was rebuilt", w.remote.reads)
+	}
+	w.get(t, doc, "merger")
+	w.get(t, doc, "merger")
+	if len(w.remote.reads) != 2 {
+		t.Fatal("different visibility shared a raw part", w.remote.reads)
+	}
+	w.advance(2*time.Hour + time.Second)
+	w.get(t, doc, "remotescoped")
+	if len(w.remote.reads) != 3 {
+		t.Fatal("raw part did not expire", w.remote.reads)
+	}
+}
+
+func TestAccMergedRawPartDoesNotMaskFailedRefresh(t *testing.T) {
+	w := cacheFixture(t, true, nil)
+	doc := "outer/rawparts/solo/versions"
+	w.remote.docs["solo/versions"] = "v3.0.0"
+	w.get(t, doc, "merger")
+	w.advance(2*time.Hour + time.Second)
+	w.remote.err = fmt.Errorf("stored metadata broke: %w", format.ErrStorageFault)
+	rec := w.do("GET", base+doc, "merger", "")
+	if rec.Code != 500 {
+		t.Fatalf("raw stale fallback masked fault: %d %s", rec.Code, rec.Body)
 	}
 }

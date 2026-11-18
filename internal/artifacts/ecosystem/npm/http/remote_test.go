@@ -571,7 +571,7 @@ func TestAccRemoteInvalidMetadataCanBeCorrectedWithoutCacheExpiry(t *testing.T) 
 			requireRemote(t, f.do("GET", remoteRegistry+"pkg", "reader"), 200, "1.0.0")
 		})
 	}
-	for _, invalid := range []string{`{"objects":null}`, `{"objects":[{"package":{"name":"../escape","version":"1.0.0"}}]}`, `{"objects":[{"package":{"name":"pkg","version":"bad"}}]}`} {
+	for _, invalid := range []string{`{"objects":null}`, `{"objects":[{"package":{"name":"../escape","version":"1.0.0"}}]}`, `{"objects":[{"package":{"name":"pkg","version":"../escape"}}]}`} {
 		t.Run("search="+invalid, func(t *testing.T) {
 			f := newRemoteFixture(t)
 			f.up.Set(

@@ -70,7 +70,7 @@ func validateSearchMetadata(_ context.Context, r io.ReadSeeker, size int64) erro
 		if json.Unmarshal(entry["package"], &pkg) != nil || !npmfmt.ValidName(pkg.Name) {
 			return remoteProtocolError()
 		}
-		if _, valid := npmfmt.CleanVersion(pkg.Version); !valid {
+		if !npmfmt.SafeSearchVersion(pkg.Version) {
 			return remoteProtocolError()
 		}
 	}

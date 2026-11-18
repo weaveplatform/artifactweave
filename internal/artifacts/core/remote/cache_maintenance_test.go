@@ -1,14 +1,17 @@
 package remote_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
@@ -249,5 +252,95 @@ func TestAccCacheMaintenanceRestoreFencesBlockedRefresh(t *testing.T) {
 	ref, err := w.db.Blobs().Get(t.Context(), saved.Actual.SHA256)
 	if err != nil || ref.Refs != 1 {
 		t.Fatal("restore references inconsistent", ref, err)
+	}
+}
+
+func TestAccMetadataRefreshBypassesPositiveAndNegativeAge(t *testing.T) {
+	w := policyFixture(t)
+	q := w.request("search.json", source.ResourceKindMetadata)
+	w.up.Set("/search.json", fakeupstream.Resource{Body: []byte(`{"objects":[]}`)})
+	w.mustRead(q, `{"objects":[]}`)
+	w.mustRead(q, `{"objects":[]}`)
+	if w.up.Count("GET", "/search.json") != 1 {
+		t.Fatal("positive cache was not warm")
+	}
+	beforeRefresh := w.up.Count("", "/search.json")
+	q.Resource.RefreshMetadata = true
+	w.mustRead(q, `{"objects":[]}`)
+	w.mustRead(q, `{"objects":[]}`)
+	if w.up.Count("", "/search.json") != beforeRefresh+2 {
+		t.Fatal("refresh retained positive age", w.up.Requests())
+	}
+	q.Resource.Path = "missing.json"
+	q.Resource.RefreshMetadata = false
+	for range 2 {
+		if _, err := w.read(q); !errors.Is(err, kernel.ErrNotFound) {
+			t.Fatal(err)
+		}
+	}
+	if w.up.Count("", "/missing.json") != 1 {
+		t.Fatal("negative cache was not warm")
+	}
+	q.Resource.RefreshMetadata = true
+	for range 2 {
+		if _, err := w.read(q); !errors.Is(err, kernel.ErrNotFound) {
+			t.Fatal(err)
+		}
+	}
+	if w.up.Count("", "/missing.json") != 3 {
+		t.Fatal("refresh retained negative age", w.up.Requests())
+	}
+	permit := w.permit
+	permit.Intent, permit.UpstreamNetworkAllowed = source.RetrievalIntentCacheOnly, false
+	q.Resource.Path = "search.json"
+	q.CacheOnly = true
+	before := w.up.Count("", "")
+	result, err := w.p.Read(t.Context(), q, permit)
+	if err != nil || w.bytes(result) != `{"objects":[]}` {
+		t.Fatal(err)
+	}
+	if w.up.Count("", "") != before {
+		t.Fatal("refresh escaped cache-only")
+	}
+}
+
+func TestAccPolicyAuthorityBindsOptionsWithoutFetching(t *testing.T) {
+	w := policyFixture(t)
+	revision := "first"
+	resolved := 0
+	w.p.Options = func(context.Context, repo.Config) (remote.Options, error) {
+		resolved++
+		return remote.Options{Revision: revision}, nil
+	}
+	w.p.CheckCurrent = func(_ context.Context, _ remote.Store, _ source.Request, _ source.Permit, pinned string) error {
+		if pinned != revision {
+			return source.ErrSuperseded
+		}
+		return nil
+	}
+	q := w.request("search.json", source.ResourceKindMetadata)
+	binding, err := w.p.BindAuthority(t.Context(), q, w.permit)
+	if err != nil || binding.Revision != "first" || binding.Revalidate == nil || resolved != 1 {
+		t.Fatal(binding.Revision, err, resolved)
+	}
+	if err := binding.Revalidate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	revision = "rotated"
+	if err := binding.Revalidate(t.Context()); !errors.Is(err, source.ErrSuperseded) {
+		t.Fatal("lost options revision fence", err)
+	}
+	permit := w.permit
+	permit.Intent, permit.UpstreamNetworkAllowed = source.RetrievalIntentCacheOnly, false
+	cached, err := w.p.BindAuthority(t.Context(), q, permit)
+	if err != nil || cached.Revision != "" || cached.Revalidate != nil || resolved != 1 {
+		t.Fatal("cache-only resolved credentials", err, resolved)
+	}
+	q.Repo.Offline = new(true)
+	if _, err := w.p.BindAuthority(t.Context(), q, w.permit); err != nil || resolved != 1 {
+		t.Fatal("offline resolved credentials", err, resolved)
+	}
+	if w.up.Count("", "") != 0 {
+		t.Fatal("authority fetched", w.up.Requests())
 	}
 }

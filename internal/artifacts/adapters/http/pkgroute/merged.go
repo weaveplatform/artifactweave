@@ -190,3 +190,43 @@ func digest(parts ...string) string {
 	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
 	return hex.EncodeToString(sum[:])
 }
+
+// MergedRawPart caches a remote member's immutable, unfiltered intermediate for
+// formats that re-authorize and filter it on every request, including scoped
+// callers. It deliberately does not change MergedPart's conservative contract
+// for already-filtered documents. visibility identifies the incoming subject's
+// scope; document must hash sensitive query/source inputs because cache logs name
+// it. The format checks current source authority before lookup and disclosure.
+func (k *Kit) MergedRawPart(mr *http.Request, document, visibility string, build func(*http.Request) (virtual.Entry, error)) (virtual.Entry, error) {
+	q := RequestFrom(mr)
+	if q.virtual == nil || q.Repo.Class != repo.Remote || k.o.Cache == nil || visibility == "" {
+		return build(mr)
+	}
+	step := spell([]virtual.Member{{Repo: q.Repo, Upstream: !q.CacheOnly}})
+	key := virtual.CacheKey{
+		Virtual:    q.virtual.Key,
+		Document:   virtual.PartOf(document, q.Repo.Key),
+		Members:    digest(step...),
+		Visibility: digest(append(step, visibility)...),
+		Base:       baseurl.From(mr.Context()),
+	}
+	entry, err := k.o.Cache.Get(mr.Context(), key, virtual.Period(*q.virtual), func(ctx context.Context) (virtual.Entry, error) {
+		value, err := build(mr.WithContext(ctx))
+		if err != nil {
+			return virtual.Entry{}, &rawPartFailure{cause: err}
+		}
+		return value, nil
+	})
+	var failure *rawPartFailure
+	if errors.As(err, &failure) {
+		return virtual.Entry{}, failure.cause
+	}
+	return entry, err //nolint:wrapcheck // preserves cache cancellation and the builder's answer
+}
+
+// Raw intermediates must not hide a failed refresh behind stale fallback. The
+// marker evicts only this entry; callers still receive the original typed fault.
+type rawPartFailure struct{ cause error }
+
+func (e *rawPartFailure) Error() string   { return e.cause.Error() }
+func (e *rawPartFailure) Unwrap() []error { return []error{virtual.ErrPassOver, e.cause} }

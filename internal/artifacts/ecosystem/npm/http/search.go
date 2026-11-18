@@ -98,6 +98,10 @@ type searchPackage struct {
 // A search without text by a caller who may read the whole repository is
 // the exception, which searchAll pages in the store.
 func (h handler) search(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualSearch(w, r)
+		return
+	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Remote {
 		h.remoteSearch(w, r)
 		return

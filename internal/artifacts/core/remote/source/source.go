@@ -159,6 +159,10 @@ type Resource struct {
 	// Transient forbids persistent caching of a Git LFS batch response, whose
 	// upstream transfer actions may carry expiring URLs or credentials.
 	Transient bool
+	// RefreshMetadata is a trusted adapter request to revalidate metadata at
+	// its upstream even when its positive/negative raw cache entry is fresh.
+	// Conditional requests, admission, offline and CacheOnly restrictions remain.
+	RefreshMetadata bool
 	// NoCacheFile marks a read whose document 7.x keeps in the remote's
 	// memory rather than as a file of its cache, such as a folder listing
 	// (RemoteRepoBase.remoteResourceCache), so the remote policy fills it
@@ -359,33 +363,14 @@ type Service struct {
 // work, then fences the returned representation against a changed source. No
 // store transaction is opened here or propagated by this package.
 func (s *Service) Read(ctx context.Context, q Request) (Result, error) {
-	if err := authorize(q); err != nil {
+	authority, err := s.authorize(ctx, q, false)
+	if err != nil {
 		return Result{}, err
 	}
-	if err := ctx.Err(); err != nil {
-		return Result{}, fmt.Errorf("read source: %w", err)
-	}
-	if s.Resolve == nil {
-		return Result{}, ErrUnsupported
-	}
-	identity, err := s.Resolve(ctx, q.Repo)
-	if err != nil {
-		return Result{}, safeError(err)
-	}
-	if identity.Kind != model.ExternalHTTP {
-		return Result{}, ErrUnsupported
-	}
-	if identity.Repository == "" || identity.ID == "" || identity.Generation == "" {
-		return Result{}, ErrUnavailable
-	}
-	p := Permit{Identity: identity, Intent: RetrievalIntentMayFetch, UpstreamNetworkAllowed: true}
+	identity, p := authority.Identity(), authority.permit
 	backend := s.HTTP
 	if q.CacheOnly {
-		p.Intent, p.UpstreamNetworkAllowed = RetrievalIntentCacheOnly, false
 		backend = s.Cache
-	}
-	if err = s.revalidate(ctx, q, p); err != nil {
-		return Result{}, err
 	}
 	remember := q.Resource.ClientMIME != nil && !q.CacheOnly
 	if remember {
@@ -668,7 +653,7 @@ func authorize(q Request) error {
 		(r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
 		return ErrInvalidRequest
 	}
-	if err := validateMetadataPOST(q); err != nil {
+	if err := validateMetadataMethod(q); err != nil {
 		return err
 	}
 	if err := validateAdapterContract(r); err != nil {
@@ -681,8 +666,11 @@ func authorize(q Request) error {
 	return authorizePath(q, checkedPath)
 }
 
-func validateMetadataPOST(q Request) error {
+func validateMetadataMethod(q Request) error {
 	r := q.Resource
+	if r.RefreshMetadata && (r.Kind != ResourceKindMetadata || r.Method != http.MethodGet) {
+		return ErrInvalidRequest
+	}
 	if r.Method != http.MethodPost {
 		if len(r.PostBody) != 0 || r.Transient &&
 			(q.Repo.PackageType != repo.GitLFS || validateGitLFSLocksGET(r) != nil) {
