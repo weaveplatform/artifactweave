@@ -4,7 +4,10 @@
 completes the structural shared-walk requirement of
 [EPIC-ENG #1521](https://github.com/weaveplatform/artifactweave/issues/1521).
 It changes no public API or protocol behavior. The maintainer retains epic
-closure and final P10 qualification under #1571.
+closure. Final P10 qualification belongs to
+[EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528)
+after documentation PR #1708 closed #1571; the
+[qualification ledger](../testing/phase10-signoff.md) records the remaining work.
 
 ## One traversal, two policies
 
