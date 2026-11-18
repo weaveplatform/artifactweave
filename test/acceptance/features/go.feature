@@ -458,11 +458,19 @@ Feature: Go module repositories answer the GOPROXY protocol
     When I run jf "gp v1.0.0 --build-name go-virtual-publish --build-number 1" in "producer"
     Then the command succeeds
     And the server answered no request with 500 since the last command
-    When I run jf "gp v1.0.0 --build-name go-virtual-publish --build-number 1" in "producer"
+    # jf timestamps .info on every publish and retains each checksum in a build.
+    # Separate builds keep the three-file assertion independent of the clock.
+    When I run jf "gp v1.0.0 --build-name go-virtual-publish --build-number 2" in "producer"
     Then the command succeeds
     When I run jf "rt bp go-virtual-publish 1 --server-id aw"
     Then the command succeeds
     When I GET "/artifactory/api/build/go-virtual-publish/1" as admin
+    Then the response status is 200
+    And the JSON field "buildInfo.modules.0.id" equals "example.com/acme/published"
+    And the JSON field "buildInfo.modules.0.artifacts" has 3 entries
+    When I run jf "rt bp go-virtual-publish 2 --server-id aw"
+    Then the command succeeds
+    When I GET "/artifactory/api/build/go-virtual-publish/2" as admin
     Then the response status is 200
     And the JSON field "buildInfo.modules.0.id" equals "example.com/acme/published"
     And the JSON field "buildInfo.modules.0.artifacts" has 3 entries
