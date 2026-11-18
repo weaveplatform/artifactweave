@@ -85,9 +85,11 @@
 //
 // # Status
 //
-// Implemented P7, with remote retrieval in P9. Moved here in P9d. P10
-// virtual.go merges Go module version lists; golang/http serves virtual
-// reads over local, federated and remote members. Virtual publishing uses the default deployment member (GOV-02).
+// Implemented P7 local/P9 remote protocols, moved here in P9d. P10 delivers
+// module-version list unions and member-bound Go resolution (#1544), and Go/JF
+// publication through the DDR (#1557). Native scenarios build a local module with
+// a private remote dependency through one virtual. This is separate from P13
+// peer federation and P35 coordination. See the virtual guide.
 //
 // # Testing
 //

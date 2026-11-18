@@ -50,3 +50,15 @@ Virtual channels select records in the shared walk's member order (nested virtua
 CEP-16 documents are served through the native `/artifactory/api/conda/` endpoint. Generic `/artifactory/<repository>/` index and shard downloads, including checksum sidecars and archive-entry variants, return 404 because persisted documents contain the unfiltered repository snapshot; generic folder archives omit them too. Copy and move operations report and skip these documents, including folder descendants, and checksum deployment cannot reuse their stored bytes. Non-admin trash restores may return shard documents only to their original repository and paths; the entire selection is checked before any restore batch. Administrators retain the existing restore behavior. Ordinary package transfers and restores remain available. Classic raw metadata retains its existing generic item boundary: its own path permissions govern access. Use the native endpoint when metadata must reflect individual package permissions.
 
 The required `@conda` feature includes `@conda_shards` proof for L/F/R/V and remote offline reuse. It explicitly enables sharding, clears both package and shard caches, requires successful index **and shard** requests, rejects any classic repodata request, and checks installed fixture bytes. HTTP acceptance additionally covers delete/restore/reindex, read filtering, hash failures, redirect confinement, refresh and permission/source changes during a shard fetch.
+
+## Virtual repositories
+
+A virtual channel merges one subdir's authorized records with first-member file
+ownership. Local/federated records stay live; each remote part follows the virtual
+period and its current source policy. Classic and explicitly enabled CEP-16
+shards retain the same membership and archive rules.
+
+[Native micromamba scenarios](../../test/acceptance/features/conda.feature)
+cover nested local/remote installs, offline cache and explicit shard use. See the
+[shared virtual rules](virtual-repositories.md); unresolved remote-part/refusal details remain [I] in the
+[ADP-04 #216 entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6893506348).

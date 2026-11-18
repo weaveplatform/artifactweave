@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "reviewed": "2026-11-03",
+  "reviewed": "2026-11-18",
   "target": "current published Artifactory 7.x contract; live target version remains #216",
   "class_source": "https://docs.jfrog.com/artifactory/docs/repository-support-for-package-clients",
   "rows": [
@@ -9,7 +9,7 @@
       "catalog": true,
       "classes": "LRVF",
       "client": "apk",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: signed APKINDEX merge; apk installs local plus remote packages and reuses offline cache; F: publish, resolve, reindex (one node)",
       "route": "GET /artifactory/{repo-key}/{branch}/{component}/{arch}/APKINDEX.tar.gz; GET/PUT/DELETE /artifactory/{repo-key}/{path}; POST /artifactory/api/alpine/{repo-key}/reindex",
       "metadata": "APKINDEX.tar.gz, signatures, package checksums",
       "lifecycle": "reindex, delete, restore",
@@ -18,7 +18,15 @@
       "evidence": "test/acceptance/features/alpine.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/alpine-linux-repositories",
       "route_file": "internal/artifacts/ecosystem/alpine/http/alpine.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/alpine.feature",
+          "anchor": "apk installs a local and a remote member through a signed virtual repository offline"
+        }
+      ]
     },
     {
       "type": "cargo",
@@ -34,14 +42,15 @@
       "evidence": "test/acceptance/features/cargo.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/cargo-repositories",
       "route_file": "internal/artifacts/ecosystem/cargo/http/cargo.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "not supported"
     },
     {
       "type": "composer",
       "catalog": true,
       "classes": "LRVF",
       "client": "composer",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: merged p2 releases with first-member dist provenance; Composer 2 resolves later members; F: publish, resolve, reindex (one node)",
       "route": "GET /artifactory/api/composer/{repo-key}/packages.json; GET /artifactory/api/composer/{repo-key}/p2/{vendor}/{package}.json; GET /artifactory/api/composer/{repo-key}/dist/{vendor}/{package}/{version}.zip; POST /artifactory/api/composer/{repo-key}/reindex; GET/PUT/DELETE /artifactory/{repo-key}/{path}",
       "metadata": "Composer 1 local packages.json version map; Composer 2 metadata-url and p2 per-package JSON; ZIP identity validation and SHA-1 checksums when supplied",
       "lifecycle": "reindex, delete, restore",
@@ -50,14 +59,22 @@
       "evidence": "test/acceptance/features/composer.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/php-composer-repositories",
       "route_file": "internal/artifacts/ecosystem/composer/http/composer.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/composer.feature",
+          "anchor": "Composer 2 installs a version only a later virtual member holds"
+        }
+      ]
     },
     {
       "type": "bower",
       "catalog": true,
       "classes": "LRVF",
       "client": "bower",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: Git/Artifactory resolve, private Stash SSH-locator registration, cache, refresh, offline; V: ordered resolve, registration, external dependency rewrite/allowlist and art shorthand; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: Git/Artifactory resolve, private Stash SSH-locator registration, cache, refresh, offline; V: package/ref union; first version holder; registration, guarded external dependencies and art shorthand; F: publish, resolve, reindex (one node)",
       "route": "GET /artifactory/api/bower/{repo-key}/packages, /refs and /binaries; POST /packages registration; PUT/DELETE /artifactory/{repo-key}/{path}",
       "metadata": "manifest-indexed packages, durable Git registrations, smart HTTP refs, validated archives and delivery-time dependency rewriting",
       "lifecycle": "reindex, delete, restore",
@@ -66,14 +83,22 @@
       "evidence": "test/acceptance/features/bower.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/bower-repositories",
       "route_file": "internal/artifacts/ecosystem/bower/http/bower.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/bower.feature",
+          "anchor": "virtual dependency rewrite and art shorthand stay cached with fresh client state"
+        }
+      ]
     },
     {
       "type": "chef",
       "catalog": true,
       "classes": "LRVF",
       "client": "knife artifactory (knife-art)",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: cookbook/version merge; Knife resolves remote plus nested local members; F: publish, resolve, reindex (one node)",
       "route": "GET/HEAD/POST/DELETE /artifactory/api/chef/{repo-key}/api/v1/cookbooks/...; GET/HEAD /artifactory/api/chef/{repo-key}/api/v1/search; POST /artifactory/api/chef/{repo-key}/reindex; GET/PUT/DELETE /artifactory/{repo-key}/{path}",
       "metadata": "validated cookbook metadata.json and TAR archives, Supermarket catalogs/version links, dependencies and platforms",
       "lifecycle": "reindex, delete, restore",
@@ -82,14 +107,22 @@
       "evidence": "test/acceptance/features/chef.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/chef-repositories",
       "route_file": "internal/artifacts/ecosystem/chef/http/chef.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/chef.feature",
+          "anchor": "Knife resolves cookbooks through a virtual over a remote and a nested virtual"
+        }
+      ]
     },
     {
       "type": "cocoapods",
       "catalog": true,
       "classes": "LRVF",
       "client": "pod",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: CDN/spec union; CocoaPods installs remote plus nested local pods; F: publish, resolve, reindex (one node)",
       "route": "GET /artifactory/api/pods/{repo-key}/{cdn-path}; PUT/DELETE /artifactory/{repo-key}/{archive-path}",
       "metadata": "native CDN shards/spec JSON, HTTP-source archives and bounded Git-source archives with pinned recursive submodules",
       "lifecycle": "reindex, delete, restore",
@@ -98,14 +131,22 @@
       "evidence": "test/acceptance/features/cocoapods.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/cocoapods-repositories",
       "route_file": "internal/artifacts/ecosystem/cocoapods/http/pods.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/cocoapods.feature",
+          "anchor": "install pods through a virtual repository over a remote member and a nested local member"
+        }
+      ]
     },
     {
       "type": "conan",
       "catalog": true,
       "classes": "LRVF",
       "client": "conan",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: revision/search union with first-holder files; Conan 1/2 mixed downloads and DDR publication; F: publish, resolve, reindex (one node)",
       "route": "GET/PUT/DELETE /artifactory/api/conan/{repo-key}/v2/conans/{reference}/...; POST /artifactory/api/conan/{repo-key}/reindex",
       "metadata": "recipes, revisions, packages and manifests",
       "lifecycle": "reindex, delete, restore",
@@ -114,14 +155,27 @@
       "evidence": "docs/testing/conan.md",
       "source": "https://docs.jfrog.com/artifactory/docs/conan-repositories",
       "route_file": "internal/artifacts/ecosystem/conan/http/conan.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/server/artifacts/conan/conan_client_remote_test.go",
+          "anchor": "TestAccConanRemoteClient"
+        },
+        {
+          "kind": "client",
+          "path": "test/server/artifacts/conan/conan_client_test.go",
+          "anchor": "TestAccConanClients"
+        }
+      ]
     },
     {
       "type": "conda",
       "catalog": true,
       "classes": "LRVF",
       "client": "conda",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: per-subdir repodata merge; micromamba resolves nested local and remote members; opt-in CEP-16 sharding; F: publish, resolve, reindex (one node)",
       "route": "GET/HEAD /artifactory/api/conda/{repo-key}/{subdir}/{index-or-package}; GET/PUT/DELETE /artifactory/{repo-key}/{path}; POST /artifactory/api/conda/{repo-key}/reindex",
       "metadata": "repodata.json, current_repodata.json and .zst variants; opt-in CEP-16 MessagePack/Zstandard shard index and content-addressed shards; archive hashes",
       "lifecycle": "reindex, delete, restore",
@@ -130,14 +184,22 @@
       "evidence": "test/acceptance/features/conda.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/conda-repositories",
       "route_file": "internal/artifacts/ecosystem/conda/http/conda.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/conda.feature",
+          "anchor": "micromamba installs through a virtual channel over a remote and a nested virtual"
+        }
+      ]
     },
     {
       "type": "cran",
       "catalog": true,
       "classes": "LRVF",
       "client": "R install.packages",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node); L/F: opt-in legacy source archive migration",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: PACKAGES selects greatest version per name; R downloads first matching archive through nested remotes; F: publish, resolve, reindex (one node); L/F: opt-in legacy source archive migration",
       "route": "GET/PUT/DELETE /artifactory/{repo-key}/{path}; POST /artifactory/api/cran/{repo-key}/sources and /binaries; POST /artifactory/api/cran/reindex/{repo-key}; GET /artifactory/api/cran/{repo-key}/move-archives",
       "metadata": "PACKAGES and PACKAGES.gz source/binary indexes; validated DESCRIPTION and MD5sum",
       "lifecycle": "reindex, delete, restore; atomic, idempotent legacy archive migration",
@@ -146,14 +208,22 @@
       "evidence": "test/acceptance/features/cran.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/cran-repositories",
       "route_file": "internal/artifacts/ecosystem/cran/http/cran.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/cran.feature",
+          "anchor": "R installs from a remote member through a nested CRAN virtual"
+        }
+      ]
     },
     {
       "type": "debian",
       "catalog": true,
       "classes": "LRVF",
       "client": "apt",
-      "operations": "L: binary/source publish, resolve, reindex, delete, restore; R: binary/source resolve, cache, refresh, offline; V: binary resolve from ordered members; F: binary publish, resolve, reindex (one node); snapshots: create, resolve, async",
+      "operations": "L: binary/source publish, resolve, reindex, delete, restore; R: binary/source resolve, cache, refresh, offline; V: signed distribution metadata union; apt installs remote plus local packages and virtual snapshots; F: binary publish, resolve, reindex (one node); snapshots: create, resolve, async",
       "route": "GET/PUT/DELETE /artifactory/{repo-key}/{path}; POST /artifactory/api/deb/reindex/{repo-key}; POST /artifactory/api/deb/{repo-key}/snapshot; GET /artifactory/api/deb/{target-repo}/snapshots/{tag}/{path}",
       "metadata": "Packages/Sources, Release/InRelease, SHA256 by-hash, signatures and metadata snapshots",
       "lifecycle": "reindex, delete, restore, snapshot",
@@ -162,14 +232,22 @@
       "evidence": "test/acceptance/features/debian.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/debian-repositories",
       "route_file": "internal/artifacts/ecosystem/debian/http/debian.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/debian.feature",
+          "anchor": "apt installs a remote member through a signed virtual repository offline"
+        }
+      ]
     },
     {
       "type": "docker",
       "catalog": true,
       "classes": "LRVF",
       "client": "docker",
-      "operations": "native publish/resolve and lifecycle per linked acceptance",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: Docker/crane pull and push through DDR; sorted catalog/tag union; timestamp tag selection and local referrers",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -178,14 +256,27 @@
       "evidence": "test/acceptance/features/docker.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/docker/http/route.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/registry_virtual.feature",
+          "anchor": "crane pulls local and remote images by tag and digest through one virtual"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/registry_virtual.feature",
+          "anchor": "crane pushes a derived image through the virtual using cached remote layers"
+        }
+      ]
     },
     {
       "type": "helm",
       "catalog": true,
       "classes": "LRVF",
       "client": "helm",
-      "operations": "native publish/resolve and lifecycle per linked acceptance",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: index.yaml union; Helm resolves namespaced local/remote charts and external chart URLs; item uploads to DDR",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -194,14 +285,22 @@
       "evidence": "test/acceptance/features/helm_classic.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/helm/http/helm.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/helm_virtual.feature",
+          "anchor": "charts, member selection and publishing resolve with relative URLs <relative> and namespaces <namespaces>"
+        }
+      ]
     },
     {
       "type": "helmoci",
       "catalog": false,
       "classes": "LRVF",
       "client": "helmoci",
-      "operations": "native publish/resolve and lifecycle per linked acceptance",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: Helm OCI pull and push through DDR; catalog/tag union; OCI membership compatibility",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -210,14 +309,27 @@
       "evidence": "test/acceptance/features/helm_oci.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/docker/http/route.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/registry_virtual.feature",
+          "anchor": "Helm pulls local and remote chart versions through a Helm OCI virtual"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/registry_virtual.feature",
+          "anchor": "Helm pushes and pulls a chart through a Helm OCI virtual DDR"
+        }
+      ]
     },
     {
       "type": "huggingfaceml",
       "catalog": true,
       "classes": "LRVF",
       "client": "huggingface_hub",
-      "operations": "L: publish, resolve, reindex, delete, restore, bounded legacy migration; R: resolve, cache, refresh, offline; V: publish to default target, resolve ordered members; F: publish, resolve, reindex, bounded legacy migration (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore, bounded legacy migration; R: resolve, cache, refresh, offline; V: first readable repository/revision holder; Hub download and DDR publication; Xet paths retain member authority; F: publish, resolve, reindex, bounded legacy migration (one node)",
       "route": "GET/POST/HEAD/PUT /artifactory/api/huggingfaceml/{repo-key}/... (Hub metadata, commit, Git LFS, opt-in Xet CAS)",
       "metadata": "models/datasets, immutable revisions, Git LFS, verified Xet chunks/shards and scoped reconstruction",
       "lifecycle": "native reindex, delete, restore; atomic bounded legacy migration with original retention; remote metadata and asset cache",
@@ -226,14 +338,27 @@
       "evidence": "test/acceptance/features/huggingface_xet.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/hugging-face-repositories",
       "route_file": "internal/artifacts/ecosystem/huggingface/http/protocol.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "first member wins",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/huggingface_xet.feature",
+          "anchor": "Hub client resolves through a virtual member"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/huggingface.feature",
+          "anchor": "Hub client publishes through <class>"
+        }
+      ]
     },
     {
       "type": "gems",
       "catalog": true,
       "classes": "LRVF",
       "client": "gem, Bundler",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: merged indexes; gem/Bundler resolve local plus remote gems; gem push to DDR; F: publish, resolve, reindex (one node)",
       "route": "GET /artifactory/api/gems/{repo-key}/{names|versions|info/{gem}|specs.4.8.gz|quick/Marshal.4.8/{gem}.gemspec.rz|gems/{gem}.gem}; POST /artifactory/api/gems/{repo-key}/api/v1/gems; GET/PUT/DELETE /artifactory/{repo-key}/gems/{gem}.gem; POST /artifactory/api/gems/{repo-key}/reindex",
       "metadata": "Bundler compact names/versions/info with checksums, RubyGems Marshal specs and gemspec, gem details and versions JSON",
       "lifecycle": "reindex, delete, restore",
@@ -242,14 +367,22 @@
       "evidence": "test/acceptance/features/gems.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/rubygems-repositories",
       "route_file": "internal/artifacts/ecosystem/gems/http/gems.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/gems.feature",
+          "anchor": "gem push and install through a virtual repository over local and remote members"
+        }
+      ]
     },
     {
       "type": "gitlfs",
       "catalog": true,
       "classes": "LRVF",
       "client": "git lfs",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: first readable object/lock owner; Git LFS mixed pull and DDR publication; F: publish, resolve, reindex (one node)",
       "route": "POST /artifactory/api/lfs/{repo-key}/objects/batch; GET/HEAD/PUT /artifactory/api/lfs/{repo-key}/objects/{oid}; GET/DELETE /artifactory/{repo-key}/objects/{shard}/{shard}/{oid}; GET/POST /artifactory/api/lfs/{repo-key}/locks; POST /artifactory/api/lfs/{repo-key}/locks/verify; POST /artifactory/api/lfs/{repo-key}/locks/{id}/unlock",
       "metadata": "batch object metadata, SHA-256 object checksums, owner-aware path locks and pre-push lock verification (#843)",
       "lifecycle": "reindex, delete, restore",
@@ -258,14 +391,27 @@
       "evidence": "test/acceptance/features/gitlfs.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/git-lfs-repositories",
       "route_file": "internal/artifacts/ecosystem/gitlfs/http/protocol.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "first member wins",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/gitlfs.feature",
+          "anchor": "the pinned client pulls through a virtual repository over a local and a remote member"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/gitlfs.feature",
+          "anchor": "the pinned client publishes through a virtual deploy target"
+        }
+      ]
     },
     {
       "type": "go",
       "catalog": true,
       "classes": "LRVF",
       "client": "go",
-      "operations": "native publish/resolve and lifecycle per linked acceptance",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: sorted module-version union; Go resolves local/private remote modules and jf go publishes to DDR",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -274,14 +420,27 @@
       "evidence": "test/acceptance/features/round_trip.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/golang/http/golang.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/go.feature",
+          "anchor": "A cold Go build resolves local and private remote modules through one virtual"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/go.feature",
+          "anchor": "Publish a Go build through a virtual and resolve mixed dependencies through the same virtual"
+        }
+      ]
     },
     {
       "type": "gradle",
       "catalog": true,
       "classes": "LRVF",
       "client": "Gradle 9.8.2",
-      "operations": "L/F: native publish and resolve; R/V: native resolve; fresh caches and token denial",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: Gradle mixed resolve and DDR publication; Maven metadata/version selection and cross-layout item reads",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -290,14 +449,27 @@
       "evidence": "test/acceptance/features/system_recipes.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/maven/http/maven.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "item routes",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/system_recipes.feature",
+          "anchor": "Gradle resolves the exact bytes from a <class> repository"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/system_recipes.feature",
+          "anchor": "Gradle publishes a module into a <class> repository"
+        }
+      ]
     },
     {
       "type": "ivy",
       "catalog": false,
       "classes": "LRVF",
       "client": "Apache Ivy 2.6.0",
-      "operations": "L/F: descriptor/JAR deployment then native resolve; R/V: native resolve; fresh caches and token denial",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: Ivy mixed resolve and DDR publication; Maven metadata/version selection and cross-layout item reads",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -306,14 +478,22 @@
       "evidence": "test/acceptance/features/system_recipes.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/maven/http/maven.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "item routes",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/system_recipes.feature",
+          "anchor": "Ivy publishes into a mixed virtual deployment target and resolves with a fresh cache"
+        }
+      ]
     },
     {
       "type": "maven",
       "catalog": true,
       "classes": "LRVF",
       "client": "maven",
-      "operations": "native publish/resolve and lifecycle per linked acceptance",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: merged metadata and cross-member version/snapshot selection; mvn/jf release+snapshot deployment to DDR; POM cleanup and root-to-member read layouts",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -322,14 +502,27 @@
       "evidence": "test/acceptance/features/maven.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/maven/http/maven.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "item routes",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/maven.feature",
+          "anchor": "<maven> deploys release and snapshots through a mixed virtual and resolves merged versions without repository escape"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/system_recipes.feature",
+          "anchor": "Gradle uses an Ivy artifact pattern to resolve a Maven publication through a different virtual layout"
+        }
+      ]
     },
     {
       "type": "npm",
       "catalog": true,
       "classes": "LRVF",
       "client": "npm",
-      "operations": "native publish/resolve and lifecycle per linked acceptance",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: merged full/abbreviated packuments, dist-tags and keys; npm 11/12 install/ci, publish/tag/deprecate/unpublish, legacy account authentication, search and guarded external dependencies",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -338,14 +531,42 @@
       "evidence": "test/acceptance/features/npm.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/npm/http/npm.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/npm_virtual.feature",
+          "anchor": "<npm> installs a cold mixed dependency tree and verifies its virtual lockfile with npm ci"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/npm_virtual.feature",
+          "anchor": "<npm> logs in, publishes, tags, deprecates and unpublishes through one virtual deployment target"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/npm_virtual.feature",
+          "anchor": "<npm> audits both signing members and reports an unsigned virtual member"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/npm_virtual.feature",
+          "anchor": "<npm> installs allowed tarball and GitHub dependencies only through the virtual cache remote"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/npm_virtual.feature",
+          "anchor": "<npm> searches live local and cached remote members through a nested virtual"
+        }
+      ]
     },
     {
       "type": "nuget",
       "catalog": true,
       "classes": "LRVF",
       "client": "nuget",
-      "operations": "native publish/resolve and lifecycle per linked acceptance",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: merged V2/V3 feeds, registration and search; dotnet restore, forced-auth DDR package/symbol push; first-readable symbols; no-op reindex",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -354,14 +575,32 @@
       "evidence": "test/acceptance/features/nuget_exit.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/nuget/http/nuget.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/nuget_virtual.feature",
+          "anchor": "<dotnet> restores a remote parent and its local transitive dependency"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/nuget_virtual.feature",
+          "anchor": "<dotnet> restores local and private remote packages through a virtual v2 feed"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/nuget_virtual.feature",
+          "anchor": "<dotnet> publishes package and symbols through a forced virtual and restores from empty caches"
+        }
+      ]
     },
     {
       "type": "oci",
       "catalog": true,
       "classes": "LRVF",
       "client": "oci",
-      "operations": "native publish/resolve and lifecycle per linked acceptance",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: ORAS pull and push through DDR; catalog/tag union and readable-local referrers",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -370,14 +609,27 @@
       "evidence": "test/acceptance/features/registry_clients.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/docker/http/route.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/registry_virtual.feature",
+          "anchor": "oras pulls both OCI members through a virtual repository"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/registry_virtual.feature",
+          "anchor": "oras pushes and pulls an artifact through an OCI virtual DDR"
+        }
+      ]
     },
     {
       "type": "opkg",
       "catalog": true,
       "classes": "LRVF",
       "client": "opkg",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: Packages feed union; opkg resolves local plus remote packages; F: publish, resolve, reindex (one node)",
       "route": "GET/PUT/DELETE /artifactory/{repo-key}/{feed}/{package|Packages|Packages.gz|Release|Packages.sig}; POST /artifactory/api/opkg/reindex/{repoKey}",
       "metadata": "Packages and Packages.gz, signatures and checksums",
       "lifecycle": "reindex, delete, restore",
@@ -386,14 +638,22 @@
       "evidence": "test/acceptance/features/opkg.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/opkg-repositories",
       "route_file": "internal/artifacts/ecosystem/opkg/http/opkg.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/opkg.feature",
+          "anchor": "opkg installs from a local and a remote member of a virtual feed"
+        }
+      ]
     },
     {
       "type": "pub",
       "catalog": true,
       "classes": "LRVF",
       "client": "dart pub",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: version union with first-member archive binding; dart pub resolves local plus remote packages; F: publish, resolve, reindex (one node)",
       "route": "GET/POST /artifactory/api/pub/{repo-key}/api/packages/...; GET /artifactory/api/pub/{repo-key}/packages/...; POST /artifactory/api/pub/{repo-key}/reindex; GET/PUT/DELETE /artifactory/{repo-key}/{path}",
       "metadata": "package versions and archives",
       "lifecycle": "reindex, delete, restore",
@@ -402,14 +662,22 @@
       "evidence": "test/acceptance/features/pub.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/pub-repositories",
       "route_file": "internal/artifacts/ecosystem/pub/http/pub.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/pub.feature",
+          "anchor": "virtual repository resolves ordered local and remote members"
+        }
+      ]
     },
     {
       "type": "puppet",
       "catalog": true,
       "classes": "LRVF",
       "client": "puppet module",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: release union; Puppet resolves remote plus nested local modules; F: publish, resolve, reindex (one node)",
       "route": "GET /artifactory/api/puppet/{repo-key}/v3/{modules,releases,files}/...; POST /artifactory/api/puppet/{repo-key}/reindex; GET/PUT/DELETE /artifactory/{repo-key}/{path}",
       "metadata": "module metadata and archives",
       "lifecycle": "reindex, delete, restore",
@@ -418,14 +686,22 @@
       "evidence": "test/acceptance/features/puppet.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/puppet-repositories",
       "route_file": "internal/artifacts/ecosystem/puppet/http/puppet.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/puppet.feature",
+          "anchor": "Puppet resolves modules through a virtual over a remote and a nested virtual"
+        }
+      ]
     },
     {
       "type": "pypi",
       "catalog": true,
       "classes": "LRVF",
       "client": "pypi",
-      "operations": "native publish/resolve and lifecycle per linked acceptance",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: merged HTML/JSON simple and Warehouse documents; pip/uv mixed installs; twine/uv DDR publication",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -434,14 +710,27 @@
       "evidence": "test/acceptance/features/pypi_clients.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/pypi/http/pypi.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/pypi_virtual.feature",
+          "anchor": "pip and uv install wheel and sdist dependencies from virtual HTML and JSON indexes"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/pypi_virtual.feature",
+          "anchor": "twine and uv publish a wheel and sdist to a virtual deployment target and install back"
+        }
+      ]
     },
     {
       "type": "rpm",
       "catalog": true,
       "classes": "LRVF",
       "client": "dnf",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: signed repodata union; dnf installs local plus remote RPMs; F: publish, resolve, reindex (one node)",
       "route": "GET/PUT/DELETE /artifactory/{repo-key}/{path} and POST /artifactory/api/yum/{repo-key}",
       "metadata": "repodata, signatures and package checksums",
       "lifecycle": "reindex, delete, restore",
@@ -450,14 +739,22 @@
       "evidence": "test/acceptance/features/rpm.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/rpm-repositories",
       "route_file": "internal/artifacts/adapters/http/items.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/rpm.feature",
+          "anchor": "dnf installs through a virtual RPM repository backed by a remote and a local member"
+        }
+      ]
     },
     {
       "type": "sbt",
       "catalog": true,
       "classes": "LRVF",
       "client": "sbt 2.0.12",
-      "operations": "L/F: native publish and resolve; R/V: native resolve; remote offline cache and credential denial",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: sbt mixed resolve and DDR publication with fresh caches; Maven metadata/version selection",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -466,14 +763,22 @@
       "evidence": "test/acceptance/features/sbt.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/maven/http/maven.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "item routes",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/sbt.feature",
+          "anchor": "sbt resolves mixed virtual origins, publishes into its deployment target and uses empty client caches"
+        }
+      ]
     },
     {
       "type": "swift",
       "catalog": true,
       "classes": "LRVF",
       "client": "swift package",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: release union; SwiftPM mixed resolve and DDR publication; nested protocol controls; F: publish, resolve, reindex (one node)",
       "route": "GET/PUT /artifactory/api/swift/{repo-key}/{scope}/{name}[/{version}[.zip|/Package.swift]]; POST /artifactory/api/swift/{repo-key}/reindex",
       "metadata": "version lists, release metadata, manifests and checksum-pinned source ZIPs",
       "lifecycle": "reindex, delete, restore",
@@ -482,14 +787,27 @@
       "evidence": "internal/artifacts/ecosystem/swift/http/swift_test.go",
       "source": "https://docs.jfrog.com/artifactory/docs/swift-repositories",
       "route_file": "internal/artifacts/ecosystem/swift/http/swift.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "internal/artifacts/ecosystem/swift/http/remote_test.go",
+          "anchor": "TestAccSwiftPMVirtualLocalRemoteAndPublish"
+        },
+        {
+          "kind": "server",
+          "path": "test/acceptance/features/swift.feature",
+          "anchor": "a Swift virtual repository resolves a release through a nested virtual member"
+        }
+      ]
     },
     {
       "type": "terraform",
       "catalog": true,
       "classes": "LRVF",
       "client": "terraform",
-      "operations": "native publish/resolve and lifecycle per linked acceptance",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: module/provider version unions; fresh Terraform init through mixed module registry, provider registry and TLS mirror; signed member-bound bundles",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -498,7 +816,20 @@
       "evidence": "test/acceptance/features/terraform_registry.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/terraform/http/terraform.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/terraform_remote.feature",
+          "anchor": "a fresh init resolves rewritten HCL and JSON registry dependencies through one virtual"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/terraform_providers.feature",
+          "anchor": "fresh init installs hosted and private remote providers through a nested virtual <mode>"
+        }
+      ]
     },
     {
       "type": "terraformbackend",
@@ -514,7 +845,8 @@
       "evidence": "test/acceptance/features/terraform_backend.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/terraformbackend/http/terraformbackend.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "not supported"
     },
     {
       "type": "vagrant",
@@ -530,14 +862,15 @@
       "evidence": "test/acceptance/features/vagrant.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/vagrant-repositories",
       "route_file": "internal/artifacts/ecosystem/vagrant/http/vagrant.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "not supported"
     },
     {
       "type": "ansible",
       "catalog": true,
       "classes": "LRVF",
       "client": "ansible-galaxy",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: Galaxy version merge; publish to DDR; resolve remote plus nested local dependencies; F: publish, resolve, reindex (one node)",
       "route": "GET/HEAD /artifactory/api/ansible/{repo-key}/api/v3/{collection-or-artifact-path}; POST /artifactory/api/ansible/{repo-key}/api/v3/artifacts/collections/; GET/PUT/DELETE /artifactory/{repo-key}/{path}",
       "metadata": "Galaxy v3 collection versions/dependencies, validated archives and file manifests",
       "lifecycle": "reindex, delete, restore",
@@ -546,14 +879,22 @@
       "evidence": "test/acceptance/features/ansible.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/ansible-repositories",
       "route_file": "internal/artifacts/ecosystem/ansible/http/ansible.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/ansible.feature",
+          "anchor": "Galaxy publishes through a virtual to its deployment repository and installs over a remote and a nested virtual"
+        }
+      ]
     },
     {
       "type": "bazelmodules",
       "catalog": true,
       "classes": "LRVF",
       "client": "bazel",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members; F: publish, resolve, reindex (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: module-version/yanking union; controlled Bazel builds through ordered members; F: publish, resolve, reindex (one node)",
       "route": "GET/HEAD /artifactory/api/bazelmodules/{repo-key}/{registry-path}; PUT/DELETE /artifactory/{repo-key}/modules/{name}/{version}/{file}",
       "metadata": "module metadata and source archives",
       "lifecycle": "reindex, delete, restore",
@@ -562,14 +903,22 @@
       "evidence": "internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go",
       "source": "https://docs.jfrog.com/artifactory/docs/bazel-modules-repositories",
       "route_file": "internal/artifacts/ecosystem/bazelmodules/http/bazelmodules.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go",
+          "anchor": "TestAccBazelClient"
+        }
+      ]
     },
     {
       "type": "generic",
       "catalog": false,
       "classes": "LRVF",
       "client": "jf rt",
-      "operations": "upload, download, delete, restore and remote fetch",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: ordered item fetch with remote cache/offline reuse; curl/JF direct-download, browsing and DDR upload",
       "route": "/artifactory/{repo-key}/{path}",
       "metadata": "item metadata",
       "lifecycle": "see evidence or owner",
@@ -578,7 +927,20 @@
       "evidence": "test/acceptance/features/round_trip.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/repository-support-for-package-clients",
       "route_file": "internal/artifacts/adapters/http/items.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "item routes",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/generic_remote.feature",
+          "anchor": "curl and JFrog CLI fetch a cold file through a virtual and reuse the remote's cache through an outage"
+        },
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/artifacts.feature",
+          "anchor": "jf rt u through a virtual repository"
+        }
+      ]
     },
     {
       "type": "vcs",
@@ -594,14 +956,15 @@
       "evidence": "test/acceptance/features/vcs_recipes.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/vcs-repositories",
       "route_file": "internal/artifacts/ecosystem/vcs/http/vcs_routes.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "not supported"
     },
     {
       "type": "p2",
       "catalog": true,
       "classes": "RV",
       "client": "Eclipse p2",
-      "operations": "R: resolve, cache, refresh, offline; V: resolve ordered members",
+      "operations": "R: resolve, cache, refresh, offline; V: ordered composite children, including nested P2 and local Generic update sites; Eclipse p2 director install",
       "route": "GET /artifactory/{repo-key}/{p2-path}; R cached update site or site.zip!/; V composite metadata and ordered members",
       "metadata": "Eclipse metadata and artifacts",
       "lifecycle": "R cache refresh/offline; V live member view",
@@ -610,14 +973,22 @@
       "evidence": "test/acceptance/features/p2.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/p2-repositories",
       "route_file": "internal/artifacts/adapters/http/items.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/p2.feature",
+          "anchor": "a virtual P2 repository keeps external remote and local Generic members ordered"
+        }
+      ]
     },
     {
       "type": "hex",
       "catalog": true,
       "classes": "LRV",
       "client": "mix hex",
-      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: resolve ordered members",
+      "operations": "L: publish, resolve, reindex, delete, restore; R: resolve, cache, refresh, offline; V: signed release/version union; Mix resolves local plus remote packages",
       "route": "GET/HEAD /artifactory/api/hex/{repo-key}/{names|versions|packages/name|tarballs/name-version.tar|public_key}; PUT/DELETE /artifactory/{repo-key}/tarballs/{name-version.tar}",
       "metadata": "signed gzip protobuf registry v2, tarball checksums and dependency requirements",
       "lifecycle": "reindex, delete, restore",
@@ -626,14 +997,22 @@
       "evidence": "test/acceptance/features/hex.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/hex-repositories",
       "route_file": "internal/artifacts/ecosystem/hex/http/hex.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/hex.feature",
+          "anchor": "Virtual repository falls through to a signed remote member"
+        }
+      ]
     },
     {
       "type": "nix",
       "catalog": true,
       "classes": "LRVF",
       "client": "nix",
-      "operations": "L: publish, resolve, reindex, delete, restore, publish and follow channels; R: resolve, cache, refresh, offline, follow channels; V: resolve ordered members, follow channels; F: publish, resolve, reindex, publish and follow channels (one node)",
+      "operations": "L: publish, resolve, reindex, delete, restore, publish and follow channels; R: resolve, cache, refresh, offline, follow channels; V: first readable narinfo/NAR/channel holder; Nix signature verification and offline remote substitution; F: publish, resolve, reindex, publish and follow channels (one node)",
       "route": "GET/HEAD/PUT/DELETE /artifactory/api/nix/{repo-key}/{path}; POST /artifactory/api/nix/{repo-key}/reindex",
       "metadata": "bounded narinfo and NAR integrity, Ed25519 signature generation and verification, channel tarball (nixexprs.tar.xz) check",
       "lifecycle": "reindex, delete, restore",
@@ -642,7 +1021,15 @@
       "evidence": "test/acceptance/features/nix.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/nix-repositories",
       "route_file": "internal/artifacts/ecosystem/nix/http/nix.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "first member wins",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/nix.feature",
+          "anchor": "Nix verifies a remote cache and substitutes with the upstream offline"
+        }
+      ]
     },
     {
       "type": "machinelearning",
@@ -658,7 +1045,8 @@
       "evidence": "test/acceptance/features/machinelearning.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/machine-learning-repositories",
       "route_file": "internal/artifacts/ecosystem/machinelearning/http/protocol.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "not supported"
     },
     {
       "type": "aieditorextensions",
@@ -674,7 +1062,8 @@
       "evidence": "test/acceptance/features/ai_editor_extensions.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/ai-editor-extension-repositories",
       "route_file": "internal/artifacts/ecosystem/aieditorextensions/http/aieditorextensions.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "not supported"
     },
     {
       "type": "jetbrainsplugins",
@@ -690,7 +1079,8 @@
       "evidence": "test/acceptance/features/jetbrainsplugins.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/jetbrains-plugins-repositories",
       "route_file": "internal/artifacts/ecosystem/jetbrainsplugins/http/protocol.go",
-      "p9c": true
+      "p9c": true,
+      "virtual": "not supported"
     },
     {
       "type": "releasebundles",
@@ -707,14 +1097,15 @@
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/adapters/http/items.go",
       "p9c": false,
-      "owner_phase": "P15/P24"
+      "owner_phase": "P15/P24",
+      "virtual": "not supported"
     },
     {
       "type": "luarocks",
       "catalog": true,
       "classes": "LRVF",
       "client": "luarocks",
-      "operations": "native publish/resolve and lifecycle per linked acceptance",
+      "operations": "L/F: hosted protocols (one node); R: upstream resolve/cache/offline; V: merged manifest; LuaRocks mixed resolve and DDR publication",
       "route": "native format route and/or /artifactory/{repo-key}/{path}",
       "metadata": "format-owned metadata and index",
       "lifecycle": "see evidence or owner",
@@ -723,7 +1114,15 @@
       "evidence": "test/acceptance/features/luarocks_local.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/luarocks/http/luarocks.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "native merge",
+      "virtual_evidence": [
+        {
+          "kind": "client",
+          "path": "test/acceptance/features/luarocks_virtual.feature",
+          "anchor": "virtual publication and mixed install with offline cached member"
+        }
+      ]
     },
     {
       "type": "nimmodel",
@@ -739,7 +1138,8 @@
       "evidence": "test/acceptance/features/nimmodel_remote.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/nimmodel/http/nimmodel.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "not supported"
     },
     {
       "type": "skills",
@@ -755,7 +1155,8 @@
       "evidence": "test/acceptance/features/skills.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/skills/http/skills.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "not supported"
     },
     {
       "type": "agentplugins",
@@ -771,7 +1172,8 @@
       "evidence": "test/acceptance/features/agent_plugins_clients.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/agentplugins/http/agentplugins.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "not supported"
     },
     {
       "type": "agentpackages",
@@ -787,7 +1189,8 @@
       "evidence": "test/acceptance/features/agent_packages.feature",
       "source": "https://docs.jfrog.com/artifactory/docs/connect-your-package-manager-to-artifactory",
       "route_file": "internal/artifacts/ecosystem/agentpackages/http/agentpackages.go",
-      "p9c": false
+      "p9c": false,
+      "virtual": "not supported"
     }
   ]
 }

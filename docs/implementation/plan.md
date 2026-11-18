@@ -1091,13 +1091,40 @@ tickets are the only gates, so a ticket starts as soon as its blockers have merg
 
 Decision: [0008](../research/decisions/0008-virtual-repositories.md).
 
-**Tasks**
-1. Ordered resolution, `defaultDeploymentRepo`, `artifactoryRequestsCanRetrieveRemoteArtifacts`, `hideUnauthorizedResources`.
-2. Per-format merging with `virtualRetrievalCachePeriodSecs`.
+**Delivered implementation**
 
-**Exit criteria**
-- Each client resolves through a virtual over local plus remote members, including Go.
-- `artifactory_virtual_*_repository` for the eight types apply, plan clean, destroy. **M3.**
+- The shared engine implements effective priority order, nesting/cycle handling,
+  member miss/denial rules, hiding, patterns, upstream-origin controls, per-process
+  merged metadata, DDR deployment and stored/browse views
+  ([engine tickets](https://github.com/weaveplatform/artifactweave/issues/1521)).
+- Maven-family item paths add merged metadata, cross-member version/snapshot
+  selection, POM cleanup and independent virtual-to-member read layouts
+  ([family tickets](https://github.com/weaveplatform/artifactweave/issues/1524)).
+  [npm](https://github.com/weaveplatform/artifactweave/issues/1525),
+  [PyPI](https://github.com/weaveplatform/artifactweave/issues/1527),
+  [NuGet](https://github.com/weaveplatform/artifactweave/issues/1526),
+  [Helm](https://github.com/weaveplatform/artifactweave/issues/1523),
+  [Go](https://github.com/weaveplatform/artifactweave/issues/1522),
+  [Terraform](https://github.com/weaveplatform/artifactweave/issues/1529) and
+  [Docker/OCI/Helm OCI](https://github.com/weaveplatform/artifactweave/issues/1520) implement
+  their format-specific resolution and documented publication paths; the 23 P9b/P9c
+  adapters use the shared walk. The [format matrix](package-format-matrix.md) names
+  the mechanism and anchored client/server evidence separately for all 49 types.
+- The [virtual operations guide](../operations/virtual-repositories.md) records
+  R1–R10, family exceptions and known open defects. Its
+  [inference register](../operations/virtual-repositories.md#inference-register)
+  links the existing #216 entries; these remain pending vendor comparison.
+- The [Terraform virtual configuration scenario](../../deploy/artifactweave/terraform/virtual-repositories)
+  implements apply, clean plan and destroy for the provider-supported virtual
+  resources ([QUA-01](https://github.com/weaveplatform/artifactweave/issues/1531)).
+
+**M3 qualification boundary**
+
+The retained native scenarios cover local plus remote resolution, including Go,
+and the family-specific DDR publication flows. This is an implementation/evidence
+map, not the combined qualification record. [QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571)
+retains the final M3 run, decision 0008 acceptance and the phase status change.
+P13 owns peer federation and P35 owns multi-node cache coordination.
 
 ## P11: Projects, webhooks, retention, replication
 

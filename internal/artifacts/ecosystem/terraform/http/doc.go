@@ -104,6 +104,11 @@
 //
 // Implemented P8, with remote modules and providers in P9. Moved here in P9d.
 //
+// P10 delivers virtual module/provider registry and provider mirror reads,
+// member-bound signed bundle selection and static module source rewriting. Native
+// Terraform init uses mixed members; this does not imply native publication APIs.
+// See docs/operations/virtual-repositories.md for family evidence and limits.
+//
 // # Testing
 //
 //   - terraform_test.go and providers_test.go: the module and provider

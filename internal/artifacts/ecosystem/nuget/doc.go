@@ -127,7 +127,7 @@
 //     https://docs.jfrog.com/artifactory/docs/migration-tool.
 //   - Target layout: docs/research/architecture-options/5-modular-monolith.md,
 //     line 231 (ecosystem/nuget), line 379 (one slice per package type),
-//     line 658 (remote_empty_feed.go), line 664 (the P10 virtual.go) and
+//     line 658 (remote_empty_feed.go), line 664 (virtual.go) and
 //     lines 997 and 1014 (the mapping rows).
 //   - Plan: docs/implementation/plan.md#p8-pypi-nuget-helm-terraform-locals,
 //     #p9-remote-repositories and #p9d-modular-monolith-migration, epic ECO
@@ -142,13 +142,12 @@
 //
 // # Status
 //
-// Implemented P8, with remote retrieval, the remote v2 feed and symbols
-// included, in P9. Moved here in P9d. Virtual v3 discovery, flat containers,
-// registration and bounded search/autocomplete are implemented in P10 (#1548).
-// Virtual V2 feeds, counts and downloads are implemented by #1562.
-// Virtual publication maps to a local/federated deployment member; symbol
-// reads aggregate eligible members. Virtual reindex accepts without own work,
-// and normalized virtual saves require normalized member descriptors (#1569).
+// Implemented P8 local/P9 remote protocols, moved here in P9d. P10 delivers
+// V3 registration/search, V2 feeds and member-bound package downloads (#1548,
+// #1562); DDR package/symbol pushes, first-readable symbol lookup, forced virtual
+// authentication, normalized membership and Manage-gated no-op reindex (#1569).
+// The virtual guide distinguishes native restore/push evidence from server
+// refusal controls and the remaining P19 comparison.
 //
 // # Testing
 //

@@ -5,8 +5,7 @@ repository key. Native remote adapters have separate guides for
 [Maven-family](maven-remote-repositories.md), [Docker/OCI/Helm OCI](registry-remote.md),
 [npm](npm-remote.md), [Python](pypi-remote.md), [NuGet v2/v3 and symbols](nuget-remote.md),
 [classic Helm](helm-remote.md), [Terraform modules](terraform-remote-modules.md)
-and [Terraform providers](terraform-remote-providers.md). Virtual fetching
-belongs to P10 and project-scoped sources to P11; see the
+and [Terraform providers](terraform-remote-providers.md). Virtual item fetching and native Go aggregation are implemented below; project-scoped sources remain owned by P11; see the
 [capability roadmap](../implementation/capability-roadmap.md). The generic endpoint
 does not substitute for a native package protocol.
 
@@ -151,3 +150,25 @@ compatibility behavior retains the retrieval contract's RC-2/P19 comparison obli
 initial/TTL user-property synchronization, durable cached-download counts and
 confirmed source absence under their individual flags. Its operational bounds and
 current-version qualification limits are documented separately.
+
+## Virtual repositories
+
+Generic item downloads walk local/federated members, remote caches and remote
+upstreams in effective priority order. The selected real member owns the bytes
+and permissions. PUT targets a local/federated DDR; DELETE and transfer operations
+retain the [shared virtual rules](virtual-repositories.md)' refusals. A cache alias never fetches upstream.
+
+[Native curl/JF scenarios](../../test/acceptance/features/generic_remote.feature)
+cover cold fetch, offline reuse, member-only grants, browsing and origin markers;
+[item publication](../../test/acceptance/features/artifacts.feature) covers the DDR.
+
+### Go virtual repositories
+
+Use the virtual Go proxy endpoint for ordinary `go` resolution. Version lists
+union member versions; `.info`, `.mod` and `.zip` retain the first eligible
+member's content and current source policy. `jf go` publishes through the DDR;
+Go/JF [mixed resolution/publication scenarios](../../test/acceptance/features/go.feature)
+use a local module plus a private remote dependency. No R8 merged-document TTL
+is applied. Closed Go refusal/merge choices remain [I] in the
+[read entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6946764751)
+and [publication entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6948049781).

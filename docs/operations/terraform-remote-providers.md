@@ -198,3 +198,7 @@ P28/#668 and does not change provider signature requirements.
 Protocol references: [provider registry](https://developer.hashicorp.com/terraform/internals/provider-registry-protocol),
 [network mirror](https://developer.hashicorp.com/terraform/internals/provider-network-mirror-protocol),
 and [JFrog repository settings](https://docs.jfrog.com/artifactory/docs/terraform-opentofu-and-terraform-backend-repositories#remote-terraform-repository).
+
+The [shared virtual rules](virtual-repositories.md) cover common order, hiding,
+patterns and member policy. Native Terraform publication is not implied by module
+or provider resolution; the delivered generic item/DDR path remains separate.

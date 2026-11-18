@@ -6,6 +6,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -24,21 +27,30 @@ type catalog struct {
 }
 
 type row struct {
-	Type       string `json:"type"`
-	Catalog    bool   `json:"catalog"`
-	P9c        bool   `json:"p9c"`
-	Classes    string `json:"classes"`
-	Client     string `json:"client"`
-	Operations string `json:"operations"`
-	Route      string `json:"route"`
-	RouteFile  string `json:"route_file"`
-	Metadata   string `json:"metadata"`
-	Lifecycle  string `json:"lifecycle"`
-	Status     string `json:"status"`
-	OwnerIssue int    `json:"owner_issue"`
-	OwnerPhase string `json:"owner_phase,omitempty"`
-	Evidence   string `json:"evidence"`
-	Source     string `json:"source"`
+	Type            string         `json:"type"`
+	Catalog         bool           `json:"catalog"`
+	P9c             bool           `json:"p9c"`
+	Classes         string         `json:"classes"`
+	Client          string         `json:"client"`
+	Operations      string         `json:"operations"`
+	Route           string         `json:"route"`
+	RouteFile       string         `json:"route_file"`
+	Metadata        string         `json:"metadata"`
+	Lifecycle       string         `json:"lifecycle"`
+	Status          string         `json:"status"`
+	OwnerIssue      int            `json:"owner_issue"`
+	OwnerPhase      string         `json:"owner_phase,omitempty"`
+	Evidence        string         `json:"evidence"`
+	Source          string         `json:"source"`
+	Virtual         string         `json:"virtual"`
+	VirtualEvidence []virtualProof `json:"virtual_evidence,omitempty"`
+}
+
+// virtualProof distinguishes implemented protocol behavior from client evidence.
+type virtualProof struct {
+	Kind   string `json:"kind"`
+	Path   string `json:"path"`
+	Anchor string `json:"anchor"`
 }
 
 func main() {
@@ -117,6 +129,9 @@ func validate(c catalog) error {
 		if r.Classes != classes {
 			return fmt.Errorf("%s class drift: catalog %q, registered %q", typ, r.Classes, classes)
 		}
+		if err := validateVirtual(r); err != nil {
+			return err
+		}
 		if r.Client == "" || r.Operations == "" || r.Route == "" || r.RouteFile == "" ||
 			r.Metadata == "" ||
 			r.Lifecycle == "" {
@@ -181,6 +196,66 @@ func validate(c catalog) error {
 	return nil
 }
 
+func validateVirtual(r row) error {
+	switch r.Virtual {
+	case "native merge", "item routes", "first member wins", "not supported":
+	default:
+		return fmt.Errorf("%s has unknown virtual mechanism %q", r.Type, r.Virtual)
+	}
+	if strings.Contains(r.Classes, "V") != (r.Virtual != "not supported") {
+		return fmt.Errorf("%s virtual mechanism contradicts registered classes", r.Type)
+	}
+	if r.Virtual == "not supported" {
+		if len(r.VirtualEvidence) != 0 || strings.Contains(r.Operations, "V:") {
+			return fmt.Errorf("%s unsupported virtual claims evidence or operations", r.Type)
+		}
+		return nil
+	}
+	if len(r.VirtualEvidence) == 0 || !strings.Contains(r.Operations, "V:") {
+		return fmt.Errorf("%s virtual operations and evidence are required", r.Type)
+	}
+	for _, proof := range r.VirtualEvidence {
+		if err := validateVirtualProof(proof); err != nil {
+			return fmt.Errorf("%s virtual evidence: %w", r.Type, err)
+		}
+	}
+	return nil
+}
+
+func validateVirtualProof(p virtualProof) error {
+	if p.Kind != "client" && p.Kind != "server" {
+		return fmt.Errorf("unknown evidence kind %q", p.Kind)
+	}
+	if p.Anchor == "" || p.Path == "" {
+		return errors.New("path and scenario/test anchor are required")
+	}
+	body, err := os.ReadFile(filepath.Clean(p.Path))
+	if err != nil {
+		return err
+	}
+	if strings.HasSuffix(p.Path, ".feature") {
+		for _, line := range strings.Split(string(body), "\n") {
+			line = strings.TrimSpace(line)
+			for _, prefix := range []string{"Scenario: ", "Scenario Outline: "} {
+				if strings.TrimPrefix(line, prefix) == p.Anchor && strings.HasPrefix(line, prefix) {
+					return nil
+				}
+			}
+		}
+	} else if strings.HasSuffix(p.Path, "_test.go") && strings.HasPrefix(p.Anchor, "TestAcc") {
+		file, err := parser.ParseFile(token.NewFileSet(), p.Path, body, 0)
+		if err != nil {
+			return fmt.Errorf("parse acceptance evidence: %w", err)
+		}
+		for _, decl := range file.Decls {
+			if fn, ok := decl.(*ast.FuncDecl); ok && fn.Recv == nil && fn.Name.Name == p.Anchor {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("missing acceptance scenario/test %q in %s", p.Anchor, p.Path)
+}
+
 func render(c catalog) []byte {
 	rows := append([]row(nil), c.Rows...)
 	sort.Slice(rows, func(i, j int) bool { return rows[i].Type < rows[j].Type })
@@ -201,11 +276,15 @@ func render(c catalog) []byte {
 		&b,
 		"[Source conflicts, target-version questions and architecture contracts](package-format-inventory-notes.md) explain the class boundaries behind this matrix.\n\n",
 	)
+	fmt.Fprint(
+		&b,
+		"Virtual resolution describes the implementation mechanism, independently of evidence strength. `client` links a retained native-client acceptance scenario; `server` links protocol acceptance only. Neither claims P10 sign-off or cross-peer federation. See [virtual operation rules and family limits](../operations/virtual-repositories.md).\n\n",
+	)
 	fmt.Fprintln(
 		&b,
-		"| Type | Guide catalog | Registered classes | Client | Client operations by class | Current route | Metadata | Lifecycle | State / owner | Evidence / source |",
+		"| Type | Guide catalog | Registered classes | Virtual resolution | Client | Client operations by class | Current route | Metadata | Lifecycle | State / owner | Evidence / source |",
 	)
-	fmt.Fprintln(&b, "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+	fmt.Fprintln(&b, "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
 	for _, r := range rows {
 		catalog := "yes"
 		if !r.Catalog {
@@ -226,12 +305,18 @@ func render(c catalog) []byte {
 		if r.Evidence != "" {
 			evidence = "[test](../../" + r.Evidence + "), " + evidence
 		}
+		virtual := r.Virtual
+		for _, proof := range r.VirtualEvidence {
+			label := strings.NewReplacer("<", "&lt;", ">", "&gt;", "|", "\\|").Replace(proof.Anchor)
+			virtual += fmt.Sprintf(" [%s: %s](../../%s)", proof.Kind, label, proof.Path)
+		}
 		fmt.Fprintf(
 			&b,
-			"| `%s` | %s | %s | %s | %s | `%s` ([owner](../../%s)) | %s | %s | %s | %s |\n",
+			"| `%s` | %s | %s | %s | %s | %s | `%s` ([owner](../../%s)) | %s | %s | %s | %s |\n",
 			r.Type,
 			catalog,
 			r.Classes,
+			virtual,
 			r.Client,
 			r.Operations,
 			r.Route,

@@ -130,6 +130,10 @@
 // #760). Moved here in P9d. Merger added in P10
 // (https://github.com/weaveplatform/artifactweave/issues/1551).
 //
+// Delivered virtual mechanism and retained client/server evidence are mapped
+// in docs/operations/virtual-repositories.md and the generated type matrix.
+// P13 peer federation and P35 coordination remain separate.
+//
 // # Testing
 //
 //   - package_test.go and corruption_test.go: ReadPackage on a genuine

@@ -87,6 +87,11 @@
 // Implemented P8, with remote retrieval in P9. Moved here in P9d. P10 HLM-01
 // adds merged virtual indexes and member chart/provenance downloads.
 //
+// P10 also delivers namespaced member-bound chart/provenance selection and
+// guarded external chart URLs, with member-write invalidation through nested
+// containing virtual indexes and native URL-mode/publication controls.
+// See docs/operations/virtual-repositories.md for family evidence and limits.
+//
 // # Testing
 //
 //   - helm_test.go: repo add and pull, cold index reads, refusals and index

@@ -84,6 +84,10 @@
 // and federated members. The ecosystem Merger retains winning releases and
 // advisory associations, and the protocol signs the resulting registry.
 //
+// Delivered virtual mechanism and retained client/server evidence are mapped
+// in docs/operations/virtual-repositories.md and the generated type matrix.
+// P13 peer federation and P35 coordination remain separate.
+//
 // # Testing
 //
 //   - package_test.go and terms_test.go: the public decimal and ecto

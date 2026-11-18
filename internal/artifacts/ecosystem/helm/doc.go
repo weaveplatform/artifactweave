@@ -92,11 +92,11 @@
 //
 // # Status
 //
-// Implemented P8 (Helm local repositories), with remote repositories in P9.
-// Moved here in P9d. P10 HLM-01 adds the pure virtual index Merger and
-// post-commit invalidation of containing virtual indexes, including nesting.
-// HLM-02 adds member-qualified and external URLs and exclusive namespace reads;
-// publishing through the default deployment repository refreshes the same index.
+// Implemented P8 local/P9 remote protocols, moved here in P9d. P10 delivers
+// the pure index Merger, visibility-keyed index cache and post-commit invalidation
+// through containing virtuals (#1558), plus namespaced member selection and guarded
+// external chart retrieval (#1565). Native Helm scenarios retain relative-URL,
+// namespace, local/remote and publication controls. See the virtual guide.
 //
 // # Testing
 //

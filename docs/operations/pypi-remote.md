@@ -4,12 +4,7 @@ P9 issue [#627](https://github.com/weaveplatform/artifactweave/issues/627) imple
 remote Python simple indexes, Warehouse JSON metadata, wheels, source distributions,
 PEP 658/714 metadata sidecars and explicitly advertised detached `.asc` signatures.
 Uploads remain refused. Existing local and federated upload and lifecycle behavior is
-unchanged. Virtual PyPI repositories now serve reads over local and remote members;
-the detailed protocol and compatibility rules are recorded in
-[decision 0037](../research/decisions/0037-pypi.md#p10-virtual-python-reads-pyp-01).
-Virtual publication uses a configured local or federated `defaultDeploymentRepo` and
-the target's Write permissions. Twine/uv publish to the virtual's base URL, while
-pip/uv install from `/simple/`; see [the publication contract](../research/decisions/0037-pypi.md#p10-virtual-python-publication-pyp-02).
+unchanged. Virtual behavior is described in the section below.
 
 Configure a remote repository with `packageType: "pypi"`. `pyPIRegistryUrl` is the
 registry API base (default `https://pypi.org`); `pyPIRepositorySuffix` is appended to
@@ -91,3 +86,25 @@ delivery; the controlled pip/uv source fixture uses this observed header too.
 The label was first tracked by
 [#697](https://github.com/weaveplatform/artifactweave/issues/697), found by the
 public conformance work in #638 rather than a vendor parity capture.
+
+## Virtual repositories
+
+Virtual PyPI repositories now serve reads over local and remote members;
+the detailed protocol and compatibility rules are recorded in
+[decision 0037](../research/decisions/0037-pypi.md#p10-virtual-python-reads-pyp-01).
+Virtual publication uses a configured local or federated `defaultDeploymentRepo` and
+the target's Write permissions. Twine/uv publish to the virtual's base URL, while
+pip/uv install from `/simple/`; see [the publication contract](../research/decisions/0037-pypi.md#p10-virtual-python-publication-pyp-02).
+
+HTML/JSON simple indexes and Warehouse documents merge
+readable members per request, retaining a version's winning distribution and
+rewritten virtual URLs; JSON capability and wheel metadata rules are unchanged.
+The [native scenarios](../../test/acceptance/features/pypi_virtual.feature)
+cover mixed transitive installs, cold client state and both publishers.
+
+The [shared virtual rules](virtual-repositories.md) describe own/nested patterns and no-target refusal.
+The cold stored canonical/policy-path mismatch remains the known unmerged
+[#1670](https://github.com/weaveplatform/artifactweave/issues/1670) limitation;
+this guide does not claim its pending repair is delivered. Closed response
+choices remain [I] in the [read entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6955912161)
+and [publication entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6959812942).

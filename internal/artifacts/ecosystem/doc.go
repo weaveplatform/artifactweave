@@ -87,11 +87,12 @@
 // npm's options. P8 added PyPI, NuGet, Helm, Terraform and the Terraform
 // backend, with the settings of PyPI, Helm and the Terraform backend; P9b
 // and P9c added the formats they implemented, and P9c conda's settings.
-// Moved here in P9d. Roadmap: the slices move below this directory with their
-// ECO tickets, the artifacts settings are built from Settings
-// (https://github.com/weaveplatform/artifactweave/issues/1093), and the
-// module constructor wires the registry
-// (https://github.com/weaveplatform/artifactweave/issues/1094).
+// P9d completed the ecosystem slices, settings and module registry wiring.
+// P10 adds each format's virtual merger or first-holder protocol helper;
+// HTTP slices bind those helpers to the shared member/source policy. The
+// generated type matrix records delivered mechanisms and native-client versus
+// server evidence separately. See docs/operations/virtual-repositories.md;
+// #1571 owns final phase qualification, P13 peer federation and P35 coordination.
 //
 // # Testing
 //

@@ -78,12 +78,11 @@
 //
 // # Status
 //
-// Implemented P8 (PyPI local repositories), with remote repositories in
-// P9. Moved here in P9d. P10 virtual.go merges readable project records
-// with priority and complete filename ownership; the HTTP adapter serves
-// virtual simple/Warehouse metadata, distributions and wheel metadata. PYP-02
-// maps multipart uploads and package PUTs to the deployment target under its
-// permissions and admission rules, with immediate virtual read-back.
+// Implemented P8 local/P9 remote protocols, moved here in P9d. P10 delivers
+// per-request readable-project merges, virtual simple/Warehouse/distribution and
+// wheel-metadata reads (#1549), and Twine/uv publication through the DDR with its
+// actual path permissions and immediate read-back (#1563). Native evidence and
+// known cold-cache policy-path issue #1670 are recorded in the virtual guide.
 //
 // # Testing
 //

@@ -31,9 +31,6 @@
 //     MemberWritten, the written member's key and Containing, a Repos that
 //     lists the virtual repositories naming a key (port.RepoStore).
 //
-// Planned: artifactoryRequestsCanRetrieveRemoteArtifacts (target layout,
-// lines 659-665; decision 0008).
-//
 // # Outputs
 //
 //   - resolve.go: Members, a virtual repository's real members in 7.x's
@@ -62,8 +59,8 @@
 //     first), Accepts (both repositories' patterns, for a merged list
 //     filtered before it is paged, R5), and APIBase and ItemBase, the
 //     virtual repository's URL a merged document points at. The formats'
-//     Mergers so far: gems.Merger, luarocks.Merger and pub.Merger
-//     (https://github.com/weaveplatform/artifactweave/issues/1538).
+//     Mergers are listed with their client/server evidence in
+//     docs/implementation/package-format-matrix.md.
 //   - cache.go: Cache, the process's merged metadata, each Entry kept by
 //     CacheKey (virtual repository, document, member list, the members the
 //     caller reads, base URL) and fresh for the virtual repository's period
@@ -107,60 +104,32 @@
 //     https://github.com/weaveplatform/artifactweave/issues/958 holds the
 //     map.
 //   - Decision 0008: docs/research/decisions/0008-virtual-repositories.md,
-//     rules R1 to R8, with their Artifactory 7.161.26 sources.
+//     rules R1 to R11, with their Artifactory 7.161.26 sources.
 //   - Decision 0044:
 //     docs/research/decisions/0044-modular-monolith-migration.md,
 //     "Placeholders".
 //
 // # Status
 //
-// Implemented P10: member order and nesting (Members, Walk;
-// https://github.com/weaveplatform/artifactweave/issues/1252); the walk's
-// fall-through and the item route's not-found, forbidden and hidden
-// answers (Resolution, Answer;
-// https://github.com/weaveplatform/artifactweave/issues/1533); the
-// deploy target (DeployTarget;
-// https://github.com/weaveplatform/artifactweave/issues/1534); the item
-// route's upstream steps, which itemkit takes in Resolve's order
-// (https://github.com/weaveplatform/artifactweave/issues/1535); and the
-// merge contract (Merger, Collect and its helpers;
-// https://github.com/weaveplatform/artifactweave/issues/1536); the
-// merged metadata cache (Cache;
-// https://github.com/weaveplatform/artifactweave/issues/1543), which the
-// families wire into their merges; RubyGems, LuaRocks and Dart pub
-// virtual repositories on it, each with its Merger in
-// ecosystem/<type>/virtual.go
-// (https://github.com/weaveplatform/artifactweave/issues/1538); and Git LFS
-// and Hugging Face on Members' Package walk and DeployTarget, their tests in
-// their ecosystem/<type>/http packages
-// (https://github.com/weaveplatform/artifactweave/issues/1540). The storage
-// API's views and the folder index of a virtual repository read its members
-// through Stored and Walk
-// (https://github.com/weaveplatform/artifactweave/issues/1537). The rest of
-// the package is planned for P10's other tickets
-// (https://github.com/weaveplatform/artifactweave/issues/1521).
+// Delivered P10: effective priority ordering, nesting/cycle/duplicate handling,
+// configuration-compatible deployment mapping, miss/denial/hiding answers,
+// origin-restricted upstream steps and per-process merged metadata. Item routes,
+// storage views, browsing and all adopted package handlers use the shared walk.
+// Formats own their metadata mergers, first-holder choices, write routes and
+// cache invalidation; the generated type matrix records their mechanisms and
+// separate client/server evidence. Item read sessions supply request-local layouts;
+// core takes a caller-supplied translator and imports no ecosystem adapter.
 //
-// Formats that implement Merger: Bower (Names, Versions), CocoaPods
-// (Index), Composer (Releases) and Swift (Releases), each in its
-// ecosystem/<type>/virtual.go
-// (https://github.com/weaveplatform/artifactweave/issues/1539). Of these
-// four, only Composer keeps a merged document in Cache (its p2 metadata),
-// as 7.161.26 saves a period for a Composer virtual repository alone among
-// them (https://github.com/weaveplatform/artifactweave/issues/1652).
-// Alpine (APKINDEX.tar.gz), RPM (repodata) and Opkg (the feed) implement
-// it over their package rows, each in its ecosystem/<type>/virtual.go, and
-// keep Alpine's and RPM's merges in Cache
-// (https://github.com/weaveplatform/artifactweave/issues/1551).
-// Debian (its dists/ metadata) and CRAN (PACKAGES) implement it the same
-// way and keep their merges in Cache; P2's composite takes its children's
-// order and visited set from Members and Walk
-// (https://github.com/weaveplatform/artifactweave/issues/1552).
+// Deployment lands in a local/federated DDR with its actual path admission.
+// Package protocols retain native refusal envelopes. Cached merges are bounded,
+// keyed by current whole-member visibility and request base URL; path-scoped
+// readers merge per request. Helm explicitly invalidates containing indexes;
+// other member writes do not implicitly invalidate metadata. Source/cache and
+// current-authority policy remain the caller's responsibility at every member.
 //
-// Ansible and Chef (Releases), Puppet (Releases) and Conda (Merger, one
-// subdir's channel index) implement it, each in its
-// ecosystem/<type>/virtual.go; Chef keeps its cookbook and version records
-// in Cache, and Conda each remote member's part of an index
-// (https://github.com/weaveplatform/artifactweave/issues/1553).
+// See docs/operations/virtual-repositories.md for R1-R10, family evidence and
+// known open defects. #1571 owns final P10 qualification/decision acceptance;
+// P13 owns cross-peer federation and P35 multi-node cache coordination.
 //
 // # Testing
 //

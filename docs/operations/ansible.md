@@ -106,3 +106,14 @@ corrupt archive refusal with no cached item, and invalid-credential publish/inst
 full and Ansible-scoped CI profiles. Package acceptance tests cover lifecycle,
 permissions, member priority, pagination, refresh and upstream failure. The shared
 format contract exercises copy/move, delete, restore and reindex across its stores.
+
+## Virtual repositories
+
+Galaxy collection versions merge readable real members; archive URLs preserve
+the selected member and stay on the virtual. The existing remote/nested behavior
+and DDR publication described above use the [shared virtual rules](virtual-repositories.md). This adapter
+merges per request. [Native Galaxy evidence](../../test/acceptance/features/ansible.feature)
+covers remote plus nested local dependencies and publication; inferred cache
+choices remain in the [ADP-04 #216 entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6893506348) [I].
+That entry's older cached-as-Chef proposal predates the merged per-request
+implementation documented in decision 0008; the comparison remains open.
