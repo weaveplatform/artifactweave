@@ -513,10 +513,11 @@ boundaries, rather than inferred from every error returned by the content reader
 A remote cached-content open has a narrow `ContentOpenError` origin marker;
 its ordinary direct-source error text, cause and HTTP classification stay the
 same. Only this interceptor excludes that content origin from lookup tagging.
-Shared source normalization can already have erased an unmarked SQL lookup
-cause before the interceptor sees it; [#1692](https://github.com/weaveplatform/artifactweave/issues/1692)
-tracks that separate cross-kind limitation. This fix does not globally change
-`safeError` or reconstruct a lost cause from an arbitrary gateway response.
+[#1692](https://github.com/weaveplatform/artifactweave/issues/1692) preserves
+an existing trusted `kernel.ErrStore` through shared source sanitization, so a
+source-identity/cache-entry statement failure reaches this lookup boundary intact.
+It does not reconstruct a lost store cause from an arbitrary gateway response;
+the interceptor's independent content-phase exclusion remains in force.
 
 Content acquisition and reads deliberately retain their tolerant merge behavior:
 a failed member contributes nothing, allowing a partial merge from healthy

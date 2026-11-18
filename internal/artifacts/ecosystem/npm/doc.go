@@ -80,10 +80,13 @@
 //
 // # Status
 //
-// Implemented P7 (npm local repositories), with remote repositories in P9.
-// Moved here in P9d. P10 virtual.go merges packuments and dist-tags; the HTTP
-// adapter renders request-specific documents and resolves immutable tarballs.
-// Virtual writes, authentication, search and keys remain separate P10 tickets.
+// Implemented P7 local/P9 remote protocols, moved here in P9d. P10 delivers
+// packument/dist-tag and signing-key merges, request-specific rendering, immutable
+// member-bound tarballs, DDR publication/tag/deprecation/unpublish, and separate
+// legacy account/token authentication;
+// live virtual search and guarded external-dependency rewriting (#1561, #1566,
+// #1567, #1319, #1568). Vulnerability audit proxying remains P28; browser login
+// remains P21. See docs/operations/virtual-repositories.md and npm-remote.md.
 //
 // # Testing
 //

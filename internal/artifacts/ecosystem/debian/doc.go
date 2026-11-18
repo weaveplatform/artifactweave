@@ -166,6 +166,10 @@
 // Implemented P9c, which delivered the plan's P29 group (issues #757 to
 // #760). Moved here in P9d.
 //
+// Delivered virtual mechanism and retained client/server evidence are mapped
+// in docs/operations/virtual-repositories.md and the generated type matrix.
+// P13 peer federation and P35 coordination remain separate.
+//
 // # Testing
 //
 //   - binary_test.go, binary_security_test.go and real_fixture_test.go:

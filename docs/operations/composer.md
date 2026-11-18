@@ -21,3 +21,12 @@ Run `composer install --prefer-dist`. For an authenticated repository, configure
 The metadata's `dist.url` points back through the same Composer repository, preserving the member a virtual repository took each version from and caller permissions. Hosted downloads carry the archive's SHA-1 `shasum`; remote downloads validate upstream metadata, the declared SHA-1 when present, and the ZIP's package identity. Remote metadata and artifacts use the shared source cache and transport policy. For an offline read of already cached content, use the repository's `-cache` alias in the Composer URL. A cache miss stays a miss and does not contact the upstream.
 
 `POST /artifactory/api/composer/<repo>/reindex` requires Manage on a local or federated repository and verifies every stored archive. The metadata view is derived from current items, so deletion and restoration appear immediately without waiting for an index job. A virtual repository's `p2` metadata is the union of its members' releases, local members before remote ones and nested virtual repositories included; each version, and its dist, comes from the first member that lists it, so `composer require` of a version only a later member holds installs. A member that misses, fails or that the caller may not read is passed over, a failing one with a warning in the server log, and Read on the members is enough to resolve through the virtual repository. The merged `p2` metadata is kept for the virtual repository's `virtualRetrievalCachePeriodSecs` (default 7200 seconds; 0 merges on every request), so a release added to a member shows through the virtual repository once the period ends. A caller who may read no member is refused `packages.json` with 403 (401 when anonymous). Cross-peer federation convergence belongs to P13.
+
+## Virtual repositories
+
+The p2 merge, first-version dist binding, period expiry and root permission gate
+described above follow the [shared virtual rules](virtual-repositories.md). Composer 2 is required for the
+remote/virtual path. [Native scenarios](../../test/acceptance/features/composer.feature)
+prove first-member duplicates and a version only a later member holds. Cache and
+whole-repository gate choices remain [I] in the
+[existing #216 corrections](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6941939885).

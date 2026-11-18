@@ -126,7 +126,7 @@
 //     format, four layouts), line 401 (the protocol's home,
 //     ecosystem/maven/http), line 655 (the upstream rules, which keep the
 //     names remote_backend.go and remote_eager.go here because remote.go
-//     was taken), line 664 (the P10 virtual.go) and lines 997 and 1014
+//     was taken), line 664 (virtual.go) and lines 997 and 1014
 //     (the mapping rows).
 //   - Plan: docs/implementation/plan.md#p7-npm-go-maven-locals,
 //     #p9-remote-repositories and #p9d-modular-monolith-migration, epic ECO
@@ -141,12 +141,12 @@
 //
 // # Status
 //
-// Implemented P7, with remote retrieval in P9. Moved here in P9d. P10
-// virtual.go implements POM repository-reference cleanup, called before an
-// item route returns a Maven-family or generic virtual POM. Roadmap:
-// MVN-01 adds the Merger of virtual maven-metadata.xml. MVN-02 supplies the
-// format hook for cross-member snapshot and release-token selection, retaining
-// the original virtual layout's mode decision and the member resolver contracts.
+// Implemented P7 local/P9 remote protocols, moved here in P9d. P10 delivers
+// merged maven-metadata.xml, cross-member version/snapshot selection and POM
+// repository cleanup (#1545, #1546, #1547), with native publication/resolution
+// qualification scenarios (#1559). Item-route read layouts translate directly
+// from the addressed virtual to each member (#1560); write/copy/move behavior
+// retains its existing contract. See docs/operations/virtual-repositories.md.
 //
 // # Testing
 //

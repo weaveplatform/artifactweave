@@ -10,12 +10,13 @@
 // # Inputs
 //
 //   - The catalog, docs/implementation/package-format-inventory.json by
-//     default (-inventory).
+//     default (-inventory), with per-type virtual mechanisms and separately
+//     reviewed client/server acceptance anchors.
 //
 // # Outputs
 //
 //   - The matrix, docs/implementation/package-format-matrix.md by default
-//     (-output).
+//     (-output), including the virtual resolution/evidence column.
 //   - With -check, a failure instead of a write when the catalog is invalid
 //     or the committed matrix differs.
 //
@@ -28,5 +29,8 @@
 //
 // # Status
 //
-// Implemented P9c (issue 755).
+// Implemented P9c (issue 755). P10 #1570 validates every virtual mechanism
+// against registered classes and retained scenario/test declarations, keeping
+// client evidence distinct from server protocol controls. It records delivery,
+// not P10 final qualification or P13 peer federation.
 package main

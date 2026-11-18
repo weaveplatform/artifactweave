@@ -781,6 +781,8 @@ func RPMSourceRequest(q source.Request) (source.Request, error) {
 	}
 	q.Resource.Kind = source.ResourceKindMetadata
 	q.Resource.PermissionFolder = true
+	// Read retains its folder scope; blackout and patterns check the file.
+	q.Resource.PolicyPath = p
 	switch {
 	case name == "repomd.xml":
 		q.Resource.Variant = "rpm-repomd-v1"

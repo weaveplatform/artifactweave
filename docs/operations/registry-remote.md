@@ -5,8 +5,7 @@ tag/digest manifests, indexes and their platform manifests, blobs, tags and OCI
 referrers. Repository-path, Artifactory-prefix and configured subdomain routing
 use the same local authentication challenge as local registries. Remote uploads,
 mounts and deletes are refused. Virtual repositories now resolve manifest/blob
-GET and HEAD through their local, federated and remote members. Other virtual
-operations remain in their P10 tickets.
+GET and HEAD through their local, federated and remote members. Virtual push, listings, timestamp tags and local referrers are implemented below.
 
 ```sh
 curl --fail --user admin "$REGISTRY/artifactory/api/repositories/dockerhub" \
@@ -81,6 +80,11 @@ Protocol sources checked 2026-10-22: [OCI Distribution v1.1.1](https://github.co
 and [Helm OCI registries](https://helm.sh/docs/topics/registries/).
 
 
+## Virtual repositories
+
+See the [shared virtual rules](virtual-repositories.md) for member order, origins,
+visibility and remote-policy behavior.
+
 A virtual uses the first readable member holding the requested tag, manifest digest
 or blob. Nested virtuals flatten in effective priority order; a priority member's
 miss still falls through. The virtual's own image-path patterns apply to admins
@@ -111,8 +115,7 @@ name, with ordinary REST item deployments retaining their full-path patterns.
 
 Manifest/blob DELETE through a virtual answers 400 with an empty body;
 `DeleteDockerTag` answers the Artifactory 400 envelope. Address the concrete member
-to delete a tag. Tag/catalog listings and referrers retain their current 405
-responses until their corresponding P10 tickets.
+to delete a tag. Catalog/tag listings and referrers are supported as described below.
 
 A virtual may enable `cachingLocalForeignLayersEnabled` to fetch a missing foreign
 layer named by a readable local/federated manifest through an allowed remote
@@ -122,3 +125,19 @@ apply. The blob is cached in the remote, preserving the local manifest. A cached
 blob remains available through normal member resolution when foreign fetching is
 subsequently disabled. Timestamp tags and virtual referrers are described in
 [decision 0031](../research/decisions/0031-docker-oci-registry.md).
+
+Catalog and tag endpoints return bounded sorted/deduplicated pages with virtual
+and member patterns applied before page cuts. Remote catalogs are read from that
+remote's own source/cache; configured project prefixes expose pullable names.
+Catalog ReadAny permits a path-scoped member reader to list all its image names
+from an admitted catalog; a cold fetch retains the remote cache-publication gate;
+tag lists still apply per-tag visibility. These are separate from manifest/blob
+selection and the digest-location hints. Timestamp tags choose the newest eligible
+local/federated manifest, effective order on ties, before considering remotes;
+digest resolution ignores that option. Virtual referrers require image Read first
+and union readable local/federated descriptors; remotes do not contribute by default.
+
+[crane/ORAS/Helm/Docker scenarios](../../test/acceptance/features/registry_virtual.feature)
+retain pull/push/timestamp/referrer and catalog/tag controls. Exact closed answers
+remain [I] in the [listing entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6969664218)
+and [timestamp/foreign-layer entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6972246717).

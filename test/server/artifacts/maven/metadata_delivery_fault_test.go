@@ -324,8 +324,9 @@ func TestAccVirtualMetadataContentFailureRetainsMemberDenial(t *testing.T) {
 
 type metadataCachedOpenFault struct {
 	blob.Store
-	target string
-	calls  *int
+	target  string
+	calls   *int
+	failure error
 }
 
 func (b metadataCachedOpenFault) Open(ctx context.Context, sha string) (io.ReadSeekCloser, blob.Info, error) {
@@ -333,71 +334,77 @@ func (b metadataCachedOpenFault) Open(ctx context.Context, sha string) (io.ReadS
 		return b.Store.Open(ctx, sha)
 	}
 	(*b.calls)++
-	return nil, blob.Info{}, fmt.Errorf("cached content open: %w", format.ErrStorageFault)
+	return nil, blob.Info{}, fmt.Errorf("cached content open: %w", b.failure)
 }
 
 func TestAccVirtualMetadataCachedContentAcquisitionKeepsPassover(t *testing.T) {
 	for _, backend := range []string{"sqlite", "postgres"} {
-		t.Run(backend, func(t *testing.T) {
-			w := metadataFaultWorld(t, repo.Maven, backend)
-			putMetadata(t, w, "second", virtualMetadataPath, virtualMetadata("2.0"), 100)
-			w.Repo.PriorityResolution = repo.Flex(true)
-			w.Update()
-			c, err := w.Runtime.Store.Repos().Get(t.Context(), "virtual")
-			if err != nil {
-				t.Fatal(err)
-			}
-			c.Repositories = []string{"remote", "second"}
-			if err = w.Runtime.Store.Repos().Update(t.Context(), c); err != nil {
-				t.Fatal(err)
-			}
-			raw := virtualMetadata("1.0")
-			w.Upstream.Set("/"+virtualMetadataPath, fakeupstream.Resource{Body: []byte(raw)})
-			path := "/artifactory/virtual/" + virtualMetadataPath
-			harness.WantStatus(t, w.Request("GET", path, "admin", ""), 200)
-			svc := *w.Runtime.Artifacts.RemoteSources()
-			backend, ok := svc.HTTP.(*mavenfmt.MavenBackend)
-			if !ok {
-				t.Fatalf("unexpected runtime backend %T", svc.HTTP)
-			}
-			copyBackend := *backend
-			originalPolicy := backend.Policy
-			// Reuse runtime dependencies, with fresh synchronization state. This plain
-			// controlled HTTP source has no smart peer to delegate back to the original.
-			policy := &remote.Policy{
-				MetadataChanged: originalPolicy.MetadataChanged,
-				Fetch:           originalPolicy.Fetch, GitFetch: originalPolicy.GitFetch,
-				PrepareUpload: originalPolicy.PrepareUpload, ProjectResponse: originalPolicy.ProjectResponse,
-				Store: originalPolicy.Store, Blobs: originalPolicy.Blobs, Items: originalPolicy.Items,
-				Pool: originalPolicy.Pool, Options: originalPolicy.Options, CheckCurrent: originalPolicy.CheckCurrent,
-				Key: originalPolicy.Key, Now: originalPolicy.Now, MetadataLimit: originalPolicy.MetadataLimit,
-			}
-			calls := 0
-			policy.Blobs = metadataCachedOpenFault{Store: policy.Blobs, target: pomSums(raw).SHA256, calls: &calls}
-			copyBackend.Policy = policy
-			svc.HTTP = &copyBackend
-			w.H = harness.Router(
-				harness.Config{
-					Store:         w.Runtime.Store,
-					Blobs:         w.Runtime.Blobs,
-					Auth:          w.Runtime.Auth,
-					Tokens:        w.Runtime.Tokens,
-					Keys:          w.Runtime.Keys,
-					RemoteSources: &svc,
-					RemoteHTTP:    w.Runtime.Artifacts.RemoteHTTP(),
-				},
-			)
-			// The same cached-content fault keeps the established direct source500.
-			harness.WantStatus(t, w.Request("GET", "/artifactory/remote/"+virtualMetadataPath, "admin", ""), 500)
-			calls = 0
-			response := w.Request("GET", path, "admin", "")
-			if calls != 1 {
-				t.Fatal("actual cached-blob Open boundary not exercised", calls)
-			}
-			harness.WantStatus(t, response, 200)
-			if !strings.Contains(response.Body.String(), "<version>2.0</version>") {
-				t.Fatal("healthy later member lost", response.Body.String())
-			}
-		})
+		for _, fault := range []struct {
+			name string
+			err  error
+		}{{"format-marker", format.ErrStorageFault}, {"database-marker", kernel.ErrStore}} {
+			t.Run(backend+"/"+fault.name, func(t *testing.T) {
+				w := metadataFaultWorld(t, repo.Maven, backend)
+				putMetadata(t, w, "second", virtualMetadataPath, virtualMetadata("2.0"), 100)
+				w.Repo.PriorityResolution = repo.Flex(true)
+				w.Update()
+				c, err := w.Runtime.Store.Repos().Get(t.Context(), "virtual")
+				if err != nil {
+					t.Fatal(err)
+				}
+				c.Repositories = []string{"remote", "second"}
+				if err = w.Runtime.Store.Repos().Update(t.Context(), c); err != nil {
+					t.Fatal(err)
+				}
+				raw := virtualMetadata("1.0")
+				w.Upstream.Set("/"+virtualMetadataPath, fakeupstream.Resource{Body: []byte(raw)})
+				path := "/artifactory/virtual/" + virtualMetadataPath
+				harness.WantStatus(t, w.Request("GET", path, "admin", ""), 200)
+				svc := *w.Runtime.Artifacts.RemoteSources()
+				backend, ok := svc.HTTP.(*mavenfmt.MavenBackend)
+				if !ok {
+					t.Fatalf("unexpected runtime backend %T", svc.HTTP)
+				}
+				copyBackend := *backend
+				originalPolicy := backend.Policy
+				// Reuse runtime dependencies, with fresh synchronization state. This plain
+				// controlled HTTP source has no smart peer to delegate back to the original.
+				policy := &remote.Policy{
+					MetadataChanged: originalPolicy.MetadataChanged,
+					Fetch:           originalPolicy.Fetch, GitFetch: originalPolicy.GitFetch,
+					PrepareUpload: originalPolicy.PrepareUpload, ProjectResponse: originalPolicy.ProjectResponse,
+					Store: originalPolicy.Store, Blobs: originalPolicy.Blobs, Items: originalPolicy.Items,
+					Pool: originalPolicy.Pool, Options: originalPolicy.Options, CheckCurrent: originalPolicy.CheckCurrent,
+					Key: originalPolicy.Key, Now: originalPolicy.Now, MetadataLimit: originalPolicy.MetadataLimit,
+				}
+				calls := 0
+				policy.Blobs = metadataCachedOpenFault{Store: policy.Blobs, target: pomSums(raw).SHA256, calls: &calls, failure: fault.err}
+				copyBackend.Policy = policy
+				svc.HTTP = &copyBackend
+				w.H = harness.Router(
+					harness.Config{
+						Store:         w.Runtime.Store,
+						Blobs:         w.Runtime.Blobs,
+						Auth:          w.Runtime.Auth,
+						Tokens:        w.Runtime.Tokens,
+						Keys:          w.Runtime.Keys,
+						RemoteSources: &svc,
+						RemoteHTTP:    w.Runtime.Artifacts.RemoteHTTP(),
+					},
+				)
+				// Trusted storage markers answer direct source500; the selected-content
+				// origin still lets metadata keep a healthy member's partial response.
+				harness.WantStatus(t, w.Request("GET", "/artifactory/remote/"+virtualMetadataPath, "admin", ""), 500)
+				calls = 0
+				response := w.Request("GET", path, "admin", "")
+				if calls != 1 {
+					t.Fatal("actual cached-blob Open boundary not exercised", calls)
+				}
+				harness.WantStatus(t, response, 200)
+				if !strings.Contains(response.Body.String(), "<version>2.0</version>") {
+					t.Fatal("healthy later member lost", response.Body.String())
+				}
+			})
+		}
 	}
 }

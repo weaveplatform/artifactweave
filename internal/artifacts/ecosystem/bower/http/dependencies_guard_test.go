@@ -39,9 +39,9 @@ func (r dependencyFaultRepos) Get(ctx context.Context, key string) (repo.Config,
 	return r.RepoStore.Get(ctx, key)
 }
 
-// These controls retain Bower's pre-extraction answers. npm separately retains
-// genuine served-copy and current-authority faults as server errors.
-func TestAccBowerExternalGuardCompatibility(t *testing.T) {
+// Shared guard markers must survive Bower's adapter, including the final
+// authority check and a failed read of its own served copy.
+func TestAccBowerExternalGuardStorageFaults(t *testing.T) {
 	for _, tc := range []string{"authority", "body"} {
 		t.Run(tc, func(t *testing.T) {
 			f := newFixture(t)
@@ -87,16 +87,14 @@ func TestAccBowerExternalGuardCompatibility(t *testing.T) {
 			}
 			router := chi.NewRouter()
 			router.Use(accesstest.Over(t, f.db).Middleware(t, true, func(*http.Request) kernel.Principal { return kernel.Principal{Name: "admin", Admin: true} }))
-			pkgroute.Mount(router, pkgroute.Options{Store: st, Items: func() *item.Service { return f.items }}, protocol)
+			pkgroute.Mount(
+				router,
+				pkgroute.Options{Store: st, Items: func() *item.Service { return f.items }, Fault: func(_ *http.Request, err error) { f.faults = append(f.faults, err) }},
+				protocol,
+			)
 			f.router = router
 			got := f.get("/artifactory/api/bower/virtual/control", "admin")
-			want := 503
-			if tc == "body" {
-				want = 502
-			}
-			if got.Code != want {
-				t.Fatalf("%s: %d %s want%d", tc, got.Code, got.Body, want)
-			}
+			wantDependencyStorageFault(t, got, f.faults)
 			t.Logf("BOWER guard %s status=%d body=%s", tc, got.Code, got.Body.String())
 		})
 	}

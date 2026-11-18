@@ -18,6 +18,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	bowerfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/bower"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -66,8 +67,10 @@ func (h handler) dependencyRequest(r *http.Request) (*http.Request, error) {
 }
 
 func (h handler) checkDependencyAuthority(ctx context.Context, r *http.Request) error {
-	// Preserve Bower's existing supersession answer; npm keeps genuine store faults.
 	if err := h.externalGuard().Check(ctx, r); err != nil {
+		if errors.Is(err, pkgroute.ErrExternalAuthorityStore) {
+			return dependencyAuthorityFault(ctx, err)
+		}
 		return source.ErrSuperseded
 	}
 	return nil
@@ -76,12 +79,21 @@ func (h handler) checkDependencyAuthority(ctx context.Context, r *http.Request) 
 func (h handler) currentDependencyRead(ctx context.Context, r *http.Request, path string, folder bool) error {
 	err := h.externalGuard().CurrentRead(ctx, r, path, folder)
 	if errors.Is(err, pkgroute.ErrExternalAuthorityStore) {
-		return source.ErrSuperseded
+		return dependencyAuthorityFault(ctx, err)
 	}
 	if err != nil {
 		return fmt.Errorf("bower dependency current read: %w", err)
 	}
 	return nil
+}
+
+// A failed authority statement is an own-store fault, not evidence that the
+// source changed. Keep Bower's established answer when the request itself ended.
+func dependencyAuthorityFault(ctx context.Context, err error) error {
+	if ctx.Err() != nil {
+		return source.ErrSuperseded
+	}
+	return fmt.Errorf("bower dependency authority: %w: %w", format.ErrStorageFault, err)
 }
 
 type dependencyRead struct {
@@ -217,7 +229,7 @@ func (h handler) readDependency(
 			return h.currentDependencyRead(ctx, r, resource.Path, false)
 		},
 	)
-	if errors.Is(err, pkgroute.ErrExternalBodyRead) {
+	if errors.Is(err, pkgroute.ErrExternalBodyRead) && !errors.Is(err, format.ErrStorageFault) {
 		return dependencyRead{}, remoteInvalid()
 	}
 	if err != nil {

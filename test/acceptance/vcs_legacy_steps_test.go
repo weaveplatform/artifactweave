@@ -255,7 +255,7 @@ func (w *world) vcsLegacyClient(operation, token string) error {
 		return err
 	}
 	w.vars["vcs-result-file"] = filepath.Base(destination.Name())
-	return w.runSystemRecipe(w.mavenImage, []string{"--entrypoint", "curl"}, []string{
+	return w.runJVMRecipe([]string{"--entrypoint", "curl"}, []string{
 		"--disable", "--fail", "--silent", "--show-error", "--header",
 		"Authorization: Bearer " + w.expand(token),
 		w.recipeClientURL() + "/artifactory/api/vcs/" + w.expand(operation),

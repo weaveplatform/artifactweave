@@ -128,6 +128,12 @@
 // Implemented P7, with remote retrieval in P9. Moved here in P9d, which also
 // moved the server root's npm operations here (WEB-17).
 //
+// P10 delivers virtual packument/tarball, search and key reads, DDR mutation
+// handlers and guarded external-dependency delivery. Legacy account/token routes
+// retain their own authorization. Packument models and remote search pages use
+// the virtual period; response overlays and key union remain request-specific.
+// See docs/operations/virtual-repositories.md for family evidence and limits.
+//
 // # Testing
 //
 //   - npm_test.go, publish_test.go, lifecycle_test.go, latest_test.go and

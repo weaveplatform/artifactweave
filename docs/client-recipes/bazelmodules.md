@@ -78,3 +78,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go](../../internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go).
 - Evidence: [test/acceptance/features/bazelmodules.feature](../../test/acceptance/features/bazelmodules.feature).
 - Evidence: [test/acceptance/features/bazel_recipes.feature](../../test/acceptance/features/bazel_recipes.feature).
+- Evidence: [test/acceptance/system_recipe_steps_test.go](../../test/acceptance/system_recipe_steps_test.go).

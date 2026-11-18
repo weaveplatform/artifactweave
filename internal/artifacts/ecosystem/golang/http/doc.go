@@ -80,6 +80,11 @@
 //
 // Implemented P7, with remote retrieval in P9. Moved here in P9d.
 //
+// P10 delivers virtual version-list merge and member-bound module reads,
+// plus DDR publication. Native Go/JF scenarios resolve a local module and private
+// remote dependency with fresh client state; remote source policy remains active.
+// See docs/operations/virtual-repositories.md for family evidence and limits.
+//
 // # Testing
 //
 //   - golang_test.go: version lists, @latest, .info, .mod and .zip reads,

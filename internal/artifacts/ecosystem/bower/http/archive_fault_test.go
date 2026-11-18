@@ -91,7 +91,7 @@ func TestUnitBowerDependencyZIPChecksContentAndCompression(t *testing.T) {
 }
 
 func TestAccBowerDependencyReadFailuresNeverDeliverOrRecordUsage(t *testing.T) {
-	for _, fault := range []string{"empty result", "missing blob", "interrupted stream", "corrupt archive", "revoked source"} {
+	for _, fault := range []string{"empty result", "missing blob", "interrupted served copy", "corrupt archive", "revoked source"} {
 		t.Run(fault, func(t *testing.T) {
 			f, base := dependencyFixture(t)
 			used, closed, reads := false, false, 0
@@ -112,7 +112,9 @@ func TestAccBowerDependencyReadFailuresNeverDeliverOrRecordUsage(t *testing.T) {
 						}
 					default:
 						var reader io.Reader = bytes.NewReader(bowerArchive(t, []archiveEntry{{"dep/bower.json", `{"name":"dep"}`, 0}}))
-						if fault == "interrupted stream" {
+						// This completed source result is the server's served copy;
+						// genuine upstream errors occur before a result is returned.
+						if fault == "interrupted served copy" {
 							reader = brokenMetadataBody{}
 						} else if fault == "corrupt archive" {
 							reader = strings.NewReader("not an archive")
@@ -142,7 +144,7 @@ func TestAccBowerDependencyReadFailuresNeverDeliverOrRecordUsage(t *testing.T) {
 				"admin",
 			)
 			want := http.StatusBadGateway
-			if fault == "missing blob" {
+			if fault == "missing blob" || fault == "interrupted served copy" {
 				want = http.StatusInternalServerError
 			} else if fault == "revoked source" {
 				want = http.StatusForbidden

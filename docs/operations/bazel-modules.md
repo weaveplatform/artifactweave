@@ -115,3 +115,20 @@ advisories and re-signs its registry; Nix preserves the serving member's signatu
 faults with warnings, retain Conan's native remove 405, and route native Nix
 publication to the default deployment target. These are controlled-fixture
 implementation choices, not live Artifactory observations.
+
+## Virtual repositories
+
+Virtual module metadata unions versions and first-winner yanking state; each
+module descriptor and source archive stays bound to its selected member. The
+shared virtual rules govern nesting, patterns, current authority and remote
+policy; no merged-document TTL is applied.
+
+[`TestAccBazelClient`](../../internal/artifacts/ecosystem/bazelmodules/http/bazelmodules_test.go)
+is the opt-in pinned Bazel build acceptance scenario; protocol and failure
+controls remain separate in that package. Upstream authentication failures remain
+errors (the priority-remote 401 control does not fall through to a local holder),
+as recorded by the existing family inference; this is not claimed vendor parity.
+Source refusal details remain [I] in
+the [ADP-06 #216 entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6946397513).
+
+See [shared virtual rules](virtual-repositories.md) for common behavior.

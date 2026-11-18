@@ -212,6 +212,12 @@
 // Implemented P6, with remote retrieval in P9. Moved here in P9d, which also
 // moved the server root's Docker REST operations here (WEB-17).
 //
+// P10 delivers virtual pulls, DDR upload sessions and manifest imports,
+// bounded catalog/tag unions, timestamp tag selection, local referrer unions and
+// guarded foreign-layer caching. Virtual token scopes retain the addressed image
+// while each serving/writing member keeps its own current authority.
+// See docs/operations/virtual-repositories.md for family evidence and limits.
+//
 // # Testing
 //
 //   - docker_test.go: path parsing, image names, registry paths and

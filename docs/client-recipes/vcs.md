@@ -67,3 +67,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [internal/artifacts/ecosystem/vcs/http/archive_git_test.go](../../internal/artifacts/ecosystem/vcs/http/archive_git_test.go).
 - Evidence: [internal/artifacts/ecosystem/vcs/http/testdata/git-archives.json](../../internal/artifacts/ecosystem/vcs/http/testdata/git-archives.json).
 - Evidence: [test/server/artifacts/vcs/vcs_delivery_test.go](../../test/server/artifacts/vcs/vcs_delivery_test.go).
+- Evidence: [test/acceptance/system_recipe_steps_test.go](../../test/acceptance/system_recipe_steps_test.go).

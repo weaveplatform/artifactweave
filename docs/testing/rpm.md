@@ -28,6 +28,12 @@ PUT /artifactory/<repo>/pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm
 The server checks the RPM header, package identity, path, size and SHA-256
 before admitting local content or caching remote content. Local and federated
 repodata is rebuilt after package changes when automatic calculation is on.
+Remote metadata download policy is checked at the requested `repodata/` file,
+including blackout and include/exclude patterns before an upstream exchange.
+The source request retains its initial folder Read scope and later cached-file
+Read checks; folder permission alone does not guarantee delivery. Internal
+virtual package discovery retains its separate package-path policy. See the
+[policy research and controls](../research/rpm-metadata-policy-path.md).
 Remote metadata accepts checksum-addressed gzip and zstd primary indexes,
 including the zstd output of Fedora 42 `createrepo_c`.
 On virtual repositories, the Yum API also accepts
@@ -66,8 +72,9 @@ over HTTPS and avoid placing passwords in shared `.repo` files.
 
 ## Evidence
 
-[`@rpm` acceptance](../../test/acceptance/features/rpm.feature) uses a pinned
-Fedora 42 image with `dnf5` 5.2.18.0 and a genuine `rpmbuild` package. It installs
+[`@rpm` acceptance](../../test/acceptance/features/rpm.feature) uses the [pinned Fedora client](../../test/acceptance/clients/fedora.Dockerfile)
+and a genuine `rpmbuild` package. The controlled RPM fixture was built on Fedora
+42; that fixture identity is independent of the current client image pin. It installs
 through local, remote, virtual and one-node federated repositories, verifies
 GPG-signed local and virtual metadata, tests offline cache, metadata refresh
 after zap and same-origin redirects, manual Yum calculation, lifecycle rebuilds, malformed metadata,

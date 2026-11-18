@@ -82,6 +82,10 @@
 // Implemented P9c, which delivered the plan's P30 group (issues #762 to
 // #768). Moved here in P9d.
 //
+// Delivered virtual mechanism and retained client/server evidence are mapped
+// in docs/operations/virtual-repositories.md and the generated type matrix.
+// P13 peer federation and P35 coordination remain separate.
+//
 // # Testing
 //
 //   - composer_test.go: archive identity and bounds, the hosted path and

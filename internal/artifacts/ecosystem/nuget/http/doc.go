@@ -113,6 +113,12 @@
 // Implemented P8, with remote retrieval in P9: the v3 API (#628), then
 // the v2 feed and symbols (#629). Moved here in P9d.
 //
+// P10 delivers virtual V2/V3 reads, DDR package/symbol pushes, first-readable
+// symbol delivery, forced virtual authentication and no-op virtual reindex.
+// Normalized membership validation belongs to core/repos; protocol refusals keep
+// the existing native envelopes and real target-path permissions.
+// See docs/operations/virtual-repositories.md for family evidence and limits.
+//
 // # Testing
 //
 //   - v3_test.go: the service index, the flat container, restore through

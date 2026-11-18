@@ -156,8 +156,12 @@
 //
 // # Status
 //
-// Implemented P6, with Helm OCI chart metadata in P8 and remote retrieval
-// in P9. Moved here in P9d.
+// Implemented P6 registry protocols, Helm OCI metadata in P8 and remote
+// retrieval in P9, moved here in P9d. P10 delivers virtual manifest/blob pulls and
+// digest hints (#1541), DDR pushes and referenced-content import (#1555), bounded
+// catalog/tag unions (#1424), timestamp tag selection, readable-local referrers
+// and guarded foreign-layer caching (#1556). Registry scopes, image authority and
+// the remote's own source policy remain at delivery. See the virtual guide.
 //
 // # Testing
 //
