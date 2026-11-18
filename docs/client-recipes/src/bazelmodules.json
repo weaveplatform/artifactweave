@@ -82,6 +82,14 @@
         "a fresh Bazel build requires the repository-specific read grant",
         "Then the response status is 401"
       ]
+    },
+    {
+      "path": "test/acceptance/system_recipe_steps_test.go",
+      "contains": [
+        "func TestAccRecipeClientPlatforms",
+        "recipe requires platform",
+        "\"linux/amd64\""
+      ]
     }
   ]
 }

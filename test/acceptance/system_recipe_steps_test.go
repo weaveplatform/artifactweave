@@ -15,7 +15,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -191,10 +193,6 @@ func (w *world) recipeClientURL() string {
 		return strings.Replace(w.url, "127.0.0.1", "host.docker.internal", 1)
 	}
 	return w.url
-}
-
-func (w *world) runSystemRecipe(image string, flags, argv []string) error {
-	return w.runRecipeClient(image, "linux/amd64", flags, argv)
 }
 
 func (w *world) runRecipeClient(image, platform string, flags, argv []string) error {
@@ -461,8 +459,9 @@ func (w *world) buildBazelRecipe() error {
 			return err
 		}
 	}
-	return w.runSystemRecipe(
+	return w.runRecipeClient(
 		"gcr.io/bazel-public/bazel@sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa",
+		"linux/amd64",
 		[]string{"-w", "/work/" + filepath.Base(project)},
 		[]string{
 			"--output_user_root=/tmp/bazel-output",
@@ -487,8 +486,7 @@ func (w *world) downloadVCSRecipe(token string) error {
 		!os.IsNotExist(err) {
 		return err
 	}
-	return w.runSystemRecipe(
-		w.mavenImage,
+	return w.runJVMRecipe(
 		[]string{"--entrypoint", "curl"},
 		[]string{
 			"--disable",
@@ -514,4 +512,78 @@ func (w *world) vcsRecipeArchive(marker string) error {
 		return err
 	}
 	return w.vcsArchiveContains(marker)
+}
+
+// Exercise the callers as well as the shared runner: an image-name comparison
+// cannot determine whether a recipe's client requires a particular platform.
+func TestAccRecipeClientPlatforms(t *testing.T) {
+	clientDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(clientDir, "docker"), []byte("#!/bin/sh\nprintf '%s\\n' \"$@\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", clientDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	const jvmImage = "configured-jvm:platform-test"
+	for _, test := range []struct {
+		name, image, platform, entrypoint string
+		run                               func(*world) error
+	}{
+		{
+			name: "vcs-archive", image: jvmImage, entrypoint: "curl",
+			run: func(w *world) error { return w.downloadVCSRecipe("test-token") },
+		},
+		{
+			name: "vcs-legacy", image: jvmImage, entrypoint: "curl",
+			run: func(w *world) error { return w.vcsLegacyClient("tags/example/team/project", "test-token") },
+		},
+		{
+			name: "jvm", image: jvmImage, entrypoint: "java",
+			run: func(w *world) error {
+				return w.runJVMRecipe([]string{"--entrypoint", "java"}, []string{"-version"})
+			},
+		},
+		{
+			name: "bazel", platform: "linux/amd64",
+			image: "gcr.io/bazel-public/bazel@sha256:d090e62af5f0190bef545f278677bab7175d7db9c028d1e492bb4bfb3e1975fa",
+			run:   (*world).buildBazelRecipe,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			w := newWorld(t)
+			w.dir, w.mavenImage, w.url = t.TempDir(), jvmImage, "http://127.0.0.1:8080"
+			w.vars = map[string]string{}
+			if err := test.run(w); err != nil {
+				t.Fatal(err)
+			}
+			if w.lastRC != 0 {
+				t.Fatalf("recipe command exited %d: %s", w.lastRC, w.body)
+			}
+			args := strings.Split(strings.TrimSuffix(string(w.body), "\n"), "\n")
+			prefix := []string{
+				"run", "--rm", "--network", "host", "--user",
+				fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
+				"-v", w.dir + ":/work", "-w", "/work", "-e", "HOME=/work/recipe-home",
+			}
+			if len(args) < len(prefix) || !slices.Equal(args[:len(prefix)], prefix) {
+				t.Fatalf("recipe lost its isolation flags: %q", args)
+			}
+			platform := slices.Index(args, "--platform")
+			if test.platform == "" {
+				if platform >= 0 {
+					t.Fatalf("configured JVM image must select its own platform: %q", args)
+				}
+			} else if platform < 0 || platform+1 >= len(args) || args[platform+1] != test.platform {
+				t.Fatalf("recipe requires platform %q: %q", test.platform, args)
+			}
+			image := slices.Index(args, test.image)
+			if image < 0 || image == len(args)-1 {
+				t.Fatalf("recipe image/arguments changed: %q", args)
+			}
+			if test.entrypoint != "" {
+				entrypoint := slices.Index(args[:image], "--entrypoint")
+				if entrypoint < 0 || entrypoint+1 >= image || args[entrypoint+1] != test.entrypoint {
+					t.Fatalf("recipe entrypoint changed: %q", args)
+				}
+			}
+		})
+	}
 }
