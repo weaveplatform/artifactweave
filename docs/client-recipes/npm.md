@@ -64,7 +64,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - For verification, use a new project with no node_modules/lockfile and a new npm cache.
 - A repeated publish of an existing version is refused; --force does not make publication idempotent.
-- Virtual npm supports merged reads, publication and mutations through its configured deployment target, plus login/logout, ping and whoami. Normal reads retain merged metadata until the retrieval period expires; write=true reads the deployment target only. Virtual search merges readable local and remote member hits, caches remote pages for the virtual retrieval period, and reads local indexes live. Virtual signing keys remain a separate ticket and answer 501. Federated native-client qualification remains follow-on work.
+- Virtual npm supports merged reads, publication and mutations through its configured deployment target, plus login/logout, ping and whoami. Normal reads retain merged metadata until the retrieval period expires; write=true reads the deployment target only. Virtual search merges readable local and remote member hits, caches remote pages for the virtual retrieval period, and reads local indexes live. Virtual signing keys merge readable signing members per request. npm audit signatures verifies signed packages and reports unsigned packages as missing signatures; restrictive patterns must include .npm/keys.json. Federated native-client qualification remains follow-on work.
 
 ## Verification sources
 

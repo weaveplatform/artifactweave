@@ -269,3 +269,100 @@ Feature: npm virtual packuments and immutable dependency tarballs
       | npm    |
       | npm    |
       | npm 12 |
+
+
+  @npm_virtual_keys
+  Scenario Outline: <npm> audits both signing members and reports an unsigned virtual member
+    Given the registry is running
+    And the <npm> client can reach the registry
+    And a private signing npm upstream serves "remote-signed" at "1.0.0"
+    And a private signing npm upstream serves "local-signed" at "1.0.0"
+    When I create the ECDSA key pair "npm-local-publisher" with alias "local-publisher" as admin
+    Then the response status is 201
+    When I PUT "/artifactory/api/repositories/npm-signed" as admin with body:
+      """
+      {"rclass":"local","packageType":"npm","primaryKeyPairRef":"npm-local-publisher"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/npm-unsigned" as admin with body:
+      """
+      {"rclass":"local","packageType":"npm"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/npm-origin" as admin with body:
+      """
+      {"rclass":"remote","packageType":"npm","url":"{upstream}","username":"npm-origin","password":"npm-origin-secret"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/npm-signing-inner" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"npm","repositories":["npm-origin","npm-signed"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/npm-signing-all" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"npm","repositories":["npm-signing-inner"]}
+      """
+    Then the response status is 200
+    Given a file ".npmrc" with expanded content:
+      """
+      registry={url}/api/npm/npm-signed/
+      //{host}/artifactory/api/npm/npm-signed/:_auth={basicauth}
+      """
+    And a file "signed/package.json" with content:
+      """
+      {"name":"local-signed","version":"1.0.0","description":"local version owner"}
+      """
+    When I run npm "publish ./signed --ignore-scripts"
+    Then the command succeeds
+    Given a file ".npmrc" with expanded content:
+      """
+      registry={url}/api/npm/npm-signing-all/
+      //{host}/artifactory/api/npm/npm-signing-all/:_auth={basicauth}
+      """
+    And a file "package.json" with content:
+      """
+      {"name":"virtual-audit","version":"1.0.0","dependencies":{"local-signed":"1.0.0","remote-signed":"1.0.0"}}
+      """
+    When I run npm "install --ignore-scripts --audit=false --cache .npm-cold"
+    Then the command succeeds
+    And the file "node_modules/local-signed/package.json" contains "local version owner"
+    When I run npm "audit signatures --cache .npm-audit"
+    Then the command succeeds
+    And the output contains "2 packages have verified registry signatures"
+    And virtual npm keys preserve both publishers and the local version owner
+    And the private npm signing upstream received only configured credentials
+    Given a file ".npmrc" with expanded content:
+      """
+      registry={url}/api/npm/npm-unsigned/
+      //{host}/artifactory/api/npm/npm-unsigned/:_auth={basicauth}
+      """
+    And a file "unsigned/package.json" with content:
+      """
+      {"name":"unsigned-member","version":"1.0.0"}
+      """
+    When I run npm "publish ./unsigned --ignore-scripts"
+    Then the command succeeds
+    When I POST "/artifactory/api/repositories/npm-signing-all" as admin with body:
+      """
+      {"repositories":["npm-signing-inner","npm-unsigned"],"virtualRetrievalCachePeriodSecs":0}
+      """
+    Then the response status is 200
+    Given a file ".npmrc" with expanded content:
+      """
+      registry={url}/api/npm/npm-signing-all/
+      //{host}/artifactory/api/npm/npm-signing-all/:_auth={basicauth}
+      """
+    When I run npm "install unsigned-member@1.0.0 --ignore-scripts --audit=false --cache .npm-fresh"
+    Then the command succeeds
+    When I run npm "audit signatures --cache .npm-audit-fresh"
+    Then the command fails
+    And the output contains "1 package has a missing registry signature"
+    And the output contains "unsigned-member@1.0.0"
+    And the output does not contain "found no dependencies to audit"
+    And the server answered no request with 500 since the last command
+
+    Examples:
+      | npm    |
+      | npm    |
+      | npm 12 |

@@ -53,6 +53,22 @@ installs a scoped and an unscoped package through a remote of the fake upstream,
 signs each version with a key it lists, and runs `npm audit signatures` with both
 pinned clients.
 
+## Through a virtual repository
+
+A virtual's `/-/npm/v1/keys` combines eligible signing members in effective
+member order, once per `keyid`. Grant Read and include `.npm/keys.json` on the
+real repositories and allow that path through virtual/nested patterns. Local
+key configuration is live; remote documents use their own retrieval cache and
+credentials. A virtual has no signing keypair of its own.
+
+The [virtual scenarios](../../test/acceptance/features/npm_virtual.feature)
+(tag `@npm_virtual_keys`) install packages signed by a local repository and a
+private remote through a nested virtual and verify both with npm 11 and 12.
+They then add an unsigned local member: audit must report its package as missing
+a registry signature, rather than treating the whole registry as unsupported.
+An absent upstream keys document contributes nothing; genuine source errors
+retain the direct remote answer. See [research](../research/p10-npm-keys.md).
+
 ## The Sigstore dependency
 
 Before it asks the registry, `npm audit signatures` initialises npm's Sigstore TUF

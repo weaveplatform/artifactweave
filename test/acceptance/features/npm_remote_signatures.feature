@@ -1,4 +1,4 @@
-@npm @npm_remote
+@npm @npm_remote @npm_remote_signatures
 Feature: npm audit signatures verifies what an npm remote repository relays
   An npm remote repository relays its upstream's dist.signatures, and
   answers its own /-/npm/v1/keys with the upstream's keys document, so npm

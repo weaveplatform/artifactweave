@@ -103,7 +103,7 @@
   "test/acceptance/features/npm.feature": "36307dd2b6f9449ee818fca5bbf420313ce8996bf3a223ed939102d6dc897c6a",
   "test/acceptance/features/npm_remote.feature": "7b32810fac3656864fb566dd569a8f0d23a6ab9b6b5f19da6b270a558d5c5c3e",
   "test/acceptance/features/npm_search_auth.feature": "dcd7c80ebd49df1ba7a6f2320220a56ba78f85add8ebb2ef964f3af4d2855f61",
-  "test/acceptance/features/npm_virtual.feature": "d84f04263215a952da953794d0da0e333c87a4cfc12e985ac1d0ba513e44e49b",
+  "test/acceptance/features/npm_virtual.feature": "9bf096a59d2c48dc39d1b8abf7f4e049d763d7bdaaf87c23ab672c76bca1c3a2",
   "test/acceptance/features/nuget_publish.feature": "fc8139226dfaa62dd5e3e720c61a258c1803d179a42f099e29b4894acdf88a77",
   "test/acceptance/features/nuget_remote.feature": "c0deebdbff349c104a0c68c2c2d9eaba93688be33901b98203489b7bface296c",
   "test/acceptance/features/nuget_v3.feature": "1abcb87a5fa48a1addc608e433991c129a894f9b9dcf9805129cab1be96ec5f5",

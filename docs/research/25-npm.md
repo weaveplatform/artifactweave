@@ -471,8 +471,8 @@ The original virtual's R4 hiding controls denied mutations, including a canonica
 path refusal after package-folder admission; a target's hiding setting does not
 replace it. Login/logout/ping/whoami keep their existing local behavior without
 requiring a deployment target. Mutations and writable-document reads do not
-invalidate or replace the R8 merged model; its age governs visibility. Search
-and virtual signing keys remain deferred 501 before their own validation.
+invalidate or replace the R8 merged model; its age governs visibility. At that implementation stage search and virtual signing keys remained deferred
+501; NPM-03 now serves search and NPM-04 serves the signing keys below.
 
 Native npm 11.20.0 on Node 26.13.1 and npm 12.2.1 on Node 24.22.3 both refuse an implicit
 `latest` publish when a merged remote version is higher than the new version,
@@ -481,3 +481,29 @@ mixed-member case without changing merged latest semantics. Strict Linux client
 proof covers legacy login, scoped/unscoped publish, cold dependency install,
 virtual lockfile tarballs and `npm ci` integrity, dist-tag changes, deprecation,
 version/whole-package unpublish, retained remote versions and logout.
+
+
+### P10 NPM-04 signing keys (#1319)
+
+Virtual GET/HEAD `/-/npm/v1/keys` now checks exact-file Read and then virtual
+policy at `.npm/keys.json` before loading members. It merges readable local and
+federated signing configuration and each remote's existing source document, in
+effective order, retaining the first whole entry for each string `keyid`.
+No virtual document cache or virtual signing keypair is introduced. Local
+configuration is live; remote retrieval, negative-cache, credentials, offline
+and blackout behavior remain source-owned.
+
+Current JFrog npm documentation and RTDEV-42377 require mixed signed/unsigned
+members to retain signing keys, so npm reports missing signatures rather than
+skipping audit. An upstream keys 404 contributes nothing. Genuine source errors
+retain the direct remote answer, including shared-source 502 normalization of
+unexpected upstream 400/410. The remaining response/ordering inferences and
+primary/client evidence are in [P10 keys research](p10-npm-keys.md) and
+[#216](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6977107477).
+
+Strict Linux npm 11.20.0 and 12.2.1 proof covers signed local plus private
+signing remote, duplicate-version ownership, nested virtual resolution, and
+adding an unsigned member. Existing direct local rotation/tampering and direct
+remote relaying controls remain covered. The related existing local keys bug
+was fixed here: configured keypair lookup now follows exact-file Read and policy,
+so a refused reader cannot trigger a key-store lookup or see its fault.
