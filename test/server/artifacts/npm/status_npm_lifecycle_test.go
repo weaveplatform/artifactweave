@@ -42,8 +42,15 @@ var npmLifecycleStatusPart = statusPart{
 	rows: func() []statusCase {
 		local := npmBase + "npm-local/"
 		tags := local + "-/package/status-tags/dist-tags"
+		virtual := npmBase + "npm-virtual/"
 		gone := local + "status-gone/-/status-gone-"
 		return []statusCase{
+			{npmTagAdd, virtual + "-/package/status-virtual-tags/dist-tags/next", "admin", `"1.0.0"`, 200},
+			{npmTagRemove, virtual + "-/package/status-virtual-tags/dist-tags/next", "admin", "", 200},
+			{npmPublish, virtual + "status-virtual-tags", "admin", `{"versions":{"1.0.0":{"deprecated":"old"}}}`, 200},
+			{npmUnpublishVersions, virtual + "status-virtual-tags/-rev/1-0", "admin", `{"versions":{"1.0.0":{}}}`, 200},
+			{npmUnpublishTarball, virtual + "status-virtual-tags/-/status-virtual-tags-2.0.0.tgz/-rev/1-0", "admin", "", 404},
+			{npmUnpublish, virtual + "status-virtual-tags/-rev/1-0", "admin", "", 200},
 			// The seed parked a conversion of npm-local, which resume
 			// queues again; then none is parked.
 			{npmResume, npmMigrations + "npm-local/resume", "admin", "", 202},
@@ -127,6 +134,8 @@ var npmLifecycleStatusPart = statusPart{
 	seed: func(t *testing.T, db harness.Store, blobs blob.Store) {
 		t.Helper()
 		items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
+		deployNPM(t, items, "npm-local", "status-virtual-tags", "1.0.0", nil)
+		deployNPM(t, items, "npm-local", "status-virtual-tags", "2.0.0", nil)
 		deployNPM(t, items, "npm-local", "status-tags", "1.0.0", nil)
 		deployNPM(t, items, "npm-local", "status-tags", "2.0.0", nil)
 		for _, v := range []string{"1.0.0", "1.1.0", "2.0.0"} {

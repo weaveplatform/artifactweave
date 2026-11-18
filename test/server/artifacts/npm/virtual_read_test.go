@@ -254,9 +254,13 @@ func TestAccNPMVirtualReads(t *testing.T) {
 	if short.Header().Get("Content-Type") != "application/vnd.npm.install-v1+json" || strings.Contains(short.Body.String(), "description") {
 		t.Fatal(short.Header(), short.Body.String())
 	}
+	virtualNPMConfig(t, w, "virtual", func(c *repo.Config) { c.DefaultDeploymentRepo = "first" })
 	write := w.Request("GET", base+"pkg?write=true", "admin", "", "Accept", "application/vnd.npm.install-v1+json")
-	if write.Code != 200 || !bytes.Equal(write.Body.Bytes(), r.Body.Bytes()) {
+	if write.Code != 200 || write.Header().Get("Content-Type") != "application/json" {
 		t.Fatal(write.Code, write.Body.String())
+	}
+	if versions := virtualNPMJSON(t, write.Body.Bytes())["versions"].(map[string]any); len(versions) != 1 || versions["1.0.0"] == nil {
+		t.Fatal(versions)
 	}
 	override := w.Request("GET", base+"pkg", "admin", "", "X-JFrog-Override-Base-URL", "https://override.example")
 	harness.WantStatus(t, override, 200)
@@ -317,15 +321,8 @@ func TestAccNPMVirtualPriorityAndCache(t *testing.T) {
 func TestAccNPMVirtualDeferredRoutes(t *testing.T) {
 	w := virtualNPMWorld(t, npmfmt.Settings{})
 	for _, tc := range []struct{ method, path, body string }{
-		{"PUT", "pkg", "not json"},
-		{"DELETE", "pkg/-rev/bad", "not json"},
-		{"PUT", "-/user/org.couchdb.user:alice", "not json"},
-		{"DELETE", "-/user/token/invalid", ""},
-		{"GET", "-/ping", ""},
-		{"GET", "-/whoami", ""},
 		{"GET", "-/v1/search?size=not-a-number", ""},
 		{"GET", "-/npm/v1/keys", ""},
-		{"PUT", "-/package/pkg/dist-tags/not%20valid", "not json"},
 		{"GET", "-/package/pkg/not-dist-tags", ""},
 	} {
 		r := w.Request(tc.method, npmBase+"virtual/"+tc.path, "reader", tc.body)

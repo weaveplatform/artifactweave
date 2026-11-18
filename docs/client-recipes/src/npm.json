@@ -22,8 +22,8 @@
     }
   ],
   "publish": {
-    "classes": "L",
-    "note": "Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
+    "classes": "LV",
+    "note": "Virtual publication requires a local or federated default deployment repository and checks permissions on its actual paths. Remote repositories remain read-only client sources.",
     "steps": [
       {
         "language": "sh",
@@ -46,7 +46,7 @@
   "limitations": [
     "For verification, use a new project with no node_modules/lockfile and a new npm cache.",
     "A repeated publish of an existing version is refused; --force does not make publication idempotent.",
-    "Virtual npm supports packuments, version documents, dist-tag lists and immutable tarballs over readable members. Virtual publication/authentication, ping/whoami, search and signing keys remain separate tickets and answer 501. Federated native-client qualification remains follow-on work."
+    "Virtual npm supports merged reads, publication and mutations through its configured deployment target, plus login/logout, ping and whoami. Normal reads retain merged metadata until the retrieval period expires; write=true reads the deployment target only. Search and virtual signing keys remain separate tickets and answer 501. Federated native-client qualification remains follow-on work."
   ],
   "evidence": [
     {
@@ -83,7 +83,10 @@
         "cold mixed dependency tree",
         "npm ci",
         "local winner",
-        "npm 12"
+        "npm 12",
+        "logs in, publishes, tags, deprecates and unpublishes",
+        "npm-publish-all",
+        "unpublish virtual-pub --force"
       ]
     }
   ]

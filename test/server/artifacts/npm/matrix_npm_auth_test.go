@@ -8,7 +8,7 @@ package npm_test
 var npmAuthMatrixPart = matrixPart{
 	rows: func() []matrixRow {
 		local := npmBase + "npm-local/"
-		return []matrixRow{
+		return npmVirtualMatrixRows([]matrixRow{
 			// Filtered, not refused: what a caller may not read is left out.
 			row(npmSearch, local+"-/v1/search?text=work", "", anyone, 200),
 			row(npmLogin, local+"-/user/org.couchdb.user:v-{p}", npmLoginBody("v-{p}", "pw"),
@@ -21,7 +21,7 @@ var npmAuthMatrixPart = matrixPart{
 			// principal is refused.
 			at(npmAuth, "", signedIn, 200),
 			row(npmScopeAuth, local+"auth/acme", "", signedIn, 200),
-		}
+		})
 	},
 }
 

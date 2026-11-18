@@ -48,6 +48,9 @@ var npmAuthStatusPart = statusPart{
 			{npmSearch, npmBase + "missing/-/v1/search", "admin", "", 404},
 			{npmSearch, npmBase + "libs-local/-/v1/search", "admin", "", 404},
 			{npmSearch, npmBase + "npm-remote/-/v1/search", "admin", "", 501},
+			{npmSearch, npmBase + "npm-virtual/-/v1/search", "admin", "", 501},
+			{npmLogin, npmBase + "npm-virtual/-/user/org.couchdb.user:user", "", npmLoginBody("user", "pw"), 201},
+			{npmLogout, npmBase + "npm-virtual/-/user/token/no-such-token", "", "", 200},
 
 			// A login needs no credentials, and stale ones count as none:
 			// npm sends whatever .npmrc holds. 201, as 7.x answers it

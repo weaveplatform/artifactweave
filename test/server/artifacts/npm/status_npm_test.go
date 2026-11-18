@@ -81,6 +81,7 @@ var npmStatusPart = statusPart{
 			// This fixture mounts no remote source; its virtual reads npm-local.
 			{npmPackument, npmBase + "npm-remote/status-pkg", "admin", "", 501},
 			{npmPackument, npmBase + "npm-virtual/status-pkg", "admin", "", 200},
+			{npmPackument, npmBase + "npm-virtual/status-pkg?write=true", "admin", "", 200},
 			// npm's own operations under /-/ that no route serves yet.
 			{npmPackument, local + "-/v1/login", "admin", "", 404},
 			{npmPackument, local + "status-pkg/a/b", "admin", "", 404},
@@ -110,6 +111,10 @@ var npmStatusPart = statusPart{
 			{npmPing, local + "-/ping", "anonymous", "", 200},
 			{npmPing, local + "-/ping", "", "", 401},
 			{npmPing, npmBase + "npm-remote/-/ping", "admin", "", 501},
+			{npmPing, npmBase + "npm-virtual/-/ping", "admin", "", 200},
+			{npmWhoami, npmBase + "npm-virtual/-/whoami", "admin", "", 200},
+			{npmPublish, npmBase + "npm-virtual/status-virtual-pub", "admin", npmPublishBody("status-virtual-pub", "1.0.0"), 201},
+			{npmPublish, npmBase + "npm-virtual/status-virtual-pub", "user", "{", 403},
 			{npmPing, npmBase + "missing/-/ping", "admin", "", 404},
 			{npmWhoami, local + "-/whoami", "admin", "", 200},
 			{npmWhoami, local + "-/whoami", "user", "", 200},

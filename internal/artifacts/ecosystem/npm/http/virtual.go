@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
@@ -26,38 +27,46 @@ func (virtualSource) Item(context.Context, pkgroute.Store, repo.Config, string) 
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
-// Preserve the old class refusal before deferred operations validate a body,
-// path, query or credentials. Enabling reads must not enable local write/auth
-// behavior on virtual repositories before NPM-02/03/04.
+// Deferred search and signing-key routes keep their class refusal before any
+// handler-specific validation. Writes and account operations now use NPM-02.
 func (h handler) virtualRouteGate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		q := pkgroute.RequestFrom(r)
-		if q.Repo.Class != repo.Virtual {
+		if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual || virtualRouteAllowed(r) {
 			next.ServeHTTP(w, r)
 			return
 		}
-		allowed := r.Method == http.MethodGet || r.Method == http.MethodHead
-		p, err := pkgroute.ParsePath(q.Rest)
-		if err != nil || len(p.Segments) == 0 {
-			allowed = false
-		}
-		if allowed && p.Segments[0] == "-" {
-			allowed = false
-			if r.Method == http.MethodGet && len(p.Segments) >= 4 && p.Segments[1] == "package" {
-				_, tag, tagErr := tagPath(r)
-				allowed = tagErr == nil && tag == ""
-			}
-		}
-		if !allowed {
-			h.k.Error(
-				w,
-				r,
-				apierror.New(http.StatusNotImplemented, fmt.Sprintf("'%s' is a virtual repository, which artifactweave does not serve through the npm API yet", q.Repo.Key)),
-			)
-			return
-		}
-		next.ServeHTTP(w, r)
+		h.k.Error(
+			w,
+			r,
+			apierror.New(
+				http.StatusNotImplemented,
+				fmt.Sprintf("'%s' is a virtual repository, which artifactweave does not serve through the npm API yet", pkgroute.RequestFrom(r).Repo.Key),
+			),
+		)
 	})
+}
+
+func virtualRouteAllowed(r *http.Request) bool {
+	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
+	if err != nil || len(p.Segments) == 0 {
+		return false
+	}
+	read := r.Method == http.MethodGet || r.Method == http.MethodHead
+	mutate := r.Method == http.MethodPut || r.Method == http.MethodDelete
+	if p.Segments[0] != "-" {
+		return read || mutate
+	}
+	if len(p.Segments) == 2 && r.Method == http.MethodGet && (p.Segments[1] == "ping" || p.Segments[1] == "whoami") {
+		return true
+	}
+	if len(p.Segments) >= 4 && p.Segments[1] == "package" {
+		_, tag, err := tagPath(r)
+		return err == nil && ((r.Method == http.MethodGet && tag == "") || mutate)
+	}
+	if len(p.Segments) == 3 && p.Segments[1] == "user" && strings.HasPrefix(p.Segments[2], couchUser) && r.Method == http.MethodPut {
+		return true
+	}
+	return len(p.Segments) == 4 && p.Segments[1] == "user" && p.Segments[2] == "token" && r.Method == http.MethodDelete
 }
 
 func (h handler) virtualRead(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +81,8 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, notFound(r))
 	case slices.Contains(rest, "-"):
 		h.virtualTarball(w, r, name, p.String())
+	case len(rest) == 0 && r.URL.Query().Get("write") == "true":
+		h.virtualWriteDocument(w, r, name)
 	case len(rest) == 0:
 		h.virtualPackage(w, r, name, "", false)
 	case len(rest) == 1:

@@ -433,3 +433,51 @@ version retains its winning digest until expiry; a contributing file 404 evicts
 the model, while a later readable duplicate may serve only identical bytes.
 Direct strict-layout file reads remain independent of packument policy or absence;
 a metadata storage failure remains a server fault.
+
+### P10 NPM-02 virtual writes (2026-11-18)
+
+The official [npm guide](https://docs.jfrog.com/artifactory/docs/npm-repositories)
+recommends one virtual registry and documents login against it [D]. The official
+[virtual repository guide](https://docs.jfrog.com/artifactory/docs/virtual-repositories)
+defines its default deployment repository [D]. The verified official 7.161.26
+OSS archive's `backend/core/src/main/java/org/artifactory/util/UploadServiceUtils.java`,
+`getTargetRepository` (lines 248–261), maps a virtual upload to that configured
+local or federated repository [S]. The archive omits `NpmVirtualRepoHandler`.
+No trial or live Artifactory capture was used.
+
+The #1566 planning evidence cites RTFACT-10646's npm E400 for a publish without
+a deployment target and its `Unable to update/publish` server log. The Jira page
+is currently inaccessible, so it supplies no newly verified response body. The
+following ticket fallbacks remain explicit **[I]**, recorded on #216:
+
+- Every npm mutation without a usable deployment target answers 400 in npm's
+  envelope, with `No local repository was configured as local deployment repository
+  for the (<key>) virtual repository.` The same answer covers a deleted target,
+  an unrelated target, a virtual or remote target, and a target of another type.
+  Effective nested membership remains accepted; normal configuration saves
+  enforce direct membership (decision 0008).
+- `GET /<package>?write=true` reads only the deployment repository's full document.
+  It checks that member's package-folder Read before virtual/member document
+  policy, filters individual versions by that member's Read, and retains virtual
+  tarball URLs, base-URL overrides and per-response conditional headers. No
+  deployment target answers the same 400. Ordinary reads remain merged.
+- npm's package/tarball `/-rev` DELETEs target that repository, as do its publish,
+  deprecate, dist-tag and version-removal PUTs. They retain the local handler's
+  validation and permission contract. The item API's empty virtual DELETE 404 is
+  a separate route and remains unchanged.
+
+The caller's permissions apply to the deployment repository's actual paths.
+The original virtual's R4 hiding controls denied mutations, including a canonical
+path refusal after package-folder admission; a target's hiding setting does not
+replace it. Login/logout/ping/whoami keep their existing local behavior without
+requiring a deployment target. Mutations and writable-document reads do not
+invalidate or replace the R8 merged model; its age governs visibility. Search
+and virtual signing keys remain deferred 501 before their own validation.
+
+Native npm 11.20.0 on Node 26.13.1 and npm 12.2.1 on Node 24.22.3 both refuse an implicit
+`latest` publish when a merged remote version is higher than the new version,
+before sending the publish PUT. An explicit `--tag local` permits that useful
+mixed-member case without changing merged latest semantics. Strict Linux client
+proof covers legacy login, scoped/unscoped publish, cold dependency install,
+virtual lockfile tarballs and `npm ci` integrity, dist-tag changes, deprecation,
+version/whole-package unpublish, retained remote versions and logout.
