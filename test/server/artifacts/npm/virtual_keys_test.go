@@ -135,6 +135,9 @@ func TestAccNPMVirtualKeysRealBackends(t *testing.T) {
 			w.Upstream.Delete("/-/npm/v1/keys")
 			none := w.Request("GET", root+"-/npm/v1/keys", "admin", "")
 			harness.WantStatus(t, none, 404)
+			// Repository-file provenance belongs to trusted file readers, not
+			// API callers' query parameters or headers.
+			harness.WantStatus(t, w.Request("GET", root+"-/npm/v1/keys?repositoryFile=true", "admin", "", "X-Repository-File", "true"), 404)
 			if !strings.Contains(none.Body.String(), "not found") {
 				t.Fatal(none.Body.String())
 			}

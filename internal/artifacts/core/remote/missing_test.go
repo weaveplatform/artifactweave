@@ -22,6 +22,7 @@ func TestAccPolicyMissingOriginRetainsExpiredFile(t *testing.T) {
 					w := policyFixture(t)
 					q := w.request("file.txt", kind)
 					q.Resource.Mutable = true
+					q.Resource.RepositoryFile = kind == source.ResourceKindMetadata
 					w.up.Set("/file.txt", fakeupstream.Resource{Body: []byte("old bytes"), ETag: `"old"`, Modified: w.clock.Now()})
 					w.mustRead(q, "old bytes")
 					key := w.p.CacheKey(q, "credential-1")
@@ -88,7 +89,7 @@ func TestAccPolicyMissingOriginRetainsExpiredFile(t *testing.T) {
 }
 
 func TestAccPolicyMissingOriginKeepsRefusalAndNegativeBoundaries(t *testing.T) {
-	for _, mode := range []string{"cold", "fresh", "unique", "fresh-negative", "no-cache", "must-revalidate", "non-file"} {
+	for _, mode := range []string{"cold", "fresh", "unique", "fresh-negative", "no-cache", "must-revalidate", "non-file", "api-document"} {
 		t.Run(mode, func(t *testing.T) {
 			w := policyFixture(t)
 			q := w.request("file.txt", source.ResourceKindArtifact)
@@ -96,6 +97,10 @@ func TestAccPolicyMissingOriginKeepsRefusalAndNegativeBoundaries(t *testing.T) {
 			if mode == "non-file" {
 				q.Resource.Kind = source.ResourceKindMetadata
 				q.Resource.NoCacheFile = true
+				q.Resource.RepositoryFile = true
+			}
+			if mode == "api-document" {
+				q.Resource.Kind = source.ResourceKindMetadata
 			}
 			header := http.Header{}
 			if mode == "no-cache" || mode == "must-revalidate" {

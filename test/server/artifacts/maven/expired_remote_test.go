@@ -2,19 +2,44 @@ package maven_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"reflect"
+	"sync/atomic"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	mavenfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 const expiredSnapshot = "org/acme/retained/1.0-SNAPSHOT/retained-1.0-SNAPSHOT.jar"
+
+func expiredFetchCount(w *remoteWorld, path string) func() int64 {
+	p := w.rt.Artifacts.RemoteSources().HTTP.(*mavenfmt.MavenBackend).Policy
+	previous := p.Fetch
+	var calls atomic.Int64
+	p.Fetch = func(ctx context.Context, q source.Request, permit source.Permit, opts remote.Options, request remote.Request) (*http.Response, error) {
+		if q.Resource.Path == path {
+			calls.Add(1)
+		}
+		if previous != nil {
+			return previous(ctx, q, permit, opts, request)
+		}
+		conn, err := p.Pool.Connection(q.Repo, opts)
+		if err != nil {
+			return nil, fmt.Errorf("observe upstream connection: %w", err)
+		}
+		return conn.Fetch(ctx, request) //nolint:wrapcheck // observe the real protocol exchange without changing its failure
+	}
+	return calls.Load
+}
 
 func expiredReadAlone(t *testing.T, w *remoteWorld) {
 	t.Helper()
@@ -50,6 +75,7 @@ func TestAccMavenExpiredRemoteRetainsFiles(t *testing.T) {
 							)
 							contentType = "application/xml"
 						}
+						fetches := expiredFetchCount(w, path)
 						mavenSource(w, path, data, contentType)
 						remoteStatus(t, w.request(http.MethodGet, "/artifactory/remote/"+path, "reader", ""), http.StatusOK)
 						entries, _, err := w.rt.Store.RemoteCache().Exact(t.Context(), "remote", path, kernel.Page{Limit: 10})
@@ -71,6 +97,7 @@ func TestAccMavenExpiredRemoteRetainsFiles(t *testing.T) {
 							w.up.Set("/"+path, fakeupstream.Resource{Fault: fakeupstream.Fault{BeforeHeaders: gate}})
 						}
 						requests := w.up.Count("", "/"+path)
+						beforeFetch := fetches()
 						got := w.request(method, "/artifactory/remote/"+path, "reader", "")
 						remoteStatus(t, got, http.StatusOK)
 						if method == http.MethodGet && !bytes.Equal(got.Body.Bytes(), data) {
@@ -79,12 +106,13 @@ func TestAccMavenExpiredRemoteRetainsFiles(t *testing.T) {
 						if method == http.MethodHead && got.Body.Len() != 0 {
 							t.Fatal("HEAD returned a body")
 						}
-						// The transport may retry a timed-out idempotent request
-						// once when its remaining request budget permits it.
+						// net/http may replay across more than one reused connection.
+						// The contract is one policy fetch, not a fixed physical cap.
 						delta := w.up.Count("", "/"+path) - requests
-						if delta < 1 || delta > 2 || (answer != "timeout" && delta != 1) {
-							t.Fatal("origin revalidation attempts", delta)
+						if fetches()-beforeFetch != 1 || delta < 1 || (answer != "timeout" && delta != 1) {
+							t.Fatal("origin policy/physical exchanges", fetches()-beforeFetch, delta)
 						}
+						t.Logf("revalidation: one logical fetch, %d physical exchanges", delta)
 						after, err := w.rt.Store.RemoteCache().Read(t.Context(), before.Token.Key)
 						if err != nil || !after.NegativeUntil.IsZero() {
 							t.Fatal("retained file became a negative", after, err)

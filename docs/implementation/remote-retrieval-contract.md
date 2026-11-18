@@ -205,7 +205,7 @@ or authentication challenges as artifactweave credentials.
 |---|---|---|
 | HEAD 200, then GET 200 | GET headers, validators, length and bytes are authoritative if HEAD disagrees; commit only after EOF and validation | 200; normal client range/conditional processing then applies |
 | HEAD 405 or 501 | One GET fallback; remember no permanent capability from a single error | GET result |
-| HEAD 404 or GET 404 | For a currently complete cached file, retain its bytes and validators, refresh its validation clock under the current source/token fences and clear an expired historical negative; do not record a new miss. Otherwise record only a confirmed miss for this identity. Non-file API documents keep their ordinary negative handling. | Serve the retained file, including to a Read-only caller; cold/changed content still needs Deploy/Cache. Existing strict HTTP rules remain RC-3. Without a permitted retained file, 404. See [#1645 research](../research/expired-remote-copy.md), including its correction to the original clock premise. |
+| HEAD 404 or GET 404 | For a currently complete repository-file resource, retain its bytes and validators, refresh its validation clock under current source/token fences and clear an expired historical negative; do not record a new miss. Artifact kind denotes a file; raw metadata needs trusted file-reader provenance. Protocol-owned API metadata keeps its existing 404/negative handling, independently of how its raw representation is persisted. | Serve the retained file, including to a Read-only caller; cold/changed content still needs Deploy/Cache. Existing strict HTTP rules remain RC-3. Without a permitted retained file, 404. See [#1645 research](../research/expired-remote-copy.md), including its clock correction and file/API boundary. |
 | HEAD/GET 304 | Requires a complete corresponding stored representation and matching upstream validator; update validation time, no blob write | Serve stored body or downstream 304; unexpected 304 without a usable entry is 502 |
 | HEAD/GET 401 or 403 | Never negative-cache or mark assumed-offline; preserve status, sanitize body/challenge | 401 or 403; no stale fallback even when `hardFail=false` |
 | 429 | No negative entry or connection-offline state; honor a bounded `Retry-After` cooldown | 429 with sanitized bounded `Retry-After` |
@@ -227,7 +227,10 @@ marker. Exact modern vendor status remains **[I]**, with no live vendor capture.
 This preservation does not classify every content error as a lookup failure.
 The virtual metadata interceptor retains its separate lookup/content phases
 ([#1686](https://github.com/weaveplatform/artifactweave/issues/1686));
-`ContentOpenError` retains a selected cached-content origin and its existing cause.
+`ContentOpenError` retains a selected cached-content origin and its existing cause,
+including physical verification of a retained blob after an origin 404. That
+producer marker does not cover entry/item lookup, clock publication or failed
+current-authority/token checks.
 Its omission/partial merge, ordinary body-read failures and malformed-document
 handling remain unchanged. Publication fault mapping and stale/offline rules are
 unchanged by the source-sanitization fix.

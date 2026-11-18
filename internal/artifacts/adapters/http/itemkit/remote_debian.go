@@ -55,6 +55,7 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 	switch {
 	case debian.ReleaseMetadataPath(p):
 		q.Resource.Kind = source.ResourceKindMetadata
+		q.Resource.RepositoryFile = true
 		q.Resource.Variant = "debian-release-v1"
 		q.Resource.ValidateMetadata = func(
 			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
@@ -104,6 +105,7 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 			q.Resource.PermissionFolder = true
 		}
 		q.Resource.Kind = source.ResourceKindMetadata
+		q.Resource.RepositoryFile = true
 		q.Resource.Variant = "debian-by-hash-v1"
 		q.Resource.ValidateMetadata = func(
 			_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
@@ -118,6 +120,7 @@ func DebianSourceRequest(q source.Request) (source.Request, error) {
 		return q, kernel.ErrNotFound
 	case debian.GeneratedPath(p):
 		q.Resource.Kind = source.ResourceKindMetadata
+		q.Resource.RepositoryFile = true
 	}
 	return q, nil
 }
@@ -158,6 +161,7 @@ func debianIndexSourceRequest(q source.Request) (source.Request, error) {
 		return q, kernel.ErrNotFound
 	}
 	q.Resource.Kind = source.ResourceKindMetadata
+	q.Resource.RepositoryFile = true
 	q.Resource.ValidateMetadata = func(
 		_ context.Context, r io.ReadSeeker, size int64, _ source.MetadataResponse,
 	) error {

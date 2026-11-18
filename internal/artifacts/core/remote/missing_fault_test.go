@@ -128,6 +128,9 @@ func TestAccPolicyMissingOriginPreservesOwnStorageFaults(t *testing.T) {
 					}
 					_, err = w.read(q)
 					wantStorageFault(t, err)
+					if errors.As(err, new(*source.ContentOpenError)) != (phase == "blob") {
+						t.Fatal("only physical blob faults may carry the selected-content origin", phase, err)
+					}
 					if !errors.Is(err, errDropped) || !errors.Is(err, kernel.ErrStore) {
 						t.Fatal("lost the original own-store cause", err)
 					}
@@ -147,6 +150,7 @@ func TestAccPolicyMissingOriginPreservesOwnStorageFaults(t *testing.T) {
 func TestAccPolicyMissingOriginConcurrentEvictionWinsOverMissingBlob(t *testing.T) {
 	w := policyFixture(t)
 	q := w.request("meta.txt", source.ResourceKindMetadata)
+	q.Resource.RepositoryFile = true
 	w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("old")})
 	w.mustRead(q, "old")
 	key := w.p.CacheKey(q, "credential-1")
@@ -168,6 +172,38 @@ func TestAccPolicyMissingOriginConcurrentEvictionWinsOverMissingBlob(t *testing.
 	_, err = w.read(q)
 	if !errors.Is(err, source.ErrSuperseded) {
 		t.Fatal("concurrent cache eviction must supersede the retained copy", err)
+	}
+	if errors.As(err, new(*source.ContentOpenError)) {
+		t.Fatal("eviction fence acquired the failed content's phase", err)
+	}
+}
+
+func TestAccPolicyMissingOriginContentFailureKeepsCurrentAuthority(t *testing.T) {
+	for _, verdict := range []error{source.ErrDenied, source.ErrSuperseded, errors.Join(kernel.ErrStore, errDropped)} {
+		t.Run(verdict.Error(), func(t *testing.T) {
+			w := policyFixture(t)
+			q := w.request("meta.txt", source.ResourceKindMetadata)
+			q.Resource.RepositoryFile = true
+			w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("old")})
+			w.mustRead(q, "old")
+			contentFailed := false
+			w.p.Blobs = missingBlob{Store: w.blobs, stat: func(context.Context, string) error {
+				contentFailed = true
+				return errDropped
+			}}
+			w.p.CheckCurrent = func(context.Context, remote.Store, source.Request, source.Permit, string) error {
+				if contentFailed {
+					return verdict
+				}
+				return nil
+			}
+			w.clock.Advance(time.Minute)
+			w.up.Set("/meta.txt", fakeupstream.Resource{Status: http.StatusNotFound})
+			_, err := w.read(q)
+			if !errors.Is(err, verdict) || errors.As(err, new(*source.ContentOpenError)) {
+				t.Fatal("current authority must win over passable content", err)
+			}
+		})
 	}
 }
 

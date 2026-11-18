@@ -68,6 +68,33 @@ func TestAccRPMRemoteMetadataPolicyNamesRequestedFile(t *testing.T) {
 	}
 }
 
+func TestAccRPMExpiredMetadataRetainsRepositoryFile(t *testing.T) {
+	for _, backend := range []string{"sqlite", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			w := rpmPolicyWorld(t, backend)
+			w.Repo.RetrievalCachePeriodSecs = new(0)
+			w.Update()
+			const name = "repodata/repomd.xml"
+			body, err := os.ReadFile(repopath.Path(t, "test/acceptance/testdata/rpm-upstream/repodata/repomd.xml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.Upstream.Set("/"+name, fakeupstream.Resource{Body: body})
+			before := w.Request(http.MethodGet, "/artifactory/remote/"+name, "admin", "")
+			if before.Code != http.StatusOK {
+				t.Fatal(before.Code, before.Body.String())
+			}
+			w.Upstream.Set("/"+name, fakeupstream.Resource{Status: http.StatusNotFound})
+			for _, method := range []string{http.MethodGet, http.MethodHead} {
+				after := w.Request(method, "/artifactory/remote/"+name, "admin", "")
+				if after.Code != http.StatusOK || (method == http.MethodGet && !bytes.Equal(after.Body.Bytes(), body)) {
+					t.Fatal("physical RPM metadata adopted API miss semantics", method, after.Code, after.Body.String())
+				}
+			}
+		})
+	}
+}
+
 func rpmPolicyAcceptedPackage(t *testing.T, w *harness.RemoteWorld) {
 	t.Helper()
 	const name = "pool/artifactweave-alpha-1.0-1.fc42.noarch.rpm"

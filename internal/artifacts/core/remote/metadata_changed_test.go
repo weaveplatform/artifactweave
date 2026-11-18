@@ -23,6 +23,7 @@ func TestAccMetadataRefreshNotifiesAfterPublication(t *testing.T) {
 	}
 	w.up.Set("/index.yaml", fakeupstream.Resource{Body: []byte("entries: {}"), ETag: `"one"`})
 	q := w.request("index.yaml", source.ResourceKindMetadata)
+	q.Resource.RepositoryFile = true
 	w.mustRead(q, "entries: {}")
 	if changes != 1 {
 		t.Fatal(changes)

@@ -23,7 +23,7 @@ func (p *Policy) missing(
 	token model.RemoteCacheToken,
 ) (fillResult, error) {
 	out := fillResult{key: token.Key}
-	if fileRead(q) {
+	if retainedOriginFile(q) {
 		// Read the representation that Begin observed, rather than the older
 		// candidate used to form the upstream request. A concurrent replacement or
 		// eviction must neither be overwritten nor acquire a false fresh clock.
@@ -63,6 +63,10 @@ func (p *Policy) missing(
 	return out, kernel.ErrNotFound
 }
 
+func retainedOriginFile(q source.Request) bool {
+	return fileRead(q) && (q.Resource.Kind == source.ResourceKindArtifact || q.Resource.RepositoryFile)
+}
+
 // retainedFile checks the cache's current item and blob without fetching or
 // re-admitting bytes. Item-store verdicts retain their existing mapping; a
 // missing blob under a stable entry or an actual store failure is our fault.
@@ -79,11 +83,14 @@ func (p *Policy) retainedFile(ctx context.Context, e model.RemoteCacheEntry) err
 	}
 	info, err := p.Blobs.Stat(ctx, e.Blob.Checksums.SHA256)
 	if err != nil {
-		return fmt.Errorf("stat retained blob: %w", err)
+		// The entry has selected its copy. This physical-content check must
+		// retain the same phase as result's later Open: metadata merging may
+		// omit failed member content without omitting lookup/authority faults.
+		return &source.ContentOpenError{Err: fmt.Errorf("stat retained blob: %w", err)}
 	}
 	if info.Size != e.Blob.Size || info.Digests.SHA256 != e.Blob.Checksums.SHA256 {
 		err = fmt.Errorf("retained blob differs from cache entry: %w", kernel.ErrStore)
-		return err
+		return &source.ContentOpenError{Err: err}
 	}
 	return nil
 }

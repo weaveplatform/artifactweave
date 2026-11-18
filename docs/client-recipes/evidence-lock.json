@@ -161,7 +161,7 @@
   "test/acceptance/vcs_steps_test.go": "6d3bb2e83a242e8ac779261e73323bfaae5f4f051a5d27053e797e216e1f845c",
   "test/server/artifacts/conan/conan_client_remote_test.go": "f6cb274617036e1e8f576344f56fd4e0b4e52b60f23cb5ef2cc949873525a45d",
   "test/server/artifacts/conan/conan_client_test.go": "3c71796a0511863f83e9bc83c51c73831a908b46efa323b5d6eeb9bcaf66abc0",
-  "test/server/artifacts/rpm/rpm_remote_policy_test.go": "048c14bad5671bab6f985096ca778a35462b364a8194fd8e8ca827ee81acddb6",
+  "test/server/artifacts/rpm/rpm_remote_policy_test.go": "f2d7c3a8b4377dc1f70745d018367fd5292a4aa3736e1ec794ad30943021d884",
   "test/server/artifacts/vcs/vcs_delivery_test.go": "5f9348d4c82bcb24b9708dd901133c780824c4502793c0ce9211c8ffc523994d",
   "test/server/artifacts/vcs/vcs_legacy_test.go": "5a46412ac476ee98d651badec4876caaa5d8fff486f6aee1394f5dd505ca794c",
   "test/server/artifacts/vcs/vcs_routes_test.go": "50f4146330500727525a6021d39c5954328759c2020472805a6dc444cc33588a"

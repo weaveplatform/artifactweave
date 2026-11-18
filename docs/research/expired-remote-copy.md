@@ -61,9 +61,16 @@ answer; the implementation does not globally bypass missed-retrieval caching.
 ## Local boundary and evidence
 
 Only explicit origin 404 branches in the shared fetch and Read-only info paths
-select this transition. File-backed raw metadata, including Maven
-`maven-metadata.xml`, is a file for this purpose. Non-file API documents and POST
-queries keep their ordinary negative behavior. A known file barred by the
+select this transition. Artifact-kind resources denote files. Metadata must also
+carry trusted `RepositoryFile` provenance from an actual repository-file reader:
+the item-route resource builder, the existing P2/Alpine/CRAN/opkg/RPM/Debian
+physical-file classifiers, Maven's file preparation, or the metadata interceptor's
+member-file lookup. These producers cover native non-Maven index-file requests
+as well as raw `maven-metadata.xml`. Format-owned API metadata keeps its ordinary
+404/negative behavior even when its raw representation is persisted. This
+provenance affects only the new origin-miss decision; it changes no admission,
+offline, TTL, cache identity or persistence rule. `NoCacheFile` and POST still
+exclude a request. A known file barred by the
 existing `no-cache`/`must-revalidate` rule is not served and acquires no new
 negative entry. That HTTP restriction remains the existing RC-3 inference.
 
@@ -82,6 +89,37 @@ existing cancellation mapping. Item-store not-found/conflict verdicts keep their
 ordinary answers. Blob loss under a stable entry is a storage fault, whereas an
 actual concurrent eviction wins through the token fence. This is an internal
 integrity/error boundary, not a claimed vendor storage-error API.
+
+Physical verification of an already selected raw metadata blob retains the
+content-acquisition phase of its later `Open`, using `ContentOpenError`.
+`DbStoringRepoMixin` (lines 492–510) and the default `PropertiesAddon`
+(lines 126–128) select a `FileResource` from node/file information; physical
+binary acquisition follows inside `MavenMetadataInterceptor`'s tolerant catch
+(lines 186–208). See the [metadata fault audit](virtual-metadata-faults-source-audit.md).
+An early unmarked `Stat` introduced an abort before that content boundary.
+Actual blob deletion reproduced direct 500 and virtual 500 on both SQL backends;
+the narrow producer marker restores a healthy later member's virtual 200 while
+preserving direct 500, the original cause and unchanged cache state. Entry/item
+lookup and clock-publication faults remain unmarked and abort; a current
+authority/token failure wins over the content error. The existing audit's
+current-version and missing-binary hierarchy qualifications still apply.
+
+CI also exposed an introduced overreach: using only the existing `fileRead`
+predicate retained disappeared Bower refs and npm keys. That predicate governs
+fill/offline policy and cannot establish which native API documents use ordinary
+repository-file lookup. The explicit provenance restores those API contracts
+without changing `NoCacheFile` or guessing from a validation variant or path.
+There is no source-backed claim here that every unmarked API document is kept
+only in memory by Artifactory. Current native API behavior beyond the established
+format contracts remains unproven; ordinary `getInfo` is not evidence that every
+native API adopts its file fallback. Query parameters and headers cannot opt an
+API request into repository-file retention.
+
+The HTTP fixture also incorrectly capped physical timeout exchanges at two.
+Go's `net/http.Transport.roundTrip`/`shouldRetryRequest` can replay an idempotent
+request across more than one reused connection. The test now observes one
+logical policy fetch while retaining real socket-timeout, returned-byte and
+unchanged-clock checks, without imposing an unsupported transport-attempt count.
 
 Repeated full-server probes on exact main `d9c304f54` and `9af4ece68` found that
 an origin 404 set `NegativeUntil` and advanced the cache revision while preserving

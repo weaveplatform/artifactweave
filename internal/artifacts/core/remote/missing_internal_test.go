@@ -35,3 +35,23 @@ func TestUnitRetainedErrorPreservesEndedRequest(t *testing.T) {
 		}
 	}
 }
+
+func TestUnitRetainedOriginFileProvenance(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		resource source.Resource
+		want     bool
+	}{
+		{"artifact", source.Resource{Kind: source.ResourceKindArtifact, Method: http.MethodGet}, true},
+		{"repository metadata file", source.Resource{Kind: source.ResourceKindMetadata, RepositoryFile: true, Method: http.MethodGet}, true},
+		{"API metadata", source.Resource{Kind: source.ResourceKindMetadata, Method: http.MethodGet}, false},
+		{"no-cache-file overrides provenance", source.Resource{Kind: source.ResourceKindMetadata, RepositoryFile: true, NoCacheFile: true, Method: http.MethodGet}, false},
+		{"POST overrides provenance", source.Resource{Kind: source.ResourceKindMetadata, RepositoryFile: true, Method: http.MethodPost}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := retainedOriginFile(source.Request{Resource: tc.resource}); got != tc.want {
+				t.Fatal(got, tc.want)
+			}
+		})
+	}
+}

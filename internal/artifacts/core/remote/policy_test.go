@@ -254,6 +254,7 @@ func TestAccPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
 			w := policyFixture(t)
 			w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good"), ETag: `"old"`})
 			q := w.request("meta.txt", source.ResourceKindMetadata)
+			q.Resource.RepositoryFile = true
 			q.Repo.HardFail = ptr(tc.hard)
 			w.mustRead(q, "good")
 			w.clock.Advance(31 * time.Second)

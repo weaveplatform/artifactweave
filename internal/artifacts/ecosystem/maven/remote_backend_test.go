@@ -94,6 +94,9 @@ func TestAccMavenMetadataIdentityAndEquivalentLayouts(t *testing.T) {
 		first.Resource.EscapedPath != second.Resource.EscapedPath {
 		t.Fatal("client-specific metadata cache identity")
 	}
+	if !first.Resource.RepositoryFile || !second.Resource.RepositoryFile {
+		t.Fatal("Maven file preparation lost repository-file provenance")
+	}
 	l, err := layout.Lookup(repo.LayoutMaven2)
 	if err != nil {
 		t.Fatal(err)
@@ -325,6 +328,7 @@ func TestAccMavenPreparedMetadataKeepsAdmission(t *testing.T) {
 	q := w.request("listing", source.ResourceKindMetadata)
 	q.Resource.Variant = "listing-v1"
 	q.Resource.ExpectedContentType = "application/json"
+	q.Repo.RetrievalCachePeriodSecs = new(0)
 	called := 0
 	q.Resource.ValidateMetadata = func(_ context.Context, body io.ReadSeeker, _ int64, _ source.MetadataResponse) error {
 		called++
@@ -348,6 +352,10 @@ func TestAccMavenPreparedMetadataKeepsAdmission(t *testing.T) {
 	if w.bytes(result) != "{}" || called == 0 {
 		t.Fatal("custom admission was replaced", called)
 	}
+	w.up.Set("/listing", fakeupstream.Resource{Status: http.StatusNotFound})
+	if _, err = m.Read(t.Context(), q, w.permit); !errors.Is(err, kernel.ErrNotFound) {
+		t.Fatal("prepared API metadata inherited repository-file retention", err)
+	}
 	// A nil pool would panic if the prepared response asked for checksum files.
 	w.p.Pool = nil
 	if err = m.PrepareUpload(
@@ -362,7 +370,7 @@ func TestAccMavenPreparedMetadataKeepsAdmission(t *testing.T) {
 	ordinary := w.request("org/acme/app/maven-metadata.xml", source.ResourceKindMetadata)
 	prepared, err := m.prepare(t.Context(), ordinary)
 	if err != nil || prepared.Resource.Variant != "maven-source-v1" ||
-		prepared.Resource.Validate == nil ||
+		prepared.Resource.Validate == nil || !prepared.Resource.RepositoryFile ||
 		preparedMetadata(prepared.Resource) {
 		t.Fatal("ordinary Maven admission changed", prepared.Resource, err)
 	}
