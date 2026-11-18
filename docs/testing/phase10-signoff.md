@@ -4,9 +4,11 @@ Status: **implementation evidence recorded; final qualification pending**.
 
 Audit date: 2026-11-18. Merged implementation baseline:
 [`cbed189bceac60069fd037d9de56235e05877e68`](https://github.com/weaveplatform/artifactweave/commit/cbed189bceac60069fd037d9de56235e05877e68).
-The native GitHub child lists and issue/merged-PR timelines show **44 of 45 child
-tickets closed**. [QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571)
-is still open. Epic closure remains with the maintainer.
+The native GitHub child lists and issue/merged-PR timelines show **44 of 46 child
+tickets closed**, including the qualification follow-up identified in this audit.
+[QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571) and
+[ADP-08 #1709](https://github.com/weaveplatform/artifactweave/issues/1709)
+remain open. Epic closure remains with the maintainer.
 
 This ledger records controlled implementation evidence, not a live Artifactory
 comparison or a completed merged-main release gate. Decision 0008 remains
@@ -20,7 +22,7 @@ for the separate acceptance criteria or the final combined-tree gate.
 
 | Epic | Closed children | Delivery and remaining qualification |
 | --- | --- | --- |
-| [#1519](https://github.com/weaveplatform/artifactweave/issues/1519) Existing native virtual adapters adopt the engine (P9b/P9c types) | 7/7 | [#1637](https://github.com/weaveplatform/artifactweave/pull/1637), [#1647](https://github.com/weaveplatform/artifactweave/pull/1647), [#1648](https://github.com/weaveplatform/artifactweave/pull/1648), [#1649](https://github.com/weaveplatform/artifactweave/pull/1649), [#1653](https://github.com/weaveplatform/artifactweave/pull/1653), [#1655](https://github.com/weaveplatform/artifactweave/pull/1655), [#1656](https://github.com/weaveplatform/artifactweave/pull/1656), [#1657](https://github.com/weaveplatform/artifactweave/pull/1657), [#1659](https://github.com/weaveplatform/artifactweave/pull/1659) |
+| [#1519](https://github.com/weaveplatform/artifactweave/issues/1519) Existing native virtual adapters adopt the engine (P9b/P9c types) | 7/8 | Required cross-protocol qualification table: [#1709](https://github.com/weaveplatform/artifactweave/issues/1709). Merged delivery: [#1637](https://github.com/weaveplatform/artifactweave/pull/1637), [#1647](https://github.com/weaveplatform/artifactweave/pull/1647), [#1648](https://github.com/weaveplatform/artifactweave/pull/1648), [#1649](https://github.com/weaveplatform/artifactweave/pull/1649), [#1653](https://github.com/weaveplatform/artifactweave/pull/1653), [#1655](https://github.com/weaveplatform/artifactweave/pull/1655), [#1656](https://github.com/weaveplatform/artifactweave/pull/1656), [#1657](https://github.com/weaveplatform/artifactweave/pull/1657), [#1659](https://github.com/weaveplatform/artifactweave/pull/1659) |
 | [#1520](https://github.com/weaveplatform/artifactweave/issues/1520) Docker, OCI and Helm OCI virtual repositories | 4/4 | [#1669](https://github.com/weaveplatform/artifactweave/pull/1669), [#1673](https://github.com/weaveplatform/artifactweave/pull/1673), [#1677](https://github.com/weaveplatform/artifactweave/pull/1677), [#1683](https://github.com/weaveplatform/artifactweave/pull/1683) |
 | [#1521](https://github.com/weaveplatform/artifactweave/issues/1521) Shared virtual engine (`internal/artifacts/core/virtual`, item routes, kit) | 10/10 | [#1585](https://github.com/weaveplatform/artifactweave/pull/1585), [#1596](https://github.com/weaveplatform/artifactweave/pull/1596), [#1607](https://github.com/weaveplatform/artifactweave/pull/1607), [#1612](https://github.com/weaveplatform/artifactweave/pull/1612), [#1615](https://github.com/weaveplatform/artifactweave/pull/1615), [#1617](https://github.com/weaveplatform/artifactweave/pull/1617), [#1625](https://github.com/weaveplatform/artifactweave/pull/1625), [#1626](https://github.com/weaveplatform/artifactweave/pull/1626), [#1634](https://github.com/weaveplatform/artifactweave/pull/1634), [#1637](https://github.com/weaveplatform/artifactweave/pull/1637), [#1638](https://github.com/weaveplatform/artifactweave/pull/1638), [#1646](https://github.com/weaveplatform/artifactweave/pull/1646), [#1658](https://github.com/weaveplatform/artifactweave/pull/1658) |
 | [#1522](https://github.com/weaveplatform/artifactweave/issues/1522) Go virtual repositories | 2/2 | [#1660](https://github.com/weaveplatform/artifactweave/pull/1660), [#1662](https://github.com/weaveplatform/artifactweave/pull/1662) |
@@ -169,6 +171,7 @@ retain their primary-source and modern-version limits in their owning research.
 
 | Item | Current disposition |
 | --- | --- |
+| [#1709](https://github.com/weaveplatform/artifactweave/issues/1709) | The adapter epic explicitly requires one table covering all 23 adapters over member order, nesting and a cycle. Individual native/kit tests exist, but the complete table was not identified in the merged tree. This tracks the missing qualification artifact, not a reproduced runtime defect, and blocks #1571. |
 | [#1645 / PR #1705](https://github.com/weaveplatform/artifactweave/pull/1705) | Draft correction for retaining an expired repository file on origin 404. Introduced metadata-content and API-document regressions are being fixed in that PR; its old-head CI failures do not qualify the new correction. |
 | [#1704](https://github.com/weaveplatform/artifactweave/issues/1704) | Existing-copy validation-clock SQL faults still need the independently tested cause-preserving 500 correction merged. |
 | [#1706 / PR #1707](https://github.com/weaveplatform/artifactweave/pull/1707) | Test-only Go repeated-publication fixture isolation is in CI. Both independent builds still require exactly three artifacts; no registry behavior is changed. |
