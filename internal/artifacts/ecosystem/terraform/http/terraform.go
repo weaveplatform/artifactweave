@@ -56,6 +56,7 @@ func Protocol(o Options) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
 		repo.Federated: pkgroute.Local{},
+		repo.Virtual:   pkgroute.Virtual{},
 	}
 	if o.RemoteSources != nil {
 		sources[repo.Remote] = pkgroute.Remote{Service: o.RemoteSources}

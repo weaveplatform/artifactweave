@@ -52,7 +52,7 @@ jf config add aw --url "$AW_URL" --artifactory-url "$AW_URL/artifactory" --acces
 
 ## Publish
 
-Classes: **local, federated**. JFrog CLI packages module subdirectories and deploys the indexed ZIPs. Run from the parent of alpha/.
+Classes: **local, federated, virtual**. JFrog CLI packages module subdirectories and deploys indexed ZIPs to a MODULE local/federated repository or a virtual with a MODULE defaultDeploymentRepo. Provider publication still uses a concrete PROVIDER repository. Run from the parent of alpha/.
 
 ```sh
 jf terraform-config --server-id-deploy=aw --repo-deploy="$AW_REPO"
@@ -115,7 +115,7 @@ provider_installation {
 Classes outside **local, remote, virtual, federated** are not registered for this format. Commands above apply only to each operation's listed classes. Federated evidence is for one node; it does not establish cross-vendor replication.
 
 - Provider source coordinates use <authority>/<repository>-rt-ns-<namespace>/<provider>, not the module __ separator.
-- Publish to a concrete local/federated repository; remote repositories resolve only.
+- Module publication through a virtual requires defaultDeploymentRepo. Provider publication targets a concrete local/federated repository; virtual provider/mirror resolution remains #1564. Remote repositories resolve only.
 - The HTTP host override in tests is a loopback fixture workaround; production clients should use HTTPS discovery.
 - The provider registry requires a valid publisher signature and configured verification key. The HTTPS network mirror is a separate installation mode that checks archive hashes and the lockfile; it does not claim publisher-signature verification.
 
@@ -130,3 +130,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/tokens.feature](../../test/acceptance/features/tokens.feature).
 - Evidence: [test/acceptance/features/terraform_providers.feature](../../test/acceptance/features/terraform_providers.feature).
 - Evidence: [test/acceptance/terraform_provider_steps_test.go](../../test/acceptance/terraform_provider_steps_test.go).
+- Evidence: [test/acceptance/features/terraform_remote.feature](../../test/acceptance/features/terraform_remote.feature).

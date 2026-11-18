@@ -46,6 +46,10 @@ func parse(rest string) (operation, bool) {
 }
 
 func (h handler) serve(w http.ResponseWriter, r *http.Request) {
+	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		h.virtualModule(w, r)
+		return
+	}
 	if r.URL.Query().Has("sig") {
 		h.signed(w, r)
 		return

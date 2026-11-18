@@ -101,7 +101,7 @@ var tfRegistryStatusPart = statusPart{
 				"/artifactory/api/terraform/v1/modules/tf-registry-virtual__ns/name/aws/versions",
 				"admin",
 				"",
-				501,
+				404,
 			},
 		}
 	},

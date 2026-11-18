@@ -28,6 +28,7 @@ require (
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/go-jose/go-jose/v4 v4.1.9
 	github.com/google/go-cmp v0.7.0
+	github.com/hashicorp/hcl/v2 v2.25.0
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/klauspost/compress v1.20.4
 	github.com/moby/moby/client v0.6.3
@@ -41,6 +42,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.45.0
 	github.com/tinylib/msgp v1.6.5
 	github.com/ulikunitz/xz v0.5.17
+	github.com/zclconf/go-cty v1.19.0
 	github.com/zeebo/blake3 v0.2.4
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/metric v1.47.0
@@ -73,10 +75,13 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.62.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.62.0 // indirect
 	github.com/Microsoft/go-winio v0.6.4 // indirect
+	github.com/agext/levenshtein v1.2.1 // indirect
 	github.com/alexflint/go-arg v1.6.1 // indirect
 	github.com/alexflint/go-scalar v1.2.0 // indirect
 	github.com/apache/arrow-go/v18 v18.9.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
+	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
+	github.com/apparentlymart/go-textseg/v17 v17.0.1 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.27 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.9 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.12 // indirect
@@ -140,6 +145,7 @@ require (
 	github.com/magiconair/properties v1.18.13 // indirect
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
+	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.3.3 // indirect
 	github.com/moby/moby/api v1.57.0 // indirect

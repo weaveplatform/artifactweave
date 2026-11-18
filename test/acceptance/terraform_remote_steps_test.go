@@ -15,6 +15,7 @@ import (
 )
 
 func (w *world) registerTerraformRemote(sc *godog.ScenarioContext) {
+	sc.Step(`^a Terraform remote parent depends on local and remote registry submodules$`, w.terraformVirtualUpstream)
 	sc.Step(
 		`^a Terraform registry upstream serves versioned ZIP and subdirectory archives$`,
 		w.terraformRemoteUpstream,
@@ -140,5 +141,65 @@ func (w *world) terraformRemoteRequests() error {
 			return fmt.Errorf("Terraform did not fetch %s through controlled upstream", path)
 		}
 	}
+	return nil
+}
+
+// Deliberately unreachable registry hosts and bare registry addresses prove that
+// both HCL and JSON dependencies resolve through the requested virtual instead.
+func (w *world) terraformVirtualUpstream() error {
+	if err := w.terraformRemoteUpstream(); err != nil {
+		return err
+	}
+	putJSON := func(path string, doc any) {
+		body, _ := json.Marshal(doc)
+		w.remote.Set(path, fakeupstream.Resource{Body: body, Header: http.Header{"Content-Type": {"application/json"}}})
+	}
+	putJSON("/registry/modules/acme/helper/aws/versions", map[string]any{"modules": []any{map[string]any{"versions": []any{map[string]string{"version": "1.0.0"}}}}})
+	w.remote.Set("/registry/modules/acme/helper/aws/1.0.0/download", fakeupstream.Resource{Status: 204, Header: http.Header{"X-Terraform-Get": {"/archives/helper.zip"}}})
+	var helper bytes.Buffer
+	zw := zip.NewWriter(&helper)
+	file, err := zw.Create("modules/child/main.tf")
+	if err != nil {
+		return err
+	}
+	if _, err = file.Write([]byte(`output "name" { value = "remote dependency" }`)); err != nil {
+		return err
+	}
+	if err = zw.Close(); err != nil {
+		return err
+	}
+	w.remote.Set("/archives/helper.zip", fakeupstream.Resource{Body: helper.Bytes(), Header: http.Header{"Content-Type": {"application/zip"}}})
+	var parent bytes.Buffer
+	gz := gzip.NewWriter(&parent)
+	tw := tar.NewWriter(gz)
+	files := map[string]string{
+		"snapshot/modules/demo/main.tf": `module "local" {
+ source = "must-not-contact.invalid/acme/local/aws"
+ version = "1.2.3"
+}
+output "release" { value = "${module.local.name} and ${module.remote.name}" }
+`,
+		"snapshot/modules/demo/main.tf.json": `[{"module":{"remote":{"source":"acme/helper/aws//modules/child","version":"1.0.0"}}}]`,
+		"snapshot/README.md":                 "all sibling files remain in the original package\n",
+	}
+	for name, body := range files {
+		if err = tw.WriteHeader(&tar.Header{Name: name, Mode: 0o600, Size: int64(len(body))}); err != nil {
+			return err
+		}
+		if _, err = tw.Write([]byte(body)); err != nil {
+			return err
+		}
+	}
+	if err = tw.Close(); err != nil {
+		return err
+	}
+	if err = gz.Close(); err != nil {
+		return err
+	}
+	w.remote.Set("/archives/nested.tar.gz", fakeupstream.Resource{Body: parent.Bytes(), Header: http.Header{"Content-Type": {"application/gzip"}}})
+	w.remote.Set(
+		"/registry/modules/acme/greeting/aws/2.0.0/download",
+		fakeupstream.Resource{Status: 204, Header: http.Header{"X-Terraform-Get": {"/archives/nested.tar.gz//*/modules/demo"}}},
+	)
 	return nil
 }

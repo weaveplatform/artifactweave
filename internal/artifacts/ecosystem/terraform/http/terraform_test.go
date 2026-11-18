@@ -211,7 +211,7 @@ func TestAccModuleRoutes(t *testing.T) {
 		{"GET", prefix + "v1/modules/untyped__ns/name/aws/versions", "admin", 404},
 		{"GET", prefix + "v1/modules/other__ns/name/aws/versions", "admin", 404},
 		{"GET", prefix + "v1/modules/remote__ns/name/aws/versions", "admin", 501},
-		{"GET", prefix + "v1/modules/virtual__ns/name/aws/versions", "admin", 501},
+		{"GET", prefix + "v1/modules/virtual__ns/name/aws/versions", "admin", 404},
 		{"GET", prefix + "v1/modules/no__ns/name/aws/versions", "admin", 404},
 		{"GET", prefix + "v1/modules/plain/name/aws/versions", "admin", 404},
 		{"GET", prefix + "v1/providers/mods-rt-ns-ns/null/versions", "admin", 404},
