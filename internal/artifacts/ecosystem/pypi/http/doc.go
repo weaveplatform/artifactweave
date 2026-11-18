@@ -98,6 +98,12 @@
 // Implemented P8, with remote retrieval in P9. Moved here in P9d, which also
 // moved the server root's Warehouse JSON registrar here (WEB-17).
 //
+// P10 delivers merged virtual simple/Warehouse and distribution/sidecar
+// reads, plus Twine/uv DDR publication. Source and member authority remain bound
+// through delivery; cold publication retains the trusted upstream policy path
+// while storing the canonical representation (#1670).
+// See docs/operations/virtual-repositories.md for family evidence and limits.
+//
 // # Testing
 //
 //   - simple_test.go, json_test.go, download_test.go and upload_test.go:

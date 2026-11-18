@@ -82,6 +82,10 @@
 // mergers use the shared visibility-aware cache; uploads check the default
 // deployment target.
 //
+// Delivered virtual mechanism and retained client/server evidence are mapped
+// in docs/operations/virtual-repositories.md and the generated type matrix.
+// P13 peer federation and P35 coordination remain separate.
+//
 // # Testing
 //
 //   - path_test.go: the stored layout's recipe and package paths, and the

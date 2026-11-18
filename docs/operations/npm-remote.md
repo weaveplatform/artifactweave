@@ -48,6 +48,41 @@ listed. Origin credentials are not sent to another authority unless `allowAnyHos
 is on and that authority uses HTTPS
 ([transport contract](../implementation/remote-http-transport.md)).
 
+Local and federated repositories
+sign with ECDSA and serve `/-/npm/v1/keys` (#362, decision 0034). A remote relays its
+upstream's `dist.signatures` and answers `/-/npm/v1/keys` with the upstream's keys
+document (#1318, decision 0034, "Signatures"), so `npm audit signatures` verifies
+packages installed through a remote of a signing upstream; virtuals now merge keys from readable local/federated and remote members while retaining winning `dist.signatures`. P28 owns vulnerability-audit proxying. Audit requests do not receive a synthetic
+empty-success response. P21/#262 owns browser login;
+legacy authentication remains available.
+
+`npm_remote.feature` runs npm 11 and npm 12: cold scoped/unscoped install, lockfile URLs
+and integrity, then `npm ci` from a second empty client cache with upstream stopped and
+the server offline. The fixture demonstrates artifactweave behavior. Artifactory
+comparison and the inferred remote error/filtering shapes remain P19/#216 work, among
+them the `dist.tarball` 7.x writes for a tarball outside the registry, which no source
+shows [I].
+
+## Virtual repositories
+
+One virtual registry serves full/abbreviated packuments, version documents,
+dist-tags, search, signing keys and tarballs. Member/version winners retain raw
+manifest fields and signatures; public tarball URLs remain virtual. npm 11/12
+install/ci scenarios cover scoped/unscoped local plus remote dependency trees.
+Publish, tag, deprecate and unpublish use the DDR's actual permissions;
+`?write=true` reads that target rather than the merged model. Legacy
+login/logout/whoami retain the user/account-token handlers and do not borrow DDR
+authorization.
+Search assembles results per request from live readable local rows and remote
+search pages cached for the virtual period. Key
+union makes `npm audit signatures` verify signed members while an unsigned
+member still reports the client's unsigned result.
+
+The cached packument model follows R8; writes do not invalidate it. Request URL,
+full/abbreviated rendering, conditions and external-dependency rewriting remain
+request-specific. See the [shared virtual rules](virtual-repositories.md) and
+[native scenarios](../../test/acceptance/features/npm_virtual.feature).
+
 A virtual can enable `externalDependenciesEnabled`, provide Ant patterns in
 `externalDependenciesPatterns`, and select a same-type direct remote member with
 `externalDependenciesRemoteRepo`. Matching tarball/GitHub dependencies become
@@ -64,18 +99,6 @@ bindings prevent two sources with one filename from serving each other's bytes;
 a cache miss while offline remains a refusal. See [NPM-05 research and its explicit
 inferences](../research/p10-npm-external.md) for naming and merge choices. This
 virtual dependency handling is separate from remote `dist.tarball` handling above.
-Local and federated repositories
-sign with ECDSA and serve `/-/npm/v1/keys` (#362, decision 0034). A remote relays its
-upstream's `dist.signatures` and answers `/-/npm/v1/keys` with the upstream's keys
-document (#1318, decision 0034, "Signatures"), so `npm audit signatures` verifies
-packages installed through a remote of a signing upstream; virtual signature and key
-merging is #1319, and P28 owns audit proxying. Audit requests do not receive a synthetic
-empty-success response. P21/#262 owns browser login;
-legacy authentication remains available.
-
-`npm_remote.feature` runs npm 11 and npm 12: cold scoped/unscoped install, lockfile URLs
-and integrity, then `npm ci` from a second empty client cache with upstream stopped and
-the server offline. The fixture demonstrates artifactweave behavior. Artifactory
-comparison and the inferred remote error/filtering shapes remain P19/#216 work, among
-them the `dist.tarball` 7.x writes for a tarball outside the registry, which no source
-shows [I].
+Unsettled naming/versioning and archive-URL choices remain [I] in the
+[NPM-05 #216 entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6977564885).
+Signing-key choices are recorded in the [NPM-04 entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6977107477).

@@ -95,6 +95,10 @@
 // #768). Moved here in P9d. Merger and SortNewestFirst added in P10
 // (https://github.com/weaveplatform/artifactweave/issues/1538).
 //
+// Delivered virtual mechanism and retained client/server evidence are mapped
+// in docs/operations/virtual-repositories.md and the generated type matrix.
+// P13 peer federation and P35 coordination remain separate.
+//
 // # Testing
 //
 //   - virtual_test.go: the Merger lists each version once, newest first.

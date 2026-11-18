@@ -57,7 +57,7 @@ inventory across products, APIs and clients.
 |---|---|
 | Upstream fetch/cache, credentials, metadata rewrite, remote version searches, Smart Remote synchronization/transitive lookup | P9, [epic #612](https://github.com/weaveplatform/artifactweave/issues/612); the [retrieval contract](remote-retrieval-contract.md) maps every field to an owner and tests. Generic remote retrieval, [npm remote retrieval](../operations/npm-remote.md), [Python remote retrieval](../operations/pypi-remote.md), [NuGet v2/v3 and symbol remote retrieval](../operations/nuget-remote.md), [classic Helm remote retrieval](../operations/helm-remote.md), the shared source/transport/security/cache foundation and [cache maintenance](remote-cache-maintenance.md) are implemented. NuGet remote/cache reindex (#700) rebuilds index rows only from verified cached archives. [Maven-family remote retrieval](../operations/maven-remote-repositories.md) is implemented with native Maven evidence; [Terraform module remote retrieval](../operations/terraform-remote-modules.md) and [provider remote retrieval](../operations/terraform-remote-providers.md) are implemented with pinned native cold/offline evidence; [Smart Remote synchronization](smart-remote.md) is implemented with current-wire #216 and external-peer P37 qualification retained; [remote folder browsing](../operations/remote-repositories.md#remote-folder-browsing) is implemented with bounded HTML/Smart listings; [transitive AQL](../operations/transitive-aql.md) is implemented with direct/virtual member bounds and native CLI evidence. [#213 upstream search](../operations/upstream-search.md) discovers authoritative metadata/listings without binary prefetch, including permission-safe differing layouts through #672. The [P9 sign-off ledger](../testing/phase9-signoff.md) records the passing all-15 public conformance run (#638) and exact-head combined-tree exit through #639 after the provider compatibility fix (#701) |
 | LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages | P9b implements repository management and native protocols for every documented supported class. These five were missing from the original 44-type inventory and are separate from P9c's 28 generic-fallback formats |
-| Virtual resolution and metadata merging | P10; native clients resolve local and remote members with permission filtering |
+| Virtual resolution and metadata merging | Implemented P10 mechanisms and retained client/server evidence are mapped in the [virtual guide](../operations/virtual-repositories.md) and [type matrix](package-format-matrix.md); #1571 owns final phase qualification |
 | Projects, webhook delivery, package cleanup, single push/pull replication | P11; project-scoped remote resolution (#487) spans P9's source model and P11's sharing/authorization, with closure in P11 |
 | Full descriptor, system configuration, LDAP, anonymous access and configured mail notifications | P12; #303 includes native anonymous reads with an explicit permission grant; mail settings must result in delivery. Proxy obligations include NTLM/domain/ntHost, `redirectedToHosts` credential behavior and broader proxy compatibility; #618 supports HTTP(S) Basic proxies and requires CONNECT for DNS-named HTTP sources |
 | Repository and Access Federation, topology | P13/P14 for artifactweave peers; external interoperability is additionally owned by P37/P40 |
@@ -123,37 +123,37 @@ itself rejects is a compatibility rule, not a missing product feature.
 
 | Public type(s) | Accepted classes | Native behavior owner |
 |---|---|---|
-| `docker`, `oci`, `helmoci`, `go`, `helm`, `maven`, `gradle`, `ivy`, `sbt`, `npm`, `nuget`, `pypi`, `terraform` | L/R/V/F | Local protocols P6–P8; remote P9, virtual P10, federation P13, remaining gaps P28 |
+| `docker`, `oci`, `helmoci`, `go`, `helm`, `maven`, `gradle`, `ivy`, `sbt`, `npm`, `nuget`, `pypi`, `terraform` | L/R/V/F | Local protocols P6–P8 and remote P9; P10 virtual metadata/item resolution and family DDR flows implemented ([evidence](../operations/virtual-repositories.md#family-evidence)); peer federation P13, remaining protocol gaps P28 |
 | `terraformbackend` | L | P8 state service; remaining applicable APIs P28 |
-| `generic` | L/R/V/F | P3 storage and P9 HTTP remote retrieval implemented; virtual fetching P10, federation P13 |
+| `generic` | L/R/V/F | P3 storage, P9 HTTP remote retrieval and P10 ordered virtual fetch/DDR/browse implemented; peer federation P13 |
 | `releasebundles` | L/F | P15; v2 workflows P24 |
-| `alpine` | L/R/V/F | P9c |
-| `debian` | L/R/V/F | P9c |
-| `rpm` | L/R/V/F | P9c |
-| `opkg` | L/R/V/F | P9c |
+| `alpine` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `debian` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `rpm` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `opkg` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `cargo` | L/R/F | P9c; verify the documented federation workaround separately |
-| `composer` | L/R/V/F | P9c |
-| `gems` | L/R/V/F | P9c |
-| `pub` | L/R/V/F | P9c |
-| `swift` | L/R/V/F | P9c |
-| `hex` | L/R/V | P9c |
-| `bower` | L/R/V/F | P9c |
-| `conan` | L/R/V/F | P9c |
-| `cocoapods` | L/R/V/F | P9c |
-| `bazelmodules` | L/R/V/F | P9c |
-| `p2` | R/V | P9c |
+| `composer` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `gems` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `pub` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `swift` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `hex` | L/R/V | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `bower` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `conan` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `cocoapods` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `bazelmodules` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `p2` | R/V | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `jetbrainsplugins` | R | P9c |
 | `aieditorextensions` | R | P9c |
-| `conda` | L/R/V/F | P9c |
-| `cran` | L/R/V/F | P9c |
-| `huggingfaceml` | L/R/V/F | P9c |
+| `conda` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `cran` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `huggingfaceml` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `machinelearning` | L/F | P9c |
-| `ansible` | L/R/V/F | P9c |
-| `chef` | L/R/V/F | P9c |
-| `puppet` | L/R/V/F | P9c |
+| `ansible` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `chef` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
+| `puppet` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `vagrant` | L/F | P9c #785: native metadata, verified boxes and Vagrant client proof; [guide](../testing/vagrant.md) |
 | `vcs` | R | P9c |
-| `gitlfs` | L/R/V/F | P9c |
+| `gitlfs` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `nix` | L/R/V/F; signed binary cache native proof | P9c #788 |
 
 P9b registers the five documented types below for their target classes. LuaRocks,
@@ -176,6 +176,26 @@ to its native client, controlled fault evidence and final gate.
 | [Skills](https://docs.jfrog.com/artifactory/docs/skills-repositories) | L | Publish, discovery, search and CLI install/update implemented; real scanning P26 |
 | [Agent Plugins](https://docs.jfrog.com/artifactory/docs/agent-plugins-repositories) | L | ZIP index, marketplaces and CLI publish/install/update implemented; signed Evidence P23 |
 | [Agent Packages](https://docs.jfrog.com/artifactory/docs/agent-packages-repositories) | L/F | APM v1 local and one-node federated native paths implemented; peer convergence P13 |
+
+### Delivered virtual capabilities and later owners
+
+The P10 implementation tickets are merged: the shared walk/configuration gates,
+item upstream fetching, metadata cache, browsing and DDR mapping, followed by
+Maven, npm, PyPI, NuGet, Helm, Go, Terraform and Docker/OCI/Helm OCI protocols and
+the 23 adopted adapters. The [operations guide](../operations/virtual-repositories.md)
+links every family and its retained evidence. `native merge`, `item routes` and
+`first member wins` are implementation mechanisms; the inventory's separate
+client/server references determine the evidence strength.
+
+P10 does not qualify cross-peer federation (P13), project-source sharing (P11),
+multi-node cache coordination (P35) or unrelated unfinished protocol/API surface
+(P28 and the named format owners). The merged cache is bounded per process as
+recorded by the [remote cache policy](remote-cache-policy.md#concurrency-and-publication).
+Native evidence is not a live vendor-parity capture. #216 retains the inferred
+comparisons and P19 owns that comparison environment. #1571 owns the combined
+qualification record and final P10 status; this documentation does not mark it done.
+Known unmerged defects in the virtual guide remain visible rather than counted
+as delivered fixes.
 
 ### Existing issues and client blockers
 

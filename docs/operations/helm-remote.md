@@ -2,13 +2,7 @@
 
 Remote `helm` repositories serve an upstream `index.yaml`, chart archives and
 provenance through `/artifactory/api/helm/<repo>/`. Helm OCI uses the separate
-Docker/OCI adapter (#624). Virtual repositories merge readable member indexes.
-With `useNamespaces: true`, chart URLs name a flattened real member and reads
-select it exclusively on both the Helm API and item routes. Allowed external
-charts use the virtual `_external` API route and retain their remote member's
-URL and source policies. Publish through the virtual item route to its configured
-`defaultDeploymentRepo`; the next index read includes the deployed chart.
-A virtual without that deployment target refuses writes with 405.
+Docker/OCI adapter (#624). Virtual behavior is described below.
 
 ```sh
 curl --fail --user admin "$REGISTRY/artifactory/api/repositories/charts" \
@@ -82,3 +76,22 @@ Primary protocol sources checked 2026-10-22:
 and [JFrog Helm repositories](https://docs.jfrog.com/artifactory/docs/kubernetes-helm-chart-repositories).
 These tests prove artifactweave behavior; supported Helm generation qualification
 continues under P28/P41.
+
+## Virtual repositories
+
+Virtual repositories merge readable member indexes.
+With `useNamespaces: true`, chart URLs name a flattened real member and reads
+select it exclusively on both the Helm API and item routes. Allowed external
+charts use the virtual `_external` API route and retain their remote member's
+URL and source policies. Publish through the virtual item route to its configured
+`defaultDeploymentRepo`; the next index read includes the deployed chart.
+A virtual without that deployment target refuses writes with 405.
+
+Relative URLs retain their chosen member/source authority. Uploading a chart
+invalidates containing virtual indexes through nesting, so read-back is immediate
+rather than waiting for the merged-index TTL.
+
+[Native Helm scenarios](../../test/acceptance/features/helm_virtual.feature)
+cover mixed local/remote charts, namespaces, URL modes and publication. See the
+[shared virtual rules](virtual-repositories.md) for visibility-keyed cache behavior; exact external-route
+choices remain [I] in the [HLM-02 #216 entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6954421021).

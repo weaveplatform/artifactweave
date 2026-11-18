@@ -3,7 +3,7 @@
 Maven, Gradle, Ivy and SBT remotes fetch repository content through
 `/artifactory/{repo}/{path}` (#625). The shared [remote operations guide](remote-repositories.md)
 explains transport security, source authorization, cache aliases, no-store delivery and
-cache maintenance. Virtual merging remains P10.
+cache maintenance. Virtual merging and item-route layout translation are implemented; see the virtual section below.
 
 ```sh
 curl --fail --user admin "$REGISTRY/artifactory/api/repositories/maven-central" \
@@ -129,3 +129,23 @@ layout translation and cached snapshot retention. These fake-upstream observatio
 prove artifactweave behavior, not a captured Artifactory response. The [research
 addendum](../research/27-maven.md#12-p9-remote-implementation-evidence-625) records
 current sources and the remaining #216/P19 comparison cases.
+
+## Virtual repositories
+
+Maven, Gradle, Ivy and sbt resolve through the virtual item URL. The virtual
+merges `maven-metadata.xml`, selects version tokens and the newest eligible
+snapshot across members, and retains member permissions, release/snapshot and
+remote source policies. Pure format helpers own metadata merge/selection; item
+routes own member delivery. Maven POM cleanup removes configured repository
+references without changing upstream cached originals.
+
+Read paths translate from the addressed virtual layout independently into each
+nested/member layout. Plain files and `[RELEASE]` can retry their original path;
+snapshots and metadata have no original retry. Uploads keep the exact supplied
+path and use the DDR, even when its layout differs. Closed-addon and delivered
+filename choices remain [I] ([MVN-06 #216 entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6974481140)).
+
+[Mixed native publication/resolution](../../test/acceptance/features/maven.feature),
+[Gradle/Ivy publication and cross-layout reads](../../test/acceptance/features/system_recipes.feature)
+and [sbt](../../test/acceptance/features/sbt.feature) use fresh client caches.
+The [shared virtual rules](virtual-repositories.md) cover order, hiding, browsing and transfer refusals.

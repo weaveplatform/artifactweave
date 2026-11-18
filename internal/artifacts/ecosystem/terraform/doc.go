@@ -88,12 +88,13 @@
 //
 // # Status
 //
-// Implemented P8 (Terraform module and provider local repositories), with
-// remote modules and providers in P9. Moved here in P9d. P10 adds virtual
-// module version unions and member-bound signed downloads (#1550); virtual
-// provider and network-mirror operations remain deferred to #1564. Remote
-// module source rewriting retains raw cache provenance and changes only
-// delivered archive representations.
+// Implemented P8 local/P9 remote module/provider protocols, moved here in
+// P9d. P10 delivers module-version unions, member-bound bundles and static module
+// source rewriting (#1550), and provider registry/network-mirror version unions,
+// platform downloads and member-bound signed bundle selection (#1564). Fresh
+// Terraform init scenarios cover mixed members. Native registry publication is
+// not implied; project sources, remote execution and broader browsing retain
+// their named owners. See the virtual guide.
 //
 // # Testing
 //

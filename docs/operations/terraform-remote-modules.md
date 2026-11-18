@@ -116,7 +116,7 @@ subdirectory and relative sibling module, then repeats with a fresh client modul
 cache during upstream outage. This controlled fixture proves artifactweave behavior;
 Artifactory parity observations remain #216 / P19. Local module/provider and state
 backend behavior is unchanged. Provider remotes retain #632; virtual modules are
-implemented by #1550, while virtual providers/network mirrors remain #1564. Remote `terraformbackend` and remote execution are not enabled. Broader registry
+implemented by #1550, while virtual providers/network mirrors are implemented by #1564. Remote `terraformbackend` and remote execution are not enabled. Broader registry
 and execution contracts remain owned by P28; browser login remains P21/#262.
 
 Every initial metadata/archive URL and redirect hop is checked against the same
@@ -159,3 +159,7 @@ ETag, conditional responses and ranges describe the delivered bytes. Unchanged
 archives retain their byte content and compression without an output temporary copy.
 Exact inferred syntax and representation choices are recorded for #216 in
 [the P10 research](../research/p10-terraform-modules.md).
+
+The [shared virtual rules](virtual-repositories.md) cover common order, hiding,
+patterns and member policy. Native Terraform publication is not implied by module
+or provider resolution; the delivered generic item/DDR path remains separate.

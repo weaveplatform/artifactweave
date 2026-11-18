@@ -128,7 +128,7 @@ Upstream PDB identities do not establish a trustworthy package owner. They requi
 explicit symbol-path Read grant; a package-only grant does not imply symbol access. Current
 permission/source/credential fences apply again at delivery. Local `.snupkg` extraction and
 its source ownership/deletion rules remain separate; remote PDBs are cached upstream bytes,
-not derived local symbols. Virtual symbol resolution belongs to P10.
+not derived local symbols. Virtual symbol resolution searches the first readable local extracted PDB or remote symbol file under current policy.
 
 `maxUniqueSnapshots` also applies to cached remote NuGet prereleases. Cache admission marks
 deduplicated durable cleanup work, processed by the existing NuGet periodic worker. Zero
@@ -176,10 +176,10 @@ only one cached version is indexed. Scheduling, rebuilding and subsequent offlin
 make zero upstream requests. Persistent-store tests also cover abandoned leases, replacement
 workers, rollback/retry and source/authority changes. This is controlled API implementation
 evidence; vendor-specific scheduling/failure details remain #216 comparison work. Local and
-federated reindex retain their existing behavior; virtual reindex remains P10.
+federated reindex retain their existing behavior; a virtual reindex accepts the Manage-gated request without creating an index or job.
 
 
-## Virtual V2 and V3 reads
+## Virtual repositories
 
 Configure a NuGet virtual repository with local/federated and remote members,
 then use one source URL:
@@ -197,6 +197,18 @@ versions keep the first member's complete record and download bytes.
 V2 pages contain at most 100 entries and next links remain on the virtual URL.
 Latest/absolute-latest flags describe the merged visible ID, including versions
 on later pages. Native qualification covers both pinned .NET SDK lanes with
-fresh client caches. Virtual publication, deletion, relisting, symbols and
-reindex remain deferred; writes retain `501`. `forceNugetAuthentication`
-continues to challenge before routing when enabled.
+fresh client caches. V2 package and V3 symbol pushes use the local/federated DDR and its actual target-path
+Deploy permission, preserving local 201/409. A missing DDR refuses 405 before body
+admission. Virtual DELETE/relist returns empty 404 without mutation. Symbol reads
+choose the first readable extracted local PDB or remote file, respecting its
+cache/offline/current-authority rules. Virtual reindex is a Manage-gated 200
+acknowledgement with no virtual-owned index/job.
+
+`forceNugetAuthentication` on the virtual challenges anonymous requests before
+routing; forcing a member alone does not make the unforced virtual inherit that
+challenge. A normalized virtual requires normalized direct and nested members;
+a nonnormalized parent may contain a normalized child. DV-111's normalization
+behavior remains unchanged. Closed status/auth/reindex choices are [I] in the
+[NUG-03 #216 entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6973039901).
+[Native restore/push/symbol scenarios](../../test/acceptance/features/nuget_virtual.feature)
+cover both retained .NET lanes. See the [shared virtual rules](virtual-repositories.md).

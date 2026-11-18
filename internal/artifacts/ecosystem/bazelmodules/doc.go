@@ -84,6 +84,10 @@
 // duplicates, member permissions and pass-over warnings. The ecosystem Merger
 // unions authorized version metadata per request.
 //
+// Delivered virtual mechanism and retained client/server evidence are mapped
+// in docs/operations/virtual-repositories.md and the generated type matrix.
+// P13 peer federation and P35 coordination remain separate.
+//
 // # Testing
 //
 //   - bazelmodules_test.go: paths and module identity, the integrity

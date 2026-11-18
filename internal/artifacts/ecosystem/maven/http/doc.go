@@ -79,6 +79,11 @@
 // virtual package type merges member maven-metadata.xml documents, preserving
 // permission fall-through and serving checksums of the merged bytes.
 //
+// P10 additionally supplies cross-member snapshot/version selection, POM
+// cleanup and root-to-member item-read layouts. Native publication/resolution
+// scenarios cover Maven, Gradle, Ivy and sbt through their virtual DDR.
+// See docs/operations/virtual-repositories.md for family evidence and limits.
+//
 // # Testing
 //
 // maven_test.go calls both operations over a kittest world

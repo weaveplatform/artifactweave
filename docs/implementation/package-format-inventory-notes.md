@@ -23,12 +23,10 @@ page (`generic`, `ivy`, `helmoci`, `releasebundles`) make 49 registered types.
 Terraform registry and backend are separate rows even though they share a
 guide. The 28 `p9c` rows are the accelerated work; each changes from `gap` to
 `native` when its client evidence lands. `releasebundles` remains
-owned by P15/P24. The earlier native rows point to existing tests, not a new
-claim that all P10/P13 class work has already landed.
+owned by P15/P24. The per-type virtual column now identifies the delivered P10 mechanism and separately anchored client/server evidence; it makes no P13 peer-convergence claim.
 
 The [connection recipe index](../client-recipes/index.md) narrows each action to
-its retained native-client evidence. In particular, registered Go, npm, NuGet
-and PyPI classes are not blanket claims of qualified virtual/federated recipes.
+its retained native-client evidence. Registered classes remain distinct from the virtual client/server scenarios now linked by the matrix and from qualified one-node/federated recipes.
 The recipe's limits name those remaining checks. UX-01 adds direct Ivy, Gradle
 and sbt client evidence in place of the earlier Maven-wire references; NIM's
 client is explicitly the metadata REST flow plus a paired `crane` image pull,
@@ -92,3 +90,23 @@ and knife-art 1.0.2 proof. The [Chef guide](../testing/chef.md) records the JFro
 and Supermarket contracts, connection recipe, bounded cookbook admission,
 source-policy restrictions and fresh install evidence, including remote refresh
 and offline operation and dependencies across ordered virtual members.
+
+## P10 virtual evidence (2026-11-18)
+
+No registered class boundary changed in this documentation update. Of 49 types,
+37 accept virtual configuration:29 merge protocol metadata,5 use item routes
+(Generic and Maven-family files), and 3 use first-holder reads (Git LFS, Hub and
+Nix). The other 12 do not accept V. A mechanism is independent of qualification:
+`virtual_evidence.kind=client` names a retained native-client acceptance scenario,
+while `server` proves only protocol behavior. A Go `TestAcc` client scenario is
+valid evidence too; Conan, Bazel and Swift clients are not silently replaced by
+HTTP-only Gherkin scenarios. The generator validates each named scenario/test
+anchor and the mechanism/class relationship. The [virtual guide](../operations/virtual-repositories.md)
+records family limits and existing #216 inference entries. #1571 owns final P10
+qualification; this inventory does not declare that phase done.
+
+Deviation reconciliation against pre-P10 main `f79170f6e`: DV-202 was added for
+fixed browser/content-disposition system-property defaults; DV-057 was amended
+with the policy-first virtual-member exception. No entry was removed. DV-153's
+old remote/virtual listing 405 claim is corrected here because those listing
+operations are now served; its registry-envelope deviation remains.
