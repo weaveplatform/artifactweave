@@ -23,7 +23,7 @@ func (Handler) SelectVirtual(ctx context.Context, env format.Env, c repo.Config,
 	if !snapshot && !strings.Contains(path, tokenRelease) {
 		return nil, nil //nolint:nilnil // ordinary paths keep the engine's first-hit walk
 	}
-	s := &format.VirtualSelection{DirectRemotes: snapshot, Missing: "Could not find resource"}
+	s := &format.VirtualSelection{DirectRemotes: snapshot, NoOriginalFallback: snapshot, Missing: "Could not find resource"}
 	if snapshot {
 		s.Missing = "Artifact not found: " + path
 	}

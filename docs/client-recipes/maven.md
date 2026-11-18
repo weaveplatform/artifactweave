@@ -56,6 +56,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - Client checksums remain strict (-C). A dependency already in consumer-m2 is not evidence of remote retrieval.
 - Virtual resolution is qualified over distinct local and remote origins with fresh dependency caches. Virtual publication needs a default deployment repository; without one, deploy answers 405 and Allow: GET.
+- Virtual item reads translate the configured virtual layout independently into each member layout. A separate native control publishes with Maven to a Maven-layout local and resolves through a gradle-default virtual using Gradle Ivy metadataSources { artifact() }; these displayed commands retain Maven-layout resolution. Deployments keep the supplied path.
 
 ## Verification sources
 
@@ -66,3 +67,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/maven.feature](../../test/acceptance/features/maven.feature).
 - Evidence: [test/acceptance/features/maven_remote.feature](../../test/acceptance/features/maven_remote.feature).
 - Evidence: [test/acceptance/features/maven.feature](../../test/acceptance/features/maven.feature).
+- Evidence: [test/acceptance/features/system_recipes.feature](../../test/acceptance/features/system_recipes.feature).

@@ -39,6 +39,8 @@ func (w *world) registerSystemRecipes(sc *godog.ScenarioContext) {
 	sc.Step(`^I publish the Ivy recipe with token "([^"]*)"$`, w.publishIvyRecipe)
 	sc.Step(`^the JVM recipe used both virtual member origins$`, w.jvmRecipeOrigins)
 	sc.Step(`^the JVM publication landed in the deployment member$`, w.jvmRecipeDeployment)
+	sc.Step(`^a Gradle-layout virtual over a Maven-layout local is ready$`, w.mavenLayoutRecipe)
+	sc.Step(`^I publish the layout recipe with Maven and token "([^"]*)"$`, w.publishMavenLayoutRecipe)
 	sc.Step(`^the P2 recipe passes anonymous requests to the registry$`, func() {
 		if w.vars == nil {
 			w.vars = map[string]string{}
@@ -311,6 +313,14 @@ configurations { recipe }
 dependencies { recipe 'org.acme:widget:1.0.0' }
 tasks.register('resolveRecipe', Copy) { from configurations.recipe; into '/work/recipe-retrieved' }
 `
+	if !publish && w.vars["recipe-layout"] == "gradle-default" {
+		build = `plugins { id 'base' }
+repositories { ivy { url = uri(System.getenv('AW_REPO_URL')); allowInsecureProtocol = true; credentials { username = System.getenv('AW_USER'); password = System.getenv('AW_TOKEN') }; patternLayout { artifact '[organisation]/[module]/[revision]/[artifact]-[revision](-[classifier]).[ext]' }; metadataSources { artifact() } } }
+configurations { recipe }
+dependencies { recipe 'org.acme:widget:1.0.0' }
+tasks.register('resolveRecipe', Copy) { from configurations.recipe; into '/work/recipe-retrieved' }
+`
+	}
 	if publish {
 		build = `plugins { id 'java-library'; id 'maven-publish' }
 group = 'org.acme'

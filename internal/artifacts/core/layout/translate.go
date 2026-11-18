@@ -3,6 +3,7 @@ package layout
 import (
 	"errors"
 	"fmt"
+	"path"
 	"slices"
 	"strings"
 )
@@ -10,6 +11,74 @@ import (
 // ErrLossy reports a translation between layouts that would land two
 // source paths on one target path.
 var ErrLossy = errors.New("layout translation loses part of the path")
+
+// TranslateRead rebuilds a virtual download in the member's layout. Unlike a
+// copy or move, a read may try a lossy projection: its caller retries the
+// original spelling after a miss. Missing layouts or module values retain the
+// original path (7.x PathTranslationHelper; the closed Layouts addon is [I]).
+func TranslateRead(from, to *Layout, fullPath string) string {
+	if strings.TrimSpace(fullPath) == "" || from == nil || to == nil || from.def == to.def {
+		return fullPath
+	}
+	file, checksum := readChecksum(fullPath)
+	metadata := ""
+	if index := strings.LastIndex(file, ":"); index >= 0 {
+		if suffix := file[index+1:]; suffix == "properties" || suffix == "statistics" {
+			file, metadata = file[:index], suffix
+		}
+	}
+	v, descriptor := from.readModule(file)
+	if v == nil {
+		return fullPath
+	}
+	if v[TokenExt] == "" {
+		v[TokenExt] = strings.TrimPrefix(path.Ext(file), ".")
+	}
+	if v[TokenType] == "" {
+		v[TokenType] = v[TokenExt]
+	}
+	var out string
+	var err error
+	oneMaven := (from.def == bundled[0]) != (to.def == bundled[0])
+	if descriptor && !oneMaven {
+		out, err = to.BuildDescriptor(v)
+	} else {
+		out, err = to.Build(v)
+	}
+	if err != nil {
+		return fullPath
+	}
+	if metadata != "" {
+		out += ":" + metadata
+	}
+	return out + checksum
+}
+
+func (l *Layout) readModule(file string) (Values, bool) {
+	for _, descriptor := range []bool{true, false} {
+		p := l.artifact
+		if descriptor {
+			if !l.def.DistinctiveDescriptorPathPattern || l.descriptor == nil {
+				continue
+			}
+			p = l.descriptor
+		}
+		v, ok := p.match(file)
+		if ok && strings.TrimSpace(v[TokenOrg]) != "" && strings.TrimSpace(v[TokenModule]) != "" && strings.TrimSpace(v[TokenBaseRev]) != "" {
+			return v, descriptor
+		}
+	}
+	return nil, false
+}
+
+func readChecksum(fullPath string) (string, string) {
+	for _, suffix := range []string{".sha1", ".md5", ".sha256"} {
+		if strings.HasSuffix(fullPath, suffix) {
+			return strings.TrimSuffix(fullPath, suffix), suffix
+		}
+	}
+	return fullPath, ""
+}
 
 // LossError is ErrLossy for one path: the tokens whose values the target
 // layout has no place for, or, when every value survives but the paths

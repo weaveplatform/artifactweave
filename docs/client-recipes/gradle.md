@@ -88,6 +88,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 - JFrog CLI gradle integration is informational; direct Gradle recipe verification is a required native acceptance scenario.
 - The isolated test server uses HTTP loopback and explicitly enables allowInsecureProtocol there; production snippets require HTTPS.
 - Virtual resolution is qualified over distinct local and remote origins with fresh dependency caches. Virtual publication needs a default deployment repository; without one, deploy answers 405 and Allow: GET.
+- Virtual item reads translate the configured virtual layout independently into each member layout. A separate native control publishes with Maven to a Maven-layout local and resolves through a gradle-default virtual using Gradle Ivy metadataSources { artifact() }; these displayed commands retain Maven-layout resolution. Deployments keep the supplied path.
 
 ## Verification sources
 
@@ -98,4 +99,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/system_recipes.feature](../../test/acceptance/features/system_recipes.feature).
 - Evidence: [test/acceptance/system_recipe_steps_test.go](../../test/acceptance/system_recipe_steps_test.go).
 - Evidence: [test/acceptance/features/maven.feature](../../test/acceptance/features/maven.feature).
+- Evidence: [test/acceptance/features/system_recipes.feature](../../test/acceptance/features/system_recipes.feature).
 - Evidence: [test/acceptance/features/system_recipes.feature](../../test/acceptance/features/system_recipes.feature).

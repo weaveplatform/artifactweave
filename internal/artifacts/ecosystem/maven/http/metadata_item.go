@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
@@ -80,7 +81,14 @@ func mergeMetadata(
 	if err := generic.CheckDownload(c, owner, false); err != nil {
 		return maven.MetadataDocument{}, fmt.Errorf("maven metadata: %w", err)
 	}
-	members, err := virtual.Members(r.Context(), st.Repos(), c, virtual.Options{Order: virtual.Package, Path: owner, NoUpstream: remote.NoOriginUpstream(r.Context(), c)})
+	items := k.Items(st).ReadSession()
+	translate := itemkit.ReadTranslator(items, c)
+	members, err := virtual.Members(
+		r.Context(),
+		st.Repos(),
+		c,
+		virtual.Options{Order: virtual.Package, Path: owner, Translate: translate, NoUpstream: remote.NoOriginUpstream(r.Context(), c)},
+	)
 	if err != nil {
 		return maven.MetadataDocument{}, k.ItemError(r.Context(), "Maven metadata members", err)
 	}
@@ -89,6 +97,10 @@ func mergeMetadata(
 	priorityFound := false
 	for _, member := range members {
 		mc := member.Repo
+		memberPath, err := translate(r.Context(), mc, owner)
+		if err != nil {
+			return maven.MetadataDocument{}, k.ItemError(r.Context(), "Maven metadata member path", err)
+		}
 		if priorityFound && !mc.PriorityResolution.Bool() {
 			break
 		}
@@ -99,22 +111,22 @@ func mergeMetadata(
 		if mc.Class == repo.Remote {
 			key += "-cache"
 		}
-		if !acc.File(mc, owner, accessapi.ActionRead) || !acc.Folder(mc, owner, accessapi.ActionRead) {
-			resolution.Deny(virtual.Denial{Member: key, Path: owner, User: p.Name})
+		if !acc.File(mc, memberPath, accessapi.ActionRead) || !acc.Folder(mc, memberPath, accessapi.ActionRead) {
+			resolution.Deny(virtual.Denial{Member: key, Path: memberPath, User: p.Name})
 			continue
 		}
-		if err := generic.CheckDownload(mc, owner, false); err != nil {
+		if err := generic.CheckDownload(mc, memberPath, false); err != nil {
 			continue
 		}
-		doc, err := readMetadataMember(k, r, st, member, owner, p, acc, delivery)
+		doc, err := readMetadataMember(k, r, st, items, member, memberPath, p, acc, delivery)
 		if err != nil {
 			var api *apierror.Error
 			var upstream *source.HTTPError
 			switch {
 			case errors.Is(err, source.ErrDenied):
-				resolution.Deny(virtual.Denial{Member: key, Path: owner, User: p.Name})
+				resolution.Deny(virtual.Denial{Member: key, Path: memberPath, User: p.Name})
 			case errors.As(err, &api) && api.Status == http.StatusForbidden, errors.As(err, &upstream) && upstream.Status == http.StatusForbidden:
-				resolution.Deny(virtual.Denial{Member: key, Path: owner, User: p.Name})
+				resolution.Deny(virtual.Denial{Member: key, Path: memberPath, User: p.Name})
 			case errors.Is(err, kernel.ErrNotFound):
 			default:
 				k.Log().WarnContext(r.Context(), fmt.Sprintf("Metadata retrieval failed on repo '%s': %s", mc.Key, err), "member", mc.Key, "type", mc.PackageType)
@@ -143,6 +155,7 @@ func readMetadataMember(
 	k *itemkit.Kit,
 	r *http.Request,
 	st itemkit.Store,
+	items *item.Service,
 	member virtual.Member,
 	owner string,
 	p kernel.Principal,
@@ -173,7 +186,7 @@ func readMetadataMember(
 			}
 		}
 	} else {
-		resolved, err := k.Items(st).Resolve(r.Context(), c, format.Download{Path: owner})
+		resolved, err := items.Resolve(r.Context(), c, format.Download{Path: owner})
 		if err != nil {
 			return maven.MetadataDocument{}, fmt.Errorf("maven metadata: %w", err)
 		}

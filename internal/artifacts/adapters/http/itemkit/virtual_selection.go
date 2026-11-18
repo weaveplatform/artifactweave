@@ -83,6 +83,9 @@ func lookupSelected(ctx context.Context, st Store, members []virtual.Member, pat
 }
 
 func selectedCandidate(f Found, requested string, served memberAnswer) format.VirtualCandidate {
+	if f.asked != "" {
+		requested = f.asked
+	}
 	c := format.VirtualCandidate{Repo: f.Repo, Path: f.Item.FullPath(), Modified: f.Item.Modified}
 	if f.remote != nil {
 		c.Path = f.remote.resource.Path

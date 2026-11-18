@@ -50,6 +50,51 @@ func steps(ms []virtual.Member) string {
 	return strings.Join(out, " ")
 }
 
+func TestUnitMembersTranslatedNestedPatterns(t *testing.T) {
+	cs := configs(virt("root", "inner", "inner", "other"), virt("inner", "leaf"), virt("other", "inner"), local("leaf", false))
+	inner := cs["inner"]
+	inner.IncludesPattern = new("ivy/**")
+	cs["inner"] = inner
+	for _, tc := range []struct{ name, translated, want string }{
+		{"admitted", "ivy/org.acme/lib/1.0/lib.jar", "leaf"},
+		{"rejected", "maven/org/acme/lib/1.0/lib.jar", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := map[string]int{}
+			members, err := virtual.Members(
+				t.Context(),
+				cs,
+				cs["root"],
+				virtual.Options{Path: "original", Translate: func(_ context.Context, c repo.Config, path string) (string, error) {
+					calls[c.Key]++
+					if path != "original" {
+						t.Fatalf("hop translation: %q", path)
+					}
+					return tc.translated, nil
+				}},
+			)
+			if err != nil || steps(members) != tc.want || calls["inner"] != 1 {
+				t.Fatal(steps(members), calls, err)
+			}
+		})
+	}
+	boom := errors.New("layout storage failed")
+	_, err := virtual.Members(
+		t.Context(),
+		cs,
+		cs["root"],
+		virtual.Options{Path: "original", Translate: func(context.Context, repo.Config, string) (string, error) { return "", boom }},
+	)
+	if !errors.Is(err, boom) {
+		t.Fatalf("lost translation fault: %v", err)
+	}
+	// No translator retains the existing storage/package caller contract.
+	ms, err := virtual.Members(t.Context(), cs, cs["root"], virtual.Options{Path: "original"})
+	if err != nil || len(ms) != 0 {
+		t.Fatal(ms, err)
+	}
+}
+
 func TestUnitMembers(t *testing.T) {
 	// Every class in both priority states, listed against R1's group order.
 	six := configs(

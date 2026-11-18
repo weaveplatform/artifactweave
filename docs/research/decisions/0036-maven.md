@@ -588,7 +588,8 @@ Unit and controlled-upstream server tests cover numeric Mercury ordering, exact 
 newer choices, ties, priority boundaries, member release/snapshot policies, mixed
 virtual/member layouts, denials, both remote storage modes, remote metadata,
 origin restrictions, GET/HEAD/checksums, trace decisions and losing-stream cleanup.
-Path translation remains MVN-06; native Maven/Gradle qualification remains MVN-04.
+MVN-06 adds independent root-to-member read translation to these selections;
+MVN-04 supplies native Maven/Gradle qualification.
 
 ### P10 MVN-04 native evidence
 
@@ -602,3 +603,33 @@ fresh dependency caches. JFrog Maven/Gradle configuration and build publication
 are exercised with virtual targets where their pinned integrations accept them;
 the existing Gradle integration remains its separately recorded informational
 lane. Research 27 records source rationale and intended client controls.
+
+
+## P10 virtual item-read layout translation (MVN-06)
+
+Item downloads now use `layout.TranslateRead`, independently rebuilding the original
+virtual path for nested pattern checks and each real member. The root's patterns see
+the original; real-member authorization, policy and source identity see each actual
+attempt. Standard and latest-release walks retry the original path after any
+unfound translated result, including policy/Read/property refusals and expiry.
+Each attempt independently checks its policy and Read; only the final attempt
+contributes that member's denial and forbidden trace. Virtual member policy remains
+before Read, the documented exception to DV-057; direct reads retain Read-first. Snapshots and the Maven metadata item interceptor do not retry.
+Selection still uses the original virtual mode and each authorized member result;
+a translated unique snapshot remains exact in that member's query namespace.
+
+`item.Service.ReadSession` shares one lazy layout snapshot, including errors, across
+translation, selection and resolution. A descriptor change during a request cannot
+split those decisions; a later request reads the new definition. Ordinary services,
+writes and lossless copy/move operations retain their existing lifetime and rules.
+Native protocol and storage walks do not opt into conversion. The filename of a raw
+member response follows that member's request, as a direct read does, including
+transient remote descriptors; existing virtual POM cleanup semantics remain.
+
+Primary source details and explicit **[I]** choices for the closed Layouts addon,
+native protocol handlers and filename headers are in
+[research 27](../27-maven.md#p10-mvn-06-virtual-item-read-layout-translation-2026-11-18)
+and recorded on #216. Vendor helper tables, request snapshot/replacement tests,
+SQLite/PostgreSQL server cases and the pinned Maven-to-Gradle native scenario
+qualify this rule. The pre-existing cross-kind metadata storage-fault classification
+is separately tracked in [#1686](https://github.com/weaveplatform/artifactweave/issues/1686).
