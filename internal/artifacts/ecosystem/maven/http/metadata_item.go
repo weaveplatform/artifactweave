@@ -122,7 +122,12 @@ func mergeMetadata(
 		if err != nil {
 			var api *apierror.Error
 			var upstream *source.HTTPError
+			var lookup *metadataLookupFault
 			switch {
+			case errors.As(err, &lookup):
+				// Lookup and authority failures are not absent metadata. Content
+				// acquisition/read failures retain the interceptor's pass-over.
+				return maven.MetadataDocument{}, k.InternalError(r.Context(), "Maven metadata storage", err)
 			case errors.Is(err, source.ErrDenied):
 				resolution.Deny(virtual.Denial{Member: key, Path: memberPath, User: p.Name})
 			case errors.As(err, &api) && api.Status == http.StatusForbidden, errors.As(err, &upstream) && upstream.Status == http.StatusForbidden:
@@ -151,6 +156,25 @@ func mergeMetadata(
 	)
 }
 
+// Metadata retrieval has distinct lookup and content phases. 7.161.26's
+// MavenMetadataInterceptor tolerates IO/StorageException while opening/reading
+// content, but resource lookup precedes that catch. A content reader may itself
+// return ErrStore, so its error must not acquire this marker merely by cause.
+type metadataLookupFault struct{ error }
+
+func (e *metadataLookupFault) Unwrap() error { return e.error }
+
+func metadataLookupError(ctx context.Context, err error) error {
+	var content *source.ContentOpenError
+	if errors.As(err, &content) {
+		return err
+	}
+	if ctx.Err() == nil && (errors.Is(err, kernel.ErrStore) || errors.Is(err, format.ErrStorageFault)) {
+		return &metadataLookupFault{err}
+	}
+	return err
+}
+
 func readMetadataMember(
 	k *itemkit.Kit,
 	r *http.Request,
@@ -173,7 +197,7 @@ func readMetadataMember(
 			Resource: source.Resource{Kind: source.ResourceKindMetadata, Path: owner, Method: http.MethodGet},
 		})
 		if err != nil {
-			return maven.MetadataDocument{}, fmt.Errorf("maven metadata: %w", err)
+			return maven.MetadataDocument{}, fmt.Errorf("maven metadata: %w", metadataLookupError(r.Context(), err))
 		}
 		if result.Stream == nil {
 			return maven.MetadataDocument{}, source.ErrInvalidResult
@@ -182,17 +206,17 @@ func readMetadataMember(
 		defer body.Close()
 		if result.Revalidate != nil {
 			if err := result.Revalidate(r.Context()); err != nil {
-				return maven.MetadataDocument{}, fmt.Errorf("maven metadata: %w", err)
+				return maven.MetadataDocument{}, fmt.Errorf("maven metadata: %w", metadataLookupError(r.Context(), err))
 			}
 		}
 	} else {
 		resolved, err := items.Resolve(r.Context(), c, format.Download{Path: owner})
 		if err != nil {
-			return maven.MetadataDocument{}, fmt.Errorf("maven metadata: %w", err)
+			return maven.MetadataDocument{}, fmt.Errorf("maven metadata: %w", metadataLookupError(r.Context(), err))
 		}
 		it, err := st.Items().Get(r.Context(), c.Key, c.Class == repo.Remote, resolved)
 		if err != nil {
-			return maven.MetadataDocument{}, fmt.Errorf("maven metadata: %w", err)
+			return maven.MetadataDocument{}, fmt.Errorf("maven metadata: %w", metadataLookupError(r.Context(), err))
 		}
 		if it.Folder {
 			return maven.MetadataDocument{}, kernel.ErrNotFound

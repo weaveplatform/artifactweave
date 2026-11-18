@@ -830,7 +830,22 @@ Primary evidence is the current [Repository Layouts documentation](https://docs.
 
 Implementation keeps the root virtual's policy on the original path, checks each nested virtual at its own projected path, and applies each real member's Read and policy to the path actually attempted there. Virtual member policy precedes Read, preserving the documented member-walk exception to DV-057; direct addressed reads keep their existing Read-first gate. Exact Read is checked on the resolved item or upstream request, without requiring Read on an unresolved version token. A standard/release walk retries the original after any unfound translated result, including policy/Read/property refusal and expiry; each spelling independently applies its actual path policy and permissions. Only the final attempt supplies that member's denial and the corresponding forbidden trace. Genuine infrastructure faults remain terminal. Snapshot selection compares actual member results and still stops at an exact unique snapshot. One request-local `item.Service.ReadSession` shares compiled layout definitions and cached errors across translation, selection and resolution; the next request sees descriptor changes.
 
-Known separate defect: [#1686](https://github.com/weaveplatform/artifactweave/issues/1686) records baseline storage failures swallowed by the virtual Maven metadata interceptor on Maven, Generic, npm and NuGet item routes. Its upstream-failure pass-over remains deliberate; the shared storage-fault fix is outside MVN-06.
+[#1686](https://github.com/weaveplatform/artifactweave/issues/1686) corrects baseline
+item-lookup failures swallowed by the metadata interceptor on Maven, Generic,
+npm and NuGet item routes. Actual SQLite/PostgreSQL statement failures now abort
+instead of returning metadata absence or partial success. The initial broader
+blob-500 assumption was corrected after the primary-source audit: member content
+acquisition/read exceptions are deliberately omitted in OSS 7.161.26, even when
+another member can supply a partial response. Existing retained denials, source
+failures, malformed documents and stream closure remain in force. See the
+[phase-based audit](virtual-metadata-faults-source-audit.md) for exact exception
+scope, missing-binary uncertainty and current-version limits. This is compatible
+content tolerance, not an additional product bug. A separate verified source
+normalization defect is [#1692](https://github.com/weaveplatform/artifactweave/issues/1692):
+actual source/cache lookup statement failures can lose `kernel.ErrStore` before
+this interceptor and answer upstream-style 502 or a virtual partial response.
+That global boundary remains separate; the metadata fix acts only on preserved
+trusted lookup/authority failures.
 
 The controlled remote lookup verified that a translated upstream 404,403 or503 may
 be an unfound result, followed by an independently authorized original-path 200.
