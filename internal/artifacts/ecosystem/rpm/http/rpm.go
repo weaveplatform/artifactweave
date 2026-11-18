@@ -498,7 +498,7 @@ func (s RPMAPI) rpmMemberPackages(
 	ctx context.Context, st itemkit.Store, c repo.Config, root string,
 	p kernel.Principal, acc itemkit.Access, download bool,
 ) ([]rpm.Package, error) {
-	manifest, err := s.rpmMemberBytes(ctx, st, c, root+"repodata/repomd.xml", p, acc)
+	manifest, err := s.rpmMemberBytes(ctx, st, c, root+"repodata/repomd.xml", p, acc, download)
 	if err != nil {
 		return nil, fmt.Errorf("rpm: parse member repomd: %w", err)
 	}
@@ -510,7 +510,7 @@ func (s RPMAPI) rpmMemberPackages(
 		rpmMemberRefusesMetadata(c, primaryPath, download) {
 		return nil, kernel.ErrNotFound
 	}
-	primary, err := s.rpmMemberBytes(ctx, st, c, primaryPath, p, acc)
+	primary, err := s.rpmMemberBytes(ctx, st, c, primaryPath, p, acc, download)
 	if err != nil {
 		return nil, err
 	}
@@ -523,7 +523,7 @@ func (s RPMAPI) rpmMemberPackages(
 
 func (s RPMAPI) rpmMemberBytes(
 	ctx context.Context, st itemkit.Store, c repo.Config, path string,
-	p kernel.Principal, acc itemkit.Access,
+	p kernel.Principal, acc itemkit.Access, download bool,
 ) ([]byte, error) {
 	if c.Class == repo.Remote {
 		if s.RemoteSources == nil {
@@ -537,6 +537,9 @@ func (s RPMAPI) rpmMemberBytes(
 		if err != nil {
 			return nil, err
 		}
+		// A package lookup checks patterns at the package, while metadata
+		// delivery checks the repodata file. Both retain source fences.
+		q.Resource.BlackoutOnly = download
 		result, err := s.RemoteSources.Read(ctx, q)
 		if err != nil {
 			return nil, fmt.Errorf(
