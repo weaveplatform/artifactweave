@@ -70,6 +70,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 - Replacing a stored version with different bytes requires delete permission as well as write permission.
 - Virtual installs are qualified with pip and uv over local plus remote members in HTML and JSON modes; federated native-client qualification remains in the follow-on phase.
 - Virtual publication is qualified with Twine and uv; the deployment target must be an effectively reachable local or federated member.
+- Remote distribution include/exclude patterns use the advertised upstream file path; cold stored downloads retain their canonical client URL/cache identity. Direct and virtual cold/offline pip controls cover this distinction.
 
 ## Verification sources
 

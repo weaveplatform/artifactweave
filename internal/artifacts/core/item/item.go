@@ -112,6 +112,8 @@ type Target struct {
 
 // Deploy is a file write.
 type Deploy struct {
+	// cachePolicy is populated only by source cache publication.
+	cachePolicy format.CachePolicy
 	// shouldReplaceProperties is internal to validated remote snapshots, including an
 	// explicitly empty snapshot. Ordinary client deploy semantics stay unchanged.
 	shouldReplaceProperties bool
@@ -420,7 +422,8 @@ func (s *Service) putFile(
 	// 6.20's interceptors add theirs after saveProperties.
 	replace := d.shouldReplaceProperties || len(d.Properties) > 0
 	w := format.Write{
-		Op: format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached, By: d.By,
+		CachePolicy: d.cachePolicy,
+		Op:          format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached, By: d.By,
 		Properties: d.Properties, Size: size, Checksums: actual,
 	}
 	if err := guardWrite(ctx, h, env, d.Repo, w); err != nil {
