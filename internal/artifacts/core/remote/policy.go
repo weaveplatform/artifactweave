@@ -566,7 +566,7 @@ func (p *Policy) result(ctx context.Context, e model.RemoteCacheEntry) (source.R
 	}
 	body, info, err := p.Blobs.Open(ctx, e.Blob.Checksums.SHA256)
 	if err != nil {
-		return source.Result{}, fmt.Errorf("open cached representation: %w", err)
+		return source.Result{}, &source.ContentOpenError{Err: fmt.Errorf("open cached representation: %w", err)}
 	}
 	modified, _ := http.ParseTime(e.LastModified)
 	return source.Result{
