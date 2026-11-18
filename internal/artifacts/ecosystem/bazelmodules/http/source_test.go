@@ -10,6 +10,31 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 )
 
+func TestUnitSourceRegistryRootAndScopedPrefix(t *testing.T) {
+	for _, tc := range []struct {
+		name, root, archive string
+		allowed             bool
+	}{
+		{"empty root path", "https://registry.example", "https://registry.example/source.tar.gz", true},
+		{"explicit root slash", "https://registry.example/", "https://registry.example/source.tar.gz", true},
+		{"scoped base", "https://registry.example/registry", "https://registry.example/registry/source.tar.gz", true},
+		{"scoped base slash", "https://registry.example/registry/", "https://registry.example/registry/source.tar.gz", true},
+		{"sibling prefix", "https://registry.example/registry", "https://registry.example/registry-other/source.tar.gz", false},
+		{"outside scoped base", "https://registry.example/registry", "https://registry.example/source.tar.gz", false},
+		{"foreign origin", "https://registry.example", "https://other.example/source.tar.gz", false},
+		{"explicit matching port", "https://registry.example:8443", "https://registry.example:8443/source.tar.gz", true},
+		{"foreign port", "https://registry.example:8443", "https://registry.example:9443/source.tar.gz", false},
+		{"scheme downgrade", "https://registry.example", "http://registry.example/source.tar.gz", false},
+		{"embedded credential", "https://registry.example", "https://secret@registry.example/source.tar.gz", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := allowSourceURL(repo.Config{URL: tc.root}, tc.archive); (err == nil) != tc.allowed {
+				t.Fatalf("source URL allowed=%v; want %v: %v", err == nil, tc.allowed, err)
+			}
+		})
+	}
+}
+
 func TestUnitSourceRejectsUnapprovedOriginsAndInvalidIntegrity(t *testing.T) {
 	c := repo.Config{URL: "https://bcr.example/registry"}
 	sum := sha256.Sum256([]byte("archive"))
