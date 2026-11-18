@@ -151,6 +151,8 @@
 //
 // P10 DKR-01 adds the pure virtual member walk and bounded digest-location
 // hints (virtual.go); the HTTP slice keeps scope and member delivery checks.
+// DKR-02 adds the virtual-push import plan and image write-policy subject; only
+// the HTTP slice maps to a DDR and reads or publishes referenced content.
 //
 // # Status
 //

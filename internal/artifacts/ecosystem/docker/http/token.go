@@ -3,12 +3,15 @@ package dockerhttp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
@@ -207,16 +210,28 @@ func (g *Registry) allowedOn(ctx context.Context, realm, name string) ([]string,
 		if !found || d == nil {
 			continue
 		}
-		repo := accessapi.Repo{Key: c.Key, Class: string(c.Class)}
+		resourceRepo := accessapi.Repo{Key: c.Key, Class: string(c.Class)}
 		for a, need := range map[string]accessapi.Actions{
 			actionPull: accessapi.ActionRead, actionPush: accessapi.ActionWrite,
 			actionDelete: accessapi.ActionDelete,
 		} {
-			ok := d.AllowsFolder(accessapi.ResourceArtifact, repo, t.image, need)
-			if c.Class == "virtual" && a == actionPull {
-				ok, err = virtualReadable(ctx, g.store.Repos(), c, t.image, d)
+			ok := d.AllowsFolder(accessapi.ResourceArtifact, resourceRepo, t.image, need)
+			if c.Class == repo.Virtual {
+				switch a {
+				case actionPull:
+					ok, err = virtualReadable(ctx, g.store.Repos(), c, t.image, d)
+				case actionPush:
+					var target repo.Config
+					target, err = virtual.DeployTarget(ctx, g.store.Repos(), c)
+					ok = err == nil && d.Allows(accessapi.ResourceArtifact, accessapi.Repo{Key: target.Key, Class: string(target.Class)}, t.image+"/", need)
+					if errors.Is(err, virtual.ErrNoDeployTarget) {
+						err = nil
+					}
+				default:
+					ok = false
+				}
 				if err != nil {
-					return nil, err
+					return nil, err //nolint:wrapcheck // member/deployment lookup identifies its failure
 				}
 			}
 			if ok && !slices.Contains(allowed, a) {

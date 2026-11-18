@@ -27,8 +27,8 @@
     }
   ],
   "publish": {
-    "classes": "LF",
-    "note": "Publish to the OCI namespace of a local or one-node federated repository.",
+    "classes": "LVF",
+    "note": "A virtual publishes to its configured local or federated defaultDeploymentRepo. DEPLOY is checked on that member; virtual upload URLs and token scopes retain the virtual key. Remote repositories reject writes.",
     "steps": [
       {
         "language": "sh",
@@ -51,7 +51,8 @@
   "limitations": [
     "Strict tag overwrite may require DELETE when an existing chart version changes.",
     "JFrog CLI can wrap helm push to record build-info; configure its isolated home as in the generic recipe and add --build-name/--build-number.",
-    "The client uses oci://authority/repository, not the classic /artifactory/api/helm path."
+    "The client uses oci://authority/repository, not the classic /artifactory/api/helm path.",
+    "Manifest/blob DELETE through a virtual is refused with HTTP 400; delete through the concrete member. A virtual without a default deployment repository refuses publishing with HTTP 405."
   ],
   "evidence": [
     {
@@ -72,6 +73,12 @@
       "path": "test/acceptance/features/registry_virtual.feature",
       "contains": [
         "Helm pulls local and remote chart versions through a Helm OCI virtual"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/registry_virtual.feature",
+      "contains": [
+        "Helm pushes and pulls a chart through a Helm OCI virtual DDR"
       ]
     }
   ]

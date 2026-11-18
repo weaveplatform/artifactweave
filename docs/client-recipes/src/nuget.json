@@ -39,8 +39,8 @@
     ]
   },
   "install": {
-    "classes": "LR",
-    "note": "Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.",
+    "classes": "LRV",
+    "note": "Use the selected repository key. Virtual v3 resolution aggregates readable local and remote members, retaining source policy and package signatures. Remote resolution requires an administrator-configured upstream.",
     "steps": [
       {
         "language": "sh",
@@ -52,7 +52,7 @@
   "limitations": [
     "Use forceNugetAuthentication when the administrator requires authenticated v3 discovery.",
     "--skip-duplicate is for an existing identical package; do not infer a general safe retry contract for changed bytes.",
-    "The catalog also registers virtual/federated classes, but this recipe only advertises classes with matching native-client evidence. Registered configuration support alone is not a native recipe qualification; remaining virtual/federated proof belongs to the follow-on phase."
+    "Virtual v3 restore is qualified on both pinned SDK lanes with a signed remote parent and signed local transitive dependency. Virtual v2, publication and symbols retain 501 pending their P10 tickets; federated native qualification remains a follow-on."
   ],
   "evidence": [
     {
@@ -80,6 +80,15 @@
       "path": "test/acceptance/features/nuget_remote.feature",
       "contains": [
         "verifies cold and warm remote packages"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/nuget_virtual.feature",
+      "contains": [
+        "restores a remote parent and its local transitive dependency",
+        "--no-http-cache",
+        "nuget verify fresh/acme.dependency",
+        "/nuget-virtual/registration-semver2/acme.dependency/index.json"
       ]
     }
   ]

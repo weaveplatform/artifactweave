@@ -58,7 +58,7 @@ dotnet nuget push nupkgs/Acme.Publish.1.0.0.nupkg --source aw --api-key "$AW_USE
 
 ## Install or resolve
 
-Classes: **local, remote**. Use the selected repository key. Virtual resolution requires readable configured members; remote resolution requires an administrator-configured upstream.
+Classes: **local, remote, virtual**. Use the selected repository key. Virtual v3 resolution aggregates readable local and remote members, retaining source policy and package signatures. Remote resolution requires an administrator-configured upstream.
 
 ```sh
 dotnet restore consumer/Consumer.csproj --configfile NuGet.Config --packages "$NUGET_PACKAGES" --no-http-cache --use-lock-file
@@ -70,7 +70,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - Use forceNugetAuthentication when the administrator requires authenticated v3 discovery.
 - --skip-duplicate is for an existing identical package; do not infer a general safe retry contract for changed bytes.
-- The catalog also registers virtual/federated classes, but this recipe only advertises classes with matching native-client evidence. Registered configuration support alone is not a native recipe qualification; remaining virtual/federated proof belongs to the follow-on phase.
+- Virtual v3 restore is qualified on both pinned SDK lanes with a signed remote parent and signed local transitive dependency. Virtual v2, publication and symbols retain 501 pending their P10 tickets; federated native qualification remains a follow-on.
 
 ## Verification sources
 
@@ -82,3 +82,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/nuget_v3.feature](../../test/acceptance/features/nuget_v3.feature).
 - Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).
 - Evidence: [test/acceptance/features/nuget_remote.feature](../../test/acceptance/features/nuget_remote.feature).
+- Evidence: [test/acceptance/features/nuget_virtual.feature](../../test/acceptance/features/nuget_virtual.feature).

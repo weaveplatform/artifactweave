@@ -26,8 +26,8 @@
     }
   ],
   "publish": {
-    "classes": "LF",
-    "note": "Remote repositories reject writes; use a local or one-node federated target.",
+    "classes": "LVF",
+    "note": "A virtual publishes to its configured local or federated defaultDeploymentRepo. DEPLOY is checked on that member; virtual upload URLs and token scopes retain the virtual key. Remote repositories reject writes.",
     "steps": [
       {
         "language": "sh",
@@ -49,7 +49,8 @@
   },
   "limitations": [
     "Examples use HTTPS. CI alone adds --plain-http for its isolated loopback listener.",
-    "Cosign can use the same registry, but key creation and signature trust policy are separate from this basic connection recipe."
+    "Cosign can use the same registry, but key creation and signature trust policy are separate from this basic connection recipe.",
+    "Manifest/blob DELETE through a virtual is refused with HTTP 400; delete through the concrete member. A virtual without a default deployment repository refuses publishing with HTTP 405."
   ],
   "evidence": [
     {
@@ -76,6 +77,12 @@
       "path": "test/acceptance/features/registry_virtual.feature",
       "contains": [
         "oras pulls both OCI members through a virtual repository"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/registry_virtual.feature",
+      "contains": [
+        "oras pushes and pulls an artifact through an OCI virtual DDR"
       ]
     }
   ]

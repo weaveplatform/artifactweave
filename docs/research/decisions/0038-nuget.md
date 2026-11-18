@@ -475,8 +475,9 @@ file" (R29 12). Legacy `.symbols.nupkg` files stay unindexed (RTDEV-54891).
   router kit's default for `/api/nuget/` is therefore right as it is, and research 10's row is
   corrected (R29 16). Every 401 carries the Basic challenge.
 - **Other repositories.** Remote v3 discovery/retrieval is implemented by #628 as described
-  below. Remote v2/symbol retrieval is implemented by #629; virtual NuGet answers 501 until P10
-  (decision 0032).
+  below. Remote v2/symbol retrieval is implemented by #629. Virtual v3 reads are
+  implemented by #1548 as described below; virtual v2, symbols and writes keep
+  their original `501` class-gate answer (decision 0032).
 - **A repository keyed `v3`** is reached through its v3 tree only: `/api/nuget/v3/...` always
   routes to the v3 tree.
 - **Not served,** answering 404: the v2 queries under the v3 prefix
@@ -699,3 +700,45 @@ These assignments describe planned work, not current runtime support.
 - <https://docs.jfrog.com/artifactory/docs/nuget-repositories>,
   <https://docs.jfrog.com/artifactory/docs/migration-tool>
 - <https://learn.microsoft.com/en-us/nuget/api/overview>
+
+
+### P10 virtual v3 reads (#1548)
+
+The v3 source accepts virtual repositories. A request builds merged metadata
+from ENG-08's ordered, flattened, readable real members without a merged cache.
+NuGet's pure merger unions normalized versions with `model.CompareNuGet` and
+retains the first member's complete supplying record. A readable priority holder
+shadows non-priority contributions for the whole id. A binary read stops at its
+first actual holder, after resolving the backing item or source result, so a
+stale index record can fall through and a local winner never asks later remotes.
+Earlier priority remotes remain authoritative.
+
+Service-index resources, flat-container versions/packages/nuspecs, both
+registration hives and their external 128-version pages/leaves, query and
+autocomplete answer under the virtual URL. Upstream raw catalog fields remain
+intact; only protocol links are rewritten. Reads and delivery fences keep the
+member request, while rendering receives the original virtual request.
+A remote lacking the requested resource contributes nothing.
+
+Read precedes policy. Virtual and nested patterns filter contributions before
+paging; each member retains its own read/source policy. Unreadable, blacked-out,
+offline and pattern-rejected members are hidden with a final `404` when no
+readable holder remains. Existing direct local/remote responses retain their
+metadata policy. Symbols, every write and every v2 operation retain the original
+virtual `501` text before parsing or body admission; the common forced-auth
+challenge still runs first.
+
+Search output from each member is bounded by `skip + take`, pages sent upstream
+are at most 100, and IDs are deduplicated ignoring case before client paging.
+**[I]** Effective member/hit order fixes an ID's position, while its newest
+surviving version supplies metadata; `totalHits` counts the distinct visible IDs
+the bounded merge observed, not upstream totals. A saturating 12,700-hit window
+uses the existing remote graph ceiling; autocomplete accounts for its per-ID
+authority reads and returns retained hits before that ceiling. Local scans use a
+separate 12,700-candidate defensive ceiling so filtering can advance beyond the
+requested hit count without an unbounded catalog scan. These bounds and the
+unsettled search rank/count are recorded in research 29 for P19/#216 comparison.
+
+Native qualification uses the pinned .NET SDK 11 and 10 clients, a private
+signed-package upstream, a remote parent with a local transitive dependency,
+fresh client caches, byte comparisons and native signature verification.

@@ -29,6 +29,9 @@ const (
 type remoteDoc map[string]json.RawMessage
 
 type remoteSession struct {
+	// A virtual hides member misses even when source authority changes after
+	// discovery. Direct remote requests retain their own refusal status.
+	virtual   bool
 	h         handler
 	r         *http.Request
 	resources []resource
@@ -270,6 +273,14 @@ func (s *remoteSession) serviceIndex(w http.ResponseWriter) {
 }
 
 func (s *remoteSession) fence(ctx context.Context) error {
+	err := s.checkFence(ctx)
+	if s.virtual && nugetPassedOver(err) {
+		return notFound(s.r)
+	}
+	return err
+}
+
+func (s *remoteSession) checkFence(ctx context.Context) error {
 	for _, r := range s.results {
 		if r.Revalidate != nil {
 			if err := r.Revalidate(ctx); err != nil {

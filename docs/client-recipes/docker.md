@@ -35,7 +35,7 @@ printf %s "$AW_TOKEN" | docker login "$AW_REGISTRY" --username "$AW_USER" --pass
 
 ## Publish
 
-Classes: **local, federated**. Publish to a concrete local or one-node federated target.
+Classes: **local, virtual, federated**. A virtual publishes to its configured local or federated defaultDeploymentRepo. DEPLOY is checked on that member; virtual upload URLs and token scopes retain the virtual key. Remote repositories reject writes.
 
 ```sh
 docker buildx build --load --platform linux/amd64 --provenance=false --sbom=false -t "$AW_REGISTRY/$AW_REPO/team/app:v1" image
@@ -57,6 +57,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 - Registry client URLs omit /artifactory; the discovery endpoint is /v2/.
 - Changing tag contents can require DELETE permission under strict tag overwrite.
 - Docker itself is runner-provided, not a pinned released archive. The separately pinned crane/ORAS lanes supply stable registry-client evidence.
+- Manifest/blob DELETE through a virtual is refused with HTTP 400; delete through the concrete member. A virtual without a default deployment repository refuses publishing with HTTP 405.
 
 ## Verification sources
 
@@ -67,4 +68,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/registry_clients.feature](../../test/acceptance/features/registry_clients.feature).
 - Evidence: [test/acceptance/features/docker.feature](../../test/acceptance/features/docker.feature).
 - Evidence: [internal/access/adapters/http/authn_middleware.go](../../internal/access/adapters/http/authn_middleware.go).
+- Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).
 - Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).
