@@ -2,6 +2,7 @@ package generic
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -33,7 +34,11 @@ func (Handler) Admit(
 	if err := CheckBlackedOut(c, w.Path); err != nil {
 		return w, err
 	}
-	if err := CheckPatterns(c, w.Path); err != nil {
+	path, err := w.PatternPath(c)
+	if err != nil {
+		return w, fmt.Errorf("write pattern path: %w", err)
+	}
+	if err := CheckPatterns(c, path); err != nil {
 		return w, err
 	}
 	return w, nil
