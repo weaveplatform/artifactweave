@@ -4,11 +4,13 @@ Status: **implementation evidence recorded; final qualification pending**.
 
 Audit date: 2026-11-18. Merged implementation baseline:
 [`fb67c046de93fee4da1968487a365b05ad8c4cc0`](https://github.com/weaveplatform/artifactweave/commit/fb67c046de93fee4da1968487a365b05ad8c4cc0).
-The native GitHub child lists and issue/merged-PR timelines show **44 of 47 child
-tickets closed**, including the qualification follow-up identified in this audit.
-[QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571) and
-[ADP-08 #1709](https://github.com/weaveplatform/artifactweave/issues/1709) and
-[ENG-11 #1710](https://github.com/weaveplatform/artifactweave/issues/1710)
+The native GitHub child lists and issue/merged-PR timelines show **44 of 49 child
+tickets closed**, including the original acceptance follow-ups identified in this audit.
+[QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571),
+[ADP-08 #1709](https://github.com/weaveplatform/artifactweave/issues/1709),
+[ENG-11 #1710](https://github.com/weaveplatform/artifactweave/issues/1710),
+[HLM-03 #1713](https://github.com/weaveplatform/artifactweave/issues/1713) and
+[TFM-03 #1714](https://github.com/weaveplatform/artifactweave/issues/1714)
 remain open. Epic closure remains with the maintainer.
 
 This ledger records controlled implementation evidence, not a live Artifactory
@@ -27,17 +29,41 @@ for the separate acceptance criteria or the final combined-tree gate.
 | [#1520](https://github.com/weaveplatform/artifactweave/issues/1520) Docker, OCI and Helm OCI virtual repositories | 4/4 | [#1669](https://github.com/weaveplatform/artifactweave/pull/1669), [#1673](https://github.com/weaveplatform/artifactweave/pull/1673), [#1677](https://github.com/weaveplatform/artifactweave/pull/1677), [#1683](https://github.com/weaveplatform/artifactweave/pull/1683) |
 | [#1521](https://github.com/weaveplatform/artifactweave/issues/1521) Shared virtual engine (`internal/artifacts/core/virtual`, item routes, kit) | 10/11 | Shared traversal acceptance: [#1710](https://github.com/weaveplatform/artifactweave/issues/1710). Merged delivery: [#1585](https://github.com/weaveplatform/artifactweave/pull/1585), [#1596](https://github.com/weaveplatform/artifactweave/pull/1596), [#1607](https://github.com/weaveplatform/artifactweave/pull/1607), [#1612](https://github.com/weaveplatform/artifactweave/pull/1612), [#1615](https://github.com/weaveplatform/artifactweave/pull/1615), [#1617](https://github.com/weaveplatform/artifactweave/pull/1617), [#1625](https://github.com/weaveplatform/artifactweave/pull/1625), [#1626](https://github.com/weaveplatform/artifactweave/pull/1626), [#1634](https://github.com/weaveplatform/artifactweave/pull/1634), [#1637](https://github.com/weaveplatform/artifactweave/pull/1637), [#1638](https://github.com/weaveplatform/artifactweave/pull/1638), [#1646](https://github.com/weaveplatform/artifactweave/pull/1646), [#1658](https://github.com/weaveplatform/artifactweave/pull/1658) |
 | [#1522](https://github.com/weaveplatform/artifactweave/issues/1522) Go virtual repositories | 2/2 | [#1660](https://github.com/weaveplatform/artifactweave/pull/1660), [#1662](https://github.com/weaveplatform/artifactweave/pull/1662) |
-| [#1523](https://github.com/weaveplatform/artifactweave/issues/1523) Helm virtual repositories | 2/2 | [#1666](https://github.com/weaveplatform/artifactweave/pull/1666), [#1667](https://github.com/weaveplatform/artifactweave/pull/1667) |
+| [#1523](https://github.com/weaveplatform/artifactweave/issues/1523) Helm virtual repositories | 2/3 | Required native install dry-run: [#1713](https://github.com/weaveplatform/artifactweave/issues/1713). Merged delivery: [#1666](https://github.com/weaveplatform/artifactweave/pull/1666), [#1667](https://github.com/weaveplatform/artifactweave/pull/1667) |
 | [#1524](https://github.com/weaveplatform/artifactweave/issues/1524) Maven family virtual repositories (maven, gradle, ivy, sbt) | 5/5 | [#1661](https://github.com/weaveplatform/artifactweave/pull/1661), [#1665](https://github.com/weaveplatform/artifactweave/pull/1665), [#1668](https://github.com/weaveplatform/artifactweave/pull/1668), [#1682](https://github.com/weaveplatform/artifactweave/pull/1682), [#1688](https://github.com/weaveplatform/artifactweave/pull/1688) |
 | [#1525](https://github.com/weaveplatform/artifactweave/issues/1525) npm virtual repositories | 5/5 | [#1675](https://github.com/weaveplatform/artifactweave/pull/1675), [#1679](https://github.com/weaveplatform/artifactweave/pull/1679), [#1684](https://github.com/weaveplatform/artifactweave/pull/1684), [#1690](https://github.com/weaveplatform/artifactweave/pull/1690), [#1691](https://github.com/weaveplatform/artifactweave/pull/1691) |
 | [#1526](https://github.com/weaveplatform/artifactweave/issues/1526) NuGet virtual repositories | 3/3 | [#1674](https://github.com/weaveplatform/artifactweave/pull/1674), [#1676](https://github.com/weaveplatform/artifactweave/pull/1676), [#1685](https://github.com/weaveplatform/artifactweave/pull/1685) |
 | [#1527](https://github.com/weaveplatform/artifactweave/issues/1527) PyPI virtual repositories | 2/2 | [#1671](https://github.com/weaveplatform/artifactweave/pull/1671), [#1672](https://github.com/weaveplatform/artifactweave/pull/1672) |
 | [#1528](https://github.com/weaveplatform/artifactweave/issues/1528) Conformance, documentation and P10 sign-off | 2/3 | Final #1571 record and merged-main gate outstanding. [#1591](https://github.com/weaveplatform/artifactweave/pull/1591), [#1699](https://github.com/weaveplatform/artifactweave/pull/1699) |
-| [#1529](https://github.com/weaveplatform/artifactweave/issues/1529) Terraform virtual repositories | 2/2 | [#1681](https://github.com/weaveplatform/artifactweave/pull/1681), [#1687](https://github.com/weaveplatform/artifactweave/pull/1687) |
+| [#1529](https://github.com/weaveplatform/artifactweave/issues/1529) Terraform virtual repositories | 2/3 | Required combined module/provider workflow and cache repeat: [#1714](https://github.com/weaveplatform/artifactweave/issues/1714). Merged delivery: [#1681](https://github.com/weaveplatform/artifactweave/pull/1681), [#1687](https://github.com/weaveplatform/artifactweave/pull/1687) |
 
 [P10 index #1518](https://github.com/weaveplatform/artifactweave/issues/1518)
 tracks these 11 epics. All remain open for the maintainer to close after reviewing
 their reconciled acceptance and evidence.
+
+## Original acceptance audit
+
+Closed implementation tickets and separate feature proofs do not automatically
+satisfy an epic's exact client workflow. Original epic acceptance checkboxes
+remain available for maintainer review; the audit preserves their requirements.
+
+| Epic | Evidence and remaining acceptance boundary |
+| --- | --- |
+| ADP | The family rows below retain individual native proofs. [PR #1715](https://github.com/weaveplatform/artifactweave/pull/1715) supplies #1709's guarded 23-adapter order/nesting/cycle table and corrects an independently reproduced Bazel-only slashless registry-root defect. Neither the new table nor that fix is counted as merged yet. |
+| DKR | [Native registry scenarios](../../test/acceptance/features/registry_virtual.feature) include actual Docker remote pulls and a derived-image push/pull using cached remote layers, plus crane, ORAS and Helm OCI flows. [Catalog/tag paging tests](../../test/server/artifacts/docker) cover member union and pagination. Intentional mutation refusals remain part of the protocol contract. |
+| ENG | R1–R11 anchors below cover the item/status/policy contracts. #1710 consolidates the two core recursive traversals while retaining route-aware search, AQL, Docker and P2 behavior; configuration validation and serialization loops are not graph resolution. |
+| GOV | The [Go feature](../../test/acceptance/features/go.feature) resolves local and remote dependencies without a direct fallback, publishes through the virtual and builds from fresh consumer state. The merged #1707 fixture correction retains exact artifact counts for each independently collected build. |
+| HLM | The [four native URL/namespace examples](../../test/acceptance/features/helm_virtual.feature) exercise add/update/pull, signed provenance, dependencies and publication visibility. They render a downloaded archive with `helm template`; this does not replace the required repository-reference install dry-run. #1713 supplies that missing proof. |
+| MVN | [Merged metadata and sidecars](../../test/server/artifacts/maven/maven_virtual_metadata_test.go), [candidate selection](../../test/server/artifacts/maven/virtual_selection_test.go), [Maven deploy](../../test/acceptance/features/maven.feature), [Gradle/Ivy recipes](../../test/acceptance/features/system_recipes.feature) and [sbt publish](../../test/acceptance/features/sbt.feature) provide the named workflows. POM cleanup and its deliberate `nothing` control remain in the Maven contract. |
+| NPM | The [virtual npm outline](../../test/acceptance/features/npm_virtual.feature) covers scoped/unscoped mixed dependencies, empty-cache install/`npm ci`, publication and signature audits. Vulnerability audit remains owned by P28; the no-501 requirement concerns supported P10 operations. |
+| NUG | [Native V2/V3 restore and publication](../../test/acceptance/features/nuget_virtual.feature) are supplemented by [visibility/status tests](../../test/server/artifacts/nuget/virtual_v3_test.go) and [write/symbol/reindex controls](../../test/server/artifacts/nuget/virtual_write_test.go). Virtual reindex accepts the request without member work. |
+| PYP | [pip/uv installation and twine/uv publication](../../test/acceptance/features/pypi_virtual.feature) retain native evidence. The separate test reliability repair #1712 must remove a raw-substring timestamp collision from the existing [server merge assertion](../../test/server/artifacts/pypi/virtual_read_test.go); the captured failing response has the correct winner. |
+| QUA | The 33-resource [provider scenario](../../deploy/artifactweave/terraform/virtual-repositories) and this 37-type ledger are distinct from package-consumer proof. Decision acceptance, P10 Done and the final post-documentation merged-main workflow remain #1571's completion conditions. |
+| TFM | [Virtual modules](../../test/acceptance/features/terraform_remote.feature) and [virtual providers](../../test/acceptance/features/terraform_providers.feature) currently use separate configurations. The [combined direct-local registry scenario](../../test/acceptance/features/terraform_registry.feature) does not prove one virtual with a remote provider. #1714 supplies that exact combined workflow and empty-plugin-cache repeat. |
+
+The Helm and Terraform findings are missing qualification artifacts; no runtime
+defect was reproduced for either. #1712 is a fixture assertion defect. It is a
+direct blocker of #1571, outside the epic child-ticket count above.
 
 ## Engine rules R1–R11
 
@@ -172,10 +198,12 @@ retain their primary-source and modern-version limits in their owning research.
 
 | Item | Current disposition |
 | --- | --- |
-| [#1709](https://github.com/weaveplatform/artifactweave/issues/1709) | The adapter epic explicitly requires one table covering all 23 adapters over member order, nesting and a cycle. Individual native/kit tests exist, but the complete table was not identified in the merged tree. This tracks the missing qualification artifact, not a reproduced runtime defect, and blocks #1571. |
+| [#1709 / PR #1715](https://github.com/weaveplatform/artifactweave/pull/1715) | The adapter table and Bazel-only slashless root-URL correction are ready for review at `d0fdddef`. All local gates passed, with 46 SQLite/PostgreSQL rows, race checks and five strict native Bazel subtests with zero skips. Successful latest-head CI and merge remain required; it blocks #1571. |
 | [#1710](https://github.com/weaveplatform/artifactweave/issues/1710) | The engine epic requires one shared graph traversal. `Members`/`flatten` and route-aware `Walk` still have independent recursive loops. The follow-up shares traversal while preserving both contracts; it is structural acceptance work, not a newly reproduced client failure, and blocks #1571. |
-| [#1645 / PR #1705](https://github.com/weaveplatform/artifactweave/pull/1705) | Corrected head `ddc19865` is ready for review after all local gates, real SQL/race checks and final-source native qualification. API-document/content-phase/classifier regressions are fixed in that head; [full CI 44378432054](https://github.com/weaveplatform/artifactweave/actions/runs/44378432054) remains required before merge. |
-| [#1704 / PR #1711](https://github.com/weaveplatform/artifactweave/pull/1711) | The cause-preserving existing-copy clock-fault correction is ready for review at `f28f6a73`, with all local gates and real SQLite/PostgreSQL proof. [Full CI 44373109714](https://github.com/weaveplatform/artifactweave/actions/runs/44373109714) and merge remain required. |
+| [#1713](https://github.com/weaveplatform/artifactweave/issues/1713) | Required Helm install dry-run through the virtual remains unexecuted in the merged native outline; `helm template` on a downloaded archive is supplemental evidence. Blocks #1571. |
+| [#1714](https://github.com/weaveplatform/artifactweave/issues/1714) | Required single-virtual local-module/remote-provider `init`/`apply` and empty-plugin-cache repeat remain unqualified. Separate module/provider scenarios are retained. Blocks #1571. |
+| [#1645 / PR #1705](https://github.com/weaveplatform/artifactweave/pull/1705) | Corrected head `ddc19865` is ready for review after all local gates, real SQL/race checks and final-source native qualification. API-document/content-phase/classifier regressions are fixed in that head; [full CI 44378840058](https://github.com/weaveplatform/artifactweave/actions/runs/44378840058) remains required before merge. The preceding same-head run was superseded by the ready-for-review event. |
+| [#1704 / PR #1711](https://github.com/weaveplatform/artifactweave/pull/1711) | The existing-copy clock-fault correction has all local gates and real SQLite/PostgreSQL proof at `f28f6a73`. [Full CI 44373109714 failed](https://github.com/weaveplatform/artifactweave/actions/runs/44373109714/job/135045401094) because the existing PyPI test matched `3.11` in a valid upload timestamp; coverage and final gates consequently failed. Separate fixture repair [#1712](https://github.com/weaveplatform/artifactweave/issues/1712), normal integration and successful new-head CI are required before merge. |
 | [#1706 / PR #1707](https://github.com/weaveplatform/artifactweave/pull/1707) | Merged as `fb67c046` after [full exact-head CI 44361946001](https://github.com/weaveplatform/artifactweave/actions/runs/44361946001) passed all 19 required jobs. Both independently collected Go builds still require exactly three artifacts; no registry behavior changed. |
 | [#1693 / PR #1698](https://github.com/weaveplatform/artifactweave/pull/1698) | SQLite literal-file path fix has successful native Windows evidence. Normal main integration `90f38797` now includes the merged Go fixture correction; fresh driver/application/selector/recipe/lint checks passed and [full CI 44377565202](https://github.com/weaveplatform/artifactweave/actions/runs/44377565202) is running. |
 | [#1571](https://github.com/weaveplatform/artifactweave/issues/1571) | Final evidence audit, decision acceptance, phase completion and exact merged-main gate remain required. |
