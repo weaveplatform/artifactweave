@@ -127,6 +127,14 @@
         "TestAccVCSCustomRootlessFilePrecedesNestedBasename",
         "TestAccVCSPeerFileUsageRequiresSuccessfulDelivery"
       ]
+    },
+    {
+      "path": "test/acceptance/system_recipe_steps_test.go",
+      "contains": [
+        "func TestAccRecipeClientPlatforms",
+        "configured JVM image must select its own platform",
+        "func (w *world) downloadVCSRecipe"
+      ]
     }
   ]
 }
