@@ -1204,3 +1204,35 @@ func TestUnitRPMMetadataSeparatesFolderReadFromFilePolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestUnitRemoteResourceMarksAddressedRepositoryFile(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/artifactory/remote/repodata/repomd.xml?repositoryFile=false", nil)
+	r.Header.Set("X-Repository-File", "false")
+	resource := itemkit.RemoteResource(r, "repodata/repomd.xml")
+	q, err := itemkit.RPMSourceRequest(source.Request{Resource: resource})
+	if err != nil || !q.Resource.RepositoryFile || q.Resource.Kind != source.ResourceKindMetadata {
+		t.Fatal("physical file provenance was lost by metadata preparation or caller input", q.Resource, err)
+	}
+}
+
+func TestUnitMetadataFilePreparersPreserveRepositoryFileProvenance(t *testing.T) {
+	for _, tc := range []struct {
+		name, path string
+		prepare    func(source.Request) (source.Request, error)
+	}{
+		{"P2", "p2.index", itemkit.P2SourceRequest},
+		{"Alpine", "v3.20/main/x86_64/APKINDEX.tar.gz", itemkit.AlpineSourceRequest},
+		{"CRAN", "src/contrib/PACKAGES", itemkit.CranSourceRequest},
+		{"Opkg", "arm/Packages.gz", itemkit.OpkgSourceRequest},
+		{"RPM", "repodata/repomd.xml", itemkit.RPMSourceRequest},
+		{"Debian Release", "dists/stable/Release", itemkit.DebianSourceRequest},
+		{"Debian Packages", "dists/stable/main/binary-amd64/Packages.gz", itemkit.DebianSourceRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := tc.prepare(source.Request{Resource: source.Resource{Kind: source.ResourceKindArtifact, Path: tc.path, Method: http.MethodGet}})
+			if err != nil || q.Resource.Kind != source.ResourceKindMetadata || !q.Resource.RepositoryFile {
+				t.Fatal("validated metadata file lost its file origin", q.Resource, err)
+			}
+		})
+	}
+}

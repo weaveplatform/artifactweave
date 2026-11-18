@@ -19,13 +19,21 @@ curl --fail --user reader "$REGISTRY/artifactory/vendor/tool.bin" --output tool.
 ```
 
 A caller needs Read on the remote and requested path to read what its cache holds,
-and Deploy/Cache on that path as well to fill or refresh the cache from the upstream,
+and Deploy/Cache on that path as well to fill the cache with new or changed bytes,
 as Artifactory 7.x requires ([#1587](https://github.com/weaveplatform/artifactweave/issues/1587)).
 A caller with Read alone gets 403 on the item route, and a package client its usual
 not-found answer, for a file the cache does not hold yet. Repository blackout and include/exclude rules still apply. Requests
 recheck current user/token state, permissions, source identity, configuration and
 upstream credential revisions before publication and delivery. Uploads to remotes
 and cache aliases remain refused.
+
+When a mutable repository file expires and its origin answers 404, GET/HEAD can
+serve its complete current cached copy, refresh its validation clock and record
+no new negative. Read alone permits retaining these admitted bytes. Fresh or
+immutable copies need no origin check. This file rule does not replace native
+API endpoints' own missing-document behavior. Network failures retain their
+existing `hardFail` and HTTP cache restrictions and do not advance the validation
+clock. See the [source trace and file/API boundary](../research/expired-remote-copy.md).
 
 The first GET validates a complete upstream representation before publishing it.
 A cold range therefore fetches and checks the full artifact, then serves the requested

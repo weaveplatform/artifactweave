@@ -1,10 +1,17 @@
 package debian_test
 
 import (
+	"bytes"
 	"net/http"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/weaveplatform/artifactweave/internal/app/config"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 // componentFiles are files an upstream Debian archive publishes under
@@ -136,6 +143,41 @@ func TestAccDebianRemoteCacheAliasServesCachedMetadata(t *testing.T) {
 				}
 				if got := up.take(); got != nil {
 					t.Errorf("%s on the alias asked the upstream %q", caller, got)
+				}
+			}
+		})
+	}
+}
+
+// These native index routes prepare their own source requests rather than using
+// the ordinary item-resource builder. They must retain repository-file origin
+// misses while API metadata continues to answer its upstream's miss.
+func TestAccDebianExpiredMetadataRetainsRepositoryFiles(t *testing.T) {
+	files, _ := queryArchive(t)
+	for _, backend := range []string{"sqlite", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			var mutate []func(*config.Config)
+			if backend == "postgres" {
+				dsn := sqltest.ScratchDSN(t, sqltest.PostgresDSN(t))
+				mutate = append(mutate, func(c *config.Config) { c.Database = config.Database{Driver: "postgres", DSN: dsn} })
+			}
+			w := harness.NewRemoteWorld(t, mutate...)
+			w.Repo.PackageType = repo.Debian
+			w.Repo.RetrievalCachePeriodSecs = new(0)
+			w.Update()
+			for _, name := range []string{queryRelease, queryPackages} {
+				body := files[name]
+				w.Upstream.Set("/"+name, fakeupstream.Resource{Body: body})
+				before := w.Request(http.MethodGet, "/artifactory/remote/"+name, "admin", "")
+				if before.Code != http.StatusOK || !bytes.Equal(before.Body.Bytes(), body) {
+					t.Fatal(name, before.Code, before.Body.String())
+				}
+				w.Upstream.Set("/"+name, fakeupstream.Resource{Status: http.StatusNotFound})
+				for _, method := range []string{http.MethodGet, http.MethodHead} {
+					after := w.Request(method, "/artifactory/remote/"+name, "admin", "")
+					if after.Code != http.StatusOK || (method == http.MethodGet && !bytes.Equal(after.Body.Bytes(), body)) {
+						t.Fatal("physical Debian metadata adopted API miss semantics", name, method, after.Code, after.Body.String())
+					}
 				}
 			}
 		})

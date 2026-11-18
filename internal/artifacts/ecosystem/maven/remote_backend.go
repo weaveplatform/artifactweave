@@ -85,6 +85,7 @@ func (m *MavenBackend) prepare(ctx context.Context, q source.Request) (source.Re
 	r.Variant = "maven-source-v1"
 	if IsMetadata(r.Path) {
 		r.Kind = source.ResourceKindMetadata
+		r.RepositoryFile = true
 		r.Accept = "application/xml"
 		r.EscapedPath = (&url.URL{Path: r.Path}).EscapedPath()
 		r.ExpectedContentType = "application/xml"

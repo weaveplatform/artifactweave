@@ -35,7 +35,7 @@ adapters classify content; they do not each invent their own retry/cache policy.
 | Mutable upstream metadata | Cache raw content separately from rewritten responses; expiry performs a bounded synchronous conditional refresh. A valid 304 advances validation time. |
 | Explicitly zapped metadata | Expired, not deleted; next normal request attempts refresh first. Unavailable upstream may fall back to usable stale bytes unless hardFail or a stricter security/HTTP rule forbids it. |
 | Locally derived metadata | Rebuild from authoritative inputs; never replace a remote version list with only the binaries cached locally. |
-| Confirmed upstream 404 | Negative entry with its own expiry; other statuses, timeouts and denial are never cached as absence. |
+| Confirmed upstream 404 | Retain a currently complete cached file and unexpire it without a new negative; otherwise a negative entry with its own expiry. Non-file documents keep their existing handling. Other statuses, timeouts and denial are never cached as absence. [Source trace and clock correction](../expired-remote-copy.md). |
 | Cache alias or explicit offline | Serve existing complete cache content or 404; **zero upstream calls**, including refresh/probes/Smart side effects. |
 | `storeArtifactsLocally=false` | Normal online reads use transient streaming; no new durable item, blob reference, index or negative cache. |
 | Connection failure / hardFail | Bounded ten-attempt connection recovery and shared assumed-offline state; permitted stale fallback differs from hard failure. Exact scheduling/status choices remain [I] for #216. |

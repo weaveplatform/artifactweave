@@ -7,8 +7,9 @@ separates the resolution mechanism from client/server evidence. Registered `V` i
 not itself a native-client qualification claim. A federated member here is the
 one-node repository contract; cross-peer convergence belongs to P13.
 
-This guide describes merged implementation at main `d9c304f54` (2026-11-18),
-not P10 sign-off. [#1571](https://github.com/weaveplatform/artifactweave/issues/1571)
+This guide describes merged implementation through main `fb67c046` (2026-11-18).
+The [qualification and epic closeout record](../testing/phase10-signoff.md)
+distinguishes delivered work from the remaining final gate. [#1571](https://github.com/weaveplatform/artifactweave/issues/1571)
 owns final qualification, the plan status and decision 0008's acceptance. The
 [source-backed rules](../research/decisions/0008-virtual-repositories.md) retain
 unsettled compatibility choices as [I]. The [inference register](#inference-register)
@@ -70,9 +71,12 @@ parsing a member's content can still allow a later member to serve, or retain
 the existing miss or denial response. [Merged #1695](https://github.com/weaveplatform/artifactweave/pull/1695)
 and the [phase/source audit](../research/virtual-metadata-faults-source-audit.md)
 record this boundary and its current-version compatibility limits.
-Known open [#1692](https://github.com/weaveplatform/artifactweave/issues/1692)
-can still erase a source lookup SQL fault's classification before the consumer,
-producing an upstream-style 502 or a passed-over virtual member.
+[Merged #1700](https://github.com/weaveplatform/artifactweave/pull/1700)
+preserves source lookup SQL faults and their original cause before consumer
+classification; the former #1692 loss of storage identity is fixed. The separate
+existing-copy clock-write fault in [#1704](https://github.com/weaveplatform/artifactweave/issues/1704)
+and expired-file retention in [#1645](https://github.com/weaveplatform/artifactweave/issues/1645)
+remain tracked by the qualification record until their corrections merge.
 
 ## R4. Hiding unauthorized resources
 

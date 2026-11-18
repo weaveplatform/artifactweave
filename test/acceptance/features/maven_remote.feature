@@ -9,7 +9,7 @@ Feature: Maven downloads authoritative upstream content through a remote cache
     And a Maven upstream serves parent, transitive, release and snapshot fixtures
     When I PUT "/artifactory/api/repositories/maven-remote" as admin with body:
       """
-      {"rclass":"remote","packageType":"maven","url":"{upstream}","rejectInvalidJars":true,"remoteRepoChecksumPolicyType":"fail"}
+      {"rclass":"remote","packageType":"maven","url":"{upstream}","rejectInvalidJars":true,"remoteRepoChecksumPolicyType":"fail","retrievalCachePeriodSecs":30}
       """
     Then the response status is 200
     Given a file "settings.xml" with expanded content:
@@ -31,6 +31,15 @@ Feature: Maven downloads authoritative upstream content through a remote cache
     And the server answered no request with 500 since the last command
     And the Maven upstream received a cold GET for every fixture
     And the file "cold-jars/transitive-1.0.jar" exists
+    Given the Maven upstream forgets the non-unique snapshot files
+    And the Maven remote retrieval period has elapsed
+    When I run mvn "-s settings.xml -C -Dmaven.repo.local=/work/retained -Dmaven.repo.local.tail={m2} org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy-dependencies -DoutputDirectory=/work/retained-jars"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the Maven upstream received refresh requests for its missing snapshot files
+    And the file "retained-jars/nonunique-2.0-SNAPSHOT.jar" exists
+    When I HEAD "/artifactory/maven-remote/org/acme/p9remote625/nonunique/2.0-SNAPSHOT/nonunique-2.0-SNAPSHOT.jar" as admin
+    Then the response status is 200
     Given the generic upstream stops
     When I run mvn "-s settings.xml -C -Dmaven.repo.local=/work/warm -Dmaven.repo.local.tail={m2} org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy-dependencies -DoutputDirectory=/work/warm-jars"
     Then the command succeeds

@@ -409,6 +409,7 @@ func P2SourceRequest(q source.Request) (source.Request, error) {
 	q.Resource.Variant = "p2-native-v1"
 	if kind == p2.KindIndex || kind == p2.KindMetadata {
 		q.Resource.Kind = source.ResourceKindMetadata
+		q.Resource.RepositoryFile = true
 		q.Resource.ValidateMetadata = func(ctx context.Context, r io.ReadSeeker, size int64,
 			_ source.MetadataResponse,
 		) error {
@@ -560,6 +561,7 @@ func RemoteResource(r *http.Request, path string) source.Resource {
 		path,
 		pkgroute.EscapedResourcePath(r, "/artifactory/"+escapedKey+"/"),
 	)
+	resource.RepositoryFile = true
 	// Strip local controls without normalizing signed query bytes or ordering.
 	segments := strings.Split(r.URL.RawQuery, "&")
 	kept := segments[:0]
@@ -589,6 +591,7 @@ func AlpineSourceRequest(q source.Request) (source.Request, error) {
 			return q, kernel.ErrNotFound
 		}
 		q.Resource.Kind = source.ResourceKindMetadata
+		q.Resource.RepositoryFile = true
 		q.Resource.PermissionFolder = true
 		q.Resource.Variant = "alpine-index-v2"
 		q.Resource.ValidateMetadata = func(ctx context.Context, r io.ReadSeeker, size int64,
@@ -644,6 +647,7 @@ func CranSourceRequest(q source.Request) (source.Request, error) {
 	p := q.Resource.Path
 	if feed, _, ok := cran.IndexPath(p); ok {
 		q.Resource.Kind = source.ResourceKindMetadata
+		q.Resource.RepositoryFile = true
 		q.Resource.PermissionFolder = true
 		q.Resource.PermissionPath = feed
 		q.Resource.Variant = "cran-packages-v1"
@@ -702,6 +706,7 @@ func OpkgSourceRequest(q source.Request) (source.Request, error) {
 			return q, kernel.ErrNotFound
 		}
 		q.Resource.Kind = source.ResourceKindMetadata
+		q.Resource.RepositoryFile = true
 		q.Resource.PermissionFolder = true
 		q.Resource.Variant = "opkg-feed-v1"
 		q.Resource.ValidateMetadata = func(_ context.Context, r io.ReadSeeker, size int64,
@@ -780,6 +785,7 @@ func RPMSourceRequest(q source.Request) (source.Request, error) {
 		return q, nil
 	}
 	q.Resource.Kind = source.ResourceKindMetadata
+	q.Resource.RepositoryFile = true
 	q.Resource.PermissionFolder = true
 	// Read retains its folder scope; blackout and patterns check the file.
 	q.Resource.PolicyPath = p
