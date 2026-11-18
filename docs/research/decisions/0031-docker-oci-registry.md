@@ -909,6 +909,8 @@ member, tags answer 404 `NAME_UNKNOWN` [I]. No local cache-item enumeration repl
 failed upstream catalog. Source-policy behavior for cached metadata remains intact.
 
 Primary sources and remaining inferences are in research 23's DKR-03 section and #216.
-The source cache-publication limitation tracked by #1670 is unchanged: cold narrow
-Read is qualified with separate Deploy/Cache authority, and pure path-scoped
-Read-only metadata visibility is qualified after an administrator primes the cache.
+Cold/refresh cache-fill permissions retain the intended contract recorded in
+#1587: the cold scoped-Read test grants separate cache-fill authority, while the
+fresh-cache test grants only path-scoped Read after an administrator primes it.
+This permission rule is distinct from #1670's trusted-policy-path publication
+defect; that shared defect remains in its existing cross-kind ticket.

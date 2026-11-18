@@ -816,4 +816,6 @@ Local qualification includes nested/duplicate members, pagination and long-page
 reopening, one pending name per member, logarithmic project interval seeking,
 member-level catalog Read, per-tag authorization, safe source-page links and final
 source revocation/storage faults. Native proof is implementation evidence, not a
-vendor capture. Existing #1670 cold cache-publication behavior is preserved explicitly.
+vendor capture. Cold/refresh cache-fill authority follows the intended behavior
+recorded in #1587; fresh cached metadata needs only the caller's Read permission.
+The separate trusted-policy-path publication defect remains tracked in #1670.
