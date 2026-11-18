@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"net/url"
+	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -225,5 +227,83 @@ func TestAccOpenDBBeginsImmediate(t *testing.T) {
 	}
 	if code(err)&0xff != sqlite3.SQLITE_BUSY {
 		t.Fatalf("second BEGIN: %v; want SQLITE_BUSY", err)
+	}
+}
+
+func TestAccOpenDBKeepsLiteralPathsIndependent(t *testing.T) {
+	for _, relative := range []bool{false, true} {
+		t.Run(map[bool]string{false: "absolute", true: "relative"}[relative], func(t *testing.T) {
+			dir := t.TempDir()
+			if relative {
+				t.Chdir(dir)
+				dir = "."
+			}
+			names := []string{"state#one.db", "state#two.db", "state%23one.db", "state%one.db", "state space.db", "state+one.db", "stateplain.db"}
+			if runtime.GOOS != "windows" {
+				names = append(names, "state?one.db", "state?mode=memory&cache=shared.db", `state\one.db`)
+			}
+			for _, name := range names {
+				path := filepath.Join(dir, name)
+				if !relative && runtime.GOOS != "windows" {
+					path = "/" + path
+				}
+				db := openDB(t, path, sqlite.Options{})
+				mustExec(t, db, "CREATE TABLE IF NOT EXISTS marker (value INTEGER)")
+				var count int
+				if err := db.QueryRowContext(t.Context(), "SELECT count(*) FROM marker").Scan(&count); err != nil {
+					t.Fatal(err)
+				}
+				t.Logf("%s existing markers=%d", name, count)
+				if count != 0 {
+					t.Errorf("different configured file %s reused %d markers", name, count)
+				}
+				mustExec(t, db, "INSERT INTO marker VALUES (1)")
+				var opened string
+				if err := db.QueryRowContext(t.Context(), "SELECT file FROM pragma_database_list WHERE name='main'").Scan(&opened); err != nil {
+					t.Fatal(err)
+				}
+				if err := db.Close(); err != nil {
+					t.Fatal(err)
+				}
+				requested, err := os.Stat(path)
+				if err != nil {
+					t.Errorf("configured database file missing: %v", err)
+					continue
+				}
+				actual, err := os.Stat(opened)
+				if err != nil || !os.SameFile(requested, actual) {
+					t.Fatalf("opened database %q differs from configured %q: %v", opened, path, err)
+				}
+			}
+		})
+	}
+}
+
+func TestAccOpenDBKeepsMemoryPoolsPrivate(t *testing.T) {
+	first := openDB(t, sqlite.Memory, sqlite.Options{})
+	mustExec(t, first, "CREATE TABLE marker (value INTEGER)")
+	second := openDB(t, sqlite.Memory, sqlite.Options{})
+	var count int
+	if err := second.QueryRowContext(t.Context(), "SELECT count(*) FROM sqlite_master WHERE name='marker'").Scan(&count); err != nil || count != 0 {
+		t.Fatalf("independent memory pool contains marker: %d, %v", count, err)
+	}
+}
+
+func TestUnitDSNEscapesOnlyTheFilePath(t *testing.T) {
+	for _, path := range []string{"/data/state#one.db", "state?mode=memory&cache=shared.db", "state%23one.db", "state space.db", "//native/path.db", `C:\data\state#one.db`, `\\server\share\state#one.db`, sqlite.Memory} {
+		t.Run(path, func(t *testing.T) {
+			uri, query, ok := strings.Cut(sqlite.DSN(path, sqlite.Options{}), "?")
+			if !ok || strings.Contains(uri, "#") || strings.HasPrefix(uri, "file://") {
+				t.Fatal("path became URI structure", uri)
+			}
+			decoded, err := url.PathUnescape(strings.TrimPrefix(uri, "file:"))
+			if err != nil || decoded != path {
+				t.Fatalf("path roundtrip %q: %q, %v", path, decoded, err)
+			}
+			q, err := url.ParseQuery(query)
+			if err != nil || len(q) != 2 || q.Get("_txlock") != "immediate" {
+				t.Fatal("query changed", q, err)
+			}
+		})
 	}
 }
