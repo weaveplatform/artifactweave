@@ -39,6 +39,10 @@
 //     Walk, every route from a virtual repository to each member, for the
 //     searches and the folder index that judge a member by the route that
 //     reached it.
+//   - traversal.go: traverse, the single recursive member-graph walk behind
+//     Members and Walk. Members supplies global deduplication and nested
+//     translation/pattern gates; Walk supplies pre-read chain-cycle checks
+//     and route callbacks. Neither policy owns another recursive edge loop.
 //   - resolve.go: Resolution and Denial, what a download's walk over the
 //     members found and the first member that refused the caller Read
 //     (R3), and Answer, the item route's 404, 403 or 401 for a walk that
@@ -84,6 +88,10 @@
 //     NoUpstream).
 //   - A cycle, a self-member, a diamond and a member key no repository has
 //     never fail a walk; only a member read that fails does.
+//   - Walk retains every diamond route and calls a virtual before its
+//     descendants. Its borrowed callback chain is clipped against append;
+//     callbacks that retain the chain must clone it. Members instead keeps
+//     one first position globally, after reading each configured reference.
 //   - DeployTarget never returns a remote or virtual repository, whatever
 //     the stored configuration names.
 //   - Collect keeps the walk's order and never drops a member for a fault:
@@ -136,7 +144,8 @@
 // resolve_test.go is an external test package (virtual_test) over Configs:
 // a table of every Order over the six groups, priority, nesting, diamonds,
 // cycles, self-members, missing keys and nested pattern drops, Walk's
-// routes, bounds and failures, and Answer's statuses. deploy_test.go covers
+// routes, bounds and failures, independent read/callback traces that pin the
+// pre-read versus post-read cycle boundary, and Answer's statuses. deploy_test.go covers
 // DeployTarget for each class the defaultDeploymentRepo may name, unset and
 // missing, and a read that fails. merge_test.go merges with a test Merger
 // built from the helpers alone, as a format's virtual.go would be, and

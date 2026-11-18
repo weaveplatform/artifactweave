@@ -159,46 +159,37 @@ func flatten(
 ) (locals, remotes []repo.Config, err error) {
 	visited := map[string]bool{v.Key: true}
 	reached := map[string]bool{}
-	var walk func(c repo.Config) error
-	walk = func(c repo.Config) error {
-		for _, key := range c.Repositories {
-			m, ok, err := member(ctx, rs, c, key)
-			switch {
-			case err != nil:
-				return err
-			case !ok:
-			case m.Class == repo.Virtual:
-				if visited[m.Key] {
-					continue
-				}
-				visited[m.Key] = true
-				if o.Path != "" {
-					path := o.Path
-					if o.Translate != nil {
-						path, err = o.Translate(ctx, m, path)
-						if err != nil {
-							return fmt.Errorf("nested virtual %s path: %w", m.Key, err)
-						}
-					}
-					if !repo.PatternsOf(m).AcceptsRequest(path, o.Folder) {
-						continue
-					}
-				}
-				if err := walk(m); err != nil {
-					return err
-				}
-			case reached[m.Key]:
-			case m.Class == repo.Remote:
-				reached[m.Key] = true
-				remotes = append(remotes, m)
-			default:
-				reached[m.Key] = true
-				locals = append(locals, m)
+	err = traverse(ctx, rs, v, traversal{visit: func(_ []repo.Config, m repo.Config) (bool, error) {
+		switch {
+		case m.Class == repo.Virtual:
+			if visited[m.Key] {
+				return false, nil
 			}
+			visited[m.Key] = true
+			if o.Path != "" {
+				path := o.Path
+				if o.Translate != nil {
+					path, err = o.Translate(ctx, m, path)
+					if err != nil {
+						return false, fmt.Errorf("nested virtual %s path: %w", m.Key, err)
+					}
+				}
+				if !repo.PatternsOf(m).AcceptsRequest(path, o.Folder) {
+					return false, nil
+				}
+			}
+			return true, nil
+		case reached[m.Key]:
+		case m.Class == repo.Remote:
+			reached[m.Key] = true
+			remotes = append(remotes, m)
+		default:
+			reached[m.Key] = true
+			locals = append(locals, m)
 		}
-		return nil
-	}
-	return locals, remotes, walk(v)
+		return false, nil
+	}})
+	return locals, remotes, err
 }
 
 // member reads the member key of c; ok is false, with no error, when no
@@ -236,38 +227,14 @@ func Walk(
 	v repo.Config,
 	visit func(chain []repo.Config, m repo.Config) error,
 ) error {
-	chain := []repo.Config{v}
-	var walk func() error
-	walk = func() error {
-		c := chain[len(chain)-1]
-		for _, key := range c.Repositories {
-			if slices.ContainsFunc(chain, func(x repo.Config) bool { return x.Key == key }) {
-				continue
-			}
-			m, ok, err := member(ctx, rs, c, key)
-			if err != nil {
-				return err
-			}
-			if !ok {
-				continue
-			}
-			// Clipped, so a visit that appends to chain cannot write over
-			// the route Walk goes on with.
-			if err := visit(slices.Clip(chain), m); err != nil {
-				return err
-			}
-			if m.Class != repo.Virtual {
-				continue
-			}
-			chain = append(chain, m)
-			if err := walk(); err != nil {
-				return err
-			}
-			chain = chain[:len(chain)-1]
-		}
-		return nil
-	}
-	return walk()
+	return traverse(ctx, rs, v, traversal{
+		skip: func(chain []repo.Config, key string) bool {
+			return slices.ContainsFunc(chain, func(c repo.Config) bool { return c.Key == key })
+		},
+		visit: func(chain []repo.Config, m repo.Config) (bool, error) {
+			return true, visit(chain, m)
+		},
+	})
 }
 
 // Resolution is what a download's walk over a virtual repository's members
