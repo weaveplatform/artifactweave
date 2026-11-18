@@ -168,8 +168,8 @@ func TestAccVirtualPushAddressForms(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w := newBlobWorld(t)
-			if r := w.do("GET", "/v2/docker-virtual/Upper/referrers/sha256:"+strings.Repeat("a", 64), "", nil); r.Code != 405 {
-				t.Fatal("unsupported listing changed its validation precedence", r.Code, r.Body.String())
+			if r := w.do("POST", "/v2/docker-virtual/Upper/referrers/sha256:"+strings.Repeat("a", 64), "", nil); r.Code != 405 {
+				t.Fatal("unsupported referrers method changed its validation precedence", r.Code, r.Body.String())
 			}
 			c, err := w.db.Repos().Get(t.Context(), "docker-virtual")
 			if err != nil {

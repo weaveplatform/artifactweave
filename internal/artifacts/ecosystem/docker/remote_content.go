@@ -54,6 +54,12 @@ func (c *RegistryContent) fetch(
 	opts remote.Options,
 	request remote.Request,
 ) (*http.Response, error) {
+	if q.Resource.ExternalURL != "" {
+		if _, err := foreignResource(q.Resource); err != nil {
+			return nil, err
+		}
+		return c.external(ctx, q.Repo, opts, q.Resource.ExternalURL)
+	}
 	image, operation, reference, err := ParseRegistryPath(q.Resource.UpstreamPath)
 	if err != nil {
 		return nil, err
@@ -165,6 +171,17 @@ func (c *RegistryContent) prepare(
 	opts remote.Options,
 	u *item.CacheUpload,
 ) error {
+	if q.Resource.ExternalURL != "" {
+		spec, err := foreignResource(q.Resource)
+		if err != nil {
+			return err
+		}
+		if u.Length >= 0 && u.Length != spec.Size {
+			return item.ErrRemoteLength
+		}
+		u.MaxBytes, u.Expected.SHA256 = max(1, spec.Size), q.Resource.Checksums.SHA256
+		return nil
+	}
 	image, operation, reference, err := ParseRegistryPath(q.Resource.UpstreamPath)
 	if err != nil {
 		return err

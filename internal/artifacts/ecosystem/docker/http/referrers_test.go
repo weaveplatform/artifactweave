@@ -336,3 +336,24 @@ func TestAccReferrersAndIndexesChallengeRegistryTokens(t *testing.T) {
 		}
 	}
 }
+
+func TestAccVirtualReferrersReadBeforeMemberSearch(t *testing.T) {
+	w := newBlobWorld(t)
+	if err := w.db.Permissions().
+		Create(t.Context(), accesstest.Permission{Name: "virtual-ref-reader", Resources: map[api.ResourceType]accesstest.Resource{api.ResourceArtifact: {Actions: accesstest.Grants{Users: map[string]api.Actions{"reader": api.ActionRead}}, Targets: map[string]accesstest.Target{"docker-local": {Include: []string{"app/**"}}}}}}); err != nil {
+		t.Fatal(err)
+	}
+	var noted error
+	g := New(Options{Store: itemsFault{Store: w.db, items: failingItems{w.db.Items()}}, Blobs: w.blobs, Fault: func(_ *http.Request, err error) { noted = err }})
+	for _, as := range []string{"nobody", "reader"} {
+		noted = nil
+		rec := send(principalAs(t, w.db, router(g), as), "GET", "/v2/docker-virtual/app/referrers/"+digestOf("subject"), "", nil)
+		if as == "nobody" {
+			if rec.Code != 403 || noted != nil {
+				t.Fatal("subject permission was not first", rec.Code, noted)
+			}
+		} else if rec.Code != 500 || noted == nil {
+			t.Fatal("member storage failure hidden", rec.Code, noted)
+		}
+	}
+}

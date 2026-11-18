@@ -113,3 +113,12 @@ Manifest/blob DELETE through a virtual answers 400 with an empty body;
 `DeleteDockerTag` answers the Artifactory 400 envelope. Address the concrete member
 to delete a tag. Tag/catalog listings and referrers retain their current 405
 responses until their corresponding P10 tickets.
+
+A virtual may enable `cachingLocalForeignLayersEnabled` to fetch a missing foreign
+layer named by a readable local/federated manifest through an allowed remote
+member. This selection is inferred from 7.x's XSD, pending #216. The remote's own
+external-layer switch, URL patterns, network/cache and Deploy/Cache policy still
+apply. The blob is cached in the remote, preserving the local manifest. A cached
+blob remains available through normal member resolution when foreign fetching is
+subsequently disabled. Timestamp tags and virtual referrers are described in
+[decision 0031](../research/decisions/0031-docker-oci-registry.md).

@@ -914,3 +914,35 @@ Cold/refresh cache-fill permissions retain the intended contract recorded in
 fresh-cache test grants only path-scoped Read after an administrator primes it.
 This permission rule is distinct from #1670's trusted-policy-path publication
 defect; that shared defect remains in its existing cross-kind ticket.
+
+### P10 timestamp selection, referrers and foreign layers (DKR-04)
+
+A virtual with `resolveDockerTagsByTimestamp: true` chooses the readable local or
+federated tag manifest with the greatest modified time, breaking ties in effective
+member order. Only when no such member holds the tag does it try remote cache and
+upstream steps in their existing order. A remote-owned failure passes to the next
+member. Digest pulls retain their normal walk and member-location hints.
+[Resolve Latest Docker Image](https://docs.jfrog.com/artifactory/docs/additional-docker-information)
+settles the local-before-remote choice; the remote-cache grouping and tie rule
+remain **[I]** for #216.
+
+Virtual referrers now require image Read and the original virtual token scope
+before any member search. They merge readable local/federated results in effective
+order, first digest wins, retaining `artifactType`, annotations,
+`OCI-Filters-Applied` and the empty OCI index's 200. This follows the subject
+permission hardening in [CVE-2026-66380](https://docs.jfrog.com/releases/docs/jfrog-security-advisories#cve-2026-66380---authenticated-users-may-access-private-oci-referrer-metadata).
+Remote cache/upstream contributions remain absent under 7.161.26's default
+`oci.fetch.referrers.from.remote.cache.enabled=false`; merge order is **[I]**.
+
+`cachingLocalForeignLayersEnabled` enables the inferred local-manifest foreign
+blob fallback only after the ordinary member walk misses. The current eligible
+local/federated manifest supplies its descriptor and first URL. Its full path
+must remain visible through root/nested/member policy before it can authorize a
+fetch. The first allowed remote retains its source identity, cache policy,
+authority and publication fences. The existing sanitized foreign transport
+checks URL patterns, DNS and redirects, strips same-origin credentials/custom
+headers/cookies, and pins digest plus exact size. A flag-off pull is unchanged;
+already cached blobs still use the ordinary walk. The exact selection is **[I]**
+from the [XSD](https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd)
+and [remote settings](https://docs.jfrog.com/artifactory/docs/remote-repositories),
+recorded in research 23 and #216. No new global policy bypass is introduced.

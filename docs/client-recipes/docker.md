@@ -70,3 +70,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [internal/access/adapters/http/authn_middleware.go](../../internal/access/adapters/http/authn_middleware.go).
 - Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).
 - Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).
+- Evidence: [test/acceptance/features/registry_virtual.feature](../../test/acceptance/features/registry_virtual.feature).

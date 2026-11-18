@@ -819,3 +819,52 @@ source revocation/storage faults. Native proof is implementation evidence, not a
 vendor capture. Cold/refresh cache-fill authority follows the intended behavior
 recorded in #1587; fresh cached metadata needs only the caller's Read permission.
 The separate trusted-policy-path publication defect remains tracked in #1670.
+
+## P10 timestamp tags, virtual referrers and local foreign layers (DKR-04, 2026-11-18)
+
+[D] [Resolve Latest Docker Image](https://docs.jfrog.com/artifactory/docs/additional-docker-information)
+selects the last modified local tag before trying remotes in resolution order;
+`resolveDockerTagsByTimestamp` defaults to false. Digest resolution retains its
+existing member walk and digest-location hints (RTFACT-23394); timestamp remote
+failures pass to the next member (RTFACT-23514). These are registry rules for
+Docker, OCI and Helm OCI, rather than a different ordering in the shared engine.
+
+[D] [CVE-2026-66380](https://docs.jfrog.com/releases/docs/jfrog-security-advisories#cve-2026-66380---authenticated-users-may-access-private-oci-referrer-metadata)
+requires subject Read before disclosing OCI referrer metadata, fixed in 7.146.35
+and 7.161.16. The virtual checks its image scope before any member search, then
+includes only readable local/federated members. [S] Verified official 7.161.26
+`base/config/src/main/java/org/artifactory/common/ConstantValues.java` defaults
+`ociFetchReferrersFromRemoteCacheEnabled` to false (line 1257). Remote cached and
+upstream referrers contribute nothing under that default; direct remote reads
+retain their existing behavior.
+
+[D] The [configuration XSD](https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd)
+and verified `VirtualRepoDescriptor.java` (line 104) default
+`cachingLocalForeignLayersEnabled` to false and describe using a remote repository
+to cache Docker foreign layers. [Remote repository settings](https://docs.jfrog.com/artifactory/docs/remote-repositories)
+make external-layer enablement and URL patterns the remote's own policy. Searches
+of the official docs/release/KB sources for RTFACT-22938 and RTFACT-29508 did not
+settle the closed implementation's exact selection algorithm; the OSS addon
+interface omits that implementation.
+
+[I] Pending #216/P19: remote caches stay with remotes in timestamp order; equal
+local modification times retain effective order; referrers retain effective
+member order, each member's own digest order, and first digest wins. The inferred
+foreign fallback runs only after every ordinary blob member misses and the
+virtual flag is enabled. A currently readable local/federated manifest must name
+the requested non-distributable layer; its actual manifest path must pass the
+root, nested virtual and member policies. Hidden aliases do not consume digest
+deduplication. The first eligible witness in member/storage order supplies its
+first URL; the first remote step whose external-layer settings allow it fetches
+and caches verified bytes in that remote. Both switches gate fetching; already
+cached ordinary blobs remain readable without another foreign fetch.
+
+The external request reuses the registry's existing foreign transport: all
+registry/custom/cookie headers are stripped even on the same origin, its cookie
+jar is disabled, and every redirect retains URL/DNS policy. Digest and exact
+length are mandatory, including a zero-length descriptor with a chunked body.
+Cache-only/offline/no-origin, non-storing remotes, publication permission and
+current-source fences remain owned by the source service. Cold fill requires
+Read plus Deploy/Cache as intended in #1587; #1670's separate trusted-policy-path
+publication defect remains out of scope. Native crane/ORAS evidence proves this
+implementation, not a vendor capture. No live or trial Artifactory was used.
