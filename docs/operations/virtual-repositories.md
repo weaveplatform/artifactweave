@@ -7,7 +7,7 @@ separates the resolution mechanism from client/server evidence. Registered `V` i
 not itself a native-client qualification claim. A federated member here is the
 one-node repository contract; cross-peer convergence belongs to P13.
 
-This guide describes merged implementation through main `fb67c046` (2026-11-18).
+This guide describes merged implementation through main `df78dd391` (2026-11-18).
 The [qualification and epic closeout record](../testing/phase10-signoff.md)
 distinguishes delivered work from the remaining final gate. [#1571](https://github.com/weaveplatform/artifactweave/issues/1571)
 owns final qualification, the plan status and decision 0008's acceptance. The
@@ -75,8 +75,12 @@ record this boundary and its current-version compatibility limits.
 preserves source lookup SQL faults and their original cause before consumer
 classification; the former #1692 loss of storage identity is fixed. The separate
 existing-copy clock-write fault in [#1704](https://github.com/weaveplatform/artifactweave/issues/1704)
-and expired-file retention in [#1645](https://github.com/weaveplatform/artifactweave/issues/1645)
-remain tracked by the qualification record until their corrections merge.
+remains tracked by the qualification record until its correction merges.
+[Merged #1705](https://github.com/weaveplatform/artifactweave/pull/1705) retains a
+complete expired repository file after an explicit origin 404 and advances its
+validation clock. Physical index files retain that file contract; native API
+documents retain their own miss behavior. The [source trace](../research/expired-remote-copy.md)
+records the boundary, strict HTTP-cache controls and modern-version limits.
 
 ## R4. Hiding unauthorized resources
 
