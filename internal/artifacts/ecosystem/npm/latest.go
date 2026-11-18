@@ -37,6 +37,9 @@ type Settings struct {
 	// than the highest. 7.x has it off by default (6.20's ConstantValues;
 	// RTFACT-9754, RTFACT-20127).
 	TagLatestByPublish bool
+	// MergeDistTagsByVersion selects the highest SemVer custom-tag target across
+	// virtual members instead of the first member's tag (7.75.3+).
+	MergeDistTagsByVersion bool
 	// EnforcePath is npm.enforce_path, 7.x's artifactory.npm.enforce.path:
 	// a package tarball deployed to a local repository under a file name
 	// other than the one its package.json gives is refused (Admit). 7.x

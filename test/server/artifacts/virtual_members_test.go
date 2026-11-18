@@ -65,9 +65,10 @@ func TestAccVirtualWithoutMembers(t *testing.T) {
 		{"GET", "/artifactory/api/search/gavc?g=org&repos=maven-empty", "", 200, `"results":[]`},
 		{"GET", "/artifactory/maven-empty/org/x/maven-metadata.xml", "", 404, ""},
 		{"GET", "/artifactory/maven-empty/org/x/1.0/x-1.0.jar", "", 404, ""},
-		// The npm API does not serve virtual repositories yet, with members
-		// or without, and answers both alike.
-		{"GET", "/artifactory/api/npm/npm-empty/pkg", "", 501, "does not serve"},
+		{"GET", "/artifactory/api/npm/npm-empty/pkg", "", 404, "package not found: pkg"},
+		// Virtual npm reads are served; publishing remains deferred even
+		// when the virtual repository has no members.
+		{"PUT", "/artifactory/api/npm/npm-empty/pkg", "{", 501, "does not serve"},
 		{"POST", "/artifactory/api/repositories/npm-empty", `{"description":"d"}`, 200, ""},
 		{"DELETE", "/artifactory/api/repositories/npm-empty", "", 200, ""},
 	} {

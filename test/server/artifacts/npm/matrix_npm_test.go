@@ -22,6 +22,10 @@ var npmMatrixPart = matrixPart{
 			// here (#293).
 			row(npmReindex, local+"reindex", "", holds("npm-local", "", api.ActionManage), 200),
 			row(npmPackument, local+"work", "", reads("work"), 200),
+			row(npmPackument, npmBase+"npm-virtual/work", "", reads("work"), 200),
+			row(npmManifest, npmBase+"npm-virtual/lib/1.0.0", "", reads("lib"), 200),
+			row(npmTarball, npmBase+"npm-virtual/lib/-/lib-1.0.0.tgz", "", reads("lib"), 200),
+			row(npmPing, npmBase+"npm-virtual/-/ping", "", anyone, 501),
 			row(npmPackument, local+"lib", "", reads("lib"), 200),
 			row(npmManifest, local+"work/1.0.0", "", reads("work"), 200),
 			row(npmManifest, local+"lib/latest", "", reads("lib"), 200),

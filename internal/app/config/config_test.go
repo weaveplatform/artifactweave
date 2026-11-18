@@ -1060,6 +1060,38 @@ func TestUnitNPMTagLatestByPublish(t *testing.T) {
 	}
 }
 
+func TestUnitNPMMergeDistTagsByVersion(t *testing.T) {
+	if Default().NPM.MergeDistTagsByVersion {
+		t.Fatal("on by default")
+	}
+	if _, err := Load(LoadOptions{
+		Flags: map[string]string{"npm.merge_dist_tags_by_version": "yes"},
+	}); !errors.Is(err, ErrInvalidValue) {
+		t.Errorf("yes: %v", err)
+	}
+	for _, tc := range []struct {
+		env, flags map[string]string
+		expected   bool
+	}{
+		{nil, nil, true},
+		{map[string]string{"ARTIFACTWEAVE_NPM_MERGE_DIST_TAGS_BY_VERSION": "false"}, nil, false},
+		{
+			map[string]string{"ARTIFACTWEAVE_NPM_MERGE_DIST_TAGS_BY_VERSION": "false"},
+			map[string]string{"npm.merge_dist_tags_by_version": "true"},
+			true,
+		},
+	} {
+		got, err := Load(LoadOptions{
+			File:  writeFile(t, "npm:\n  merge_dist_tags_by_version: true\n"),
+			Env:   envOf(tc.env),
+			Flags: tc.flags,
+		})
+		if err != nil || got.NPM.MergeDistTagsByVersion != tc.expected {
+			t.Errorf("%v %v: %+v, %v", tc.env, tc.flags, got.NPM, err)
+		}
+	}
+}
+
 // npm.enforce_path is off by default, as 7.x's
 // artifactory.npm.enforce.path is, and takes flag over environment over
 // file, strictly parsed.

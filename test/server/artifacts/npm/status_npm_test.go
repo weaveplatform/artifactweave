@@ -78,9 +78,9 @@ var npmStatusPart = statusPart{
 			{npmPackument, local + "status-pkg", "", "", 401},
 			{npmPackument, npmBase + "missing/status-pkg", "admin", "", 404},
 			{npmPackument, npmBase + "libs-local/status-pkg", "admin", "", 404},
-			// Remote and virtual npm repositories are P9's and P10's.
+			// This fixture mounts no remote source; its virtual reads npm-local.
 			{npmPackument, npmBase + "npm-remote/status-pkg", "admin", "", 501},
-			{npmPackument, npmBase + "npm-virtual/status-pkg", "admin", "", 501},
+			{npmPackument, npmBase + "npm-virtual/status-pkg", "admin", "", 200},
 			// npm's own operations under /-/ that no route serves yet.
 			{npmPackument, local + "-/v1/login", "admin", "", 404},
 			{npmPackument, local + "status-pkg/a/b", "admin", "", 404},

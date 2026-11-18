@@ -7,6 +7,9 @@ type NPMTag struct {
 	// artifactory.npm.tag.tagLatestByPublish does. Off by default, as
 	// there.
 	TagLatestByPublish bool `yaml:"tag_latest_by_publish"`
+	// MergeDistTagsByVersion is 7.75.3's optional custom dist-tag merge strategy.
+	// The default keeps the first member's tag, independently of publish date.
+	MergeDistTagsByVersion bool `yaml:"merge_dist_tags_by_version"`
 }
 
 // NPMPath holds the npm format's upload path option (decision 0034).

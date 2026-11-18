@@ -81,8 +81,9 @@
 // # Status
 //
 // Implemented P7 (npm local repositories), with remote repositories in P9.
-// Moved here in P9d. Roadmap: virtual.go (P10), the Merger that merges
-// packuments for virtual repositories.
+// Moved here in P9d. P10 virtual.go merges packuments and dist-tags; the HTTP
+// adapter renders request-specific documents and resolves immutable tarballs.
+// Virtual writes, authentication, search and keys remain separate P10 tickets.
 //
 // # Testing
 //
