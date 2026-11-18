@@ -112,7 +112,7 @@
   "test/acceptance/features/pub.feature": "f9af72d4c8dd5818ea1cbf34b14b34b9e71e2ff66919a7eb853969563dddd6e4",
   "test/acceptance/features/puppet.feature": "c792ab4c573523f9aea4c78742575aa1701cbec24624c9aec06b84ab80ee7978",
   "test/acceptance/features/pypi_clients.feature": "bddf02e7edd52077046a9941b6b16b0fb060e914ab480e04a206d238e8ca0e5d",
-  "test/acceptance/features/pypi_remote.feature": "b34adcf5c0815fb9fe01e85dc219997ebba4919fe710bef0b0c3fb1c2f38b4d7",
+  "test/acceptance/features/pypi_remote.feature": "6bbeec8c4cd6bae631c5e63e78bfc4aa7dcc3fe98dc3f69674865ace3aeb09ae",
   "test/acceptance/features/pypi_uploads.feature": "b78da13eebb45bc51be83f59888892b5ffc857a720b5f41255e644d40ac5dd6d",
   "test/acceptance/features/pypi_virtual.feature": "c1cdf06fdec932bf725f21499f57d700ce65f0e04b94b2a34dff10fcfe738985",
   "test/acceptance/features/registry_clients.feature": "d7ddee6652d23b5f7dfc17146f8459056d2633de42f2c8a930f4527277d7ea22",

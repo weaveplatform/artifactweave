@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 )
 
@@ -66,6 +67,14 @@ func (s *Service) authorize(ctx context.Context, q Request, bind bool) (*Authori
 	}
 	if err := s.revalidate(ctx, q, permit); err != nil {
 		return nil, err
+	}
+	// Only a full pattern check authorizes this policy namespace. Internal
+	// blackout-only lookups retain their ordinary publication admission.
+	if q.Resource.Kind == ResourceKindArtifact && q.Resource.PolicyPath != "" && !q.Resource.BlackoutOnly && !q.Resource.permissionOnly {
+		permit.cachePolicy, err = format.NewCachePolicy(q.Repo, identity, q.Resource.Path, q.Resource.PolicyPath)
+		if err != nil {
+			return nil, fmt.Errorf("source cache policy: %w", err)
+		}
 	}
 	a := &Authority{service: s, request: q, permit: permit}
 	backend := s.HTTP

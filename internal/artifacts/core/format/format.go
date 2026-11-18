@@ -177,6 +177,9 @@ const (
 
 // Write is a file write as a format sees it before it happens.
 type Write struct {
+	// CachePolicy is a source-owned binding for cache publication only.
+	// Ordinary deploys, copies and moves carry its zero value.
+	CachePolicy CachePolicy
 	// By is the actor recorded for a deploy, empty for other write kinds.
 	// It binds staged publication to its creator without HTTP dependencies.
 	By string
