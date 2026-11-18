@@ -1,49 +1,21 @@
-# Pull Request Description
-
 ## Summary
-[Provide a brief description of the changes in this PR]
 
-### Issue Reference
-Fixes #[Issue Number]
+<!-- Explain the concrete problem, resulting behavior and implementation choices. Link the originating issue and supporting sources. -->
 
-### Motivation and Context
-- Why is this change needed?
-- What problem does it solve?
-- If it fixes an open issue, please link to the issue here
+## Before and after
 
-### Dependencies
-- List any dependencies that are required for this change
-- Include any configuration changes needed
-- Note any version updates required
+<!-- Compare the same reproducible inputs on the baseline and this branch. Include statuses, bodies or client results, and relevant unchanged controls. State the baseline commit and any verification limits. -->
 
-## Type of Change
-Please mark the relevant option with an `x`:
-- [ ] 🐛 Bug fix (non-breaking change which fixes an issue)
-- [ ] ✨ New feature (non-breaking change which adds functionality)
-- [ ] 💥 Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] 📝 Documentation update (Wiki/README/Code comments)
-- [ ] ♻️ Refactor (code improvement without functional changes)
-- [ ] 🎨 Style update (formatting, renaming)
-- [ ] 🔧 Configuration change
-- [ ] 📦 Dependency update
+## Answers kept on purpose
 
-## Testing
-- [ ] I have added unit tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
-- [ ] I have tested this code in the following browsers/environments: [list environments]
+<!-- Explain relevant behavior intentionally retained and why. State "None" when there is no additional behavior to call out. -->
 
-## Quality Checklist
-- [ ] I have reviewed my own code before requesting review
-- [ ] I have verified there are no other open Pull Requests for the same update/change
-- [ ] All CI/CD pipelines pass without errors or warnings
-- [ ] My code follows the established style guidelines of this project
-- [ ] My comments are used only when necessary, ideally where the codes purpose is not self explanatory (eg: necessary magic numbers)
-- [ ] I have added necessary documentation (if appropriate)
-- [ ] I have made corresponding changes to the README and other relevant documentation
-- [ ] My changes generate no new warnings
+## Found while fixing
 
-## Screenshots/Recordings (if appropriate)
-[Add screenshots or recordings that demonstrate the changes]
+<!-- For every additional related bug, describe the finding, affected artifact kinds, evidence and disposition. Same kind: fix it in this PR and link the fix/regression test. Multiple kinds: automatically open a separate issue, or link an existing issue covering the same defect, and explain why it belongs there. State explicitly when no additional related bugs were found. See CONTRIBUTING.md#pull-requests. -->
 
-## Additional Notes
-[Add any additional information that might be helpful for reviewers]
+## Tests
+
+<!-- Record actual commands and results, database/native-client versions, coverage scope and limits, and current CI status. Distinguish local evidence from pending CI. -->
+
+Closes #
