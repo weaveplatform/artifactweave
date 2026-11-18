@@ -28,8 +28,8 @@
     }
   ],
   "publish": {
-    "classes": "LF",
-    "note": "Add these producer settings and run from the producer project. The dependency bytes are published by sbt itself.",
+    "classes": "LVF",
+    "note": "Publish to a local, one-node federated, or virtual repository with a configured local/federated default deployment repository. A virtual authorizes and stores on that target; remote members remain read-only sources.",
     "steps": [
       {
         "language": "scala",
@@ -60,9 +60,10 @@
     ]
   },
   "limitations": [
-    "The native proof covers local and one-node federated publication plus local, remote-cache and virtual resolution, including bad credentials. It does not claim every sbt plugin layout.",
-    "Remote and virtual publication is omitted; publish to the selected concrete deployment repository.",
-    "--server keeps this one-shot invocation in the foreground rather than leaving an sbt server process attached to a user home."
+    "The native proof covers local, one-node federated and virtual publication plus mixed local/remote virtual and remote-cache resolution, including bad credentials. It does not claim every sbt plugin layout.",
+    "--server keeps this one-shot invocation in the foreground rather than leaving an sbt server process attached to a user home.",
+    "Virtual resolution is qualified over distinct local and remote origins with fresh dependency caches. Virtual publication needs a default deployment repository; without one, deploy answers 405 and Allow: GET.",
+    "sbt refuses an existing release coordinate by default. Publish a new release version; the native virtual proof publishes 1.1.0 and leaves the existing 1.0.0 intact."
   ],
   "evidence": [
     {
@@ -82,6 +83,13 @@
         "publishTo := Some",
         "libraryDependencies +=",
         "verified controlled sbt artifact bytes"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/sbt.feature",
+      "contains": [
+        "sbt used distinct local and remote virtual origins",
+        "sbt publishes the controlled recipe to \"sbt-v\""
       ]
     }
   ]

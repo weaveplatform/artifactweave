@@ -30,7 +30,8 @@ Feature: The sbt recipe publishes and resolves using real native clients
       | local     | sbt-l   |
       | federated | sbt-f   |
 
-  Scenario: sbt resolves through a virtual and a remote cache from empty client caches
+  @maven_virtual
+  Scenario: sbt resolves mixed virtual origins, publishes into its deployment target and uses empty client caches
     Given the registry is running
     And the sbt client can reach the registry
     When I PUT "/artifactory/api/repositories/sbt-source" as admin with body:
@@ -41,21 +42,32 @@ Feature: The sbt recipe publishes and resolves using real native clients
     When sbt publishes the controlled recipe to "sbt-source"
     Then the command succeeds
     And the server answered no request with 500 since the last command
+    Given an sbt upstream supplies a distinct remote dependency
+    When I PUT "/artifactory/api/repositories/sbt-r" as admin with body:
+      """
+      {"rclass":"remote","packageType":"sbt","url":"{upstream}"}
+      """
+    Then the response status is 200
     When I PUT "/artifactory/api/repositories/sbt-v" as admin with body:
       """
-      {"rclass":"virtual","packageType":"sbt","repositories":["sbt-source"]}
+      {"rclass":"virtual","packageType":"sbt","repositories":["sbt-source","sbt-r"],"defaultDeploymentRepo":"sbt-source"}
       """
     Then the response status is 200
     When sbt resolves the controlled recipe from "sbt-v" with a fresh home
     Then the command succeeds
     And the server answered no request with 500 since the last command
     And the output contains "verified controlled sbt artifact bytes"
-    And the server answered 200 to GET "/artifactory/sbt-v/org/weave/recipe/widget/1.0.0/widget-1.0.0.jar"
-    When I PUT "/artifactory/api/repositories/sbt-r" as admin with body:
-      """
-      {"rclass":"remote","packageType":"sbt","url":"{platform}/artifactory/sbt-source","username":"admin","password":"{password}"}
-      """
+    And sbt used distinct local and remote virtual origins
+    When sbt publishes the controlled recipe to "sbt-v"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the server answered 201 to PUT "/artifactory/sbt-v/org/weave/recipe/widget/1.1.0/widget-1.1.0.jar"
+    When I GET "/artifactory/api/storage/sbt-source/org/weave/recipe/widget/1.1.0/widget-1.1.0.jar" as admin
     Then the response status is 200
+    When sbt resolves the controlled recipe from "sbt-v" with a fresh home
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the output contains "verified controlled sbt artifact bytes"
     When sbt resolves the controlled recipe from "sbt-r" with a fresh home
     Then the command succeeds
     And the server answered no request with 500 since the last command

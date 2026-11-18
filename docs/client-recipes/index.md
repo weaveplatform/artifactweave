@@ -26,16 +26,16 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Generic files](generic.md) | JFrog CLI 2.131.0 | local, federated | local, remote, virtual, federated |
 | [Git LFS](gitlfs.md) | Git LFS 3.8.1 | local, federated | local, remote, virtual, federated |
 | [Go modules](go.md) | Go 1.27 (module toolchain); JFrog CLI 2.131.0 | local, virtual | local, virtual |
-| [Gradle Maven-layout repositories](gradle.md) | Gradle 9.8.2 on Temurin 27; optional JFrog CLI 2.131.0 wrapper | local, federated | local, remote, virtual, federated |
+| [Gradle Maven-layout repositories](gradle.md) | Gradle 9.8.2 on Temurin 27; optional JFrog CLI 2.131.0 wrapper | local, virtual, federated | local, remote, virtual, federated |
 | [Classic Helm charts](helm.md) | Helm 4.3.1 | local, federated | local, remote, virtual, federated |
 | [Helm OCI charts](helmoci.md) | Helm 4.3.1; JFrog CLI 2.131.0 | local, virtual, federated | local, remote, virtual, federated |
 | [Signed Hex repositories](hex.md) | Hex 2.6.0; Elixir 1.20.5; OTP 29.1.2 | local | local, remote, virtual |
 | [Hugging Face models and datasets](huggingfaceml.md) | huggingface_hub 2.4.0; hf-xet 1.8.0 | local, federated | local, remote, virtual, federated |
-| [Apache Ivy](ivy.md) | Apache Ivy 2.6.0 on the pinned Maven/Temurin image | local, federated | local, remote, virtual, federated |
+| [Apache Ivy](ivy.md) | Apache Ivy 2.6.0 on the pinned Maven/Temurin image | local, virtual, federated | local, remote, virtual, federated |
 | [JetBrains Marketplace plugins](jetbrainsplugins.md) | IntelliJ IDEA 2026.2.4 | none | remote |
 | [LuaRocks](luarocks.md) | LuaRocks 3.13.0; Lua 5.5.1 | local, virtual, federated | local, remote, virtual, federated |
 | [Versioned FrogML models](machinelearning.md) | FrogML 3.0.0; Python 3.13.18 | local, federated | local, federated |
-| [Apache Maven](maven.md) | Maven 3 image / Temurin 27; compatibility Maven 3.9 image / Temurin 26 (exact bundled versions in CI logs) | local, federated | local, remote, virtual, federated |
+| [Apache Maven](maven.md) | Maven 3 image / Temurin 27; compatibility Maven 3.9 image / Temurin 26 (exact bundled versions in CI logs) | local, virtual, federated | local, remote, virtual, federated |
 | [NIM metadata and paired container](nimmodel.md) | curl for metadata; crane 0.22.1 for the paired image | none | remote |
 | [Nix binary caches](nix.md) | Nix 2.35.6 | local, federated | local, remote, virtual, federated |
 | [npm](npm.md) | Bundled npm on Node 26.13.1; npm 12.2.1 on Node 24.22.3 | local | local, remote, virtual |
@@ -47,7 +47,7 @@ Start with the [common setup](README.md). Each recipe names the tested client, e
 | [Puppet Forge modules](puppet.md) | Puppet 8.10.0 on Ruby 3.3.13 | local, federated | local, remote, virtual, federated |
 | [Python simple index](pypi.md) | Python 3.15.2; pip 26.3; Twine 7.0.0; uv 0.13.7; Poetry 2.5.1 | local, virtual | local, remote, virtual |
 | [RPM / DNF](rpm.md) | DNF and RPM bundled with Fedora 45 (immutable image) | local, federated | local, remote, virtual, federated |
-| [sbt artifacts](sbt.md) | sbt 2.0.12; Eclipse Temurin 26 | local, federated | local, remote, virtual, federated |
+| [sbt artifacts](sbt.md) | sbt 2.0.12; Eclipse Temurin 26 | local, virtual, federated | local, remote, virtual, federated |
 | [Agent skills](skills.md) | JFrog CLI 2.131.0 | local | local |
 | [Swift Package Registry](swift.md) | Swift/SwiftPM 6.4.2 pinned Linux client | local, virtual, federated | local, remote, virtual, federated |
 | [Terraform module and provider registries](terraform.md) | Terraform 1.17.1; JFrog CLI 2.131.0 | local, federated | local, remote, virtual, federated |

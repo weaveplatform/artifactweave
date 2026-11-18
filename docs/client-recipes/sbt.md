@@ -51,7 +51,7 @@ externalResolvers := resolvers.value
 
 ## Publish
 
-Classes: **local, federated**. Add these producer settings and run from the producer project. The dependency bytes are published by sbt itself.
+Classes: **local, virtual, federated**. Publish to a local, one-node federated, or virtual repository with a configured local/federated default deployment repository. A virtual authorizes and stores on that target; remote members remain read-only sources.
 
 Append to producer build.sbt; create src/main/resources/payload.txt containing the bytes to publish.
 
@@ -85,9 +85,10 @@ sbt --server -batch update
 
 Classes outside **local, remote, virtual, federated** are not registered for this format. Commands above apply only to each operation's listed classes. Federated evidence is for one node; it does not establish cross-vendor replication.
 
-- The native proof covers local and one-node federated publication plus local, remote-cache and virtual resolution, including bad credentials. It does not claim every sbt plugin layout.
-- Remote and virtual publication is omitted; publish to the selected concrete deployment repository.
+- The native proof covers local, one-node federated and virtual publication plus mixed local/remote virtual and remote-cache resolution, including bad credentials. It does not claim every sbt plugin layout.
 - --server keeps this one-shot invocation in the foreground rather than leaving an sbt server process attached to a user home.
+- Virtual resolution is qualified over distinct local and remote origins with fresh dependency caches. Virtual publication needs a default deployment repository; without one, deploy answers 405 and Allow: GET.
+- sbt refuses an existing release coordinate by default. Publish a new release version; the native virtual proof publishes 1.1.0 and leaves the existing 1.0.0 intact.
 
 ## Verification sources
 
@@ -96,3 +97,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/sbt.Dockerfile](../../test/acceptance/clients/sbt.Dockerfile).
 - Evidence: [test/acceptance/features/sbt.feature](../../test/acceptance/features/sbt.feature).
 - Evidence: [test/acceptance/sbt_steps_test.go](../../test/acceptance/sbt_steps_test.go).
+- Evidence: [test/acceptance/features/sbt.feature](../../test/acceptance/features/sbt.feature).

@@ -175,6 +175,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerCache(sc)
 	w.registerRemote(sc)
 	w.registerMavenRemote(sc)
+	w.registerMavenVirtual(sc)
 	w.registerDocker(sc)
 	w.registerClients(sc)
 	w.registerDebian(sc)

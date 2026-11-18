@@ -31,7 +31,7 @@ export AW_REPO_URL="$AW_URL/artifactory/$AW_REPO"
 
 ## Publish
 
-Classes: **local, federated**. Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.
+Classes: **local, virtual, federated**. Publish to a local, one-node federated, or virtual repository with a configured local/federated default deployment repository. A virtual authorizes and stores on that target; remote members remain read-only sources.
 
 Producer build.gradle; settings.gradle must set rootProject.name = "widget". Place the producer sources/resources under src/main. The endpoint must use HTTPS.
 
@@ -87,6 +87,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 - The historical gradle-default Ivy-style layout needs a different resolver/publication pattern and is not represented by these commands.
 - JFrog CLI gradle integration is informational; direct Gradle recipe verification is a required native acceptance scenario.
 - The isolated test server uses HTTP loopback and explicitly enables allowInsecureProtocol there; production snippets require HTTPS.
+- Virtual resolution is qualified over distinct local and remote origins with fresh dependency caches. Virtual publication needs a default deployment repository; without one, deploy answers 405 and Allow: GET.
 
 ## Verification sources
 
@@ -97,3 +98,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/system_recipes.feature](../../test/acceptance/features/system_recipes.feature).
 - Evidence: [test/acceptance/system_recipe_steps_test.go](../../test/acceptance/system_recipe_steps_test.go).
 - Evidence: [test/acceptance/features/maven.feature](../../test/acceptance/features/maven.feature).
+- Evidence: [test/acceptance/features/system_recipes.feature](../../test/acceptance/features/system_recipes.feature).

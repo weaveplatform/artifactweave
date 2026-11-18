@@ -32,7 +32,7 @@ XML
 
 ## Publish
 
-Classes: **local, federated**. Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.
+Classes: **local, virtual, federated**. Publish to a local, one-node federated, or virtual repository with a configured local/federated default deployment repository. A virtual authorizes and stores on that target; remote members remain read-only sources.
 
 Run in a valid Maven project with a pinned deploy plugin. package then deploy:deploy avoids installing the artifact into the consumer local cache.
 
@@ -54,8 +54,8 @@ mvn -s "$AW_WORK/settings.xml" -C -Dmaven.repo.local="$AW_WORK/consumer-m2" org.
 
 Classes outside **local, remote, virtual, federated** are not registered for this format. Commands above apply only to each operation's listed classes. Federated evidence is for one node; it does not establish cross-vendor replication.
 
-- Virtual deployment is deliberately omitted; deploy directly to the authorized local member.
 - Client checksums remain strict (-C). A dependency already in consumer-m2 is not evidence of remote retrieval.
+- Virtual resolution is qualified over distinct local and remote origins with fresh dependency caches. Virtual publication needs a default deployment repository; without one, deploy answers 405 and Allow: GET.
 
 ## Verification sources
 
@@ -65,3 +65,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/maven-3.9/Dockerfile](../../test/acceptance/clients/maven-3.9/Dockerfile).
 - Evidence: [test/acceptance/features/maven.feature](../../test/acceptance/features/maven.feature).
 - Evidence: [test/acceptance/features/maven_remote.feature](../../test/acceptance/features/maven_remote.feature).
+- Evidence: [test/acceptance/features/maven.feature](../../test/acceptance/features/maven.feature).

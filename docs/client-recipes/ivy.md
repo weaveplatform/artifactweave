@@ -45,13 +45,12 @@ Save as $AW_WORK/ivysettings.xml without shell expansion; Ivy resolves aw.* JVM 
 
 ## Publish
 
-Classes: **local, federated**. Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.
+Classes: **local, virtual, federated**. Publish to a local, one-node federated, or virtual repository with a configured local/federated default deployment repository. A virtual authorizes and stores on that target; remote members remain read-only sources.
 
-Publish the actual Ivy descriptor and JAR. The descriptor declares organisation org.acme, module widget, revision 1.0.0 and a jar publication.
+Run beside ivy-1.0.0.xml and widget-1.0.0.jar. The Ivy client publishes both descriptor and JAR to the configured resolver. Replacing an existing path may require Delete permission.
 
 ```sh
-curl --fail --silent --show-error --user "$AW_USER:$AW_TOKEN" --upload-file ivy-1.0.0.xml "$AW_REPO_URL/org.acme/widget/1.0.0/ivys/ivy-1.0.0.xml"
-curl --fail --silent --show-error --user "$AW_USER:$AW_TOKEN" --upload-file widget-1.0.0.jar "$AW_REPO_URL/org.acme/widget/1.0.0/jars/widget-1.0.0.jar"
+java -Duser.home="$AW_WORK/publisher-home" -Daw.host="$AW_HOST" -Daw.user="$AW_USER" -Daw.token="$AW_TOKEN" -jar /opt/ivy.jar -settings "$AW_WORK/ivysettings.xml" -cache "$AW_WORK/publisher-cache" -ivy ivy-1.0.0.xml -publish aw -publishpattern "$PWD/[artifact]-[revision].[ext]" -deliverto "$PWD/ivy-[revision].xml" -revision 1.0.0 -overwrite
 ```
 
 ## Install or resolve
@@ -68,8 +67,8 @@ java -Duser.home="$AW_WORK/home" -Daw.host="$AW_HOST" -Daw.url="$AW_REPO_URL" -D
 
 Classes outside **local, remote, virtual, federated** are not registered for this format. Commands above apply only to each operation's listed classes. Federated evidence is for one node; it does not establish cross-vendor replication.
 
-- Remote and virtual repositories are read-only in this recipe; publish to the local member.
 - Each resolve needs a new cache and retrieve directory.
+- Virtual resolution is qualified over distinct local and remote origins with fresh dependency caches. Virtual publication needs a default deployment repository; without one, deploy answers 405 and Allow: GET.
 
 ## Verification sources
 
@@ -78,3 +77,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/maven.Dockerfile](../../test/acceptance/clients/maven.Dockerfile).
 - Evidence: [test/acceptance/features/system_recipes.feature](../../test/acceptance/features/system_recipes.feature).
 - Evidence: [test/acceptance/system_recipe_steps_test.go](../../test/acceptance/system_recipe_steps_test.go).
+- Evidence: [test/acceptance/features/system_recipes.feature](../../test/acceptance/features/system_recipes.feature).

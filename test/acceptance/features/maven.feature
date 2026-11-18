@@ -356,25 +356,21 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
   # runner's Java is 17, below the fixtures' release 21, and the build
   # installs into the scenario's own local repository, never the job's
   # plugin cache.
-  @jf @maven
-  Scenario: jf mvn deploys a release and a snapshot with a build, and jf rt bp publishes it
+  @jf @maven @maven_virtual
+  Scenario Outline: jf mvn deploys a release and a snapshot through <class> with a build, and jf rt bp publishes it
     Given the registry is running
     And the JFrog CLI is available
     And mvn is on the runner's PATH
-    When I PUT "/artifactory/api/repositories/mvn-jf" as admin with body:
-      """
-      {"rclass":"local","packageType":"maven"}
-      """
-    Then the response status is 200
+    And a maven deployment repository "<repo>" of class "<class>" is ready
     Given the Maven project "lib" in "lib"
     And the Maven project "snap" in "snap"
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
     Then the command succeeds
     And the server answered no request with 500 since the last command
-    When I run jf "mvnc --server-id-deploy aw --repo-deploy-releases mvn-jf --repo-deploy-snapshots mvn-jf" in "lib"
+    When I run jf "mvnc --server-id-deploy aw --repo-deploy-releases <repo> --repo-deploy-snapshots <repo>" in "lib"
     Then the command succeeds
     And the server answered no request with 500 since the last command
-    When I run jf "mvnc --server-id-deploy aw --repo-deploy-releases mvn-jf --repo-deploy-snapshots mvn-jf" in "snap"
+    When I run jf "mvnc --server-id-deploy aw --repo-deploy-releases <repo> --repo-deploy-snapshots <repo>" in "snap"
     Then the command succeeds
     And the server answered no request with 500 since the last command
     When I run jf "mvn install -B -Dmaven.repo.local={dir}/jf-m2 -Dmaven.compiler.release=17 --build-name mvn-accept --build-number 1" in "lib"
@@ -391,30 +387,31 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
     And the JSON field "buildInfo.modules" has 2 entries
     And the response body contains "org.acme.smoke:lib:1.0.0"
     And the response body contains "org.acme.smoke:snap:1.0-SNAPSHOT"
-    When I GET "/artifactory/api/storage/mvn-jf/org/acme/smoke/lib/1.0.0/lib-1.0.0.jar?properties" as admin
+    When I GET "/artifactory/api/storage/<ddr>/org/acme/smoke/lib/1.0.0/lib-1.0.0.jar?properties" as admin
     Then the response status is 200
     And the response body contains "build.name"
     And the response body contains "mvn-accept"
-    And within 20 seconds the body of GET "/artifactory/mvn-jf/org/acme/smoke/lib/maven-metadata.xml" as admin contains "<release>1.0.0</release>"
+    And within 20 seconds the body of GET "/artifactory/<repo>/org/acme/smoke/lib/maven-metadata.xml" as admin contains "<release>1.0.0</release>"
     # One unique build, named from the build's timestamp, of the jar and
     # the POM, beside the snapshot metadata.
-    Then within 20 seconds the JSON field "children" of GET "/artifactory/api/storage/mvn-jf/org/acme/smoke/snap/1.0-SNAPSHOT" as admin has 3 entries
+    Then within 20 seconds the JSON field "children" of GET "/artifactory/api/storage/<ddr>/org/acme/smoke/snap/1.0-SNAPSHOT" as admin has 3 entries
     And the response body contains "-1.jar"
-    When I GET "/artifactory/mvn-jf/org/acme/smoke/snap/1.0-SNAPSHOT/snap-1.0-SNAPSHOT.jar" as admin
+    When I GET "/artifactory/<repo>/org/acme/smoke/snap/1.0-SNAPSHOT/snap-1.0-SNAPSHOT.jar" as admin
     Then the response status is 200
+
+    Examples:
+      | class   | repo           | ddr                   |
+      | local   | mvn-jf         | mvn-jf                |
+      | virtual | mvn-jf-virtual | mvn-jf-virtual-member |
 
   # Gradle's run is informational (decisions 0015 and 0036): the job runs
   # @gradle in a step of its own that does not gate the merge.
-  @jf @gradle
-  Scenario: jf gradle publishes with a build, and jf rt bp publishes it
+  @jf @gradle @maven_virtual
+  Scenario Outline: jf gradle publishes through <class> with a build, and jf rt bp publishes it
     Given the registry is running
     And the JFrog CLI is available
     And gradle is on the runner's PATH
-    When I PUT "/artifactory/api/repositories/gradle-local" as admin with body:
-      """
-      {"rclass":"local","packageType":"gradle"}
-      """
-    Then the response status is 200
+    And a gradle deployment repository "<repo>" of class "<class>" is ready
     Given a file "glib/settings.gradle" with content:
       """
       rootProject.name = 'glib'
@@ -451,7 +448,7 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
     When I run jf "c add aw --url {platform}/ --artifactory-url {url}/ --user admin --password {password} --interactive=false"
     Then the command succeeds
     And the server answered no request with 500 since the last command
-    When I run jf "gradlec --server-id-deploy aw --repo-deploy gradle-local --deploy-maven-desc --use-wrapper=false --uses-plugin=false" in "glib"
+    When I run jf "gradlec --server-id-deploy aw --repo-deploy <repo> --deploy-maven-desc --use-wrapper=false --uses-plugin=false" in "glib"
     Then the command succeeds
     And the server answered no request with 500 since the last command
     When I run jf "gradle artifactoryPublish --no-daemon --build-name gradle-accept --build-number 1" in "glib"
@@ -460,11 +457,69 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
     When I run jf "rt bp gradle-accept 1 --server-id aw"
     Then the command succeeds
     And the server answered no request with 500 since the last command
-    When I GET "/artifactory/gradle-local/org/acme/gradle/glib/1.0.0/glib-1.0.0.jar" as admin
+    When I GET "/artifactory/<repo>/org/acme/gradle/glib/1.0.0/glib-1.0.0.jar" as admin
     Then the response status is 200
-    When I GET "/artifactory/gradle-local/org/acme/gradle/glib/1.0.0/glib-1.0.0.pom" as admin
+    When I GET "/artifactory/<repo>/org/acme/gradle/glib/1.0.0/glib-1.0.0.pom" as admin
     Then the response status is 200
-    And within 20 seconds the body of GET "/artifactory/gradle-local/org/acme/gradle/glib/maven-metadata.xml" as admin contains "<release>1.0.0</release>"
+    And within 20 seconds the body of GET "/artifactory/<repo>/org/acme/gradle/glib/maven-metadata.xml" as admin contains "<release>1.0.0</release>"
     When I GET "/artifactory/api/build/gradle-accept/1" as admin
     Then the response status is 200
     And the response body contains "org.acme.gradle:glib:1.0.0"
+
+    When I GET "/artifactory/api/storage/<ddr>/org/acme/gradle/glib/1.0.0/glib-1.0.0.jar" as admin
+    Then the response status is 200
+
+    Examples:
+      | class   | repo           | ddr                   |
+      | local   | gradle-local   | gradle-local          |
+      | virtual | gradle-virtual | gradle-virtual-member |
+
+
+  @maven @maven_virtual
+  Scenario Outline: <maven> deploys release and snapshots through a mixed virtual and resolves merged versions without repository escape
+    Given the registry is running
+    And the <maven> client can reach the registry
+    And a mixed Maven virtual deployment fixture is ready
+    Then within 20 seconds the body of GET "/artifactory/mvn-member/org/acme/p10virtual1559/range/maven-metadata.xml" as admin contains "<version>1.0</version>"
+    And within 20 seconds the body of GET "/artifactory/mvn-member/org/acme/p10virtual1559/shared/1.0-SNAPSHOT/maven-metadata.xml" as admin contains "<buildNumber>1</buildNumber>"
+    Given the Maven project "lib" in "lib"
+    And the Maven project "snap" in "snap"
+    And the Maven project "app" in "app"
+    And the Maven virtual consumer uses remote, range and shared snapshot dependencies
+    And a file "settings.xml" with expanded content:
+      """
+      <settings><servers><server><id>aw</id><username>admin</username><password>{password}</password></server></servers></settings>
+      """
+    When I run mvn "-f lib/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-virtual"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When I run mvn "-f snap/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-virtual"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When I run mvn "-f snap/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-virtual"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    Then within 20 seconds the JSON field "children" of GET "/artifactory/api/storage/mvn-member/org/acme/smoke/snap/1.0-SNAPSHOT" as admin has 5 entries
+    And within 20 seconds the body of GET "/artifactory/mvn-virtual/org/acme/smoke/snap/1.0-SNAPSHOT/maven-metadata.xml" as admin contains "<buildNumber>2</buildNumber>"
+    When I GET "/artifactory/api/storage/mvn-member/org/acme/smoke/lib/1.0.0/lib-1.0.0.jar" as admin
+    Then the response status is 200
+    When I run mvn "-f app/pom.xml -s settings.xml -C -Dmaven.repo.local=/work/fresh -Dmaven.repo.local.tail={m2} -Daw.url={url}/mvn-virtual package"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And Maven resolved the expected mixed origins without POM repository escape
+    When I run mvn "-f lib/pom.xml -s settings.xml -Dmaven.repo.local={m2} package deploy:deploy -DaltDeploymentRepository=aw::{url}/mvn-no-ddr"
+    Then the command fails
+    And the server answered no request with 500 since the last command
+    And the server answered 405 to PUT "/artifactory/mvn-no-ddr/org/acme/smoke/lib/1.0.0/lib-1.0.0.jar"
+    When I PUT "/artifactory/mvn-no-ddr/no-target.txt" as admin with body:
+      """
+      probe
+      """
+    Then the response status is 405
+    And the response header "Allow" contains "GET"
+    And the response body contains "No local repository was configured as local deployment repository for the (mvn-no-ddr) virtual repository."
+
+    Examples:
+      | maven     |
+      | Maven     |
+      | Maven 3.9 |

@@ -22,8 +22,8 @@
     }
   ],
   "publish": {
-    "classes": "LF",
-    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "classes": "LVF",
+    "note": "Publish to a local, one-node federated, or virtual repository with a configured local/federated default deployment repository. A virtual authorizes and stores on that target; remote members remain read-only sources.",
     "steps": [
       {
         "language": "sh",
@@ -44,8 +44,8 @@
     ]
   },
   "limitations": [
-    "Virtual deployment is deliberately omitted; deploy directly to the authorized local member.",
-    "Client checksums remain strict (-C). A dependency already in consumer-m2 is not evidence of remote retrieval."
+    "Client checksums remain strict (-C). A dependency already in consumer-m2 is not evidence of remote retrieval.",
+    "Virtual resolution is qualified over distinct local and remote origins with fresh dependency caches. Virtual publication needs a default deployment repository; without one, deploy answers 405 and Allow: GET."
   ],
   "evidence": [
     {
@@ -60,6 +60,14 @@
       "path": "test/acceptance/features/maven_remote.feature",
       "contains": [
         "Scenario: Maven resolves release, parent, transitive and both snapshot forms cold and during an upstream outage"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/maven.feature",
+      "contains": [
+        "Maven resolved the expected mixed origins without POM repository escape",
+        "mvn-no-ddr",
+        "<class> with a build"
       ]
     }
   ]

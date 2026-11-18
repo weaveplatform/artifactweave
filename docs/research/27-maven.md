@@ -787,3 +787,31 @@ implementation admission limits, not vendor size-limit claims. Required native G
 Ivy and SBT remote-client exits remain individually owned by **P28**, with the wider
 platform matrix in **P41**. `jf mvn` runs on Maven 3.10 since the JFrog extractor
 2.44.1 (#523).
+
+### P10 MVN-04 native virtual qualification (2026-11-18)
+
+The [Maven guide](https://docs.jfrog.com/artifactory/docs/maven-repositories) and
+[Gradle guide](https://docs.jfrog.com/artifactory/docs/gradle-repositories) describe
+resolution through virtual repositories; the [deployment guide](https://docs.jfrog.com/artifactory/docs/deploy-artifacts)
+maps virtual publication to a configured local deployment target. The verified
+7.161.26 OSS `UploadServiceUtils.getTargetRepository` (lines 248–261) supplies
+the shared local/federated mapping already implemented by ENG-09. The native
+fixtures consume the existing MVN-01/02/03 contracts rather than adding new
+server policy or inferred response shapes. No trial/live capture was used.
+
+MVN-04 separates controlled origins: Ivy/Gradle descriptors are local and their
+initial exact JAR bytes remote; Maven resolves a remote-only dependency, a range
+merged across members, and the newer of two unique snapshot builds. Its strict
+checksum consumer also verifies that an active-by-default profile's repository
+reference is absent from the downloaded POM and never contacted, while its
+transitive dependency still resolves through the virtual. Release and unique
+snapshot deploys go to the local deployment target; a targetless deploy retains
+405 and `Allow: GET`. JFrog Maven build publication uses a virtual target too.
+
+Real client controls retain intended behavior: Maven metadata PUT queues work
+with 202, and sbt refuses overwriting an existing release by default, so the
+virtual sbt proof publishes a new 1.1.0 coordinate. Client bootstrap graphs stay
+separate from fresh controlled dependency caches. The shared recipe runner's
+forced amd64 architecture is tracked separately for VCS in #1680; JVM invocations
+use the configured image architecture while retaining the existing three-minute
+context deadline. Other clients' explicit platform behavior is unchanged.

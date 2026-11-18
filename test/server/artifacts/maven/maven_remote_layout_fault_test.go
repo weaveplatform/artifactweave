@@ -31,7 +31,7 @@ func layoutFaultWorld(
 	return w, &logs
 }
 
-// renameTable renames the runtime's SQLite table from to to.
+// renameTable changes the table name to exercise a real driver failure.
 func renameTable(t *testing.T, w *remoteWorld, from, to string) {
 	t.Helper()
 	if _, err := w.rt.Store.DB().ExecContext(t.Context(),
@@ -48,7 +48,7 @@ func renameTable(t *testing.T, w *remoteWorld, from, to string) {
 // 400 "Bad Request", as if the client had asked for a path the layout
 // refuses; a non-unique snapshot, which the layout resolves first, already
 // answered 500 and is kept as a guard. 7.x's answer to a failure of its own database is not
-// documented, so 500 is [I], as #1470's is. The runtime's own SQLite
+// documented, so 500 is [I], as #1470's is. The runtime's own
 // database loses the table, so the failure comes up through the SQL store
 // as a driver's does.
 func TestAccMavenRemoteLayoutStoreFault(t *testing.T) {
@@ -72,8 +72,12 @@ func TestAccMavenRemoteLayoutStoreFault(t *testing.T) {
 				got.Body.String() != `{"errors":[{"message":"internal error","status":500}]}`+"\n" {
 				t.Fatalf("%d %q", got.Code, got.Body)
 			}
-			if n := strings.Count(logs.String(), "no such table: config_documents"); n != 1 {
+			if n := strings.Count(logs.String(), "level=ERROR"); n != 1 {
 				t.Fatalf("the fault was logged %d times, want once:\n%s", n, logs)
+			}
+			if !strings.Contains(logs.String(), "config_documents") ||
+				(!strings.Contains(logs.String(), "no such table: config_documents") && !strings.Contains(logs.String(), "SQLSTATE 42P01")) {
+				t.Fatalf("missing table fault was not retained: %s", logs)
 			}
 			if n := w.up.Count("", ""); n != 0 {
 				t.Fatal("asked the upstream", w.up.Requests())

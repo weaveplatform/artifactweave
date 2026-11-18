@@ -27,13 +27,13 @@
     }
   ],
   "publish": {
-    "classes": "LF",
-    "note": "Publish to a local or one-node federated repository. Remote repositories are read-through caches; select the local deployment member when reading through a virtual.",
+    "classes": "LVF",
+    "note": "Publish to a local, one-node federated, or virtual repository with a configured local/federated default deployment repository. A virtual authorizes and stores on that target; remote members remain read-only sources.",
     "steps": [
       {
         "language": "sh",
-        "code": "curl --fail --silent --show-error --user \"$AW_USER:$AW_TOKEN\" --upload-file ivy-1.0.0.xml \"$AW_REPO_URL/org.acme/widget/1.0.0/ivys/ivy-1.0.0.xml\"\ncurl --fail --silent --show-error --user \"$AW_USER:$AW_TOKEN\" --upload-file widget-1.0.0.jar \"$AW_REPO_URL/org.acme/widget/1.0.0/jars/widget-1.0.0.jar\"",
-        "note": "Publish the actual Ivy descriptor and JAR. The descriptor declares organisation org.acme, module widget, revision 1.0.0 and a jar publication."
+        "code": "java -Duser.home=\"$AW_WORK/publisher-home\" -Daw.host=\"$AW_HOST\" -Daw.user=\"$AW_USER\" -Daw.token=\"$AW_TOKEN\" -jar /opt/ivy.jar -settings \"$AW_WORK/ivysettings.xml\" -cache \"$AW_WORK/publisher-cache\" -ivy ivy-1.0.0.xml -publish aw -publishpattern \"$PWD/[artifact]-[revision].[ext]\" -deliverto \"$PWD/ivy-[revision].xml\" -revision 1.0.0 -overwrite",
+        "note": "Run beside ivy-1.0.0.xml and widget-1.0.0.jar. The Ivy client publishes both descriptor and JAR to the configured resolver. Replacing an existing path may require Delete permission."
       }
     ]
   },
@@ -49,8 +49,8 @@
     ]
   },
   "limitations": [
-    "Remote and virtual repositories are read-only in this recipe; publish to the local member.",
-    "Each resolve needs a new cache and retrieve directory."
+    "Each resolve needs a new cache and retrieve directory.",
+    "Virtual resolution is qualified over distinct local and remote origins with fresh dependency caches. Virtual publication needs a default deployment repository; without one, deploy answers 405 and Allow: GET."
   ],
   "evidence": [
     {
@@ -67,6 +67,13 @@
         "realm=\"Artifactory Realm\"",
         "\"-cache\"",
         "\"/work/recipe-cache\""
+      ]
+    },
+    {
+      "path": "test/acceptance/features/system_recipes.feature",
+      "contains": [
+        "I publish the Ivy recipe with token",
+        "the JVM publication landed in the deployment member"
       ]
     }
   ]
