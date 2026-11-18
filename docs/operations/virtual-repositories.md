@@ -7,7 +7,7 @@ separates the resolution mechanism from client/server evidence. Registered `V` i
 not itself a native-client qualification claim. A federated member here is the
 one-node repository contract; cross-peer convergence belongs to P13.
 
-This guide describes merged implementation through main `df78dd391` (2026-11-18).
+This guide describes merged implementation through main `901a11a5c` (2026-11-18).
 The [qualification and epic closeout record](../testing/phase10-signoff.md)
 distinguishes delivered work from the remaining final gate. [#1571](https://github.com/weaveplatform/artifactweave/issues/1571)
 owns final qualification, the plan status and decision 0008's acceptance. The
@@ -250,13 +250,20 @@ final release/P10 qualification remains #1571.
 Each [I] above links an existing #216 comment. [The initial P10 entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6893506348)
 groups all family tickets, including ADP-03/04, and is refined by the later
 family comments linked below. A later correction wins over an earlier proposed
-answer. The ADP-04 Ansible entry still carries its earlier cached-as-Chef
-proposal; merged code and decision 0008 instead select per-request merging. The
-existing entry identifies that open comparison question without claiming a
-posted correction. These are pending comparison, not claimed live observations.
+answer. The [P10 closeout comparison update](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6991066992)
+corrects ADP-04's earlier cached-as-Chef proposal to describe the implemented
+per-request Ansible merge. It also records cache-publication namespaces and
+separates lookup, content-acquisition, validation-clock and origin-miss questions.
+These are pending comparisons, not claimed live observations or settled modern
+vendor responses.
 
 | Subject | Existing #216 entry |
 | --- | --- |
+| PyPI upstream policy namespace and cache publication | [closeout comparison](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6991066992) |
+| Lookup/configuration faults versus tolerated Maven member-content faults | [closeout comparison](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6991066992) |
+| Existing-copy validation-clock SQL failures | [closeout comparison](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6991066992) |
+| Expired-file origin 404, validation-clock advancement and native API-document boundary | [closeout comparison](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6991066992) |
+| Ansible per-request merge: correction to the initial cached-as-Chef proposal | [closeout comparison](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6991066992) |
 | Shared order, nesting, statuses, writes, storage and member rules | [entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6893506348) |
 | Package root gates, Composer cache, pub/Gems cache choices | [entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6941939885) |
 | Maven merge/Helm index | [entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6952456044) |
