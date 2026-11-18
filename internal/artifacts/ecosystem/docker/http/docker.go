@@ -268,12 +268,11 @@ func (g *Registry) dispatch(w http.ResponseWriter, r *http.Request, q Request) {
 			return
 		}
 	}
-	if q.Repo.Class == repo.Virtual && (g.uploads == nil ||
-		!virtualPull(q.Kind, r.Method) && !virtualWrite(q.Kind, r.Method) &&
-			(r.Method != http.MethodDelete || q.Kind != KindManifest && q.Kind != KindBlob)) {
+	if g.unsupportedVirtualOperation(q, r.Method) {
 		g.writeErr(w, r, unsupportedVirtual(q.Repo))
 		return
 	}
+
 	if q.Kind.image() && !ValidName(q.Name) {
 		Write(w, Errorf(http.StatusBadRequest, CodeNameInvalid,
 			"invalid image name %q: reference images as <host>/<repository>/<image>", q.Name))
@@ -281,6 +280,14 @@ func (g *Registry) dispatch(w http.ResponseWriter, r *http.Request, q Request) {
 	}
 	if q.Repo.Class == repo.Virtual {
 		switch {
+		case virtualListing(q.Kind, r.Method):
+			if q.Kind == KindTags {
+				g.virtualTags(w, r, q)
+			} else {
+				g.catalog(w, r, q)
+			}
+			return
+
 		case virtualPull(q.Kind, r.Method):
 			g.serveVirtual(w, r, q)
 			return

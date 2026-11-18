@@ -243,15 +243,20 @@ func registryNext(
 		if err != nil {
 			return "", remote.ErrRequest
 		}
-		upstream, err := client.Image(image)
-		if err != nil {
-			//nolint:wrapcheck // preserves upstream error identity
-			return "", err
+		var expected string
+		if operation == "_catalog" {
+			expected = strings.TrimRight(client.Base().Path, "/") + "/v2/_catalog"
+		} else {
+			upstream, err := client.Image(image)
+			if err != nil {
+				//nolint:wrapcheck // preserves upstream error identity
+				return "", err
+			}
+			expected = strings.TrimRight(
+				client.Base().Path,
+				"/",
+			) + "/v2/" + upstream + "/" + operation + "/" + reference
 		}
-		expected := strings.TrimRight(
-			client.Base().Path,
-			"/",
-		) + "/v2/" + upstream + "/" + operation + "/" + reference
 		base := *client.Base()
 		base.Path = expected
 		next = base.ResolveReference(next)

@@ -789,3 +789,54 @@ func TestAccRegistryProjectAndRepositoryIsolation(t *testing.T) {
 		t.Fatal(f.scopes)
 	}
 }
+
+func TestAccRegistryCatalogScopeAndPathFence(t *testing.T) {
+	f := newRegistryFixture(t, "catalog-user")
+	f.tokenHandler = func(w http.ResponseWriter, r *http.Request) {
+		token := "image-token"
+		if r.URL.Query().Get("scope") == "registry:catalog:*" {
+			token = "catalog-token"
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"token": token, "expires_in": 60})
+	}
+	f.pullHandler = func(w http.ResponseWriter, r *http.Request) {
+		scope := "registry:catalog:*"
+		if r.URL.Path != "/v2/_catalog" {
+			scope = "repository:team/image:pull"
+		}
+		want := "Bearer image-token"
+		if scope == "registry:catalog:*" {
+			want = "Bearer catalog-token"
+		}
+		if r.Header.Get("Authorization") != want {
+			w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm=%q,service=%q,scope=%q`, f.server.URL+"/token", f.service, scope))
+			w.WriteHeader(401)
+			return
+		}
+		_, _ = io.WriteString(w, `{"repositories":["team/image"]}`)
+	}
+	for _, q := range []struct{ image, path string }{{"", "_catalog"}, {"team/image", "manifests/latest"}, {"", "_catalog"}} {
+		res, err := f.registry.Do(t.Context(), q.image, remote.Request{Method: "GET", Path: q.path})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = res.Body.Close()
+		if res.StatusCode != 200 {
+			t.Fatal(res.StatusCode)
+		}
+	}
+	if len(f.scopes) != 2 || f.scopes[0] != "registry:catalog:*" || f.scopes[1] != "repository:team/image:pull" {
+		t.Fatal(f.scopes)
+	}
+	for _, path := range []string{"", "manifests/latest", "_catalog/child", "/_catalog"} {
+		if res, err := f.registry.Do(t.Context(), "", remote.Request{Method: "GET", Path: path}); err == nil {
+			_ = res.Body.Close()
+			t.Fatal(path)
+		}
+	}
+	for _, scope := range []string{"repository:other:pull", "registry:catalog:push", "registry:catalog:* repository:other:pull"} {
+		if _, err := registryScope(scope, "_catalog"); err == nil {
+			t.Fatal(scope)
+		}
+	}
+}

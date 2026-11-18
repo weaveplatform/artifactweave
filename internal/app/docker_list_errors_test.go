@@ -74,7 +74,7 @@ func TestAccDockerListsAnswerRegistryErrors(t *testing.T) {
 		{"listDockerRepositories", catalog("missing"), "admin", 404, "NAME_UNKNOWN", ""},
 		{"listDockerRepositories", catalog("libs-local"), "admin", 404, "NAME_UNKNOWN", ""},
 		{"listDockerRepositories", catalog("docker-remote"), "admin", 405, "UNSUPPORTED", ""},
-		{"listDockerRepositories", catalog("docker-virtual"), "admin", 405, "UNSUPPORTED", ""},
+
 		{"listDockerRepositories", catalog("docker-local"), "admin", 500, "INTERNAL_ERROR", "get:docker-local"},
 		{"listDockerTags", tags("docker-local", "BAD"), "admin", 400, "NAME_INVALID", ""},
 		{"listDockerTags", tags("docker-local", "app"), "", 401, "UNAUTHORIZED", ""},

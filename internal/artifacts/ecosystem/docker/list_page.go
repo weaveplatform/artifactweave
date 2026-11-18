@@ -85,7 +85,7 @@ const foundBatch = 16
 // not, whatever page was asked for. Once Next has read such a folder it
 // needs no query.
 func (p *TagPages) Found(ctx context.Context) (bool, error) {
-	all := TagsAfter(p.pages, p.repoKey, p.name, "", foundBatch)
+	all := TagsAfter(p.pages, p.repoKey, p.name, "", min(foundBatch, p.batch))
 	for !p.found && !all.found {
 		if _, ok, err := all.folder(ctx); err != nil || !ok {
 			return false, err

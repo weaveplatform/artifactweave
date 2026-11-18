@@ -13,6 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 )
 
 // patchRepo changes the configuration of the repository key.
@@ -308,7 +309,12 @@ func TestAccCatalogFollowsPatterns(t *testing.T) {
 					t.Errorf("%s: %s", target, diff)
 				}
 			}
-			if diff := cmp.Diff(c.registry, catalog("/v2/_catalog")); diff != "" {
+			expected := slices.Clone(c.registry)
+			for _, name := range c.local {
+				expected = append(expected, "docker-virtual/"+name)
+			}
+			slices.SortFunc(expected, layout.Compare)
+			if diff := cmp.Diff(expected, catalog("/v2/_catalog")); diff != "" {
 				t.Errorf("registry-wide: %s", diff)
 			}
 			rec := w.do(http.MethodGet, "/v2/docker-local/_catalog?n=1", "", nil)

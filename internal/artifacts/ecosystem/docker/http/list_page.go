@@ -21,9 +21,7 @@ const listBuffer = 1000
 
 // names lists names in Compare's order, from after the last it was opened
 // with (layout.TagPages, catalogMerge).
-type names interface {
-	Next(context.Context) (string, bool, error)
-}
+type names = layout.NameStream
 
 // listPage is what a listing answers: the names read before the answer
 // starts, the Link to the next page, if any, and the names after them,
@@ -46,13 +44,13 @@ type listPage struct {
 // listBuffer is counted first and its names after the first listBuffer are
 // read again while the body is written, up to the n-th name the count
 // found, or to the end when no Link follows.
-func readPage(r *http.Request, open func(last string, batch int) names) (listPage, error) {
+func readPage(r *http.Request, open func(ctx context.Context, last string, batch int) names) (listPage, error) {
 	ctx := r.Context()
 	values := r.URL.Query()
 	last := values.Get("last")
 	n, err := strconv.Atoi(values.Get("n"))
 	if err != nil || n < 0 {
-		return readRest(ctx, open(last, listBuffer))
+		return readRest(ctx, open(ctx, last, listBuffer))
 	}
 	var page listPage
 	if n == 0 {
@@ -63,7 +61,7 @@ func readPage(r *http.Request, open func(last string, batch int) names) (listPag
 		// n+1 only below the buffer: n may be as large as an int holds.
 		batch = n + 1
 	}
-	src := open(last, batch)
+	src := open(ctx, last, batch)
 	count, nth := 0, ""
 	for count <= n {
 		name, ok, err := src.Next(ctx)
@@ -101,7 +99,7 @@ func readPage(r *http.Request, open func(last string, batch int) names) (listPag
 		want = count - len(page.first) + 1
 	}
 	page.rest = func(ctx context.Context, emit func(string)) error {
-		src := open(from, min(want, listBuffer))
+		src := open(ctx, from, min(want, listBuffer))
 		for {
 			name, ok, err := src.Next(ctx)
 			if err != nil || !ok {

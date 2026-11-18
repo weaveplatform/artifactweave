@@ -102,8 +102,8 @@
 //     generated file policies use the admitted image name. Upload locations and
 //     scopes keep the virtual address. Missing blobs/index children are imported
 //     before the existing manifest validation; virtual deletes are refused.
-//     Listings and referrers remain 405
-//     UNSUPPORTED until their P10 tickets. Digest location hints are bounded
+//     Virtual catalog/tag pages merge readable members before pagination;
+//     referrers remain 405 UNSUPPORTED until DKR-04. Digest location hints are bounded
 //     and recheck authority; tags always use the effective member order.
 //   - The JFrog operations under the Artifactory prefix (promote,
 //     parentManifests and delete) are no registry paths and keep the
@@ -126,7 +126,9 @@
 //     the copy a pull serves, and a blob is served from any copy in the
 //     image the patterns accept (RTFACT-30134). A blacked-out repository
 //     also refuses an image's tags list and referrers, naming the image as
-//     a remote's refusal does; the patterns refuse neither. The catalog
+//     a remote's refusal does; concrete tag/referrer listings keep their
+//     existing pattern behavior. Virtual tag names are filtered before paging.
+//     The catalog
 //     leaves out an image its repository's patterns reject (RTFACT-26524),
 //     and a mount from another repository that would refuse the blob opens
 //     a session.

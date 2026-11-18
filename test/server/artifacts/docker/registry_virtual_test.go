@@ -166,8 +166,6 @@ func TestAccRegistryVirtualReadPoliciesAndTokens(t *testing.T) {
 func TestAccRegistryVirtualOtherKindsStayUnsupported(t *testing.T) {
 	w := virtualRegistryWorld(t, repo.Docker)
 	for _, tc := range []struct{ method, path string }{
-		{"GET", "team/image/tags/list"},
-		{"GET", "_catalog"},
 		{"GET", "team/image/referrers/sha256:" + strings.Repeat("a", 64)},
 	} {
 		r := w.request(tc.method, "/v2/virtual/"+tc.path, "admin", "")

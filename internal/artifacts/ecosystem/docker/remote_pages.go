@@ -44,7 +44,15 @@ func (c *RegistryContent) pages(
 		if res.Header.Get("Vary") != "" {
 			first.Header.Set("Vary", "*")
 		}
-		if operation == "tags" {
+		switch operation {
+		case "_catalog":
+			names, parseErr := catalogNames(body)
+			if parseErr != nil {
+				return nil, parseErr
+			}
+			tags = append(tags, names...)
+
+		case "tags":
 			var listing struct {
 				Tags []string `json:"tags"`
 			}
@@ -52,7 +60,7 @@ func (c *RegistryContent) pages(
 				return nil, remote.ErrRequest
 			}
 			tags = append(tags, listing.Tags...)
-		} else {
+		default:
 			manifest, parseErr := ParseManifest(res.Header.Get("Content-Type"), body, "")
 			if parseErr != nil || !manifest.IsIndex() {
 				return nil, remote.ErrRequest
@@ -75,7 +83,7 @@ func (c *RegistryContent) pages(
 			image,
 			remote.Request{
 				Method:   http.MethodGet,
-				Path:     operation + "/" + reference,
+				Path:     registryListingPath(operation, reference),
 				Query:    query,
 				Metadata: true,
 				Header:   http.Header{"Accept": {MediaTypeOCIIndex}},
@@ -91,9 +99,12 @@ func (c *RegistryContent) pages(
 		}
 	}
 	var data []byte
-	if operation == "tags" {
+	switch operation {
+	case "_catalog":
+		data, _ = json.Marshal(map[string]any{"repositories": tags})
+	case "tags":
 		data, _ = json.Marshal(map[string]any{"name": image, "tags": tags})
-	} else {
+	default:
 		data, _ = json.Marshal(
 			map[string]any{
 				"schemaVersion": 2,
@@ -120,4 +131,11 @@ func policyNow(p *remote.Policy) time.Time {
 		return p.Now().UTC()
 	}
 	return time.Now().UTC()
+}
+
+func registryListingPath(operation, reference string) string {
+	if operation == "_catalog" {
+		return operation
+	}
+	return operation + "/" + reference
 }
