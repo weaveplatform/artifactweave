@@ -7,7 +7,7 @@ separates the resolution mechanism from client/server evidence. Registered `V` i
 not itself a native-client qualification claim. A federated member here is the
 one-node repository contract; cross-peer convergence belongs to P13.
 
-This guide describes merged implementation at main `3e8c1db96` (2026-11-18),
+This guide describes merged implementation at main `d9c304f54` (2026-11-18),
 not P10 sign-off. [#1571](https://github.com/weaveplatform/artifactweave/issues/1571)
 owns final qualification, the plan status and decision 0008's acceptance. The
 [source-backed rules](../research/decisions/0008-virtual-repositories.md) retain
