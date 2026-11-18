@@ -1185,3 +1185,22 @@ func errorEnvelope(status int, message string) string {
 	)
 	return rec.Body.String()
 }
+
+// Read authorization for RPM metadata remains on its declared folder;
+// repository download policy names the actual file independently.
+func TestUnitRPMMetadataSeparatesFolderReadFromFilePolicy(t *testing.T) {
+	for _, name := range []string{"repodata/repomd.xml", "nested/repodata/" + strings.Repeat("a", 64) + "-primary.xml.gz"} {
+		t.Run(name, func(t *testing.T) {
+			q, err := itemkit.RPMSourceRequest(source.Request{Resource: source.Resource{Path: name, PermissionPath: "scope", Method: http.MethodGet}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !q.Resource.PermissionFolder || q.Resource.PermissionPath != "scope" || q.Resource.Kind != source.ResourceKindMetadata {
+				t.Fatalf("RPM metadata Read scope changed: %+v", q.Resource)
+			}
+			if q.Resource.PolicyPath != name {
+				t.Fatalf("RPM metadata policy path=%q,want%q", q.Resource.PolicyPath, name)
+			}
+		})
+	}
+}

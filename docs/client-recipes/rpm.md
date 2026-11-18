@@ -71,3 +71,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Client pin: [test/acceptance/clients/fedora.Dockerfile](../../test/acceptance/clients/fedora.Dockerfile).
 - Evidence: [test/acceptance/rpm_steps_test.go](../../test/acceptance/rpm_steps_test.go).
 - Evidence: [test/acceptance/features/rpm.feature](../../test/acceptance/features/rpm.feature).
+- Evidence: [test/server/artifacts/rpm/rpm_remote_policy_test.go](../../test/server/artifacts/rpm/rpm_remote_policy_test.go).
