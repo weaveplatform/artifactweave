@@ -22,7 +22,7 @@ var npmLifecycleMatrixPart = matrixPart{
 		on := func(name string, a api.Actions) rule {
 			return holds("npm-local", npmfmt.CanonicalPath(name, "1.0.0"), a)
 		}
-		return []matrixRow{
+		return npmVirtualMatrixRows([]matrixRow{
 			row(npmTagList, local+"-/package/work/dist-tags", "",
 				on("work", api.ActionRead), 200),
 			row(npmTagAdd, local+"-/package/work/dist-tags/stable", `"1.0.0"`,
@@ -56,7 +56,7 @@ var npmLifecycleMatrixPart = matrixPart{
 					t.Helper()
 					park(t, f.db, npmfmt.KindConvert, "npm-local")
 				}),
-		}
+		})
 	},
 }
 

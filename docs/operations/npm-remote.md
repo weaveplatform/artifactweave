@@ -4,7 +4,10 @@ An npm remote serves full and abbreviated packuments, version documents, dist-ta
 `/-/v1/search`, and scoped/unscoped tarballs at
 `/artifactory/api/npm/<repository>/`. Configure the repository's `url` as the upstream
 registry root, then use the normal npm registry and authentication settings. A reader
-needs Read permission; cache population does not require Deploy. npm publication,
+needs Read permission. Filling a cold remote cache additionally requires
+Deploy/Cache permission on its cache path; Read alone can retrieve a warm entry
+but receives npm 404 for a cold miss (intended 7.x behavior, #1587). This also
+applies when a virtual reads the remote. npm publication,
 unpublish, deprecation and dist-tag writes to a remote answer 405.
 
 Raw upstream JSON is cached independently from the package index. Each response filters

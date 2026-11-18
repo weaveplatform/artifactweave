@@ -69,6 +69,11 @@ func (h handler) listTags(w http.ResponseWriter, r *http.Request) {
 // string, whose tarball gains npm.disttag=<tag>; the npm format takes the
 // tag from the version that had it. Both tarballs need Annotate.
 func (h handler) addTag(w http.ResponseWriter, r *http.Request) {
+	var ok bool
+	r, ok = h.deploymentRequest(w, r)
+	if !ok {
+		return
+	}
 	if h.remoteReadOnly(w, r) {
 		return
 	}
@@ -95,7 +100,7 @@ func (h handler) addTag(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, v := range versions {
 		if v.number != version && slices.Contains(v.tags, tag) &&
-			!h.k.Require(w, r, npmfmt.CanonicalPath(name, v.number), api.ActionAnnotate) {
+			!h.require(w, r, npmfmt.CanonicalPath(name, v.number), api.ActionAnnotate) {
 			return
 		}
 	}
@@ -112,6 +117,11 @@ func (h handler) addTag(w http.ResponseWriter, r *http.Request) {
 // version that outranks the others, as the npm format settles it, which
 // may be the version it was taken from.
 func (h handler) removeTag(w http.ResponseWriter, r *http.Request) {
+	var ok bool
+	r, ok = h.deploymentRequest(w, r)
+	if !ok {
+		return
+	}
 	if h.remoteReadOnly(w, r) {
 		return
 	}
@@ -157,7 +167,7 @@ func (h handler) tagged(w http.ResponseWriter, r *http.Request) (name, tag strin
 		h.k.Error(w, r, badRequest("Tag name must not be a valid SemVer range: "+tag))
 		return "", "", false
 	}
-	return name, tag, h.k.RequireFolder(w, r, name, api.ActionAnnotate)
+	return name, tag, h.requireFolder(w, r, name, api.ActionAnnotate)
 }
 
 // indexedVersion is one indexed version with the state npm changes after
@@ -213,7 +223,7 @@ func (h handler) retag(
 			h.k.Error(w, r, err)
 			return
 		}
-		if !h.k.Require(w, r, it.FullPath(), api.ActionAnnotate) {
+		if !h.require(w, r, it.FullPath(), api.ActionAnnotate) {
 			return
 		}
 		props, err := h.k.DB().Items().Properties(r.Context(), it.ID)

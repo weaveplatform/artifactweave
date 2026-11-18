@@ -62,7 +62,7 @@ func (h handler) update(w http.ResponseWriter, r *http.Request, name string, b p
 			h.k.Error(w, r, err)
 			return
 		}
-		if !h.k.Require(w, r, it.FullPath(), api.ActionAnnotate) {
+		if !h.require(w, r, it.FullPath(), api.ActionAnnotate) {
 			return
 		}
 		changes = append(changes, annotation{it: it, key: npmfmt.PropDeprecated, values: []string{
@@ -133,7 +133,7 @@ func bodyVersions(b publishBody) (versions map[string]json.RawMessage, sent bool
 // settles latest itself. <rev> is compared with nothing: every packument's
 // _rev is 1-0, as 7.x answers it, so it cannot show a stale view (#290).
 func (h handler) unpublishVersions(w http.ResponseWriter, r *http.Request, name string) {
-	if !h.k.RequireFolder(w, r, name, api.ActionDelete) {
+	if !h.requireFolder(w, r, name, api.ActionDelete) {
 		return
 	}
 	if r.ContentLength > h.maxPublish {
@@ -178,6 +178,11 @@ func (h handler) unpublishVersions(w http.ResponseWriter, r *http.Request, name 
 // sends after the PUT that removed its version, so it finds it gone and
 // takes the 404 as done. <rev> is compared with nothing (unpublishVersions).
 func (h handler) unpublish(w http.ResponseWriter, r *http.Request) {
+	var ok bool
+	r, ok = h.deploymentRequest(w, r)
+	if !ok {
+		return
+	}
 	if h.remoteReadOnly(w, r) {
 		return
 	}
@@ -211,7 +216,7 @@ func (h handler) unpublish(w http.ResponseWriter, r *http.Request) {
 // package's folder and files off its canonical paths is unknown (#216);
 // only the versions' tarballs go.
 func (h handler) unpublishPackage(w http.ResponseWriter, r *http.Request, name string) {
-	if !h.k.RequireFolder(w, r, name, api.ActionDelete) {
+	if !h.requireFolder(w, r, name, api.ActionDelete) {
 		return
 	}
 	versions, found := h.indexedOr404(w, r, name)
@@ -229,7 +234,7 @@ func (h handler) unpublishPackage(w http.ResponseWriter, r *http.Request, name s
 // transaction, once the caller is known to hold Delete on each.
 func (h handler) remove(w http.ResponseWriter, r *http.Request, paths []string) {
 	for _, p := range paths {
-		if !h.k.Require(w, r, p, api.ActionDelete) {
+		if !h.require(w, r, p, api.ActionDelete) {
 			return
 		}
 	}

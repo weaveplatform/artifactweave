@@ -68,7 +68,7 @@ func TestAccVirtualWithoutMembers(t *testing.T) {
 		{"GET", "/artifactory/api/npm/npm-empty/pkg", "", 404, "package not found: pkg"},
 		// Virtual npm reads are served; publishing remains deferred even
 		// when the virtual repository has no members.
-		{"PUT", "/artifactory/api/npm/npm-empty/pkg", "{", 501, "does not serve"},
+		{"PUT", "/artifactory/api/npm/npm-empty/pkg", "{", 400, "No local repository was configured"},
 		{"POST", "/artifactory/api/repositories/npm-empty", `{"description":"d"}`, 200, ""},
 		{"DELETE", "/artifactory/api/repositories/npm-empty", "", 200, ""},
 	} {

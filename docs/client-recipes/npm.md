@@ -39,7 +39,7 @@ export npm_config_globalconfig=/dev/null
 
 ## Publish
 
-Classes: **local**. Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.
+Classes: **local, virtual**. Virtual publication requires a local or federated default deployment repository and checks permissions on its actual paths. Remote repositories remain read-only client sources.
 
 producer/package.json supplies the package name/version. Scoped packages work with this registry too.
 
@@ -64,7 +64,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - For verification, use a new project with no node_modules/lockfile and a new npm cache.
 - A repeated publish of an existing version is refused; --force does not make publication idempotent.
-- Virtual npm supports packuments, version documents, dist-tag lists and immutable tarballs over readable members. Virtual publication/authentication, ping/whoami, search and signing keys remain separate tickets and answer 501. Federated native-client qualification remains follow-on work.
+- Virtual npm supports merged reads, publication and mutations through its configured deployment target, plus login/logout, ping and whoami. Normal reads retain merged metadata until the retrieval period expires; write=true reads the deployment target only. Search and virtual signing keys remain separate tickets and answer 501. Federated native-client qualification remains follow-on work.
 
 ## Verification sources
 

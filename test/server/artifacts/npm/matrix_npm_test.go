@@ -1,6 +1,7 @@
 package npm_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
@@ -17,7 +18,7 @@ var npmMatrixPart = matrixPart{
 		reads := func(name string) rule {
 			return holds("npm-local", npmfmt.CanonicalPath(name, "1.0.0"), api.ActionRead)
 		}
-		return []matrixRow{
+		return npmVirtualMatrixRows([]matrixRow{
 			// Manage on the repository, which only the administrators hold
 			// here (#293).
 			row(npmReindex, local+"reindex", "", holds("npm-local", "", api.ActionManage), 200),
@@ -25,7 +26,7 @@ var npmMatrixPart = matrixPart{
 			row(npmPackument, npmBase+"npm-virtual/work", "", reads("work"), 200),
 			row(npmManifest, npmBase+"npm-virtual/lib/1.0.0", "", reads("lib"), 200),
 			row(npmTarball, npmBase+"npm-virtual/lib/-/lib-1.0.0.tgz", "", reads("lib"), 200),
-			row(npmPing, npmBase+"npm-virtual/-/ping", "", anyone, 501),
+			row(npmPing, npmBase+"npm-virtual/-/ping", "", anyone, 200),
 			row(npmPackument, local+"lib", "", reads("lib"), 200),
 			row(npmManifest, local+"work/1.0.0", "", reads("work"), 200),
 			row(npmManifest, local+"lib/latest", "", reads("lib"), 200),
@@ -44,7 +45,7 @@ var npmMatrixPart = matrixPart{
 			row(npmPublish, npmBase+"npm-releases/work", npmPublishBody("work", "2.0.0-rc.1"),
 				holds("npm-releases", npmfmt.CanonicalPath("work", "2.0.0-rc.1"),
 					api.ActionWrite), 409),
-		}
+		})
 	},
 	seed: func(t *testing.T, f *matrixFixture) {
 		t.Helper()
@@ -53,4 +54,23 @@ var npmMatrixPart = matrixPart{
 				npmTarballOf(name, "1.0.0"))
 		}
 	},
+}
+
+// A virtual uses the same DDR paths and permission rules as these local rows.
+// Fresh fixtures keep each repeated mutation independent of its local control.
+func npmVirtualMatrixRows(rows []matrixRow) []matrixRow {
+	out := append([]matrixRow(nil), rows...)
+	for _, r := range rows {
+		switch r.route {
+		case npmPublish, npmTagAdd, npmTagRemove, npmUnpublishVersions, npmUnpublishTarball, npmUnpublish, npmLogin, npmLogout, npmWhoami:
+		default:
+			continue
+		}
+		if !strings.HasPrefix(r.path, npmBase+"npm-local/") {
+			continue
+		}
+		r.path = strings.Replace(r.path, npmBase+"npm-local/", npmBase+"npm-virtual/", 1)
+		out = append(out, r.alone())
+	}
+	return out
 }

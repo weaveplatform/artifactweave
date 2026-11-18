@@ -14,6 +14,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -445,8 +446,11 @@ func description(raw json.RawMessage) *string {
 // for each request and never stored, so a client behind any proxy gets a
 // URL it can reach.
 func tarballBase(r *http.Request) string {
-	return baseurl.From(r.Context()) + "/artifactory/api/npm/" +
-		url.PathEscape(pkgroute.RequestFrom(r).Repo.Key)
+	key := pkgroute.RequestFrom(r).Repo.Key
+	if v, ok := r.Context().Value(deploymentKey{}).(repo.Config); ok {
+		key = v.Key
+	}
+	return baseurl.From(r.Context()) + "/artifactory/api/npm/" + url.PathEscape(key)
 }
 
 // escapePath escapes each segment of a path for a URL. npm names need no

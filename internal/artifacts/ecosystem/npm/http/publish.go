@@ -25,9 +25,14 @@ import (
 // write answers a PUT in the registry. PUT /<name> is npm publish, or a
 // packument update when the body has no attachments, and
 // PUT /<name>/-rev/<rev> the step of npm unpublish that removes versions
-// (decision 0034). npm's other PUTs, such as logins, answer 405 until
-// their tickets serve them.
+// (decision 0034). Virtual writes bind the request to their deployment
+// target before applying these same local rules.
 func (h handler) write(w http.ResponseWriter, r *http.Request) {
+	var ok bool
+	r, ok = h.deploymentRequest(w, r)
+	if !ok {
+		return
+	}
 	if h.remoteReadOnly(w, r) {
 		return
 	}
@@ -60,7 +65,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request, name string) {
 	// Annotate, so either lets the body be read. The canonical path is
 	// checked once the body has named the version.
 	if !h.k.CanFolder(r, name, api.ActionAnnotate) &&
-		!h.k.RequireFolder(w, r, name, api.ActionWrite) {
+		!h.requireFolder(w, r, name, api.ActionWrite) {
 		return
 	}
 	if r.ContentLength > h.maxPublish {
@@ -105,6 +110,9 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request, name string) {
 	exists := func() error {
 		return apierror.New(http.StatusForbidden, fmt.Sprintf(
 			"You cannot publish over the previously published versions: %s.", t.Version))
+	}
+	if !h.require(w, r, npmfmt.CanonicalPath(t.Name, t.Version), api.ActionWrite) {
+		return
 	}
 	if _, err := h.k.StoreNew(r, npmfmt.CanonicalPath(t.Name, t.Version), b.info,
 		v.props(t.Version), v.declared, exists); err != nil {
