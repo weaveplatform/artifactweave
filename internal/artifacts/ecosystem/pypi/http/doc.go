@@ -100,7 +100,8 @@
 //
 // P10 delivers merged virtual simple/Warehouse and distribution/sidecar
 // reads, plus Twine/uv DDR publication. Source and member authority remain bound
-// through delivery; the unmerged cold stored policy-path issue #1670 remains visible.
+// through delivery; cold publication retains the trusted upstream policy path
+// while storing the canonical representation (#1670).
 // See docs/operations/virtual-repositories.md for family evidence and limits.
 //
 // # Testing

@@ -81,8 +81,9 @@
 // Implemented P8 local/P9 remote protocols, moved here in P9d. P10 delivers
 // per-request readable-project merges, virtual simple/Warehouse/distribution and
 // wheel-metadata reads (#1549), and Twine/uv publication through the DDR with its
-// actual path permissions and immediate read-back (#1563). Native evidence and
-// known cold-cache policy-path issue #1670 are recorded in the virtual guide.
+// actual path permissions and immediate read-back (#1563). Cold stored publication
+// retains the trusted upstream policy namespace and canonical identity (#1670).
+// Native evidence and the publication contract are recorded in the virtual guide.
 //
 // # Testing
 //

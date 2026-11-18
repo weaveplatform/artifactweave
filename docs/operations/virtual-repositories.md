@@ -7,7 +7,7 @@ separates the resolution mechanism from client/server evidence. Registered `V` i
 not itself a native-client qualification claim. A federated member here is the
 one-node repository contract; cross-peer convergence belongs to P13.
 
-This guide describes merged implementation at main `68a32201c` (2026-11-18),
+This guide describes merged implementation at main `8e1d986e9` (2026-11-18),
 not P10 sign-off. [#1571](https://github.com/weaveplatform/artifactweave/issues/1571)
 owns final qualification, the plan status and decision 0008's acceptance. The
 [source-backed rules](../research/decisions/0008-virtual-repositories.md) retain
@@ -175,11 +175,13 @@ Metadata has its own existing admission rules. The inferred virtual refusal
 shapes remain [I] ([shared entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6893506348)). A virtual does not create a new upstream
 credential or make an excluded destination reachable.
 
-Known unmerged [#1670](https://github.com/weaveplatform/artifactweave/issues/1670)
-(pending [PR #1694](https://github.com/weaveplatform/artifactweave/pull/1694))
-qualifies PyPI cold stored files whose advertised upstream policy path is allowed
-but canonical cache path is not: no-store/warm reads work, while cold publication
-can fail. Do not loosen an operator's patterns to imply this fix has shipped.
+Cold stored PyPI publication now preserves the already-authorized upstream
+pattern namespace while retaining canonical item/cache identity
+([merged #1694](https://github.com/weaveplatform/artifactweave/pull/1694), #1670).
+No-store/warm reads retain their behavior. The
+[shared publication contract](../research/cache-policy-path.md) keeps source,
+permission, revision, archive/checksum and transaction fences; the internal
+binding is an implementation choice, not a newly claimed vendor API.
 All source-owned and project-sharing/network qualifications stay with their
 [remote contracts](../implementation/source-boundary.md); project sources and
 cross-peer federation are not silently enabled by virtual membership.

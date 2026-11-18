@@ -24,7 +24,12 @@ The proxy rewrites relative and absolute distribution links to its public base U
 and canonical `<project>/<version>/<filename>` paths. It preserves hash fragments,
 requires-python, yanked values and metadata hashes. Warehouse project/release JSON
 keeps upstream metadata and filters and rewrites distribution URLs. Response ETags
-identify the emitted bytes. Different callers and public URLs cannot contaminate
+identify the emitted bytes. Repository patterns for a distribution apply to its
+advertised upstream file path, while the item remains at its canonical protocol
+path. Cold stored publication uses the same validated policy namespace as no-store
+and warm reads; it does not grant permissions on that file. See
+[the shared cache-policy contract](../research/cache-policy-path.md). Different
+callers and public URLs cannot contaminate
 the raw metadata cache. Current caller, source, credentials and each disclosed file's
 Read permission are checked before delivery. Project-list responses require a readable
 real distribution and use bounded project discovery, with a maximum of 256 extra project lookups; exceeding the
@@ -103,8 +108,10 @@ The [native scenarios](../../test/acceptance/features/pypi_virtual.feature)
 cover mixed transitive installs, cold client state and both publishers.
 
 The [shared virtual rules](virtual-repositories.md) describe own/nested patterns and no-target refusal.
-The cold stored canonical/policy-path mismatch remains the known unmerged
-[#1670](https://github.com/weaveplatform/artifactweave/issues/1670) limitation;
-this guide does not claim its pending repair is delivered. Closed response
+Cold stored publication now retains the trusted upstream pattern subject while
+keeping the canonical item/cache identity, as no-store and warm reads do
+([merged #1694](https://github.com/weaveplatform/artifactweave/pull/1694), #1670).
+The [shared cache-policy contract](../research/cache-policy-path.md) retains
+current authority and validation rather than granting new permission. Closed response
 choices remain [I] in the [read entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6955912161)
 and [publication entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6959812942).

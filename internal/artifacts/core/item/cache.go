@@ -16,6 +16,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -34,6 +35,8 @@ var (
 // Token was obtained before network I/O. CheckCurrent rechecks authorization and
 // effective proxy/certificate revision without network I/O in the transaction.
 type CacheUpload struct {
+	// CachePolicy was minted by source authorization, never from client input.
+	CachePolicy format.CachePolicy
 	// SmartProperties is a complete validated peer snapshot. Merge it inside
 	// the publication transaction so a concurrent local annotation wins.
 	SmartProperties        *model.Properties
@@ -295,6 +298,12 @@ func (s *Service) checkRawCacheBlob(ctx context.Context, sha string) error {
 }
 
 func (u CacheUpload) validate() error {
+	if err := u.CachePolicy.Validate(u.Repo, u.Token.Source, u.Token.Key.Path); err != nil {
+		return fmt.Errorf("cache admission policy: %w", err)
+	}
+	if !u.CachePolicy.Empty() && (u.CheckCurrent == nil || u.Kind == model.RemoteMetadata) {
+		return fmt.Errorf("cache policy requires artifact authority fence: %w", kernel.ErrInvalid)
+	}
 	if len(u.ExpectedContentTypes) > 0 {
 		if u.Kind != model.RemoteMetadata || u.ExpectedContentType != "" || u.Validate == nil ||
 			len(u.ExpectedContentTypes) > 16 {
@@ -351,7 +360,8 @@ func remoteDeploy(u CacheUpload) (Deploy, error) {
 		return Deploy{}, err
 	}
 	return Deploy{
-		Target: Target{Repo: c, Cached: true, Path: u.Token.Key.Path}, Declared: parsed,
+		cachePolicy: u.CachePolicy,
+		Target:      Target{Repo: c, Cached: true, Path: u.Token.Key.Path}, Declared: parsed,
 		Properties: u.Properties, By: u.By, Trusted: parsed == (kernel.Checksums{}),
 	}, nil
 }
