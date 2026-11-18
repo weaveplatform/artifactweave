@@ -61,6 +61,14 @@
         "I run dnf \"install artifactweave-alpha\"",
         "the dnf repository is"
       ]
+    },
+    {
+      "path": "test/server/artifacts/rpm/rpm_remote_policy_test.go",
+      "contains": [
+        "TestAccRPMRemoteMetadataPolicyNamesRequestedFile",
+        "TestAccRPMRemoteMetadataRetainsNarrowReaderRefusal",
+        "TestAccRPMVirtualPackageDiscoveryKeepsMetadataPatternsSeparate"
+      ]
     }
   ]
 }

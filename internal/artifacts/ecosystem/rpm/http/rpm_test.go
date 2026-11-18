@@ -214,12 +214,12 @@ func TestAccRPMVirtualMemberGraphPassesOverCyclesAndWrongTypes(t *testing.T) {
 	}
 	if _, err := svc.rpmMemberBytes(t.Context(), w.db,
 		repo.Config{Key: "rpm-other", Class: repo.Virtual, PackageType: repo.RPM},
-		"repodata/repomd.xml", p, acc); !errors.Is(err, kernel.ErrNotFound) {
+		"repodata/repomd.xml", p, acc, false); !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("virtual member bytes returned %v", err)
 	}
 	if _, err := svc.rpmMemberBytes(t.Context(), w.db,
 		repo.Config{Key: "rpm-local", Class: repo.Local, PackageType: repo.RPM},
-		"repodata/repomd.xml", p, acc); !errors.Is(err, kernel.ErrNotFound) {
+		"repodata/repomd.xml", p, acc, false); !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("missing local member metadata returned %v", err)
 	}
 	if _, err := svc.rpmBlob(t.Context(), strings.Repeat("0", 64)); err == nil {
@@ -331,8 +331,7 @@ func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 		remote,
 		"repodata/repomd.xml",
 		p,
-		acc,
-	); err == nil {
+		acc, false); err == nil {
 		t.Error("unavailable metadata source was accepted")
 	}
 	backendError = nil
@@ -349,8 +348,7 @@ func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 		remote,
 		"repodata/repomd.xml",
 		p,
-		acc,
-	); !errors.Is(
+		acc, false); !errors.Is(
 		err,
 		errRPMMetadataTooLarge,
 	) {
@@ -367,8 +365,7 @@ func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 		remote,
 		"repodata/repomd.xml",
 		p,
-		acc,
-	); err == nil {
+		acc, false); err == nil {
 		t.Error("failed remote metadata read was accepted")
 	}
 	if got := failedBody.closes.Load(); got != 1 {
@@ -384,8 +381,7 @@ func TestAccRPMVirtualRemoteMemberRejectsUntrustedMetadata(t *testing.T) {
 		remote,
 		"repodata/repomd.xml",
 		p,
-		acc,
-	); err == nil {
+		acc, false); err == nil {
 		t.Fatal("missing cached metadata blob was accepted")
 	}
 }
@@ -437,8 +433,7 @@ func TestAccRPMRemoteMetadataClosesBodyWhenAuthorityIsRevoked(t *testing.T) {
 					remote,
 					"repodata/repomd.xml",
 					p,
-					acc,
-				); err == nil {
+					acc, false); err == nil {
 					t.Fatal("metadata was delivered after source authority was revoked")
 				}
 				if got := body.closes.Load(); got != 1 {
