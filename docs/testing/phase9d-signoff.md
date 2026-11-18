@@ -1,6 +1,6 @@
 # Phase 9d final qualification
 
-P9d moved artifactweave's code to the modular-monolith layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md) without changing its behaviour. This record qualifies the promoted tree on merged main `83561b74` and closes [PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104), [EPIC-PRO](https://github.com/weaveplatform/artifactweave/issues/946) and the backlog index [#935](https://github.com/weaveplatform/artifactweave/issues/935). It follows the [Phase 9c qualification ledger](phase9c-signoff.md) and [#810's CI evidence](phase9c-ci-signoff.md). P10 has not started.
+P9d moved artifactweave's code to the modular-monolith layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md) without changing its behaviour. This record qualifies the promoted tree on merged main `83561b74` and closes [PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104), [EPIC-PRO](https://github.com/weaveplatform/artifactweave/issues/946) and the backlog index [#935](https://github.com/weaveplatform/artifactweave/issues/935). It follows the [Phase 9c qualification ledger](phase9c-signoff.md) and [#810's CI evidence](phase9c-ci-signoff.md). P10 had not started at that qualification date; its current delivery and remaining qualification are recorded in the [P10 ledger](phase10-signoff.md).
 
 ## Scope and commits
 
