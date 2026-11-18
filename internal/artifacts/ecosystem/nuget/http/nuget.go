@@ -133,12 +133,12 @@ func segments(r *http.Request, prefix string) ([]string, error) {
 // them.
 func v3Base(r *http.Request) string {
 	return baseurl.From(r.Context()) + "/artifactory/api/nuget/v3/" +
-		url.PathEscape(pkgroute.RequestFrom(r).Repo.Key)
+		url.PathEscape(addressedRepo(r).Key)
 }
 
 func v2Base(r *http.Request) string {
 	return baseurl.From(r.Context()) + "/artifactory/api/nuget/" +
-		url.PathEscape(pkgroute.RequestFrom(r).Repo.Key)
+		url.PathEscape(addressedRepo(r).Key)
 }
 
 func notFound(r *http.Request) error {

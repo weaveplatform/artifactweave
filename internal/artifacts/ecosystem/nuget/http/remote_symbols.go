@@ -2,12 +2,14 @@ package nugethttp
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	nugetfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nuget"
 )
 
@@ -15,10 +17,18 @@ func (s *remoteSession) symbol(w http.ResponseWriter, path string) {
 	if !s.h.k.Require(w, s.r, path, api.ActionRead) {
 		return
 	}
+	result, err := s.symbolResult(path)
+	if err != nil {
+		s.h.k.Error(w, s.r, err)
+		return
+	}
+	s.h.k.ServeResult(w, s.r, result)
+}
+
+func (s *remoteSession) symbolResult(path string) (source.Result, error) {
 	c := pkgroute.RequestFrom(s.r).Repo
 	if c.SymbolServerURL == "" {
-		s.h.k.Error(w, s.r, notFound(s.r))
-		return
+		return source.Result{}, notFound(s.r)
 	}
 	parts := strings.Split(strings.TrimPrefix(path, ".symbols/"), "/")
 	target := appendResource(c.SymbolServerURL, parts...)
@@ -27,8 +37,7 @@ func (s *remoteSession) symbol(w http.ResponseWriter, path string) {
 	check := c
 	check.URL, check.V3FeedURL = c.SymbolServerURL, ""
 	if err := resourceURL(check, target, false); err != nil {
-		s.h.k.Error(w, s.r, err)
-		return
+		return source.Result{}, err
 	}
 	resource := pkgroute.Resource(s.r, path, "")
 	resource.Method = http.MethodGet
@@ -52,8 +61,7 @@ func (s *remoteSession) symbol(w http.ResponseWriter, path string) {
 	}
 	result, err := s.h.k.Read(s.r, resource)
 	if err != nil {
-		s.h.k.Error(w, s.r, err)
-		return
+		return result, fmt.Errorf("nuget symbol source: %w", err)
 	}
-	s.h.k.ServeResult(w, s.r, result)
+	return result, nil
 }

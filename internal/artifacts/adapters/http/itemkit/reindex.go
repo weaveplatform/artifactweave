@@ -213,8 +213,7 @@ var ReindexOps = map[repo.PackageType]ReindexOp{
 	// Manage", "Supported by local, local-cache, remote and virtual
 	// repositories", and the sample answer, which accepts it to run later.
 	repo.NuGet: {
-		Classes: []repo.Class{repo.Local, repo.Federated, repo.Remote},
-		later:   []repo.Class{repo.Virtual},
+		Classes: []repo.Class{repo.Local, repo.Federated, repo.Remote, repo.Virtual},
 		Refused: "Repository '%s' is not a NuGet repository",
 		Answer:  "NuGet reindex calculation for repository '%s' accepted.",
 	},
@@ -296,6 +295,10 @@ func (s *Kit) ReindexAs(
 		}
 	}
 	switch {
+	case t == repo.NuGet && c.Class == repo.Virtual:
+		// A virtual owns no package index. Accept after the existing Manage
+		// gate without scheduling work in any concrete member [I, #216].
+		return op.Text(key), nil
 	case c.Class == repo.Remote && op.RemoteExpires != nil:
 		if err = s.expireRemote(ctx, st, c, op.RemoteExpires); err != nil {
 			return "", err

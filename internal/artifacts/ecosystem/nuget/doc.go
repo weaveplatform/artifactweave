@@ -146,7 +146,9 @@
 // included, in P9. Moved here in P9d. Virtual v3 discovery, flat containers,
 // registration and bounded search/autocomplete are implemented in P10 (#1548).
 // Virtual V2 feeds, counts and downloads are implemented by #1562.
-// Virtual publication and symbols remain deferred to #1569.
+// Virtual publication maps to a local/federated deployment member; symbol
+// reads aggregate eligible members. Virtual reindex accepts without own work,
+// and normalized virtual saves require normalized member descriptors (#1569).
 //
 // # Testing
 //

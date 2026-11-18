@@ -38,6 +38,16 @@ func (h handler) virtualV2(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		if r.Method == http.MethodDelete || r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.Method == http.MethodPut {
+			if mr := h.virtualDeployment(w, r); mr != nil {
+				next.ServeHTTP(w, mr)
+			}
+			return
+		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			h.k.Error(
 				w,

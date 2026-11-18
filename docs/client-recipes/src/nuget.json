@@ -28,8 +28,8 @@
     }
   ],
   "publish": {
-    "classes": "L",
-    "note": "Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.",
+    "classes": "LVF",
+    "note": "A virtual publishes to its configured local or federated defaultDeploymentRepo; Deploy is checked on the actual member path. Remotes are read-only client sources.",
     "steps": [
       {
         "language": "sh",
@@ -52,7 +52,7 @@
   "limitations": [
     "Use forceNugetAuthentication when the administrator requires authenticated v3 discovery.",
     "--skip-duplicate is for an existing identical package; do not infer a general safe retry contract for changed bytes.",
-    "Virtual v2 and v3 restore are qualified on both pinned SDK lanes. V3 includes a signed remote parent and signed local transitive dependency; V2 includes local and private remote packages with fresh caches. Virtual publication and symbols retain 501 pending their P10 ticket; federated native qualification remains a follow-on."
+    "Virtual v2/v3 restore and virtual package/symbol publication are qualified on both pinned SDK lanes, including forced authentication and extracted PDB bytes. Missing deployment targets return 405 with Allow: GET; virtual delete/relist return 404 without mutation. Federated native multi-node qualification remains a follow-on."
   ],
   "evidence": [
     {
@@ -90,6 +90,13 @@
         "nuget verify fresh/acme.dependency",
         "/nuget-virtual/registration-semver2/acme.dependency/index.json",
         "restores local and private remote packages through a virtual v2 feed"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/nuget_virtual.feature",
+      "contains": [
+        "publishes package and symbols through a forced virtual",
+        "resolve from NuGet repository \"nuget-virtual\""
       ]
     }
   ]

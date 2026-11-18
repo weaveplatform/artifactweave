@@ -107,7 +107,7 @@
   "test/acceptance/features/nuget_publish.feature": "fc8139226dfaa62dd5e3e720c61a258c1803d179a42f099e29b4894acdf88a77",
   "test/acceptance/features/nuget_remote.feature": "c0deebdbff349c104a0c68c2c2d9eaba93688be33901b98203489b7bface296c",
   "test/acceptance/features/nuget_v3.feature": "1abcb87a5fa48a1addc608e433991c129a894f9b9dcf9805129cab1be96ec5f5",
-  "test/acceptance/features/nuget_virtual.feature": "0ab5c0cb02ab6a84a235587680cbd97f29427a3894a904c132f0554c2741c100",
+  "test/acceptance/features/nuget_virtual.feature": "590b63f80b41096653083916145f5455d712268fcbc0f4c5899e0a7313a545a6",
   "test/acceptance/features/opkg.feature": "9ac6c11bbd6fc6a093b8c0f549720397732f03bc3b909de707a9ff2ca00c7322",
   "test/acceptance/features/pub.feature": "f9af72d4c8dd5818ea1cbf34b14b34b9e71e2ff66919a7eb853969563dddd6e4",
   "test/acceptance/features/puppet.feature": "c792ab4c573523f9aea4c78742575aa1701cbec24624c9aec06b84ab80ee7978",

@@ -7,7 +7,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	nugetfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nuget"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -53,7 +52,7 @@ func (h handler) symbols(w http.ResponseWriter, r *http.Request) {
 // It answers 201 with no body, the status 7.x answers; [I] the body is
 // inferred.
 func (h handler) store(w http.ResponseWriter, r *http.Request, folder string, symbols bool) {
-	if !h.k.RequireFolder(w, r, folder, api.ActionWrite) {
+	if !h.requireDeploy(w, r, folder, true) {
 		return
 	}
 	// The first file part is the package and the rest are ignored, as
@@ -86,6 +85,9 @@ func (h handler) store(w http.ResponseWriter, r *http.Request, folder string, sy
 	name, what := nugetfmt.FileName(n.ID, n.Version), ""
 	if symbols {
 		name, what = nugetfmt.SymbolsFileName(n.ID, n.Version), "the symbols of "
+	}
+	if !h.requireDeploy(w, r, path.Join(folder, name), false) {
+		return
 	}
 	_, err = h.k.StoreNew(r, path.Join(folder, name), form.File, nil, kernel.Checksums{},
 		func() error {

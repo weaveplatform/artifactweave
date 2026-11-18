@@ -60,7 +60,7 @@ Feature: Native NuGet restores signed dependencies through one virtual v3 feed
     And the response body contains "/nuget-virtual/registration-semver2/acme.dependency/index.json"
     And the response body contains "/nuget-virtual/flatcontainer/acme.signed/1.0.0/acme.signed.1.0.0.nupkg"
     When I GET "/artifactory/api/nuget/v3/nuget-virtual/a.pdb/invalid/a.pdb" as admin
-    Then the response status is 501
+    Then the response status is 404
     When I GET "/artifactory/api/nuget/nuget-virtual/" as admin
     Then the response status is 200
 
@@ -116,7 +116,115 @@ Feature: Native NuGet restores signed dependencies through one virtual v3 feed
       """
       malformed deferred upload
       """
-    Then the response status is 501
+    Then the response status is 405
+
+    Examples:
+      | dotnet  |
+      | .NET    |
+      | .NET 10 |
+
+  @nuget_virtual_write
+  Scenario Outline: <dotnet> publishes package and symbols through a forced virtual and restores from empty caches
+    Given the registry is running
+    And the <dotnet> client can reach the registry
+    When I PUT "/artifactory/api/repositories/nuget-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"nuget","forceNugetAuthentication":true}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/nuget-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"nuget","repositories":["nuget-local"],"defaultDeploymentRepo":"nuget-local","forceNugetAuthentication":true}
+      """
+    Then the response status is 200
+    Given the next request has header "Content-Type" "application/x-www-form-urlencoded"
+    When I POST "/artifactory/api/security/token" as admin with body:
+      """
+      username=admin&scope=applied-permissions%2Fuser&expires_in=3600
+      """
+    Then the response status is 200
+    And I keep the JSON field "access_token" of the response as "publish-token"
+    Given a file "NuGet.Config" with expanded content:
+      """
+      <configuration>
+        <packageSources>
+          <clear />
+          <add key="aw" value="{url}/api/nuget/v3/nuget-virtual/index.json" allowInsecureConnections="true" />
+        </packageSources>
+        <packageSourceCredentials>
+          <aw>
+            <add key="Username" value="admin" />
+            <add key="ClearTextPassword" value="{publish-token}" />
+          </aw>
+        </packageSourceCredentials>
+      </configuration>
+      """
+    And a file "pkg/Package.csproj" with content:
+      """
+      <Project Sdk="Microsoft.NET.Sdk">
+        <PropertyGroup>
+          <TargetFramework>net$(BundledNETCoreAppTargetFrameworkVersion)</TargetFramework>
+          <NuGetAudit>false</NuGetAudit>
+          <PackageId>Acme.Publish</PackageId>
+          <Version>1.0.0</Version>
+          <IncludeSymbols>true</IncludeSymbols>
+          <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        </PropertyGroup>
+      </Project>
+      """
+    And a file "pkg/Value.cs" with content:
+      """
+      public static class Value { public static int Number => 42; }
+      """
+    And a file "app/app.csproj" with content:
+      """
+      <Project Sdk="Microsoft.NET.Sdk">
+        <PropertyGroup>
+          <TargetFramework>net$(BundledNETCoreAppTargetFrameworkVersion)</TargetFramework>
+          <NuGetAudit>false</NuGetAudit>
+        </PropertyGroup>
+        <ItemGroup>
+          <PackageReference Include="Acme.Publish" Version="1.0.0" />
+        </ItemGroup>
+      </Project>
+      """
+    And a file "Anonymous.Config" with expanded content:
+      """
+      <configuration>
+        <packageSources>
+          <clear />
+          <add key="aw" value="{url}/api/nuget/v3/nuget-virtual/index.json" allowInsecureConnections="true" />
+        </packageSources>
+      </configuration>
+      """
+    When I run dotnet "pack pkg/Package.csproj --output nupkgs"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When I run dotnet "nuget push nupkgs/Acme.Publish.1.0.0.nupkg --source aw --api-key admin:{publish-token}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When I GET "/artifactory/nuget-local/Acme.Publish.1.0.0.snupkg" as admin
+    Then the response status is 200
+    And the client PDBs in the response resolve from NuGet repository "nuget-virtual"
+    When I run dotnet "restore app/app.csproj --configfile Anonymous.Config --packages anonymous --no-http-cache"
+    Then the command fails
+    And the server answered no request with 500 since the last command
+    And the output contains "401"
+    And the server answered 401 to GET "/artifactory/api/nuget/v3/nuget-virtual/index.json"
+    When I run dotnet "restore app/app.csproj --packages restored-v3 --no-http-cache --use-lock-file"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the files "nupkgs/Acme.Publish.1.0.0.nupkg" and "restored-v3/acme.publish/1.0.0/acme.publish.1.0.0.nupkg" are identical
+    And the NuGet lockfile "app/packages.lock.json" pins "Acme.Publish" to the package "nupkgs/Acme.Publish.1.0.0.nupkg"
+    When I POST "/artifactory/api/nuget/nuget-virtual/reindex" as admin
+    Then the response status is 200
+    When I DELETE "/artifactory/api/nuget/nuget-virtual/Acme.Publish/1.0.0" as admin
+    Then the response status is 404
+    When I POST "/artifactory/api/nuget/nuget-virtual/Acme.Publish/1.0.0" as admin
+    Then the response status is 404
+    When I GET "/artifactory/api/nuget/nuget-virtual/Download/Acme.Publish/1.0.0" as admin
+    Then the response status is 200
+    And the server answered no request with 500 since the last command
 
     Examples:
       | dotnet  |
