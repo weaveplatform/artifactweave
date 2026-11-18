@@ -564,8 +564,9 @@ store schema or generic fallback is introduced.
 The remote adapter uses source/cache metadata and archive validation, rewrites
 download URLs, and retains offline, refresh, redirect and no-store behavior.
 Ansible virtual metadata unions readable concrete members in order, with the first
-member winning duplicate versions. Nested virtuals are rejected by MemberRequest;
-P10 owns the shared nested graph. One-node federated publication is proven; P13
+member winning duplicate versions. This P9c snapshot originally rejected nested
+members; P10 adoption now uses the shared nested graph and cycle handling
+([qualification ledger](../../testing/phase10-signoff.md)). One-node federated publication is proven; P13
 owns cross-peer convergence. See the [connection recipe and checked sources](../../operations/ansible.md)
 and [native acceptance](../../../test/acceptance/features/ansible.feature), pinned
 to ansible-core 2.21.5 and checked against current published guides on 2026-10-28.
