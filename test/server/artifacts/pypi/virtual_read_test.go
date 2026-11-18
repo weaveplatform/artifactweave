@@ -7,14 +7,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"slices"
 	"strings"
 	"testing"
+	"time"
+
+	"golang.org/x/net/html"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	pypifmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/pypi"
 	platsqltest "github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
@@ -102,32 +109,65 @@ func pythonRemote(t *testing.T, w *harness.RemoteWorld, name, version string) (s
 
 func TestAccPypiVirtualReadsAndWarehouse(t *testing.T) {
 	w := virtualPythonWorld(t)
+	// The former whole-response search for "3.11" mistook this valid upload
+	// timestamp for the losing member's Python requirement (#1712).
+	uploaded := time.Date(2026, time.November, 18, 19, 3, 23, 114077000, time.UTC)
+	items := &item.Service{
+		Store: w.Runtime.Store, Blobs: w.Runtime.Blobs,
+		Formats: ecosystem.Settings{PyPI: pypifmt.Settings{SimpleJSON: true, CoreMetadata: true}}.For,
+		Now:     func() time.Time { return uploaded },
+	}
+	put := func(key, path string, body []byte, props model.Properties) {
+		t.Helper()
+		c, err := w.Runtime.Store.Repos().Get(t.Context(), key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := items.Deploy(t.Context(), item.Deploy{Target: item.Target{Repo: c, Path: path}, Body: bytes.NewReader(body), Properties: props, By: "admin"}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	const first = "demo/1.0/demo-1.0-py3-none-any.whl"
-	body := pythonPut(t, w, "first", first, "demo", "1.0")
+	body := pypiWheel(t, "demo", "1.0")
+	put("first", first, body, nil)
 	secondBody := zipBytes(
 		t,
 		map[string]string{"demo-1.0.dist-info/METADATA": "Metadata-Version: 2.1\nName: demo\nVersion: 1.0\nRequires-Python: >=3.11\nSummary: second member info\n"},
 	)
-	duplicate := w.Request("PUT", "/artifactory/second/other-path/demo-1.0-py3-none-any.whl;pypi.yanked=broken", "admin", string(secondBody))
-	if duplicate.Code != 201 {
-		t.Fatal(duplicate.Code, duplicate.Body.String())
-	}
-	pythonPut(t, w, "second", "demo/2.0/demo-2.0-py3-none-any.whl", "demo", "2.0")
-	pythonPut(t, w, "second", "demo/1.0/demo-1.0-py3-none-win_amd64.whl", "demo", "1.0")
+	put("second", "other-path/demo-1.0-py3-none-any.whl", secondBody, model.Properties{"pypi.yanked": {"broken"}})
+	put("second", "demo/2.0/demo-2.0-py3-none-any.whl", pypiWheel(t, "demo", "2.0"), nil)
+	put("second", "demo/1.0/demo-1.0-py3-none-win_amd64.whl", pypiWheel(t, "demo", "1.0"), nil)
 	remotePath, remoteBody := pythonRemote(t, w, "demo", "3.0")
 	const root = "/artifactory/api/pypi/virtual/"
 	for _, accept := range []string{"text/html", "application/vnd.pypi.simple.v1+json"} {
 		t.Run(accept, func(t *testing.T) {
 			r := w.Request("GET", root+"simple/demo/", "admin", "", "Accept", accept)
-			if r.Code != 200 || !strings.Contains(r.Body.String(), "demo-3.0-py3-none-any.whl") || !strings.Contains(r.Body.String(), "../../demo/1.0/") {
+			if r.Code != 200 {
 				t.Fatal(r.Code, r.Body.String())
 			}
-			sum := sha256.Sum256(body)
-			if !strings.Contains(r.Body.String(), hex.EncodeToString(sum[:])) {
-				t.Fatal("first member checksum lost", r.Body.String())
+			files := pythonSimpleFiles(t, r.Body.Bytes(), accept)
+			var names []string
+			var winners []pythonSimpleFile
+			for _, f := range files {
+				names = append(names, f.name)
+				if f.name == "demo-1.0-py3-none-any.whl" {
+					winners = append(winners, f)
+				}
 			}
-			if strings.Contains(r.Body.String(), "other-path") || strings.Contains(r.Body.String(), "broken") || strings.Contains(r.Body.String(), "3.11") {
-				t.Fatal("duplicate filename retained", r.Body.String())
+			slices.Sort(names)
+			wantNames := []string{"demo-1.0-py3-none-any.whl", "demo-1.0-py3-none-win_amd64.whl", "demo-2.0-py3-none-any.whl", "demo-3.0-py3-none-any.whl"}
+			if !slices.Equal(names, wantNames) || len(winners) != 1 {
+				t.Fatalf("merged files = %v; duplicate winners = %d; want %v with exactly one winner", names, len(winners), wantNames)
+			}
+			sum := sha256.Sum256(body)
+			digest := hex.EncodeToString(sum[:])
+			winner := winners[0]
+			if winner.url != "../../demo/1.0/demo-1.0-py3-none-any.whl#sha256="+digest || winner.sha256 != digest ||
+				winner.requiresPython != ">=3.9" || winner.yanked {
+				t.Fatalf("duplicate winner = %+v; want first-member URL/digest, requires-python >=3.9 and not yanked", winner)
+			}
+			if accept == "application/vnd.pypi.simple.v1+json" && winner.uploaded != "2026-11-18T19:03:23.114077Z" {
+				t.Fatalf("winner upload-time = %q; want the deterministic timestamp containing 3.11", winner.uploaded)
 			}
 			if strings.Contains(r.Body.String(), w.Upstream.URL) {
 				t.Fatal("upstream URL leaked")
@@ -197,6 +237,89 @@ func TestAccPypiVirtualReadsAndWarehouse(t *testing.T) {
 			t.Fatal(method, r.Code, r.Body.String())
 		}
 	}
+}
+
+type pythonSimpleFile struct {
+	name, url, sha256, requiresPython, uploaded string
+	yanked                                      bool
+}
+
+func pythonSimpleFiles(t *testing.T, body []byte, accept string) []pythonSimpleFile {
+	t.Helper()
+	if accept == "application/vnd.pypi.simple.v1+json" {
+		var doc struct {
+			Files []struct {
+				Filename       string            `json:"filename"`
+				URL            string            `json:"url"`
+				Hashes         map[string]string `json:"hashes"`
+				RequiresPython string            `json:"requires-python"`
+				Yanked         any               `json:"yanked"`
+				Uploaded       string            `json:"upload-time"`
+			} `json:"files"`
+		}
+		if err := json.Unmarshal(body, &doc); err != nil {
+			t.Fatal(err)
+		}
+		out := make([]pythonSimpleFile, 0, len(doc.Files))
+		for _, f := range doc.Files {
+			// PEP 691 permits an absent yanked field, equivalent to false.
+			out = append(
+				out,
+				pythonSimpleFile{
+					name:           f.Filename,
+					url:            f.URL,
+					sha256:         f.Hashes["sha256"],
+					requiresPython: f.RequiresPython,
+					uploaded:       f.Uploaded,
+					yanked:         f.Yanked != nil && f.Yanked != false,
+				},
+			)
+		}
+		return out
+	}
+	doc, err := html.Parse(bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []pythonSimpleFile
+	var visit func(*html.Node)
+	visit = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "a" {
+			f := pythonSimpleFile{name: pythonAnchorText(n)}
+			for _, a := range n.Attr {
+				switch a.Key {
+				case "href":
+					f.url = a.Val
+				case "data-requires-python":
+					f.requiresPython = a.Val
+				case "data-yanked":
+					f.yanked = true
+				}
+			}
+			link, err := url.Parse(f.url)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.sha256 = strings.TrimPrefix(link.Fragment, "sha256=")
+			out = append(out, f)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			visit(c)
+		}
+	}
+	visit(doc)
+	return out
+}
+
+func pythonAnchorText(n *html.Node) string {
+	if n.Type == html.TextNode {
+		return n.Data
+	}
+	var out strings.Builder
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		out.WriteString(pythonAnchorText(c))
+	}
+	return out.String()
 }
 
 func TestAccPypiVirtualPriorityAndVisibility(t *testing.T) {
