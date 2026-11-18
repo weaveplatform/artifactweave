@@ -7,7 +7,7 @@ separates the resolution mechanism from client/server evidence. Registered `V` i
 not itself a native-client qualification claim. A federated member here is the
 one-node repository contract; cross-peer convergence belongs to P13.
 
-This guide describes merged implementation at main `8e1d986e9` (2026-11-18),
+This guide describes merged implementation at main `3e8c1db96` (2026-11-18),
 not P10 sign-off. [#1571](https://github.com/weaveplatform/artifactweave/issues/1571)
 owns final qualification, the plan status and decision 0008's acceptance. The
 [source-backed rules](../research/decisions/0008-virtual-repositories.md) retain
@@ -64,10 +64,15 @@ the recorded [I] [ADP-06 failure contract](https://github.com/weaveplatform/arti
 not a new caller Read-denial or a blanket normalization of native errors.
 The inferred failure/refusal details and root gates remain
 [I] ([shared package entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6931452037), [root-document corrections](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6941939885)).
-Lookup/infrastructure errors have a separate boundary from ordinary upstream
-misses. Known unmerged defects [#1686](https://github.com/weaveplatform/artifactweave/issues/1686)
-(metadata item-lookup SQL faults; pending [PR #1695](https://github.com/weaveplatform/artifactweave/pull/1695)) and [#1692](https://github.com/weaveplatform/artifactweave/issues/1692)
-(source lookup SQL faults) qualify that boundary; this documentation does not repair them.
+The raw `maven-metadata.xml` interceptor returns a sanitized 500 for classified
+item or authority lookup storage faults. A failure while opening, reading or
+parsing a member's content can still allow a later member to serve, or retain
+the existing miss or denial response. [Merged #1695](https://github.com/weaveplatform/artifactweave/pull/1695)
+and the [phase/source audit](../research/virtual-metadata-faults-source-audit.md)
+record this boundary and its current-version compatibility limits.
+Known open [#1692](https://github.com/weaveplatform/artifactweave/issues/1692)
+can still erase a source lookup SQL fault's classification before the consumer,
+producing an upstream-style 502 or a passed-over virtual member.
 
 ## R4. Hiding unauthorized resources
 

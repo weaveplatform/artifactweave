@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -22,9 +23,9 @@ const (
 	cleanupPOM  = `<project><repositories><repository><id>top</id></repository></repositories><pluginRepositories/><profiles><profile><activation><activeByDefault>true</activeByDefault></activation><repositories><repository><id>active</id></repository></repositories></profile><profile><id>optional</id><repositories><repository><id>keep-optional</id></repository></repositories></profile></profiles></project>`
 )
 
-func pomCleanupWorld(t *testing.T, kind repo.PackageType, policy string) *harness.RemoteWorld {
+func pomCleanupWorld(t *testing.T, kind repo.PackageType, policy string, mutate ...func(*config.Config)) *harness.RemoteWorld {
 	t.Helper()
-	w := harness.NewRemoteWorld(t)
+	w := harness.NewRemoteWorld(t, mutate...)
 	w.Repo.PackageType = kind
 	yes := true
 	w.Repo.SuppressPomConsistencyChecks = &yes

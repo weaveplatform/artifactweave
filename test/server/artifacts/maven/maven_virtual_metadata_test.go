@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
@@ -20,9 +21,9 @@ func virtualMetadata(version string) string {
 	return `<metadata modelVersion="1.0.0"><groupId>com.acme</groupId><artifactId>lib</artifactId><versioning><versions><version>` + version + `</version></versions><lastUpdated>20261117120000</lastUpdated></versioning></metadata>`
 }
 
-func metadataWorld(t *testing.T, kind repo.PackageType) *harness.RemoteWorld {
+func metadataWorld(t *testing.T, kind repo.PackageType, mutate ...func(*config.Config)) *harness.RemoteWorld {
 	t.Helper()
-	w := pomCleanupWorld(t, kind, "")
+	w := pomCleanupWorld(t, kind, "", mutate...)
 	if err := w.Runtime.Store.Repos().Create(t.Context(), *repo.Defaults(&repo.Config{Key: "second", Class: repo.Local, PackageType: kind})); err != nil {
 		t.Fatal(err)
 	}
