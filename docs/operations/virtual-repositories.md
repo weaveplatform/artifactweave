@@ -77,6 +77,10 @@ preserves source lookup SQL faults and their original cause before consumer
 classification; the former #1692 loss of storage identity is fixed. The separate
 existing-copy clock-write fault in [#1704](https://github.com/weaveplatform/artifactweave/issues/1704)
 remains tracked by the qualification record until its correction merges.
+A source lookup SQL failure is still suppressed into a cached 200 index in virtual
+folder browsing. [#1723](https://github.com/weaveplatform/artifactweave/issues/1723)
+tracks that separate cross-kind defect and blocks final qualification; ordinary
+upstream listing I/O fallback remains intentional.
 [Merged #1705](https://github.com/weaveplatform/artifactweave/pull/1705) retains a
 complete expired repository file after an explicit origin 404 and advances its
 validation clock. Physical index files retain that file contract; native API
