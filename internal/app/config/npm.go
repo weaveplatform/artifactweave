@@ -10,6 +10,8 @@ type NPMTag struct {
 	// MergeDistTagsByVersion is 7.75.3's optional custom dist-tag merge strategy.
 	// The default keeps the first member's tag, independently of publish date.
 	MergeDistTagsByVersion bool `yaml:"merge_dist_tags_by_version"`
+	// ExternalDependenciesVersioning is the opt-in 7.x external cache naming strategy.
+	ExternalDependenciesVersioning bool `yaml:"external_dependencies_versioning"`
 }
 
 // NPMPath holds the npm format's upload path option (decision 0034).

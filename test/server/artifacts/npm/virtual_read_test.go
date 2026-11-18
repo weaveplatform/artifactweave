@@ -31,10 +31,13 @@ import (
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
-func virtualNPMWorld(t *testing.T, rules npmfmt.Settings) *harness.RemoteWorld {
+func virtualNPMWorld(t *testing.T, rules npmfmt.Settings, mutate ...func(*config.Config)) *harness.RemoteWorld {
 	t.Helper()
 	w := harness.NewRemoteWorld(t, func(c *config.Config) {
 		c.NPM.TagLatestByPublish, c.NPM.MergeDistTagsByVersion = rules.TagLatestByPublish, rules.MergeDistTagsByVersion
+		for _, change := range mutate {
+			change(c)
+		}
 		if dsn := os.Getenv("ARTIFACTWEAVE_TEST_POSTGRES_DSN"); dsn != "" {
 			c.Database = config.Database{Driver: "postgres", DSN: sqltest.ScratchDSN(t, dsn)}
 		}

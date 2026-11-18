@@ -55,7 +55,7 @@ func (h handler) listTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
-		h.virtualPackage(w, r, name, "", true)
+		h.virtualPackage(r.Context(), w, r, name, "", true)
 		return
 	}
 	p, ok := h.loadDocument(w, r, name)

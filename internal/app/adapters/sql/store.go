@@ -165,6 +165,9 @@ func (s *Store) BowerRegistrations() artport.BowerRegistrationStore {
 	return s.artifacts.BowerRegistrations()
 }
 
+// NPMExternals returns the artifacts module's external npm bindings.
+func (s *Store) NPMExternals() artport.NPMExternalStore { return s.artifacts.NPMExternals() }
+
 // UploadDigests is the artifacts module's upload digest store.
 func (s *Store) UploadDigests() artport.UploadDigestStore {
 	return s.artifacts.UploadDigests()

@@ -366,3 +366,54 @@ Feature: npm virtual packuments and immutable dependency tarballs
       | npm    |
       | npm    |
       | npm 12 |
+
+  @npm_virtual_external
+  Scenario Outline: <npm> installs allowed tarball and GitHub dependencies only through the virtual cache remote
+    Given external npm tarball and GitHub dependencies are available
+    And the registry is running
+    And the <npm> client can reach the registry
+    When the external npm proxy is configured
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/npm-parent" as admin with body:
+      """
+      {"rclass":"local","packageType":"npm"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/npm-external-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"npm","url":"{upstream}","username":"cache-only","password":"source-secret","proxy":"external-proxy","customHttpHeaders":[{"name":"X-External-Secret","value":"cache-header"}]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/npm-external" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"npm","repositories":["npm-parent","npm-external-remote"],"externalDependenciesEnabled":true,"externalDependenciesPatterns":["{upstream}/**","https://github.com/**"],"externalDependenciesRemoteRepo":"npm-external-remote"}
+      """
+    Then the response status is 200
+    When the external npm parent is deployed to "npm-parent"
+    Then the response status is 201
+    Given a file ".npmrc" with expanded content:
+      """
+      registry={url}/api/npm/npm-external/
+      //{host}/artifactory/api/npm/npm-external/:_auth={basicauth}
+      """
+    And a file "package.json" with content:
+      """
+      {"name":"external-consumer","version":"1.0.0","dependencies":{"external-root":"1.0.0"}}
+      """
+    When I run isolated external npm "install --ignore-scripts --cache .cold-external"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the external npm lockfile uses virtual archives only
+    And the file "node_modules/@acme/external-tgz/marker.txt" contains "@acme/external-tgz-external-bytes"
+    And the file "node_modules/external-git/marker.txt" contains "external-git-external-bytes"
+    And external npm origin counts are recorded
+    When I run isolated external npm "ci --ignore-scripts --cache .second-cold-external"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And external npm origins received no additional requests
+    And the external npm lockfile uses virtual archives only
+
+    Examples:
+      | npm    |
+      | npm    |
+      | npm 12 |

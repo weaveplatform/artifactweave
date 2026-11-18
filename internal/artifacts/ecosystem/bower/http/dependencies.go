@@ -6,12 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"reflect"
-	"slices"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -19,46 +18,22 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	bowerfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/bower"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
-	"github.com/weaveplatform/artifactweave/internal/kernel/antpath"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
 const dependencyTargetPrefix = "$$$art-shorthand-resolver$$$-"
 
-func dependencyRewrite(c repo.Config) bool {
-	return c.Class == repo.Virtual && c.ExternalDependenciesEnabled != nil &&
-		*c.ExternalDependenciesEnabled
-}
+func dependencyRewrite(c repo.Config) bool { return pkgroute.ExternalEnabled(c) }
 
-// dependencyURL rejects credentials and ambiguous paths before matching the
-// configured Ant allowlist. The source transport still enforces DNS and IP policy.
 func dependencyURL(c repo.Config, raw string) (*url.URL, error) {
-	if !dependencyRewrite(c) || len(raw) > 4096 {
-		return nil, source.ErrDenied
+	u, err := pkgroute.ExternalURL(c, raw)
+	if err != nil {
+		return nil, fmt.Errorf("bower dependency URL: %w", err)
 	}
-	u, err := url.Parse(raw)
-	if err != nil || u == nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" ||
-		u.User != nil ||
-		u.Fragment != "" ||
-		u.Opaque != "" ||
-		strings.ContainsAny(u.EscapedPath(), "%\\\x00") {
-		return nil, source.ErrDenied
-	}
-	for _, part := range strings.Split(u.Path, "/") {
-		if part == "." || part == ".." {
-			return nil, source.ErrDenied
-		}
-	}
-	for _, pattern := range c.ExternalDependenciesPatterns {
-		if pattern != "" && antpath.CompilePattern(pattern).Match(u.String()) {
-			return u, nil
-		}
-	}
-	return nil, source.ErrDenied
+	return u, nil
 }
 
 func dependencyTarget(raw string) string {
@@ -78,88 +53,33 @@ func decodeDependencyTarget(tag string) (string, error) {
 	return string(raw), nil
 }
 
-func (h handler) dependencyCache(r *http.Request) (*http.Request, error) {
-	virtual := pkgroute.RequestFrom(r).Repo
-	if !dependencyRewrite(virtual) || virtual.ExternalDependenciesRemoteRepo == "" ||
-		!slices.Contains(virtual.Repositories, virtual.ExternalDependenciesRemoteRepo) {
-		return nil, source.ErrDenied
-	}
-	c, err := h.k.DB().Repos().Get(r.Context(), virtual.ExternalDependenciesRemoteRepo)
-	if err != nil {
-		return nil, fmt.Errorf("bower dependency cache repository: %w", err)
-	}
-	if c.Class != repo.Remote || c.PackageType != repo.Bower ||
-		c.AllowAnyHostAuth != nil && *c.AllowAnyHostAuth {
-		return nil, source.ErrDenied
-	}
-	member, err := h.k.MemberRequest(r, c)
-	if err != nil {
-		return nil, fmt.Errorf("bower dependency member: %w", err)
-	}
-	return member, nil
+func (h handler) externalGuard() pkgroute.ExternalGuard {
+	return pkgroute.ExternalGuard{Kit: h.k, Sources: h.sources, Name: "bower"}
 }
 
-type dependencyAuthorityKey struct{}
+func (h handler) dependencyCache(r *http.Request) (*http.Request, error) {
+	return h.externalGuard().Cache(r) //nolint:wrapcheck // shared guard retains Bower's operation context
+}
 
 func (h handler) dependencyRequest(r *http.Request) (*http.Request, error) {
-	id, err := h.k.DB().RemoteCache().Source(r.Context(), pkgroute.RequestFrom(r).Repo.Key)
-	if err != nil {
-		return r, fmt.Errorf("bower virtual identity: %w", err)
-	}
-	return r.WithContext(context.WithValue(r.Context(), dependencyAuthorityKey{}, id)), nil
+	return h.externalGuard().Pin(r) //nolint:wrapcheck // shared guard retains Bower's operation context
 }
 
 func (h handler) checkDependencyAuthority(ctx context.Context, r *http.Request) error {
-	before := pkgroute.RequestFrom(r).Repo
-	current, err := h.k.DB().Repos().Get(ctx, before.Key)
-	if err != nil {
-		return source.ErrSuperseded
-	}
-	id, err := h.k.DB().RemoteCache().Source(ctx, before.Key)
-	if err != nil {
-		return source.ErrSuperseded
-	}
-	initial, ok := r.Context().Value(dependencyAuthorityKey{}).(model.SourceIdentity)
-	if !ok || id != initial {
-		return source.ErrSuperseded
-	}
-	if !reflect.DeepEqual(before, current) {
+	// Preserve Bower's existing supersession answer; npm keeps genuine store faults.
+	if err := h.externalGuard().Check(ctx, r); err != nil {
 		return source.ErrSuperseded
 	}
 	return nil
 }
 
-func (h handler) currentDependencyRead(
-	ctx context.Context,
-	r *http.Request,
-	path string,
-	folder bool,
-) error {
-	if err := h.checkDependencyAuthority(ctx, r); err != nil {
-		return err
-	}
-	if h.sources == nil || h.sources.Revalidate == nil {
-		return nil
-	}
-	id, ok := r.Context().Value(dependencyAuthorityKey{}).(model.SourceIdentity)
-	if !ok {
+func (h handler) currentDependencyRead(ctx context.Context, r *http.Request, path string, folder bool) error {
+	err := h.externalGuard().CurrentRead(ctx, r, path, folder)
+	if errors.Is(err, pkgroute.ErrExternalAuthorityStore) {
 		return source.ErrSuperseded
 	}
-	p, _ := kernel.FromContext(ctx)
-	d, _ := accessapi.DeciderFrom(ctx)
-	resource := source.Resource{Path: path, PermissionPath: path, PermissionFolder: folder}
-	err := h.sources.Revalidate(
-		ctx,
-		source.Request{
-			Repo:     pkgroute.RequestFrom(r).Repo,
-			Subject:  accessapi.SubjectOf(p),
-			Access:   d,
-			Resource: resource,
-		},
-		source.Permit{Identity: id},
-	)
 	if err != nil {
-		return fmt.Errorf("bower virtual current authority: %w", err)
+		return fmt.Errorf("bower dependency current read: %w", err)
 	}
 	return nil
 }
@@ -213,22 +133,6 @@ func (h handler) dependencyVersionRead(
 	}, nil
 }
 
-// dependencyReader is how readDependency reads a dependency's archive from
-// the cache member. A client downloading the archive downloads a file the
-// virtual repository serves, which its own patterns refuse with "No
-// repository found to serve the request" (R5). A parent's rewrite caching
-// the archive serves the parent, which binary has checked, so the virtual
-// repository's patterns refuse the dependency only when the client asks
-// for it.
-func (h handler) dependencyReader(
-	download bool,
-) func(*http.Request, source.Resource) (source.Result, error) {
-	if download {
-		return h.k.Read
-	}
-	return h.k.ReadMetadata
-}
-
 // readDependency reads an external dependency's archive through the
 // virtual repository's cache member. download is whether the client is
 // downloading the archive itself, rather than a parent's rewrite caching it
@@ -277,16 +181,7 @@ func (h handler) readDependency(
 		Method:            http.MethodGet,
 		Variant:           "bower-external-archive-v2",
 		NoCrossOriginAuth: true,
-		CheckURL: func(ctx context.Context, u *url.URL) error {
-			if err := h.checkDependencyAuthority(ctx, r); err != nil {
-				return err
-			}
-			if target.Scheme == "https" && u.Scheme != "https" {
-				return source.ErrDenied
-			}
-			_, err := dependencyURL(virtual, u.String())
-			return err
-		},
+		CheckURL:          pkgroute.ExternalRedirect(virtual, target, func(ctx context.Context) error { return h.checkDependencyAuthority(ctx, r) }),
 		Validate: func(ctx context.Context, body io.ReadSeeker, size int64) error {
 			if size <= 0 || size > maxArchiveBytes {
 				return remoteInvalid()
@@ -307,45 +202,28 @@ func (h handler) readDependency(
 	if err := h.currentDependencyRead(r.Context(), r, resource.Path, false); err != nil {
 		return dependencyRead{}, err
 	}
-	result, err := h.dependencyReader(download)(member, resource)
+	read, err := h.k.ReadExternal(
+		r,
+		member,
+		resource,
+		download,
+		maxArchiveBytes,
+		remoteInvalid(),
+		func(data []byte) error { return validateDependencyVersion(data, name, version) },
+		func(ctx context.Context) error {
+			if err := versionRead(ctx); err != nil {
+				return err
+			}
+			return h.currentDependencyRead(ctx, r, resource.Path, false)
+		},
+	)
+	if errors.Is(err, pkgroute.ErrExternalBodyRead) {
+		return dependencyRead{}, remoteInvalid()
+	}
 	if err != nil {
 		return dependencyRead{}, fmt.Errorf("bower dependency read: %w", err)
 	}
-	var body io.ReadCloser
-	switch {
-	case result.Stream != nil:
-		body = result.Stream.Body
-	case result.Item != nil:
-		body, _, err = h.k.Blobs().Open(r.Context(), result.Item.Actual.SHA256)
-	default:
-		return dependencyRead{}, remoteInvalid()
-	}
-	if err != nil {
-		return dependencyRead{}, fmt.Errorf("bower dependency blob: %w", err)
-	}
-	defer body.Close()
-	data, err := io.ReadAll(io.LimitReader(body, maxArchiveBytes+1))
-	if err != nil || len(data) > maxArchiveBytes {
-		return dependencyRead{}, remoteInvalid()
-	}
-	if err := validateDependencyVersion(data, name, version); err != nil {
-		return dependencyRead{}, err
-	}
-	revalidate := func(ctx context.Context) error {
-		if result.Revalidate != nil {
-			if err := result.Revalidate(ctx); err != nil {
-				return fmt.Errorf("bower dependency authority: %w", err)
-			}
-		}
-		if err := versionRead(ctx); err != nil {
-			return err
-		}
-		return h.currentDependencyRead(ctx, r, resource.Path, false)
-	}
-	if err := revalidate(r.Context()); err != nil {
-		return dependencyRead{}, err
-	}
-	return dependencyRead{data: data, revalidate: revalidate, used: result.Used}, nil
+	return dependencyRead{data: read.Data, revalidate: read.Revalidate, used: read.Used}, nil
 }
 
 // Versionless Git manifests are valid; a declared version must agree with the

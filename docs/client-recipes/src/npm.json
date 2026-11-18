@@ -46,7 +46,8 @@
   "limitations": [
     "For verification, use a new project with no node_modules/lockfile and a new npm cache.",
     "A repeated publish of an existing version is refused; --force does not make publication idempotent.",
-    "Virtual npm supports merged reads, publication and mutations through its configured deployment target, plus login/logout, ping and whoami. Normal reads retain merged metadata until the retrieval period expires; write=true reads the deployment target only. Virtual search merges readable local and remote member hits, caches remote pages for the virtual retrieval period, and reads local indexes live. Virtual signing keys merge readable signing members per request. npm audit signatures verifies signed packages and reports unsigned packages as missing signatures; restrictive patterns must include .npm/keys.json. Federated native-client qualification remains follow-on work."
+    "Virtual npm supports merged reads, publication and mutations through its configured deployment target, plus login/logout, ping and whoami. Normal reads retain merged metadata until the retrieval period expires; write=true reads the deployment target only. Virtual search merges readable local and remote member hits, caches remote pages for the virtual retrieval period, and reads local indexes live. Virtual signing keys merge readable signing members per request. npm audit signatures verifies signed packages and reports unsigned packages as missing signatures; restrictive patterns must include .npm/keys.json. Federated native-client qualification remains follow-on work.",
+    "A virtual with dependency rewrite, matching Ant patterns and a valid direct cache remote serves allowed tarball/GitHub dependencies through persistent synthetic tags and virtual _external URLs. Empty patterns match nothing. The cache remote retains Read/Cache permission and source policy; source URL/digest bindings prevent wrong-byte filename collisions even with npm.external_dependencies_versioning off."
   ],
   "evidence": [
     {
@@ -92,7 +93,17 @@
         "search --json widget",
         "audits both signing members and reports an unsigned virtual member",
         "audit signatures --cache .npm-audit",
-        "1 package has a missing registry signature"
+        "1 package has a missing registry signature",
+        "installs allowed tarball and GitHub dependencies",
+        "the external npm lockfile uses virtual archives only",
+        "external npm origins received no additional requests"
+      ]
+    },
+    {
+      "path": "test/acceptance/npm_external_steps_test.go",
+      "contains": [
+        "github.com:127.0.0.1",
+        "client attempted direct tarball download"
       ]
     }
   ]

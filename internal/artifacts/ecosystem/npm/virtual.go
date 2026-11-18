@@ -20,6 +20,8 @@ type VirtualVersion struct {
 	Published        time.Time       `json:"published"`
 	Member           string          `json:"member"`
 	HasInstallScript bool            `json:"has_install_script"`
+	// ExternalTarball is a validated request-local synthetic download path.
+	ExternalTarball string `json:"external_tarball,omitempty"`
 }
 
 // VirtualPackage is a base-URL/representation-independent merged model. JSON is
