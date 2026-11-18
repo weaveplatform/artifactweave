@@ -247,12 +247,14 @@ func TestAccPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
 		{"forbidden", 403, false, 403},
 		{"throttled stale", 429, false, 200},
 		{"throttled hard", 429, true, 429},
-		{"confirmed deleted", 404, false, 404},
+		{"origin missing retained copy", 404, false, 200},
+		{"origin missing hard retained copy", 404, true, 200},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w := policyFixture(t)
 			w.up.Set("/meta.txt", fakeupstream.Resource{Body: []byte("good"), ETag: `"old"`})
 			q := w.request("meta.txt", source.ResourceKindMetadata)
+			q.Resource.RepositoryFile = true
 			q.Repo.HardFail = ptr(tc.hard)
 			w.mustRead(q, "good")
 			w.clock.Advance(31 * time.Second)
@@ -280,7 +282,11 @@ func TestAccPolicyFailureClassesPreserveGoodMetadata(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !entry.ValidatedAt.Equal(w.clock.Now().Add(-31 * time.Second)) {
+			if tc.status == http.StatusNotFound {
+				if !entry.ValidatedAt.Equal(w.clock.Now()) || !entry.NegativeUntil.IsZero() {
+					t.Fatal("origin miss did not unexpire retained file", entry)
+				}
+			} else if !entry.ValidatedAt.Equal(w.clock.Now().Add(-31 * time.Second)) {
 				t.Fatal("failure refreshed clock")
 			}
 		})

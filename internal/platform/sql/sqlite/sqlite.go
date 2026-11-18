@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	msqlite "modernc.org/sqlite"
@@ -64,7 +65,14 @@ func DSN(path string, o Options) string {
 	q.Add("_pragma", "foreign_keys(1)")
 	q.Add("_pragma", "synchronous(NORMAL)")
 	q.Set("_txlock", "immediate")
-	return "file:" + path + "?" + q.Encode()
+	// The input is a filesystem path, not URI syntax. Quoting also keeps a
+	// literal percent escape from naming a different file. A leading // must
+	// remain path bytes rather than becoming a URI authority.
+	encoded := (&url.URL{Path: path}).EscapedPath()
+	if strings.HasPrefix(encoded, "//") {
+		encoded = "%2F" + encoded[1:]
+	}
+	return "file:" + encoded + "?" + q.Encode()
 }
 
 // OpenDB returns a pool over the SQLite database at path, through the

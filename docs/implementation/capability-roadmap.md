@@ -193,9 +193,10 @@ multi-node cache coordination (P35) or unrelated unfinished protocol/API surface
 recorded by the [remote cache policy](remote-cache-policy.md#concurrency-and-publication).
 Native evidence is not a live vendor-parity capture. #216 retains the inferred
 comparisons and P19 owns that comparison environment. #1571 owns the combined
-qualification record and final P10 status; this documentation does not mark it done.
-Known unmerged defects in the virtual guide remain visible rather than counted
-as delivered fixes.
+qualification record and final P10 status. The [closeout ledger](../testing/phase10-signoff.md)
+maps the 44 completed child tickets, family/client/provider evidence and the
+remaining merged-main qualification. Known unmerged corrections remain visible
+there; P10 is not yet marked done.
 
 ### Existing issues and client blockers
 

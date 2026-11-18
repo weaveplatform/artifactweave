@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -15,6 +17,7 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/weaveplatform/artifactweave/internal/app/config"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/s3"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
@@ -185,5 +188,59 @@ func TestAccRuntimeRunsGC(t *testing.T) {
 	}
 	if err := rt.Close(ctx); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAccRuntimeSQLitePathsKeepArtifactStoresIndependent(t *testing.T) {
+	for _, kind := range []repo.PackageType{repo.PyPI, repo.Conan} {
+		t.Run(string(kind), func(t *testing.T) {
+			dir := t.TempDir()
+			for _, name := range []string{"state#one", "state#two", "stateplain"} {
+				cfg := config.Default()
+				cfg.DataDir = filepath.Join(dir, name)
+				rt, err := OpenRuntime(t.Context(), cfg, slog.New(slog.DiscardHandler), RuntimeOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				createErr := rt.Store.Repos().Create(t.Context(), repo.Config{Key: string(kind), Class: repo.Local, PackageType: kind})
+				if err := rt.Close(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				t.Logf("%s %s create repository: %v", kind, name, createErr)
+				if createErr != nil {
+					t.Errorf("different data directory reused artifact store: %v", createErr)
+				}
+				if _, err := os.Stat(cfg.SQLitePath()); err != nil {
+					t.Errorf("configured database file missing: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestAccRuntimeSQLiteExplicitPathsRemainLiteral(t *testing.T) {
+	for _, prefix := range []string{"", "file:"} {
+		t.Run(map[bool]string{false: "path", true: "file-prefix"}[prefix != ""], func(t *testing.T) {
+			dir := t.TempDir()
+			for _, name := range []string{"state#one.db", "state#two.db", "state%23one.db", "state space.db"} {
+				cfg := testConfig(t)
+				path := filepath.Join(dir, name)
+				cfg.Database.DSN = prefix + path
+				rt, err := OpenRuntime(t.Context(), cfg, slog.New(slog.DiscardHandler), RuntimeOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				createErr := rt.Store.Repos().Create(t.Context(), repo.Config{Key: "pypi", Class: repo.Local, PackageType: repo.PyPI})
+				if err := rt.Close(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				if createErr != nil {
+					t.Fatal("explicit path reused another store", createErr)
+				}
+				if _, err := os.Stat(path); err != nil {
+					t.Fatal("configured file missing", err)
+				}
+			}
+		})
 	}
 }

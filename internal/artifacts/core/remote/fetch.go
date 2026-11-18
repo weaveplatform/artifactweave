@@ -121,10 +121,7 @@ func (p *Policy) fetch(
 	}
 	switch res.StatusCode {
 	case http.StatusNotFound:
-		if err = p.negative(ctx, q, permit, opts.Revision, token); err != nil {
-			return out, err
-		}
-		return out, kernel.ErrNotFound
+		return p.missing(ctx, q, permit, opts.Revision, token)
 	case http.StatusNotModified:
 		out.entry, err = p.revalidate(ctx, q, permit, opts.Revision, token, e, res)
 		return out, err
@@ -579,6 +576,24 @@ func (p *Policy) unexpire(
 	token model.RemoteCacheToken,
 	e model.RemoteCacheEntry,
 ) (model.RemoteCacheEntry, error) {
+	updated, err := p.unexpireEntry(ctx, q, permit, revision, token, e)
+	if err != nil {
+		return model.RemoteCacheEntry{}, PolicyError(err)
+	}
+	return updated, nil
+}
+
+// unexpireEntry leaves transaction errors intact so the origin-miss path can
+// distinguish a failed store call from an upstream failure. Existing callers
+// retain unexpire's error mapping.
+func (p *Policy) unexpireEntry(
+	ctx context.Context,
+	q source.Request,
+	permit source.Permit,
+	revision string,
+	token model.RemoteCacheToken,
+	e model.RemoteCacheEntry,
+) (model.RemoteCacheEntry, error) {
 	e.ValidatedAt = p.now()
 	var updated model.RemoteCacheEntry
 	err := p.Store.Tx(ctx, func(tx context.Context) error {
@@ -593,7 +608,7 @@ func (p *Policy) unexpire(
 		return nil
 	})
 	if err != nil {
-		return model.RemoteCacheEntry{}, PolicyError(err)
+		return model.RemoteCacheEntry{}, fmt.Errorf("unexpire remote cache transaction: %w", err)
 	}
 	return updated, nil
 }

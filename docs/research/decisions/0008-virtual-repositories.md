@@ -23,8 +23,11 @@ place it: `resolve.go` for member order, the `defaultDeploymentRepo` and
 `cache.go` for `virtualRetrievalCachePeriodSecs`. Each format's merge lives in
 `internal/artifacts/ecosystem/<type>/virtual.go`.
 
-Rules R1 to R11 are Artifactory 7.x's, and P10 implements them. Until a P10 ticket lands,
-the code answers as the P9c sections below and the format guides describe. Each rule names
+Rules R1 to R11 are Artifactory 7.x's, and P10 implements them. The P10 delivery
+tickets are merged; the [qualification record](../../testing/phase10-signoff.md)
+maps their evidence and remaining final-gate work. The P9c sections below retain
+their historical scope; the delivered P10 rules and current format guides take
+precedence where adoption changed an adapter. Each rule names
 its sources. Class names and line numbers are 7.161.26's, under
 `backend/core/src/main/java/org/artifactory/` unless another path is given. **[I]** marks
 an answer that no source settles; #216 lists each one for the comparison in P19.
@@ -481,10 +484,13 @@ epic amends its own row of the format table when it lands, and
 [QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571) marks this
 decision Accepted at sign-off.
 
-The P9c sections below describe today's Puppet, Conda, Ansible and Chef adapters, for
-example Ansible's "other source failures stop resolution" and the 400 for a nested virtual
-member. They hold until [EPIC-ADP](https://github.com/weaveplatform/artifactweave/issues/1519)
-moves each adapter onto the engine; R1 to R11 then apply to it, R3's fall-through included.
+The P9c sections below describe the adapters before P10 adoption, including
+Ansible's earlier failure and nested-member answers. All seven
+[EPIC-ADP](https://github.com/weaveplatform/artifactweave/issues/1519) delivery tickets
+are now closed and merged. R1 to R11 and the current operations guides apply to
+those adapters, R3's fall-through included. Status remains Proposed until #1571
+records the required final qualification; child-ticket completion alone does not
+claim that gate has passed.
 
 P10's **[I]** items, grouped by ticket with the source and the inferred answer of each, are
 in the comment headed "From #1530" on

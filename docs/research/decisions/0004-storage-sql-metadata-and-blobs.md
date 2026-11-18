@@ -281,6 +281,26 @@ it is documented; a PUT of the checksum file fixes a missing checksum here. Six 
 - The items table is the hot path; indexes on `(repo_key, path, name)`, `actual_sha1`,
   `actual_sha256` and the EAV property table are part of the migrations.
 
+## SQLite filesystem paths
+
+`database.dsn` is a filesystem path, with the optional `file:` prefix removed by
+configuration; it is not an arbitrary SQLite URI. The platform driver encodes
+that path before adding its fixed pragma/transaction query (#1693). Literal URI
+delimiters and percent sequences therefore identify the requested file, rather
+than another database. Leading path slashes cannot introduce URI authority.
+Private `:memory:` databases, ordinary relative/absolute paths and all connection
+settings retain their existing contracts; paths are not normalized here.
+
+The [SQLite URI specification](https://www.sqlite.org/uri.html) establishes path
+percent-decoding, ignored fragments and authority handling. Pinned modernc
+[v1.62.0 connection code](https://gitlab.com/cznic/sqlite/-/blob/v1.62.0/conn.go)
+passes `file:` names through with `SQLITE_OPEN_URI`; its driver-only and actual
+application tests establish Artifactweave file location and isolation. Native
+Windows checks use that runner's filesystem paths; round-trip encoding tests alone
+do not establish Windows drive or UNC file-location behavior. OS-invalid names
+are excluded from native filesystem cases. No new URI-query configuration is
+introduced.
+
 ## Verification
 
 - `internal/app/storetest` and `internal/platform/blob/blobtest` contract suites run against

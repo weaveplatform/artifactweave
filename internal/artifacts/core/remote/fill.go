@@ -49,8 +49,9 @@ func fileRead(q source.Request) bool {
 // not (denied, a *source.CacheFillDenied), as 7.x answers it. 7.161.26's
 // RemoteRepoBase.getInfo asks the upstream for the file's info before any
 // download, and only the download checks the deploy path
-// (downloadAndSave), so the upstream's HEAD decides: a miss is the miss
-// (404, remembered as any miss); a copy the cache holds that the upstream
+// (downloadAndSave), so the upstream's HEAD decides: a miss with no retained file is a miss
+// (404, remembered); an expired file still in the cache is served and made
+// fresh again when the origin misses; a copy the cache holds that the upstream
 // has not changed is served and made fresh again (304, or a 200 that
 // unchanged reads as the same file, as LastModifiedExpiryRemoteInterceptor
 // keeps the expired copy, and unexpireIfExists makes it fresh); a file it
@@ -157,10 +158,7 @@ func (p *Policy) info(
 	}
 	switch res.StatusCode {
 	case http.StatusNotFound:
-		if err = p.negative(ctx, q, permit, opts.Revision, token); err != nil {
-			return out, err
-		}
-		return out, kernel.ErrNotFound
+		return p.missing(ctx, q, permit, opts.Revision, token)
 	case http.StatusNotModified:
 		out.entry, err = p.revalidate(ctx, q, permit, opts.Revision, token, e, res)
 		return out, err

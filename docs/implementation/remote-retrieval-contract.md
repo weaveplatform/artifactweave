@@ -165,7 +165,8 @@ rebuild the cached-binary index but must not replace that upstream list with a s
 Apply authorization first, then cache-only/offline, then no-store, then freshness.
 "Usable" below means complete, validated content in the current source generation;
 explicit cache-only reads may inspect retained older-generation content if still
-authorized. A timeout or failed refresh never advances a success/freshness clock.
+authorized. A timeout or network failure never advances a success/freshness clock.
+An actual origin 404 with a retained complete file follows the unexpire transition below.
 Rows R1–R14 are required table-driven cases in [#620](https://github.com/weaveplatform/artifactweave/issues/620), with [#615](https://github.com/weaveplatform/artifactweave/issues/615) recording requests and
 fake time. [#621](https://github.com/weaveplatform/artifactweave/issues/621) and the format tickets repeat the applicable rows through HTTP.
 
@@ -177,7 +178,7 @@ fake time. [#621](https://github.com/weaveplatform/artifactweave/issues/621) and
 | R4 | Mutable upstream metadata, fresh hit | None | Serve; client conditional GET/HEAD is evaluated against the downstream representation. |
 | R5 | Mutable metadata, expired or explicitly zapped | One shared synchronous conditional refresh | Wait up to `metadataRetrievalTimeoutSecs`; successful 200 replaces, matching 304 revalidates. Error follows R10–R12. No unconditional stale-while-refresh promise. |
 | R6 | Locally derived metadata | No independent upstream fetch | Rebuild from its declared authoritative inputs; local `EnsureFresh` is not remote retrieval freshness. A remote view depends on R3–R5, not just locally cached packages. |
-| R7 | Fresh negative entry | None | 404, no item/blob/index row. Expiry permits another fetch; zero missing TTL disables negative persistence. |
+| R7 | Fresh negative entry | None | 404. A new cold miss creates no item/blob/index row; historical negatives may still retain older bytes, which are not disclosed while the negative is fresh. Expiry permits another fetch; zero missing TTL disables negative persistence. |
 | R8 | Any `-cache` GET/HEAD; or entrypoint requires CacheOnly | None, including Smart Remote side effects | Serve retained complete bytes, even expired/zapped, or 404. No probe, eager fetch, refresh, remote listing or statistics callback. |
 | R9 | Explicit `offline=true` | None | Same cache behavior as R8, regardless of `hardFail`; offline is intentional, not a failed request. |
 | R10 | Assumed-offline cooldown | No request until cooldown expires | Retained complete bytes, even expired, whatever `hardFail` or their Cache-Control says, or 404 `<key>: is assumed offline, '<key>:<path>' is not found at '<path>'.; Path: '<key>:<path>'` on the item route and each format route's own miss on a miss, as 7.161.26's `RemoteRepoBase.internalGetInfo` answers while `isOffline` holds ([#1601](https://github.com/weaveplatform/artifactweave/issues/1601)); a folder listing, a search's metadata read and a POST query, which 7.x keeps no file for, and Smart Remote's own discovery, property and statistics exchanges keep the 502 [I]. One permitted demand at expiry probes; peers share it. A fresh/immutable hit that needs no upstream remains a hit. |
@@ -204,7 +205,7 @@ or authentication challenges as artifactweave credentials.
 |---|---|---|
 | HEAD 200, then GET 200 | GET headers, validators, length and bytes are authoritative if HEAD disagrees; commit only after EOF and validation | 200; normal client range/conditional processing then applies |
 | HEAD 405 or 501 | One GET fallback; remember no permanent capability from a single error | GET result |
-| HEAD 404 or GET 404 | Record only a confirmed miss for this identity; do not replace good bytes with an error body | 404, including a refresh that confirms deletion; retain old bytes only for explicit cache access |
+| HEAD 404 or GET 404 | For a currently complete repository-file resource, retain its bytes and validators, refresh its validation clock under current source/token fences and clear an expired historical negative; do not record a new miss. Artifact kind denotes a file; raw metadata needs trusted file-reader provenance. Protocol-owned API metadata keeps its existing 404/negative handling, independently of how its raw representation is persisted. | Serve the retained file, including to a Read-only caller; cold/changed content still needs Deploy/Cache. Existing strict HTTP rules remain RC-3. Without a permitted retained file, 404. See [#1645 research](../research/expired-remote-copy.md), including its clock correction and file/API boundary. |
 | HEAD/GET 304 | Requires a complete corresponding stored representation and matching upstream validator; update validation time, no blob write | Serve stored body or downstream 304; unexpected 304 without a usable entry is 502 |
 | HEAD/GET 401 or 403 | Never negative-cache or mark assumed-offline; preserve status, sanitize body/challenge | 401 or 403; no stale fallback even when `hardFail=false` |
 | 429 | No negative entry or connection-offline state; honor a bounded `Retry-After` cooldown | 429 with sanitized bounded `Retry-After` |
@@ -226,7 +227,10 @@ marker. Exact modern vendor status remains **[I]**, with no live vendor capture.
 This preservation does not classify every content error as a lookup failure.
 The virtual metadata interceptor retains its separate lookup/content phases
 ([#1686](https://github.com/weaveplatform/artifactweave/issues/1686));
-`ContentOpenError` retains a selected cached-content origin and its existing cause.
+`ContentOpenError` retains a selected cached-content origin and its existing cause,
+including physical verification of a retained blob after an origin 404. That
+producer marker does not cover entry/item lookup, clock publication or failed
+current-authority/token checks.
 Its omission/partial merge, ordinary body-read failures and malformed-document
 handling remain unchanged. Publication fault mapping and stale/offline rules are
 unchanged by the source-sanitization fix.
@@ -619,7 +623,7 @@ absent from this baseline must enter P20's ledger with an implementation owner.
 | [#630](https://github.com/weaveplatform/artifactweave/issues/630) Helm; [#631](https://github.com/weaveplatform/artifactweave/issues/631)/#632 Terraform | Preserve index/discovery lists, chart provenance, module ZIP/provider checksum/signature bytes; validate external origins. Terraform backend is a different local-only repository contract. |
 | [#633](https://github.com/weaveplatform/artifactweave/issues/633) Go; P10 | P9 tests GOPROXY `.info/.mod/.zip`, list/latest source without enabling unsupported direct remote routes. P10 composes ordered sources and proves native Go; P28 sumdb/VCS and P33 VCS transport remain assigned. |
 | [#634](https://github.com/weaveplatform/artifactweave/issues/634)/#635/#636 and [#213](https://github.com/weaveplatform/artifactweave/issues/213) | Smart capabilities, explicit browsing, transitive AQL and upstream version search must be observable before P9 closes. They reuse identity/auth/cache bounds rather than creating unbounded alternate clients. |
-| P10 | Source result includes freshness, raw metadata, representation identity and fetch intent. Permission-filtered merging must not turn an upstream failure into absence or enable remote I/O through current recursive item lookup before P10 lands. |
+| P10 | Delivered virtual resolution uses the remote member's freshness, representation identity, fetch intent and current source policy; the shared walk controls upstream steps rather than recursive cache lookup. Format-specific pass-over and lookup/content fault boundaries are recorded in the [virtual guide](../operations/virtual-repositories.md#r10-a-remote-member-keeps-its-own-policy) and [qualification ledger](../testing/phase10-signoff.md), including outstanding corrections. |
 | P11 / [#487](https://github.com/weaveplatform/artifactweave/issues/487) | Project sharing/authorization and the two absent admin endpoints; single replication and general package cleanup. Replication cannot transfer freshness/credential state as portable content or confuse a rewritten view with authoritative input. |
 | P12 / P27 | Full descriptor/global settings (including configurable transitive member limits); Curation/PTC enforcement/user context. Stored flags remain visible as inert until these phases deliver them. |
 | P29–P33 / P35 / P37 | Additional package formats consume this contract; multi-process deduplication is P35; cross-vendor Smart/replication interoperability is P37. None is claimed by P9 fake-peer success. |

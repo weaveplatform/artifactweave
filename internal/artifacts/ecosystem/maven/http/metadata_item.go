@@ -194,7 +194,7 @@ func readMetadataMember(
 		var err error
 		result, err = k.RemoteSources.Read(r.Context(), source.Request{
 			Repo: c, Subject: accessapi.SubjectOf(p), Access: acc.Decider, Project: c.ProjectKey, CacheOnly: !member.Upstream,
-			Resource: source.Resource{Kind: source.ResourceKindMetadata, Path: owner, Method: http.MethodGet},
+			Resource: source.Resource{Kind: source.ResourceKindMetadata, Path: owner, Method: http.MethodGet, RepositoryFile: true},
 		})
 		if err != nil {
 			return maven.MetadataDocument{}, fmt.Errorf("maven metadata: %w", metadataLookupError(r.Context(), err))
