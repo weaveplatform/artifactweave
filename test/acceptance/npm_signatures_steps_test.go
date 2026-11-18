@@ -26,6 +26,7 @@ import (
 
 // registerNPMSignatures registers the steps of npm_signatures.feature.
 func (w *world) registerNPMSignatures(sc *godog.ScenarioContext) {
+	w.registerNPMVirtualKeys(sc)
 	sc.Step(`^I create the ECDSA key pair "([^"]*)" with alias "([^"]*)" as admin$`,
 		w.createECDSAKeyPair)
 	sc.Step(

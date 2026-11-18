@@ -82,6 +82,12 @@ var npmStatusPart = statusPart{
 			{npmPackument, npmBase + "npm-remote/status-pkg", "admin", "", 501},
 			{npmPackument, npmBase + "npm-virtual/status-pkg", "admin", "", 200},
 			{npmPackument, npmBase + "npm-virtual/status-pkg?write=true", "admin", "", 200},
+			// These unsigned controls use the same npm read route. Virtual keys
+			// now resolve real member Read before answering an empty union.
+			{npmPackument, local + "-/npm/v1/keys", "admin", "", 404},
+			{npmPackument, npmBase + "npm-virtual/-/npm/v1/keys", "admin", "", 404},
+			{npmPackument, npmBase + "npm-virtual/-/npm/v1/keys", "user", "", 403},
+			{npmPackument, npmBase + "npm-virtual/-/npm/v1/keys", "", "", 401},
 			// npm's own operations under /-/ that no route serves yet.
 			{npmPackument, local + "-/v1/login", "admin", "", 404},
 			{npmPackument, local + "status-pkg/a/b", "admin", "", 404},

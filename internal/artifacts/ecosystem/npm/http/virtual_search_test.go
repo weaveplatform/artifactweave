@@ -345,7 +345,10 @@ func TestAccNPMVirtualSearchKeepsDeferredPathAndMethodRefusals(t *testing.T) {
 		{"PUT", "-/v1/search"},
 		{"GET", "-/v1/search/"},
 		{"GET", "-/v1/search;property=value"},
-		{"GET", "-/npm/v1/keys"},
+		{"POST", "-/npm/v1/keys"},
+		{"PUT", "-/npm/v1/keys"},
+		{"GET", "-/npm/v1/keys/"},
+		{"GET", "-/npm/v1/keys;property=value"},
 	} {
 		wantStatus(t, f.do(tc.method, "/artifactory/api/npm/npm-virtual/"+tc.path, "reader"), 501)
 	}

@@ -27,8 +27,8 @@ func (virtualSource) Item(context.Context, pkgroute.Store, repo.Config, string) 
 	return pkgroute.Found{}, source.ErrUnsupported
 }
 
-// Deferred signing-key routes keep their class refusal before any
-// handler-specific validation. Writes and account operations now use NPM-02.
+// Unsupported virtual operations retain their class refusal before any
+// handler-specific validation. Writes and account operations use NPM-02.
 func (h handler) virtualRouteGate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if pkgroute.RequestFrom(r).Repo.Class != repo.Virtual || virtualRouteAllowed(r) {
@@ -51,10 +51,13 @@ func virtualRouteAllowed(r *http.Request) bool {
 	if err != nil || len(p.Segments) == 0 {
 		return false
 	}
-	if !p.Folder && len(p.Props) == 0 && len(p.Segments) == 3 && p.Segments[0] == "-" && p.Segments[1] == "v1" && p.Segments[2] == "search" && r.Method == http.MethodGet {
+	if virtualDocumentPath(p, []string{"-", "v1", "search"}) && r.Method == http.MethodGet {
 		return true
 	}
 	read := r.Method == http.MethodGet || r.Method == http.MethodHead
+	if read && virtualDocumentPath(p, keysPath) {
+		return true
+	}
 	mutate := r.Method == http.MethodPut || r.Method == http.MethodDelete
 	if p.Segments[0] != "-" {
 		return read || mutate
@@ -72,10 +75,20 @@ func virtualRouteAllowed(r *http.Request) bool {
 	return len(p.Segments) == 4 && p.Segments[1] == "user" && p.Segments[2] == "token" && r.Method == http.MethodDelete
 }
 
+// Keep reserved document paths exact: folder or matrix-parameter forms must not
+// enable a previously deferred virtual operation.
+func virtualDocumentPath(p pkgroute.Path, segments []string) bool {
+	return !p.Folder && len(p.Props) == 0 && slices.Equal(p.Segments, segments)
+}
+
 func (h handler) virtualRead(w http.ResponseWriter, r *http.Request) {
 	p, err := pkgroute.ParsePath(pkgroute.RequestFrom(r).Rest)
 	if err != nil {
 		h.k.Error(w, r, err)
+		return
+	}
+	if slices.Equal(p.Segments, keysPath) {
+		h.virtualKeys(w, r)
 		return
 	}
 	name, rest, ok := splitName(p.Segments)

@@ -37,12 +37,9 @@ type keysDocument struct {
 // an include or exclude pattern on the path, refuses the document with the
 // policy's 404.
 func (h handler) keys(w http.ResponseWriter, r *http.Request) bool {
-	listed, err := npmfmt.Keys(r.Context(), h.keyPairs, pkgroute.RequestFrom(r).Repo)
-	switch {
-	case err != nil:
-		h.k.Error(w, r, err)
-		return true
-	case len(listed) == 0:
+	c := pkgroute.RequestFrom(r).Repo
+	// Preserve the unsigned endpoint when no signing store or references exist.
+	if h.keyPairs == nil || c.PrimaryKeyPairRef == "" && c.SecondaryKeyPairRef == "" {
 		return false
 	}
 	if !h.k.Require(w, r, keysDocumentPath, api.ActionRead) {
@@ -51,6 +48,14 @@ func (h handler) keys(w http.ResponseWriter, r *http.Request) bool {
 	if err := h.k.CheckDocument(r, keysDocumentPath); err != nil {
 		h.k.Error(w, r, err)
 		return true
+	}
+	listed, err := npmfmt.Keys(r.Context(), h.keyPairs, c)
+	switch {
+	case err != nil:
+		h.k.Error(w, r, err)
+		return true
+	case len(listed) == 0:
+		return false
 	}
 	writeJSON(w, http.StatusOK, jsonType, keysDocument{Keys: listed})
 	return true

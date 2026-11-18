@@ -40,16 +40,7 @@ const remoteKeysPath = "-/npm/v1/keys"
 // remote's packuments answer (502, 504, or the upstream's 401, 403, 429 or
 // 5xx), so npm fails the audit rather than skip it [I] (#216).
 func (h handler) remoteKeys(w http.ResponseWriter, r *http.Request) {
-	result, err := h.k.Read(r, source.Resource{
-		Kind:                source.ResourceKindMetadata,
-		Path:                keysDocumentPath,
-		UpstreamPath:        remoteKeysPath,
-		Method:              http.MethodGet,
-		Accept:              jsonType,
-		ExpectedContentType: jsonType,
-		Variant:             "npm-keys-v1",
-		Validate:            validateKeysDocument,
-	})
+	result, err := h.k.Read(r, remoteKeysResource())
 	switch {
 	case upstreamMissing(err):
 		h.k.Error(w, r, notFound(r))
@@ -101,4 +92,18 @@ func validateKeysDocument(_ context.Context, r io.ReadSeeker, size int64) error 
 		}
 	}
 	return nil
+}
+
+// Keep direct and virtual member reads under the identical source contract.
+func remoteKeysResource() source.Resource {
+	return source.Resource{
+		Kind:                source.ResourceKindMetadata,
+		Path:                keysDocumentPath,
+		UpstreamPath:        remoteKeysPath,
+		Method:              http.MethodGet,
+		Accept:              jsonType,
+		ExpectedContentType: jsonType,
+		Variant:             "npm-keys-v1",
+		Validate:            validateKeysDocument,
+	}
 }

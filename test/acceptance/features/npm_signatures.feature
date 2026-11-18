@@ -11,7 +11,7 @@ Feature: npm audit signatures verifies what an npm local repository signs
   Background:
     Given the registry is running
 
-  @npm
+  @npm @npm_signatures
   Scenario Outline: <npm> verifies the signatures of an npm local repository after a key pair rotates, and refuses a tampered one
     Given the <npm> client can reach the registry
     When I PUT "/artifactory/api/repositories/npm-signed" as admin with body:

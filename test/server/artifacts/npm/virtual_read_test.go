@@ -321,7 +321,10 @@ func TestAccNPMVirtualPriorityAndCache(t *testing.T) {
 func TestAccNPMVirtualDeferredRoutes(t *testing.T) {
 	w := virtualNPMWorld(t, npmfmt.Settings{})
 	for _, tc := range []struct{ method, path, body string }{
-		{"GET", "-/npm/v1/keys", ""},
+		{"POST", "-/npm/v1/keys", "{bad"},
+		{"PUT", "-/npm/v1/keys", "{bad"},
+		{"GET", "-/npm/v1/keys/", ""},
+		{"GET", "-/npm/v1/keys;property=value", ""},
 		{"GET", "-/package/pkg/not-dist-tags", ""},
 	} {
 		r := w.Request(tc.method, npmBase+"virtual/"+tc.path, "reader", tc.body)
