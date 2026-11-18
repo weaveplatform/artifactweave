@@ -46,9 +46,14 @@ table or claim to simulate an entire database outage. The permanent regressions
 also exercise the current-authority check and a transaction failure after the
 actual clock Put, so rollback must preserve the retained entry.
 
-The final branch integrates main
-`cbed189bceac60069fd037d9de56235e05877e68`, whose added RPM fix is independent
-of the clock error boundary. The original red evidence remains qualified to
+The original qualified branch integrated main
+`cbed189bceac60069fd037d9de56235e05877e68`. Later normal integration of the
+merged expired-file fix and PyPI assertion repair reaches main
+`901a11a5c02d9e6b7be3abbf83caa865a2510fcf`. The expired-file fix extracted a raw
+`unexpireEntry` transaction helper. This correction maps errors only in its
+legacy `unexpire` wrapper and `revalidate`; the raw helper and the origin-miss
+handler remain byte-identical to main and keep their own phase-specific mapping.
+The original red evidence remains qualified to
 `38e8e4aec0d9c8d9179208f27c662908ad9167fc`.
 
 ## Cause and bounded correction
@@ -72,10 +77,11 @@ own-storage contracts in
 [#1470](https://github.com/weaveplatform/artifactweave/issues/1470) and
 [#1489](https://github.com/weaveplatform/artifactweave/issues/1489). No primary
 source cited here or controlled live Artifactory observation establishes an
-exact current 7.x answer to these injected local database failures. No specific existing
-[#216](https://github.com/weaveplatform/artifactweave/issues/216) comment is
-claimed to settle this clock-publication question; its comparison draft remains
-local.
+exact current 7.x answer to these injected local database failures. The
+[published P10 comparison update](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6991066992)
+registers this clock-publication question alongside the distinct lookup/content
+and origin-miss boundaries. It is a comparison question, not a vendor capture
+or evidence settling the current wire answer.
 
 ## Retained boundaries
 
@@ -108,3 +114,19 @@ unchanged retained state and a healthy recovery control.
 cause preservation, driver timeout identity, ordinary refusal/verdict mappings
 and ended-request behavior. These controlled tests prove this server's contract;
 they do not claim live vendor parity.
+
+After integrating main `901a11a5c02d9e6b7be3abbf83caa865a2510fcf`, fresh normal
+and race/shuffle commands each passed all 96 clock rows (48 SQLite and 48 actual
+PostgreSQL) plus four origin-miss retention controls, with zero skips. Their
+command times were 78.338 and 104.245 seconds. The complete affected core tree
+also passed race/shuffle. Only the two successful current-source profiles enter
+the local coverage union: identical 1,129 canonical blocks, duplicate counts
+collapsed by maximum, **1,375/1,511 statements (90.999338%)**. All 26 counted
+production/dependency hashes match the integrated source.
+
+The integrated tree passed all 14 configured quality checks and 20 repeats of
+the repaired PyPI server test. The earlier successful two-scenario Maven native
+run remains qualified to its original branch source; it is not a new native run
+of this integrated tree. Docker was unavailable locally. A fresh successful full
+CI run on the new head, including native clients and repository-wide coverage,
+remains required before merge.
