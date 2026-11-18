@@ -1012,12 +1012,12 @@ func safeError(err error) error {
 	if err == nil {
 		return nil
 	}
-	// A failure of the server's own storage, such as a failed read of its
-	// copy under check, is a server fault in the store's words, never the
+	// A failure of the server's own storage, including database lookups and
+	// reads of its copy under check, is a server fault in the store's words, never the
 	// upstream's, so it passes as it is and a router answers it 500
 	// "internal error" as any other fault, not the 502 ErrUnavailable
 	// would give.
-	if errors.Is(err, format.ErrStorageFault) {
+	if errors.Is(err, format.ErrStorageFault) || errors.Is(err, kernel.ErrStore) {
 		return err
 	}
 	var failure *HTTPError
