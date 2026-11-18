@@ -36,6 +36,9 @@ func (w *world) registerSystemRecipes(sc *godog.ScenarioContext) {
 	sc.Step(`^I resolve the (ivy|gradle) recipe with token "([^"]*)"$`, w.resolveJVMRecipe)
 	sc.Step(`^the JVM recipe retrieved the controlled artifact$`, w.jvmRecipeArtifact)
 	sc.Step(`^I publish the Gradle recipe with token "([^"]*)"$`, w.publishGradleRecipe)
+	sc.Step(`^I publish the Ivy recipe with token "([^"]*)"$`, w.publishIvyRecipe)
+	sc.Step(`^the JVM recipe used both virtual member origins$`, w.jvmRecipeOrigins)
+	sc.Step(`^the JVM publication landed in the deployment member$`, w.jvmRecipeDeployment)
 	sc.Step(`^the P2 recipe passes anonymous requests to the registry$`, func() {
 		if w.vars == nil {
 			w.vars = map[string]string{}
@@ -111,10 +114,27 @@ func (w *world) jvmRecipeRepository(kind, class string) error {
 		); err != nil {
 			return err
 		}
-		if err = w.recipeDeploy(member, files); err != nil {
+		localFiles := map[string][]byte{}
+		w.remote = fakeupstream.New(w.t, fakeupstream.Options{})
+		w.closers = append(w.closers, w.remote.Close)
+		for path, data := range files {
+			if strings.HasSuffix(path, ".jar") {
+				w.remote.Set("/"+path, fakeupstream.Resource{Body: data})
+				w.vars["recipe-origin-jar"] = path
+			} else {
+				localFiles[path] = data
+				w.vars["recipe-origin-descriptor"] = path
+			}
+		}
+		if err = w.recipeDeploy(member, localFiles); err != nil {
 			return err
 		}
-		config["repositories"] = []string{member}
+		remote := key + "-remote"
+		if err = w.recipeRepoPut(remote, map[string]any{"rclass": "remote", "packageType": kind, "repoLayoutRef": layout, "url": w.remote.URL}); err != nil {
+			return err
+		}
+		config["repositories"] = []string{member, remote}
+		config["defaultDeploymentRepo"] = member
 	}
 	if err = w.recipeRepoPut(key, config); err != nil {
 		return err
@@ -172,6 +192,10 @@ func (w *world) recipeClientURL() string {
 }
 
 func (w *world) runSystemRecipe(image string, flags, argv []string) error {
+	return w.runRecipeClient(image, "linux/amd64", flags, argv)
+}
+
+func (w *world) runRecipeClient(image, platform string, flags, argv []string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
@@ -183,8 +207,6 @@ func (w *world) runSystemRecipe(image string, flags, argv []string) error {
 		"--rm",
 		"--network",
 		"host",
-		"--platform",
-		"linux/amd64",
 		"--user",
 		fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		"-v",
@@ -193,6 +215,9 @@ func (w *world) runSystemRecipe(image string, flags, argv []string) error {
 		"/work",
 		"-e",
 		"HOME=/work/recipe-home",
+	}
+	if platform != "" {
+		args = append(args, "--platform", platform)
 	}
 	args = append(args, flags...)
 	args = append(args, image)
@@ -230,8 +255,7 @@ func (w *world) resolveJVMRecipe(kind, token string) error {
 		); err != nil {
 			return err
 		}
-		return w.runSystemRecipe(
-			w.mavenImage,
+		return w.runJVMRecipe(
 			[]string{"--entrypoint", "java"},
 			[]string{
 				"-Duser.home=/work/recipe-home",
@@ -309,8 +333,7 @@ publishing {
 }
 
 func (w *world) runGradleRecipe(token, task string) error {
-	return w.runSystemRecipe(
-		w.mavenImage,
+	return w.runJVMRecipe(
 		[]string{
 			"--entrypoint",
 			"gradle",

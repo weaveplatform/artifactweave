@@ -20,6 +20,7 @@ Feature: JVM connection recipes resolve from fresh homes with scoped credentials
     Then the command succeeds
     And the server answered no request with 500 since the last command
     And the JVM recipe retrieved the controlled artifact
+    And the JVM recipe used both virtual member origins
     And the server answered 200 to GET "/artifactory/ivy-recipe-<class>/org.acme/widget/1.0.0/jars/widget-1.0.0.jar"
 
     Examples:
@@ -47,6 +48,7 @@ Feature: JVM connection recipes resolve from fresh homes with scoped credentials
     Then the command succeeds
     And the server answered no request with 500 since the last command
     And the JVM recipe retrieved the controlled artifact
+    And the JVM recipe used both virtual member origins
     And the server answered 200 to GET "/artifactory/gradle-recipe-<class>/org/acme/widget/1.0.0/widget-1.0.0.jar"
 
     Examples:
@@ -73,6 +75,7 @@ Feature: JVM connection recipes resolve from fresh homes with scoped credentials
     When I publish the Gradle recipe with token "{recipe-token}"
     Then the command succeeds
     And the server answered no request with 500 since the last command
+    And the JVM publication landed in the deployment member
     When I resolve the gradle recipe with token "{recipe-token}"
     Then the command succeeds
     And the server answered no request with 500 since the last command
@@ -82,3 +85,24 @@ Feature: JVM connection recipes resolve from fresh homes with scoped credentials
       | class     |
       | local     |
       | federated |
+      | virtual   |
+
+  @maven_virtual
+  Scenario: Ivy publishes into a mixed virtual deployment target and resolves with a fresh cache
+    Given the registry is running
+    And the JVM recipe client image is available
+    And a controlled ivy recipe repository of class "virtual" is ready
+    When I POST "/access/api/v1/tokens" as admin with body:
+      """
+      {"expires_in":3600}
+      """
+    Then the response status is 200
+    And I keep the JSON field "access_token" of the response as "recipe-token"
+    When I publish the Ivy recipe with token "{recipe-token}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the JVM publication landed in the deployment member
+    When I resolve the ivy recipe with token "{recipe-token}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the JVM recipe retrieved the controlled artifact

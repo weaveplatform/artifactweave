@@ -589,3 +589,16 @@ newer choices, ties, priority boundaries, member release/snapshot policies, mixe
 virtual/member layouts, denials, both remote storage modes, remote metadata,
 origin restrictions, GET/HEAD/checksums, trace decisions and losing-stream cleanup.
 Path translation remains MVN-06; native Maven/Gradle qualification remains MVN-04.
+
+### P10 MVN-04 native evidence
+
+Virtual recipes now publish through a configured deployment target as well as
+resolve across local and remote members. Pinned Maven and Maven 3.9 consumers use
+fresh artifact caches and strict checksums for local release/snapshot deployment,
+a remote-only dependency, merged version-range metadata, the newer cross-member
+snapshot and POM repository-reference cleanup. Native Ivy, direct Gradle and sbt
+publish through the virtual, verify the concrete target and resolve back from
+fresh dependency caches. JFrog Maven/Gradle configuration and build publication
+are exercised with virtual targets where their pinned integrations accept them;
+the existing Gradle integration remains its separately recorded informational
+lane. Research 27 records source rationale and intended client controls.

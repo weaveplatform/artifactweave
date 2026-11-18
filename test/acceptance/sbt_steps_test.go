@@ -18,6 +18,8 @@ import (
 
 func (w *world) registerSbt(sc *godog.ScenarioContext) {
 	sc.Step(`^the sbt client can reach the registry$`, w.sbtAvailable)
+	sc.Step(`^an sbt upstream supplies a distinct remote dependency$`, w.sbtMixedUpstream)
+	sc.Step(`^sbt used distinct local and remote virtual origins$`, w.sbtMixedOrigins)
 	sc.Step(`^sbt publishes the controlled recipe to "([^"]*)"$`, w.publishSbtRecipe)
 	sc.Step(
 		`^sbt resolves the controlled recipe from "([^"]*)" with a fresh home$`,
@@ -85,6 +87,9 @@ libraryDependencies += "org.weave.recipe" % "widget" % "1.0.0"
 `
 
 func (w *world) publishSbtRecipe(key string) error {
+	if key == "sbt-v" {
+		w.vars["sbt-virtual-published"] = "true"
+	}
 	return w.runSbtRecipe(key, sbtRecipePublish, "publish", false)
 }
 
@@ -97,14 +102,22 @@ func (w *world) runSbtRecipe(key, build, task string, denied bool) error {
 	if err != nil {
 		return err
 	}
+	if task == "update" && w.vars["sbt-mixed"] == "true" {
+		build += "\nlibraryDependencies += \"org.weave.recipe\" % \"remote-widget\" % \"1.0.0\"\n"
+	}
+	common := sbtRecipeCommon
+	if key == "sbt-v" && w.vars["sbt-virtual-published"] == "true" {
+		common = strings.Replace(common, `version := "1.0.0"`, `version := "1.1.0"`, 1)
+		build = strings.Replace(build, `"widget" % "1.0.0"`, `"widget" % "1.1.0"`, 1)
+	}
 	project, err := os.MkdirTemp(dir, "sbt-recipe-")
 	if err != nil {
 		return err
 	}
 	for name, content := range map[string]string{
 		"project/build.properties":       "sbt.version=2.0.12\n",
-		"build.sbt":                      sbtRecipeCommon + build,
-		"src/main/resources/payload.txt": "recipe fixture\n",
+		"build.sbt":                      common + build,
+		"src/main/resources/payload.txt": w.sbtPayload(key),
 	} {
 		if err := os.MkdirAll(filepath.Join(project, filepath.Dir(name)), 0o700); err != nil {
 			return err
@@ -160,8 +173,13 @@ func (w *world) runSbtRecipe(key, build, task string, denied bool) error {
 	if err != nil || w.lastRC != 0 || task != "update" {
 		return err
 	}
-	if err := verifySbtArtifact(filepath.Join(project, "coursier")); err != nil {
+	if err := verifySbtPayload(filepath.Join(project, "coursier"), w.sbtArtifact(key), w.sbtPayload(key)); err != nil {
 		return err
+	}
+	if w.vars["sbt-mixed"] == "true" {
+		if err := verifySbtPayload(filepath.Join(project, "coursier"), "remote-widget-1.0.0.jar", "remote sbt dependency\n"); err != nil {
+			return err
+		}
 	}
 	w.body = append(w.body, []byte("\nverified controlled sbt artifact bytes\n")...)
 	return nil
@@ -187,13 +205,13 @@ func (w *world) runSbtContainer(project, base, key, host, secret, task string) e
 	})
 }
 
-func verifySbtArtifact(cache string) error {
+func verifySbtPayload(cache, name, expected string) error {
 	var artifact string
 	if err := filepath.WalkDir(cache, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !entry.IsDir() && entry.Name() == "widget-1.0.0.jar" {
+		if !entry.IsDir() && entry.Name() == name {
 			artifact = path
 			return fs.SkipAll
 		}
@@ -218,7 +236,7 @@ func verifySbtArtifact(cache string) error {
 	if err != nil {
 		return err
 	}
-	if string(data) != "recipe fixture\n" {
+	if string(data) != expected {
 		return fmt.Errorf("sbt fetched different controlled artifact bytes")
 	}
 	return nil

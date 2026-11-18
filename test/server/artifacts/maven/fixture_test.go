@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
@@ -17,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -112,7 +114,7 @@ type remoteWorld struct {
 
 func newRemoteWorld(t *testing.T) *remoteWorld {
 	t.Helper()
-	w := harness.NewRemoteWorld(t)
+	w := harness.NewRemoteWorld(t, func(c *config.Config) { mavenTestBackend(t, c) })
 	return &remoteWorld{t: w.T, rt: w.Runtime, h: w.H, up: w.Upstream, c: w.Repo}
 }
 
@@ -144,7 +146,9 @@ func remoteStatus(t *testing.T, r *httptest.ResponseRecorder, code int) {
 // default one with a temporary data directory.
 func testConfig(t *testing.T) config.Config {
 	t.Helper()
-	return harness.AppConfig(t)
+	c := harness.AppConfig(t)
+	mavenTestBackend(t, &c)
+	return c
 }
 
 // openRuntime opens the application runtime with the harness's costs. The
@@ -152,4 +156,13 @@ func testConfig(t *testing.T) config.Config {
 // when the test ends.
 func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*app.Runtime, error) {
 	return app.OpenRuntime(ctx, cfg, log, harness.AppOptions())
+}
+
+// Backend qualification must select PostgreSQL explicitly and isolate each
+// runtime's schema; otherwise an exported DSN silently exercises SQLite.
+func mavenTestBackend(t *testing.T, c *config.Config) {
+	t.Helper()
+	if dsn := os.Getenv("ARTIFACTWEAVE_TEST_POSTGRES_DSN"); dsn != "" {
+		c.Database = config.Database{Driver: "postgres", DSN: sqltest.ScratchDSN(t, dsn)}
+	}
 }
