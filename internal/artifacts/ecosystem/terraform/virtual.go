@@ -49,3 +49,18 @@ func (ModuleMerger[T]) Merge(ctx context.Context, parts []virtual.Part[[]ModuleV
 }
 
 var _ virtual.Merger[[]ModuleVersion[struct{}]] = ModuleMerger[struct{}]{}
+
+// ProviderVersion retains one supplying member's whole protocol/platform record.
+// Its version-union mechanics are shared with modules; ownership stays at the
+// format boundary, never in the generic member walk.
+type ProviderVersion[T any] = ModuleVersion[T]
+
+// ProviderMerger keeps the first eligible whole version record in effective
+// member order. Exact platform downloads resolve independently of this list.
+// [I] Public 7.x sources do not settle duplicate provider ownership (#216).
+type ProviderMerger[T any] struct{}
+
+// Merge returns the sorted union without combining platforms from later owners.
+func (ProviderMerger[T]) Merge(ctx context.Context, parts []virtual.Part[[]ProviderVersion[T]]) ([]ProviderVersion[T], error) {
+	return (ModuleMerger[T]{}).Merge(ctx, parts)
+}

@@ -131,6 +131,10 @@ func (w *world) registerTerraformProviderRemote(sc *godog.ScenarioContext) {
 }
 
 func (w *world) terraformProviderRemoteUpstream() error {
+	return w.terraformProviderRemoteUpstreamAt("tf-providers")
+}
+
+func (w *world) terraformProviderRemoteUpstreamAt(repoKey string) error {
 	if err := w.remoteUpstream("/ready", "ready"); err != nil {
 		return err
 	}
@@ -228,7 +232,7 @@ func (w *world) terraformProviderRemoteUpstream() error {
 	)
 	if err = w.send(
 		"PUT",
-		"/artifactory/api/repositories/tf-providers",
+		"/artifactory/api/repositories/"+repoKey,
 		string(config),
 		admin,
 	); err != nil {

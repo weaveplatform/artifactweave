@@ -1,6 +1,7 @@
 package terraformhttp
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -22,14 +23,22 @@ type providerClaim struct {
 }
 
 func (h handler) remoteProviderURL(r *http.Request, b providerBundle, index int) (string, error) {
+	c, err := h.providerDownloadClaim(r, b, index)
+	if err != nil {
+		return "", err
+	}
+	return h.signDownloadURL(r, c)
+}
+
+func (h handler) providerDownloadClaim(r *http.Request, b providerBundle, index int) (claims, error) {
 	p, _ := kernel.FromContext(r.Context())
 	reference, err := p.DownloadReference()
 	if err != nil {
-		return "", fmt.Errorf("terraform provider identity: %w", err)
+		return claims{}, fmt.Errorf("terraform provider identity: %w", err)
 	}
 	result := b.results[b.resultIndex(index)]
 	now := h.o.Now()
-	return h.signDownloadURL(r, claims{
+	return claims{
 		Subject:    p.Name,
 		Repo:       pkgroute.RequestFrom(r).Repo.Key,
 		Path:       b.paths[index],
@@ -48,7 +57,7 @@ func (h handler) remoteProviderURL(r *http.Request, b providerBundle, index int)
 			Host:     b.q.host,
 			Mirror:   b.q.isUpstreamMirror,
 		},
-	})
+	}, nil
 }
 
 func (b providerBundle) resultIndex(kind int) int {
@@ -86,17 +95,21 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 		principal, d, err = h.o.Authorizer.Authorize(r.Context(), principal, principal.Anonymous)
 	}
 	if err != nil {
-		h.k.Error(w, r, forbidden)
+		h.k.Error(w, r, signedAuthorityError(err))
 		return
 	}
 	ctx := accessapi.WithCaller(r.Context(), principal, d)
 	r = r.WithContext(ctx)
-	if !h.k.Require(w, r, c.Path, accessapi.ActionRead) {
+	if c.Member != "" {
+		if !h.k.Can(r, c.Path, accessapi.ActionRead) {
+			h.k.Error(w, r, forbidden)
+			return
+		}
+	} else if !h.k.Require(w, r, c.Path, accessapi.ActionRead) {
 		return
 	}
-	identity, err := h.o.RemoteSources.Resolve(ctx, pkgroute.RequestFrom(r).Repo)
-	if err != nil || identity != *c.Source {
-		h.k.Error(w, r, forbidden)
+	if err := h.currentSignedSource(r, c); err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	// The file's cache path follows the URL the metadata names, so the
@@ -116,7 +129,7 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 	}
 	if err != nil {
 		bundle.close()
-		h.k.Error(w, r, err)
+		h.k.Error(w, r, signedMemberError(c, err))
 		return
 	}
 	selected := bundle.resultIndex(p.Kind)
@@ -137,6 +150,18 @@ func (h handler) remoteSignedProvider(w http.ResponseWriter, r *http.Request, c 
 		}
 	}()
 	result.Revalidate = combineModuleFences(bundle.results, readCheck, bundle.disclosed())
+	if c.Member != "" {
+		check := result.Revalidate
+		result.Revalidate = func(ctx context.Context) error {
+			if err := check(ctx); err != nil {
+				if signedDeliveryRefusal(err) {
+					return forbidden
+				}
+				return err
+			}
+			return h.virtualClaimFence(r.WithContext(ctx), c)
+		}
+	}
 	result.Used = combineModuleUsage(bundle.results)
 	h.k.ServeResult(w, r, result)
 }

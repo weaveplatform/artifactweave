@@ -47,6 +47,14 @@ func parse(rest string) (operation, bool) {
 
 func (h handler) serve(w http.ResponseWriter, r *http.Request) {
 	if pkgroute.RequestFrom(r).Repo.Class == repo.Virtual {
+		if r.URL.Query().Has("sig") && strings.HasPrefix(pkgroute.RequestFrom(r).Rest, "providers/") {
+			h.virtualSignedProvider(w, r)
+			return
+		}
+		if q, ok := parseProvider(pkgroute.RequestFrom(r).Rest); ok && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+			h.virtualProvider(w, r, q)
+			return
+		}
 		h.virtualModule(w, r)
 		return
 	}

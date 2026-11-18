@@ -11,6 +11,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
@@ -33,6 +34,9 @@ func moduleMember(c repo.Config) bool {
 }
 
 func modulePassedOver(err error) bool {
+	if errors.Is(err, kernel.ErrStore) || errors.Is(err, format.ErrStorageFault) {
+		return false
+	}
 	if pkgroute.PassedOver(err) {
 		return true
 	}
@@ -374,7 +378,7 @@ func (h handler) virtualSignedModule(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err != nil {
-		h.k.Error(w, r, forbidden)
+		h.k.Error(w, r, signedAuthorityError(err))
 		return
 	}
 	r = r.WithContext(accessapi.WithCaller(r.Context(), p, d))
@@ -393,6 +397,12 @@ func (h handler) virtualSignedModule(w http.ResponseWriter, r *http.Request) {
 		}
 		if pkgroute.RequestFrom(mr).Repo.Class == repo.Remote {
 			h.remoteSignedModule(w, mr, c)
+			return
+		}
+		// A remote capability remains bound to that source incarnation even if
+		// legacy state replaces the member with hosted identical bytes.
+		if c.Source != nil || c.Credential != nil || c.Module != "" {
+			h.k.Error(w, r, forbidden)
 			return
 		}
 		found, e := h.k.ResolveDownloadItem(mr, c.Path)
@@ -433,10 +443,10 @@ func (h handler) virtualClaimFence(r *http.Request, c claims) error {
 	}
 	_, d, err := h.principal(r, c.Subject)
 	if err != nil {
-		return err
+		return signedAuthorityError(err)
 	}
 	for _, m := range members {
-		if m.Repo.Key != c.Member || !moduleMember(m.Repo) {
+		if m.Repo.Key != c.Member || (c.Provider == nil && !moduleMember(m.Repo)) || (c.Provider != nil && !providerMember(m.Repo)) {
 			continue
 		}
 		if generic.CheckDownload(m.Repo, c.Path, false) != nil {
@@ -453,7 +463,7 @@ func (h handler) virtualClaimFence(r *http.Request, c claims) error {
 // A missing or refused capability is invalid, but a failed storage read is
 // still a server fault, just as on a directly addressed signed module URL.
 func (h handler) virtualSignedError(w http.ResponseWriter, r *http.Request, err error) {
-	if modulePassedOver(err) {
+	if signedDeliveryRefusal(err) {
 		err = forbidden
 	}
 	h.k.Error(w, r, err)

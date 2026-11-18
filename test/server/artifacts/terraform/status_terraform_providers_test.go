@@ -2,10 +2,12 @@ package terraform_test
 
 import (
 	"bytes"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform/terraformtest"
@@ -54,6 +56,10 @@ func seedRegistryProvider(t *testing.T, db harness.Store, blobs blob.Store) {
 			t.Fatal(err)
 		}
 	}
+	if err := db.Repos().
+		Create(t.Context(), *repo.Defaults(&repo.Config{Key: "tf-provider-virtual", Class: repo.Virtual, PackageType: repo.Terraform, Repositories: []string{"tf-provider-local"}})); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func providerRoutePaths() map[string]string {
@@ -81,19 +87,25 @@ var tfProviderStatusPart = statusPart{
 	rows: func() []statusCase {
 		rows := []statusCase{}
 		for route, path := range providerRoutePaths() {
-			for _, method := range []string{"GET", "HEAD"} {
-				key := method + route[3:]
-				status := 200
-				if route == tfProviderSigned {
-					status = 403
+			for _, virtual := range []bool{false, true} {
+				target := path
+				if virtual {
+					target = strings.ReplaceAll(path, "tf-provider-local", "tf-provider-virtual")
 				}
-				rows = append(rows, statusCase{key, path, "admin", "", status})
-				if route != tfProviderSigned {
-					rows = append(
-						rows,
-						statusCase{key, path, "", "", 401},
-						statusCase{key, path, "user", "", 403},
-					)
+				for _, method := range []string{"GET", "HEAD"} {
+					key := method + route[3:]
+					status := 200
+					if route == tfProviderSigned {
+						status = 403
+					}
+					rows = append(rows, statusCase{key, target, "admin", "", status})
+					if route != tfProviderSigned {
+						denied := 403
+						if virtual {
+							denied = 404
+						}
+						rows = append(rows, statusCase{key, target, "", "", 401}, statusCase{key, target, "user", "", denied})
+					}
 				}
 			}
 		}
@@ -112,14 +124,32 @@ var tfProviderMatrixPart = matrixPart{
 			api.ActionRead,
 		)
 		for route, path := range providerRoutePaths() {
-			for _, method := range []string{"GET", "HEAD"} {
-				r := row(method+route[3:], path, "", read, 200)
-				if route == tfProviderSigned {
-					r.who = func(matrixPrincipal) int { return 0 }
-					r.ok = 403
-					r.open = true
+			for _, virtual := range []bool{false, true} {
+				target := path
+				if virtual {
+					target = strings.ReplaceAll(path, "tf-provider-local", "tf-provider-virtual")
 				}
-				rows = append(rows, r)
+				for _, method := range []string{"GET", "HEAD"} {
+					visible := read
+					if virtual {
+						visible = func(p matrixPrincipal) int {
+							if status := anyone(p); status != 0 {
+								return status
+							}
+							if !p.holds("tf-provider-local", "work/hashicorp/null/3.3.2/terraform-provider-null_3.3.2_linux_amd64.zip", api.ActionRead) {
+								return 404
+							}
+							return 0
+						}
+					}
+					r := row(method+route[3:], target, "", visible, 200)
+					if route == tfProviderSigned {
+						r.who = func(matrixPrincipal) int { return 0 }
+						r.ok = 403
+						r.open = true
+					}
+					rows = append(rows, r)
+				}
 			}
 		}
 		return rows

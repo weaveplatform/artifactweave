@@ -42,3 +42,21 @@ func TestUnitModuleMergeCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestUnitProviderVersionsRetainWholeOwner(t *testing.T) {
+	type record struct{ Protocols, Platforms []string }
+	first := record{[]string{"6.0"}, []string{"linux_amd64"}}
+	later := record{[]string{"5.0"}, []string{"darwin_arm64"}}
+	parts := []virtual.Part[[]ProviderVersion[record]]{
+		{Doc: []ProviderVersion[record]{{Version: "2.0.0", Value: first}}},
+		{Doc: []ProviderVersion[record]{{Version: "2.0.0", Value: later}, {Version: "1.0.0", Value: later}}},
+	}
+	got, err := (ProviderMerger[record]{}).Merge(t.Context(), parts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []ProviderVersion[record]{{Version: "1.0.0", Value: later}, {Version: "2.0.0", Value: first}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("whole owner lost: got %#v want %#v", got, want)
+	}
+}

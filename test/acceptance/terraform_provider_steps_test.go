@@ -24,9 +24,14 @@ func (w *world) registerTerraformProviders(sc *godog.ScenarioContext) {
 	})
 	sc.Step(`^a null provider is published for the "(registry|mirror)"$`, w.publishNullProvider)
 	sc.Step(`^Terraform installs from the "(registry|mirror)"$`, w.configureNullProvider)
+	w.registerVirtualTerraformProviders(sc)
 }
 
 func (w *world) publishNullProvider(mode string) error {
+	return w.publishNullProviderAt(mode, "tf-providers", "hashicorp")
+}
+
+func (w *world) publishNullProviderAt(mode, repoKey, namespace string) error {
 	archive, err := os.ReadFile(os.Getenv("ARTIFACTWEAVE_NULL_PROVIDER_ZIP"))
 	if err != nil {
 		return err
@@ -64,7 +69,7 @@ func (w *world) publishNullProvider(mode string) error {
 	body, _ := json.Marshal(config)
 	if err = check(
 		"PUT",
-		"/artifactory/api/repositories/tf-providers",
+		"/artifactory/api/repositories/"+repoKey,
 		string(body),
 		200,
 	); err != nil {
@@ -82,7 +87,7 @@ func (w *world) publishNullProvider(mode string) error {
 	for name, b := range files {
 		if err = check(
 			"PUT",
-			"/artifactory/tf-providers/hashicorp/null/3.3.2/"+name,
+			"/artifactory/"+repoKey+"/"+namespace+"/null/3.3.2/"+name,
 			string(b),
 			201,
 		); err != nil {
@@ -103,6 +108,9 @@ func (w *world) publishNullProvider(mode string) error {
 	}
 	w.vars["provider-token"] = token.AccessToken
 	w.vars["provider-key"] = key.KeyID()
+	if mode == "registry" {
+		w.vars["provider-signature"] = string(files[rel.Name("SHA256SUMS.sig")])
+	}
 	return nil
 }
 
