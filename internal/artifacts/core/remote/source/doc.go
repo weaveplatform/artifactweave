@@ -65,9 +65,10 @@
 //     alike, since artifactweave writes its message: a listing that checks
 //     each disclosed release can keep one whose file is refused, and a read
 //     answers the policy's 404 (#1237). A failure of the server's own
-//     storage (format.ErrStorageFault) leaves as it is too, in
+//     storage (format.ErrStorageFault or trusted kernel.ErrStore) leaves as it is
+//     too, in
 //     the store's words, so a router answers it as a server fault rather
-//     than as ErrUnavailable (#1269). A *CacheFillDenied and
+//     than as ErrUnavailable (#1269, #1692). A *CacheFillDenied and
 //     ErrAssumedOffline leave as they are, for the item route's reasons.
 //   - The package opens no store transaction and propagates none.
 //

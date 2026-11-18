@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
@@ -928,5 +929,148 @@ func TestUnitContentOpenMarkerPreservesErrorIdentity(t *testing.T) {
 		if marked.Error() != cause.Error() || !errors.Is(marked, cause) {
 			t.Fatal("content marker lost cause", marked, cause)
 		}
+	}
+}
+
+func TestUnitTrustedLookupFaultSurvivesSourceBoundaries(t *testing.T) {
+	for _, stage := range []string{"source identity", "backend lookup", "current authority", "backend fence", "final source", "late source", "late current", "authority delivery"} {
+		t.Run(stage, func(t *testing.T) {
+			cause := errors.New("database statement dropped")
+			fault := fmt.Errorf("own lookup: %w: %w", kernel.ErrStore, cause)
+			q := request(t, "")
+			content := &body{Reader: strings.NewReader("content")}
+			resolves, reads := 0, 0
+			late := false
+			svc := source.Service{
+				Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
+					resolves++
+					if stage == "source identity" || stage == "final source" && resolves > 1 || stage == "late source" && late || stage == "authority delivery" && late {
+						return artmodel.SourceIdentity{}, fault
+					}
+					return identity(ctx, c)
+				},
+				Revalidate: func(context.Context, source.Request, source.Permit) error {
+					if stage == "current authority" || stage == "late current" && late {
+						return fault
+					}
+					return nil
+				},
+				HTTP: backend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
+					reads++
+					if stage == "backend lookup" {
+						return source.Result{}, fault
+					}
+					out := stream(content)
+					if stage == "backend fence" {
+						out.Revalidate = func(context.Context) error { return fault }
+					}
+					return out, nil
+				}),
+			}
+			var err error
+			if stage == "authority delivery" {
+				authority, initial := svc.Authorize(t.Context(), q)
+				if initial != nil {
+					t.Fatal(initial)
+				}
+				late = true
+				err = authority.Revalidate(t.Context())
+			} else {
+				out, initial := svc.Read(t.Context(), q)
+				err = initial
+				if stage == "late source" || stage == "late current" {
+					if initial != nil {
+						t.Fatal(initial)
+					}
+					late = true
+					err = out.Revalidate(t.Context())
+				}
+				if out.Stream != nil {
+					_ = out.Stream.Body.Close()
+				}
+			}
+			if err != fault || !errors.Is(err, kernel.ErrStore) || !errors.Is(err, cause) {
+				t.Fatalf("lost trusted lookup identity: %v", err)
+			}
+			wantClosed := int32(0)
+			if reads > 0 && stage != "backend lookup" {
+				wantClosed = 1
+			}
+			if content.closes.Load() != wantClosed {
+				t.Fatal("source body ownership", content.closes.Load(), wantClosed)
+			}
+		})
+	}
+}
+
+func TestUnitUnmarkedSourceFailuresKeepTheirVerdicts(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		failure, want error
+	}{
+		{"missing", fmt.Errorf("missing: %w", kernel.ErrNotFound), kernel.ErrNotFound},
+		{"conflict", fmt.Errorf("conflict: %w", kernel.ErrConflict), source.ErrUnavailable},
+		{"cancelled", fmt.Errorf("query ended: %w", context.Canceled), context.Canceled},
+		{"deadline", fmt.Errorf("query ended: %w", context.DeadlineExceeded), context.DeadlineExceeded},
+		{"unmarked upstream", errors.New("upstream connection failed"), source.ErrUnavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := source.Service{Resolve: identity, HTTP: backend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
+				return source.Result{}, tc.failure
+			})}
+			_, err := svc.Read(t.Context(), request(t, ""))
+			if !errors.Is(err, tc.want) || errors.Is(err, kernel.ErrStore) {
+				t.Fatalf("changed ordinary verdict %v", err)
+			}
+		})
+	}
+}
+
+func TestUnitEndedSourceReadDoesNotResolveAStore(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		t.Run(fmt.Sprint(deadline), func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			if deadline {
+				cancel()
+				ctx, cancel = context.WithDeadline(t.Context(), time.Unix(1, 0))
+			} else {
+				cancel()
+			}
+			defer cancel()
+			calls := 0
+			svc := source.Service{Resolve: func(context.Context, repo.Config) (artmodel.SourceIdentity, error) {
+				calls++
+				return artmodel.SourceIdentity{}, kernel.ErrStore
+			}}
+			_, err := svc.Read(ctx, request(t, ""))
+			if !errors.Is(err, ctx.Err()) || errors.Is(err, kernel.ErrStore) || calls != 0 {
+				t.Fatal("ended request reached store", err, calls)
+			}
+		})
+	}
+}
+
+func TestUnitContentReadFailureStaysOnTheOwnedBody(t *testing.T) {
+	for _, failure := range []error{io.ErrUnexpectedEOF, context.DeadlineExceeded, fmt.Errorf("content read: %w", kernel.ErrStore)} {
+		t.Run(failure.Error(), func(t *testing.T) {
+			content := &body{Reader: iotest.ErrReader(failure)}
+			svc := source.Service{Resolve: identity, HTTP: backend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
+				return stream(content), nil
+			})}
+			out, err := svc.Read(t.Context(), request(t, ""))
+			if err != nil {
+				t.Fatal("content was classified before a read", err)
+			}
+			_, err = io.ReadAll(out.Stream.Body)
+			if err != failure {
+				t.Fatal("content read lost its phase/cause", err)
+			}
+			if err := out.Stream.Body.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if content.closes.Load() != 1 {
+				t.Fatal("content body not closed", content.closes.Load())
+			}
+		})
 	}
 }

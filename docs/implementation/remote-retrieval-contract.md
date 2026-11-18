@@ -214,6 +214,23 @@ or authentication challenges as artifactweave credentials.
 | Unexpected 2xx, unsafe redirect or unsolicited 206 on full fetch | Not a full cacheable artifact; typed protocol error | 502 |
 | GET 200 or 304 whose stored or spooled copy fails to open or read while the format's check (`Validate`, `ValidateMetadata`, its inspection, a 304's re-admission, or a publication hook such as Hex's `Deployed`) reads it, or while a format route reads the copy the source service served it (LuaRocks, Bower, Composer, Ansible, Bazel modules, CocoaPods, Conda and Hugging Face metadata, [#1462](https://github.com/weaveplatform/artifactweave/issues/1462); npm package documents, Hex tarballs and registry resources, Debian and CRAN indexes and P2 site archives, [#1488](https://github.com/weaveplatform/artifactweave/issues/1488)); or whose copy the blob store fails to write or commit, whose spool file cannot be written, or whose publication meets a failed store call (the fence, the item or entry write, the transaction's begin or commit), or a statement the store failed to run under a format's hook (`kernel.ErrStore`, which the SQL store's `Wrap` marks; [#1470](https://github.com/weaveplatform/artifactweave/issues/1470)) or as the authority fence re-reads the repository or its options, or as the repository's availability state (the assumed-offline circuit) is read before the upstream exchange or the upstream's answer is recorded in it after ([#1489](https://github.com/weaveplatform/artifactweave/issues/1489); 7.x keeps that state in memory [I]) | The server's storage fault, not the upstream's: publish nothing, keep the prior entry, never trip assumed-offline; a failed read of the upstream's body stays the upstream's ([#1269](https://github.com/weaveplatform/artifactweave/issues/1269)) | 500 "internal error" [I] where the error on its own would answer a 502 with no fallback; a read or write that times out or ends short keeps its 504 or 502 and R11 fallback; the store's verdicts (not found, conflict, invalid) map as before |
 
+Source identity and cache-entry lookups preserve an existing trusted
+`kernel.ErrStore` through source sanitization, alongside `format.ErrStorageFault`
+([#1692](https://github.com/weaveplatform/artifactweave/issues/1692)). A genuine
+failed statement reaches the router as an internal fault, with its original cause
+available for one fault log; it does not become an upstream failure, network
+attempt or circuit event. Missing rows, conflicts and ended statements keep their
+existing store/source verdicts. Arbitrary upstream/context errors acquire no store
+marker. Exact modern vendor status remains **[I]**, with no live vendor capture.
+
+This preservation does not classify every content error as a lookup failure.
+The virtual metadata interceptor retains its separate lookup/content phases
+([#1686](https://github.com/weaveplatform/artifactweave/issues/1686));
+`ContentOpenError` retains a selected cached-content origin and its existing cause.
+Its omission/partial merge, ordinary body-read failures and malformed-document
+handling remain unchanged. Publication fault mapping and stale/offline rules are
+unchanged by the source-sanitization fix.
+
 A downstream HEAD on a remote that stores artifacts locally fills the cache as a GET
 does, in the GET's own flight (the upstream's HEAD, then its GET, unless
 `bypassHeadRequests`), and is answered from what it published: the file's own type,

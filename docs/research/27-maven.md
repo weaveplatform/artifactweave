@@ -841,11 +841,11 @@ failures, malformed documents and stream closure remain in force. See the
 [phase-based audit](virtual-metadata-faults-source-audit.md) for exact exception
 scope, missing-binary uncertainty and current-version limits. This is compatible
 content tolerance, not an additional product bug. A separate verified source
-normalization defect is [#1692](https://github.com/weaveplatform/artifactweave/issues/1692):
-actual source/cache lookup statement failures can lose `kernel.ErrStore` before
-this interceptor and answer upstream-style 502 or a virtual partial response.
-That global boundary remains separate; the metadata fix acts only on preserved
-trusted lookup/authority failures.
+normalization defect, [#1692](https://github.com/weaveplatform/artifactweave/issues/1692),
+is resolved by preserving trusted `kernel.ErrStore` from source/cache lookups
+before sanitization. Actual failed statements now reach the interceptor's terminal
+lookup-fault branch rather than an upstream-style 502/partial response. Content
+omission, true misses and existing upstream/refusal rules remain separate.
 
 The controlled remote lookup verified that a translated upstream 404,403 or503 may
 be an unfound result, followed by an independently authorized original-path 200.
