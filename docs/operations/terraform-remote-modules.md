@@ -40,8 +40,9 @@ owned by [P28 #668](https://github.com/weaveplatform/artifactweave/issues/668).
 A `//subdirectory` selector can include directory glob patterns. Admission requires
 exactly one real directory, including implicit parent directories. The client gets
 that concrete directory, because Terraform's registry installer treats this suffix
-literally. The complete original archive is served, preserving relative sibling
-module references. Safe internal links are retained; absolute/escaping link targets,
+literally. The complete package is delivered, preserving relative sibling
+module references. Registry module dependencies are rewritten as described below;
+archives needing no source edits retain their exact original bytes and format. Safe internal links are retained; absolute/escaping link targets,
 special device entries, duplicate or traversal paths, and entries beneath any link
 are rejected regardless of entry order. Link targets are resolved component by component
 through the complete archive graph before consuming `..`; escaping chains and cycles are
@@ -109,13 +110,13 @@ response can succeed immediately without waiting for a negative-cache TTL. No-st
 bytes are validated in temporary storage and removed after delivery; offline requests
 cannot invent a cache entry for content that was never stored.
 
-`terraform_remote.feature` uses pinned Terraform 1.16.4 to initialize and apply two
+`terraform_remote.feature` uses pinned Terraform 1.17.1 to initialize and apply two
 selected versions from cold ZIP and redirected tar sources, including a wildcard
 subdirectory and relative sibling module, then repeats with a fresh client module
 cache during upstream outage. This controlled fixture proves artifactweave behavior;
 Artifactory parity observations remain #216 / P19. Local module/provider and state
-backend behavior is unchanged. Provider remotes retain #632; virtual resolution is
-P10. Remote `terraformbackend` and remote execution are not enabled. Broader registry
+backend behavior is unchanged. Provider remotes retain #632; virtual modules are
+implemented by #1550, while virtual providers/network mirrors remain #1564. Remote `terraformbackend` and remote execution are not enabled. Broader registry
 and execution contracts remain owned by P28; browser login remains P21/#262.
 
 Every initial metadata/archive URL and redirect hop is checked against the same
@@ -127,3 +128,34 @@ forward GitHub credentials to the CDN. GitHub documents archive downloads as
 redirects in its [repository contents API](https://docs.github.com/en/rest/repos/contents#download-a-repository-archive-tar);
 a public `HEAD` of the pinned Terraform tag on 2026-10-22 returned the corresponding
 `codeload.github.com/hashicorp/terraform/legacy.tar.gz/refs/tags/v1.16.4` location.
+
+
+## Virtual modules and registry dependency sources
+
+A virtual serves MODULE local/federated members and remote registries under
+`<public-host>/<virtual>__<namespace>/<name>/<system>`. Its version list is the
+eligible version union; first eligible member owns a duplicate. Virtual/nested and
+member patterns filter archives before disclosure, and unreadable members count as
+missing. Local PROVIDER and untyped repositories contribute no modules. The signed
+90-second download URL stays under the virtual key, names its real member internally,
+and rechecks current effective membership, signer Read and policy at delivery.
+Publishing modules to a virtual uses its `defaultDeploymentRepo`, including ordinary
+module indexing; no target answers 405 with `Allow: GET`.
+
+JFrog documents source override enabled by default since 7.39.4. Both direct remote
+and virtual delivery rewrite static module registry sources in `.tf` and `.tf.json`
+to this request's public host and repository namespace. Bare registry coordinates
+and explicit registry hosts are supported, preserving `//modules/...` selectors.
+Safe link entries are retained with their validated targets; Terraform 1.17.1
+materializes these entries as ordinary files rather than following them. Relative paths, Git/URL getters, dynamic expressions and other blocks'
+`source` attributes retain their values. Each configuration file is bounded to
+16 MiB for parsing, in addition to the existing complete archive limits.
+
+Cached source bytes and checksums remain the validated upstream originals. Delivery
+uses a separate derived archive only when a source changes: ZIP remains ZIP; TAR
+variants become tar.gz; changed single compressed files become gzip. Getter format,
+public rewrite target and derived digest are signed. Delivered hashes, length,
+ETag, conditional responses and ranges describe the delivered bytes. Unchanged
+archives retain their byte content and compression without an output temporary copy.
+Exact inferred syntax and representation choices are recorded for #216 in
+[the P10 research](../research/p10-terraform-modules.md).

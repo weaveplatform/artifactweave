@@ -1,0 +1,51 @@
+package terraform
+
+import (
+	"context"
+	"fmt"
+	"slices"
+	"strings"
+
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
+)
+
+// ModuleVersion retains the complete supplying member's contribution. The
+// caller removes unreadable or policy-rejected archives before merging.
+type ModuleVersion[T any] struct {
+	Version string
+	Value   T
+}
+
+// ModuleMerger unions versions in the engine's member order. A duplicate
+// retains its first eligible holder, including its bytes and source authority.
+// [I] No primary 7.x source settles duplicate module-version ownership (#216).
+type ModuleMerger[T any] struct{}
+
+// Merge returns a sorted version union without changing its contributions.
+func (ModuleMerger[T]) Merge(ctx context.Context, parts []virtual.Part[[]ModuleVersion[T]]) ([]ModuleVersion[T], error) {
+	byVersion := map[string]ModuleVersion[T]{}
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("terraform merge: %w", err)
+	}
+	for _, p := range parts {
+		for _, v := range p.Doc {
+			if _, exists := byVersion[v.Version]; !exists {
+				byVersion[v.Version] = v
+			}
+		}
+	}
+	out := make([]ModuleVersion[T], 0, len(byVersion))
+	for _, v := range byVersion {
+		out = append(out, v)
+	}
+	slices.SortFunc(out, func(a, b ModuleVersion[T]) int {
+		if n := model.CompareSemver(a.Version, b.Version); n != 0 {
+			return n
+		}
+		return strings.Compare(a.Version, b.Version)
+	})
+	return out, nil
+}
+
+var _ virtual.Merger[[]ModuleVersion[struct{}]] = ModuleMerger[struct{}]{}

@@ -30,8 +30,8 @@
     }
   ],
   "publish": {
-    "classes": "LF",
-    "note": "JFrog CLI packages module subdirectories and deploys the indexed ZIPs. Run from the parent of alpha/.",
+    "classes": "LFV",
+    "note": "JFrog CLI packages module subdirectories and deploys indexed ZIPs to a MODULE local/federated repository or a virtual with a MODULE defaultDeploymentRepo. Provider publication still uses a concrete PROVIDER repository. Run from the parent of alpha/.",
     "steps": [
       {
         "language": "sh",
@@ -73,7 +73,7 @@
   },
   "limitations": [
     "Provider source coordinates use <authority>/<repository>-rt-ns-<namespace>/<provider>, not the module __ separator.",
-    "Publish to a concrete local/federated repository; remote repositories resolve only.",
+    "Module publication through a virtual requires defaultDeploymentRepo. Provider publication targets a concrete local/federated repository; virtual provider/mirror resolution remains #1564. Remote repositories resolve only.",
     "The HTTP host override in tests is a loopback fixture workaround; production clients should use HTTPS discovery.",
     "The provider registry requires a valid publisher signature and configured verification key. The HTTPS network mirror is a separate installation mode that checks archive hashes and the lockfile; it does not claim publisher-signature verification."
   ],
@@ -116,6 +116,16 @@
         "SHA256SUMS.sig",
         "/artifactory/tf-providers/hashicorp/null/3.3.2/",
         "network_mirror"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/terraform_remote.feature",
+      "contains": [
+        "terraform-config --server-id-deploy=aw --repo-deploy=tf-all",
+        "source = \"{host}/tf-all__acme/greeting/aws\"",
+        "Terraform selected module \"parent.local\" at version \"1.2.3\"",
+        "Terraform selected module \"parent.remote\" at version \"1.0.0\"",
+        "tf-all__acme/helper/aws//modules/child"
       ]
     }
   ]

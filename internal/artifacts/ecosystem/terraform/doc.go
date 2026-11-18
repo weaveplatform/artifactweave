@@ -89,7 +89,11 @@
 // # Status
 //
 // Implemented P8 (Terraform module and provider local repositories), with
-// remote modules and providers in P9. Moved here in P9d.
+// remote modules and providers in P9. Moved here in P9d. P10 adds virtual
+// module version unions and member-bound signed downloads (#1550); virtual
+// provider and network-mirror operations remain deferred to #1564. Remote
+// module source rewriting retains raw cache provenance and changes only
+// delivered archive representations.
 //
 // # Testing
 //

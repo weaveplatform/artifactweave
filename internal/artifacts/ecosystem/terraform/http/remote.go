@@ -229,7 +229,7 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 		return
 	}
 	resource := moduleArtifactResource(r, location)
-	resource.Method = http.MethodGet // issuing a signed digest requires validated complete bytes, including HEAD
+	completeModuleResource(&resource) // signing/rewrite needs complete original bytes, including HEAD
 	artifact, err := h.k.Read(r, resource)
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -246,6 +246,12 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 		h.k.Error(w, r, err)
 		return
 	}
+	representation, err := h.rewriteModule(r, artifact, location, moduleRewriteTarget(r))
+	if err != nil {
+		h.k.Error(w, r, err)
+		return
+	}
+	defer closeModuleResult(representation.result)
 	public, err := h.remoteDownloadURL(
 		r,
 		q.module,
@@ -254,6 +260,7 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 		artifact.Identity,
 		selected,
 		location.Archive,
+		representation,
 	)
 	if err != nil {
 		h.k.Error(w, r, err)
@@ -489,7 +496,7 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 		return
 	}
 	resource := moduleArtifactResource(r, location)
-	resource.Method = http.MethodGet
+	completeModuleResource(&resource)
 	if resource.Checksums.SHA256 != "" && !strings.EqualFold(resource.Checksums.SHA256, c.SHA256) {
 		h.k.Error(w, r, forbidden)
 		return
@@ -505,11 +512,41 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 		h.k.Error(w, r, forbidden)
 		return
 	}
+	representation, err := h.rewriteModule(r, result, location, c.Rewrite)
+	if err != nil {
+		closeModuleResult(result)
+		h.k.Error(w, r, err)
+		return
+	}
+	if representation.digest != c.DeliveredSHA256 ||
+		c.Archive != "" && (representation.archive != c.Archive || r.URL.Query().Get("archive") != "" && r.URL.Query().Get("archive") != c.Archive) {
+		closeModuleResult(result)
+		closeModuleResult(representation.result)
+		h.k.Error(w, r, forbidden)
+		return
+	}
+	original := result
+	if representation.digest != "" {
+		closeModuleResult(result)
+		result = representation.result
+	}
 	result.Revalidate = combineModuleFences(
-		[]source.Result{metadata, result},
+		[]source.Result{metadata, original},
 		readCheck,
-		within(result, c.Path),
+		within(original, c.Path),
 	)
+	if c.Member != "" {
+		sourceFence := result.Revalidate
+		result.Revalidate = func(ctx context.Context) error {
+			if err := sourceFence(ctx); err != nil {
+				if modulePassedOver(err) {
+					return forbidden
+				}
+				return err
+			}
+			return h.virtualClaimFence(r.WithContext(ctx), c)
+		}
+	}
 	h.k.ServeResult(w, r, result)
 }
 

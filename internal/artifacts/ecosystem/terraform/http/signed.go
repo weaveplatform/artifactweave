@@ -30,7 +30,11 @@ var (
 )
 
 type claims struct {
-	Provider *providerClaim `json:"provider,omitempty"`
+	Member          string         `json:"internal_repo,omitempty"`
+	Rewrite         rewriteTarget  `json:"rewrite,omitempty"`
+	DeliveredSHA256 string         `json:"delivered_sha256,omitempty"`
+	Archive         string         `json:"archive,omitempty"`
+	Provider        *providerClaim `json:"provider,omitempty"`
 	// Module is the remote module version a remote module URL serves,
 	// <ns>/<name>/<system>/<version>: its archive's cache path follows the
 	// upstream location, so Path does not name it.
@@ -236,6 +240,7 @@ func (h handler) remoteDownloadURL(
 	path, digest string,
 	identity model.SourceIdentity,
 	subdir, archive string,
+	variants ...moduleRewrite,
 ) (string, error) {
 	p, _ := kernel.FromContext(r.Context())
 	reference, err := p.DownloadReference()
@@ -254,6 +259,16 @@ func (h handler) remoteDownloadURL(
 		Credential: &reference,
 		Module:     m.Package() + "/" + m.Version,
 	}
+	c.Rewrite = moduleRewriteTarget(r)
+	c.Archive = archive
+	if len(variants) > 0 {
+		c.DeliveredSHA256 = variants[0].digest
+		c.Archive = variants[0].archive
+	}
+	return h.moduleDownloadURL(r, c, subdir, c.Archive)
+}
+
+func (h handler) moduleDownloadURL(r *http.Request, c claims, subdir, archive string) (string, error) {
 	raw, err := h.signDownloadURL(r, c)
 	if err != nil {
 		return "", err
