@@ -461,6 +461,7 @@ func (p *Policy) upload(
 		}
 	}
 	return item.CacheUpload{
+		CachePolicy:          permit.CachePolicy(),
 		Expected:             q.Resource.Checksums,
 		ExpectedContentType:  q.Resource.ExpectedContentType,
 		ExpectedContentTypes: q.Resource.ExpectedContentTypes,

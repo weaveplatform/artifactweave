@@ -49,6 +49,16 @@ files lie in `internal/app`, beside the router, and in the module suites
 selected test names as a `test-selection` artifact and reports selected and
 skipped lane reasons in its summary.
 
+Full qualification also requires `Go acceptance (Windows, SQLite paths)`.
+It runs the embedded driver's `TestAccOpenDB` contracts on `windows-latest`,
+including actual opened-file identity for literal URI characters, private memory
+pools, pragmas and transaction locking. These remain acceptance tests; the
+three-OS `TestUnit` lane does not run them. The Windows job verifies that the
+literal-path test is present and cannot pass the required gate if it fails or
+is skipped. Its diagnostic coverage profile is separate from the merged
+coverage artifacts; Linux package acceptance retains the normal SQLite coverage
+contribution. Scoped format, documentation and deployment runs skip this job.
+
 The CI test selector reports the selected profile, changed paths and reasons in
 the job summary. The format profile combines reviewed test ownership with the
 current Go reverse import graph. It includes the format's server test packages,

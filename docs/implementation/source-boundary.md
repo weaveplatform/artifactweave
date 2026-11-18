@@ -189,3 +189,14 @@ statistics or fabricated items. Offline and cache-only requests never initiate i
 The AQL adapter retains source/credential fences and current path authority through
 final result delivery. Administrator pattern exemption applies only to this search
 operation; ordinary artifact delivery keeps existing repository policy.
+
+## Cache publication policy namespace
+
+A source-authorized artifact may use a policy path different from its canonical
+item path. Full pattern authorization mints an immutable binding scoped to that
+source incarnation, repository and target. Cache publication validates it and
+retains its existing current-authority and transaction fences. Only the pattern
+check uses the bound path; item identity, archive inspection and checksums retain
+the canonical path. Metadata, blackout-only lookups and ordinary deploy/transfer
+admission keep their existing behavior. See [the contract and consumer audit](../research/cache-policy-path.md)
+and [#1670](https://github.com/weaveplatform/artifactweave/issues/1670).

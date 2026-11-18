@@ -247,10 +247,15 @@ type Request struct {
 // bytes. Each hop must narrow this permit; it cannot borrow a more privileged
 // flight's newly fetched result. It is not a persisted credential.
 type Permit struct {
+	cachePolicy            format.CachePolicy
 	Identity               model.SourceIdentity
 	Intent                 RetrievalIntent
 	UpstreamNetworkAllowed bool
 }
+
+// CachePolicy returns the immutable path binding minted by source authorization.
+// A caller-created Permit has no override.
+func (p Permit) CachePolicy() format.CachePolicy { return p.cachePolicy }
 
 // MetadataResponse is trusted adapter-only response context, never an HTTP header
 // or log field. BaseURL contains only scheme, host and path after redirects.
