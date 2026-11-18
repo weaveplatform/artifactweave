@@ -407,7 +407,8 @@ capture; this is not a promise to implement arbitrary OData:
   SemVer filtering, before applying latest/substring predicates and pagination.
 - `GET` and `HEAD` are served for the service document, metadata, entries, feeds, counts
   and downloads. Download access uses the item service's checks and statistics.
-- `priorityResolution` does not apply to the v2 feed (R29 11), an input for P10.
+- Virtual V2 priority follows the NUG-02 decision below; the conflicting
+  configuration prose remains an inferred P19 comparison.
 
 The restore and fallback query grammar was rechecked against
 [`V2FeedQueryBuilder.cs` at 8.1.0.12](https://github.com/NuGet/NuGet.Client/blob/350273adcd4c/src/NuGet.Core/NuGet.Protocol/LegacyFeed/V2FeedQueryBuilder.cs),
@@ -476,7 +477,7 @@ file" (R29 12). Legacy `.symbols.nupkg` files stay unindexed (RTDEV-54891).
   corrected (R29 16). Every 401 carries the Basic challenge.
 - **Other repositories.** Remote v3 discovery/retrieval is implemented by #628 as described
   below. Remote v2/symbol retrieval is implemented by #629. Virtual v3 reads are
-  implemented by #1548 as described below; virtual v2, symbols and writes keep
+  implemented by #1548 as described below; virtual symbols and writes keep
   their original `501` class-gate answer (decision 0032).
 - **A repository keyed `v3`** is reached through its v3 tree only: `/api/nuget/v3/...` always
   routes to the v3 tree.
@@ -638,7 +639,7 @@ filter semantics, non-normalized repositories, SemVer2/global authentication set
 and any still-supported PDB identities beyond MSF7/Portable PDB. P19/P20 must settle
 uncertain target contracts; P12 supplies settings and P36 non-normalized migration.
 P9 #628 implements v3 remote signatures/cache behavior; #629 implements v2/symbol
-retrieval and remote snapshot retention. P10 owns virtual priority and metadata.
+retrieval and remote snapshot retention. P10 virtual priority and metadata are implemented in the sections below.
 NuGet CLI, Chocolatey, PowerShell, Visual Studio/MSBuild and JFrog NuGet proof belong
 to P28/P41 alongside the existing .NET v2/v3 and symbol-byte evidence.
 
@@ -724,9 +725,9 @@ Read precedes policy. Virtual and nested patterns filter contributions before
 paging; each member retains its own read/source policy. Unreadable, blacked-out,
 offline and pattern-rejected members are hidden with a final `404` when no
 readable holder remains. Existing direct local/remote responses retain their
-metadata policy. Symbols, every write and every v2 operation retain the original
-virtual `501` text before parsing or body admission; the common forced-auth
-challenge still runs first.
+metadata policy. Symbols and writes retain the original virtual `501` text
+before parsing or body admission; V2 reads are implemented by NUG-02 below.
+The common forced-auth challenge still runs first.
 
 Search output from each member is bounded by `skip + take`, pages sent upstream
 are at most 100, and IDs are deduplicated ignoring case before client paging.
@@ -742,3 +743,49 @@ unsettled search rank/count are recorded in research 29 for P19/#216 comparison.
 Native qualification uses the pinned .NET SDK 11 and 10 clients, a private
 signed-package upstream, a remote parent with a local transitive dependency,
 fresh client caches, byte comparisons and native signature verification.
+
+
+### P10 virtual V2 reads (#1562)
+
+GET/HEAD V2 discovery, EDMX, Packages, FindPackagesById, Search, counts,
+individual entries and Download now aggregate readable real members. Writes
+retain their original `501` class gate, before parsing/body admission and after
+forced authentication. V3 and direct local/remote responses retain controls.
+
+The pure k-way merger reads sorted per-ID member cursors. Normal output retains
+only the requested page plus one lookahead, then writes 100 entries and a next
+link preserving the virtual URL, query and remaining `$top`. Complete metadata
+for each active ID is separate from page retention: it is necessary to compute
+latest flags for an ID with more than 100 versions. Whole-repository readers use
+#1512's count/range-version and count/package APIs with one candidate package at
+a time; partial readers use SearchNuGet cursor pages. Remote collection retains
+its existing 100-page/10,000-version/64 MiB bound. Counts consume all cursors.
+
+First normalized-version ownership and priority-ID shadowing precede request
+filtering. A priority member containing only prerelease, SemVer2 or unmatched
+versions can therefore hide ordinary versions; an unreadable or member-policy
+rejected source cannot. Unlisted/mismatching first copies retain ownership.
+The retained OData grammar, search terms, targetFramework and ordering behavior
+are evaluated after ownership, before paging. Unsupported IsPrerelease grammar
+retains its direct-feed `400`; it does not reproduce the 7.x `500` bug.
+
+**[I]** The conflicting priority prose is resolved using RTFACT-25420 and
+RTFACT-26719: V2 virtual feeds apply priority shadowing. `IsLatestVersion` and
+`IsAbsoluteLatestVersion` are recomputed over the merged visible ID after
+shadowing/SemVer/prerelease visibility and before OData predicates. The OSS
+`nuget.virtual.feed.isLatest.legacy = TRUE` constant does not settle its
+algorithm. Both inferences are logged in research 29 and P19/#216.
+
+Whole Atom records stay attached to their supplying member; links use the
+original virtual request. The final source fence follows rendering/stat reads
+and checks retained page/count/latest owners, so a losing remote's later denial
+cannot hide a local answer. Missing/unreadable members fall through as `404`;
+true storage faults remain errors. Native qualification covers actual .NET 11
+and 10 V2 virtual restores with local/remote package bytes and V3 regression
+controls.
+
+**[I]** Virtual Atom output omits aggregate `DownloadCount`: no reviewed 7.x
+source defines aggregation across supplying members, and hidden/losing version
+counts must not leak. Local per-version statistics retain their selected stored
+owner; direct local and remote counters retain their existing behavior. This is
+recorded with the other NUG-02 inferences for P19/#216.

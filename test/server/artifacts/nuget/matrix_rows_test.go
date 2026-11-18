@@ -33,10 +33,18 @@ var nugetMatrixPart = matrixPart{
 	rows: func() []matrixRow {
 		local := nugetV3 + "nuget-local/"
 		virtual := nugetV3 + "nuget-virtual/"
+		virtualV2 := nugetV2 + "nuget-virtual/"
 		read := api.ActionRead
 		return append([]matrixRow{
 			row(nugetIndex, local+"index.json", "", anyone, 200),
 			row(nugetIndex, virtual+"index.json", "", anyone, 200),
+			row(nugetV2Service, virtualV2, "", anyone, 200),
+			row(nugetV2Metadata, virtualV2+"$metadata", "", anyone, 200),
+			row(nugetV2Entry, virtualV2+"Packages(Id='Work',Version='1.0.0')", "", nugetLists(nugetWork), 200),
+			row(nugetV2Download, virtualV2+"Download/Work/1.0.0", "", nugetLists(nugetWork), 200),
+			row(nugetV2Find, virtualV2+"FindPackagesById()?id=%27Work%27", "", anyone, 200),
+			row(nugetV2Packages, virtualV2+"Packages()", "", anyone, 200),
+			row(nugetV2Count, virtualV2+"Packages()/$count", "", anyone, 200),
 			row(nugetFlatVersions, virtual+"flatcontainer/work/index.json", "", nugetLists(nugetWork), 200),
 			row(nugetFlatFile, virtual+"flatcontainer/work/1.0.0/work.1.0.0.nupkg", "", nugetLists(nugetWork), 200),
 			row(nugetFlatFile, virtual+"flatcontainer/lib/1.0.0/lib.nuspec", "", nugetLists(nugetLib), 200),

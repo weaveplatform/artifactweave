@@ -229,7 +229,7 @@ func TestAccVirtualV3DeferredOperationsAndMalformedReads(t *testing.T) {
 			t.Fatalf("%+v %d %s", row, r.Code, r.Body)
 		}
 	}
-	for _, method := range []string{"GET", "PUT", "DELETE", "POST"} {
+	for _, method := range []string{"PUT", "DELETE", "POST"} {
 		r := f.do(method, "/artifactory/api/nuget/nuget-virtual/", "admin")
 		if r.Code != 501 || !strings.Contains(r.Body.String(), "through the nuget API yet") {
 			t.Fatal(r.Code, r.Body)

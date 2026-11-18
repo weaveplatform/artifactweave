@@ -62,6 +62,60 @@ Feature: Native NuGet restores signed dependencies through one virtual v3 feed
     When I GET "/artifactory/api/nuget/v3/nuget-virtual/a.pdb/invalid/a.pdb" as admin
     Then the response status is 501
     When I GET "/artifactory/api/nuget/nuget-virtual/" as admin
+    Then the response status is 200
+
+    Examples:
+      | dotnet  |
+      | .NET    |
+      | .NET 10 |
+
+  Scenario Outline: <dotnet> restores local and private remote packages through a virtual v2 feed
+    Given the registry is running
+    And the <dotnet> client can reach the registry
+    And a NuGet package "Acme.Legacy" at "1.0.0" in "nupkgs"
+    And a NuGet package "Acme.Legacy" at "2.0.0-beta.1" in "nupkgs"
+    And a NuGet package "Acme.Local" at "1.0.0" in "local"
+    And a private NuGet v2 upstream serves packages from "nupkgs"
+    When I PUT "/artifactory/api/repositories/nuget-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"nuget"}
+      """
+    Then the response status is 200
+    When I deploy the files under "local" to "/artifactory/nuget-local" as admin
+    When I PUT "/artifactory/api/repositories/nuget-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"nuget","url":"{upstream}","feedContextPath":"custom/feed","downloadContextPath":"custom/download","v3FeedUrl":"","username":"upstream","password":"private-fixture","forceNugetAuthentication":true}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/nuget-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"nuget","repositories":["nuget-local","nuget-remote"],"forceNugetAuthentication":true}
+      """
+    Then the response status is 200
+    Given a file "NuGet.Config" with expanded content:
+      """
+      <configuration><packageSources><clear/><add key="aw" value="{url}/api/nuget/nuget-virtual" protocolVersion="2" allowInsecureConnections="true"/></packageSources><packageSourceCredentials><aw><add key="Username" value="admin"/><add key="ClearTextPassword" value="{password}"/></aw></packageSourceCredentials></configuration>
+      """
+    And a file "app/app.csproj" with content:
+      """
+      <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net$(BundledNETCoreAppTargetFrameworkVersion)</TargetFramework><NuGetAudit>false</NuGetAudit></PropertyGroup><ItemGroup><PackageReference Include="Acme.Legacy" Version="[2.0.0-beta.1,3.0.0)"/><PackageReference Include="Acme.Local" Version="1.0.0"/></ItemGroup></Project>
+      """
+    When I run dotnet "restore app/app.csproj --packages v2-fresh --no-http-cache"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the files "nupkgs/Acme.Legacy.2.0.0-beta.1.nupkg" and "v2-fresh/acme.legacy/2.0.0-beta.1/acme.legacy.2.0.0-beta.1.nupkg" are identical
+    And the files "local/Acme.Local.1.0.0.nupkg" and "v2-fresh/acme.local/1.0.0/acme.local.1.0.0.nupkg" are identical
+    And the server answered 200 to GET "/artifactory/api/nuget/nuget-virtual/FindPackagesById()"
+    And the server answered 200 to GET "/artifactory/api/nuget/nuget-virtual/Download/Acme.Legacy/2.0.0-beta.1"
+    And the generic upstream received 1 GET requests for "/custom/download/Acme.Legacy/2.0.0-beta.1"
+    When I GET "/artifactory/api/nuget/nuget-virtual/Packages()" as admin
+    Then the response status is 200
+    And the response body contains "/api/nuget/nuget-virtual/Download/"
+    And the response body does not contain "/api/nuget/nuget-remote/"
+    When I PUT "/artifactory/api/nuget/nuget-virtual/" as admin with body:
+      """
+      malformed deferred upload
+      """
     Then the response status is 501
 
     Examples:

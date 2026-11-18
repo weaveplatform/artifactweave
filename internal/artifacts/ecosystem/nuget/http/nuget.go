@@ -68,6 +68,7 @@ func V2(remote ...*source.Service) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
 		repo.Federated: pkgroute.Local{},
+		repo.Virtual:   virtualSource{},
 	}
 	if len(remote) > 0 && remote[0] != nil {
 		sources[repo.Remote] = pkgroute.Remote{Service: remote[0]}
@@ -83,6 +84,7 @@ func V2(remote ...*source.Service) pkgroute.Protocol {
 		Reserved: []string{"{repoKey}/reindex"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
+			r.Use(h.virtualV2)
 			r.Use(h.remoteV2)
 			r.Get("/", h.v2)
 			r.Head("/", h.v2)
