@@ -511,29 +511,29 @@ func TestAccBazelClient(t *testing.T) {
 		[]byte("module(name = \"hello\", version = \"1.0.0\")\n"),
 	)
 	f.publish(federated, "modules/hello/1.0.0/hello-1.0.0.tar.gz", packageArchive)
-	remoteRepo := *repo.Defaults(&repo.Config{Key: "bazel-remote", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL + "/registry/", PriorityResolution: repo.Flex(true)})
+	remoteRepo := *repo.Defaults(&repo.Config{Key: "bazel-remote", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL, PriorityResolution: repo.Flex(true)})
 	if err := f.db.Repos().Create(t.Context(), remoteRepo); err != nil {
 		t.Fatal(err)
 	}
 	up.Set(
-		"/registry/modules/hello/metadata.json",
+		"/modules/hello/metadata.json",
 		fakeupstream.Resource{Body: []byte(`{"versions":["1.0.0"]}`)},
 	)
 	up.Set(
-		"/registry/modules/hello/1.0.0/MODULE.bazel",
+		"/modules/hello/1.0.0/MODULE.bazel",
 		fakeupstream.Resource{Body: []byte("module(name = \"hello\", version = \"1.0.0\")\n")},
 	)
 	sum := sha256.Sum256(packageArchive)
 	remoteSource, _ := json.Marshal(
 		map[string]any{
 			"type":         "archive",
-			"url":          up.URL + "/registry/archives/hello.tar.gz",
+			"url":          up.URL + "/archives/hello.tar.gz",
 			"integrity":    "sha256-" + base64.StdEncoding.EncodeToString(sum[:]),
 			"strip_prefix": "hello-1.0.0",
 		},
 	)
-	up.Set("/registry/modules/hello/1.0.0/source.json", fakeupstream.Resource{Body: remoteSource})
-	up.Set("/registry/archives/hello.tar.gz", fakeupstream.Resource{Body: packageArchive})
+	up.Set("/modules/hello/1.0.0/source.json", fakeupstream.Resource{Body: remoteSource})
+	up.Set("/archives/hello.tar.gz", fakeupstream.Resource{Body: packageArchive})
 	v := *repo.Defaults(&repo.Config{Key: "bazel-virtual", Class: repo.Virtual, PackageType: repo.BazelModules, Repositories: []string{f.local.Key, remoteRepo.Key}, DefaultDeploymentRepo: f.local.Key})
 	if err := f.db.Repos().Create(t.Context(), v); err != nil {
 		t.Fatal(err)
@@ -643,14 +643,14 @@ func TestAccBazelClient(t *testing.T) {
 	}
 	t.Run("yanked-remote-version", func(t *testing.T) {
 		up.Set(
-			"/registry/modules/hello/metadata.json",
+			"/modules/hello/metadata.json",
 			fakeupstream.Resource{
 				Body: []byte(
 					`{"versions":["1.0.0"],"yanked_versions":{"1.0.0":"security regression"}}`,
 				),
 			},
 		)
-		yanked := *repo.Defaults(&repo.Config{Key: "bazel-yanked", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL + "/registry/"})
+		yanked := *repo.Defaults(&repo.Config{Key: "bazel-yanked", Class: repo.Remote, PackageType: repo.BazelModules, URL: up.URL})
 		if err := f.db.Repos().Create(t.Context(), yanked); err != nil {
 			t.Fatal(err)
 		}

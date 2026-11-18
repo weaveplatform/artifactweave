@@ -103,6 +103,11 @@ func allowSourceURL(c repo.Config, raw string) error {
 		}
 	}
 	base, err := url.Parse(c.URL)
+	// An HTTP origin with no path names its root. path.Clean otherwise turns
+	// the empty path into ".", incorrectly excluding every root archive.
+	if err == nil && base.Path == "" {
+		base.Path = "/"
+	}
 	if err == nil && base.Scheme == u.Scheme && strings.EqualFold(base.Host, u.Host) &&
 		(path.Clean(u.Path) == path.Clean(base.Path) || strings.HasPrefix(path.Clean(u.Path), strings.TrimSuffix(path.Clean(base.Path), "/")+"/")) {
 		return nil
