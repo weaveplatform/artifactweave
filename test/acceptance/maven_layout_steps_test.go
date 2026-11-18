@@ -62,6 +62,11 @@ func (w *world) publishMavenLayoutRecipe(token string) error {
 		}
 		plugins = filepath.Join(home, ".m2", "repository")
 	}
+	// Docker creates a missing bind source as root, but the client uses the
+	// caller's UID and must be able to write Maven's plugin locks there.
+	if err = os.MkdirAll(plugins, 0o755); err != nil {
+		return fmt.Errorf("create Maven plugin cache: %w", err)
+	}
 	// Only build-tool plugins are warmed. The artifact coordinate is published
 	// by Maven here and Gradle resolves it from an empty dependency cache.
 	return w.runJVMRecipe([]string{"--entrypoint", "mvn", "-v", plugins + ":/m2"}, []string{
