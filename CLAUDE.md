@@ -20,6 +20,10 @@ These apply to every weaveplatform repository created from this template.
   dependency that CI would catch.
 - **Commits and PR titles** follow Conventional Commits; release-please derives
   versions and the changelog from them.
+- **PR descriptions and related bugs.** When opening or updating a PR, or finding
+  an additional related bug, follow [CONTRIBUTING.md](CONTRIBUTING.md#pull-requests):
+  use PR #1644's sections, fix same-kind bugs in the PR, and automatically ticket
+  cross-kind bugs with an explicit linked disposition.
 
 ## Comments
 
