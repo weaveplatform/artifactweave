@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -150,10 +151,20 @@ func (s *remoteSession) deliverPackage(
 	checks kernel.Checksums,
 	nuspec bool,
 ) {
+	result, err := s.packageResult(ctx, id, key, target, checks, nuspec)
+	if err != nil {
+		s.h.k.Error(w, s.r, err)
+		return
+	}
+	s.deliverPackageResult(ctx, w, result, nuspec)
+}
+
+// Return source failures before writing so a virtual can pass over an absent
+// binary without committing a response from a member that cannot serve it.
+func (s *remoteSession) packageResult(ctx context.Context, id, key, target string, checks kernel.Checksums, nuspec bool) (source.Result, error) {
 	path := remotePackagePath(id, key)
 	if err := s.fence(ctx); err != nil {
-		s.h.k.Error(w, s.r, pkgroute.SourceError(err, false))
-		return
+		return source.Result{}, fmt.Errorf("nuget package authority: %w", pkgroute.SourceError(err, false))
 	}
 	resource := pkgroute.Resource(s.r, path, "")
 	resource.Method = http.MethodGet
@@ -175,8 +186,10 @@ func (s *remoteSession) deliverPackage(
 	}
 	result, err := s.h.k.Read(s.r, resource)
 	if err != nil {
-		s.h.k.Error(w, s.r, err)
-		return
+		return source.Result{}, fmt.Errorf("nuget package source: %w", err)
+	}
+	if nuspec {
+		return result, nil
 	}
 	current := result.Revalidate
 	result.Revalidate = func(ctx context.Context) error {
@@ -188,6 +201,11 @@ func (s *remoteSession) deliverPackage(
 		}
 		return nil
 	}
+	return result, nil
+}
+
+func (s *remoteSession) deliverPackageResult(ctx context.Context, w http.ResponseWriter, result source.Result, nuspec bool) {
+	var err error
 	if !nuspec {
 		s.h.k.ServeResult(w, s.r, result)
 		return
@@ -208,6 +226,6 @@ func (s *remoteSession) deliverPackage(
 		s.h.k.Error(w, s.r, remoteFailure())
 		return
 	}
-	s.results = append(s.results, source.Result{Revalidate: current, Used: result.Used})
+	s.results = append(s.results, source.Result{Revalidate: result.Revalidate, Used: result.Used})
 	s.bytesResponse(w, n.Raw, "application/xml")
 }

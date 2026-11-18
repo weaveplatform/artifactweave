@@ -559,3 +559,61 @@ or `::` for an unrestricted framework. The public Newtonsoft.Json 13.0.3 Atom en
 was checked on 2026-10-22 and contains these groups alongside ordinary dependencies.
 Remote admission preserves this property and excludes empty groups from dependency
 version classification; this is NuGet protocol evidence, not an Artifactory capture.
+
+## P10 virtual v3 implementation (#1548, NUG-01)
+
+Primary-source review on 2026-11-17 used the official
+[NuGet guide](https://docs.jfrog.com/artifactory/docs/nuget-repositories),
+[remote settings](https://docs.jfrog.com/artifactory/docs/remote-repositories),
+[virtual guide](https://docs.jfrog.com/artifactory/docs/virtual-repositories), the
+7.x release/Jira evidence in sections 4–7, and the verified official OSS
+7.161.26 archive (SHA-256
+`b867422f3137c542b402c38a2ca2584396ef431b691ca70f038ff5cc3768802c`).
+`PackageRepoServiceImpl.getSubRepositories` lines 318–339 delegates package
+requests to the shared virtual resolver and optionally removes duplicate cache
+steps. The commercial NuGet merger is absent from the OSS distribution.
+No live Artifactory instance or trial was used.
+
+**[D]** The guides support one virtual NuGet URL over local and remote members.
+**[J]** RTFACT-24989 (7.17.4) establishes v3 priority resolution;
+RTFACT-26847 establishes the local binary fast path; RTFACT-29322 requires
+virtual registration links and the newest merged search version;
+RTFACT-29543 requires missing upstream resources to contribute nothing;
+RTFACT-30611 bounds upstream query pages; RTDEV-88743 hides unreadable members.
+The adapter uses ENG-08's flattened effective order, whole-version first-owner
+selection and per-id priority shadowing. Raw upstream catalog fields, dependency
+ranges and signature/integrity metadata remain attached to the supplying version.
+Every generated resource, page, leaf, package and dependency-registration URL
+uses the original virtual request. Source and permission checks retain the real
+member request, including the engine's cache-only restriction.
+
+The sources do not settle cross-member search rank or `totalHits` (the related
+RTFACT-22552 was closed unresolved). The following choices are **[I]**, queued for
+P19/#216 rather than presented as captured 7.x behavior:
+
+- Search preserves effective member order and each member's hit order. IDs are
+  deduplicated ignoring case before paging; an existing ID keeps its position
+  and takes metadata from its newest surviving whole-version owner.
+- `totalHits` counts distinct visible IDs observed by the bounded merge, rather
+  than adding upstream totals. Autocomplete with an ID counts merged versions.
+- Member output is bounded by `skip + take`, with upstream pages at most 100.
+  The existing 128-document remote graph budget bounds the search window to
+  12,700 hits; autocomplete ID-authority reads consume the same budget, so it
+  stops with accumulated hits before exhausting it. Local candidate scans have
+  a separate 12,700-candidate ceiling while advancing past policy/query misses.
+  Integer overflow and allocation from an untrusted `skip` are avoided. Counts
+  describe only the visible bounded observation, including defensive ceilings.
+- Virtual listings filter package paths before paging. Direct local and remote
+  metadata retains its established blackout-only/pattern contract. A package's
+  Read grant is checked before its policy; unreadable or rejected members are
+  hidden as misses. A priority id holds only through readable, source-admitted
+  member contributions; virtual filtering can then leave that shadowed id empty.
+
+The strict Linux acceptance feature restores only the signed remote parent;
+its signed transitive dependency is present only in the local member. Both
+pinned .NET SDK 11 and 10 clients verify signatures and exact package bytes with
+fresh package and HTTP caches. The direct remote cold/warm feature remains a
+control. Symbols, writes and v2 preserve their previous virtual `501` envelope,
+including malformed deferred requests; forced authentication still precedes it.
+The existing cross-cutting PyPI cold cache-publication limitation #1670 remains
+separate and is not changed here.

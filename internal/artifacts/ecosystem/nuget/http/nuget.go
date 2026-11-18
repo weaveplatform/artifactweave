@@ -25,6 +25,7 @@ func V3(remote ...*source.Service) pkgroute.Protocol {
 	sources := map[repo.Class]pkgroute.Source{
 		repo.Local:     pkgroute.Local{},
 		repo.Federated: pkgroute.Local{},
+		repo.Virtual:   virtualSource{},
 	}
 	if len(remote) > 0 && remote[0] != nil {
 		sources[repo.Remote] = pkgroute.Remote{Service: remote[0]}
@@ -37,6 +38,7 @@ func V3(remote ...*source.Service) pkgroute.Protocol {
 		Challenge:    forced,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			h := handler{k: k}
+			r.Use(h.virtualV3)
 			r.Use(h.remoteV3)
 			r.Get("/", h.serviceIndex)
 			r.Head("/", h.serviceIndex)

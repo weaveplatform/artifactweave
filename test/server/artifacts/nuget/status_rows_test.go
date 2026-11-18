@@ -74,9 +74,9 @@ func nugetStatusRows() []statusCase {
 		{nugetIndex, local, "admin", "", 200},
 		{nugetIndex, nugetV3 + "missing/index.json", "admin", "", 404},
 		{nugetIndex, nugetV3 + "libs-local/index.json", "admin", "", 404},
-		// Remote and virtual NuGet repositories are P9's and P10's.
+		// The fixture has no remote source; virtual discovery needs no member read.
 		{nugetIndex, nugetV3 + "nuget-remote/index.json", "admin", "", 501},
-		{nugetIndex, nugetV3 + "nuget-virtual/index.json", "admin", "", 501},
+		{nugetIndex, nugetV3 + "nuget-virtual/index.json", "admin", "", 200},
 		{nugetIndex, local + "FindPackagesById()", "admin", "", 404},
 		{nugetIndexHead, local + "index.json", "admin", "", 200},
 		{nugetIndexHead, local + "index.json", "", "", 401},

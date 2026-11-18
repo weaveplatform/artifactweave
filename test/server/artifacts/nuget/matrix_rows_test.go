@@ -32,9 +32,21 @@ var nugetMatrixPart = matrixPart{
 	},
 	rows: func() []matrixRow {
 		local := nugetV3 + "nuget-local/"
+		virtual := nugetV3 + "nuget-virtual/"
 		read := api.ActionRead
 		return append([]matrixRow{
 			row(nugetIndex, local+"index.json", "", anyone, 200),
+			row(nugetIndex, virtual+"index.json", "", anyone, 200),
+			row(nugetFlatVersions, virtual+"flatcontainer/work/index.json", "", nugetLists(nugetWork), 200),
+			row(nugetFlatFile, virtual+"flatcontainer/work/1.0.0/work.1.0.0.nupkg", "", nugetLists(nugetWork), 200),
+			row(nugetFlatFile, virtual+"flatcontainer/lib/1.0.0/lib.nuspec", "", nugetLists(nugetLib), 200),
+			row(nugetRegIndex, virtual+"registration-semver2/work/index.json", "", nugetLists(nugetWork), 200),
+			row(nugetRegPage, virtual+"registration/work/page/1.0.0/1.0.0.json", "", nugetLists(nugetWork), 200),
+			row(nugetRegLeaf, virtual+"registration/work/1.0.0.json", "", nugetLists(nugetWork), 200),
+			row(nugetRegDownload, virtual+"registration/Download/Work/1.0.0", "", nugetLists(nugetWork), 200),
+			row(nugetSearch, virtual+"query?q=work", "", anyone, 200),
+			row(nugetAutocomplete, virtual+"autocomplete?q=w", "", anyone, 200),
+			row(nugetAutocomplete, virtual+"autocomplete?id=work", "", anyone, 200),
 			row(
 				nugetSymbolRead,
 				local+"app.pdb/"+nugetPDBKey+"/app.pdb",

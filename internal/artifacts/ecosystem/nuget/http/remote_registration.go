@@ -2,6 +2,7 @@ package nugethttp
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -206,10 +207,14 @@ func (s *remoteSession) registration(
 }
 
 func (s *remoteSession) rewriteEntry(hv hive, id string, v remoteVersion) remoteDoc {
-	u := urlsOf(s.r, hv)
-	d := v.entry
+	return rewriteEntryAt(s.r, hv, id, v)
+}
+
+func rewriteEntryAt(r *http.Request, hv hive, id string, v remoteVersion) remoteDoc {
+	u := urlsOf(r, hv)
+	d := maps.Clone(v.entry)
 	catalog := objectField(d, "catalogEntry")
-	content := v3Base(s.r) + "/flatcontainer/" + remotePackagePath(id, v.key)
+	content := v3Base(r) + "/flatcontainer/" + remotePackagePath(id, v.key)
 	setField(d, "@id", u.leaf(id, v.key))
 	setField(d, "registration", u.index(id))
 	setField(d, "packageContent", content)
