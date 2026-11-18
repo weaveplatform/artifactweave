@@ -223,7 +223,7 @@ func TestAccVirtualV3VisibilityPoliciesAndAbsentResources(t *testing.T) {
 func TestAccVirtualV3DeferredOperationsAndMalformedReads(t *testing.T) {
 	f := newVirtualFixture(t)
 	text := "'nuget-virtual' is a virtual repository, which artifactweave does not serve through the nuget/v3 API yet"
-	for _, row := range []struct{ method, path string }{{"GET", "a.pdb/invalid/a.pdb"}, {"HEAD", "a.pdb/invalid/a.pdb"}, {"PUT", "symbols"}, {"PUT", "symbols/%2e%2e/bad"}, {"POST", "query"}, {"DELETE", "flatcontainer/bad"}} {
+	for _, row := range []struct{ method, path string }{{"PUT", "symbols/%2e%2e/bad"}, {"POST", "query"}, {"DELETE", "flatcontainer/bad"}} {
 		r := f.doBody(row.method, virtualV3+row.path, "admin", bytes.NewReader([]byte("malformed")))
 		if r.Code != 501 || row.method != "HEAD" && !strings.Contains(r.Body.String(), text) {
 			t.Fatalf("%+v %d %s", row, r.Code, r.Body)
@@ -231,7 +231,16 @@ func TestAccVirtualV3DeferredOperationsAndMalformedReads(t *testing.T) {
 	}
 	for _, method := range []string{"PUT", "DELETE", "POST"} {
 		r := f.do(method, "/artifactory/api/nuget/nuget-virtual/", "admin")
-		if r.Code != 501 || !strings.Contains(r.Body.String(), "through the nuget API yet") {
+		want := 404
+		if method == "PUT" {
+			want = 405
+		}
+		if r.Code != want || want == 404 && r.Body.Len() != 0 || want == 405 && r.Header().Get("Allow") != "GET" {
+			t.Fatal(r.Code, r.Body)
+		}
+	}
+	for _, method := range []string{"GET", "HEAD"} {
+		if r := f.do(method, virtualV3+"a.pdb/invalid/a.pdb", "admin"); r.Code != 404 {
 			t.Fatal(r.Code, r.Body)
 		}
 	}

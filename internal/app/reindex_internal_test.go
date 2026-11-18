@@ -148,7 +148,7 @@ func recording(f *reindexRecorder) func(repo.PackageType) format.Handler {
 
 // Each operation refuses as 7.x does: a missing repository 404, a caller
 // without the right 401 or 403, a repository of another type, or of a
-// class 7.x does not reindex, 400. NuGet virtual reindex remains P10. Each
+// class 7.x does not reindex, 400. Each
 // answers in its path's envelope.
 func TestAccReindexRefusals(t *testing.T) {
 	w, _ := reindexWorld(t, recording(&reindexRecorder{}), true)
@@ -165,7 +165,6 @@ func TestAccReindexRefusals(t *testing.T) {
 		{"nuget/nuget-local/reindex", "user", http.StatusForbidden},
 		{"nuget/nuget-remote/reindex", "user", http.StatusForbidden},
 		{"nuget/nuget-remote-cache/reindex", "reader", http.StatusForbidden},
-		{"nuget/nuget-virtual/reindex", "admin", http.StatusNotImplemented},
 		{"nuget/nuget-virtual/reindex", "user", http.StatusForbidden},
 		{"nuget/helm-local/reindex", "admin", http.StatusBadRequest},
 		{"nuget/libs-local/reindex", "deployer", http.StatusForbidden},
@@ -196,9 +195,8 @@ func TestAccReindexRefusals(t *testing.T) {
 		}
 	}
 	rec := w.do("POST", "/artifactory/api/nuget/nuget-virtual/reindex", "admin", "")
-	if !strings.Contains(rec.Body.String(),
-		"'nuget-virtual' is a virtual repository, which artifactweave does not reindex yet") {
-		t.Errorf("later: %s", rec.Body)
+	if rec.Code != http.StatusOK || rec.Body.String() != "NuGet reindex calculation for repository 'nuget-virtual' accepted." {
+		t.Errorf("virtual acceptance: %d %s", rec.Code, rec.Body)
 	}
 	rec = w.do("POST", "/artifactory/api/helm/helm-virtual/reindex", "admin", "")
 	if !strings.Contains(

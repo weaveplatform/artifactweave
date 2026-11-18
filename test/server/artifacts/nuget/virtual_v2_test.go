@@ -182,7 +182,15 @@ func TestAccNuGetVirtualV2BackendsAndPages(t *testing.T) {
 				t.Fatal("priority shadow", r.Body)
 			}
 			for _, method := range []string{"PUT", "DELETE", "POST"} {
-				harness.WantStatus(t, w.Request(method, root, "admin", "malformed"), 501)
+				want := 404
+				if method == "PUT" {
+					want = 405
+				}
+				r = w.Request(method, root, "admin", "malformed")
+				harness.WantStatus(t, r, want)
+				if want == 404 && r.Body.Len() != 0 {
+					t.Fatal("virtual mutation body", r.Body.String())
+				}
 			}
 			harness.WantStatus(t, w.Request("GET", root+"Download/Missing/1.0.0", "denied", ""), 404)
 		})

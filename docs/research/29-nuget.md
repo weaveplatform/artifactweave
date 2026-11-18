@@ -675,3 +675,44 @@ that aggregate, matching the established remote non-disclosure behavior, while
 local `VersionDownloadCount` remains the selected stored owner's statistic.
 Direct local and remote counters retain their existing behavior. This additional
 inference is also queued for P19/#216.
+
+## P10 virtual publication, symbols and membership (NUG-03, 2026-11-18)
+
+[D] [NuGet repositories](https://docs.jfrog.com/artifactory/docs/nuget-repositories)
+document package and symbol publication through local/virtual repositories and
+virtual symbol servers combining local symbol packages with remote symbol files.
+Their Enforce Layout section permits normalized members inside a non-normalized
+virtual and requires Enforce Layout on every member of a normalized virtual.
+[Calculate NuGet Repository Metadata](https://docs.jfrog.com/artifactory/reference/calculateNuGetRepositoryMetadata)
+includes virtual repositories and retains the existing Manage permission gate.
+
+[S] Verified official 7.161.26
+`backend/core/src/main/java/org/artifactory/repo/service/NugetRepoConfigValidator.java`
+checks each referenced configuration, including a nested virtual descriptor, and
+supplies the exact normalized refusal: `Nuget Repository <key> must have only
+normalized repositories`. Its symmetric non-normalized restriction conflicts with
+the current explicit documentation; the implementation follows the documented
+one-way rule, preserving mixed-layout nested downloads and DV-111's normalization
+everywhere. The rule applies when the virtual is saved, including unchanged
+member lists; changing a concrete member does not re-save its parents.
+
+[S] `base/common/src/main/java/org/artifactory/addon/nuget/NuGetAuthUtil.java`,
+`repoForcesAuth` (lines 81–92), checks only the addressed repository/virtual
+configuration. A forced member does not force an unforced virtual to challenge.
+Anonymous access must still be enabled globally for that distinction to matter.
+
+[I] Pending #216/P19: virtual publication maps to the real local/federated DDR
+and retains its 201/409, including the DDR key in a duplicate refusal. Missing or
+unusable DDRs retain R6's 405 and `Allow: GET`. Virtual delete/relist return an
+empty 404 without mutating a member. Virtual reindex accepts the documented text
+with 200 but queues no work, since the virtual owns no package index. Symbol
+reads use effective member order and the first readable eligible PDB, preserving
+remote cache-only/offline and current-source delivery fences. Read refusals count
+as member misses; superseded source revisions retain the source service's retry
+response and real storage faults retain 500.
+
+The native proof uses isolated SDK 11 and 10 LTS clients, fresh package/HTTP
+caches, real package/symbol pushes, extracted PDB byte identity and lockfile
+integrity. It is implementation evidence, not a vendor capture. No trial or
+live Artifactory capture was used. #1587's cold-fill Deploy/Cache requirement is
+intended; #1670 remains the separate cross-kind trusted-policy-path issue.

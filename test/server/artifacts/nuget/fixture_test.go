@@ -3,13 +3,16 @@ package nuget_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/app"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -70,7 +73,7 @@ type remoteWorld struct {
 
 func newRemoteWorld(t *testing.T) *remoteWorld {
 	t.Helper()
-	w := harness.NewRemoteWorld(t)
+	w := harness.NewRemoteWorld(t, nugetBackend(t)...)
 	return &remoteWorld{t: w.T, rt: w.Runtime, h: w.H, up: w.Upstream, c: w.Repo}
 }
 
@@ -96,4 +99,15 @@ func (w *remoteWorld) update() {
 func remoteStatus(t *testing.T, r *httptest.ResponseRecorder, code int) {
 	t.Helper()
 	harness.WantStatus(t, r, code)
+}
+
+// Each remote runtime owns a scratch schema when actual PostgreSQL is requested;
+// legacy protocol-only in-memory fixtures retain their existing controls.
+func nugetBackend(t *testing.T) []func(*config.Config) {
+	t.Helper()
+	if dsn := os.Getenv("ARTIFACTWEAVE_TEST_POSTGRES_DSN"); dsn != "" {
+		scratch := sqltest.ScratchDSN(t, dsn)
+		return []func(*config.Config){func(c *config.Config) { c.Database = config.Database{Driver: "postgres", DSN: scratch} }}
+	}
+	return nil
 }

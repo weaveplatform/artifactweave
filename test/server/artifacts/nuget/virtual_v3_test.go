@@ -3,6 +3,7 @@ package nuget_test
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
@@ -16,7 +17,7 @@ import (
 
 func nugetVirtualWorld(t *testing.T, mutate ...func(*config.Config)) *harness.RemoteWorld {
 	t.Helper()
-	w := harness.NewRemoteWorld(t, mutate...)
+	w := harness.NewRemoteWorld(t, append(nugetBackend(t), mutate...)...)
 	w.Repo.PackageType = repo.NuGet
 	w.Repo.V3FeedURL = w.Upstream.URL + "/v3/index.json"
 	w.Update()
@@ -25,6 +26,18 @@ func nugetVirtualWorld(t *testing.T, mutate ...func(*config.Config)) *harness.Re
 			t.Fatal(err)
 		}
 	}
+	w.H = harness.Router(harness.Config{
+		Store:         w.Runtime.Store,
+		Blobs:         w.Runtime.Blobs,
+		Auth:          w.Runtime.Auth,
+		Tokens:        w.Runtime.Tokens,
+		Keys:          w.Runtime.Keys,
+		RemoteSources: w.Runtime.Artifacts.RemoteSources(),
+		RemoteHTTP:    w.Runtime.Artifacts.RemoteHTTP(),
+		VirtualCache:  w.Runtime.Artifacts.VirtualCache(),
+		Work:          w.Runtime.Work,
+		Logger:        slog.New(slog.DiscardHandler),
+	})
 	return w
 }
 
@@ -97,6 +110,11 @@ func TestAccNuGetVirtualV3Backends(t *testing.T) {
 	for _, backend := range []string{"sqlite", "postgres"} {
 		t.Run(backend, func(t *testing.T) {
 			var mutate []func(*config.Config)
+			if backend == "sqlite" {
+				mutate = append(mutate, func(c *config.Config) {
+					c.Database = config.Database{Driver: "sqlite", DSN: t.TempDir() + "/nuget.sqlite"}
+				})
+			}
 			if backend == "postgres" {
 				dsn := platsqltest.ScratchDSN(t, platsqltest.PostgresDSN(t))
 				mutate = append(mutate, func(c *config.Config) { c.Database.Driver = "postgres"; c.Database.DSN = dsn })
@@ -152,12 +170,12 @@ func TestAccNuGetVirtualV3Backends(t *testing.T) {
 				t.Fatal("priority id did not shadow", r.Body)
 			}
 			for _, path := range []string{"a.pdb/invalid/a.pdb", "symbols"} {
-				method := "GET"
+				method, want := "GET", 404
 				if path == "symbols" {
-					method = "PUT"
+					method, want = "PUT", 405
 				}
 				r = w.Request(method, root+path, "admin", "malformed")
-				harness.WantStatus(t, r, 501)
+				harness.WantStatus(t, r, want)
 			}
 		})
 	}

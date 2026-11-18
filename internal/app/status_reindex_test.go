@@ -270,10 +270,10 @@ var reindexStatusPart = statusPart{
 			{reindexNuGet, nuget + "reindex-nuget/reindex", "", "", 401},
 			{reindexNuGet, nuget + "missing/reindex", "admin", "", 404},
 			{reindexNuGet, nuget + "reindex-helm/reindex", "admin", "", 400},
-			// Remote/cache reindex is P9; virtual reindex remains P10.
+			// NuGet virtual reindex accepts without scheduling a virtual index.
 			{reindexNuGet, nuget + "reindex-nuget-remote/reindex", "admin", "", 200},
 			{reindexNuGet, nuget + "reindex-nuget-remote-cache/reindex", "admin", "", 200},
-			{reindexNuGet, nuget + "reindex-nuget-virtual/reindex", manager, "", 501},
+			{reindexNuGet, nuget + "reindex-nuget-virtual/reindex", manager, "", 200},
 			{reindexNuGet, nuget + "reindex-nuget-virtual/reindex", "user", "", 403},
 
 			{reindexHelm, helm + "reindex-helm/reindex", "admin", "", 200},

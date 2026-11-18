@@ -93,7 +93,11 @@ func TestAccVirtualV2OwnershipQueriesFlagsAndDownloads(t *testing.T) {
 	}
 	for _, method := range []string{"PUT", "POST", "DELETE"} {
 		r = f.doBody(method, virtualV2+"%2e%2e/bad", "admin", strings.NewReader("invalid"))
-		if r.Code != 501 || !strings.Contains(r.Body.String(), "through the nuget API yet") {
+		want := 404
+		if method == "PUT" {
+			want = 405
+		}
+		if r.Code != want || want == 404 && r.Body.Len() != 0 || want == 405 && r.Header().Get("Allow") != "GET" {
 			t.Fatal(r.Code, r.Body)
 		}
 	}
@@ -453,5 +457,17 @@ func TestAccVirtualV2CountersBelongToTheSupplyingVersion(t *testing.T) {
 	wantStatus(t, r, 200)
 	if strings.Contains(r.Body.String(), "<d:DownloadCount") || strings.Contains(r.Body.String(), "9999") || !strings.Contains(r.Body.String(), ">1</d:VersionDownloadCount>") {
 		t.Fatal(r.Body)
+	}
+}
+
+func TestAccVirtualV2UnsupportedMethodsRemainDeferred(t *testing.T) {
+	f := newVirtualLegacyFixture(t)
+	for _, method := range []string{"PATCH", "OPTIONS"} {
+		for _, path := range []string{"", "Packages()"} {
+			r := f.doBody(method, virtualV2+path, "admin", strings.NewReader("malformed"))
+			if r.Code != 501 || !strings.Contains(r.Body.String(), "through the nuget API yet") {
+				t.Fatal(method, path, r.Code, r.Body)
+			}
+		}
 	}
 }

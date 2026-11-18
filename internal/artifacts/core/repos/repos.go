@@ -164,6 +164,14 @@ func CheckMembers(c *repo.Config, stored *repo.Config, known []repo.Config) erro
 	if err := checkReferences(c, stored, find); err != nil {
 		return err
 	}
+	if c.PackageType == repo.NuGet && c.EnableNormalizedVersion != nil && *c.EnableNormalizedVersion {
+		for _, key := range c.Repositories {
+			member, _ := find(key)
+			if member.EnableNormalizedVersion == nil || !*member.EnableNormalizedVersion {
+				return badRequestf("Nuget Repository %s must have only normalized repositories", c.Key)
+			}
+		}
+	}
 	ddr := c.DefaultDeploymentRepo
 	if ddr == "" {
 		return checkMemberTypes(c, membersChanged, find)

@@ -315,7 +315,7 @@ func nugetSymbolStatusRows() []statusCase {
 		{nugetSymbolRead, strings.Replace(p, "nuget-local", "missing", 1), "admin", "", 404},
 		{nugetSymbolRead, strings.Replace(p, "nuget-local", "libs-local", 1), "admin", "", 404},
 		{nugetSymbolRead, strings.Replace(p, "nuget-local", "nuget-remote", 1), "admin", "", 501},
-		{nugetSymbolRead, strings.Replace(p, "nuget-local", "nuget-virtual", 1), "admin", "", 501},
+		{nugetSymbolRead, strings.Replace(p, "nuget-local", "nuget-virtual", 1), "admin", "", 200},
 		{nugetSymbolRead, forced, "anonymous", "", 401},
 		{nugetSymbolRead, forced, "admin", "", 200},
 		{nugetSymbolHead, p, "user", "", 403},

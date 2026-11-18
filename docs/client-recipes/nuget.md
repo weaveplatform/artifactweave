@@ -47,7 +47,7 @@ export DOTNET_CLI_HOME="$NUGET_PACKAGES/cli-home"
 
 ## Publish
 
-Classes: **local**. Publish only to the classes listed here. A federated recipe proves one-node behavior; remote repositories are read-only client sources.
+Classes: **local, virtual, federated**. A virtual publishes to its configured local or federated defaultDeploymentRepo; Deploy is checked on the actual member path. Remotes are read-only client sources.
 
 Symbol packages are published when the project creates snupkg files. Do not log the expanded API-key argument.
 
@@ -70,7 +70,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - Use forceNugetAuthentication when the administrator requires authenticated v3 discovery.
 - --skip-duplicate is for an existing identical package; do not infer a general safe retry contract for changed bytes.
-- Virtual v2 and v3 restore are qualified on both pinned SDK lanes. V3 includes a signed remote parent and signed local transitive dependency; V2 includes local and private remote packages with fresh caches. Virtual publication and symbols retain 501 pending their P10 ticket; federated native qualification remains a follow-on.
+- Virtual v2/v3 restore and virtual package/symbol publication are qualified on both pinned SDK lanes, including forced authentication and extracted PDB bytes. Missing deployment targets return 405 with Allow: GET; virtual delete/relist return 404 without mutation. Federated native multi-node qualification remains a follow-on.
 
 ## Verification sources
 
@@ -82,4 +82,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/nuget_v3.feature](../../test/acceptance/features/nuget_v3.feature).
 - Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).
 - Evidence: [test/acceptance/features/nuget_remote.feature](../../test/acceptance/features/nuget_remote.feature).
+- Evidence: [test/acceptance/features/nuget_virtual.feature](../../test/acceptance/features/nuget_virtual.feature).
 - Evidence: [test/acceptance/features/nuget_virtual.feature](../../test/acceptance/features/nuget_virtual.feature).

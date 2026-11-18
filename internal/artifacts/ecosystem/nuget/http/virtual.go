@@ -44,9 +44,12 @@ func (h handler) virtualV3(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		// The old class gate ran before path parsing and body admission. Preserve it
-		// for every deferred operation, including malformed symbol and write paths.
+		// Retain the old class gate before parsing/admission for operations still
+		// deferred; publishing and the three-segment symbol route are now served.
 		root, _, _ := strings.Cut(q.Rest, "/")
+		if h.virtualSymbolRoute(w, r, root) {
+			return
+		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead ||
 			root != "" && root != "index.json" && root != "flatcontainer" && root != "registration" && root != "registration-semver2" && root != "query" && root != "autocomplete" {
 			h.k.Error(

@@ -477,8 +477,9 @@ file" (R29 12). Legacy `.symbols.nupkg` files stay unindexed (RTDEV-54891).
   corrected (R29 16). Every 401 carries the Basic challenge.
 - **Other repositories.** Remote v3 discovery/retrieval is implemented by #628 as described
   below. Remote v2/symbol retrieval is implemented by #629. Virtual v3 reads are
-  implemented by #1548 as described below; virtual symbols and writes keep
-  their original `501` class-gate answer (decision 0032).
+  implemented by #1548 as described below; #1569 adds virtual symbol reads and
+  publication through the deployment target. Other deferred operations retain
+  their original class-gate answer.
 - **A repository keyed `v3`** is reached through its v3 tree only: `/api/nuget/v3/...` always
   routes to the v3 tree.
 - **Not served,** answering 404: the v2 queries under the v3 prefix
@@ -628,7 +629,7 @@ N9-1 through N9-7 in research 29 remain P19/#216 work.
   the package it is stored as the package, after it the push answers 409.
 - A repository keyed `v3` has no reachable v2 root.
 - Symbol-server extraction covers local repositories. Remote symbols proxy explicit upstream
-  SSQP identities with symbol-path grants; virtual symbol resolution remains P10.
+  SSQP identities with symbol-path grants; #1569 adds virtual member resolution.
 - **Unconfirmed:** the items in R29 section 17 are inferred and on the live-comparison list
   ([#216](https://github.com/weaveplatform/artifactweave/issues/216)) for P19.
 
@@ -725,8 +726,9 @@ Read precedes policy. Virtual and nested patterns filter contributions before
 paging; each member retains its own read/source policy. Unreadable, blacked-out,
 offline and pattern-rejected members are hidden with a final `404` when no
 readable holder remains. Existing direct local/remote responses retain their
-metadata policy. Symbols and writes retain the original virtual `501` text
-before parsing or body admission; V2 reads are implemented by NUG-02 below.
+metadata policy. NUG-03 below adds symbols and writes; the remaining deferred
+operations retain the original virtual `501` before parsing/body admission.
+V2 reads are implemented by NUG-02 below.
 The common forced-auth challenge still runs first.
 
 Search output from each member is bounded by `skip + take`, pages sent upstream
@@ -789,3 +791,33 @@ source defines aggregation across supplying members, and hidden/losing version
 counts must not leak. Local per-version statistics retain their selected stored
 owner; direct local and remote counters retain their existing behavior. This is
 recorded with the other NUG-02 inferences for P19/#216.
+
+### P10 virtual publishing, symbols and administration (NUG-03)
+
+V2 package PUT and V3 symbol PUT use the configured local/federated deployment
+member. Deploy is checked on its real folder and canonical package path; the
+existing 201/409 behavior names that member while response URLs retain the
+addressed virtual. A missing/unusable DDR is R6's 405 with `Allow: GET`; virtual
+DELETE and POST relist are empty 404s without mutation **[I]**. Other unsupported
+V2 methods retain their previous 501 before parsing or body admission.
+
+A virtual symbol server selects the first readable local extracted PDB or remote
+symbol file in effective order, checking path policy and the remote's source
+cache/authority boundaries. A member's Read refusal remains absent; storage faults
+remain server errors. Forced authentication challenges at the addressed virtual
+before its routes. A forced member does not alter an unforced parent's challenge:
+7.161.26 `NuGetAuthUtil.repoForcesAuth` reads only the addressed descriptor.
+
+Saving a normalized NuGet virtual requires Enforce Layout on each referenced
+member, including nested virtual descriptors. The source-backed 400 message is
+`Nuget Repository <key> must have only normalized repositories`. A non-normalized
+parent may include normalized children, following the explicit current
+[NuGet documentation](https://docs.jfrog.com/artifactory/docs/nuget-repositories)
+over the verified source validator's symmetric restriction. DV-111 is unchanged:
+all runtime package behavior remains normalized. Mixed-layout nested V2/V3
+package downloads still work.
+
+[NuGet reindex](https://docs.jfrog.com/artifactory/reference/calculateNuGetRepositoryMetadata)
+accepts a virtual with the existing Manage gate and 200 text. It queues no own or
+member work **[I]**. Research 29 and #216 record the unsettled details; no live or
+trial vendor capture was used.
