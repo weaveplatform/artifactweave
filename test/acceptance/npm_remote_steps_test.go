@@ -22,6 +22,7 @@ func (w *world) registerRemoteNPM(sc *godog.ScenarioContext) {
 	sc.Step(`^an npm upstream serves "([^"]*)" at "([^"]*)"$`, w.npmUpstream)
 	sc.Step(`^an npm upstream search returns:$`, w.npmSearchUpstream)
 	w.registerNPMSignatures(sc)
+	w.registerExternalNPM(sc)
 }
 
 // npmUpstreamKey is the key every fake npm upstream signs its versions with

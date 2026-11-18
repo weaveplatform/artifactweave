@@ -104,6 +104,7 @@ func (r repos) Delete(ctx context.Context, key string) error {
 			DeleteWhere(func(_ string, v model.BowerRegistration) bool {
 				return v.RepoKey == key
 			})
+		npmExternals(r).rows().DeleteWhere(func(_ string, v model.NPMExternal) bool { return v.Virtual == key })
 		remoteRecords(r).sources().Del(key)
 		remoteRecords(r).entries().
 			DeleteWhere(func(_ string, e model.RemoteCacheEntry) bool { return e.Token.Key.RepoKey == key })

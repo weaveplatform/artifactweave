@@ -91,6 +91,10 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request) {
 		h.virtualKeys(w, r)
 		return
 	}
+	if len(p.Segments) == 2 && p.Segments[0] == "_external" && !p.Folder && len(p.Props) == 0 {
+		h.externalTarball(r.Context(), w, r, p.String())
+		return
+	}
 	name, rest, ok := splitName(p.Segments)
 	switch {
 	case !ok:
@@ -100,9 +104,9 @@ func (h handler) virtualRead(w http.ResponseWriter, r *http.Request) {
 	case len(rest) == 0 && r.URL.Query().Get("write") == "true":
 		h.virtualWriteDocument(w, r, name)
 	case len(rest) == 0:
-		h.virtualPackage(w, r, name, "", false)
+		h.virtualPackage(r.Context(), w, r, name, "", false)
 	case len(rest) == 1:
-		h.virtualPackage(w, r, name, rest[0], false)
+		h.virtualPackage(r.Context(), w, r, name, rest[0], false)
 	default:
 		h.k.Error(w, r, notFound(r))
 	}
@@ -132,13 +136,33 @@ func (h handler) virtualFolder(w http.ResponseWriter, r *http.Request, name stri
 	return h.k.RequireFolder(w, r, name, api.ActionRead)
 }
 
-func (h handler) virtualPackage(w http.ResponseWriter, r *http.Request, name, spec string, tagsOnly bool) {
+func (h handler) virtualPackage(ctx context.Context, w http.ResponseWriter, r *http.Request, name, spec string, tagsOnly bool) {
 	if !h.virtualFolder(w, r, name) {
 		return
 	}
-	model, err := h.virtualModel(r, name)
+	r, external, err := h.externalRequest(ctx, r)
 	if err != nil {
 		h.k.Error(w, r, err)
+		return
+	}
+	model, err := h.virtualModel(r, name)
+	if err != nil && external != nil && member404(err) {
+		model = npmfmt.VirtualPackage{}
+		err = nil
+	}
+	if err == nil && external != nil {
+		var check func(context.Context) error
+		model, check, err = h.externalPackage(r, external, name, model)
+		if err == nil && check != nil {
+			err = check(ctx)
+		}
+	}
+	if err != nil {
+		if external != nil {
+			h.externalError(w, r, err)
+		} else {
+			h.k.Error(w, r, err)
+		}
 		return
 	}
 	if tagsOnly {
@@ -336,6 +360,9 @@ func virtualVersion(name, number string, v npmfmt.VirtualVersion, base string, s
 		return nil, remoteProtocolError()
 	}
 	dist["tarball"] = jsonString(base + "/" + escapePath(npmfmt.CanonicalPath(name, number)))
+	if v.ExternalTarball != "" {
+		dist["tarball"] = jsonString(base + v.ExternalTarball)
+	}
 	fields["version"], fields["dist"] = jsonString(number), encode(dist)
 	return fields, nil
 }

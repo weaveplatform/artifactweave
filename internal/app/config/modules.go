@@ -62,9 +62,10 @@ func (c Config) Artifacts() artifacts.Settings {
 			Maven:  maven.Settings{MetadataVersion3Enabled: c.Maven.MetadataVersion3Enabled},
 			Helm:   helm.Settings{RelativeURLs: &relativeURLs},
 			NPM: npm.Settings{
-				TagLatestByPublish:     c.NPM.TagLatestByPublish,
-				MergeDistTagsByVersion: c.NPM.MergeDistTagsByVersion,
-				EnforcePath:            c.NPM.EnforcePath,
+				TagLatestByPublish:             c.NPM.TagLatestByPublish,
+				MergeDistTagsByVersion:         c.NPM.MergeDistTagsByVersion,
+				ExternalDependenciesVersioning: c.NPM.ExternalDependenciesVersioning,
+				EnforcePath:                    c.NPM.EnforcePath,
 			},
 			PyPI: pypi.Settings{
 				EnforceLayout:              c.PyPI.EnforceLayout,

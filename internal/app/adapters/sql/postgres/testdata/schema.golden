@@ -560,6 +560,16 @@ column leases.acquired_at bigint
 column leases.expires_at bigint NOT NULL
 constraint leases.leases_pkey PRIMARY KEY (name)
 index leases.leases_pkey CREATE UNIQUE INDEX leases_pkey ON leases USING btree (name)
+table npm_externals
+column npm_externals.virtual_key text COLLATE "C" NOT NULL
+column npm_externals.name text COLLATE "C" NOT NULL
+column npm_externals.spec text COLLATE "C" NOT NULL
+column npm_externals.source_url text COLLATE "C" NOT NULL
+column npm_externals.file text COLLATE "C" NOT NULL
+column npm_externals.sha256 text COLLATE "C" NOT NULL DEFAULT ''::text
+constraint npm_externals.npm_externals_pkey PRIMARY KEY (virtual_key, name, spec)
+constraint npm_externals.npm_externals_virtual_key_fkey FOREIGN KEY (virtual_key) REFERENCES repositories(key) ON DELETE CASCADE
+index npm_externals.npm_externals_pkey CREATE UNIQUE INDEX npm_externals_pkey ON npm_externals USING btree (virtual_key, name, spec)
 table outbox
 column outbox.origin text COLLATE "C" NOT NULL
 column outbox.stream text COLLATE "C" NOT NULL

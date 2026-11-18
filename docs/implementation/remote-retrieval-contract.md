@@ -597,7 +597,7 @@ absent from this baseline must enter P20's ledger with an implementation owner.
 |---|---|
 | [#615](https://github.com/weaveplatform/artifactweave/issues/615), [#637](https://github.com/weaveplatform/artifactweave/issues/637), [#638](https://github.com/weaveplatform/artifactweave/issues/638), [#639](https://github.com/weaveplatform/artifactweave/issues/639) | Deterministic status/body/time/auth faults; provider apply/empty-plan/destroy separately from content; optional real-upstream monitoring; final native/client, security and CI sign-off. Fakes are not vendor observations. |
 | [#623](https://github.com/weaveplatform/artifactweave/issues/623)/#624 Docker/OCI/Helm OCI | Challenge tokens, immutable digests, mutable tags, foreign layers, exact manifest bytes; source auth failure cannot become `MANIFEST_UNKNOWN`. |
-| [#625](https://github.com/weaveplatform/artifactweave/issues/625) Maven/Gradle/Ivy/SBT; [#626](https://github.com/weaveplatform/artifactweave/issues/626) npm | Preserve full upstream version metadata; validate snapshots/POM/JARs and packument/tarball integrity. Eager companions are bounded. npm local signing is [#362](https://github.com/weaveplatform/artifactweave/issues/362); an npm remote relays its upstream's keys document ([#1318](https://github.com/weaveplatform/artifactweave/issues/1318)); npm audit proxying remains P28. |
+| [#625](https://github.com/weaveplatform/artifactweave/issues/625) Maven/Gradle/Ivy/SBT; [#626](https://github.com/weaveplatform/artifactweave/issues/626) npm | Preserve full upstream version metadata; validate snapshots/POM/JARs and packument/tarball integrity. Eager companions are bounded. npm virtual external dependencies use the selected cache remote’s source policy and persisted URL bindings ([#1568](https://github.com/weaveplatform/artifactweave/issues/1568)). npm local signing is [#362](https://github.com/weaveplatform/artifactweave/issues/362); an npm remote relays its upstream's keys document ([#1318](https://github.com/weaveplatform/artifactweave/issues/1318)); npm audit proxying remains P28. |
 | [#627](https://github.com/weaveplatform/artifactweave/issues/627) PyPI; [#628](https://github.com/weaveplatform/artifactweave/issues/628)/#629 NuGet | Correct HTML/JSON and v2/v3 variants, upstream signature/core-metadata integrity, no invented local-only view of remote versions; names, pages and rewritten downloads stay consistent. |
 | [#630](https://github.com/weaveplatform/artifactweave/issues/630) Helm; [#631](https://github.com/weaveplatform/artifactweave/issues/631)/#632 Terraform | Preserve index/discovery lists, chart provenance, module ZIP/provider checksum/signature bytes; validate external origins. Terraform backend is a different local-only repository contract. |
 | [#633](https://github.com/weaveplatform/artifactweave/issues/633) Go; P10 | P9 tests GOPROXY `.info/.mod/.zip`, list/latest source without enabling unsupported direct remote routes. P10 composes ordered sources and proves native Go; P28 sumdb/VCS and P33 VCS transport remain assigned. |
@@ -700,9 +700,12 @@ a registry without keys, and a source failure answers its source error, so
 `npm audit signatures` through a remote of a signing upstream verifies what it relays
 (decision 0034, "Signatures"; the answers no source names are [I]).
 
-P10 retains virtual external dependency-spec rewriting, destination-repository
-selection and virtual signature and key merging (#1319); P28 retains audit proxying;
-P21 retains browser login.
+P10 NPM-05 serves virtual external dependency-spec rewriting through its selected
+cache remote, with persisted URL/tag/digest bindings and the shared guarded source
+read ([research and inferences](../research/p10-npm-external.md), #1568). The normal
+remote's current permissions, cold-fill admission, offline/no-store and redirect
+rules remain authoritative; a synthetic record is never fetch authority. Virtual
+signature/key merging remains #1319; P28 retains audit proxying and P21 browser login.
 A remote fetches each tarball from the URL its upstream's packument gives, outside the
 registry's root or on another host included, as 7.x does (RTFACT-23931, 7.24.1), with no
 repository field gating it: `externalDependencies*` are an npm virtual repository's

@@ -65,6 +65,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 - For verification, use a new project with no node_modules/lockfile and a new npm cache.
 - A repeated publish of an existing version is refused; --force does not make publication idempotent.
 - Virtual npm supports merged reads, publication and mutations through its configured deployment target, plus login/logout, ping and whoami. Normal reads retain merged metadata until the retrieval period expires; write=true reads the deployment target only. Virtual search merges readable local and remote member hits, caches remote pages for the virtual retrieval period, and reads local indexes live. Virtual signing keys merge readable signing members per request. npm audit signatures verifies signed packages and reports unsigned packages as missing signatures; restrictive patterns must include .npm/keys.json. Federated native-client qualification remains follow-on work.
+- A virtual with dependency rewrite, matching Ant patterns and a valid direct cache remote serves allowed tarball/GitHub dependencies through persistent synthetic tags and virtual _external URLs. Empty patterns match nothing. The cache remote retains Read/Cache permission and source policy; source URL/digest bindings prevent wrong-byte filename collisions even with npm.external_dependencies_versioning off.
 
 ## Verification sources
 
@@ -77,3 +78,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [internal/access/core/authn/token.go](../../internal/access/core/authn/token.go).
 - Evidence: [test/acceptance/features/npm_remote.feature](../../test/acceptance/features/npm_remote.feature).
 - Evidence: [test/acceptance/features/npm_virtual.feature](../../test/acceptance/features/npm_virtual.feature).
+- Evidence: [test/acceptance/npm_external_steps_test.go](../../test/acceptance/npm_external_steps_test.go).

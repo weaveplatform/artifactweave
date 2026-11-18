@@ -37,7 +37,7 @@ way: a registry whose tarballs lie outside its own root stopped answering 404 in
 ([RTFACT-23931](https://jfrog.atlassian.net/browse/RTFACT-23931)), and 7.161.26 uses an
 npm handler's download URL on another host as it stands. No repository field gates it.
 `externalDependenciesEnabled` and `externalDependenciesPatterns` belong to an npm
-virtual repository's dependency rewrite (P10); an npm remote ignores them (#1574).
+virtual repository's dependency rewrite; an npm remote ignores them (#1574).
 
 Safety rules still apply to every tarball URL. Userinfo, fragments, non-HTTP(S) schemes,
 traversal and HTTPS downgrades are refused, so the packument and its version and
@@ -48,9 +48,23 @@ listed. Origin credentials are not sent to another authority unless `allowAnyHos
 is on and that authority uses HTTPS
 ([transport contract](../implementation/remote-http-transport.md)).
 
-P10 owns virtual-repository dependency-spec rewriting and
-`externalDependenciesRemoteRepo`, including Git shorthand dependencies. These are
-separate from the remote `dist.tarball` handling above. Local and federated repositories
+A virtual can enable `externalDependenciesEnabled`, provide Ant patterns in
+`externalDependenciesPatterns`, and select a same-type direct remote member with
+`externalDependenciesRemoteRepo`. Matching tarball/GitHub dependencies become
+persistent synthetic dist-tags; installs fetch their validated archives through
+that remote under `<remote>-cache/_external/`, with virtual tarball URLs. Disabled
+rewriting, invalid cache selection or unmatched URLs retain the original specs.
+The remote retains its Read/Cache permissions, source policy and current-authority
+checks. The allowlist must permit the actual archive URL and all redirect hosts;
+unknown git hosts stay unchanged. A configured empty allowlist matches nothing.
+
+`npm.external_dependencies_versioning` is off by default. When enabled it uses an
+available URL version hint; a versionless URL keeps its filename [I]. Independent URL/digest
+bindings prevent two sources with one filename from serving each other's bytes;
+a cache miss while offline remains a refusal. See [NPM-05 research and its explicit
+inferences](../research/p10-npm-external.md) for naming and merge choices. This
+virtual dependency handling is separate from remote `dist.tarball` handling above.
+Local and federated repositories
 sign with ECDSA and serve `/-/npm/v1/keys` (#362, decision 0034). A remote relays its
 upstream's `dist.signatures` and answers `/-/npm/v1/keys` with the upstream's keys
 document (#1318, decision 0034, "Signatures"), so `npm audit signatures` verifies

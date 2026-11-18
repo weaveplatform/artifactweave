@@ -20,6 +20,7 @@ type Store interface {
 	Packages() PackageStore
 	GitLFSLocks() GitLFSLockStore
 	BowerRegistrations() BowerRegistrationStore
+	NPMExternals() NPMExternalStore
 	UploadDigests() UploadDigestStore
 	Builds() BuildStore
 	ArchivedItems() ArchivedItemStore

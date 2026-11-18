@@ -40,6 +40,8 @@ type Settings struct {
 	// MergeDistTagsByVersion selects the highest SemVer custom-tag target across
 	// virtual members instead of the first member's tag (7.75.3+).
 	MergeDistTagsByVersion bool
+	// ExternalDependenciesVersioning appends URL version information to external cache names.
+	ExternalDependenciesVersioning bool
 	// EnforcePath is npm.enforce_path, 7.x's artifactory.npm.enforce.path:
 	// a package tarball deployed to a local repository under a file name
 	// other than the one its package.json gives is refused (Admit). 7.x

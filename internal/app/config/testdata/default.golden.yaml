@@ -151,6 +151,7 @@ npm:
     login_token_expiry: 720h0m0s
     tag_latest_by_publish: false
     merge_dist_tags_by_version: false
+    external_dependencies_versioning: false
     enforce_path: false
     max_publish_size: 1GiB
 token:

@@ -26,18 +26,19 @@ func TestUnitModuleSettingsFromConfig(t *testing.T) {
 	cfg, err := Load(LoadOptions{
 		File: filepath.Join("testdata", "every-key.yaml"),
 		Flags: map[string]string{
-			"gc.interval":                       "7m",
-			"gc.grace_period":                   "3h",
-			"npm.merge_dist_tags_by_version":    "true",
-			"npm.enforce_path":                  "true",
-			"cran.archive_mover_enabled":        "true",
-			"huggingface.xet_enabled":           "true",
-			"conda.shards_enabled":              "true",
-			"pypi.enforce_layout":               "true",
-			"pypi.enforce_naming_normalization": "true",
-			"pypi.simple_json":                  "true",
-			"pypi.core_metadata":                "true",
-			"remote.allowed_private_origins":    "https://mirror.example.com",
+			"gc.interval":                          "7m",
+			"gc.grace_period":                      "3h",
+			"npm.merge_dist_tags_by_version":       "true",
+			"npm.external_dependencies_versioning": "true",
+			"npm.enforce_path":                     "true",
+			"cran.archive_mover_enabled":           "true",
+			"huggingface.xet_enabled":              "true",
+			"conda.shards_enabled":                 "true",
+			"pypi.enforce_layout":                  "true",
+			"pypi.enforce_naming_normalization":    "true",
+			"pypi.simple_json":                     "true",
+			"pypi.core_metadata":                   "true",
+			"remote.allowed_private_origins":       "https://mirror.example.com",
 		},
 	})
 	if err != nil {
@@ -87,7 +88,7 @@ func TestUnitModuleSettingsFromConfig(t *testing.T) {
 			Debian: debian.Settings{DisableMetadataValidation: true},
 			// relative_urls: false, which only a non-nil pointer carries.
 			Helm: helm.Settings{RelativeURLs: &relativeURLs},
-			NPM:  npm.Settings{TagLatestByPublish: true, MergeDistTagsByVersion: true, EnforcePath: true},
+			NPM:  npm.Settings{TagLatestByPublish: true, MergeDistTagsByVersion: true, ExternalDependenciesVersioning: true, EnforcePath: true},
 			PyPI: pypi.Settings{
 				EnforceLayout:              true,
 				EnforceNamingNormalization: true,

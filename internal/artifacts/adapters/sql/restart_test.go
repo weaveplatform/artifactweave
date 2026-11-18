@@ -196,3 +196,25 @@ func TestAccVirtualCopiesSurviveRestart(t *testing.T) {
 		t.Fatal(b, err)
 	}
 }
+
+func TestAccNPMExternalMappingsSurviveRestart(t *testing.T) {
+	ctx := t.Context()
+	path := filepath.Join(t.TempDir(), "npm-external.db")
+	s := mustOpenFile(t, path, nil)
+	if err := s.Repos().Create(ctx, repo.Config{Key: "v", Class: repo.Virtual, PackageType: repo.NPM}); err != nil {
+		t.Fatal(err)
+	}
+	row := model.NPMExternal{Virtual: "v", Name: "dep", Spec: "dep-art-external", URL: "https://example/dep.tgz", File: "dep.tgz", SHA256: "digest"}
+	if err := s.NPMExternals().Put(ctx, row); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s = mustOpenFile(t, path, nil)
+	defer func() { _ = s.Close() }()
+	got, err := s.NPMExternals().Get(ctx, "v", "dep", row.Spec)
+	if err != nil || got != row {
+		t.Fatal(got, err)
+	}
+}

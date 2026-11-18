@@ -28,6 +28,7 @@ func Run(t *testing.T, newStore Factory) {
 	runContent(t, newStore)
 	runGitLFSLocks(t, newStore)
 	runBowerRegistrations(t, newStore)
+	runNPMExternals(t, newStore)
 	runUploadDigests(t, newStore)
 	runRemoteCache(t, newStore)
 	runVirtualCopies(t, newStore)

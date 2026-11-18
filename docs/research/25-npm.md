@@ -507,3 +507,15 @@ adding an unsigned member. Existing direct local rotation/tampering and direct
 remote relaying controls remain covered. The related existing local keys bug
 was fixed here: configured keypair lookup now follows exact-file Read and policy,
 so a refused reader cannot trigger a key-store lookup or see its fault.
+
+### P10 NPM-05 external dependency rewrite (2026-11-18)
+
+Current primary guidance, historical fixes RTFACT-13802/18626/20763, exact
+7.161.26 source boundaries and explicit unresolved naming/cache/merge choices are
+in [the NPM-05 dossier](p10-npm-external.md). Rewriting is request-specific over the
+immutable merged model, with durable synthetic tag/source identity and normal
+member-bound remote policy. Pinned npm 11/12 qualify allowed tarball and GitHub
+dependencies, including a scoped name, cold install and a fresh-cache `npm ci`
+whose lockfile stays on the virtual; the clients cannot download directly from
+the fixture origins. Bower controls retain its existing answers; #1689 owns the
+separately proved Bower external storage-fault classification defect.

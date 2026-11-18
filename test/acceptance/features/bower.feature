@@ -237,6 +237,7 @@ Feature: Native Bower client resolution
       | STASH    | bower-stash   |
       | OLDSTASH | bower-private |
 
+  @bower_external
   Scenario: virtual dependency rewrite and art shorthand stay cached with fresh client state
     Given an external Bower dependency and parent fixture are available
     And the registry is running
