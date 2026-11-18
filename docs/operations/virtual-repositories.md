@@ -7,7 +7,7 @@ separates the resolution mechanism from client/server evidence. Registered `V` i
 not itself a native-client qualification claim. A federated member here is the
 one-node repository contract; cross-peer convergence belongs to P13.
 
-This guide describes merged implementation through main `cbed189bc` (2026-11-18).
+This guide describes merged implementation through main `fb67c046` (2026-11-18).
 The [qualification and epic closeout record](../testing/phase10-signoff.md)
 distinguishes delivered work from the remaining final gate. [#1571](https://github.com/weaveplatform/artifactweave/issues/1571)
 owns final qualification, the plan status and decision 0008's acceptance. The

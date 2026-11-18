@@ -3,7 +3,7 @@
 Status: **implementation evidence recorded; final qualification pending**.
 
 Audit date: 2026-11-18. Merged implementation baseline:
-[`cbed189bceac60069fd037d9de56235e05877e68`](https://github.com/weaveplatform/artifactweave/commit/cbed189bceac60069fd037d9de56235e05877e68).
+[`fb67c046de93fee4da1968487a365b05ad8c4cc0`](https://github.com/weaveplatform/artifactweave/commit/fb67c046de93fee4da1968487a365b05ad8c4cc0).
 The native GitHub child lists and issue/merged-PR timelines show **44 of 47 child
 tickets closed**, including the qualification follow-up identified in this audit.
 [QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571) and
@@ -168,16 +168,16 @@ implementation; that discrepancy remains explicit. Unposted inference drafts
 are not represented as existing #216 comments. New runtime-fault classifications
 retain their primary-source and modern-version limits in their owning research.
 
-## Outstanding qualification and corrective work
+## Qualification status and corrective work
 
 | Item | Current disposition |
 | --- | --- |
 | [#1709](https://github.com/weaveplatform/artifactweave/issues/1709) | The adapter epic explicitly requires one table covering all 23 adapters over member order, nesting and a cycle. Individual native/kit tests exist, but the complete table was not identified in the merged tree. This tracks the missing qualification artifact, not a reproduced runtime defect, and blocks #1571. |
 | [#1710](https://github.com/weaveplatform/artifactweave/issues/1710) | The engine epic requires one shared graph traversal. `Members`/`flatten` and route-aware `Walk` still have independent recursive loops. The follow-up shares traversal while preserving both contracts; it is structural acceptance work, not a newly reproduced client failure, and blocks #1571. |
-| [#1645 / PR #1705](https://github.com/weaveplatform/artifactweave/pull/1705) | Draft correction for retaining an expired repository file on origin 404. Introduced metadata-content and API-document regressions are being fixed in that PR; its old-head CI failures do not qualify the new correction. |
-| [#1704](https://github.com/weaveplatform/artifactweave/issues/1704) | Existing-copy validation-clock SQL faults still need the independently tested cause-preserving 500 correction merged. |
-| [#1706 / PR #1707](https://github.com/weaveplatform/artifactweave/pull/1707) | Test-only Go repeated-publication fixture isolation is in CI. Both independent builds still require exactly three artifacts; no registry behavior is changed. |
-| [#1693 / PR #1698](https://github.com/weaveplatform/artifactweave/pull/1698) | SQLite literal-file path fix has successful native Windows evidence. Full CI currently waits for the separately diagnosed Go fixture correction to merge and be integrated. |
+| [#1645 / PR #1705](https://github.com/weaveplatform/artifactweave/pull/1705) | Corrected head `ddc19865` is ready for review after all local gates, real SQL/race checks and final-source native qualification. API-document/content-phase/classifier regressions are fixed in that head; [full CI 44378432054](https://github.com/weaveplatform/artifactweave/actions/runs/44378432054) remains required before merge. |
+| [#1704 / PR #1711](https://github.com/weaveplatform/artifactweave/pull/1711) | The cause-preserving existing-copy clock-fault correction is ready for review at `f28f6a73`, with all local gates and real SQLite/PostgreSQL proof. [Full CI 44373109714](https://github.com/weaveplatform/artifactweave/actions/runs/44373109714) and merge remain required. |
+| [#1706 / PR #1707](https://github.com/weaveplatform/artifactweave/pull/1707) | Merged as `fb67c046` after [full exact-head CI 44361946001](https://github.com/weaveplatform/artifactweave/actions/runs/44361946001) passed all 19 required jobs. Both independently collected Go builds still require exactly three artifacts; no registry behavior changed. |
+| [#1693 / PR #1698](https://github.com/weaveplatform/artifactweave/pull/1698) | SQLite literal-file path fix has successful native Windows evidence. Normal main integration `90f38797` now includes the merged Go fixture correction; fresh driver/application/selector/recipe/lint checks passed and [full CI 44377565202](https://github.com/weaveplatform/artifactweave/actions/runs/44377565202) is running. |
 | [#1571](https://github.com/weaveplatform/artifactweave/issues/1571) | Final evidence audit, decision acceptance, phase completion and exact merged-main gate remain required. |
 
 The successful [RPM correction gate](https://github.com/weaveplatform/artifactweave/actions/runs/44355578274)
