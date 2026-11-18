@@ -96,7 +96,15 @@ func (s *Kit) fileStep(r *http.Request, req ItemRequest, p kernel.Principal, acc
 			return Found{}, passedOver, nil
 		}
 		restore := keepUnfound(dl)
-		read, ok := s.readRemoteItem(r, m, memberRequest(req, m), p, acc, dl.trace)
+		attempt := memberRequest(req, m)
+		if dl.layoutTranslated {
+			var err error
+			attempt.Path, err = dl.translate(ctx, m, req.Path)
+			if err != nil {
+				return Found{}, passedOver, fmt.Errorf("member request path: %w", err)
+			}
+		}
+		read, ok := s.readRemoteItem(r, m, attempt, p, acc, dl.trace)
 		restore()
 		if !ok {
 			// The member's cache holds the path, which its cache step
@@ -143,7 +151,11 @@ func (s *Kit) archiveStep(
 		ctx context.Context, dl *Download, m repo.Config, res *virtual.Resolution,
 	) (Found, memberAnswer, error) {
 		restore := keepUnfound(dl)
-		a, read, ok := s.readRemoteArchive(r, m, memberRequest(req, m), archive, p, acc, dl.trace)
+		attemptArchive := archive
+		if dl.layoutTranslated {
+			attemptArchive = resourcePath(dl.path)
+		}
+		a, read, ok := s.readRemoteArchive(r, m, memberRequest(req, m), attemptArchive, p, acc, dl.trace)
 		restore()
 		if !ok {
 			return Found{}, passedOver, nil
@@ -179,7 +191,7 @@ func (s *Kit) archiveStep(
 // remote resource is not found, whether the upstream lacks it or failed;
 // otherwise the walk passes over m.
 func fallBack(dl *Download, m repo.Config, res *virtual.Resolution) (Found, memberAnswer, error) {
-	kept, ok := dl.expired[m.Key]
+	kept, ok := dl.expired[m.Key+":"+dl.path]
 	if !ok {
 		return Found{}, passedOver, nil
 	}

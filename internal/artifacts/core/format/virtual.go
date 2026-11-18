@@ -34,8 +34,11 @@ type VirtualChoice struct {
 // cache steps, letting each remote choose its own copy through its source policy.
 type VirtualSelection struct {
 	DirectRemotes bool
-	Skip          func(repo.Config) []string
-	Choose        func(context.Context, VirtualCandidate, *VirtualCandidate) (VirtualChoice, error)
-	Missing       string
-	Returning     func(VirtualCandidate) string
+	// NoOriginalFallback keeps snapshot lookups on their translated path;
+	// standard and latest-release reads may retry the original after a miss.
+	NoOriginalFallback bool
+	Skip               func(repo.Config) []string
+	Choose             func(context.Context, VirtualCandidate, *VirtualCandidate) (VirtualChoice, error)
+	Missing            string
+	Returning          func(VirtualCandidate) string
 }

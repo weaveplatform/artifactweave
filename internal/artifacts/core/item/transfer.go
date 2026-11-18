@@ -475,6 +475,18 @@ func (tr *translation) claim(dst, src string) string {
 // Layout compiles a repository layout: one the descriptor stored, else a
 // bundled one.
 func (s *Service) Layout(ctx context.Context, name string) (*layout.Layout, error) {
+	if s.readLayouts == nil {
+		return s.loadLayout(ctx, name)
+	}
+	if loaded, ok := s.readLayouts[name]; ok {
+		return loaded.layout, loaded.err
+	}
+	l, err := s.loadLayout(ctx, name)
+	s.readLayouts[name] = readLayout{layout: l, err: err}
+	return l, err
+}
+
+func (s *Service) loadLayout(ctx context.Context, name string) (*layout.Layout, error) {
 	doc, err := s.Store.Configs().Get(ctx, configdoc.ConfigLayout, name)
 	if errors.Is(err, kernel.ErrNotFound) {
 		l, err := layout.Lookup(name)

@@ -239,8 +239,10 @@ func (s *Kit) traceDownload(
 			return err
 		}
 	}
-	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
-	dl.selectVirtual = s.Items(st).SelectVirtual
+	items := s.Items(st).ReadSession()
+	dl := newDownload(req.Path, req.IsFolder, req.matrix(), items.Resolve)
+	dl.selectVirtual = items.SelectVirtual
+	dl.translate = ReadTranslator(items, c)
 	dl.trace = t
 	dl.upstream = s.walkStep(r, req, p, acc)
 	f, err := Lookup(ctx, st, c, cached, req.Path, acc, dl, virtual.Resolve)

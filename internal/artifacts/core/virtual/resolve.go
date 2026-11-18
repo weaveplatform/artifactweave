@@ -73,6 +73,10 @@ type Options struct {
 	// with its members (VirtualResolverRequestFilter.accepts 90-108). The
 	// storage API leaves it empty: 7.x's storage walk applies no filter.
 	Path string
+	// Translate rebuilds Path directly from the addressed virtual's layout in
+	// the nested virtual's layout before testing its patterns. Nil preserves
+	// the untranslated storage and package-handler walks.
+	Translate func(context.Context, repo.Config, string) (string, error)
 	// Folder is whether the request names a folder, which the patterns
 	// admit when an include could match below it.
 	Folder bool
@@ -168,8 +172,17 @@ func flatten(
 					continue
 				}
 				visited[m.Key] = true
-				if o.Path != "" && !repo.PatternsOf(m).AcceptsRequest(o.Path, o.Folder) {
-					continue
+				if o.Path != "" {
+					path := o.Path
+					if o.Translate != nil {
+						path, err = o.Translate(ctx, m, path)
+						if err != nil {
+							return fmt.Errorf("nested virtual %s path: %w", m.Key, err)
+						}
+					}
+					if !repo.PatternsOf(m).AcceptsRequest(path, o.Folder) {
+						continue
+					}
 				}
 				if err := walk(m); err != nil {
 					return err

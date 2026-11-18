@@ -162,6 +162,11 @@ func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
 		return remoteRead{}, false
 	}
 	resource := RemoteResource(r, req.Path)
+	if decoded, decodeErr := url.PathUnescape(resource.EscapedPath); decodeErr != nil || decoded != req.Path {
+		// A virtual layout translation changes the member's canonical source
+		// identity as well as its lookup path. Matrix values remain separate.
+		resource.EscapedPath = (&url.URL{Path: req.Path}).EscapedPath()
+	}
 	// The item route checks an upstream's label against the client's
 	// Accept, and answers a refusal 409, as 7.x's download does.
 	resource.ClientMIME = &source.ClientMIME{

@@ -2,12 +2,129 @@ package layout_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
 )
+
+// The shipped 7.161.26 helper tables distinguish read projection from the
+// lossless copy/move contract, especially descriptors crossing Maven 2.
+func TestUnitTranslateRead(t *testing.T) {
+	for _, c := range []struct{ name, maven, ivy, gradle string }{
+		{"jar", "org/momo/popo/1.0/popo-1.0.jar", "org.momo/popo/1.0/jars/popo-1.0.jar", "org.momo/popo/1.0/popo-1.0.jar"},
+		{"archive", "org/momo/popo/1.0/popo-1.0.tar.gz", "org.momo/popo/1.0/tar.gzs/popo-1.0.tar.gz", "org.momo/popo/1.0/popo-1.0.tar.gz"},
+		{"classifier", "org/momo/popo/1.0/popo-1.0-sources.jar", "org.momo/popo/1.0/jars/popo-sources-1.0.jar", "org.momo/popo/1.0/popo-1.0-sources.jar"},
+		{"long module", "really/super/ultra/mega-hyper/long/artifact-of-death/1.0/artifact-of-death-1.0-sources.jar", "really.super.ultra.mega-hyper.long/artifact-of-death/1.0/jars/artifact-of-death-sources-1.0.jar", "really.super.ultra.mega-hyper.long/artifact-of-death/1.0/artifact-of-death-1.0-sources.jar"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			paths := map[string]string{"maven-2-default": c.maven, "ivy-default": c.ivy, "gradle-default": c.gradle}
+			for from, source := range paths {
+				for to, target := range paths {
+					t.Run(from+" to "+to, func(t *testing.T) {
+						for _, suffix := range []string{"", ".md5", ".sha1", ".sha256", ":properties", ":statistics.sha1"} {
+							if got := layout.TranslateRead(bundled(t, from), bundled(t, to), source+suffix); got != target+suffix {
+								t.Errorf("%s: got %q, want %q", suffix, got, target+suffix)
+							}
+						}
+					})
+				}
+			}
+		})
+	}
+	for _, c := range []struct{ from, to, source, want string }{
+		{"maven-2-default", "ivy-default", "org/momo/popo/1.0/popo-1.0.pom", "org.momo/popo/1.0/poms/popo-1.0.pom"},
+		{"maven-2-default", "gradle-default", "org/momo/popo/1.0/popo-1.0.pom", "org.momo/popo/1.0/popo-1.0.pom"},
+		{"ivy-default", "maven-2-default", "org.momo/popo/1.0/ivys/ivy-1.0.xml", "org/momo/popo/1.0/popo-1.0.xml"},
+		{"ivy-default", "gradle-default", "org.momo/popo/1.0/ivys/ivy-1.0.xml", "org.momo/popo/ivy-1.0.xml"},
+		{"gradle-default", "ivy-default", "org.momo/popo/ivy-1.0.xml", "org.momo/popo/1.0/xmls/ivy-1.0.xml"},
+		{"gradle-default", "maven-2-default", "org.momo/popo/ivy-1.0.xml", "org/momo/popo/1.0/popo-1.0.xml"},
+		{"ivy-default", "gradle-default", "org.momo/popo/1.0-20260101120000/jars/popo-1.0-20260101120000.jar", "org.momo/popo/1.0-20260101120000/popo-1.0-20260101120000.jar"},
+		{"maven-2-default", "ivy-default", "org/momo/popo/1.0-SNAPSHOT/popo-1.0-20260101.120000-1.jar", "org.momo/popo/1.0-SNAPSHOT/jars/popo-1.0-20260101.120000-1.jar"},
+		{"maven-2-default", "ivy-default", "org/momo/popo/[RELEASE]/popo-[RELEASE].jar", "org.momo/popo/[RELEASE]/jars/popo-[RELEASE].jar"},
+		{"maven-2-default", "simple-default", "org/momo/popo/1.0/popo-1.0-sources.jar", "org/momo/popo/popo-1.0.jar"},
+		{"maven-2-default", "ivy-default", "org/momo/popo/1.0/popo-1.0.jar.sha512", "org.momo/popo/1.0/jar.sha512s/popo-1.0.jar.sha512"},
+		{"maven-2-default", "ivy-default", "org:acme/app/1.0/app-1.0.jar:properties", "org:acme/app/1.0/jars/app-1.0.jar:properties"},
+	} {
+		t.Run(c.from+" to "+c.to+" "+c.source, func(t *testing.T) {
+			if got := layout.TranslateRead(bundled(t, c.from), bundled(t, c.to), c.source); got != c.want {
+				t.Fatalf("got %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+func TestUnitTranslateReadPassThrough(t *testing.T) {
+	maven := bundled(t, "maven-2-default")
+	custom := func(def layout.Definition) *layout.Layout {
+		t.Helper()
+		l, err := layout.Compile(def)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return l
+	}
+	for _, c := range []struct {
+		name     string
+		from, to *layout.Layout
+		path     string
+	}{
+		{"blank", maven, bundled(t, "ivy-default"), " \t"},
+		{"no source", nil, maven, "org/momo/popo/1.0/popo-1.0.jar"},
+		{"no target", maven, nil, "org/momo/popo/1.0/popo-1.0.jar"},
+		{"same", maven, maven, "org/momo/popo/1.0/popo-1.0.jar.md5"},
+		{"unreadable", maven, bundled(t, "ivy-default"), "README.txt"},
+		{"metadata", maven, bundled(t, "ivy-default"), "org/momo/popo/maven-metadata.xml"},
+		{"missing identity", bundled(t, "cargo-default"), maven, "crates/popo/popo-1.0.crate"},
+		{"missing custom value", maven, custom(layout.Definition{Name: "custom", ArtifactPathPattern: "[orgPath]/[module]/[channel<.+>]/[baseRev].[ext]"}), "org/momo/popo/1.0/popo-1.0.jar"},
+		{"missing descriptor", bundled(t, "ivy-default"), custom(layout.Definition{Name: "custom", ArtifactPathPattern: "[orgPath]/[module]/[baseRev].[ext]"}), "org.momo/popo/1.0/ivys/ivy-1.0.xml"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := layout.TranslateRead(c.from, c.to, c.path); got != c.path {
+				t.Fatalf("got %q, want unchanged %q", got, c.path)
+			}
+		})
+	}
+	// A distinctive descriptor that matches but has no valid module must give
+	// the artifact pattern its chance, as the vendor helper does.
+	from := custom(
+		layout.Definition{
+			Name:                             "overlap",
+			ArtifactPathPattern:              "[orgPath]/[module]/[baseRev].[ext]",
+			DistinctiveDescriptorPathPattern: true,
+			DescriptorPathPattern:            "[module<.+>].jar",
+		},
+	)
+	if got := layout.TranslateRead(from, maven, "org/momo/popo/1.0.jar"); got != "org/momo/popo/1.0/popo-1.0.jar" {
+		t.Fatal(got)
+	}
+	def := maven.Definition()
+	def.DescriptorPathPattern = "[orgPath]/[module]/1.0/[module]-1.0.[ext]"
+	if got := layout.TranslateRead(custom(def), bundled(t, "ivy-default"), "org/acme/lib/1.0/lib-1.0.pom"); got != "org.acme/lib/1.0/poms/lib-1.0.pom" {
+		t.Fatal("invalid descriptor did not fall back to artifact values:", got)
+	}
+	def = maven.Definition()
+	def.FileIntegrationRevisionRegExp = "SNAPSHOT|[0-9]+"
+	if got := layout.TranslateRead(custom(def), bundled(t, "gradle-default"), "org/acme/lib/1.0/lib-1.0.pom"); got != "org.acme/lib/ivy-1.0.xml" {
+		t.Fatal("redefined Maven name treated as bundled Maven 2:", got)
+	}
+	// Read projection deliberately accepts a target which cannot parse its
+	// result. Copy and move still refuse the corresponding lossy conversion.
+	source := "org/momo/popo/1.0-SNAPSHOT/popo-1.0-SNAPSHOT.jar"
+	target := custom(layout.Definition{Name: "digits", ArtifactPathPattern: "[org]/[module]/[baseRev]/[fileItegRev].[ext]", FileIntegrationRevisionRegExp: `[0-9]{14}`})
+	got := layout.TranslateRead(maven, target, source)
+	if !strings.Contains(got, "SNAPSHOT") {
+		t.Fatal(got)
+	}
+	if _, err := target.Match(got); err == nil {
+		t.Fatal("expected non-readable target spelling")
+	}
+	if _, err := layout.Translate(maven, target, source); !errors.Is(err, layout.ErrLossy) {
+		t.Fatalf("copy/move: %v", err)
+	}
+}
 
 func bundled(t *testing.T, name string) *layout.Layout {
 	t.Helper()

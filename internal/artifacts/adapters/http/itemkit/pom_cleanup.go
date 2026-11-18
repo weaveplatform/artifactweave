@@ -209,7 +209,7 @@ func (s *Kit) serveReturnedPOM(w http.ResponseWriter, r *http.Request, st Store,
 		return
 	}
 	if f.remote != nil {
-		s.serveRemoteRead(w, r, f.Repo, v, memberRequest(req, f.Repo), p, *f.remote)
+		s.serveRemoteRead(w, r, f.Repo, v, foundRequest(req, f), p, *f.remote)
 		return
 	}
 	s.ServeItemFile(w, r, st, f, p)

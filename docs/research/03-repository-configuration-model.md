@@ -450,6 +450,24 @@ stays where it was written.
 
 #### Layout translation
 
+##### Virtual item reads (P10 MVN-06)
+
+`core/layout.TranslateRead` implements the documented virtual-to-member projection,
+with checksum suffixes, descriptor-first valid module extraction and unchanged paths
+when mapping is unavailable. It deliberately has no lossless read-back guard.
+`itemkit` uses one request-local layout snapshot across its nested pattern filter,
+Maven selection and real-member attempts. Projections always start at the addressed
+virtual; they never accumulate through nested layouts. Plain files and `[RELEASE]`
+retry an original spelling after an unfound translated result, including a policy or
+Read refusal; snapshots and Maven metadata do not. Each attempted member path has
+its own policy and Read checks, in the established virtual-member order. Only the
+final attempt supplies the member's denial; infrastructure faults remain terminal. Writes,
+storage lookups and native protocol walks retain their existing path rules.
+[Research 27](27-maven.md#p10-mvn-06-virtual-item-read-layout-translation-2026-11-18)
+records the primary 7.x sources and remaining closed-addon/header/protocol inferences.
+
+##### Copy and move (unchanged)
+
 A copy or move with `suppressLayouts=0` into the root of a repository of another layout
 reads each file's path with the source layout and builds it with the target's,
 descriptors through the descriptor patterns (`pkg/layout.Translate`). What 7.x does with a

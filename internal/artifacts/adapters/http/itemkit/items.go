@@ -344,6 +344,7 @@ type Found struct {
 	// which the route answers as a direct read of Repo would
 	// (serveRemoteRead), in place of Item.
 	remote *remoteRead
+	asked  string
 }
 
 // resolver rewrites a download's path in a repository that holds items,
@@ -355,11 +356,15 @@ type resolver func(ctx context.Context, c repo.Config, d format.Download) (strin
 // download checks (generic.CheckDownload) against the path and folder it
 // checks, and the format's rewrite of the path.
 type Download struct {
-	path          string
-	isFolder      bool
-	matrix        model.Matrix
-	resolve       resolver
-	selectVirtual func(context.Context, repo.Config, string) (*format.VirtualSelection, error)
+	path               string
+	isFolder           bool
+	matrix             model.Matrix
+	resolve            resolver
+	selectVirtual      func(context.Context, repo.Config, string) (*format.VirtualSelection, error)
+	translate          func(context.Context, repo.Config, string) (string, error)
+	noOriginalFallback bool
+	layoutTranslated   bool
+	deferForbidden     bool
 	// trace records the steps of a ?trace request (traceItem); nil for a
 	// download.
 	trace *resolutionTrace
@@ -497,6 +502,12 @@ func lookupMembers(
 			dl.upstream = nil
 		}
 		o.Path, o.Folder = dl.path, dl.isFolder
+		if dl.translate != nil {
+			o.Translate = dl.nestedPath
+		}
+		if dl.expired == nil {
+			dl.expired = map[string]expiredCopy{}
+		}
 	}
 	members, err := virtual.Members(ctx, st.Repos(), c, o)
 	if err != nil {
@@ -524,6 +535,7 @@ func lookupMembers(
 			return Found{}, fmt.Errorf("virtual selection: %w", err)
 		}
 		if selection != nil {
+			dl.noOriginalFallback = selection.NoOriginalFallback
 			return lookupSelected(ctx, st, members, p, acc, dl, selection)
 		}
 	}
@@ -608,7 +620,7 @@ func lookupReadable(
 	return Found{}, kernel.ErrNotFound
 }
 
-// lookupMember is one step of a download's walk through a virtual
+// lookupMemberPath is one step of a download's walk through a virtual
 // repository: step's member m, a real member, in the order 7.161.26's
 // member answers it (DbLocalRepo.checkDownloadIsAllowed 212-219,
 // RemoteRepoBase.checkDownloadIsAllowed 744-758, then getInfo), each
@@ -617,18 +629,14 @@ func lookupReadable(
 // upstream step makes the same checks, Read on the file included, before
 // dl.upstream asks the upstream anything.
 //
-//   - The download policy first: a refusal passes over silently, since 7.x
-//     answers it 404 and only a 403 counts toward the walk's answer. A
-//     request to the member itself checks Read first instead (DV-057), so
-//     that a caller learns nothing of a repository it may not read; in a
-//     walk the pass-over tells it nothing either.
-//   - Then Read on the path, which res keeps when it is refused (R3), the
-//     path a file request names whether m holds it or not, as
-//     checkDownloadIsAllowed checks it before getInfo looks.
+//   - The member's download policy first, as checkDownloadIsAllowed does;
+//     virtual member walks retain DV-057's documented exception.
+//   - Then Read on the actual attempted path, which res retains when refused
+//     (R3), whether the member holds the file or not.
 //   - Then the item. Matrix parameters it conflicts with pass over too, as
 //     DbStoringRepoMixin.getInfo answers that unfound; one it lacks makes
 //     it the closest match.
-func lookupMember(
+func lookupMemberPath(
 	ctx context.Context,
 	st Store,
 	step virtual.Member,
@@ -660,6 +668,7 @@ func lookupMember(
 	case errors.Is(err, kernel.ErrNotFound):
 		if !dl.isFolder && !acc.File(m, file, accessapi.ActionRead) {
 			deny(ctx, dl, res, m, file)
+			return Found{}, passedOver, nil
 		}
 		return Found{}, passedOver, nil
 	case errors.As(err, &rejected):
@@ -707,7 +716,7 @@ func lookupMember(
 			if dl.expired == nil {
 				dl.expired = map[string]expiredCopy{}
 			}
-			dl.expired[m.Key] = expiredCopy{found: f, served: served}
+			dl.expired[m.Key+":"+dl.path] = expiredCopy{found: f, served: served}
 			return Found{}, passedOver, nil
 		}
 		dl.stepf("Returning cached resource")
@@ -745,7 +754,7 @@ func deny(ctx context.Context, dl *Download, res *virtual.Resolution, m repo.Con
 	caller, _ := kernel.FromContext(ctx)
 	d := virtual.Denial{Member: key, Path: p, User: caller.Name}
 	dl.stepf("Download denied (%s) - returning un-found resource", d.Message())
-	if res.Deny(d) {
+	if res.Deny(d) && !dl.deferForbidden {
 		dl.stepf("Request is forbidden by %s", m.Key)
 	}
 }
@@ -835,8 +844,10 @@ func (s *Kit) getItem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	dl := newDownload(req.Path, req.IsFolder, req.matrix(), s.Items(st).Resolve)
-	dl.selectVirtual = s.Items(st).SelectVirtual
+	items := s.Items(st).ReadSession()
+	dl := newDownload(req.Path, req.IsFolder, req.matrix(), items.Resolve)
+	dl.selectVirtual = items.SelectVirtual
+	dl.translate = ReadTranslator(items, c)
 	lookupRequest, _ := pomLookupRequest(ctx, r, c, req)
 	dl.upstream = s.walkStep(lookupRequest, req, p, acc)
 	if req.Path == "" {
@@ -1020,7 +1031,7 @@ func (s *Kit) getSidecar(
 		if _, clean := maven.POMCleanupPolicy(c, artifact); clean {
 			f.remote.sidecar = string(alg)
 		}
-		s.serveRemoteRead(w, r, f.Repo, c, memberRequest(req, f.Repo), caller, *f.remote)
+		s.serveRemoteRead(w, r, f.Repo, c, foundRequest(req, f), caller, *f.remote)
 		return
 	}
 	value := item.ServedChecksum(f.Repo, f.Item, alg)
