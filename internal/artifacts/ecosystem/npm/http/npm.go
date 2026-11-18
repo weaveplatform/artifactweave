@@ -69,7 +69,7 @@ func Protocol(o Options) pkgroute.Protocol {
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			routes(r, handler{
 				accounts: o.Accounts, k: k, maxPublish: o.MaxPublishSize, format: o.Format,
-				keyPairs: o.KeyPairs,
+				keyPairs: o.KeyPairs, sources: o.RemoteSources,
 			})
 		},
 	}
@@ -101,6 +101,7 @@ type handler struct {
 	maxPublish int64
 	format     npmfmt.Settings
 	keyPairs   accessapi.Keys
+	sources    *source.Service
 }
 
 // ping answers every caller the server lets through: an authenticated

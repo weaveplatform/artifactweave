@@ -56,13 +56,14 @@ var npmMatrixPart = matrixPart{
 	},
 }
 
-// A virtual uses the same DDR paths and permission rules as these local rows.
+// A virtual uses the same permission rules as these local rows; writes name
+// the deployment target while searches filter its effective members.
 // Fresh fixtures keep each repeated mutation independent of its local control.
 func npmVirtualMatrixRows(rows []matrixRow) []matrixRow {
 	out := append([]matrixRow(nil), rows...)
 	for _, r := range rows {
 		switch r.route {
-		case npmPublish, npmTagAdd, npmTagRemove, npmUnpublishVersions, npmUnpublishTarball, npmUnpublish, npmLogin, npmLogout, npmWhoami:
+		case npmSearch, npmPublish, npmTagAdd, npmTagRemove, npmUnpublishVersions, npmUnpublishTarball, npmUnpublish, npmLogin, npmLogout, npmWhoami:
 		default:
 			continue
 		}

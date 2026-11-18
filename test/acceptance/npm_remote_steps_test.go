@@ -20,6 +20,7 @@ import (
 
 func (w *world) registerRemoteNPM(sc *godog.ScenarioContext) {
 	sc.Step(`^an npm upstream serves "([^"]*)" at "([^"]*)"$`, w.npmUpstream)
+	sc.Step(`^an npm upstream search returns:$`, w.npmSearchUpstream)
 	w.registerNPMSignatures(sc)
 }
 
@@ -91,5 +92,17 @@ func (w *world) npmUpstream(name, version string) error {
 			Header: map[string][]string{"Content-Type": {"application/octet-stream"}},
 		},
 	)
+	return nil
+}
+
+func (w *world) npmSearchUpstream(doc *godog.DocString) error {
+	if err := w.remoteUpstream("/ready", "ready"); err != nil {
+		return err
+	}
+	var body map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(doc.Content), &body); err != nil {
+		return err
+	}
+	w.remote.Set("/-/v1/search", fakeupstream.Resource{Body: []byte(doc.Content), Header: map[string][]string{"Content-Type": {"application/json"}}})
 	return nil
 }

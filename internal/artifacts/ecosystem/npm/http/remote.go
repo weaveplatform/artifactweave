@@ -289,30 +289,7 @@ func (h handler) remoteTarballResult(r *http.Request, name, path string) (source
 }
 
 func (h handler) remoteSearch(w http.ResponseWriter, r *http.Request) {
-	c := pkgroute.RequestFrom(r).Repo
-	base, err := url.Parse(strings.TrimRight(c.URL, "/") + "/")
-	if err != nil {
-		h.k.Error(w, r, remoteProtocolError())
-		return
-	}
-	target := base.ResolveReference(&url.URL{Path: "-/v1/search", RawQuery: r.URL.Query().Encode()})
-	resource := source.Resource{
-		Kind:                source.ResourceKindMetadata,
-		Path:                "-/v1/search",
-		Method:              http.MethodGet,
-		Accept:              jsonType,
-		ExternalURL:         target.String(),
-		PermissionFolder:    true,
-		ExpectedContentType: jsonType,
-		Variant:             "npm-search-v2",
-		Validate:            validateSearchMetadata,
-	}
-	result, err := h.k.Read(r, resource)
-	if err != nil {
-		h.k.Error(w, r, err)
-		return
-	}
-	doc, err := readRemoteDocument(r.Context(), result)
+	doc, result, err := h.readSearchPage(r, r.URL.Query(), false)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
@@ -376,4 +353,40 @@ func fenceDisclosures(result *source.Result, paths []string) {
 		}
 		return nil
 	}
+}
+
+func searchResource(r *http.Request, query url.Values, refresh bool) (source.Resource, error) {
+	c := pkgroute.RequestFrom(r).Repo
+	base, err := url.Parse(strings.TrimRight(c.URL, "/") + "/")
+	if err != nil {
+		return source.Resource{}, remoteProtocolError()
+	}
+	target := base.ResolveReference(&url.URL{Path: "-/v1/search", RawQuery: query.Encode()})
+	resource := source.Resource{
+		Kind:                source.ResourceKindMetadata,
+		Path:                "-/v1/search",
+		Method:              http.MethodGet,
+		Accept:              jsonType,
+		ExternalURL:         target.String(),
+		PermissionFolder:    true,
+		ExpectedContentType: jsonType,
+		Variant:             "npm-search-v3",
+		Validate:            validateSearchMetadata,
+	}
+
+	resource.RefreshMetadata = refresh
+	return resource, nil
+}
+
+func (h handler) readSearchPage(r *http.Request, query url.Values, refresh bool) (remoteDocument, source.Result, error) {
+	resource, err := searchResource(r, query, refresh)
+	if err != nil {
+		return nil, source.Result{}, err
+	}
+	result, err := h.k.Read(r, resource)
+	if err != nil {
+		return nil, result, fmt.Errorf("npm search metadata: %w", err)
+	}
+	doc, err := readRemoteDocument(r.Context(), result)
+	return doc, result, err
 }

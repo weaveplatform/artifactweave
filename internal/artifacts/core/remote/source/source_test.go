@@ -863,3 +863,60 @@ func TestUnitGalleryPOSTRequiresBoundedValidatedBodyAndHashedCacheIdentity(t *te
 		})
 	}
 }
+
+func TestUnitAuthorityDoesNotReadBackendAndRechecksDescendants(t *testing.T) {
+	q := request(t, "")
+	q.Resource = source.Resource{Kind: source.ResourceKindMetadata, Path: "pkg/index.json", PermissionFolder: true, PermissionPath: "pkg", Method: http.MethodGet}
+	calls, checks := 0, 0
+	generation := "revision-1"
+	s := &source.Service{Resolve: func(ctx context.Context, c repo.Config) (artmodel.SourceIdentity, error) {
+		id, err := identity(ctx, c)
+		id.Generation = artmodel.SourceGeneration(generation)
+		return id, err
+	}, Revalidate: func(context.Context, source.Request, source.Permit) error { checks++; return nil }, HTTP: backend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
+		calls++
+		return itemResult(), nil
+	})}
+	authority, err := s.Authorize(t.Context(), q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := authority.CheckPermission(t.Context(), "pkg/descendant.tgz"); err != nil {
+		t.Fatal(err)
+	}
+	if err := authority.CheckRead(t.Context(), "outside/secret.tgz"); !errors.Is(err, source.ErrDenied) {
+		t.Fatal(err)
+	}
+	if calls != 0 || checks < 2 {
+		t.Fatal(calls, checks)
+	}
+	generation = "changed"
+	if err := authority.Revalidate(t.Context()); !errors.Is(err, source.ErrSuperseded) {
+		t.Fatal(err)
+	}
+}
+
+func TestUnitRefreshMetadataIsTrustedAndPreservesCacheOnly(t *testing.T) {
+	q := request(t, "")
+	q.Resource.RefreshMetadata = true
+	s := &source.Service{Resolve: identity}
+	if _, err := s.Authorize(t.Context(), q); !errors.Is(err, source.ErrInvalidRequest) {
+		t.Fatal(err)
+	}
+	q.Resource.Kind = source.ResourceKindMetadata
+	q.CacheOnly = true
+	reads := 0
+	s.Cache = backend(func(_ context.Context, _ source.Request, permit source.Permit) (source.Result, error) {
+		reads++
+		if permit.UpstreamNetworkAllowed || permit.Intent != source.RetrievalIntentCacheOnly {
+			t.Fatal(permit)
+		}
+		return itemResult(), nil
+	})
+	if _, err := s.Read(t.Context(), q); err != nil {
+		t.Fatal(err)
+	}
+	if reads != 1 {
+		t.Fatal(reads)
+	}
+}

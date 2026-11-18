@@ -191,3 +191,81 @@ Feature: npm virtual packuments and immutable dependency tarballs
       | npm    |
       | npm    |
       | npm 12 |
+
+  @npm_virtual_search
+  Scenario Outline: <npm> searches live local and cached remote members through a nested virtual
+    Given the registry is running
+    And the <npm> client can reach the registry
+    And an npm upstream search returns:
+      """
+      {"objects":[{"package":{"name":"widget-common","version":"9.0.0"}},{"package":{"name":"hidden-widget","version":"1.0.0"}},{"package":{"name":"widget-remote","version":"1.0.0","description":"remote widget","maintainers":[],"keywords":["widget"]},"vendor":"whole-object"},{"package":{"name":"widget-unity","version":"Unity-1.0.0.0","maintainers":[],"keywords":["widget"]}}],"total":999,"time":"upstream"}
+      """
+    When I PUT "/artifactory/api/repositories/npm-search-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"npm"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/npm-search-remote" as admin with body:
+      """
+      {"rclass":"remote","packageType":"npm","url":"{upstream}","retrievalCachePeriodSecs":3600,"missedRetrievalCachePeriodSecs":3600}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/npm-search-inner" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"npm","repositories":["npm-search-local","npm-search-remote"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/npm-search-all" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"npm","repositories":["npm-search-inner","npm-search-remote"],"excludesPattern":".npm/hidden-widget/**","virtualRetrievalCachePeriodSecs":600}
+      """
+    Then the response status is 200
+    Given a file ".npmrc" with expanded content:
+      """
+      registry={url}/api/npm/npm-search-local/
+      //{host}/artifactory/api/npm/npm-search-local/:_auth={basicauth}
+      """
+    And a file "common/package.json" with content:
+      """
+      {"name":"widget-common","version":"1.0.0","description":"first local owner","keywords":["widget"]}
+      """
+    When I run npm "publish ./common --ignore-scripts"
+    Then the command succeeds
+    Given a file ".npmrc" with expanded content:
+      """
+      registry={url}/api/npm/npm-search-all/
+      //{host}/artifactory/api/npm/npm-search-all/:_auth={basicauth}
+      """
+    When I run npm "search --json widget --cache .npm-search-one"
+    Then the command succeeds
+    And the output contains "widget-common"
+    And the output contains "first local owner"
+    And the output contains "widget-remote"
+    And the output contains "widget-unity"
+    And the output contains "Unity-1.0.0.0"
+    And the output does not contain "hidden-widget"
+    And the output does not contain "9.0.0"
+    When I run npm "search --json widget --cache .npm-search-two"
+    Then the command succeeds
+    And the output contains "widget-remote"
+    And the generic upstream received 1 GET requests for "/-/v1/search"
+    When I GET "/artifactory/api/npm/npm-search-all/-/v1/search?text=widget" as admin
+    Then the response status is 200
+    And the response body contains "whole-object"
+    And the response body does not contain "total"
+    And the response body does not contain "time"
+    When I POST "/artifactory/api/repositories/npm-search-all" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"npm","repositories":["npm-search-inner","npm-search-remote"],"excludesPattern":".npm/hidden-widget/**","virtualRetrievalCachePeriodSecs":0}
+      """
+    Then the response status is 200
+    When I run npm "search --json widget --cache .npm-search-no-cache"
+    Then the command succeeds
+    And the output contains "widget-remote"
+    And the generic upstream received 2 GET requests for "/-/v1/search"
+    And the server answered no request with 500 since the last command
+
+    Examples:
+      | npm    |
+      | npm    |
+      | npm 12 |

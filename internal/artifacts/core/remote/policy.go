@@ -122,6 +122,28 @@ func (p *Policy) Acquire(ctx context.Context, repoKey string) (func(), error) {
 	return p.capacity.Acquire(ctx, repoKey)
 }
 
+// BindAuthority pins the options revision for a format's cached intermediate.
+// Cache-only/offline reads intentionally avoid credential resolution, just as
+// Read does. Check is the existing no-network publication/delivery fence.
+func (p *Policy) BindAuthority(ctx context.Context, q source.Request, permit source.Permit) (source.AuthorityBinding, error) {
+	if permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed || enabled(q.Repo.Offline) {
+		return source.AuthorityBinding{}, nil
+	}
+	if p.Options == nil {
+		return source.AuthorityBinding{}, source.ErrUnavailable
+	}
+	opts, err := p.Options(ctx, q.Repo)
+	if err != nil {
+		return source.AuthorityBinding{}, PolicyError(err)
+	}
+	if err := p.Check(ctx, q, permit, opts.Revision); err != nil {
+		return source.AuthorityBinding{}, err
+	}
+	return source.AuthorityBinding{Revision: opts.Revision, Revalidate: func(ctx context.Context) error {
+		return p.Check(ctx, q, permit, opts.Revision)
+	}}, nil
+}
+
 // Read is the source.Backend that the source service's HTTP kind calls once
 // it has authorised q. It serves a fresh cached entry, otherwise revalidates
 // or fetches from the upstream (one shared fill per cache key and source
@@ -466,6 +488,9 @@ func (p *Policy) ReadEntry(
 }
 
 func (p *Policy) fresh(q source.Request, e model.RemoteCacheEntry) bool {
+	if q.Resource.RefreshMetadata && q.Resource.Kind == source.ResourceKindMetadata && !q.CacheOnly {
+		return false
+	}
 	return Fresh(q.Repo, e, p.now())
 }
 
@@ -493,6 +518,9 @@ func Fresh(c repo.Config, e model.RemoteCacheEntry, now time.Time) bool {
 }
 
 func (p *Policy) negativeFresh(q source.Request, e model.RemoteCacheEntry) bool {
+	if q.Resource.RefreshMetadata && q.Resource.Kind == source.ResourceKindMetadata && !q.CacheOnly {
+		return false
+	}
 	return (q.Repo.MissedRetrievalCachePeriodSecs == nil || *q.Repo.MissedRetrievalCachePeriodSecs > 0) &&
 		e.NegativeUntil.After(p.now())
 }

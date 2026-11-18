@@ -48,7 +48,7 @@ var npmAuthStatusPart = statusPart{
 			{npmSearch, npmBase + "missing/-/v1/search", "admin", "", 404},
 			{npmSearch, npmBase + "libs-local/-/v1/search", "admin", "", 404},
 			{npmSearch, npmBase + "npm-remote/-/v1/search", "admin", "", 501},
-			{npmSearch, npmBase + "npm-virtual/-/v1/search", "admin", "", 501},
+			{npmSearch, npmBase + "npm-virtual/-/v1/search", "admin", "", 200},
 			{npmLogin, npmBase + "npm-virtual/-/user/org.couchdb.user:user", "", npmLoginBody("user", "pw"), 201},
 			{npmLogout, npmBase + "npm-virtual/-/user/token/no-such-token", "", "", 200},
 
