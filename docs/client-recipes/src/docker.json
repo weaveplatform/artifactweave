@@ -87,6 +87,12 @@
       "contains": [
         "crane pushes a derived image through the virtual using cached remote layers"
       ]
+    },
+    {
+      "path": "test/acceptance/features/registry_virtual.feature",
+      "contains": [
+        "crane resolves duplicate tags by newest local timestamp while digest pulls stay stable"
+      ]
     }
   ]
 }

@@ -313,3 +313,89 @@ Feature: Virtual Docker, OCI and Helm OCI repositories resolve local and remote 
     Then the command succeeds
     When I run docker "pull {host}/registry-virtual/team/image:derived"
     Then the command succeeds
+
+  @registry_virtual_timestamp
+  Scenario: crane resolves duplicate tags by newest local timestamp while digest pulls stay stable
+    Given crane is available
+    And a layer "first.tar.gz" holding "hello.txt" with content "first timestamp image"
+    And a layer "later.tar.gz" holding "hello.txt" with content "later timestamp image"
+    When I PUT "/artifactory/api/repositories/registry-later" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker"}
+      """
+    Then the response status is 200
+    When I POST "/artifactory/api/repositories/registry-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"docker","repositories":["registry-local","registry-later","registry-proxy"]}
+      """
+    Then the response status is 200
+    When I run crane "auth login {host} -u admin -p {password}"
+    Then the command succeeds
+    When I run crane "append -f first.tar.gz -t {host}/registry-local/team/image:latest"
+    Then the command succeeds
+    When I run crane "digest {host}/registry-local/team/image:latest"
+    Then the command succeeds
+    And I keep the output as "first_timestamp_digest"
+    When I run crane "append -f later.tar.gz -t {host}/registry-later/team/image:latest"
+    Then the command succeeds
+    When I run crane "digest {host}/registry-later/team/image:latest"
+    Then the command succeeds
+    And I keep the output as "later_timestamp_digest"
+    When I run crane "digest {host}/registry-virtual/team/image:latest"
+    Then the command succeeds
+    And the output is the kept value "first_timestamp_digest"
+    When I POST "/artifactory/api/repositories/registry-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"docker","repositories":["registry-local","registry-later","registry-proxy"],"resolveDockerTagsByTimestamp":true}
+      """
+    Then the response status is 200
+    When I run crane "digest {host}/registry-virtual/team/image:latest"
+    Then the command succeeds
+    And the output is the kept value "later_timestamp_digest"
+    When I run crane "pull {host}/registry-virtual/team/image@{first_timestamp_digest} first-by-digest.tar"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+
+  @registry_virtual_referrers
+  Scenario: oras discovers referrers attached in two readable virtual members
+    Given oras is available
+    And a file "subject.txt" with content:
+      """
+      shared OCI subject
+      """
+    And a file "signature.txt" with content:
+      """
+      first member signature
+      """
+    And a file "sbom.txt" with content:
+      """
+      second member SBOM
+      """
+    When I PUT "/artifactory/api/repositories/registry-later" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker"}
+      """
+    Then the response status is 200
+    When I POST "/artifactory/api/repositories/registry-virtual" as admin with body:
+      """
+      {"rclass":"virtual","packageType":"docker","repositories":["registry-local","registry-later","registry-proxy"]}
+      """
+    Then the response status is 200
+    When I run oras "login {host} -u admin -p {password} --plain-http"
+    Then the command succeeds
+    When I run oras "push {host}/registry-local/team/subject:v1 --plain-http --artifact-type application/vnd.example.subject subject.txt:text/plain"
+    Then the command succeeds
+    When I run oras "copy {host}/registry-local/team/subject:v1 {host}/registry-later/team/subject:v1 --from-plain-http --to-plain-http"
+    Then the command succeeds
+    When I run oras "attach {host}/registry-local/team/subject:v1 --plain-http --artifact-type application/vnd.example.signature signature.txt:text/plain"
+    Then the command succeeds
+    When I run oras "attach {host}/registry-later/team/subject:v1 --plain-http --artifact-type application/vnd.example.sbom sbom.txt:text/plain"
+    Then the command succeeds
+    When I run oras "discover {host}/registry-virtual/team/subject:v1 --plain-http"
+    Then the command succeeds
+    And the output contains "application/vnd.example.signature"
+    And the output contains "application/vnd.example.sbom"
+    When I run oras "discover {host}/registry-virtual/team/subject:v1 --plain-http --artifact-type application/vnd.example.sbom"
+    Then the command succeeds
+    And the output contains "application/vnd.example.sbom"
+    And the server answered no request with 500 since the last command

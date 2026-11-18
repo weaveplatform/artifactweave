@@ -280,6 +280,9 @@ func (g *Registry) dispatch(w http.ResponseWriter, r *http.Request, q Request) {
 	}
 	if q.Repo.Class == repo.Virtual {
 		switch {
+		case q.Kind == KindReferrers && r.Method == http.MethodGet && g.uploads != nil:
+			g.getReferrers(w, r, q)
+			return
 		case virtualListing(q.Kind, r.Method):
 			if q.Kind == KindTags {
 				g.virtualTags(w, r, q)

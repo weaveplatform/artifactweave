@@ -165,14 +165,6 @@ func TestAccRegistryVirtualReadPoliciesAndTokens(t *testing.T) {
 
 func TestAccRegistryVirtualOtherKindsStayUnsupported(t *testing.T) {
 	w := virtualRegistryWorld(t, repo.Docker)
-	for _, tc := range []struct{ method, path string }{
-		{"GET", "team/image/referrers/sha256:" + strings.Repeat("a", 64)},
-	} {
-		r := w.request(tc.method, "/v2/virtual/"+tc.path, "admin", "")
-		if r.Code != 405 || !strings.Contains(r.Body.String(), "virtual is a virtual repository, which the registry does not serve yet") {
-			t.Fatal(tc, r.Code, r.Body.String())
-		}
-	}
 	r := w.request("DELETE", "/artifactory/api/docker/virtual/v2/delete", "admin", `{"dockerRepository":"team/image","tag":"latest"}`, "Content-Type", "application/json")
 	if r.Code != 400 || !strings.Contains(r.Body.String(), "Unable to delete a manifest from a virtual repository") {
 		t.Fatal(r.Code, r.Body.String())

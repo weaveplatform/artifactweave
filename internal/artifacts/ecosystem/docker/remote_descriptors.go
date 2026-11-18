@@ -12,7 +12,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
-	"github.com/weaveplatform/artifactweave/internal/kernel/antpath"
 )
 
 // Read reads q through the policy and holds a manifest or a blob to the
@@ -33,6 +32,9 @@ func (c *RegistryContent) Read(
 	if err != nil {
 		//nolint:wrapcheck // preserves upstream error identity
 		return out, err
+	}
+	if q.Resource.ExternalURL != "" {
+		return validateForeignResult(q.Resource, out)
 	}
 	image, operation, reference, err := ParseRegistryPath(q.Resource.UpstreamPath)
 	if err != nil || operation != "manifests" && operation != "blobs" {
@@ -153,21 +155,11 @@ func (c *RegistryContent) descriptor(
 }
 
 func registryExternal(ctx context.Context, c repo.Config, opts remote.Options, raw string) error {
-	if !enabled(c.ExternalDependenciesEnabled) || opts.CheckURL == nil {
+	if !AllowsForeignLayer(c, raw) || opts.CheckURL == nil {
 		return remote.ErrSecurity
 	}
 	u, err := remote.CheckedURL(raw)
 	if err != nil {
-		return remote.ErrSecurity
-	}
-	allowed := false
-	for _, pattern := range c.ExternalDependenciesPatterns {
-		if pattern != "" && antpath.CompilePattern(pattern).Match(raw) {
-			allowed = true
-			break
-		}
-	}
-	if !allowed {
 		return remote.ErrSecurity
 	}
 	//nolint:wrapcheck // preserves upstream error identity

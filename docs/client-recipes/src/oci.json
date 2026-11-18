@@ -84,6 +84,12 @@
       "contains": [
         "oras pushes and pulls an artifact through an OCI virtual DDR"
       ]
+    },
+    {
+      "path": "test/acceptance/features/registry_virtual.feature",
+      "contains": [
+        "oras discovers referrers attached in two readable virtual members"
+      ]
     }
   ]
 }

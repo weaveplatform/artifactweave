@@ -102,9 +102,13 @@
 //     generated file policies use the admitted image name. Upload locations and
 //     scopes keep the virtual address. Missing blobs/index children are imported
 //     before the existing manifest validation; virtual deletes are refused.
+//     Timestamp tags choose the newest readable local/federated manifest before
+//     remote steps; digests retain their existing order. Virtual referrers check
+//     image Read first and merge readable local/federated descriptors. Optional
+//     local foreign-layer fallback uses a current eligible manifest and the
+//     selected remote's sanitized external transport, validation and cache.
 //     Virtual catalog/tag pages merge readable members before pagination;
-//     referrers remain 405 UNSUPPORTED until DKR-04. Digest location hints are bounded
-//     and recheck authority; tags always use the effective member order.
+//     digest location hints are bounded and recheck authority.
 //   - The JFrog operations under the Artifactory prefix (promote,
 //     parentManifests and delete) are no registry paths and keep the
 //     Artifactory envelope.

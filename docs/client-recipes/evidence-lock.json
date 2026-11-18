@@ -117,7 +117,7 @@
   "test/acceptance/features/pypi_virtual.feature": "c1cdf06fdec932bf725f21499f57d700ce65f0e04b94b2a34dff10fcfe738985",
   "test/acceptance/features/registry_clients.feature": "d7ddee6652d23b5f7dfc17146f8459056d2633de42f2c8a930f4527277d7ea22",
   "test/acceptance/features/registry_remote.feature": "0481a9b5a0714a58d577ba964454f14cc7f6726b14b304f812a786cf1ba96349",
-  "test/acceptance/features/registry_virtual.feature": "3daa46e31206b5705fa766c671e7412c40599ca8994fdcb81f79db25ceb16612",
+  "test/acceptance/features/registry_virtual.feature": "93b397eece1b87469cde424635f10bc44771bd3e8b17f7e05f460990b3e7e993",
   "test/acceptance/features/round_trip.feature": "e860497841f25ee179d564daa4bdfeccb88eeae176507bf91bb202433ee9c989",
   "test/acceptance/features/rpm.feature": "a5dd9ee80f8617406cd6f8482c02b4dd8924a376566f8c27e8b20ce1f1fd3139",
   "test/acceptance/features/sbt.feature": "6c17a7bbea04f2740f71e3d016fb669b4651645e57cc33e1c4dd6bf9bd742796",

@@ -74,6 +74,7 @@ func (g *Registry) requireVirtual(r *http.Request, q Request) error {
 
 type virtualRead struct {
 	q      Request
+	member virtual.Member
 	item   model.Item
 	result source.Result
 	remote bool
@@ -116,6 +117,9 @@ func (g *Registry) serveVirtual(w http.ResponseWriter, r *http.Request, q Reques
 		return
 	}
 	read, err := g.findVirtual(r, q, members, revision)
+	if errors.Is(err, kernel.ErrNotFound) && q.Kind == KindBlob && q.Repo.CachingLocalForeignLayersEnabled != nil && *q.Repo.CachingLocalForeignLayersEnabled {
+		read, err = g.virtualForeign(r, q, members)
+	}
 	if err != nil {
 		if errors.Is(err, kernel.ErrNotFound) {
 			if q.Kind == KindBlob {
@@ -147,6 +151,25 @@ func (g *Registry) serveVirtual(w http.ResponseWriter, r *http.Request, q Reques
 
 func (g *Registry) findVirtual(r *http.Request, q Request, members []virtual.Member, revision string) (virtualRead, error) {
 	kind := q.Kind.String()
+	if _, digest := layout.SHA256Hex(q.Reference); !digest && q.Kind == KindManifest && q.Repo.ResolveDockerTagsByTimestamp != nil && *q.Repo.ResolveDockerTagsByTimestamp {
+		read, found, err := g.latestVirtualTag(r, q, members)
+		if err != nil {
+			return read, err
+		}
+		if found {
+			g.rememberVirtual(q, read, revision)
+			return read, nil
+		}
+		// A remote cache retains its remote resolution step. Its stored
+		// timestamp must not outrank any local or federated tag.
+		remotes := make([]virtual.Member, 0, len(members))
+		for _, member := range members {
+			if member.Repo.Class == repo.Remote {
+				remotes = append(remotes, member)
+			}
+		}
+		members = remotes
+	}
 	if _, digest := layout.SHA256Hex(q.Reference); digest {
 		if loc, ok := g.locations.Get(q.Repo.Key, kind, q.Reference, revision); ok {
 			for _, m := range members {
@@ -168,30 +191,58 @@ func (g *Registry) findVirtual(r *http.Request, q Request, members []virtual.Mem
 	for _, m := range members {
 		read, err := g.virtualMember(r, q, m)
 		if err != nil {
-			if virtualPassedOver(err) {
+			var upstream *source.HTTPError
+			timestampFailure := q.Kind == KindManifest && q.Repo.ResolveDockerTagsByTimestamp != nil && *q.Repo.ResolveDockerTagsByTimestamp && !layout.ValidDigest(q.Reference) &&
+				read.remote && errors.As(err, &upstream) && upstream.Status >= http.StatusBadRequest
+			if virtualPassedOver(err) || timestampFailure {
 				continue
 			}
 			return read, fmt.Errorf("registry virtual member: %w", err)
 		}
-		sum := read.item.Actual.SHA256
-		if read.remote {
-			if read.result.Item != nil {
-				sum = read.result.Item.Actual.SHA256
-			} else {
-				sum = read.result.Stream.Checksums.SHA256
-			}
-		}
-		g.locations.Put(q.Repo.Key, kind, "sha256:"+sum, revision, layout.MemberLocation{Key: m.Repo.Key, Upstream: m.Upstream})
+		g.rememberVirtual(q, read, revision)
 		return read, nil
 	}
 	return virtualRead{}, kernel.ErrNotFound
+}
+
+func (g *Registry) latestVirtualTag(r *http.Request, q Request, members []virtual.Member) (virtualRead, bool, error) {
+	candidates := []layout.VirtualTagCandidate{}
+	reads := map[string]virtualRead{}
+	for _, member := range members {
+		if member.Repo.Class != repo.Local && member.Repo.Class != repo.Federated {
+			continue
+		}
+		read, err := g.virtualMember(r, q, member)
+		if virtualPassedOver(err) {
+			continue
+		}
+		if err != nil {
+			return read, false, fmt.Errorf("registry timestamp member: %w", err)
+		}
+		candidates = append(candidates, layout.VirtualTagCandidate{Member: member, Item: read.item})
+		reads[member.Repo.Key] = read
+	}
+	chosen, found := layout.LatestVirtualTag(candidates)
+	return reads[chosen.Member.Repo.Key], found, nil
+}
+
+func (g *Registry) rememberVirtual(q Request, read virtualRead, revision string) {
+	sum := read.item.Actual.SHA256
+	if read.remote {
+		if read.result.Item != nil {
+			sum = read.result.Item.Actual.SHA256
+		} else {
+			sum = read.result.Stream.Checksums.SHA256
+		}
+	}
+	g.locations.Put(q.Repo.Key, q.Kind.String(), "sha256:"+sum, revision, layout.MemberLocation{Key: read.member.Repo.Key, Upstream: read.member.Upstream})
 }
 
 func (g *Registry) virtualMember(r *http.Request, q Request, m virtual.Member) (virtualRead, error) {
 	cacheOnly := !m.Upstream
 	mustBeFresh := cacheOnly && (m.Repo.Offline == nil || !*m.Repo.Offline) && !remote.NoOriginUpstream(r.Context(), q.Repo)
 	q.Repo = m.Repo
-	read := virtualRead{q: q, remote: m.Repo.Class == repo.Remote}
+	read := virtualRead{q: q, member: m, remote: m.Repo.Class == repo.Remote}
 	d, _ := accessapi.DeciderFrom(r.Context())
 	if !memberReadable(d, m.Repo, q.Name) {
 		return read, kernel.ErrNotFound

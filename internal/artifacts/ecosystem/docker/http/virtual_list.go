@@ -379,7 +379,7 @@ func virtualListing(kind Kind, method string) bool {
 }
 
 func (g *Registry) unsupportedVirtualOperation(q Request, method string) bool {
-	if q.Repo.Class != repo.Virtual || virtualListing(q.Kind, method) {
+	if q.Repo.Class != repo.Virtual || virtualListing(q.Kind, method) || g.uploads != nil && q.Kind == KindReferrers && method == http.MethodGet {
 		return false
 	}
 	return g.uploads == nil || !virtualPull(q.Kind, method) && !virtualWrite(q.Kind, method) && (method != http.MethodDelete || q.Kind != KindManifest && q.Kind != KindBlob)

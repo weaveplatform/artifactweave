@@ -2,10 +2,13 @@ package dockerhttp
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 )
 
@@ -39,8 +42,14 @@ type referrersIndex struct {
 // repository refuses the request first, as a blob pull checks blackout
 // before its digest (imageBlackedOut).
 func (g *Registry) getReferrers(w http.ResponseWriter, r *http.Request, q Request) {
-	if err := q.Require(r, q.Name+"/", api.ActionRead); err != nil {
-		Write(w, err)
+	var err error
+	if q.Repo.Class == repo.Virtual {
+		err = g.requireVirtual(r, q)
+	} else {
+		err = q.Require(r, q.Name+"/", api.ActionRead)
+	}
+	if err != nil {
+		g.writeErr(w, r, err)
 		return
 	}
 	if imageBlackedOut(w, q) {
@@ -52,7 +61,12 @@ func (g *Registry) getReferrers(w http.ResponseWriter, r *http.Request, q Reques
 		return
 	}
 	artifactType := r.URL.Query().Get("artifactType")
-	found, err := g.uploads.Referrers(r.Context(), owner(r, q), q.Reference, artifactType)
+	var found []layout.Descriptor
+	if q.Repo.Class == repo.Virtual {
+		found, err = g.virtualReferrers(r, q, artifactType)
+	} else {
+		found, err = g.uploads.Referrers(r.Context(), owner(r, q), q.Reference, artifactType)
+	}
 	if err != nil {
 		g.writeErr(w, r, err)
 		return
@@ -69,4 +83,24 @@ func (g *Registry) getReferrers(w http.ResponseWriter, r *http.Request, q Reques
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
+}
+
+func (g *Registry) virtualReferrers(r *http.Request, q Request, artifactType string) ([]layout.Descriptor, error) {
+	members, _, err := layout.VirtualMembers(r.Context(), g.store.Repos(), q.Repo, q.Name)
+	if err != nil {
+		return nil, fmt.Errorf("virtual referrer members: %w", err)
+	}
+	d, _ := api.DeciderFrom(r.Context())
+	parts := []layout.VirtualReferrersPart{}
+	for _, member := range members {
+		if (member.Repo.Class != repo.Local && member.Repo.Class != repo.Federated) || !memberReadable(d, member.Repo, q.Name) {
+			continue
+		}
+		found, err := g.uploads.Referrers(r.Context(), registry.Owner{Repo: member.Repo, Name: q.Name}, q.Reference, artifactType)
+		if err != nil {
+			return nil, fmt.Errorf("virtual referrers in %s: %w", member.Repo.Key, err)
+		}
+		parts = append(parts, layout.VirtualReferrersPart{Member: member, Manifests: found})
+	}
+	return layout.MergeVirtualReferrers(parts), nil
 }
