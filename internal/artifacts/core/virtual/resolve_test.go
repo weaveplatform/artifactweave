@@ -294,6 +294,144 @@ func TestUnitWalk(t *testing.T) {
 	}
 }
 
+// tracedRepos records actual store calls, including reads later suppressed by
+// effective-member deduplication. Route-local cycles skip before that boundary.
+type tracedRepos struct {
+	virtual.Repos
+	events *[]string
+}
+
+func (r tracedRepos) Get(ctx context.Context, key string) (repo.Config, error) {
+	*r.events = append(*r.events, "read "+key)
+	return r.Repos.Get(ctx, key)
+}
+
+func TestUnitTraversalPreservesMemberAndRouteLookupOrder(t *testing.T) {
+	cs := configs(
+		virt("root", "left", "right", "leaf", "absent"),
+		virt("left", "shared", "root"), virt("right", "shared", "leaf"),
+		virt("shared", "leaf", "up"), local("leaf", false), remote("up", false),
+	)
+	for _, tc := range []struct {
+		name, wantMembers     string
+		wantReads, wantRoutes []string
+	}{
+		{
+			name: "effective members", wantMembers: "leaf up",
+			wantReads: []string{
+				"read left", "read shared", "read leaf", "read up", "read root",
+				"read right", "read shared", "read leaf", "read leaf", "read absent",
+			},
+		},
+		{
+			name: "every route",
+			wantReads: []string{
+				"read left", "read shared", "read leaf", "read up", "read right",
+				"read shared", "read leaf", "read up", "read leaf", "read leaf", "read absent",
+			},
+			wantRoutes: []string{
+				"root>left", "root/left>shared", "root/left/shared>leaf", "root/left/shared>up",
+				"root>right", "root/right>shared", "root/right/shared>leaf", "root/right/shared>up",
+				"root/right>leaf", "root>leaf",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var events, routes []string
+			rs := tracedRepos{Repos: cs, events: &events}
+			var err error
+			if tc.wantMembers != "" {
+				var members []virtual.Member
+				members, err = virtual.Members(t.Context(), rs, cs["root"], virtual.Options{Order: virtual.Stored})
+				if steps(members) != tc.wantMembers {
+					t.Fatal("effective members", steps(members), tc.wantMembers)
+				}
+			} else {
+				err = virtual.Walk(t.Context(), rs, cs["root"], func(chain []repo.Config, m repo.Config) error {
+					routes = append(routes, route(chain, m))
+					return nil
+				})
+			}
+			if err != nil || !slices.Equal(events, tc.wantReads) || !slices.Equal(routes, tc.wantRoutes) {
+				t.Fatal("trace", events, routes, err, "want", tc.wantReads, tc.wantRoutes)
+			}
+		})
+	}
+}
+
+func TestUnitTraversalPreservesCycleLookupFault(t *testing.T) {
+	cs := configs(virt("root", "root", "leaf"), local("leaf", false))
+	for _, name := range []string{"effective members", "every route"} {
+		t.Run(name, func(t *testing.T) {
+			var events []string
+			rs := tracedRepos{Repos: failing{cs, "root"}, events: &events}
+			if name == "effective members" {
+				members, err := virtual.Members(t.Context(), rs, cs["root"], virtual.Options{})
+				if !errors.Is(err, errStore) || members != nil || !slices.Equal(events, []string{"read root"}) {
+					t.Fatal("cycle configuration read must precede global dedup", members, events, err)
+				}
+				return
+			}
+			err := virtual.Walk(t.Context(), rs, cs["root"], func(chain []repo.Config, m repo.Config) error {
+				events = append(events, "visit "+route(chain, m))
+				return nil
+			})
+			if err != nil || !slices.Equal(events, []string{"read leaf", "visit root>leaf"}) {
+				t.Fatal("route cycle must stop before its store read", events, err)
+			}
+		})
+	}
+}
+
+func TestUnitTraversalStopsBeforeLaterReads(t *testing.T) {
+	cs := configs(virt("root", "inner", "later"), virt("inner", "leaf", "broken"),
+		local("leaf", false), local("later", false))
+	stop := errors.New("stop traversal")
+	for _, tc := range []struct {
+		name string
+		want []string
+	}{
+		{"translation", []string{"read inner", "translate inner original"}},
+		{"member store", []string{"read inner", "read leaf", "read broken"}},
+		{"route callback", []string{"read inner", "visit root>inner"}},
+		{"route store", []string{"read inner", "visit root>inner", "read leaf", "visit root/inner>leaf", "read broken"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var events []string
+			rs := tracedRepos{Repos: failing{cs, "broken"}, events: &events}
+			wantErr := errStore
+			var err error
+			switch tc.name {
+			case "translation":
+				wantErr = stop
+				_, err = virtual.Members(t.Context(), rs, cs["root"], virtual.Options{
+					Path: "original",
+					Translate: func(_ context.Context, m repo.Config, path string) (string, error) {
+						events = append(events, "translate "+m.Key+" "+path)
+						return "", stop
+					},
+				})
+			case "member store":
+				_, err = virtual.Members(t.Context(), rs, cs["root"], virtual.Options{})
+			default:
+				if tc.name == "route callback" {
+					wantErr = stop
+				}
+				err = virtual.Walk(t.Context(), rs, cs["root"], func(chain []repo.Config, m repo.Config) error {
+					events = append(events, "visit "+route(chain, m))
+					if tc.name == "route callback" {
+						return stop
+					}
+					return nil
+				})
+			}
+			if !errors.Is(err, wantErr) || !slices.Equal(events, tc.want) {
+				t.Fatal("first failure", events, err, "want", tc.want, wantErr)
+			}
+		})
+	}
+}
+
 // TestUnitAnswer: a walk that found nothing answers as 7.161.26's
 // DownloadServiceImpl.respondResourceNotFound answers the unfound resource
 // processStandard returns: 404 without a refusal, the first refusal's 403,
