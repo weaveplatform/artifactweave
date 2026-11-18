@@ -97,7 +97,7 @@
   "test/acceptance/features/luarocks_virtual.feature": "4444868f2349290224bedf01a12ae6a5372a4f5dc5e33306f53a7d8fc130b4dd",
   "test/acceptance/features/machinelearning.feature": "48447ad3c0c9bd21def4de8ccaa8876e0aac385a4c205813e79164b3f9d89028",
   "test/acceptance/features/maven.feature": "37db6f39f2a6a1b2902ecf25702c95b566b6b8ef3e9e60d65c59b23630bedb68",
-  "test/acceptance/features/maven_remote.feature": "1fc40d2a36c773577be5410fc0232b381a1303d6bc653ab98399a0cd18d3bdf9",
+  "test/acceptance/features/maven_remote.feature": "ded84ab292af90b27ddc1c06f112086d52500c26fee21149888f2c4664d36405",
   "test/acceptance/features/nimmodel_remote.feature": "a8c174000365fb1cb48db5e03d4f16c1b13be02b9fb95abed88c744b056cfc59",
   "test/acceptance/features/nix.feature": "a362170fa3bed62fbe5f729fd7088f0e8e64acace9f30f416098783c258a1ca4",
   "test/acceptance/features/npm.feature": "36307dd2b6f9449ee818fca5bbf420313ce8996bf3a223ed939102d6dc897c6a",
