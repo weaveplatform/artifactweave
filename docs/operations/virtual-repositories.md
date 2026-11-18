@@ -7,9 +7,10 @@ separates the resolution mechanism from client/server evidence. Registered `V` i
 not itself a native-client qualification claim. A federated member here is the
 one-node repository contract; cross-peer convergence belongs to P13.
 
-This guide describes merged implementation through main `901a11a5c` (2026-11-18).
+This guide describes merged implementation through main `621523d38` (2026-11-18).
 The [qualification and epic closeout record](../testing/phase10-signoff.md)
-distinguishes delivered work from the remaining final gate. [#1571](https://github.com/weaveplatform/artifactweave/issues/1571)
+distinguishes delivered work from the remaining final gate. GitHub closed #1571
+with documentation PR #1708; [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528)
 owns final qualification, the plan status and decision 0008's acceptance. The
 [source-backed rules](../research/decisions/0008-virtual-repositories.md) retain
 unsettled compatibility choices as [I]. The [inference register](#inference-register)
@@ -152,7 +153,7 @@ A merged-document cache is separate from every remote's raw/artifact cache.
 | Chef | Cookbook/version documents; catalog/search remain request-paged. |
 | Conan | Merged revision, search and package documents; files retain source/member resolution. |
 | Conda | Each remote member's subdir part; local/federated records remain live. |
-| Ansible | Per-request; the existing ADP-04 comparison entry retains an older cached-as-Chef proposal, rather than an updated claim about this implementation. |
+| Ansible | Per-request; the [published comparison correction](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6991066992) identifies the older ADP-04 cached-as-Chef proposal as superseded. |
 | Other virtual types | Per-request merge/first-holder lookup; declaring the field does not create a merged cache. |
 
 Artifactweave defaults this field to 7200 seconds; stored explicit periods remain effective. Zero
@@ -203,7 +204,7 @@ cross-peer federation are not silently enabled by virtual membership.
 
 The matrix's anchored proof distinguishes actual native-client scenarios from
 server-only controls. These links identify retained implementation evidence;
-final release/P10 qualification remains #1571.
+final release/P10 qualification remains in #1528.
 
 | Type | Operator guide/recipe | Retained virtual evidence |
 | --- | --- | --- |
