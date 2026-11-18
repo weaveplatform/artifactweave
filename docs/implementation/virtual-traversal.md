@@ -72,3 +72,15 @@ in the implementing PR's Tests section. The closeout ledger and epic acceptance
 row should reference this sole implementation and its merged evidence before
 checking the structural requirement; this document does not assert final P10
 qualification or close an epic.
+
+## Allocation preservation
+
+The initial shared helper also built route chains for effective-member walks,
+which do not consume them. A bounded diagnostic over a diamond graph found
+Members increasing from 8,960 bytes / 3 allocations to 20,992 bytes / 6
+allocations per walk. The private `hasChain` policy now allocates and maintains
+the chain only for `Walk`; the same shared recursive edge loop serves both APIs.
+Ten samples on Go 1.27.4, Darwin/arm64 restore the baseline Members result and
+retain Walk's 12,032 bytes / 3 allocations. The workload has root → left/right
+→ shared → local leaf/remote. Variants ran serially; other qualification work
+was active, so these are allocation comparisons, not latency claims.

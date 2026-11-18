@@ -228,6 +228,7 @@ func Walk(
 	visit func(chain []repo.Config, m repo.Config) error,
 ) error {
 	return traverse(ctx, rs, v, traversal{
+		hasChain: true,
 		skip: func(chain []repo.Config, key string) bool {
 			return slices.ContainsFunc(chain, func(c repo.Config) bool { return c.Key == key })
 		},

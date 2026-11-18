@@ -11,14 +11,20 @@ import (
 // rejects a cycle before reading its key; Members deduplicates only after the
 // read. visit decides whether a nested virtual's descendants are traversed.
 type traversal struct {
-	skip  func(chain []repo.Config, key string) bool
-	visit func(chain []repo.Config, member repo.Config) (bool, error)
+	// Only route walks need the borrowed callback chain. Keeping that
+	// choice here avoids copying configurations for effective-member walks.
+	hasChain bool
+	skip     func(chain []repo.Config, key string) bool
+	visit    func(chain []repo.Config, member repo.Config) (bool, error)
 }
 
 // traverse owns the graph's only recursive member loop. Both policies retain
 // configured depth-first reads, missing members and immediate error propagation.
 func traverse(ctx context.Context, rs Repos, v repo.Config, t traversal) error {
-	chain := []repo.Config{v}
+	var chain []repo.Config
+	if t.hasChain {
+		chain = []repo.Config{v}
+	}
 	var walk func(repo.Config) error
 	walk = func(c repo.Config) error {
 		for _, key := range c.Repositories {
@@ -41,11 +47,15 @@ func traverse(ctx context.Context, rs Repos, v repo.Config, t traversal) error {
 			if m.Class != repo.Virtual || !descend {
 				continue
 			}
-			chain = append(chain, m)
+			if t.hasChain {
+				chain = append(chain, m)
+			}
 			if err := walk(m); err != nil {
 				return err
 			}
-			chain = chain[:len(chain)-1]
+			if t.hasChain {
+				chain = chain[:len(chain)-1]
+			}
 		}
 		return nil
 	}
