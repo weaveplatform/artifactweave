@@ -3,15 +3,17 @@
 Status: **implementation evidence recorded; final qualification pending**.
 
 Audit date: 2026-11-18. Merged implementation baseline:
-[`fb67c046de93fee4da1968487a365b05ad8c4cc0`](https://github.com/weaveplatform/artifactweave/commit/fb67c046de93fee4da1968487a365b05ad8c4cc0).
-The native GitHub child lists and issue/merged-PR timelines show **44 of 49 child
+[`df78dd3916d156de6b665ff8fd50d9cc02f669be`](https://github.com/weaveplatform/artifactweave/commit/df78dd3916d156de6b665ff8fd50d9cc02f669be).
+The native GitHub child lists and issue/merged-PR timelines show **45 of 49 child
 tickets closed**, including the original acceptance follow-ups identified in this audit.
-[QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571),
 [ADP-08 #1709](https://github.com/weaveplatform/artifactweave/issues/1709),
 [ENG-11 #1710](https://github.com/weaveplatform/artifactweave/issues/1710),
 [HLM-03 #1713](https://github.com/weaveplatform/artifactweave/issues/1713) and
 [TFM-03 #1714](https://github.com/weaveplatform/artifactweave/issues/1714)
 remain open. Epic closure remains with the maintainer.
+GitHub closed [QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571)
+with documentation PR #1708. That records issue state; the remaining acceptance
+and final combined-main gate below are still pending in the qualification epic.
 
 This ledger records controlled implementation evidence, not a live Artifactory
 comparison or a completed merged-main release gate. Decision 0008 remains
@@ -34,7 +36,7 @@ for the separate acceptance criteria or the final combined-tree gate.
 | [#1525](https://github.com/weaveplatform/artifactweave/issues/1525) npm virtual repositories | 5/5 | [#1675](https://github.com/weaveplatform/artifactweave/pull/1675), [#1679](https://github.com/weaveplatform/artifactweave/pull/1679), [#1684](https://github.com/weaveplatform/artifactweave/pull/1684), [#1690](https://github.com/weaveplatform/artifactweave/pull/1690), [#1691](https://github.com/weaveplatform/artifactweave/pull/1691) |
 | [#1526](https://github.com/weaveplatform/artifactweave/issues/1526) NuGet virtual repositories | 3/3 | [#1674](https://github.com/weaveplatform/artifactweave/pull/1674), [#1676](https://github.com/weaveplatform/artifactweave/pull/1676), [#1685](https://github.com/weaveplatform/artifactweave/pull/1685) |
 | [#1527](https://github.com/weaveplatform/artifactweave/issues/1527) PyPI virtual repositories | 2/2 | [#1671](https://github.com/weaveplatform/artifactweave/pull/1671), [#1672](https://github.com/weaveplatform/artifactweave/pull/1672) |
-| [#1528](https://github.com/weaveplatform/artifactweave/issues/1528) Conformance, documentation and P10 sign-off | 2/3 | Final #1571 record and merged-main gate outstanding. [#1591](https://github.com/weaveplatform/artifactweave/pull/1591), [#1699](https://github.com/weaveplatform/artifactweave/pull/1699) |
+| [#1528](https://github.com/weaveplatform/artifactweave/issues/1528) Conformance, documentation and P10 sign-off | 3/3 | #1571 closed with [#1708](https://github.com/weaveplatform/artifactweave/pull/1708); final acceptance and merged-main completion record remain pending here. Earlier delivery: [#1591](https://github.com/weaveplatform/artifactweave/pull/1591), [#1699](https://github.com/weaveplatform/artifactweave/pull/1699) |
 | [#1529](https://github.com/weaveplatform/artifactweave/issues/1529) Terraform virtual repositories | 2/3 | Required combined module/provider workflow and cache repeat: [#1714](https://github.com/weaveplatform/artifactweave/issues/1714). Merged delivery: [#1681](https://github.com/weaveplatform/artifactweave/pull/1681), [#1687](https://github.com/weaveplatform/artifactweave/pull/1687) |
 
 [P10 index #1518](https://github.com/weaveplatform/artifactweave/issues/1518)
@@ -58,7 +60,7 @@ remain available for maintainer review; the audit preserves their requirements.
 | NPM | The [virtual npm outline](../../test/acceptance/features/npm_virtual.feature) covers scoped/unscoped mixed dependencies, empty-cache install/`npm ci`, publication and signature audits. Vulnerability audit remains owned by P28; the no-501 requirement concerns supported P10 operations. |
 | NUG | [Native V2/V3 restore and publication](../../test/acceptance/features/nuget_virtual.feature) are supplemented by [visibility/status tests](../../test/server/artifacts/nuget/virtual_v3_test.go) and [write/symbol/reindex controls](../../test/server/artifacts/nuget/virtual_write_test.go). Virtual reindex accepts the request without member work. |
 | PYP | [pip/uv installation and twine/uv publication](../../test/acceptance/features/pypi_virtual.feature) retain native evidence. The separate test reliability repair #1712 must remove a raw-substring timestamp collision from the existing [server merge assertion](../../test/server/artifacts/pypi/virtual_read_test.go); the captured failing response has the correct winner. |
-| QUA | The 33-resource [provider scenario](../../deploy/artifactweave/terraform/virtual-repositories) and this 37-type ledger are distinct from package-consumer proof. Decision acceptance, P10 Done and the final post-documentation merged-main workflow remain #1571's completion conditions. |
+| QUA | The 33-resource [provider scenario](../../deploy/artifactweave/terraform/virtual-repositories) and this 37-type ledger are distinct from package-consumer proof. Decision acceptance, P10 Done and the final post-documentation merged-main workflow remain required; the completion record belongs in #1528 even though #1571 is now closed. |
 | TFM | [Virtual modules](../../test/acceptance/features/terraform_remote.feature) and [virtual providers](../../test/acceptance/features/terraform_providers.feature) currently use separate configurations. The [combined direct-local registry scenario](../../test/acceptance/features/terraform_registry.feature) does not prove one virtual with a remote provider. #1714 supplies that exact combined workflow and empty-plugin-cache repeat. |
 
 The Helm and Terraform findings are missing qualification artifacts; no runtime
@@ -202,11 +204,11 @@ retain their primary-source and modern-version limits in their owning research.
 | [#1710](https://github.com/weaveplatform/artifactweave/issues/1710) | The engine epic requires one shared graph traversal. `Members`/`flatten` and route-aware `Walk` still have independent recursive loops. The follow-up shares traversal while preserving both contracts; it is structural acceptance work, not a newly reproduced client failure, and blocks #1571. |
 | [#1713](https://github.com/weaveplatform/artifactweave/issues/1713) | Required Helm install dry-run through the virtual remains unexecuted in the merged native outline; `helm template` on a downloaded archive is supplemental evidence. Blocks #1571. |
 | [#1714](https://github.com/weaveplatform/artifactweave/issues/1714) | Required single-virtual local-module/remote-provider `init`/`apply` and empty-plugin-cache repeat remain unqualified. Separate module/provider scenarios are retained. Blocks #1571. |
-| [#1645 / PR #1705](https://github.com/weaveplatform/artifactweave/pull/1705) | Corrected head `ddc19865` is ready for review after all local gates, real SQL/race checks and final-source native qualification. API-document/content-phase/classifier regressions are fixed in that head; [full CI 44378840058](https://github.com/weaveplatform/artifactweave/actions/runs/44378840058) remains required before merge. The preceding same-head run was superseded by the ready-for-review event. |
+| [#1645 / PR #1705](https://github.com/weaveplatform/artifactweave/pull/1705) | Merged as `6c55dff0e` after [full exact-head CI 44378840058](https://github.com/weaveplatform/artifactweave/actions/runs/44378840058) passed all 19 required jobs, including native clients and both coverage thresholds. The corrected file/API-document/content-phase boundary is delivered. The preceding superseded run and original red evidence remain separately qualified. |
 | [#1704 / PR #1711](https://github.com/weaveplatform/artifactweave/pull/1711) | The existing-copy clock-fault correction has all local gates and real SQLite/PostgreSQL proof at `f28f6a73`. [Full CI 44373109714 failed](https://github.com/weaveplatform/artifactweave/actions/runs/44373109714/job/135045401094) because the existing PyPI test matched `3.11` in a valid upload timestamp; coverage and final gates consequently failed. Separate fixture repair [#1712](https://github.com/weaveplatform/artifactweave/issues/1712), normal integration and successful new-head CI are required before merge. |
 | [#1706 / PR #1707](https://github.com/weaveplatform/artifactweave/pull/1707) | Merged as `fb67c046` after [full exact-head CI 44361946001](https://github.com/weaveplatform/artifactweave/actions/runs/44361946001) passed all 19 required jobs. Both independently collected Go builds still require exactly three artifacts; no registry behavior changed. |
-| [#1693 / PR #1698](https://github.com/weaveplatform/artifactweave/pull/1698) | SQLite literal-file path fix has successful native Windows evidence. Normal main integration `90f38797` now includes the merged Go fixture correction; fresh driver/application/selector/recipe/lint checks passed and [full CI 44377565202](https://github.com/weaveplatform/artifactweave/actions/runs/44377565202) is running. |
-| [#1571](https://github.com/weaveplatform/artifactweave/issues/1571) | Final evidence audit, decision acceptance, phase completion and exact merged-main gate remain required. |
+| [#1693 / PR #1698](https://github.com/weaveplatform/artifactweave/pull/1698) | Merged as `544e9acad` after [full exact-head CI 44377565202](https://github.com/weaveplatform/artifactweave/actions/runs/44377565202) passed all 20 required jobs. The dedicated Windows lane passes all five driver cases, including literal absolute/relative filenames; it does not establish UNC-share or Windows application-runtime evidence. Both coverage thresholds passed. |
+| [#1571 / PR #1708](https://github.com/weaveplatform/artifactweave/pull/1708) | Documentation merged as `df78dd391` after exact-head documentation checks passed. GitHub closed #1571 with that merge. The four acceptance follow-ups, separate PyPI assertion repair, decision acceptance and exact final merged-main gate remain required; record their completion in #1528. |
 
 The successful [RPM correction gate](https://github.com/weaveplatform/artifactweave/actions/runs/44355578274)
 at `c7f8dd05dbb64a830f1e32e26b56c1980c87271f` passed all 19 required jobs
@@ -215,7 +217,7 @@ native-client selection includes RPM/DNF. The user merged that correction as
 `cbed189bceac60069fd037d9de56235e05877e68`. This is useful integrated PR evidence;
 it is **not** the post-signoff merged-main run required by #1571.
 
-Before closing #1571 and the qualification epic:
+Remaining final qualification steps:
 
 1. Merge the outstanding corrections only after successful latest-head CI.
 2. Reconcile every evidence row and inference/deviation limit against that main.
