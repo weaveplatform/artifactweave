@@ -145,7 +145,8 @@
 // Implemented P8, with remote retrieval, the remote v2 feed and symbols
 // included, in P9. Moved here in P9d. Virtual v3 discovery, flat containers,
 // registration and bounded search/autocomplete are implemented in P10 (#1548).
-// Virtual v2, publication and symbols remain deferred to #1562 and #1569.
+// Virtual V2 feeds, counts and downloads are implemented by #1562.
+// Virtual publication and symbols remain deferred to #1569.
 //
 // # Testing
 //

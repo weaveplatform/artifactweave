@@ -254,7 +254,7 @@ func nugetV2StatusRows() []statusCase {
 		{nugetV2Service, nugetV2 + "missing/", "admin", "", 404},
 		{nugetV2Service, nugetV2 + "libs-local/", "admin", "", 404},
 		{nugetV2Service, nugetV2 + "nuget-remote/", "admin", "", 501},
-		{nugetV2Service, nugetV2 + "nuget-virtual/", "admin", "", 501},
+		{nugetV2Service, nugetV2 + "nuget-virtual/", "admin", "", 200},
 		{nugetV2Service, nugetV2 + "nuget-forced/", "anonymous", "", 401},
 		{nugetV2Metadata, nugetV2 + "nuget-forced/$metadata", "anonymous", "", 401},
 		{nugetV2Entry, local + "Packages(Id='Status.Pkg',Version='1.0')", "user", "", 404},

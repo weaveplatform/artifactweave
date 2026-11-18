@@ -191,10 +191,14 @@ func remoteV2Listed(e remoteAtomEntry) bool {
 }
 
 func (s *remoteSession) rewriteAtom(e remoteAtomEntry) atomEntry {
+	return rewriteAtomAt(s.r, e)
+}
+
+func rewriteAtomAt(r *http.Request, e remoteAtomEntry) atomEntry {
 	out := e.atom
 	id, key := e.meta.ID, e.meta.Version
 	out.ID = v2Base(
-		s.r,
+		r,
 	) + "/Packages(Id='" + url.PathEscape(
 		id,
 	) + "',Version='" + url.PathEscape(
@@ -202,7 +206,7 @@ func (s *remoteSession) rewriteAtom(e remoteAtomEntry) atomEntry {
 	) + "')"
 	out.Content = atomContent{
 		Type: "application/zip",
-		Src:  v2Base(s.r) + "/Download/" + url.PathEscape(id) + "/" + url.PathEscape(key),
+		Src:  v2Base(r) + "/Download/" + url.PathEscape(id) + "/" + url.PathEscape(key),
 	}
 	e.values["Id"], e.values["NormalizedVersion"] = id, key
 	delete(e.values, "DownloadCount")

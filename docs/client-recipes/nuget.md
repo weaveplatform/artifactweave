@@ -70,7 +70,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 
 - Use forceNugetAuthentication when the administrator requires authenticated v3 discovery.
 - --skip-duplicate is for an existing identical package; do not infer a general safe retry contract for changed bytes.
-- Virtual v3 restore is qualified on both pinned SDK lanes with a signed remote parent and signed local transitive dependency. Virtual v2, publication and symbols retain 501 pending their P10 tickets; federated native qualification remains a follow-on.
+- Virtual v2 and v3 restore are qualified on both pinned SDK lanes. V3 includes a signed remote parent and signed local transitive dependency; V2 includes local and private remote packages with fresh caches. Virtual publication and symbols retain 501 pending their P10 ticket; federated native qualification remains a follow-on.
 
 ## Verification sources
 

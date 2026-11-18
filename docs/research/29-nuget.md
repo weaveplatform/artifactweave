@@ -617,3 +617,61 @@ control. Symbols, writes and v2 preserve their previous virtual `501` envelope,
 including malformed deferred requests; forced authentication still precedes it.
 The existing cross-cutting PyPI cold cache-publication limitation #1670 remains
 separate and is not changed here.
+
+## P10 virtual V2 implementation (#1562, NUG-02)
+
+Primary-source review on 2026-11-18 rechecked the official
+[NuGet guide](https://docs.jfrog.com/artifactory/docs/nuget-repositories),
+[virtual guide](https://docs.jfrog.com/artifactory/docs/virtual-repositories),
+[local settings](https://docs.jfrog.com/artifactory/docs/local-repositories),
+[remote settings](https://docs.jfrog.com/artifactory/docs/remote-repositories),
+release notes and KB search. The priority descriptions still disagree: local
+settings exclude NuGet while remote settings include it, and the earlier
+configuration reference excludes V2 specifically. RTFACT-25420 and the 7.38.0
+RTFACT-26719 priority/paging fix describe priority behavior on V2 virtual feeds.
+The discrepancy remains unresolved. **[I]** NUG-02 follows those concrete fixes
+and the ticket's explicit fallback: a readable priority holder shadows the
+whole ID, including when its versions are later excluded by a request filter.
+An entirely unreadable or member-policy-rejected source is not a holder.
+
+The verified official OSS 7.161.26 source has
+`base/config/src/main/java/org/artifactory/common/ConstantValues.java:578`
+(`nuget.v2.search.page.size = 100`) and line 619
+(`nuget.virtual.feed.isLatest.legacy = TRUE`), but the commercial reader is absent.
+No source settles the flag's cross-member algorithm. **[I]** latest means the
+highest visible stable version and absolute latest the highest visible version,
+after first ownership, priority, permissions, patterns and request SemVer/
+prerelease visibility, before OData predicates and pagination. An unlisted or
+query-mismatching first copy retains ownership; a later copy cannot replace it.
+The retained OData grammar and targetFramework behavior remain the direct
+feed's. Unsupported `IsPrerelease` expressions answer the established `400`,
+never the historical `500` bug.
+
+The pure k-way merge advances sorted package-ID cursors, retaining a 100-entry
+page and one lookahead. It computes latest flags from each complete active ID,
+so page one of an ID with 150 mixed versions does not invent a latest version.
+A whole-reader local cursor uses the merged #1512 count/range-version or
+count/package APIs and one candidate package at a time; path readers use
+`SearchNuGet` cursor pages. The body metadata bound is the complete active ID
+per member, separately from bounded returned-page retention. Remote inputs keep
+`legacyCollect`'s existing 100-page, 10,000-version and 64 MiB graph limits;
+reading a normal page does not cause an eager full local-repository scan.
+`$count` intentionally consumes the streams. Request filters do not prune source
+candidates before ownership; virtual Search uses the unfiltered member Packages
+collection so an unlisted first owner cannot be silently replaced.
+
+Atom metadata is preserved with its owner and rendered from the original
+virtual request. Member requests retain source authority and cache-only binding.
+The final fence runs after atom/stat rendering, and retains page/count owners
+plus the latest owners on which flags depend, excluding unused remote copies.
+Native .NET 11 and 10 qualification restores both local and private V2 remote
+packages using one virtual V2 URL with fresh package/HTTP caches, while the
+signed V3 and direct V2 scenarios remain controls. These are controlled upstream
+proofs, not live Artifactory captures. No trial or live capture was used.
+
+**[I]** No reviewed 7.x source settles a virtual package's aggregate
+`DownloadCount` across supplying members. Virtual Atom entries therefore omit
+that aggregate, matching the established remote non-disclosure behavior, while
+local `VersionDownloadCount` remains the selected stored owner's statistic.
+Direct local and remote counters retain their existing behavior. This additional
+inference is also queued for P19/#216.

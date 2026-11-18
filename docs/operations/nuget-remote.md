@@ -13,7 +13,8 @@ are not invented. Proxying an upstream `VulnerabilityInfo` resource remains P28 
 integration with P27 security data; an upstream advisory resource is not advertised by
 this adapter. Remote v2/v3 writes answer 405. V2 feeds and upstream symbol reads are
 implemented by P9 [#629](https://github.com/weaveplatform/artifactweave/issues/629).
-Local v2/v3 publication and restore are unchanged; virtual resolution belongs to P10.
+Local v2/v3 publication and restore retain their existing behavior. Virtual v2/v3
+reads aggregate configured readable members as described below.
 
 Package identities are case-insensitive and versions use NuGet normalization. A cached
 archive's canonical permission path is `<lower-id>/<normalized-version>/<lower-id>.<normalized-version>.nupkg`.
@@ -176,3 +177,26 @@ make zero upstream requests. Persistent-store tests also cover abandoned leases,
 workers, rollback/retry and source/authority changes. This is controlled API implementation
 evidence; vendor-specific scheduling/failure details remain #216 comparison work. Local and
 federated reindex retain their existing behavior; virtual reindex remains P10.
+
+
+## Virtual V2 and V3 reads
+
+Configure a NuGet virtual repository with local/federated and remote members,
+then use one source URL:
+
+- V2: `/artifactory/api/nuget/<virtual>` with `protocolVersion="2"`.
+- V3: `/artifactory/api/nuget/v3/<virtual>/index.json`.
+
+A remote used by V2 needs its V2 feed/download contexts configured as above.
+Read grants are checked on real members and package paths. A member the caller
+cannot read contributes nothing; a package no readable member holds answers
+`404`. Virtual and nested patterns filter before paging. Priority members
+shadow the whole package ID before request query filters; duplicate normalized
+versions keep the first member's complete record and download bytes.
+
+V2 pages contain at most 100 entries and next links remain on the virtual URL.
+Latest/absolute-latest flags describe the merged visible ID, including versions
+on later pages. Native qualification covers both pinned .NET SDK lanes with
+fresh client caches. Virtual publication, deletion, relisting, symbols and
+reindex remain deferred; writes retain `501`. `forceNugetAuthentication`
+continues to challenge before routing when enabled.
