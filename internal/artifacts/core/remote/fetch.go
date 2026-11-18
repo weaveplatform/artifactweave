@@ -593,9 +593,19 @@ func (p *Policy) unexpire(
 		return nil
 	})
 	if err != nil {
-		return model.RemoteCacheEntry{}, PolicyError(err)
+		return model.RemoteCacheEntry{}, clockError(ctx, err)
 	}
 	return updated, nil
+}
+
+// Clock publication is local storage work, even when a driver's failure
+// wraps a timeout. Keep that cause before the upstream classifier can erase
+// it; record verdicts and failures of an ended request keep their old answers.
+func clockError(ctx context.Context, err error) error {
+	if ctx.Err() == nil && errors.Is(err, kernel.ErrStore) {
+		return fmt.Errorf("publish remote cache clock: %w", item.MarkStorageFault(ctx, err, err))
+	}
+	return PolicyError(err)
 }
 
 // requestURL is the URL 7.x names in a refusal: the one it asked for,
@@ -773,7 +783,7 @@ func (p *Policy) revalidate(
 		return nil
 	})
 	if err != nil {
-		return model.RemoteCacheEntry{}, PolicyError(err)
+		return model.RemoteCacheEntry{}, clockError(ctx, err)
 	}
 	p.metadataChanged(ctx, q)
 	return updated, nil
