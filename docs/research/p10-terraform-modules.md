@@ -59,7 +59,7 @@ syntax, exact archive representation or duplicate ownership.
 5. Current effective membership, signer Read, member/virtual patterns and source
    authority are rechecked before signing and delivery. Unreadable or refused
    contributions do not disclose a member; true storage faults remain faults.
-   Provider and network-mirror virtual operations retain 501 pending #1564.
+   Provider and network-mirror virtual operations were deferred to #1564, now covered by [TFM-02 research](p10-terraform-providers.md).
 
 ## Same-kind finding fixed here
 

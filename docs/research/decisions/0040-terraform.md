@@ -101,7 +101,7 @@ rest of the path.
 Once the repository is known, the kit's checks run in this order, the order every router kit
 mount has (amended 2026-10-20, [#532](https://github.com/weaveplatform/artifactweave/issues/532)):
 1. A repository of another package type answers 404.
-2. Local/federated registries and the remote module/provider adapters (#631/#632) are served. P10 #1550 adds virtual module reads and signed member downloads; virtual provider and network-mirror operations retain 501 until #1564.
+2. Local/federated registries and the remote module/provider adapters (#631/#632) are served. P10 #1550/#1564 add virtual module/provider reads, network mirrors and signed member downloads.
 3. The route must fit the repository's `terraformType` (below).
 
 ### Signed download URLs
@@ -335,7 +335,7 @@ beside npm's registry do (decision [0034](0034-npm.md)) **[I]** (amended 2026-10
 | 404 | an unknown repository or none in the namespace, a repository of another package type, a route that does not fit `terraformType` or a repository without it, an unknown or invisible module, provider, version or platform, no version the caller can read, and a path that is no operation |
 | 405 | another method on a listed path |
 | 409 | a provider `download` whose repository has no GPG key pair, whose `SHA256SUMS` lacks the package or names another SHA-256, or whose signature does not verify |
-| 501 | virtual provider/network-mirror operations, naming their class, until #1564 |
+| 501 | unsupported virtual operations, including provider writes and malformed provider operations |
 
 ### Permissions
 
@@ -535,7 +535,7 @@ native client recognizes its syntax.
   `https://<host>/app/settings/tokens` and checks the pasted token through `account/details`.
   artifactweave supplies no browser token page; mint an Access token separately. The native
   backend exit checks verify validation, saving and reuse of that token (R31 6).
-- **Remote modules/providers** are implemented by #631/#632; P10 #1550 implements virtual module resolution. Virtual providers/network mirrors remain #1564. Additional source-getter qualification is P28/#668.
+- **Remote modules/providers** are implemented by #631/#632; P10 #1550 implements virtual module resolution. P10 #1564 implements virtual providers/network mirrors. Additional source-getter qualification is P28/#668.
 - **Reindex cost.** A reindex reads every provider package to recompute its `h1:` hash.
 - **Unconfirmed points.** What 7.x answers in R31 section 14 is inferred, and on the
   live-capture list (#216) for P19.
@@ -570,7 +570,7 @@ These assignments describe planned work, not current runtime support.
   - the key resolver over keys containing `__` and `-rt-ns-`, capitals, and a key `v1`;
   - signed URLs that are expired, tampered with, outlived by an overwrite, or whose
     principal lost Read;
-  - each 409, and 501 for virtual provider/network-mirror operations; remote module/provider paths have their P9 fault and integrity tests;
+  - each 409, and 501 for deferred virtual provider operations; remote module/provider paths have their P9 fault and integrity tests;
   - the `terraformType` mismatches.
 - **Acceptance**, as "Testing against a plain-HTTP host" says (#556):
   - `terraform init` of a module deployed by `PUT` and of one deployed by
@@ -683,5 +683,44 @@ HCL/JSON module blocks and submodule selectors. Original cached bytes remain
 unchanged, and derived representation validators/format are signed and recalculated.
 This also fixes the previously missing documented direct-remote source override.
 [Research and inference record](../p10-terraform-modules.md) describes exact syntax,
-format bounds and evidence tracked under #216. Providers/network mirrors retain
-the original class 501 until #1564; state backends are unchanged.
+format bounds and evidence tracked under #216. P10 #1564 extends this member resolution to providers/network mirrors; state backends are unchanged.
+
+
+## P10 virtual providers (#1564)
+
+Provider registry and mirror reads walk PROVIDER local/federated and remote
+members in ENG-08 order; MODULE members contribute nothing. The virtual's
+`terraformType` does not restrict the kinds its members serve. Both encoded
+`<virtual>-rt-ns-<namespace>` and repository-scoped routes retain the original
+virtual when rendering links. Namespace equal to a real member key keeps its
+full storage path.
+
+Versions are unioned and sorted. A duplicate retains its first eligible member's
+whole protocols/platforms record **[I]**. Registry exact downloads independently
+select the first member with the requested version and platform. Mirror version
+JSON instead retains its first eligible version owner's complete visible archive
+map; later complementary platforms are not combined **[I]**. All archive,
+SHA256SUMS, signature, filename and signing-key metadata come from that selected
+member. Raw mirror hash lists remain unchanged; a hashless mirror gets the
+existing computed `h1:` fallback without an invented signer.
+
+Signed URLs last 90 seconds, name the requested virtual and carry the real member.
+Hosted provider claims distinguish provider delivery even when the virtual is
+configured as MODULE. Metadata construction revalidates the incoming principal
+and scope. Hosted signed delivery retains the subject/current-Read contract;
+remote signed delivery also restores its credential/source claims. Current
+membership, nested patterns and serving-member Read/policy are checked again.
+Missing, expired, removed or unreadable capabilities use the exact 403 download
+URL refusal; genuine identity, permission and source-store failures remain 500.
+Remote source-incarnation claims cannot become hosted capabilities after legacy
+repository-class replacement. This also fixes those masked storage faults in the
+existing signed module paths.
+
+There is no merged metadata cache. Local changes are visible on the next read;
+remote raw metadata and files retain their existing source cache, refresh,
+integrity and offline boundaries. Terraform remains exempt from R7's remote-fetch
+flag. Member misses pass over; an empty result uses the existing Terraform 404
+profile. Direct local/remote registry and mirror content, deferred writes and
+state backends retain their previous contracts. The
+[research record](../p10-terraform-providers.md) distinguishes primary evidence
+from the provider ownership and exact-capability inferences tracked under #216.

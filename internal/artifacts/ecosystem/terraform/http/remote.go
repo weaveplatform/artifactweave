@@ -465,12 +465,17 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 		principal, d, err = h.o.Authorizer.Authorize(r.Context(), principal, principal.Anonymous)
 	}
 	if err != nil {
-		h.k.Error(w, r, forbidden)
+		h.k.Error(w, r, signedAuthorityError(err))
 		return
 	}
 	ctx := accessapi.WithCaller(r.Context(), principal, d)
 	r = r.WithContext(ctx)
-	if !h.k.Require(w, r, c.Path, accessapi.ActionRead) {
+	if c.Member != "" {
+		if !h.k.Can(r, c.Path, accessapi.ActionRead) {
+			h.k.Error(w, r, forbidden)
+			return
+		}
+	} else if !h.k.Require(w, r, c.Path, accessapi.ActionRead) {
 		return
 	}
 	// The archive's cache path follows its location, so the URL names the
@@ -481,14 +486,13 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 		h.k.Error(w, r, forbidden)
 		return
 	}
-	identity, err := h.o.RemoteSources.Resolve(ctx, pkgroute.RequestFrom(r).Repo)
-	if err != nil || identity != *c.Source {
-		h.k.Error(w, r, forbidden)
+	if err := h.currentSignedSource(r, c); err != nil {
+		h.k.Error(w, r, err)
 		return
 	}
 	location, metadata, err := h.upstreamModuleLocation(r, m)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.k.Error(w, r, signedMemberError(c, err))
 		return
 	}
 	if location.Path != c.Path || metadata.Identity != *c.Source {
@@ -504,7 +508,7 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 	resource.Checksums.SHA256 = c.SHA256
 	result, err := h.k.Read(r, resource)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.k.Error(w, r, signedMemberError(c, err))
 		return
 	}
 	if moduleDigest(result) != c.SHA256 || result.Identity != *c.Source {
@@ -539,7 +543,7 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 		sourceFence := result.Revalidate
 		result.Revalidate = func(ctx context.Context) error {
 			if err := sourceFence(ctx); err != nil {
-				if modulePassedOver(err) {
+				if signedDeliveryRefusal(err) {
 					return forbidden
 				}
 				return err

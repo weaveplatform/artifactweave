@@ -133,7 +133,7 @@ func TestAccTerraformVirtualModuleBackends(t *testing.T) {
 			if refused.Header().Get("Allow") != "GET" {
 				t.Fatal(refused.Header())
 			}
-			harness.WantStatus(t, w.Request("GET", "/artifactory/api/terraform/virtual/v1/providers/hashicorp/null/versions", "admin", ""), 501)
+			harness.WantStatus(t, w.Request("GET", "/artifactory/api/terraform/virtual/v1/providers/hashicorp/null/versions", "admin", ""), 404)
 		})
 	}
 }

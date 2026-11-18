@@ -398,10 +398,32 @@ func (h handler) providerDownload(
 			return
 		}
 	}
-	keys, err := h.providerKeys(r)
+	doc, err := h.providerDownloadData(r, v, a)
 	if err != nil {
 		h.k.Error(w, r, err)
 		return
+	}
+	urls := []string{}
+	for _, it := range []model.Item{a.item, v.sums, v.signature} {
+		u, err := h.downloadURL(r, it)
+		if err != nil {
+			h.k.Error(w, r, err)
+			return
+		}
+		urls = append(urls, u)
+	}
+	for index, key := range []string{"download_url", "shasums_url", "shasums_signature_url"} {
+		doc[key] = urls[index]
+	}
+	writeJSON(w, r, doc)
+}
+
+// providerDownloadData verifies one hosted release and retains its own keys,
+// checksum/signature bytes and protocol manifest before any URL rendering.
+func (h handler) providerDownloadData(r *http.Request, v providerVersion, a providerArchive) (map[string]any, error) {
+	keys, err := h.providerKeys(r)
+	if err != nil {
+		return nil, err
 	}
 	armors := []string{}
 	for _, k := range keys {
@@ -409,13 +431,11 @@ func (h handler) providerDownload(
 	}
 	sums, err := h.read(r, v.sums)
 	if err != nil {
-		h.k.Error(w, r, err)
-		return
+		return nil, err
 	}
 	sig, err := h.read(r, v.signature)
 	if err != nil {
-		h.k.Error(w, r, err)
-		return
+		return nil, err
 	}
 	verified, err := tf.Check(
 		tf.Release{
@@ -430,38 +450,17 @@ func (h handler) providerDownload(
 		armors,
 	)
 	if err != nil { // Format rejections become this protocol's error envelope.
-		h.k.Error(w, r, apierror.New(http.StatusConflict, err.Error()))
-		return
+		return nil, apierror.New(http.StatusConflict, err.Error())
 	}
 	protocols, err := h.protocols(r, v.manifest)
 	if err != nil {
-		h.k.Error(w, r, err)
-		return
+		return nil, err
 	}
-	urls := []string{}
-	for _, it := range []model.Item{a.item, v.sums, v.signature} {
-		u, err := h.downloadURL(r, it)
-		if err != nil {
-			h.k.Error(w, r, err)
-			return
-		}
-		urls = append(urls, u)
-	}
-	writeJSON(
-		w,
-		r,
-		map[string]any{
-			"protocols":             protocols,
-			"os":                    a.os,
-			"arch":                  a.arch,
-			"filename":              a.item.Name,
-			"download_url":          urls[0],
-			"shasums_url":           urls[1],
-			"shasums_signature_url": urls[2],
-			"shasum":                verified.Shasum,
-			"signing_keys":          map[string]any{"gpg_public_keys": keys},
-		},
-	)
+	return map[string]any{
+		"protocols": protocols, "os": a.os, "arch": a.arch,
+		"filename": a.item.Name, "shasum": verified.Shasum,
+		"signing_keys": map[string]any{"gpg_public_keys": keys},
+	}, nil
 }
 
 func (h handler) archiveH1(r *http.Request, it model.Item) (string, error) {

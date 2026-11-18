@@ -1,6 +1,6 @@
 # Terraform remote providers
 
-The P9 provider adapter uses authoritative upstream metadata and preserves the
+The provider adapter uses authoritative upstream metadata and preserves the
 publisher's original ZIP, SHA256SUMS, detached signature and GPG public-key
 identity. Remote repositories do not need a local signing key. No local private
 key signs or replaces an upstream package.
@@ -143,16 +143,55 @@ unavailable. Rejections identify the failing metadata, checksum,
 signature or archive stage using server-owned descriptions; upstream response text,
 URLs and credentials remain private.
 
+## Virtual provider repositories
+
+A virtual combines PROVIDER local/federated and remote members, including nested
+virtuals. MODULE members contribute nothing. Its own `terraformType` may remain
+MODULE: provider reads select the member type. Use the same registry source
+`<host>/<virtual>-rt-ns-<namespace>/<type>` or mirror base
+`https://<host>/artifactory/api/terraform/<virtual>/providers/`. Native provider API writes remain unsupported. Generic item deployments keep
+the normal default-deployment target and its own admission; the publication
+recipe uses a concrete PROVIDER repository.
+
+Versions are a sorted union. A duplicate version's protocols/platforms come
+whole from the first eligible member. Registry exact downloads walk members
+again until the requested version and platform exist; mirror version JSON uses
+only the first version owner's visible archive map. Complementary platforms
+from later members are not mixed into that mirror answer. These duplicate-owner
+choices remain explicit inferences pending #216 vendor comparison.
+
+The virtual's and nested virtuals' patterns filter visible content before
+ownership. Read and download policy apply to the real serving member. Remote
+metadata keeps its `.terraform/...` policy paths and files keep the actual cache
+paths above; listing paths cannot replace those file policy paths. A denied,
+missing, offline-unavailable or blacked-out member is passed over, while real
+storage faults retain 500. Terraform ignores the R7 remote-fetch flag.
+
+All three registry bundle URLs name the virtual and carry a 90-second member
+capability. The bytes and publisher's keys remain that member's. Metadata
+construction checks the incoming principal and scope again before issuing URLs.
+Hosted signed delivery retains the established signer/current-Read contract;
+remote signed delivery also restores its credential/source claims. Delivery
+requires current effective membership, patterns and signer Read. Removal,
+expiry or unreadability yields 403 `Invalid or expired Terraform download URL`.
+Identity, permission or source-store failures remain 500.
+
+Virtual responses are not stored in a merged cache. Local index changes appear
+on the next read, and remote source caching/refresh/offline rules are unchanged.
+The native fixture installs separate hosted and private remote publishers through
+both a nested virtual registry and an HTTPS virtual network mirror with fresh
+client caches, without a direct mirror fallback.
+
 ## Evidence and remaining ownership
 
-The native content qualification uses Terraform 1.16.4 and the pinned null 3.3.2
+The native content qualification uses Terraform 1.17.1 and the pinned null 3.3.2
 provider archive against a controlled publisher. It covers origin-registry GPG
 verification, registry-derived mirrors and raw upstream mirrors, initial tampering
 or signature failure, corrected-upstream retry, apply, and reinstallation with
 an empty provider installation cache while the server is offline. It is separate from JFrog
 Terraform-provider repository CRUD acceptance. Controlled upstream tests do not
 establish an observed Artifactory response: P19/#216 owns vendor comparison and
-ADR0040 retains its existing status. P10 owns virtual resolution; P21/#262 owns
+ADR0040 retains its existing status. P10 #1564 implements virtual provider resolution; P21/#262 owns
 browser login approval. Additional Terraform source-getter qualification remains
 P28/#668 and does not change provider signature requirements.
 

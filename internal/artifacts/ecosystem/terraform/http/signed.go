@@ -15,7 +15,9 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	tf "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -284,4 +286,68 @@ func (h handler) moduleDownloadURL(r *http.Request, c claims, subdir, archive st
 		return head + "//" + subdir + "?" + query, nil
 	}
 	return u.String(), nil
+}
+
+// A verified capability can be refused by current authority, but does not turn
+// an unreadable user/permission store into an invalid credential. The access
+// API distinguishes those failures with typed errors, never message text.
+func signedAuthorityError(err error) error {
+	if signedAuthorityRefusal(err) {
+		return forbidden
+	}
+	return err
+}
+
+func signedAuthorityRefusal(err error) bool {
+	if errors.Is(err, kernel.ErrStore) || errors.Is(err, format.ErrStorageFault) {
+		return false
+	}
+	var answer *apierror.Error
+	return errors.Is(err, kernel.ErrNotFound) || errors.As(err, &answer) && (answer.Status == http.StatusUnauthorized || answer.Status == http.StatusForbidden)
+}
+
+// Signed delivery refuses missing/currently unauthorized capabilities, while
+// temporary upstream failures keep their retry/error semantics. Member discovery
+// deliberately passes over those failures and therefore cannot classify this.
+func signedDeliveryRefusal(err error) bool {
+	if errors.Is(err, kernel.ErrStore) || errors.Is(err, format.ErrStorageFault) {
+		return false
+	}
+	if signedAuthorityRefusal(err) || errors.Is(err, kernel.ErrForbidden) || errors.Is(err, kernel.ErrUnauthenticated) || errors.Is(err, source.ErrDenied) ||
+		pkgroute.IsRefusal(err) {
+		return true
+	}
+	var answer *apierror.Error
+	if errors.As(err, &answer) {
+		return answer.Status == http.StatusNotFound
+	}
+	var upstream *source.HTTPError
+	return errors.As(err, &upstream) && (upstream.Status == http.StatusUnauthorized || upstream.Status == http.StatusForbidden || upstream.Status == http.StatusNotFound)
+}
+
+func signedMemberError(c claims, err error) error {
+	if c.Member != "" && signedDeliveryRefusal(err) {
+		return forbidden
+	}
+	return err
+}
+
+func (h handler) currentSignedSource(r *http.Request, c claims) error {
+	if h.o.RemoteSources == nil || h.o.RemoteSources.Resolve == nil || c.Source == nil {
+		return forbidden
+	}
+	identity, err := h.o.RemoteSources.Resolve(r.Context(), pkgroute.RequestFrom(r).Repo)
+	if err != nil {
+		if errors.Is(err, kernel.ErrStore) || errors.Is(err, format.ErrStorageFault) {
+			return fmt.Errorf("terraform signed source: %w", err)
+		}
+		if signedDeliveryRefusal(err) || errors.Is(err, source.ErrUnsupported) {
+			return forbidden
+		}
+		return fmt.Errorf("terraform signed source: %w", pkgroute.SourceError(err, false))
+	}
+	if identity != *c.Source {
+		return forbidden
+	}
+	return nil
 }

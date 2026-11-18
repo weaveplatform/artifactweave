@@ -52,7 +52,7 @@ jf config add aw --url "$AW_URL" --artifactory-url "$AW_URL/artifactory" --acces
 
 ## Publish
 
-Classes: **local, federated, virtual**. JFrog CLI packages module subdirectories and deploys indexed ZIPs to a MODULE local/federated repository or a virtual with a MODULE defaultDeploymentRepo. Provider publication still uses a concrete PROVIDER repository. Run from the parent of alpha/.
+Classes: **local, federated, virtual**. JFrog CLI packages module subdirectories and deploys indexed ZIPs to a MODULE local/federated repository or a virtual with a MODULE defaultDeploymentRepo. The provider example uses a concrete PROVIDER repository; generic item uploads retain normal virtual default-deployment admission, while native provider API writes remain unsupported. Run from the parent of alpha/.
 
 ```sh
 jf terraform-config --server-id-deploy=aw --repo-deploy="$AW_REPO"
@@ -69,7 +69,7 @@ done
 
 ## Install or resolve
 
-Classes: **local, remote, virtual, federated**. Use repo__namespace for module sources. Replace the template values in main.tf; these are Terraform source strings, not shell expansion.
+Classes: **local, remote, virtual, federated**. Use repo__namespace for module sources. Provider registry and network-mirror reads also accept a virtual combining PROVIDER local/federated and remote members. Replace the template values in main.tf; these are Terraform source strings, not shell expansion.
 
 main.tf; authority is AW_URL without scheme. Select the read repository, including a virtual or remote if configured.
 
@@ -115,7 +115,7 @@ provider_installation {
 Classes outside **local, remote, virtual, federated** are not registered for this format. Commands above apply only to each operation's listed classes. Federated evidence is for one node; it does not establish cross-vendor replication.
 
 - Provider source coordinates use <authority>/<repository>-rt-ns-<namespace>/<provider>, not the module __ separator.
-- Module publication through a virtual requires defaultDeploymentRepo. Provider publication targets a concrete local/federated repository; virtual provider/mirror resolution remains #1564. Remote repositories resolve only.
+- Module publication through a virtual requires defaultDeploymentRepo. The provider upload example targets a concrete PROVIDER repository; generic item uploads retain the virtual default-deployment target’s admission, while native provider API writes remain unsupported. Virtual provider/mirror reads preserve the selected member’s signature and bytes; registry exact-platform selection and mirror whole-version ownership are distinct. Remote repositories resolve only.
 - The HTTP host override in tests is a loopback fixture workaround; production clients should use HTTPS discovery.
 - The provider registry requires a valid publisher signature and configured verification key. The HTTPS network mirror is a separate installation mode that checks archive hashes and the lockfile; it does not claim publisher-signature verification.
 
@@ -131,3 +131,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/terraform_providers.feature](../../test/acceptance/features/terraform_providers.feature).
 - Evidence: [test/acceptance/terraform_provider_steps_test.go](../../test/acceptance/terraform_provider_steps_test.go).
 - Evidence: [test/acceptance/features/terraform_remote.feature](../../test/acceptance/features/terraform_remote.feature).
+- Evidence: [test/acceptance/terraform_provider_virtual_steps_test.go](../../test/acceptance/terraform_provider_virtual_steps_test.go).

@@ -89,7 +89,7 @@ func TestAccProviderRoutes(t *testing.T) {
 		{"GET", prefix + "v1/providers/PROVIDER-rt-ns-hashicorp/null/versions", "admin", 200},
 		{"GET", prefix + "v1/providers/mods-rt-ns-hashicorp/null/versions", "admin", 404},
 		{"GET", prefix + "v1/providers/remote-rt-ns-hashicorp/null/versions", "admin", 501},
-		{"GET", prefix + "v1/providers/virtual-rt-ns-hashicorp/null/versions", "admin", 501},
+		{"GET", prefix + "v1/providers/virtual-rt-ns-hashicorp/null/versions", "admin", 404},
 		{"GET", mirrorBase + "index.json", "admin", 200},
 		{"HEAD", mirrorBase + "3.3.2.json", "admin", 200},
 		{"POST", mirrorBase + "index.json", "admin", 405},
