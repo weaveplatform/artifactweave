@@ -199,6 +199,7 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	fullJobs := []string{
 		"vuln",
 		"build",
+		"sqlite-windows",
 		"acceptance-gradle",
 		"acceptance-jvm",
 		"oci-conformance",
@@ -502,7 +503,8 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 	base := map[string]string{
 		"PROFILE": "docs", "IMPACT": "success", "DOCS": "skipped", "HAS_UNIT": "false",
 		"UNIT_LINUX": "skipped", "UNIT_MACOS": "skipped", "UNIT_WINDOWS": "skipped",
-		"GO_ACCEPTANCE": "skipped", "HAS_ACCEPTANCE": "false",
+		"SQLITE_WINDOWS": "skipped",
+		"GO_ACCEPTANCE":  "skipped", "HAS_ACCEPTANCE": "false",
 		"LINT": "skipped", "VULN": "skipped", "BUILD": "skipped",
 		"ACCEPTANCE": "skipped", "CONAN": "skipped", "NUGET": "skipped", "COVERAGE": "skipped",
 		"AFFECTED_COVERAGE": "skipped", "PARITY": "skipped", "JVM": "skipped",
@@ -511,6 +513,7 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 	}
 	full := map[string]string{
 		"PROFILE": "full", "HAS_UNIT": "true", "GO_ACCEPTANCE": "success",
+		"SQLITE_WINDOWS": "success",
 		"HAS_ACCEPTANCE": "true", "LINT": "success", "VULN": "success",
 		"BUILD": "success", "ACCEPTANCE": "success", "CONAN": "success", "NUGET": "success",
 		"JVM":      "success",
@@ -535,6 +538,9 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 		{"docs rejects an unexpected unit job", "", map[string]string{
 			"DOCS": "success", "UNIT_WINDOWS": "success",
 		}, false},
+		{"docs rejects unexpected Windows SQLite acceptance", "", map[string]string{
+			"DOCS": "success", "SQLITE_WINDOWS": "success",
+		}, false},
 		{"provider fixture only", "", map[string]string{
 			"PROFILE": "deployment", "PROVIDER_SELECTED": "true", "TERRAFORM": "success",
 		}, true},
@@ -550,6 +556,9 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			"DEPLOY_SELECTED": "true", "DEPLOY": "success",
 		}, true},
 		{"release full gate", "success", full, true},
+		{"full rejects failed Windows SQLite acceptance", "success", fullWith("SQLITE_WINDOWS", "failure"), false},
+		{"full rejects skipped Windows SQLite acceptance", "success", fullWith("SQLITE_WINDOWS", "skipped"), false},
+		{"full rejects cancelled Windows SQLite acceptance", "success", fullWith("SQLITE_WINDOWS", "cancelled"), false},
 		{
 			"cancelled release package acceptance", "success",
 			fullWith("GO_ACCEPTANCE", "cancelled"), false,

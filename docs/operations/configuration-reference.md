@@ -149,6 +149,19 @@ per process. The exact scope rules, failure behavior, response headers and reser
 administrator recovery allowance are described in [decision 0043](../research/decisions/0043-api-reliability.md).
 Use the same policy and synchronized clocks on replicas sharing the database.
 
+SQLite's `database.dsn` is a literal filesystem path, with an optional `file:`
+prefix removed before opening it. Characters such as `#`, `%`, spaces and, where
+valid on the host OS, `?` belong to that filename; they do not supply URI query
+options. The driver quotes the path separately from its fixed connection settings.
+`:memory:` (also `file::memory:` in configuration) retains the private in-memory
+database contract. Relative paths stay relative to the process working directory.
+
+Existing deployments affected by URI aliasing may have data at the old decoded
+or truncated filename. The corrected driver selects the literal configured file.
+Check and back up the existing database before deciding how to recover that data;
+no automatic move or copy is performed, because multiple configured names may
+have shared one file. Normal schema migrations are unchanged.
+
 ## Planned application settings
 
 The following design settings are not implemented and are rejected as unknown YAML keys.

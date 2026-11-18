@@ -240,6 +240,41 @@ jobs:
     runs-on: windows-latest
     steps: *unit-steps
 
+  sqlite-windows:
+    name: 'Go acceptance (Windows, SQLite paths)'
+    needs: [impact]
+    if: needs.impact.outputs.profile == 'full'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
+      # File identity and URI decoding need the real Windows SQLite driver;
+      # TestUnit's string round trips cannot establish which file it opens.
+      - name: Native SQLite filesystem contracts
+        shell: bash
+        run: |
+          go test -list '^TestAccOpenDB' ./internal/platform/sql/sqlite > "$RUNNER_TEMP/sqlite-path-tests.txt"
+          grep -q '^TestAccOpenDBKeepsLiteralPathsIndependent$' "$RUNNER_TEMP/sqlite-path-tests.txt"
+          go test -race -shuffle=on -count=1 -timeout=5m -v \
+            -coverprofile="$RUNNER_TEMP/sqlite-paths.cover" -run '^TestAccOpenDB' ./internal/platform/sql/sqlite
+
   acceptance-go:
     name: 'Go acceptance tests (Linux packages)'
     needs: [impact]
@@ -1430,7 +1465,7 @@ jobs:
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [impact, docs, unit-linux, unit-macos, unit-windows, acceptance-go, lint, vuln, build, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
+    needs: [impact, docs, unit-linux, unit-macos, unit-windows, sqlite-windows, acceptance-go, lint, vuln, build, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Required jobs match the selected profile
@@ -1441,6 +1476,7 @@ jobs:
           UNIT_LINUX: ${{ needs['unit-linux'].result }}
           UNIT_MACOS: ${{ needs['unit-macos'].result }}
           UNIT_WINDOWS: ${{ needs['unit-windows'].result }}
+          SQLITE_WINDOWS: ${{ needs['sqlite-windows'].result }}
           HAS_UNIT: ${{ needs.impact.outputs.has_unit }}
           GO_ACCEPTANCE: ${{ needs['acceptance-go'].result }}
           HAS_ACCEPTANCE: ${{ needs.impact.outputs.has_acceptance }}
@@ -1470,7 +1506,7 @@ jobs:
             full)
               require docs "$DOCS" skipped
               require affected-coverage "$AFFECTED_COVERAGE" skipped
-              for result in "$UNIT_LINUX" "$UNIT_MACOS" "$UNIT_WINDOWS" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" \
+              for result in "$UNIT_LINUX" "$UNIT_MACOS" "$UNIT_WINDOWS" "$SQLITE_WINDOWS" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" \
                 "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
                 require full-job "$result" success
               done
@@ -1502,7 +1538,7 @@ jobs:
               else
                 require acceptance-conan "$CONAN" skipped
               fi
-              for result in "$VULN" "$BUILD" "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
+              for result in "$SQLITE_WINDOWS" "$VULN" "$BUILD" "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
                 require unselected "$result" skipped
               done
               ;;
@@ -1518,7 +1554,7 @@ jobs:
               else
                 require terraform-deployment "$DEPLOY" skipped
               fi
-              for result in "$UNIT_LINUX" "$UNIT_MACOS" "$UNIT_WINDOWS" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" \
+              for result in "$UNIT_LINUX" "$UNIT_MACOS" "$UNIT_WINDOWS" "$SQLITE_WINDOWS" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" \
                 "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$OCI"; do
                 require unselected "$result" skipped
               done
@@ -1526,7 +1562,7 @@ jobs:
             *) echo "unknown CI profile: $PROFILE"; exit 1 ;;
           esac
           if [ "$PROFILE" = docs ]; then
-            for result in "$UNIT_LINUX" "$UNIT_MACOS" "$UNIT_WINDOWS" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" \
+            for result in "$UNIT_LINUX" "$UNIT_MACOS" "$UNIT_WINDOWS" "$SQLITE_WINDOWS" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" \
               "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do
               require unselected "$result" skipped
             done
