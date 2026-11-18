@@ -7,7 +7,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 
@@ -20,6 +22,50 @@ func (w *world) registerMavenRemote(sc *godog.ScenarioContext) {
 		w.mavenUpstream,
 	)
 	sc.Step(`^the Maven upstream received a cold GET for every fixture$`, w.mavenColdRequests)
+	sc.Step(`^the Maven upstream forgets the non-unique snapshot files$`, w.mavenForgetSnapshot)
+	sc.Step(`^the Maven remote retrieval period has elapsed$`, w.mavenRetrievalElapsed)
+	sc.Step(`^the Maven upstream received refresh requests for its missing snapshot files$`, w.mavenMissingSnapshotRequests)
+}
+
+func (w *world) mavenRetrievalElapsed() error {
+	// The public configuration API enforces a minimum 30-second period.
+	// Real expiry qualifies the direct cache path without test-only mutation.
+	timer := time.NewTimer(31 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-w.t.Context().Done():
+		return fmt.Errorf("waiting for Maven cache expiry: %w", w.t.Context().Err())
+	}
+}
+
+func (w *world) mavenForgetSnapshot() error {
+	if w.vars == nil {
+		w.vars = map[string]string{}
+	}
+	for _, file := range []string{"nonunique-2.0-SNAPSHOT.pom", "nonunique-2.0-SNAPSHOT.jar", "maven-metadata.xml"} {
+		path := "/" + remoteMavenGroup + "nonunique/2.0-SNAPSHOT/" + file
+		w.vars["missing-snapshot-"+file] = strconv.Itoa(w.remote.Count("", path))
+		w.remote.Set(path, fakeupstream.Resource{Status: http.StatusNotFound})
+	}
+	return nil
+}
+
+func (w *world) mavenMissingSnapshotRequests() error {
+	for _, file := range []string{"nonunique-2.0-SNAPSHOT.pom", "nonunique-2.0-SNAPSHOT.jar", "maven-metadata.xml"} {
+		path := "/" + remoteMavenGroup + "nonunique/2.0-SNAPSHOT/" + file
+		before, err := strconv.Atoi(w.vars["missing-snapshot-"+file])
+		if err != nil {
+			return fmt.Errorf("read initial snapshot request count: %w", err)
+		}
+		// Maven may probe with HEAD before GET. Count a new exchange after
+		// removal, independently of the initial HEAD/GET download pair.
+		if count := w.remote.Count("", path); count <= before {
+			return fmt.Errorf("missing snapshot %s was not revalidated: %d requests, initially %d", path, count, before)
+		}
+	}
+	return nil
 }
 
 const remoteMavenGroup = "org/acme/p9remote625/"

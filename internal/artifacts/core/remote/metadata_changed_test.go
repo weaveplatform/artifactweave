@@ -23,6 +23,7 @@ func TestAccMetadataRefreshNotifiesAfterPublication(t *testing.T) {
 	}
 	w.up.Set("/index.yaml", fakeupstream.Resource{Body: []byte("entries: {}"), ETag: `"one"`})
 	q := w.request("index.yaml", source.ResourceKindMetadata)
+	q.Resource.RepositoryFile = true
 	w.mustRead(q, "entries: {}")
 	if changes != 1 {
 		t.Fatal(changes)
@@ -38,6 +39,17 @@ func TestAccMetadataRefreshNotifiesAfterPublication(t *testing.T) {
 	}
 	w.up.Set("/index.yaml", fakeupstream.Resource{Status: 404})
 	w.clock.Advance(time.Minute)
+	w.mustRead(q, "entries: {}")
+	if changes != 2 {
+		t.Fatal("retained bytes invalidated metadata", changes)
+	}
+	entry, err := w.db.RemoteCache().Read(t.Context(), w.p.CacheKey(q, "credential-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = w.db.RemoteCache().Evict(t.Context(), entry.Token); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := w.read(q); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal(err)
 	}

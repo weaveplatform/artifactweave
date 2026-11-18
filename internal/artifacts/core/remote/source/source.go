@@ -168,8 +168,13 @@ type Resource struct {
 	// (RemoteRepoBase.remoteResourceCache), so the remote policy fills it
 	// for a caller with Read alone (AuthorizeFill is not asked).
 	NoCacheFile bool
-	Query       string
-	Variant     string
+	// RepositoryFile identifies metadata selected as an addressed repository
+	// file by a trusted file reader. Only origin-miss retention uses it;
+	// it changes no admission, cache, TTL or offline policy. Artifact kind
+	// already denotes a file. Unmarked metadata keeps its API miss semantics.
+	RepositoryFile bool
+	Query          string
+	Variant        string
 	// Accept is the adapter's own Accept for the upstream request, such as
 	// the registry's manifest types or npm's abbreviated packument, and part
 	// of the cache identity. It is never the client's header: 7.161.26's

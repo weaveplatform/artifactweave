@@ -12,8 +12,9 @@ curl --fail --user admin "$REGISTRY/artifactory/api/repositories/maven-central" 
 ```
 
 Configure the native client repository URL as `$REGISTRY/artifactory/maven-central/`,
-with its ordinary server credentials. Read permission is sufficient to populate the
-cache; client deployment to a remote remains refused.
+with its ordinary server credentials. Read permits an existing cached copy;
+populating the file cache with cold or changed bytes also needs Deploy/Cache on
+the remote's cache path (#1587). Client deployment to a remote remains refused.
 
 ## Resolution and metadata
 
@@ -50,6 +51,17 @@ Gradle/Ivy/SBT paths and a Gradle to Maven-2 translation.
 The `{repo}-cache` view performs no upstream I/O. Raw XML is available there after
 fetching, independently of the requesting client's Accept header. The normal shared
 freshness/stale policy governs a remote while its upstream is unavailable.
+
+If an expired cached snapshot or raw metadata file is still complete and its
+origin now answers 404, a direct GET/HEAD retains the copy, advances its validation
+clock and creates no negative entry. Read alone is sufficient for this retained
+copy. Existing current-source, path, pattern and permission fences still apply.
+A fresh or unique immutable copy needs no origin check. Network 5xx/timeouts keep
+their existing `hardFail` and stale-cache rules, without advancing validation time;
+the stricter HTTP cache rules remain unchanged. Maven snapshot virtuals use the
+same direct remote selection; a Generic virtual retains its standard member walk.
+See the [primary source trace](../research/expired-remote-copy.md) for the clock
+correction and the separate RC-2/RC-3 comparison limits.
 
 ## Admission, checksums and retention
 
