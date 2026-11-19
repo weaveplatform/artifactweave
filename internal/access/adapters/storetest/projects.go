@@ -17,6 +17,8 @@ func runProjects(t *testing.T, newStore Factory) {
 	t.Run("Environments", func(t *testing.T) { testEnvironments(t, newStore(t)) })
 	t.Run("ProjectMembers", func(t *testing.T) { testProjectMembers(t, newStore(t)) })
 	t.Run("Assignments", func(t *testing.T) { testAssignments(t, newStore(t)) })
+	t.Run("ProjectAuthorities", func(t *testing.T) { testProjectAuthorities(t, newStore) })
+	t.Run("ProjectAuthoritySnapshots", func(t *testing.T) { testProjectAuthoritySnapshots(t, newStore) })
 }
 
 func project(key string) model.Project {

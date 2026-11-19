@@ -51,17 +51,23 @@ func (p projectStore) Create(ctx context.Context, v model.Project) error {
 	if err != nil {
 		return err
 	}
-	_, err = p.s.Exec(
-		ctx,
-		"create project "+v.Key,
-		dialect.Insert("projects", dialect.OpsCols(projectCols)),
-		args...)
-	return err
+	a := port.NewProjectAuthority()
+	return p.tx(ctx, func(ctx context.Context) error {
+		_, err := p.s.Exec(
+			ctx,
+			"create project "+v.Key,
+			dialect.Insert("projects", append(dialect.OpsCols(projectCols), "incarnation", "policy_revision")),
+			append(args, a.Incarnation, a.Revision)...)
+		return err
+	})
 }
 
 func (p projectStore) Get(ctx context.Context, key string) (model.Project, error) {
+	if err := p.guard(ctx); err != nil {
+		return model.Project{}, err
+	}
 	v, err := scanProject(p.s.Q(ctx).QueryRowContext(ctx,
-		p.s.Dialect().Rebind("SELECT "+projectCols+" FROM projects WHERE key = ?"), key))
+		p.s.Dialect().Rebind("SELECT "+projectCols+" FROM projects WHERE key = ?"+p.s.LockClause(ctx)), key))
 	return v, p.s.Wrap("get project "+key, err)
 }
 
@@ -70,22 +76,32 @@ func (p projectStore) Update(ctx context.Context, v model.Project) error {
 	if err != nil {
 		return err
 	}
-	return p.s.ExecOne(
-		ctx,
-		"update project "+v.Key,
-		"UPDATE projects SET display_name = ?, description = ?, "+
-			"storage_quota_bytes = ?, soft_limit = ?, quota_email = ?, admin_privileges = ? WHERE key = ?",
-		append(args[1:], v.Key)...)
+	return p.tx(ctx, func(ctx context.Context) error {
+		return p.s.ExecOne(
+			ctx,
+			"update project "+v.Key,
+			"UPDATE projects SET display_name = ?, description = ?, "+
+				"storage_quota_bytes = ?, soft_limit = ?, quota_email = ?, admin_privileges = ?, policy_revision = ? WHERE key = ?",
+			append(args[1:], port.NewProjectAuthority().Revision, v.Key)...)
+	})
 }
 
 func (p projectStore) Delete(ctx context.Context, key string) error {
-	return p.s.Tx(ctx, func(ctx context.Context) error {
+	return p.tx(ctx, func(ctx context.Context) error {
 		if err := p.s.ExecOne(
 			ctx,
 			"delete project "+key,
 			"DELETE FROM projects WHERE key = ?",
 			key,
 		); err != nil {
+			return err
+		}
+		// Removing this receiving project changes every surviving explicit
+		// share that names it, even though the producer assignment remains.
+		if _, err := p.s.Exec(ctx, "revoke deleted project's shares",
+			"UPDATE project_repositories SET sharing_revision = ? WHERE repo_key IN "+
+				"(SELECT repo_key FROM project_repository_shares WHERE project_key = ?)",
+			port.NewSharingAuthority().Revision, key); err != nil {
 			return err
 		}
 		for _, q := range []string{
@@ -106,6 +122,9 @@ func (p projectStore) Delete(ctx context.Context, key string) error {
 }
 
 func (p projectStore) List(ctx context.Context) ([]model.Project, error) {
+	if err := p.guard(ctx); err != nil {
+		return nil, err
+	}
 	var out []model.Project
 	err := p.s.Rows(ctx, "list projects", "SELECT "+projectCols+" FROM projects ORDER BY key", nil,
 		func(r *sql.Rows) error {
@@ -119,10 +138,13 @@ func (p projectStore) List(ctx context.Context) ([]model.Project, error) {
 // requireProject returns ErrNotFound unless the project exists; global
 // records (an empty key) need none.
 func (p projectStore) requireProject(ctx context.Context, key string) error {
+	if err := p.guard(ctx); err != nil {
+		return err
+	}
 	if key == "" {
 		return nil
 	}
-	ok, err := p.s.Exists(ctx, "find project "+key, "SELECT 1 FROM projects WHERE key = ?", key)
+	ok, err := p.s.Exists(ctx, "find project "+key, "SELECT 1 FROM projects WHERE key = ?"+p.s.LockClause(ctx), key)
 	if err != nil {
 		return err
 	}
@@ -149,7 +171,7 @@ func scanRole(row interface{ Scan(...any) error }) (model.Role, error) {
 }
 
 func (p projectStore) PutRole(ctx context.Context, r model.Role) error {
-	return p.s.Tx(ctx, func(ctx context.Context) error {
+	return p.tx(ctx, func(ctx context.Context) error {
 		if err := p.requireProject(ctx, r.ProjectKey); err != nil {
 			return err
 		}
@@ -172,11 +194,17 @@ func (p projectStore) PutRole(ctx context.Context, r model.Role) error {
 			envs,
 			acts,
 		)
-		return err
+		if err != nil {
+			return err
+		}
+		return p.rotatePolicy(ctx, r.ProjectKey)
 	})
 }
 
 func (p projectStore) Role(ctx context.Context, projectKey, name string) (model.Role, error) {
+	if err := p.guard(ctx); err != nil {
+		return model.Role{}, err
+	}
 	v, err := scanRole(p.s.Q(ctx).QueryRowContext(ctx,
 		p.s.Dialect().Rebind("SELECT "+roleCols+" FROM roles WHERE project_key = ? AND name = ?"),
 		projectKey, name),
@@ -193,6 +221,9 @@ func (p projectStore) Roles(ctx context.Context, projectKey string) ([]model.Rol
 }
 
 func (p projectStore) roles(ctx context.Context, q string, args ...any) ([]model.Role, error) {
+	if err := p.guard(ctx); err != nil {
+		return nil, err
+	}
 	var out []model.Role
 	err := p.s.Rows(ctx, "list roles", q, args, func(r *sql.Rows) error {
 		v, err := scanRole(r)
@@ -203,18 +234,26 @@ func (p projectStore) roles(ctx context.Context, q string, args ...any) ([]model
 }
 
 func (p projectStore) DeleteRole(ctx context.Context, projectKey, name string) error {
-	return p.s.ExecOne(ctx, fmt.Sprintf("delete role %s/%s", projectKey, name),
-		"DELETE FROM roles WHERE project_key = ? AND name = ?", projectKey, name)
+	return p.tx(ctx, func(ctx context.Context) error {
+		if err := p.s.ExecOne(ctx, fmt.Sprintf("delete role %s/%s", projectKey, name),
+			"DELETE FROM roles WHERE project_key = ? AND name = ?", projectKey, name); err != nil {
+			return err
+		}
+		return p.rotatePolicy(ctx, projectKey)
+	})
 }
 
 func (p projectStore) CreateEnvironment(ctx context.Context, e model.Environment) error {
-	return p.s.Tx(ctx, func(ctx context.Context) error {
+	return p.tx(ctx, func(ctx context.Context) error {
 		if err := p.requireProject(ctx, e.ProjectKey); err != nil {
 			return err
 		}
 		_, err := p.s.Exec(ctx, "create environment "+e.Name,
 			dialect.Insert("environments", []string{"name", "project_key"}), e.Name, e.ProjectKey)
-		return err
+		if err != nil {
+			return err
+		}
+		return p.rotatePolicy(ctx, e.ProjectKey)
 	})
 }
 
@@ -222,6 +261,9 @@ func (p projectStore) Environments(
 	ctx context.Context,
 	projectKey string,
 ) ([]model.Environment, error) {
+	if err := p.guard(ctx); err != nil {
+		return nil, err
+	}
 	var out []model.Environment
 	err := p.s.Rows(
 		ctx,
@@ -239,7 +281,7 @@ func (p projectStore) Environments(
 }
 
 func (p projectStore) RenameEnvironment(ctx context.Context, projectKey, from, to string) error {
-	return p.s.Tx(ctx, func(ctx context.Context) error {
+	return p.tx(ctx, func(ctx context.Context) error {
 		if err := p.s.ExecOne(
 			ctx,
 			fmt.Sprintf("rename environment %s/%s", projectKey, from),
@@ -249,6 +291,9 @@ func (p projectStore) RenameEnvironment(ctx context.Context, projectKey, from, t
 			projectKey,
 		); err != nil {
 			return err
+		}
+		if from == to {
+			return nil
 		}
 		roles, err := p.roles(ctx, "SELECT "+roleCols+" FROM roles WHERE environments IS NOT NULL")
 		if err != nil {
@@ -263,6 +308,9 @@ func (p projectStore) RenameEnvironment(ctx context.Context, projectKey, from, t
 				if _, err := p.s.Exec(ctx, "rename environment in role "+r.Name,
 					"UPDATE roles SET environments = ? WHERE project_key = ? AND name = ?",
 					envs, r.ProjectKey, r.Name); err != nil {
+					return err
+				}
+				if err := p.rotatePolicy(ctx, r.ProjectKey); err != nil {
 					return err
 				}
 			}
@@ -280,15 +328,16 @@ func (p projectStore) RenameEnvironment(ctx context.Context, projectKey, from, t
 				if _, err := p.s.Exec(
 					ctx,
 					"rename environment in assignment "+a.RepoKey,
-					"UPDATE project_repositories SET environments = ? WHERE repo_key = ?",
+					"UPDATE project_repositories SET environments = ?, sharing_revision = ? WHERE repo_key = ?",
 					envs,
+					port.NewSharingAuthority().Revision,
 					a.RepoKey,
 				); err != nil {
 					return err
 				}
 			}
 		}
-		return nil
+		return p.rotatePolicy(ctx, projectKey)
 	})
 }
 
@@ -305,8 +354,13 @@ func renameIn(names []string, from, to string) bool {
 }
 
 func (p projectStore) DeleteEnvironment(ctx context.Context, projectKey, name string) error {
-	return p.s.ExecOne(ctx, fmt.Sprintf("delete environment %s/%s", projectKey, name),
-		"DELETE FROM environments WHERE name = ? AND project_key = ?", name, projectKey)
+	return p.tx(ctx, func(ctx context.Context) error {
+		if err := p.s.ExecOne(ctx, fmt.Sprintf("delete environment %s/%s", projectKey, name),
+			"DELETE FROM environments WHERE name = ? AND project_key = ?", name, projectKey); err != nil {
+			return err
+		}
+		return p.rotatePolicy(ctx, projectKey)
+	})
 }
 
 const memberCols = "project_key, principal_type, principal_name, roles"
@@ -323,7 +377,7 @@ func scanMember(row interface{ Scan(...any) error }) (model.ProjectMember, error
 }
 
 func (p projectStore) PutMember(ctx context.Context, m model.ProjectMember) error {
-	return p.s.Tx(ctx, func(ctx context.Context) error {
+	return p.tx(ctx, func(ctx context.Context) error {
 		if err := p.requireProject(ctx, m.ProjectKey); err != nil {
 			return err
 		}
@@ -344,13 +398,19 @@ func (p projectStore) PutMember(ctx context.Context, m model.ProjectMember) erro
 			m.Name,
 			roles,
 		)
-		return err
+		if err != nil {
+			return err
+		}
+		return p.rotatePolicy(ctx, m.ProjectKey)
 	})
 }
 
 func (p projectStore) Member(
 	ctx context.Context, projectKey string, typ model.PrincipalType, name string,
 ) (model.ProjectMember, error) {
+	if err := p.guard(ctx); err != nil {
+		return model.ProjectMember{}, err
+	}
 	v, err := scanMember(p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind("SELECT "+memberCols+
 		" FROM project_members WHERE project_key = ? AND principal_type = ? AND principal_name = ?"),
 		projectKey, typ, name))
@@ -360,6 +420,9 @@ func (p projectStore) Member(
 func (p projectStore) Members(
 	ctx context.Context, projectKey string, typ model.PrincipalType,
 ) ([]model.ProjectMember, error) {
+	if err := p.guard(ctx); err != nil {
+		return nil, err
+	}
 	var out []model.ProjectMember
 	err := p.s.Rows(ctx, "list members", "SELECT "+memberCols+
 		" FROM project_members WHERE project_key = ? AND principal_type = ? ORDER BY principal_name",
@@ -377,20 +440,25 @@ func (p projectStore) DeleteMember(
 	typ model.PrincipalType,
 	name string,
 ) error {
-	return p.s.ExecOne(
-		ctx,
-		fmt.Sprintf("delete member %s/%s/%s", projectKey, typ, name),
-		"DELETE FROM project_members WHERE project_key = ? AND principal_type = ? AND principal_name = ?",
-		projectKey,
-		typ,
-		name,
-	)
+	return p.tx(ctx, func(ctx context.Context) error {
+		if err := p.s.ExecOne(
+			ctx,
+			fmt.Sprintf("delete member %s/%s/%s", projectKey, typ, name),
+			"DELETE FROM project_members WHERE project_key = ? AND principal_type = ? AND principal_name = ?",
+			projectKey,
+			typ,
+			name,
+		); err != nil {
+			return err
+		}
+		return p.rotatePolicy(ctx, projectKey)
+	})
 }
 
 const assignmentCols = "repo_key, project_key, environments, shared_with_all, shared_read_only, updated_at"
 
 func (p projectStore) PutAssignment(ctx context.Context, a model.RepositoryAssignment) error {
-	return p.s.Tx(ctx, func(ctx context.Context) error {
+	return p.tx(ctx, func(ctx context.Context) error {
 		if err := p.requireProject(ctx, a.ProjectKey); err != nil {
 			return err
 		}
@@ -403,7 +471,7 @@ func (p projectStore) PutAssignment(ctx context.Context, a model.RepositoryAssig
 			"put assignment "+a.RepoKey,
 			dialect.Upsert(
 				"project_repositories",
-				dialect.OpsCols(assignmentCols),
+				append(dialect.OpsCols(assignmentCols), "sharing_revision"),
 				[]string{"repo_key"},
 			),
 			a.RepoKey,
@@ -412,6 +480,7 @@ func (p projectStore) PutAssignment(ctx context.Context, a model.RepositoryAssig
 			a.SharedWithAll,
 			a.SharedReadOnly,
 			dialect.Micros(a.Updated),
+			port.NewSharingAuthority().Revision,
 		); err != nil {
 			return err
 		}
@@ -452,9 +521,12 @@ func (p projectStore) assignments(
 	where string,
 	args ...any,
 ) ([]model.RepositoryAssignment, error) {
+	if err := p.guard(ctx); err != nil {
+		return nil, err
+	}
 	var out []model.RepositoryAssignment
 	err := p.s.Rows(ctx, "list assignments",
-		"SELECT "+assignmentCols+" FROM project_repositories "+where+" ORDER BY repo_key", args,
+		"SELECT "+assignmentCols+" FROM project_repositories "+where+" ORDER BY repo_key"+p.s.LockClause(ctx), args,
 		func(r *sql.Rows) error {
 			var (
 				v       model.RepositoryAssignment
@@ -528,7 +600,7 @@ func (p projectStore) Assignments(
 }
 
 func (p projectStore) DeleteAssignment(ctx context.Context, repoKey string) error {
-	return p.s.Tx(ctx, func(ctx context.Context) error {
+	return p.tx(ctx, func(ctx context.Context) error {
 		if _, err := p.s.Exec(ctx, "delete assignment "+repoKey,
 			"DELETE FROM project_repository_shares WHERE repo_key = ?", repoKey); err != nil {
 			return err

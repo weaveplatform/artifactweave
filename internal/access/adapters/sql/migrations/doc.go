@@ -23,17 +23,17 @@
 //   - The stream's versions only grow. A schema change is a new file with the
 //     next version: a database records the versions it has applied and never
 //     runs one again, so a change to an applied file never reaches it.
-//   - The baselines of the eight streams, applied in the canonical module
+//   - The migrations of the eight streams, applied in the canonical module
 //     order, reproduce the committed schema goldens byte for byte
 //     (TestAccSchemaGolden, on SQLite and PostgreSQL).
 //   - No foreign key leaves the stream (decision 0044, "No cross-module foreign
 //     keys"), so the stream migrates up and down on its own.
-//   - The stream owns 19 tables, which no other stream creates or references:
+//   - The stream owns 20 tables, which no other stream creates or references:
 //     users, user_groups, group_members, permissions, permission_grants,
 //     permission_targets, tokens, keypairs, certificates, trusted_keys,
 //     signing_keys, projects, roles, environments, project_members,
-//     project_repositories, project_repository_shares, api_restriction_audit
-//     and api_restrictions.
+//     project_repositories, project_repository_shares, api_restriction_audit,
+//     api_restrictions and project_authority_guard.
 //
 // # References
 //
@@ -54,6 +54,8 @@
 // # Status
 //
 // Implemented P9d: the baseline (issue 994).
+// P11 adds project/policy/share authority and the short-transaction snapshot
+// guard; project-aware repository retrieval remains owned by issue 487.
 //
 // # Testing
 //

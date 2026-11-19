@@ -192,6 +192,8 @@ func TestAccProjectsUnmigrated(t *testing.T) {
 	ps := accsql.New(dialect.New(db, sqlite.Dialect, nil)).Projects()
 	errOf := func(_ any, err error) error { return err }
 	ops := map[string]error{
+		"project authority":  errOf(ps.Authority(ctx, "p")),
+		"sharing authority":  errOf(ps.SharingAuthority(ctx, "r")),
 		"project create":     ps.Create(ctx, model.Project{Key: "p"}),
 		"project get":        errOf(ps.Get(ctx, "p")),
 		"project update":     ps.Update(ctx, model.Project{Key: "p"}),
