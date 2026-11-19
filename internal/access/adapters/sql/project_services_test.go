@@ -1,4 +1,4 @@
-package project_test
+package sql_test
 
 import (
 	"context"
@@ -110,4 +110,15 @@ func testRoleCleanupRollback(t *testing.T, newStore func(*testing.T) port.Store)
 			}
 		})
 	}
+}
+
+func must(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func custom(name string) model.Role {
+	return model.Role{Name: name, Type: model.RoleCustom, Actions: []string{"READ_REPOSITORY"}, Environments: []string{"DEV"}}
 }

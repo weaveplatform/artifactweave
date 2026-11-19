@@ -3,13 +3,52 @@ package project_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
+	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/access/core/project"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
+
+var errStoreFailure = fmt.Errorf("injected project service storage failure: %w", kernel.ErrStore)
+
+type failingStore struct {
+	port.Store
+	fail string
+}
+
+func (s failingStore) Projects() port.ProjectStore {
+	return failingProjects{ProjectStore: s.Store.Projects(), fail: s.fail}
+}
+
+type failingProjects struct {
+	port.ProjectStore
+	fail string
+}
+
+func (s failingProjects) PutMember(ctx context.Context, m model.ProjectMember) error {
+	if s.fail == "put member" {
+		return errStoreFailure
+	}
+	return s.ProjectStore.PutMember(ctx, m)
+}
+
+func (s failingProjects) DeleteMember(ctx context.Context, key string, typ model.PrincipalType, name string) error {
+	if s.fail == "delete group member" && typ == model.PrincipalGroup {
+		return errStoreFailure
+	}
+	return s.ProjectStore.DeleteMember(ctx, key, typ, name)
+}
+
+func (s failingProjects) Members(ctx context.Context, key string, typ model.PrincipalType) ([]model.ProjectMember, error) {
+	if s.fail == "read group members" && typ == model.PrincipalGroup {
+		return nil, errStoreFailure
+	}
+	return s.ProjectStore.Members(ctx, key, typ)
+}
 
 func (s failingProjects) Get(ctx context.Context, key string) (model.Project, error) {
 	if s.fail == "project get" {
