@@ -79,3 +79,52 @@ Feature: Bounded remote browsing through curl
     When I run curl "--fail --silent --show-error --user admin:{password} {url}/smart-browse/"
     Then the command succeeds
     And the output contains "file.bin"
+
+  Scenario: Direct remote browsing combines cached and live children with cached name ownership
+    Given a generic upstream serves "/nested/cached.bin" with content "cached bytes"
+    And a generic upstream serves "/nested/same.bin" with content "cached file"
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/browse/nested/cached.bin"
+    Then the command succeeds
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/browse/nested/same.bin"
+    Then the command succeeds
+    Given a remote directory index at "/nested/" contains:
+      """
+      <!DOCTYPE html><a href="live.bin">live</a><a href="same.bin/">collision</a>
+      """
+    When I POST "/artifactory/api/repositories/browse" as admin with body:
+      """
+      {"listRemoteFolderItems":true}
+      """
+    Then the response status is 200
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/browse/nested/"
+    Then the command succeeds
+    And the output contains "cached.bin"
+    And the output contains "live.bin"
+    And the output contains "same.bin"
+    And the output does not contain "same.bin/"
+    And the generic upstream received 0 GET requests for "/nested/live.bin"
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/browse-cache/nested/"
+    Then the command succeeds
+    And the output contains "cached.bin"
+    And the output does not contain "live.bin"
+
+  Scenario: A cached folder survives an unavailable origin without inventing an absent folder
+    Given a generic upstream serves "/cached/kept.bin" with content "kept bytes"
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/browse/cached/kept.bin"
+    Then the command succeeds
+    And the generic upstream received 0 GET requests for "/cached/"
+    When I POST "/artifactory/api/repositories/browse" as admin with body:
+      """
+      {"listRemoteFolderItems":true}
+      """
+    Then the response status is 200
+    Given the generic upstream stops
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/browse/cached/"
+    Then the command succeeds
+    And the output contains "kept.bin"
+    When I GET "/artifactory/browse/absent/" as admin
+    Then the response status is 404
+    And the response body does not contain "Index of"
+    When I run curl "--fail --silent --show-error --user admin:{password} {url}/browse-cache/cached/"
+    Then the command succeeds
+    And the output contains "kept.bin"

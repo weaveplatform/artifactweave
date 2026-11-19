@@ -828,7 +828,7 @@ func (s *Kit) getItem(w http.ResponseWriter, r *http.Request) {
 		httpkit.WriteErr(w, r, refused(c, req, p))
 		return
 	}
-	if s.getRemoteFolder(w, r, c, cached, req, p, acc) {
+	if s.getRemoteFolder(w, r, st, c, cached, req, p, acc) {
 		return
 	}
 	alias, err := aliasRemoteMetadata(ctx, st, c, cached, req.Path)

@@ -580,7 +580,7 @@ P20 must retain their capability ledger entries until their receiving phase clos
 | `contentSynchronisation.statistics.enabled` | Implemented with bounded durable work and current-source fences; [#634](https://github.com/weaveplatform/artifactweave/issues/634) | Cached normal download reports usage when enabled; alias/offline never calls out; duplicate/retry failure cannot multiply counters. |
 | `contentSynchronisation.properties.enabled` | Implemented with bounded durable work and current-source fences; [#634](https://github.com/weaveplatform/artifactweave/issues/634) | Expired normal read refreshes upstream-owned properties, disabled does not; failure keeps prior values; Docker digest pull limitation retained. |
 | `contentSynchronisation.source.originAbsenceDetection` | Implemented with bounded durable work and current-source fences; [#634](https://github.com/weaveplatform/artifactweave/issues/634) | Confirmed origin deletion distinguished from outage/denial; generic limitation explicit; no destructive delete on unconfirmed absence. |
-| `listRemoteFolderItems` | Implemented/default off; [#635](https://github.com/weaveplatform/artifactweave/issues/635), [#213](https://github.com/weaveplatform/artifactweave/issues/213) | Off causes no browse call; on exposes uncached children through bounded HTML/Smart listings without fetching binaries. `TestListing*`, `TestSmartListing*`, `TestRemoteBrowsing*` and `@remote_listing` cover filtering, pagination, malformed responses, cache-only/offline and final fences. #213 adds non-Maven version-search use. |
+| `listRemoteFolderItems` | Implemented/default off; [#635](https://github.com/weaveplatform/artifactweave/issues/635), [#213](https://github.com/weaveplatform/artifactweave/issues/213), [#1640](https://github.com/weaveplatform/artifactweave/issues/1640) | Off causes no browse call; on exposes uncached children through bounded HTML/Smart listings without fetching binaries. Direct browsing combines cached and live names, preserving cached types and explicit folder presence after ordinary upstream failure. New cache-composition faults abort sanitized404; earlier typed source/authority answers remain. `TestListing*`, `TestSmartListing*`, `TestAccRemoteFolder*`, `TestRemoteBrowsing*` and `@remote_listing` cover filtering, ownership, presence, pagination, malformed responses, cache-only/offline and final fences. #213 adds non-Maven version-search use. |
 | `handleReleases`, `handleSnapshots`, `suppressPomConsistencyChecks`, `rejectInvalidJars` | Existing local Maven checks, remote intent stored; [#625](https://github.com/weaveplatform/artifactweave/issues/625)/#619 | Allowed artifact vs disallowed release/snapshot or malformed JAR/POM; failed admission preserves cache; no upstream call for known denied kind. |
 | `fetchJarsEagerly`, `fetchSourcesEagerly` | Stored; [#625](https://github.com/weaveplatform/artifactweave/issues/625)/#620 durable companions | Enabled fetches at most companion work, disabled none; failure cannot fail an already valid requested artifact or spawn retries without bound. |
 | `maxUniqueSnapshots` | Implemented for local and remote Maven/NuGet by [#625](https://github.com/weaveplatform/artifactweave/issues/625)/#629, using existing durable work and shared #622 maintenance | Bound cached versions, zero unlimited; cleanup cannot delete current referenced sidecars; interrupted job resumes. |
@@ -691,6 +691,15 @@ access and repository patterns, records each disclosed artifact path, and invoke
 cannot widen the original folder, performs no fetch, and repeats current caller,
 source and credential checks. Revoking one version while another remains readable
 must prevent the stale response from being delivered.
+
+Direct folder indexes also hold an independent request-local `Authority` while
+composing stored and live children. `Authority.CheckRead` and `CheckFolder` apply
+the same bounded descendant checks as a successful source result; neither fetches
+content. Final `Authority.Revalidate` protects cached disclosure when upstream
+acquisition failed and therefore supplied no result fence. Canonical upstream child
+presence can survive pattern filtering, but never grants Read on any child. The
+[direct browsing audit](../research/direct-remote-folder-listings-source-audit.md)
+records the source-established HTML phase and the limits of current-version claims.
 
 Adapters may also authorize an unmodified metadata file by its exact path (for
 example Maven XML); this grants that file's complete contents and does not grant
