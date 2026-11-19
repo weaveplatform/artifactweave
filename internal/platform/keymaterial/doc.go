@@ -26,6 +26,8 @@
 // # Outputs
 //
 //   - CheckPair: nil when the two halves belong to one key of the type.
+//   - CheckPublic: validates every block and packet in a public field before
+//     admission or export, including records stored by older versions.
 //   - RSAPrivateKey, Ed25519PrivateKey, Ed25519PublicKey, ECDSAPrivateKey
 //     and ECDSAPublicKey: the parsed keys a format signs or verifies its
 //     metadata with. An ECDSA key is on P-256, P-384 or P-521.
@@ -38,8 +40,9 @@
 //   - Error texts are observable: the key pair and certificate API returns
 //     them in its 400 responses, so they stay byte-identical.
 //   - The package keeps no state and writes no logs, so it never stores or
-//     logs the key material it is given; the stores seal that material at
-//     rest (decision 0017).
+//     logs the key material it is given; the stores seal private fields at
+//     rest (decision 0017). A public field must contain only public material;
+//     its original valid bytes are preserved, and refusals never quote it.
 //   - A wrong passphrase on a legacy encrypted PEM key is reported as such
 //     even when the decryption happens to pass the padding check, because
 //     that encryption has no integrity check.
@@ -81,6 +84,8 @@
 //     that passes the padding check is still reported as a wrong passphrase.
 //   - TestUnitCheckGPG: armored OpenPGP pairs, with and without a
 //     passphrase, and their refusals.
+//   - public_test.go: complete-field public validation, secret primary and
+//     subkey packets, later blocks/entities and the supported algorithms.
 //   - TestUnitEd25519KeyMaterial: Ed25519 pairs, the two key parsers and
 //     the pairs that are refused.
 //   - TestUnitECDSAKeyMaterial: ECDSA pairs as PEM and as gpg's armored

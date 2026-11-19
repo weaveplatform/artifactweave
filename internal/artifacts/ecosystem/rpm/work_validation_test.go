@@ -366,3 +366,20 @@ func TestUnitRPMHooksRejectCorruptStoredContentAndStaleInspection(t *testing.T) 
 		t.Fatal("missing item accepted RPM index properties")
 	}
 }
+
+func TestUnitMetadataRejectsPrivateBearingPublicKey(t *testing.T) {
+	key, err := terraformtest.NewKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := &accessapitest.Keys{
+		Keypairs: map[string]accessapi.Keypair{"legacy": {Name: "legacy", Type: accessapi.KeypairGPG, PrivateKey: key.Private, PublicKey: key.Public + key.Private}},
+	}
+	files := map[string][]byte{"repodata/repomd.xml": []byte("manifest")}
+	if err := signMetadata(t.Context(), keys, repo.Config{PrimaryKeyPairRef: "legacy"}, files); err == nil {
+		t.Fatal("private-bearing public material was exported")
+	}
+	if _, ok := files["repodata/repomd.xml.key"]; ok {
+		t.Fatal("private-bearing output was retained")
+	}
+}
