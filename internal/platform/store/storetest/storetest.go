@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
+	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
@@ -25,6 +26,7 @@ type Store interface {
 	Instance() instance.InstanceStore
 	Outbox() outbox.OutboxStore
 	Events() outbox.EventStore
+	Schedules() schedule.Store
 	Uploads() session.UploadStore
 	Replays() idempotency.ReplayStore
 	RequestBudgets() apilimit.RequestBudgetStore
@@ -49,6 +51,7 @@ func Run(t *testing.T, newStore Factory) {
 func RunWithoutWatches(t *testing.T, newStore func(t *testing.T) Store) {
 	t.Helper()
 	runPlatformOperations(t, newStore)
+	t.Run("Schedules", func(t *testing.T) { RunSchedules(t, newStore) })
 	runWork(t, newStore)
 	runInstance(t, newStore)
 	runOutbox(t, newStore)
