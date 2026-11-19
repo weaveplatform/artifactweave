@@ -340,7 +340,7 @@ func rewriteModuleArchive(ctx context.Context, ra io.ReaderAt, size int64, locat
 		if err != nil {
 			return "", false, remoteModuleError()
 		}
-		return "tar.gz", changed, nil
+		return "tar.gz", changed || location.Archive == "tar", nil
 	}
 	u, _ := url.Parse(location.Target)
 	name := strings.TrimSuffix(path.Base(u.Path), "."+location.Archive)
@@ -463,11 +463,17 @@ func rewriteModuleTar(r io.Reader, target rewriteTarget, w io.Writer) (bool, err
 	return changed, nil
 }
 
-// Discover edits without creating a derived archive. Common packages with only
-// relative/Git sources retain both their original representation and disk needs.
+// Discover representation changes without creating a derived archive. Supported
+// packages with only relative/Git sources retain their original representation.
 func moduleArchiveNeedsRewrite(ctx context.Context, ra io.ReaderAt, size int64, location moduleSource, target rewriteTarget) (bool, error) {
 	if err := location.validateArchive(ctx, io.NewSectionReader(ra, 0, size), size); err != nil {
 		return false, err
+	}
+	// The pinned Terraform/OpenTofu getters do not decompress plain TAR: they
+	// parse its bytes as vanity XML. Reuse the guarded derived tar.gz delivery
+	// even without configuration edits; the source cache keeps original bytes.
+	if location.Archive == "tar" {
+		return true, nil
 	}
 	if location.Archive == "zip" {
 		zr, err := zip.NewReader(ra, size)
