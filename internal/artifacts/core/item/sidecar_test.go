@@ -350,3 +350,21 @@ func TestUnitSidecarsBeside(t *testing.T) {
 		t.Errorf("a format that keeps none: %v", got)
 	}
 }
+
+func TestUnitDeleteFactsPreserveSidecarOrder(t *testing.T) {
+	w := keeping(t)
+	file := w.must("x.bin", "payload")
+	signature := w.must("x.bin.sig", "signed")
+	armoured := w.must("x.bin.asc", "armoured")
+	result, err := w.svc.Delete(t.Context(), Target{Repo: w.loc, Path: "x.bin"}, "deleter")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []model.Item{file, armoured, signature}
+	if !slices.Equal(result.Removed, want) {
+		t.Fatalf("deleted sidecar facts=%+v, want=%+v", result.Removed, want)
+	}
+	if result.Files != 3 || result.Bytes != int64(len("payloadsignedarmoured")) {
+		t.Fatalf("delete summary=%+v", result)
+	}
+}

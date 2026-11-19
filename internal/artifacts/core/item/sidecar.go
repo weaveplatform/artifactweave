@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -141,6 +142,7 @@ func (s *Service) deleteSidecars(
 			res.BlobRefs[sha] += n
 		}
 	}
+	slices.SortFunc(res.Removed, func(a, b model.Item) int { return strings.Compare(a.FullPath(), b.FullPath()) })
 	return res, nil
 }
 
