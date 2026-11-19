@@ -25,6 +25,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
+	"github.com/weaveplatform/artifactweave/internal/platform/keymaterial"
 )
 
 const rpmMetadataLimit = 36 << 20
@@ -141,6 +142,9 @@ func signVirtualRPM(
 	}
 	if pair.Type != accessapi.KeypairGPG {
 		return errRPMVirtualKey
+	}
+	if err := keymaterial.CheckPublic(keymaterial.GPG, pair.PublicKey); err != nil {
+		return fmt.Errorf("rpm: virtual public key: %w", err)
 	}
 	sig, err := rpm.SignRepomd(files["repodata/repomd.xml"], pair.PrivateKey, pair.Passphrase)
 	if err != nil {
@@ -373,6 +377,11 @@ func (s RPMAPI) virtualRPMFiles(
 	var files map[string][]byte
 	if err := gob.NewDecoder(bytes.NewReader(e.Body)).Decode(&files); err != nil {
 		return nil, fmt.Errorf("%w: %s", errRPMVirtualMetadata, err.Error())
+	}
+	if key, ok := files["repodata/repomd.xml.key"]; ok {
+		if err := keymaterial.CheckPublic(keymaterial.GPG, string(key)); err != nil {
+			return nil, fmt.Errorf("%w: invalid public key material", errRPMVirtualMetadata)
+		}
 	}
 	return files, nil
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/keymaterial"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
@@ -396,6 +397,9 @@ func signMetadata(
 	}
 	if pair.Type != accessapi.KeypairGPG {
 		return fmt.Errorf("%w: rpm metadata signing requires gpg", errInvalidPackage)
+	}
+	if err := keymaterial.CheckPublic(keymaterial.GPG, pair.PublicKey); err != nil {
+		return fmt.Errorf("rpm: metadata public key: %w", err)
 	}
 	manifest := files["repodata/repomd.xml"]
 	signature, err := SignRepomd(manifest, pair.PrivateKey, pair.Passphrase)
