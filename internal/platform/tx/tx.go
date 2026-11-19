@@ -3,8 +3,11 @@ package tx
 import "context"
 
 // Runner runs a unit of work. Store calls made with the context fn receives
-// take part; an error from fn rolls all of them back. A nested Tx joins the
-// outer transaction.
+// take part; an error from fn or a panic escaping it rolls all of them back.
+// A panic continues unchanged after rollback. A nested Tx joins the outer
+// transaction; a panic recovered inside the outer fn does not itself roll
+// back the transaction. A panic from AfterCommit happens after commit and
+// does not roll back committed writes.
 //
 // Tx returns fn's error, or an error that wraps it, after the rollback. A Tx
 // called outside a transaction fails without calling fn when ctx has ended.

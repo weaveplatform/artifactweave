@@ -89,11 +89,13 @@ func (s *Store) lock(ctx context.Context) error {
 
 // Tx implements tx.Runner. It takes the gate for the whole of fn, saves a
 // snapshot of every table and sequence, and passes fn a context that Do,
-// Tx, AfterCommit and InTx recognise. When fn returns an error, Tx restores
-// the snapshot and returns that error unchanged; otherwise fn's writes stand
-// and the deferred functions run. Outside a transaction, Tx fails without
-// running fn when ctx has ended, or ends while Tx waits for the gate, with an
-// error that wraps ctx.Err() and reads "inmem: <error>". Called with a
+// Tx, AfterCommit and InTx recognise. When fn returns an error or panics,
+// Tx restores the snapshot before releasing the gate, preserving the error
+// or panic unchanged; otherwise fn's writes stand and the deferred functions
+// run. A panic recovered inside fn does not roll back the transaction.
+// Outside a transaction, Tx fails without running fn when ctx has ended,
+// or ends while Tx waits for the gate, with an error that wraps ctx.Err()
+// and reads "inmem: <error>". Called with a
 // context already inside this store's Tx, it runs fn in that transaction at
 // once: the outer Tx commits or rolls back both, and an inner error that the
 // outer fn drops rolls nothing back, unlike the SQL unit of work (see
@@ -123,8 +125,13 @@ func (s *Store) Tx(ctx context.Context, fn func(context.Context) error) error {
 		tables[name] = t.snapshot()
 	}
 	seqs := maps.Clone(s.seqs)
+	// Restore before the earlier gate-release defer lets another caller in.
+	defer func() {
+		if !committed {
+			s.tables, s.seqs = tables, seqs
+		}
+	}()
 	if err := fn(context.WithValue(ctx, txKey{s}, tx)); err != nil {
-		s.tables, s.seqs = tables, seqs
 		return err
 	}
 	committed = true

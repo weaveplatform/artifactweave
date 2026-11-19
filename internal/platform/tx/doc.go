@@ -31,6 +31,10 @@
 //
 //   - An error from Tx's function rolls back every store call made with its
 //     context, and Tx returns that error or one that wraps it.
+//   - A panic escaping Tx's function rolls back those calls and continues
+//     unchanged. A panic recovered inside the function leaves the outer
+//     transaction to decide the outcome. AfterCommit runs after commit, so
+//     a panic in one of its functions cannot roll back committed writes.
 //   - A nested Tx joins the outer transaction, whose commit or rollback
 //     decides for both. An inner error that the outer function drops still
 //     fails the outer transaction in the SQL unit of work and does not in
