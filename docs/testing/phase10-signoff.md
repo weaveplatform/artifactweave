@@ -4,6 +4,8 @@ Status: **implementation evidence recorded; final qualification pending**.
 
 Audit date: 2026-11-18. Merged implementation baseline:
 [`621523d38c1cda8b822fbb1b52a7f4b36e5f7b5d`](https://github.com/weaveplatform/artifactweave/commit/621523d38c1cda8b822fbb1b52a7f4b36e5f7b5d).
+PR qualification evidence below was refreshed on 2026-11-19; the merged-child
+snapshot remains tied to that baseline.
 The native GitHub child lists and issue/merged-PR timelines show **47 of 49 child
 tickets closed**, including the original acceptance follow-ups identified in this audit.
 [HLM-03 #1713](https://github.com/weaveplatform/artifactweave/issues/1713) and
@@ -12,6 +14,8 @@ remain open. ENG-11 #1710 closed with merged PR #1718 after successful full CI.
 Epic closure remains with the maintainer.
 The additional [virtual folder source-fault blocker #1723](https://github.com/weaveplatform/artifactweave/issues/1723)
 is outside that 49-child count and must be resolved before final qualification.
+Its correction in [PR #1726](https://github.com/weaveplatform/artifactweave/pull/1726)
+has passed full CI and awaits maintainer merge.
 GitHub closed [QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571)
 with documentation PR #1708. That records issue state; the remaining acceptance
 and final combined-main gate below are still pending in the qualification epic.
@@ -213,7 +217,9 @@ limits in their owning research; other unposted drafts are not treated as commen
 | [#1706 / PR #1707](https://github.com/weaveplatform/artifactweave/pull/1707) | Merged as `fb67c046` after [full exact-head CI 44361946001](https://github.com/weaveplatform/artifactweave/actions/runs/44361946001) passed all 19 required jobs. Both independently collected Go builds still require exactly three artifacts; no registry behavior changed. |
 | [#1693 / PR #1698](https://github.com/weaveplatform/artifactweave/pull/1698) | Merged as `544e9acad` after [full exact-head CI 44377565202](https://github.com/weaveplatform/artifactweave/actions/runs/44377565202) passed all 20 required jobs. The dedicated Windows lane passes all five driver cases, including literal absolute/relative filenames; it does not establish UNC-share or Windows application-runtime evidence. Both coverage thresholds passed. |
 | [#1571 / PR #1708](https://github.com/weaveplatform/artifactweave/pull/1708) | Documentation merged as `df78dd391` after exact-head documentation checks passed. GitHub closed #1571 with that merge. The two original acceptance follow-ups and qualified clock correction await maintainer merges. Resolve #1723, accept the decision and qualify the final combined main before recording completion in #1528. |
-| [#1723](https://github.com/weaveplatform/artifactweave/issues/1723) | Additional final-qualification blocker outside the 49-child count. On current merged main, real source-table statement failures return direct 500 but a cached virtual folder index returns 200, reproduced for Generic/Maven on SQLite/PostgreSQL without an origin request. The virtual listing discards trusted source errors; its correction must abort the partial result while retaining ordinary upstream I/O fallback. Source-era HTML wire mapping and the retained project source-authority contract remain distinct. |
+| [#1636 / PR #1724](https://github.com/weaveplatform/artifactweave/pull/1724) | Separate trace follow-up outside the 49-child count. Full [CI 44419496608](https://github.com/weaveplatform/artifactweave/actions/runs/44419496608) passed all 20 required jobs, actual Linux native clients and both coverage thresholds at `55df7f0a685cd72deab208c898a35640d93e0cb1`. Stored-file query-property evaluations now add the source-established trace step without changing matching or download answers. Maintainer merge remains pending. |
+| [#1640 / PR #1725](https://github.com/weaveplatform/artifactweave/pull/1725) | Separate direct-folder follow-up outside the 49-child count. Full [CI 44425983909](https://github.com/weaveplatform/artifactweave/actions/runs/44425983909) passed all 20 required jobs, actual Linux native clients and both coverage thresholds at `739aac6179857b3be82b2cf934dd50b8a9260156`. The direct index combines cached/upstream children with cache-name/type precedence and final descendant checks. Explicit 4 scenarios / 102 steps / zero skips belong to the separate Darwin proof. Maintainer merge remains pending. |
+| [#1723 / PR #1726](https://github.com/weaveplatform/artifactweave/pull/1726) | Additional final-qualification blocker outside the 49-child count. Full [CI 44430053878](https://github.com/weaveplatform/artifactweave/actions/runs/44430053878) passed all 20 required jobs, actual Linux native clients and both coverage thresholds at `d19d9787c0f62fbfd812cc84f79173f4bf19aeb4`. Repeated Generic/Maven SQLite/PostgreSQL source faults now abort the virtual index with sanitized 500; final authority failures also abort, while ordinary initial upstream fallback remains. The focused local Linux proof passed 6 scenarios / 218 steps / zero skips. Source-era HTML mapping and the observed project authority contract remain distinct. Maintainer merge is still required before final qualification. |
 
 
 The successful [RPM correction gate](https://github.com/weaveplatform/artifactweave/actions/runs/44355578274)

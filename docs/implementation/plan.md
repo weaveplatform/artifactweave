@@ -1128,6 +1128,11 @@ with documentation PR #1708. [EPIC-QUA #1528](https://github.com/weaveplatform/a
 retains the remaining acceptance work, final M3 run, decision 0008 acceptance
 and the completion update to this plan. P10 remains in qualification until that
 evidence is complete.
+The required acceptance and fault-correction PR gates have passed. Their
+maintainer merges remain pending, including the additional
+[source-fault blocker #1723 / PR #1726](https://github.com/weaveplatform/artifactweave/pull/1726).
+These PR results precede the final full validation on merged main; they do not
+mark M3 or P10 complete.
 P13 owns peer federation and P35 owns multi-node cache coordination.
 
 ## P11: Projects, webhooks, retention, replication
