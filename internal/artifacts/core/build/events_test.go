@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
@@ -110,4 +111,53 @@ func (s buildFailingEvents) AppendEvent(ctx context.Context, e outbox.Event) (ou
 		return outbox.Event{}, err
 	}
 	return outbox.Event{}, s.err
+}
+
+func TestUnitPromotionPropertyEventsRetainInternalActor(t *testing.T) {
+	w := newWorld(t)
+	w.seed("job")
+	ctx := t.Context()
+	origin, err := instance.EnsureID(ctx, w.db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.db.Events().RegisterConsumer(ctx, origin, "proof"); err != nil {
+		t.Fatal(err)
+	}
+	before, _, err := w.db.Events().Next(ctx, origin, "proof", 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.svc.Promote(
+		ctx,
+		Promotion{Name: "job", Number: "1", Status: "qa", Artifacts: true, Properties: model.Properties{"stage": {"qa"}}, By: "publisher"},
+		everyone,
+	); err != nil {
+		t.Fatal(err)
+	}
+	after, _, err := w.db.Events().Next(ctx, origin, "proof", 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	properties, builds := 0, 0
+	for _, event := range after[len(before):] {
+		if event.Topic == artapi.PropertyAdded {
+			var facts artapi.PropertyEvent
+			if err := json.Unmarshal(event.Payload, &facts); err != nil {
+				t.Fatal(err)
+			}
+			if facts.Property == "stage" {
+				properties++
+				if facts.Actor.Name != "publisher" || facts.Actor.System {
+					t.Fatalf("promotion property actor=%+v", facts.Actor)
+				}
+			}
+		}
+		if event.Topic == artapi.BuildPromoted {
+			builds++
+		}
+	}
+	if properties != 1 || builds != 1 {
+		t.Fatalf("promotion facts: properties=%d builds=%d", properties, builds)
+	}
 }

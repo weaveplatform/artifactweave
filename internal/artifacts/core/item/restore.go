@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -33,7 +34,7 @@ func (s *Service) Restore(
 ) (model.Item, error) {
 	var restored model.Item
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		ctx = withPropertyActor(ctx, by)
+		ctx = artifactevents.WithActor(ctx, by)
 		if _, err := s.invalidateCache(ctx, t, by); err != nil {
 			return err
 		}

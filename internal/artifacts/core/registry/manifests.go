@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
@@ -126,6 +127,7 @@ func (s *Service) folderState(
 // The repository's tag limits then apply to the image, all in one
 // transaction.
 func (s *Service) PutManifest(ctx context.Context, p Push) error {
+	ctx = artifactevents.WithActor(ctx, p.By)
 	m := p.Manifest
 	if err := s.childrenPresent(ctx, p.Owner, m.Manifests); err != nil {
 		return err

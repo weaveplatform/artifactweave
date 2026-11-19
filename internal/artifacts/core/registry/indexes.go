@@ -11,6 +11,7 @@ import (
 
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -137,6 +138,7 @@ func (s *Service) unreferenced(
 // Delete on the image, which covers its digest folders. DELETE
 // /artifactory/api/docker/<repo>/v2/delete (#226) calls it.
 func (s *Service) DeleteMultiArch(ctx context.Context, o Owner, tag string) ([]string, error) {
+	ctx = artifactevents.WithActor(ctx, o.By)
 	var removed []string
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		dir := o.Name + "/" + tag

@@ -9,6 +9,7 @@ import (
 
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
@@ -39,6 +40,7 @@ type Removal struct {
 // Removal, the multi-architecture delete with Platforms, and Max Unique
 // Tags with all three. kernel.ErrNotFound when the image has no such tag.
 func (s *Service) RemoveTag(ctx context.Context, o Owner, tag string, r Removal) error {
+	ctx = artifactevents.WithActor(ctx, o.By)
 	items := s.items()
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		dir := o.Name + "/" + tag

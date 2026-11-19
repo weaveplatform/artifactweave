@@ -10,6 +10,7 @@ import (
 
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
@@ -92,6 +93,7 @@ func (s *Service) TagManifest(ctx context.Context, o Owner, tag string) (model.I
 // moves, keeping its history, and the platform manifests nothing left in the
 // source image names go too. All of it is one transaction.
 func (s *Service) Promote(ctx context.Context, p Promotion) error {
+	ctx = artifactevents.WithActor(ctx, p.To.By)
 	for _, r := range p.Tags {
 		if p.From.Repo.Key == p.To.Repo.Key && p.From.Name == p.To.Name && r.From == r.To {
 			return ErrSamePlace

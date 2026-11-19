@@ -84,6 +84,29 @@ func TestAccDockerEventsFollowLogicalOperations(t *testing.T) {
 				promoted.Actor.Name != "bob" {
 				t.Fatalf("promotion facts=%+v", promoted)
 			}
+			all, _, err := db.Events().Next(ctx, origin, "proof", 1000)
+			if err != nil {
+				t.Fatal(err)
+			}
+			propertyCount := 0
+			for _, event := range all {
+				if event.Topic != artapi.PropertyAdded {
+					continue
+				}
+				var facts artapi.PropertyEvent
+				if err := json.Unmarshal(event.Payload, &facts); err != nil {
+					t.Fatal(err)
+				}
+				if facts.Item.Repository.Key == w.oci.Key && (facts.Property == layout.RepoNameProperty || facts.Property == layout.ManifestProperty) {
+					propertyCount++
+					if facts.Actor.Name != "bob" || facts.Actor.System {
+						t.Fatalf("Docker promotion property actor=%+v", facts.Actor)
+					}
+				}
+			}
+			if propertyCount == 0 {
+				t.Fatal("Docker promotion recorded no property effects")
+			}
 			if err := w.svc.DeleteTag(ctx, w.owner("app"), "v1"); err != nil {
 				t.Fatal(err)
 			}

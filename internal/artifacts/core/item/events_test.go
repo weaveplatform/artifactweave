@@ -376,3 +376,22 @@ func TestUnitExistingFolderRestoreRetainsInternalActor(t *testing.T) {
 		}
 	}
 }
+
+func TestUnitFolderPropertyEventsRetainInternalCreator(t *testing.T) {
+	w := newWorld(t)
+	read := watchEvents(t, w)
+	if _, err := w.svc.MakeFolder(t.Context(), Target{Repo: w.loc, Path: "folder"}, model.Properties{"key": {"value"}}, "creator"); err != nil {
+		t.Fatal(err)
+	}
+	all := read()
+	if len(all) != 1 || all[0].Topic != artapi.PropertyAdded {
+		t.Fatalf("folder facts=%+v", all)
+	}
+	var facts artapi.PropertyEvent
+	if err := json.Unmarshal(all[0].Payload, &facts); err != nil {
+		t.Fatal(err)
+	}
+	if facts.Actor.Name != "creator" || facts.Actor.System {
+		t.Fatalf("folder actor=%+v", facts.Actor)
+	}
+}

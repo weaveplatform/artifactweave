@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -25,6 +26,7 @@ func (s *Service) DeleteTag(ctx context.Context, o Owner, tag string) error {
 // answers afterwards. An index's platform manifests stay: they are
 // manifests of their own. kernel.ErrNotFound when no folder holds it.
 func (s *Service) DeleteManifest(ctx context.Context, o Owner, hex string) error {
+	ctx = artifactevents.WithActor(ctx, o.By)
 	folders, err := layout.ManifestFolders(ctx, s.Store.Items(), o.Repo.Key, o.Name, hex)
 	if err != nil {
 		return err //nolint:wrapcheck // the layout names itself

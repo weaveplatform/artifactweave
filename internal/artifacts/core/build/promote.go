@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -83,6 +84,7 @@ func (s *Service) promoteThen(
 	a Access,
 	then func(ctx context.Context, run int64, msgs []item.Message) error,
 ) (PromotionResult, error) {
+	ctx = artifactevents.WithActor(ctx, p.By)
 	b, err := s.Store.Builds().Get(ctx, ProjectKey(p.ProjectKey), p.Name, p.Number, time.Time{})
 	if err != nil {
 		return PromotionResult{}, fmt.Errorf("build: get run: %w", err)

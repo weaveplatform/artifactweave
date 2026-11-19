@@ -6,6 +6,7 @@ import (
 	"time"
 
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -36,17 +37,8 @@ type (
 	}
 )
 
-type propertyActorKey struct{}
-
-func withPropertyActor(ctx context.Context, by string) context.Context {
-	if by != "" {
-		return context.WithValue(ctx, propertyActorKey{}, by)
-	}
-	return ctx
-}
-
 func ownPropertyEvents(ctx context.Context, id int64, by string) context.Context {
-	ctx = withPropertyActor(ctx, by)
+	ctx = artifactevents.WithActor(ctx, by)
 	previous, _ := ctx.Value(propertyOwnerKey{}).(*propertyOwner)
 	return context.WithValue(ctx, propertyOwnerKey{}, &propertyOwner{id: id, previous: previous})
 }
@@ -77,7 +69,7 @@ func (i eventItems) changeProperties(ctx context.Context, id int64, at time.Time
 		if err := change(ctx); err != nil {
 			return err
 		}
-		return i.service.emitPropertyChanges(ctx, it, before, propertyActor(ctx), at)
+		return i.service.emitPropertyChanges(ctx, it, before, "", at)
 	})
 	if err != nil {
 		return fmt.Errorf("item: format property transaction: %w", err)
@@ -113,7 +105,7 @@ func (i eventItems) Delete(ctx context.Context, repoKey string, cached bool, ful
 		}
 		for _, it := range result.Removed {
 			if !it.Folder {
-				if err := i.service.emitArtifact(ctx, artapi.ArtifactDeleted, it, nil, propertyActor(ctx), i.service.now()); err != nil {
+				if err := i.service.emitArtifact(ctx, artapi.ArtifactDeleted, it, nil, "", i.service.now()); err != nil {
 					return err
 				}
 			}
@@ -124,9 +116,4 @@ func (i eventItems) Delete(ctx context.Context, repoKey string, cached bool, ful
 		return port.DeleteResult{}, fmt.Errorf("item: format deletion transaction: %w", err)
 	}
 	return result, nil
-}
-
-func propertyActor(ctx context.Context) string {
-	by, _ := ctx.Value(propertyActorKey{}).(string)
-	return by
 }

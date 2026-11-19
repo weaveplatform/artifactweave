@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -131,6 +132,7 @@ func (s *Service) Publish(
 	by string,
 	a Access,
 ) (Published, error) {
+	ctx = artifactevents.WithActor(ctx, by)
 	projectKey = ProjectKey(projectKey)
 	b, err := Parse(projectKey, doc)
 	if err != nil {
@@ -416,6 +418,7 @@ func (s *Service) deleteThen(
 	a Access,
 	then func(context.Context, []model.BuildRun) error,
 ) ([]model.BuildRun, error) {
+	ctx = artifactevents.WithActor(ctx, d.By)
 	if !d.All && len(d.Numbers) == 0 {
 		return nil, fmt.Errorf("%w: no build numbers to delete", ErrInvalid)
 	}

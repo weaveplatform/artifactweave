@@ -24,8 +24,22 @@ type Store interface {
 	Repos() port.RepoStore
 }
 
+type actorKey struct{}
+
+// WithActor carries a fallback public actor name through nested service calls.
+// It grants no authority and never changes a verified principal or credential.
+func WithActor(ctx context.Context, by string) context.Context {
+	if by == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, actorKey{}, by)
+}
+
 // Metadata captures a committed outcome without retaining request credentials.
 func Metadata(ctx context.Context, by string) api.EventMetadata {
+	if by == "" {
+		by, _ = ctx.Value(actorKey{}).(string)
+	}
 	return api.EventMetadata{Version: 1, Outcome: "committed", Actor: outbox.ActorFrom(ctx, by)}
 }
 

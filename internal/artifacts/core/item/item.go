@@ -13,6 +13,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
@@ -661,6 +662,7 @@ func (s *Service) MakeFolder(
 	props model.Properties,
 	by string,
 ) (model.Item, error) {
+	ctx = artifactevents.WithActor(ctx, by)
 	now := s.now()
 	full := strings.Trim(t.Path, "/")
 	var folder model.Item
@@ -960,7 +962,7 @@ func (s *Service) remove(
 	now := s.now()
 	var res port.DeleteResult
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		ctx = withPropertyActor(ctx, by)
+		ctx = artifactevents.WithActor(ctx, by)
 		invalidated, err := s.invalidateCache(ctx, t, by)
 		if err != nil {
 			return err
