@@ -15,6 +15,9 @@ import (
 )
 
 func projectModuleResponse(q source.Request, res *http.Response) error {
+	if q.Resource.ModuleChecksumDocument {
+		return projectModuleChecksum(res)
+	}
 	if q.Resource.ModuleVanityDocument {
 		return projectModuleVanity(res)
 	}

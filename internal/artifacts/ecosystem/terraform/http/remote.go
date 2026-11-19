@@ -168,7 +168,7 @@ func (h handler) upstreamModuleLocation(
 		"module-metadata/"+m.Package()+"/"+m.Version+"/download",
 		endpoint,
 		m.Package(),
-		"terraform-module-location-v2",
+		"terraform-module-location-v3",
 		true,
 		func(body io.Reader, actual string) error { _, e := parseModuleLocation(body, actual, c); return e },
 	)
@@ -185,7 +185,11 @@ func (h handler) upstreamModuleLocation(
 	if err != nil {
 		return moduleSource{}, result, err
 	}
-	return h.resolveModuleVanity(r, m, location, result)
+	location, result, err = h.resolveModuleVanity(r, m, location, result)
+	if err != nil {
+		return moduleSource{}, result, err
+	}
+	return h.resolveModuleChecksum(r, m, location, result)
 }
 
 func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operation) {
@@ -235,7 +239,7 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 	completeModuleResource(&resource) // signing/rewrite needs complete original bytes, including HEAD
 	artifact, err := h.k.Read(r, resource)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.k.Error(w, r, rejectModuleChecksumOnArchiveFailure(r.Context(), metadata, err))
 		return
 	}
 	defer closeModuleResult(artifact)
@@ -511,6 +515,7 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 	resource.Checksums.SHA256 = c.SHA256
 	result, err := h.k.Read(r, resource)
 	if err != nil {
+		err = rejectModuleChecksumOnArchiveFailure(r.Context(), metadata, err)
 		h.k.Error(w, r, signedMemberError(c, err))
 		return
 	}

@@ -178,6 +178,7 @@ func (p *Policy) Read(
 	defer func() {
 		if retErr == nil && revision != "" {
 			out.Revalidate = func(current context.Context) error { return p.Check(current, q, permit, revision) }
+			out.RejectMetadata = p.fenceModuleChecksumRejection(q, permit, revision, out.RejectMetadata)
 		}
 	}()
 	if permit.Intent == source.RetrievalIntentCacheOnly || !permit.UpstreamNetworkAllowed ||
@@ -414,6 +415,9 @@ func (p *Policy) CacheKey(q source.Request, revision string) model.RemoteCacheKe
 	if q.Resource.ModuleVanityDocument {
 		identity = append(identity, "module-vanity-document-v1")
 	}
+	if q.Resource.ModuleChecksumDocument {
+		identity = append(identity, "module-checksum-document-v1")
+	}
 	if q.Resource.NuGetEmptyFeed {
 		identity = append(identity, "nuget-empty-feed-v1")
 	}
@@ -550,7 +554,11 @@ func (p *Policy) resultFor(
 			},
 		}, nil
 	}
-	return p.result(ctx, e)
+	result, err := p.result(ctx, e)
+	if err == nil && q.Resource.ModuleChecksumDocument && !q.CacheOnly && !enabled(q.Repo.Offline) {
+		result.RejectMetadata = p.rejectModuleChecksum(e.Token)
+	}
+	return result, err
 }
 
 func (p *Policy) result(ctx context.Context, e model.RemoteCacheEntry) (source.Result, error) {
@@ -638,7 +646,7 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 	}
 	// The caller's validators describe downstream bytes. Only validators of
 	// this exact complete upstream representation may revalidate its cache.
-	if e.Blob.Checksums.SHA256 != "" && !q.Resource.ModuleDownloadLocation && !q.Resource.ModuleVanityDocument &&
+	if e.Blob.Checksums.SHA256 != "" && !q.Resource.ModuleDownloadLocation && !q.Resource.ModuleVanityDocument && !q.Resource.ModuleChecksumDocument &&
 		q.Resource.Method != http.MethodPost {
 		if e.ETag != "" {
 			headers.Set("If-None-Match", e.ETag)

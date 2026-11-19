@@ -396,3 +396,51 @@ The final local race/coverage pass uses unchanged production source and passes t
 (90.090%) and Terraform HTTP 2,929/3,253 (90.040%). Architecture, configured lint,
 test-kind and generated-recipe checks pass. These are changed-package local profiles;
 the full repository's 95% combined gate remains separate required CI evidence.
+
+## Local checksum-file implementation and qualification (2026-11-19)
+
+Absolute HTTP(S) `checksum=file:` sources now use a separate closed, bounded
+metadata operation. It requires complete 200 bytes, `text/plain` or
+`application/octet-stream`, supported text encodings and no disallowed controls.
+Files are at most 16 MiB, records at most 8 KiB. GNU text/binary/portable markers,
+BSD records and one standalone digest are supported for MD5/SHA-1/SHA-256/SHA-512.
+The complete file must parse: missing, duplicate, conflicting, malformed and
+unmatched selected records fail before archive acquisition. Filenames match the
+archive URL's decoded basename before archive redirects; qualified relative
+records use POSIX paths against the original checksum URL on the same origin.
+
+The URL parser refuses relative/local/SSH/cloud checksum targets, userinfo,
+fragments, HTTPS downgrade and nested getter controls. Query values remain owned
+by each source. A vanity chain may carry one checksum-file URL into its terminal
+archive; conflicting file URLs fail. The checksum URL, selected filename and
+digest participate in the private archive descriptor. Every read uses the normal
+source/credential, DNS/redirect, cache and final-authority fences.
+
+An archive rejected with the adapter's sanitized 502 response leaves its checksum
+decision unconfirmed. The result's current-authority callback forgets only that
+exact stored metadata generation through the existing transactional CAS eviction;
+a newer replacement is preserved. This permits corrected input to retry immediately
+without advancing TTL. Policy-only edits, revoked callers, non-network intent and
+storage-error identity have dedicated controls. Transient reads retain no reusable
+file or archive. Refreshing a checksum to different bytes rejects an old signed
+archive capability before it can replace the prior valid copy.
+
+The local race/coverage run passed on frozen source: remote source 470/494
+(95.142%), remote policy 1,462/1,621 (90.191%), Terraform HTTP 3,057/3,393 (90.097%)
+and the unchanged Smart Remote package 665/681 (97.651%). Configured lint and the
+focused parser, core rejection and HTTP suites passed.
+
+Pinned Terraform 1.17.1 and OpenTofu 1.13.9 passed GNU, BSD, standalone and
+vanity-chain checksum-file init/apply/output probes in both cold and offline-server/
+fresh-client modes: **16 checksum round trips**. A repeat retained **16 vanity
+round trips and four TAR controls**, all **36 with zero skips**, original archive
+bytes, selected directories and relative sibling modules. All production and
+probe hashes were captured before execution and remained unchanged. Evidence is
+under `cover/terraform-getters/checksum-native` and `checksum-quality`.
+
+These are production HTTP-handler probes over controlled in-memory fixtures. Native
+clients consume rewritten signed sources obtained by the probe harness; full native
+registry discovery/version negotiation, standalone/SQL qualification, the remaining
+snapshot/compression matrix, permanent two-client CI acceptance and final operations/
+ADR/roadmap handoff remain required. #668 remains open; no live vendor comparison
+or final repository-wide coverage qualification is claimed.

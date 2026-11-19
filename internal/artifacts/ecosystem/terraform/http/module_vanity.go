@@ -100,6 +100,7 @@ func (h handler) resolveModuleVanity(
 	seen := make(map[string]bool)
 	var selectors []string
 	pins := kernel.Checksums{}
+	checksumURL := ""
 	for hops := 0; location.Vanity; hops++ {
 		identity, err := source.ModuleVanityIdentity(location.Target)
 		if err != nil || hops >= moduleVanityLimit || seen[identity] {
@@ -110,6 +111,9 @@ func (h handler) resolveModuleVanity(
 			selectors = append(selectors, location.Subdir)
 		}
 		if pins, err = combineModuleChecksums(pins, location.Checksums); err != nil {
+			return moduleSource{}, metadata, err
+		}
+		if checksumURL, err = combineModuleChecksumURL(checksumURL, location.ChecksumURL); err != nil {
 			return moduleSource{}, metadata, err
 		}
 		u, _ := url.Parse(location.Target)
@@ -125,7 +129,7 @@ func (h handler) resolveModuleVanity(
 			Path:        "module-metadata/vanity",
 			ExternalURL: target, CheckURL: moduleURLGuard(c, target),
 			PermissionFolder: true, PermissionPath: m.Package(), BlackoutOnly: true,
-			Variant: "terraform-module-vanity-v1:url-policy-v2",
+			Variant: "terraform-module-vanity-v2:url-policy-v2",
 			Accept:  "text/html, application/xhtml+xml", ExpectedContentType: "application/json",
 			ModuleVanityDocument: true,
 		}
@@ -151,6 +155,9 @@ func (h handler) resolveModuleVanity(
 	}
 	var err error
 	if location.Checksums, err = combineModuleChecksums(pins, location.Checksums); err != nil {
+		return moduleSource{}, metadata, err
+	}
+	if location.ChecksumURL, err = combineModuleChecksumURL(checksumURL, location.ChecksumURL); err != nil {
 		return moduleSource{}, metadata, err
 	}
 	// Each outer selector applies inside the directory selected by the next

@@ -26,11 +26,13 @@ const (
 )
 
 type moduleSource struct {
-	Target    string           `json:"target"`
-	Subdir    string           `json:"subdir"`
-	Archive   string           `json:"archive"`
-	Checksums kernel.Checksums `json:"checksums"`
-	Vanity    bool             `json:"vanity,omitempty"`
+	Target       string           `json:"target"`
+	Subdir       string           `json:"subdir"`
+	Archive      string           `json:"archive"`
+	Checksums    kernel.Checksums `json:"checksums"`
+	Vanity       bool             `json:"vanity,omitempty"`
+	ChecksumURL  string           `json:"checksum_url,omitempty"`
+	ChecksumName string           `json:"checksum_name,omitempty"`
 	// Path is the archive's cache path, where its read checks Read
 	// permission and the remote's download policy and the cache keeps it.
 	Path string `json:"path"`
@@ -173,8 +175,14 @@ func parseModuleSource(raw, base string, c repo.Config) (moduleSource, error) {
 		query.Del("terraform-get")
 	}
 	out.Archive = kind
-	if out.Checksums, err = moduleChecksum(query.Get("checksum")); err != nil {
-		return out, err
+	if value, file := strings.CutPrefix(query.Get("checksum"), "file:"); file {
+		if out.ChecksumURL, err = moduleChecksumURL(value, u.String(), c); err != nil {
+			return out, err
+		}
+	} else {
+		if out.Checksums, err = moduleChecksum(query.Get("checksum")); err != nil {
+			return out, err
+		}
 	}
 	query.Del("archive")
 	query.Del("checksum")
@@ -398,6 +406,7 @@ func moduleChecksum(raw string) (kernel.Checksums, error) {
 		return out, nil
 	}
 	algorithm, digest, ok := strings.Cut(raw, ":")
+	algorithm = strings.ToLower(algorithm)
 	if !ok {
 		switch len(raw) {
 		case 32:
