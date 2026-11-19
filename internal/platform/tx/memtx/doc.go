@@ -57,6 +57,11 @@
 //   - Deferred functions run in order once the transaction has committed and
 //     given up the gate, so they may use the store; none runs after a
 //     rollback.
+//   - BeforeCommit work runs in registration order after the outer callback
+//     finishes its writes. Its error or panic rolls back business state and
+//     earlier finalizer writes together. A joined Tx rebinds this store's
+//     queue, including when another nested store shadowed it. Invalid
+//     reentrant registration fails finalization even if its error is dropped.
 //   - Values are copied on the way in and on the way out, so callers never
 //     share memory with the store, and on the way in every time is
 //     normalised to UTC microseconds and every duration to milliseconds,

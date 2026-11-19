@@ -127,6 +127,8 @@ func (f fakeInstance) Get(context.Context) (instance.InstanceIdentity, error) {
 	return instance.InstanceIdentity{}, f.getErr
 }
 
+func (f fakeInstance) ID(context.Context) (string, error) { return "", f.getErr }
+
 func (f fakeInstance) Update(context.Context, instance.InstanceIdentity) error { return nil }
 
 func TestAccOpenTokensWithoutIdentity(t *testing.T) {

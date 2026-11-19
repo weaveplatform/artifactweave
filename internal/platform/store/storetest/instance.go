@@ -19,6 +19,8 @@ func testInstance(t *testing.T, s Store) {
 	is := s.Instance()
 	_, err := is.Get(ctx)
 	storekit.WantErr(t, err, kernel.ErrNotFound)
+	_, err = is.ID(ctx)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 	pub, priv := peerKey(1)
 	id := instance.InstanceIdentity{
 		InstanceID: peerID(1), PublicKey: pub, PrivateKey: priv,
@@ -28,6 +30,7 @@ func testInstance(t *testing.T, s Store) {
 	storekit.Must(t, is.Init(ctx, id))
 	got := storekit.Get[instance.InstanceIdentity](t)(is.Get(ctx))
 	storekit.Same(t, "Get", id, got)
+	storekit.Same(t, "ID", id.InstanceID, storekit.Get[string](t)(is.ID(ctx)))
 
 	// Returned keys are copies.
 	got.PublicKey[0]++
@@ -55,6 +58,7 @@ func testInstance(t *testing.T, s Store) {
 		ProtocolVersion: 2,
 	}
 	storekit.Must(t, is.Update(ctx, rotated))
+	storekit.Same(t, "ID after Update", rotated.InstanceID, storekit.Get[string](t)(is.ID(ctx)))
 	storekit.Same(
 		t,
 		"Get after Update",
@@ -70,6 +74,7 @@ func testInstance(t *testing.T, s Store) {
 		storekit.Get[instance.InstanceIdentity](t)(is.Get(ctx)),
 	)
 	failsCancelled(t, map[string]func(context.Context) error{
+		"ID": func(ctx context.Context) error { _, err := is.ID(ctx); return err }, //nolint:wrapcheck // cancellation contract
 		//nolint:wrapcheck // the case checks only that the call fails
 		"Get":    func(ctx context.Context) error { _, err := is.Get(ctx); return err },
 		"Init":   func(ctx context.Context) error { return is.Init(ctx, id) },

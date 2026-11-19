@@ -9,10 +9,50 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	platformtx "github.com/weaveplatform/artifactweave/internal/platform/tx"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx/memtx"
 )
 
 var errBoom = errors.New("boom")
+
+func TestUnitBeforeCommitRejoinsOwningStore(t *testing.T) {
+	a, b := memtx.New(), memtx.New()
+	var order []string
+	var bFinished bool
+	var bContext context.Context
+	if err := a.Tx(t.Context(), func(ctx context.Context) error {
+		if err := b.Tx(ctx, func(ctx context.Context) error {
+			bContext = ctx
+			if err := platformtx.BeforeCommit(ctx, func(context.Context) error {
+				order = append(order, "b")
+				return nil
+			}); err != nil {
+				return err
+			}
+			return a.Tx(ctx, func(ctx context.Context) error {
+				return platformtx.BeforeCommit(ctx, func(context.Context) error {
+					if !bFinished {
+						t.Error("rejoined A registered its work in B's transaction")
+					}
+					order = append(order, "a")
+					return nil
+				})
+			})
+		}); err != nil {
+			return err
+		}
+		bFinished = true
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(order, []string{"b", "a"}) {
+		t.Errorf("finalizer ownership/order = %v", order)
+	}
+	if err := platformtx.BeforeCommit(bContext, func(context.Context) error { return nil }); !errors.Is(err, platformtx.ErrBeforeCommit) {
+		t.Fatalf("closed nested transaction accepted work: %v", err)
+	}
+}
 
 // rec is a row with the kinds of value the store copies and normalises.
 type rec struct {

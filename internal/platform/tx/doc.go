@@ -1,6 +1,6 @@
 // Package tx declares the unit-of-work contract, Runner: one transaction
 // that every store call made with its context joins, and functions deferred
-// until that transaction commits.
+// until before or after that transaction commits.
 //
 // # Role
 //
@@ -8,8 +8,8 @@
 // and service uses. A store call joins whatever transaction its context
 // carries, so a service runs calls to several stores, and later to several
 // modules' api packages, in one Tx without passing a transaction value
-// around. The package declares only the interface and imports only the
-// standard library. Each family of stores implements it with a unit of work
+// around. The package declares the interface and the before-commit callback
+// queue, and imports only the standard library. Each family of stores implements a unit of work
 // of its own, because the families differ on purpose in one case (see
 // Invariants): platform/tx/memtx for the in-memory stores, and
 // platform/sql/dialect for the SQL stores, over database/sql. Every
@@ -22,10 +22,13 @@
 //     context it is given.
 //   - AfterCommit: a context and a function to run once the transaction
 //     that context is inside commits.
+//   - BeforeCommit: an active transaction context and a fallible callback.
 //
 // # Outputs
 //
 //   - Runner, with Tx and AfterCommit.
+//   - BeforeCommit and Finalizers: ordered required work after business
+//     mutations finish, inside the same transaction and before commit.
 //
 // # Invariants
 //
@@ -44,6 +47,14 @@
 //     rollback; outside a transaction AfterCommit runs its function at once.
 //     So work that a change asks for is asked for exactly when the change
 //     commits (decision 0033's enqueue within the change).
+//   - BeforeCommit callbacks run only after successful business work, inside
+//     the owning transaction. A callback error or panic rolls back its work
+//     together with business state. Reentrant registration fails the unit,
+//     including when the callback drops that registration error. Unsupported
+//     runners and closed contexts refuse registration without executing it.
+//   - Capture immutable event facts during business work. BeforeCommit
+//     callbacks append them without taking later domain locks, preserving
+//     domain-before-event-stream lock order across nested mutations.
 //
 // # References
 //
@@ -78,7 +89,9 @@
 //
 // # Testing
 //
-// The package declares only the interface, so it has no tests of its own.
+// beforecommit_test.go covers queue order, failure, panic cleanup, closed
+// contexts and rejected reentrant registration. The shared platform store
+// contract proves business and event rollback on memory/SQLite/PostgreSQL.
 // The metadata store's contract suite (the TxCommit, TxRollback, TxNested
 // and Cancelled subtests, and the rollback cases of the replay, outbox, work
 // queue, request budget and Git LFS lock subtests) runs Tx and AfterCommit
