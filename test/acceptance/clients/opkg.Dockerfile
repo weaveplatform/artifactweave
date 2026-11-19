@@ -2,7 +2,7 @@
 # The client is the latest opkg release from Yocto, built from source. The
 # upstream source digest and base image digest make real-client results
 # repeatable.
-FROM ubuntu:26.10@sha256:262df65c0ec6bf8d9dcc87454f4330a05fae4b97825f45854af3b136666584c2
+FROM ubuntu:26.10@sha256:c4ca31b6e93261c5dd773826f789738a49e414ca04fc094b1ccd0f91e07329a2
 
 COPY ubuntu-mirrors.sh /usr/local/bin/ubuntu-mirrors
 RUN ubuntu-mirrors
