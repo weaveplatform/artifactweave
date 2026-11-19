@@ -367,7 +367,7 @@ func scheduleGeneration(t *testing.T, s Store) {
 		// its metadata gate before calling the handler.
 		return s.Tx(ctx, func(ctx context.Context) error { return s.Settings().Put(ctx, "scheduled-run", runs) })
 	}}
-	storekit.Must(t, svc.Execute(t.Context(), old, handlers))
+	storekit.WantErr(t, svc.Execute(t.Context(), old, handlers), kernel.ErrConflict)
 	if runs != 0 {
 		t.Fatal("expired lease executed")
 	}

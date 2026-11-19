@@ -3,6 +3,7 @@ package schedule
 import (
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -130,7 +131,11 @@ func parseField(raw string, lo, hi int, names []string) ([]int, bool) {
 		}
 		if len(base) == 2 {
 			var ok bool
-			step, ok = fieldNumber(base[1], 1, hi-lo+1, nil)
+			maxStep := hi
+			if lo == FirstYear {
+				maxStep = math.MaxInt32
+			}
+			step, ok = fieldNumber(base[1], 1, maxStep, nil)
 			if !ok {
 				return nil, false
 			}

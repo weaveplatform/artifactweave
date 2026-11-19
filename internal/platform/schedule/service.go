@@ -225,7 +225,12 @@ func (s *Service) Execute(ctx context.Context, item work.WorkItem, handlers map[
 		if err != nil {
 			return fmt.Errorf("read scheduled worker lease: %w", err)
 		}
-		admitted = leased.Generation == item.Generation && leased.LeasedBy == item.LeasedBy && leased.State == work.WorkLeased && leased.LeaseUntil.After(s.now())
+		if leased.Generation != item.Generation || leased.LeasedBy != item.LeasedBy || leased.State != work.WorkLeased || !leased.LeaseUntil.After(s.now()) {
+			// A successful no-op would let Complete delete an expired lease
+			// whose generation has not changed yet, losing this logical fire.
+			return fmt.Errorf("scheduled worker lease expired or changed: %w", kernel.ErrConflict)
+		}
+		admitted = true
 		return nil
 	})
 	if err != nil {
