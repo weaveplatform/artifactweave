@@ -105,8 +105,8 @@ func TestAccRemoteBrowsingOptInAndCacheOnlyStorage(t *testing.T) {
 	}
 }
 
-func TestAccRemoteBrowsingFailureDoesNotLookLikeEmptySuccess(t *testing.T) {
-	for _, failure := range []error{source.ErrUnsupported, source.ErrSuperseded, &source.HTTPError{Status: 504}} {
+func TestAccRemoteBrowsingRefusalDoesNotLookLikeEmptySuccess(t *testing.T) {
+	for _, failure := range []error{source.ErrUnsupported, source.ErrSuperseded} {
 		svc := &source.Service{
 			Resolve: sourceIdentity,
 			HTTP: sourceBackend(
@@ -127,6 +127,35 @@ func TestAccRemoteBrowsingFailureDoesNotLookLikeEmptySuccess(t *testing.T) {
 		res := w.do("GET", "/artifactory/up/", "reader", "")
 		if res.Code < 500 || strings.Contains(res.Body.String(), "Index of") {
 			t.Fatal("failure hidden", res.Code, res.Body)
+		}
+	}
+}
+
+func TestAccRemoteBrowsingOriginTimeoutUsesFolderPresence(t *testing.T) {
+	svc := &source.Service{
+		Resolve: sourceIdentity,
+		HTTP: sourceBackend(func(context.Context, source.Request, source.Permit) (source.Result, error) {
+			return source.Result{}, &source.HTTPError{Status: 504, Kind: source.FailureKindTimeout}
+		}),
+	}
+	w := newItemWorld(t, false, func(c *Config) { c.RemoteSources = svc })
+	c, err := w.db.Repos().Get(t.Context(), "up")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.ListRemoteFolderItems = repo.Flex(true)
+	if err = w.db.Repos().Update(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	// A storing remote has an initialized cache root, but an arbitrary subfolder
+	// has no existence witness. An unavailable origin cannot create that folder.
+	for _, tc := range []struct {
+		path string
+		code int
+	}{{"/artifactory/up/", 200}, {"/artifactory/up/absent/", 404}} {
+		res := w.do("GET", tc.path, "reader", "")
+		if res.Code != tc.code || (tc.code == 404 && strings.Contains(res.Body.String(), "Index of")) {
+			t.Fatal("wrong folder presence", tc.path, res.Code, res.Body)
 		}
 	}
 }

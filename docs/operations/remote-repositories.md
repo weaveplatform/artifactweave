@@ -88,6 +88,26 @@ Set `listRemoteFolderItems` to `true` to browse an upstream folder through
 with it disabled, these endpoints continue to list only cached items. HEAD performs
 the same permission checks and metadata lookup as GET, without returning a body.
 
+An enabled direct remote index combines its cached children with the upstream's
+immediate children. A cached name keeps its file or folder type when the upstream
+lists the same name; names appear once in case-sensitive order. With an unavailable
+upstream, an existing cached folder still lists its readable children. This includes
+an explicitly empty cached folder and the initialized root of a storing remote.
+An absent subfolder returns 404 instead of an invented empty index. A remote with
+`storeArtifactsLocally=false` contributes no cached folder or children. Valid
+upstream entries hidden by repository patterns can establish folder presence
+without disclosing those entries.
+
+The cache and origin use the remote's current Read and include/exclude checks.
+Source, credential or permission changes during acquisition prevent cached
+disclosure. Ordinary origin transport/status failures can leave the cached index;
+security, malformed-index and current-authority failures keep their established
+error responses. A failure enumerating the cache aborts the whole direct index with
+a sanitized 404 and one server log containing the original cause. This HTML-phase
+answer follows the inspected 7.161.26 browse service; existing earlier source-store
+failures retain their sanitized 500. The [source audit](../research/direct-remote-folder-listings-source-audit.md)
+distinguishes those phases and the unobserved current-version details.
+
 Plain HTTP remotes use directory-index HTML. With `contentSynchronisation.enabled`,
 browsing uses authenticated Smart Remote discovery and the peer's Storage Folder
 Info API. This is a nonrecursive lookup: links to readable immediate children appear
@@ -105,6 +125,8 @@ members hold shows once. A member whose upstream fails to list leaves only its o
 upstream children out; the rest of the index still answers. The Storage API through
 a virtual repository stays cache-only, as for the remote itself
 ([#1537](https://github.com/weaveplatform/artifactweave/issues/1537)).
+The known suppression of trusted source lookup/revalidation failures in that
+virtual listing is tracked separately in [#1723](https://github.com/weaveplatform/artifactweave/issues/1723).
 
 The parser omits parent/traversal links, foreign origins, credentials and unsafe
 paths. The returned HTML escapes names and does not expose upstream query strings.
