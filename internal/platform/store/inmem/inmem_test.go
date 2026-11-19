@@ -14,3 +14,9 @@ func TestUnitContract(t *testing.T) {
 		return inmem.New(memtx.New(), watches...)
 	})
 }
+
+func TestUnitEventContract(t *testing.T) {
+	storetest.RunEvents(t, func(*testing.T) storetest.EventContractStore {
+		return inmem.New(memtx.New())
+	})
+}

@@ -583,10 +583,20 @@ column outbox.blob_size bigint NOT NULL DEFAULT 0
 column outbox.created_at bigint
 constraint outbox.outbox_pkey PRIMARY KEY (origin, stream, seq)
 index outbox.outbox_pkey CREATE UNIQUE INDEX outbox_pkey ON outbox USING btree (origin, stream, seq)
+table outbox_consumers
+column outbox_consumers.origin text COLLATE "C" NOT NULL
+column outbox_consumers.stream text COLLATE "C" NOT NULL
+column outbox_consumers.consumer text COLLATE "C" NOT NULL
+column outbox_consumers.acked_seq bigint NOT NULL
+constraint outbox_consumers.outbox_consumers_acked_seq_check CHECK ((acked_seq >= 0))
+constraint outbox_consumers.outbox_consumers_origin_stream_fkey FOREIGN KEY (origin, stream) REFERENCES outbox_sequences(origin, stream)
+constraint outbox_consumers.outbox_consumers_pkey PRIMARY KEY (origin, stream, consumer)
+index outbox_consumers.outbox_consumers_pkey CREATE UNIQUE INDEX outbox_consumers_pkey ON outbox_consumers USING btree (origin, stream, consumer)
 table outbox_sequences
 column outbox_sequences.origin text COLLATE "C" NOT NULL
 column outbox_sequences.stream text COLLATE "C" NOT NULL
 column outbox_sequences.last_seq bigint NOT NULL DEFAULT 0
+column outbox_sequences.pruned_through bigint NOT NULL DEFAULT 0
 constraint outbox_sequences.outbox_sequences_pkey PRIMARY KEY (origin, stream)
 index outbox_sequences.outbox_sequences_pkey CREATE UNIQUE INDEX outbox_sequences_pkey ON outbox_sequences USING btree (origin, stream)
 table package_version_files

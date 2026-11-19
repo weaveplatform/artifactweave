@@ -1,5 +1,6 @@
-// Package outbox holds the ordered event streams that peers exchange and the
-// hybrid logical clock that orders their events: the port that stores this
+// Package outbox holds committed module events, independent consumer positions,
+// the ordered event streams that peers exchange and their hybrid logical clock.
+// OutboxStore stores this
 // instance's outbox, each peer's acknowledged position in it, the receiver's
 // applied positions and the blob fetches that failed while applying, with the
 // values it takes and returns.
@@ -12,8 +13,8 @@
 // package may import it. OutboxStore takes and returns the clock and the
 // values, so they are declared beside it and the package imports no module.
 // The platform's store adapters (platform/store/sql and platform/store/inmem)
-// implement OutboxStore, and the metadata store's Outbox returns theirs; no
-// service appends yet. The package imports only the standard library.
+// implement OutboxStore and EventStore; the composite metadata store forwards
+// both views. The package imports the standard library and kernel sentinels.
 //
 // # Inputs
 //
@@ -24,6 +25,8 @@
 //     the blob fetches that failed while applying.
 //   - For the clock, a physical time (Next and Merge) or the text form
 //     (ParseHLC).
+//   - Module events: origin, topic, entity key, timestamp and bounded JSON.
+//     The producing module's api owns its typed topic and payload contract.
 //
 // # Outputs
 //
@@ -35,6 +38,8 @@
 //     sentinel ErrInvalidHLC.
 //   - OutboxEntry; PeerCursor, with Behind; AppliedMarker, with Expect; and
 //     FailedBlobFetch.
+//   - EventStore: transactional AppendEvent, idempotent RegisterConsumer,
+//     bounded Next, contiguous compare-and-advance Ack and PruneAcknowledged.
 //
 // # Invariants
 //
@@ -51,6 +56,14 @@
 //   - SetApplied runs in the transaction that applies the entry, which makes
 //     applying idempotent: a retried batch starts at the next expected
 //     sequence, AppliedMarker.Expect.
+//   - Module events share one reserved stream per origin and the existing
+//     sequence allocator. Peer cursors and applied markers remain independent.
+//   - Consumer effects and Ack share one metadata transaction. Acquire domain
+//     locks before Ack; Next does not take the stream write guard. A stale Ack
+//     conflicts and the caller propagates that error to roll effects back.
+//   - Pruning retains every unacknowledged consumer prefix; with no registered
+//     consumers it retains all events. Late consumers start at the retained
+//     floor, and peer Prune cannot bypass this protection on the reserved stream.
 //
 // # References
 //
@@ -79,8 +92,9 @@
 //
 // Implemented P2: the clock, the outbox values and OutboxStore, with the
 // metadata store's SQL and in-memory stores (pull request 3). Moved here in
-// P9d. Roadmap: P11 generalises the outbox to Append(ctx, Event) for every
-// consumer, and P13 delivers its streams to peers.
+// P9d. P11 EVT-01 adds EventStore and independent durable consumer positions;
+// EVT-02 supplies business producers and EVT-03 supplies the recovery/dispatch
+// loop. P13 delivers peer streams over the network.
 //
 // # Testing
 //
@@ -98,5 +112,9 @@
 // counting and clearing, and cancelled contexts) runs on the platform's
 // in-memory and SQLite stores and on the metadata store's in-memory, SQLite
 // and PostgreSQL stores. The federation model's TestUnitStamp orders stamps
-// through Compare.
+// through Compare. The RunEvents contract also covers independent consumers,
+// rollback of effects/acknowledgements/pruning, concurrent append/ack/register,
+// origin isolation, corrupt envelopes and canceled calls. SQL-specific tests
+// exercise failed migration/upgrade/rollback fixtures, injected write failures
+// and the producer-domain/consumer-Ack lock order on PostgreSQL.
 package outbox

@@ -105,6 +105,7 @@ index sqlite_autoindex_keypairs_1 keypairs
 index sqlite_autoindex_leases_1 leases
 index sqlite_autoindex_npm_externals_1 npm_externals
 index sqlite_autoindex_outbox_1 outbox
+index sqlite_autoindex_outbox_consumers_1 outbox_consumers
 index sqlite_autoindex_outbox_sequences_1 outbox_sequences
 index sqlite_autoindex_package_version_files_1 package_version_files
 index sqlite_autoindex_pairing_nonces_1 pairing_nonces
@@ -219,7 +220,8 @@ table keypairs keypairs CREATE TABLE keypairs(name TEXT PRIMARY KEY,type TEXT NO
 table leases leases CREATE TABLE leases(name TEXT PRIMARY KEY,holder TEXT NOT NULL,task TEXT NOT NULL DEFAULT '',acquired_at BIGINT,expires_at BIGINT NOT NULL)
 table npm_externals npm_externals CREATE TABLE npm_externals(virtual_key TEXT NOT NULL REFERENCES repositories(key)ON DELETE CASCADE,name TEXT NOT NULL,spec TEXT NOT NULL,source_url TEXT NOT NULL,file TEXT NOT NULL,sha256 TEXT NOT NULL DEFAULT '',PRIMARY KEY(virtual_key,name,spec))
 table outbox outbox CREATE TABLE outbox(origin TEXT NOT NULL,stream TEXT NOT NULL,seq BIGINT NOT NULL,hlc_wall BIGINT NOT NULL,hlc_logical BIGINT NOT NULL,event_type TEXT NOT NULL DEFAULT '',payload BLOB,blob_sha256 TEXT NOT NULL DEFAULT '',blob_size BIGINT NOT NULL DEFAULT 0,created_at BIGINT,PRIMARY KEY(origin,stream,seq))
-table outbox_sequences outbox_sequences CREATE TABLE outbox_sequences(origin TEXT NOT NULL,stream TEXT NOT NULL,last_seq BIGINT NOT NULL DEFAULT 0,PRIMARY KEY(origin,stream))
+table outbox_consumers outbox_consumers CREATE TABLE outbox_consumers(origin TEXT NOT NULL,stream TEXT NOT NULL,consumer TEXT NOT NULL,acked_seq BIGINT NOT NULL CHECK(acked_seq >= 0),PRIMARY KEY(origin,stream,consumer),FOREIGN KEY(origin,stream)REFERENCES outbox_sequences(origin,stream))
+table outbox_sequences outbox_sequences CREATE TABLE outbox_sequences(origin TEXT NOT NULL,stream TEXT NOT NULL,last_seq BIGINT NOT NULL DEFAULT 0,pruned_through BIGINT NOT NULL DEFAULT 0,PRIMARY KEY(origin,stream))
 table package_version_files package_version_files CREATE TABLE package_version_files(version_id BIGINT NOT NULL REFERENCES package_versions(id)ON DELETE CASCADE,item_id BIGINT NOT NULL REFERENCES items(id)ON DELETE CASCADE,PRIMARY KEY(version_id,item_id))
 table package_versions package_versions CREATE TABLE package_versions(id INTEGER PRIMARY KEY AUTOINCREMENT,package_id BIGINT NOT NULL REFERENCES packages(id)ON DELETE CASCADE,version TEXT NOT NULL,order_key BIGINT NOT NULL DEFAULT 0,created_at BIGINT,last_downloaded_at BIGINT,metadata TEXT)
 table packages packages CREATE TABLE packages(id INTEGER PRIMARY KEY AUTOINCREMENT,repo_key TEXT NOT NULL,package_type TEXT NOT NULL DEFAULT '',name TEXT NOT NULL,created_at BIGINT)

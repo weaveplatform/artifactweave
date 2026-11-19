@@ -8,10 +8,10 @@
 // platform layer, adapter: the in-memory reference implementation of the
 // platform's ports (work.WorkQueue, work.LeaseStore,
 // settings.SettingsStore, configdoc.ConfigStore, instance.InstanceStore,
-// outbox.OutboxStore, session.UploadStore, idempotency.ReplayStore and
+// outbox.OutboxStore, outbox.EventStore, session.UploadStore, idempotency.ReplayStore and
 // apilimit.RequestBudgetStore) over a shared memtx.Store. The composite
 // in-memory store in app/adapters/inmem builds one Store over its own
-// memtx.Store, delegates its nine platform accessors to it and registers
+// memtx.Store, delegates its ten platform accessors to it and registers
 // the layout fence as a watch. Tests that need only a platform store,
 // such as the work queue's, the upload sessions', the cloud blob
 // backends' and the request limiter's, build it alone over memtx.New().
@@ -28,7 +28,7 @@
 // # Outputs
 //
 //   - Store, from New, with Settings, Leases, WorkQueue, Configs, Instance,
-//     Outbox, Uploads, Replays and RequestBudgets, and memtx's Tx,
+//     Outbox, Events, Uploads, Replays and RequestBudgets, and memtx's Tx,
 //     AfterCommit and Close.
 //
 // # Invariants
@@ -37,18 +37,25 @@
 //     tables' names, so every call joins the transaction that the caller's
 //     context carries, whichever module's store began it, and the tables
 //     are the same whichever store reaches them.
+//
 //   - The config store runs the watches of a document's kind inside the
 //     write's transaction, in the order given, at the points the SQL store
 //     does: after a Put that creates the document or changes its Document
 //     bytes, and after every successful Delete. A watch's error rolls the
 //     write back.
+//
 //   - Settings keep each value as the JSON it encodes to, and times compare
 //     at the precision the SQL columns store, so a read returns what the
 //     SQL store would.
+//
 //   - The replay store writes its records straight into its table's rows,
 //     without kernel.Normalise, because a record's fields are unexported
 //     and Normalise does not reach them; Do normalises the receipt's expiry
 //     before it stores it.
+//
+//   - Module events use the existing outbox sequence allocator. Independent
+//     consumer positions fence acknowledgements and protect the retained prefix
+//     during pruning; raw peer pruning cannot bypass that reserved stream.
 //
 // # References
 //
@@ -82,6 +89,9 @@
 // P9c: the replay and request budget stores (issue 890, pull request 905).
 // Moved here in P9d, which added Store and New, with the watches in place of
 // the layout fence.
+//
+// P11 EVT-01 adds module-event consumers, compare-and-advance acknowledgements
+// and a retained floor, without changing peer cursors or applied markers.
 //
 // # Testing
 //

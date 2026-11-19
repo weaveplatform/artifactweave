@@ -119,6 +119,9 @@ func (o outboxStore) Streams(ctx context.Context, origin string) ([]string, erro
 }
 
 func (o outboxStore) Prune(ctx context.Context, origin, stream string, upTo int64) (int64, error) {
+	if stream == outbox.ModuleEventStream {
+		return eventStore(o).PruneAcknowledged(ctx, origin, upTo)
+	}
 	return o.s.Exec(ctx, "prune outbox",
 		"DELETE FROM outbox WHERE origin = ? AND stream = ? AND seq <= ?", origin, stream, upTo)
 }
