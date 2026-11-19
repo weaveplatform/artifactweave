@@ -126,6 +126,10 @@ type Resource struct {
 	// private JSON control representation; the adapter must validate its source
 	// against the actual response base before admission and rewrite it on delivery.
 	ModuleDownloadLocation bool
+	// ModuleVanityDocument projects a complete, bounded Terraform HTTP vanity
+	// response into ModuleVanityResponse. It is exclusive with registry 204
+	// projection and requires validated JSON metadata before cache admission.
+	ModuleVanityDocument bool
 	// NuGetEmptyFeed projects a bodyless NuGet v2 204 into a fixed empty Atom
 	// feed. Only trusted feed/query metadata adapters may opt in; complete
 	// metadata validation, an Atom MIME expectation and a versioned schema remain required.
@@ -794,7 +798,7 @@ func gitLFSObjectPath(oid string) string {
 }
 
 func galleryPOSTHasUnsupportedOptions(r Resource) bool {
-	return r.RequireSmart || r.SmartAQL != "" || r.ModuleDownloadLocation ||
+	return r.RequireSmart || r.SmartAQL != "" || r.ModuleDownloadLocation || r.ModuleVanityDocument ||
 		r.NuGetEmptyFeed || r.ChecksumOnly || r.Mutable || r.GoneIsMissing
 }
 
@@ -1133,8 +1137,12 @@ func invalidGitLFSObjectResource(r Resource) bool {
 }
 
 func validateModuleLocationContract(r Resource) error {
-	if !r.ModuleDownloadLocation {
+	if !r.ModuleDownloadLocation && !r.ModuleVanityDocument {
 		return nil
+	}
+	if r.ModuleVanityDocument && (r.ModuleDownloadLocation || r.NuGetEmptyFeed || r.RequireSmart || r.SmartAQL != "" ||
+		r.ExternalURL == "" || r.CheckURL == nil) {
+		return ErrInvalidRequest
 	}
 	if r.Kind != ResourceKindMetadata || r.Method != http.MethodGet ||
 		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (kernel.Checksums{}) ||
@@ -1171,7 +1179,7 @@ func validateSmartAQLContract(r Resource) error {
 	if !r.RequireSmart || r.Method != http.MethodGet || r.ValidateMetadata == nil ||
 		r.ExpectedContentType != "application/json" ||
 		len(r.ExpectedContentTypes) > 0 ||
-		r.ModuleDownloadLocation ||
+		r.ModuleDownloadLocation || r.ModuleVanityDocument ||
 		!r.PermissionFolder ||
 		r.PermissionPath != "" ||
 		r.Checksums != (kernel.Checksums{}) {

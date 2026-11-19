@@ -105,7 +105,7 @@ func (p *Policy) fetch(
 		return p.fallback(q, key, e, failure)
 	}
 	defer func() { _ = res.Body.Close() }()
-	if err = projectModuleLocation(q, res); err != nil {
+	if err = projectModuleResponse(q, res); err != nil {
 		return out, err
 	}
 	if p.ProjectResponse != nil {
@@ -282,7 +282,7 @@ func (p *Policy) directOnce(
 		return source.Result{}, failure
 	}
 	defer func() { _ = res.Body.Close() }()
-	if err = projectModuleLocation(q, res); err != nil {
+	if err = projectModuleResponse(q, res); err != nil {
 		return source.Result{}, err
 	}
 	if p.ProjectResponse != nil {

@@ -168,7 +168,7 @@ func (h handler) upstreamModuleLocation(
 		"module-metadata/"+m.Package()+"/"+m.Version+"/download",
 		endpoint,
 		m.Package(),
-		"terraform-module-location-v1",
+		"terraform-module-location-v2",
 		true,
 		func(body io.Reader, actual string) error { _, e := parseModuleLocation(body, actual, c); return e },
 	)
@@ -182,7 +182,10 @@ func (h handler) upstreamModuleLocation(
 		return moduleSource{}, result, remoteModuleError()
 	}
 	location, err := parseModuleLocation(result.Stream.Body, result.Metadata.BaseURL, c)
-	return location, result, err
+	if err != nil {
+		return moduleSource{}, result, err
+	}
+	return h.resolveModuleVanity(r, m, location, result)
 }
 
 func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operation) {

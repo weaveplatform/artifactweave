@@ -340,3 +340,59 @@ snapshot-specific positive-depth behavior, malformed selectors/encoding, duplica
 controls and configured/external destination policy. These are parser results only;
 new native cold/warm-client acceptance remains required before calling this seam
 qualified. No Git process, credential helper, submodule or LFS retrieval was enabled.
+
+## Local bounded vanity implementation and native proof (2026-11-19)
+
+The source classifier and registry-location validation variant now admit qualified
+HTTP(S) vanity documents alongside terminal archives and GitHub snapshots. A distinct
+closed metadata projection admits only a complete 200 response, selects one valid
+`X-Terraform-Get` header or a UTF-8/ASCII HTML representation, and preserves private
+caller-independent control bytes. Header-selected responses still read the whole
+bounded body before publication. HTML control bytes use base64 within JSON to avoid
+unbounded escaping overhead. The existing 204 registry projection remains separate.
+
+The adapter selects the first nonempty HTML `terraform-get` source before body/end-head,
+rejects duplicate relevant attributes and validates the selected source before cache
+admission. Relative sources use the sanitized actual response base. Each logical
+vanity GET adds exactly one `terraform-get=1`; ordinary HTTP redirects retain the
+shared transport's existing redirect semantics. Children retain their own explicit
+query, with no parent query recovery. Opaque identities of requested and effective
+documents detect cycles without persisting their private response query. At most ten
+documents are acquired, including cached/offline reads, each with a 16 MiB input bound.
+Metadata paths omit those document identities; the existing cache's keyed URL
+fingerprint distinguishes raw documents without exposing their private query.
+
+All new acquisitions use the existing source-policy service and combine every hop's
+current-authority and usage callbacks. Direct/virtual HTTP controls pass for cold,
+warm and offline reuse, both local-store settings, upstream `no-store`, invalid-input
+retry, ten/eleven hops, cycles, redirected aliases and original-byte delivery.
+Blocked-body controls pass for user credential changes, source changes, metadata zap,
+virtual member removal and cancellation, with no signed capability or archive fetch.
+Closed-contract tests refuse invalid requests before source resolution, and the
+original registry projection controls continue to pass.
+
+**Local native evidence:** Terraform 1.17.1 and OpenTofu 1.13.9 each passed header,
+HTML, redirected-relative and chained source initialization/application/output in
+cold mode and with warm offline server storage plus a fresh client directory:
+**16 round trips, zero skips**. Every package selected `root/modules/demo` and evaluated
+a relative sibling module; the native manifest retained both paths and cached source
+archives retained their exact original bytes. Native homes, CLI configs and netrc
+were isolated and no ambient getter credentials were inherited. The source stayed
+unchanged during this probe. Evidence is retained in
+`cover/terraform-getters/vanity-native-final`. The final repeat passed in 8.684 seconds
+with all source and probe hashes captured before execution.
+
+These results exercise the production remote HTTP handler over controlled in-memory
+fixtures. They are not standalone-server/SQL-backend qualification, permanent CI
+native acceptance or Artifactory observations. The probe harness obtains the registry
+download answer and passes its rewritten signed source to each native client; it does
+not exercise native registry discovery or version negotiation. Full two-client registry
+acceptance still needs that path. Checksum-file support, the remaining
+snapshot/native matrix and documentation/CI handoff remain required by A–H; #668
+stays open and ADR0040 remains Proposed.
+
+The final local race/coverage pass uses unchanged production source and passes the
+90% per-package threshold: remote source 463/485 (95.464%), remote policy 1,409/1,564
+(90.090%) and Terraform HTTP 2,929/3,253 (90.040%). Architecture, configured lint,
+test-kind and generated-recipe checks pass. These are changed-package local profiles;
+the full repository's 95% combined gate remains separate required CI evidence.

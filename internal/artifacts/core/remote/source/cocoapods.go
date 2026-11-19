@@ -97,7 +97,7 @@ func validateCocoaPodsGitContract(r Resource) error {
 		r.Validate == nil || r.CheckURL == nil || !r.NoCrossOriginAuth ||
 		r.UpstreamPath != "" || r.Query != "" || r.PermissionRoot || r.PermissionFolder ||
 		len(r.PostBody) != 0 || r.Transient || r.RequireSmart || r.SmartAQL != "" ||
-		r.ModuleDownloadLocation || r.NuGetEmptyFeed || r.ChecksumOnly ||
+		r.ModuleDownloadLocation || r.ModuleVanityDocument || r.NuGetEmptyFeed || r.ChecksumOnly ||
 		len(r.GitLFSActionHeaders) != 0 {
 		return ErrInvalidRequest
 	}

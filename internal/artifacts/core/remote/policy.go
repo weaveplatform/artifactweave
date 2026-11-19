@@ -411,6 +411,9 @@ func (p *Policy) CacheKey(q source.Request, revision string) model.RemoteCacheKe
 	if q.Resource.ModuleDownloadLocation {
 		identity = append(identity, "module-download-location-v1")
 	}
+	if q.Resource.ModuleVanityDocument {
+		identity = append(identity, "module-vanity-document-v1")
+	}
 	if q.Resource.NuGetEmptyFeed {
 		identity = append(identity, "nuget-empty-feed-v1")
 	}
@@ -635,7 +638,7 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 	}
 	// The caller's validators describe downstream bytes. Only validators of
 	// this exact complete upstream representation may revalidate its cache.
-	if e.Blob.Checksums.SHA256 != "" && !q.Resource.ModuleDownloadLocation &&
+	if e.Blob.Checksums.SHA256 != "" && !q.Resource.ModuleDownloadLocation && !q.Resource.ModuleVanityDocument &&
 		q.Resource.Method != http.MethodPost {
 		if e.ETag != "" {
 			headers.Set("If-None-Match", e.ETag)
