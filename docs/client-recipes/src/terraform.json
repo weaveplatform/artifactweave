@@ -107,7 +107,10 @@
         "initialize through a TLS mirror without a repository signing key",
         "the file \".terraform.lock.hcl\" contains \"h1:\"",
         "fresh init installs hosted and private remote providers through a nested virtual <mode>",
-        "the virtual provider bundles preserve both publishers"
+        "the virtual provider bundles preserve both publishers",
+        "one virtual installs a local module and signed remote provider again from empty client caches",
+        "this init fetched the module and signed provider only through the combined virtual",
+        "I clear the combined Terraform installation and plugin caches"
       ]
     },
     {
@@ -137,6 +140,15 @@
         "network_mirror",
         "private-provider",
         "virtualTerraformProviderBundles"
+      ]
+    },
+    {
+      "path": "test/acceptance/terraform_combined_steps_test.go",
+      "contains": [
+        "TF_PLUGIN_CACHE_DIR=",
+        "combinedTerraformRequests",
+        "combinedProviderBinary",
+        "combinedTerraformState"
       ]
     }
   ]
