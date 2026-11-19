@@ -20,7 +20,12 @@ set -eu
 printf '%s\n' "$*" > "$OBSERVED/arguments"
 printf started > "$OBSERVED/started"
 if [ "$MODE" = accept-failure ]; then exit 23; fi
-while [ ! -f "$OBSERVED/release" ]; do /bin/sleep 0.001; done
+i=0
+while [ ! -f "$OBSERVED/release" ]; do
+  i=$((i + 1))
+  if [ "$i" -ge 2000 ]; then echo 'native fixture was not released' >&2; exit 93; fi
+  /bin/sleep 0.001
+done
 printf finished > "$OBSERVED/finished"
 `
 
@@ -95,6 +100,13 @@ func TestUnitNativeAcceptanceHasItsOwnBudgetAfterImagePreparation(t *testing.T) 
 	for _, mode := range []string{"delayed-success", "image-timeout", "acceptance-timeout"} {
 		t.Run(mode, func(t *testing.T) {
 			observed, bin := t.TempDir(), t.TempDir()
+			t.Cleanup(func() {
+				// A context failure must also release the detached fixture,
+				// which otherwise keeps the command's output pipe open.
+				if err := os.WriteFile(filepath.Join(observed, "release"), nil, 0o600); err != nil {
+					t.Errorf("release native fixture: %v", err)
+				}
+			})
 			clock := filepath.Join(observed, "clock")
 			status := filepath.Join(observed, "images.status")
 			if err := os.WriteFile(clock, []byte("0"), 0o600); err != nil {
@@ -111,6 +123,7 @@ func TestUnitNativeAcceptanceHasItsOwnBudgetAfterImagePreparation(t *testing.T) 
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, "bash", "-ec", monitor)
+			cmd.WaitDelay = time.Second
 			cmd.Env = append(os.Environ(), "PROFILE=full", "MODE="+mode,
 				"CLIENT_IMAGES_STATUS="+status, "RUNNER_TEMP="+observed,
 				"OBSERVED="+observed, "MONITOR_CLOCK="+clock,
