@@ -367,3 +367,21 @@ func (p projectStore) DeleteAssignment(ctx context.Context, repoKey string) erro
 		return nil
 	})
 }
+
+func (p projectStore) ForPrincipal(ctx context.Context, user string, groups []string) ([]string, error) {
+	var result []string
+	err := p.s.Do(ctx, func() error {
+		seen := map[string]bool{}
+		for _, member := range p.members().All(nil, nil) {
+			direct := user != "" && member.Type == model.PrincipalUser && member.Name == user
+			inherited := member.Type == model.PrincipalGroup && slices.Contains(groups, member.Name)
+			if (direct || inherited) && !seen[member.ProjectKey] {
+				seen[member.ProjectKey] = true
+				result = append(result, member.ProjectKey)
+			}
+		}
+		slices.Sort(result)
+		return nil
+	})
+	return result, err
+}

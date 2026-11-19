@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -95,6 +96,9 @@ type RepoPage struct {
 // list and the key pair references are mirrored into tables so Including and
 // UsingKeypair are indexed lookups.
 type RepoStore interface {
+	// ProjectRepositories projects current ownership/environment facts without
+	// secrets or row locks, ordered by key using the project ownership index.
+	ProjectRepositories(ctx context.Context, projectKey string, page kernel.Page) ([]artapi.ProjectRepository, string, error)
 	// Create stores c; kernel.ErrConflict when the key exists.
 	Create(ctx context.Context, c repo.Config) error
 	// Get returns the configuration, including passwords and sensitive headers.

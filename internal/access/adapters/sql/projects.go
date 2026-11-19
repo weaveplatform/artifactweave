@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
@@ -610,4 +611,42 @@ func (p projectStore) DeleteAssignment(ctx context.Context, repoKey string) erro
 		return p.s.ExecOne(ctx, "delete assignment "+repoKey,
 			"DELETE FROM project_repositories WHERE repo_key = ?", repoKey)
 	})
+}
+
+func (p projectStore) ForPrincipal(ctx context.Context, user string, groups []string) ([]string, error) {
+	if err := p.guard(ctx); err != nil {
+		return nil, err
+	}
+	var conditions []string
+	var args []any
+	if user != "" {
+		conditions = append(conditions, "(principal_type = ? AND principal_name = ?)")
+		args = append(args, string(model.PrincipalUser), user)
+	}
+	if len(groups) > 0 {
+		conditions = append(conditions, "(principal_type = ? AND principal_name IN ("+dialect.Placeholders(len(groups))+"))")
+		args = append(args, string(model.PrincipalGroup))
+		for _, group := range groups {
+			args = append(args, group)
+		}
+	}
+	if len(conditions) == 0 {
+		return nil, nil
+	}
+	var result []string
+	err := p.s.Rows(
+		ctx,
+		"projects for principal",
+		"SELECT DISTINCT project_key FROM project_members WHERE "+strings.Join(conditions, " OR ")+" ORDER BY project_key",
+		args,
+		func(rows *sql.Rows) error {
+			var key string
+			if err := rows.Scan(&key); err != nil {
+				return err //nolint:wrapcheck // wrapped by Rows
+			}
+			result = append(result, key)
+			return nil
+		},
+	)
+	return result, err
 }

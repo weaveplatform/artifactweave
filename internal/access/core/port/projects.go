@@ -40,6 +40,10 @@ type ProjectStore interface {
 	Delete(ctx context.Context, key string) error
 	// List returns every project ordered by key.
 	List(ctx context.Context) ([]model.Project, error)
+	// ForPrincipal returns distinct project keys with direct user or supplied
+	// group assignments, ordered by key. The caller supplies current, authorized
+	// groups; this discovery query grants no action and loads no role definitions.
+	ForPrincipal(ctx context.Context, user string, groups []string) ([]string, error)
 	// RoleProjects reads one page of distinct projects with direct user/group
 	// assignments naming q.RoleName. Order is display name then key, bytewise,
 	// reversed when Descending. More reports an additional matching project.

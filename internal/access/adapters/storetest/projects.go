@@ -12,6 +12,7 @@ import (
 
 // runProjects covers projects (decision 0013).
 func runProjects(t *testing.T, newStore Factory) {
+	t.Run("PrincipalProjects", func(t *testing.T) { RunPrincipalProjects(t, newStore(t)) })
 	t.Run("ProjectRolePages", func(t *testing.T) { RunProjectRolePages(t, newStore) })
 	t.Run("Projects", func(t *testing.T) { testProjects(t, newStore(t)) })
 	t.Run("Roles", func(t *testing.T) { testRoles(t, newStore(t)) })
@@ -386,4 +387,42 @@ func testAssignments(t *testing.T, s port.Store) {
 	storekit.WantErr(t, ps.DeleteAssignment(ctx, "repo-d"), kernel.ErrNotFound)
 	_, err = ps.Assignment(ctx, "repo-d")
 	storekit.WantErr(t, err, kernel.ErrNotFound)
+}
+
+// RunPrincipalProjects checks current, targeted user/group project discovery.
+func RunPrincipalProjects(t *testing.T, s port.Store) {
+	ctx := t.Context()
+	createProjects(t, s, "alpha", "bravo", "charlie")
+	storekit.Must(t, s.Users().Create(ctx, model.User{Name: "alice"}))
+	storekit.Must(t, s.Users().Create(ctx, model.User{Name: "other"}))
+	storekit.Must(t, s.Groups().Create(ctx, model.Group{Name: "developers"}))
+	storekit.Must(t, s.Groups().Create(ctx, model.Group{Name: "quoted'group"}))
+	for _, member := range []model.ProjectMember{
+		{ProjectKey: "bravo", Type: model.PrincipalUser, Name: "alice", Roles: []string{"reader"}},
+		{ProjectKey: "bravo", Type: model.PrincipalGroup, Name: "developers", Roles: []string{"reader"}},
+		{ProjectKey: "alpha", Type: model.PrincipalGroup, Name: "developers", Roles: []string{"writer"}},
+		{ProjectKey: "charlie", Type: model.PrincipalUser, Name: "other", Roles: []string{"reader"}},
+		{ProjectKey: "charlie", Type: model.PrincipalGroup, Name: "quoted'group", Roles: []string{"reader"}},
+	} {
+		storekit.Must(t, s.Projects().PutMember(ctx, member))
+	}
+	for _, test := range []struct {
+		name, user   string
+		groups, want []string
+	}{
+		{name: "direct", user: "alice", want: []string{"bravo"}},
+		{name: "union deduplicates", user: "alice", groups: []string{"developers", "developers"}, want: []string{"alpha", "bravo"}},
+		{name: "group only", groups: []string{"developers"}, want: []string{"alpha", "bravo"}},
+		{name: "quoted group", groups: []string{"quoted'group"}, want: []string{"charlie"}},
+		{name: "unmatched", user: "absent", groups: []string{"absent"}},
+		{name: "empty"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			storekit.Same(t, "projects", test.want, storekit.Get[[]string](t)(s.Projects().ForPrincipal(ctx, test.user, test.groups)))
+		})
+	}
+	storekit.Must(t, s.Projects().DeleteMember(ctx, "bravo", model.PrincipalUser, "alice"))
+	storekit.Same(t, "current assignments", []string(nil), storekit.Get[[]string](t)(s.Projects().ForPrincipal(ctx, "alice", nil)))
+	storekit.Must(t, s.Projects().Delete(ctx, "alpha"))
+	storekit.Same(t, "deleted project", []string{"bravo"}, storekit.Get[[]string](t)(s.Projects().ForPrincipal(ctx, "alice", []string{"developers"})))
 }
