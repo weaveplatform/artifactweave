@@ -3,8 +3,9 @@
 Researched 2026-11-19 at base `abfb4c62bbd3c6c2ccb4bdd592789227a1bfa76f`.
 Scope: the complete [#668](https://github.com/weaveplatform/artifactweave/issues/668)
 contract, following closed #631. This is a source audit and implementation/qualification
-plan, not a native test result or an Artifactory observation. No client, Git/SSH/cloud
-getter, build or vendor trial was run. ADR0040 remains Proposed.
+plan, not an Artifactory observation. No client, Git/SSH/cloud getter, build or vendor
+trial was run during the initial audit. Later controlled native results are recorded
+below; no Git/SSH/cloud getter or vendor trial was executed. ADR0040 remains Proposed.
 
 Evidence labels: **[D]** first-party documentation; **[S]** version-pinned first-party
 source; **[L]** inspected repository implementation/evidence; **[I]** proposed local
@@ -172,8 +173,8 @@ The explicit maps cited above give this finite matrix:
 | zst / tar.zst / tzst | Absent | Absent | The [dependency's default map](https://github.com/hashicorp/go-getter/blob/v1.8.6/decompress.go) includes these, but neither pinned native map does. Do not advertise new native Zstandard support from library capability. Any server-side transcoding must have its own bounded validator and two-client proof. |
 | `archive=false`, unknown hint, loose file/directory listing | Not an extraction promise | Not an extraction promise | Refuse as unqualified module packages; do not reinterpret a failed archive as vanity. |
 
-The plain-TAR finding was reproduced locally after this audit, as recorded below. Native evidence
-must establish the actual before/after result. Existing complete ZIP CRC, compression
+The plain-TAR finding was reproduced and corrected locally after this audit, with
+native before/after evidence recorded below. Existing complete ZIP CRC, compression
 trailer/XZ-footer, entry/expanded-size and link-graph limits remain mandatory for every
 new source. If derived bytes are necessary, original checksum/cache identity stays
 separate from delivered checksum, length, ETag, range, archive hint and signed identity.
@@ -323,3 +324,19 @@ checks original source bytes, module content/permissions, derived checksum, HEAD
 ETag, ranges and signed-format tampering. The full Terraform HTTP race/shuffle
 suite and configured package lint pass. Source/probe packets are retained under
 `cover/terraform-getters`; these local results do not complete the full A–H matrix.
+
+## Local GitHub shorthand grammar progress (2026-11-19)
+
+The parser now treats additional path segments in a qualified `github.com/owner/repo`
+shorthand as a subdirectory and appends an explicit `//` selector, preserving the
+selected ref and existing snapshot cache identity. An optional `.git` suffix retains
+the same repository identity. Path validation precedes URL resolution, so cleaning
+cannot hide traversal or encoded separators. Destination policy still runs on the
+resulting archive URL, and an explicit non-Git force prefix cannot silently become
+a GitHub snapshot. Absolute forced-Git URLs retain their existing grammar.
+
+Named unit cases cover these forms, branch/tag slash refs, full commits, the existing
+snapshot-specific positive-depth behavior, malformed selectors/encoding, duplicate
+controls and configured/external destination policy. These are parser results only;
+new native cold/warm-client acceptance remains required before calling this seam
+qualified. No Git process, credential helper, submodule or LFS retrieval was enabled.

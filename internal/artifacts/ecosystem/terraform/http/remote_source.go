@@ -142,7 +142,11 @@ func parseModuleSource(raw, base string, c repo.Config) (moduleSource, error) {
 	if force != "" && force != "git" && force != "http" && force != "https" {
 		return out, apierror.New(502, "upstream Terraform module source transport is not qualified")
 	}
-	if strings.HasPrefix(raw, "github.com/") {
+	shorthand := strings.HasPrefix(raw, "github.com/")
+	if shorthand {
+		if force != "" && force != "git" {
+			return out, remoteModuleError()
+		}
 		raw = "https://" + raw
 		force = "git"
 	}
@@ -161,6 +165,13 @@ func parseModuleSource(raw, base string, c repo.Config) (moduleSource, error) {
 		raw = raw[:i] + raw[end:]
 		if !validModuleSubdir(out.Subdir) {
 			return out, remoteModuleError()
+		}
+	}
+	if shorthand {
+		var err error
+		raw, out.Subdir, err = expandGitHubModuleShorthand(raw, out.Subdir)
+		if err != nil {
+			return out, err
 		}
 	}
 	target, err := moduleURL(base, raw)
@@ -210,6 +221,33 @@ func parseModuleSource(raw, base string, c repo.Config) (moduleSource, error) {
 		return out, remoteModuleError()
 	}
 	return out, nil
+}
+
+// Terraform treats path segments after a shorthand's owner/repository as a
+// subdirectory, followed by any explicit // selector. Validate before resolving
+// the URL so path cleaning cannot hide a traversal or an encoded separator.
+func expandGitHubModuleShorthand(raw, subdir string) (string, string, error) {
+	u, err := url.Parse(raw)
+	if err != nil || strings.Contains(u.EscapedPath(), "%") {
+		return "", "", remoteModuleError()
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" ||
+		parts[0] == "." || parts[0] == ".." || parts[1] == "." || parts[1] == ".." {
+		return "", "", remoteModuleError()
+	}
+	if len(parts) > 2 {
+		implied := strings.Join(parts[2:], "/")
+		if !validModuleSubdir(implied) {
+			return "", "", remoteModuleError()
+		}
+		if subdir != "" {
+			implied += "/" + subdir
+		}
+		subdir = implied
+	}
+	u.Path = "/" + parts[0] + "/" + parts[1]
+	return u.String(), subdir, nil
 }
 
 func githubModuleSource(
