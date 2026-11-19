@@ -172,6 +172,8 @@
       "remote_matrix_test.go",
       "remote_member_test.go",
       "translation_test.go",
+      "virtual_listing_errors_test.go",
+      "virtual_listing_fence_test.go",
       "virtual_listing_test.go",
       "virtual_read_test.go",
       "virtual_selection_test.go"
@@ -272,6 +274,7 @@
       "virtual_config_test.go",
       "virtual_members_test.go",
       "virtual_order_test.go",
+      "virtual_listing_fault_test.go",
       "virtual_remote_test.go",
       "virtual_status_test.go",
       "virtual_storage_test.go",

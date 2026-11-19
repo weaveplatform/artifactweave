@@ -196,8 +196,12 @@
 //     repository on the route (virtualRepoAccepts) filter them, and a
 //     Maven group virtual repository hides Maven index paths. A name
 //     several members hold shows once, a folder where any member's is one
-//     [I], and an upstream that fails to list leaves only that member's
-//     children out [I]. Where no member the caller may read holds the
+//     [I], and an upstream acquisition failure leaves only that member's
+//     live children out [I]. Trusted source/authority failures abort
+//     composition instead, and every final disclosure check must succeed
+//     before cached children or other members are shown (#1723). Source
+//     failures keep SourceError's response; stored-child and walk errors
+//     keep InternalError. Where no member the caller may read holds the
 //     folder and no upstream lists it, the request keeps ItemNotFound, and
 //     httpkit.Denied when every member that could hold it refused the
 //     caller.
@@ -327,6 +331,8 @@
 // file, a checksum and an archive (upstreamMiss, fileStep, archiveStep,
 // remoteArchive); virtual_listing_test.go a virtual
 // repository's folder index, its merge, filters, misses and store faults;
+// virtual_listing_fence_test.go separates acquisition fallback from initial
+// and final current-authority failures;
 // virtual_read_test.go the read gate through a virtual repository, its
 // refusals and Packages;
 // redirect_test.go the signing-failure
