@@ -745,6 +745,7 @@ column projects.admin_privileges text
 column projects.incarnation text COLLATE "C" NOT NULL DEFAULT ''::text
 column projects.policy_revision text COLLATE "C" NOT NULL DEFAULT ''::text
 constraint projects.projects_pkey PRIMARY KEY (key)
+index projects.projects_by_name CREATE INDEX projects_by_name ON projects USING btree (display_name COLLATE "C", key)
 index projects.projects_pkey CREATE UNIQUE INDEX projects_pkey ON projects USING btree (key)
 table release_bundles
 column release_bundles.name text COLLATE "C" NOT NULL

@@ -56,7 +56,9 @@
 //     Basic credentials naming the anonymous user while anonymous access
 //     is off.
 //   - Every principal it lets through is authorised once, and handlers ask
-//     that decider (decision 0006).
+//     that decider (decision 0006). Project administration additionally
+//     rechecks credentials and authority under the project guard before
+//     publishing its response or mutation.
 //   - A key pair delete clears the repositories' references to the pair and
 //     deletes it in one store transaction: a failure at any step leaves
 //     both as they were.
@@ -90,6 +92,9 @@
 // request 905). P9d split them into partial strict servers (WEB-07) and
 // moved them here (WEB-09) and narrowed Deps.Store to the adapter's own
 // Store (ACC-14).
+// P11 PRJ-01 adds project lifecycle, environments, roles, direct memberships
+// and global-role project discovery with current transactional management
+// authority. Effective content grants and role-token policy remain PRJ-02.
 //
 // # Testing
 //

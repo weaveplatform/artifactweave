@@ -61,6 +61,7 @@ index permission_grants_principal permission_grants CREATE INDEX permission_gran
 index permission_targets_target permission_targets CREATE INDEX permission_targets_target ON permission_targets(target)
 index project_repositories_project project_repositories CREATE INDEX project_repositories_project ON project_repositories(project_key,repo_key)
 index project_repository_shares_project project_repository_shares CREATE INDEX project_repository_shares_project ON project_repository_shares(project_key,repo_key)
+index projects_by_name projects CREATE INDEX projects_by_name ON projects(display_name,key)
 index release_bundles_project release_bundles CREATE INDEX release_bundles_project ON release_bundles(project_key,name,version)
 index replications_repo replications CREATE INDEX replications_repo ON replications(repo_key,replication_key)
 index repositories_class repositories CREATE INDEX repositories_class ON repositories(rclass,key)

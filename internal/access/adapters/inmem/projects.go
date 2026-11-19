@@ -18,6 +18,10 @@ func (s *Store) Projects() port.ProjectStore { return projectStore{s} }
 
 type projectStore struct{ s *Store }
 
+func (p projectStore) Guard(ctx context.Context) error {
+	return p.s.Do(ctx, func() error { return nil })
+}
+
 type (
 	roleKey   struct{ project, name string }
 	memberKey struct {

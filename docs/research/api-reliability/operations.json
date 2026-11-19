@@ -464,7 +464,7 @@
     "state": "stub: 501",
     "contract": "Removes the repository from the project that owns it. Sharing with other projects is kept. The repository's projectKey is cleared synchronously. Requires a platform admin.",
     "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
+    "review_family": "project-administration",
     "effects": "no operation effect; middleware still authenticates/admit-limits",
     "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoName",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
@@ -481,7 +481,7 @@
     "state": "stub: 501",
     "contract": "Removes the share-with-all setting. Shares with individual projects remain. Requires a platform admin.",
     "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
+    "review_family": "project-administration",
     "effects": "no operation effect; middleware still authenticates/admit-limits",
     "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoName",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
@@ -498,7 +498,7 @@
     "state": "stub: 501",
     "contract": "Removes the share with the target project. Requires a platform admin.",
     "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
+    "review_family": "project-administration",
     "effects": "no operation effect; middleware still authenticates/admit-limits",
     "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoName, path:targetProjectKey",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
@@ -512,85 +512,140 @@
     "route": "DELETE /access/api/v1/projects/{projectKey}",
     "spec": "access.openapi.yaml",
     "operation_id": "deleteProject",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Deletes the project, its custom roles and memberships. The project's repositories are not deleted: they are unassigned and keep their keys. Deleting a project that still owns repositories is allowed. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey",
+    "handler": "internal/access/adapters/http/projects.go: AccessService.DeleteProject",
+    "direct_calls": [
+      "s.projectAccess",
+      "s.projectError",
+      "svc.DeleteProject"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:projectKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "DELETE /access/api/v1/projects/{projectKey}/environments/{environmentName}",
     "spec": "access.openapi.yaml",
     "operation_id": "deleteProjectEnvironment",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Removes a project environment that no repository in the project still uses. Requires a platform admin or an admin of the project. Answers 204 with no body.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey, path:environmentName",
+    "handler": "internal/access/adapters/http/projects.go: AccessService.DeleteProjectEnvironment",
+    "direct_calls": [
+      "s.projectAccess",
+      "s.projectError",
+      "svc.DeleteEnvironment"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:projectKey, path:environmentName: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "DELETE /access/api/v1/projects/{projectKey}/groups/{group}",
     "spec": "access.openapi.yaml",
     "operation_id": "deleteProjectGroup",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Removes the group's roles in the project. Requires a platform admin, or a project admin of this project with the manage_members privilege.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey, path:group",
+    "handler": "internal/access/adapters/http/project_members.go: AccessService.DeleteProjectGroup",
+    "direct_calls": [
+      "s.projectAccess",
+      "s.projectError",
+      "svc.DeleteMember"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:projectKey, path:group: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "DELETE /access/api/v1/projects/{projectKey}/roles/{role}",
     "spec": "access.openapi.yaml",
     "operation_id": "deleteProjectRole",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Deletes a CUSTOM role and removes it from every member that held it. Predefined roles cannot be deleted (400). Requires a platform admin, or a project admin of this project with the manage_members privilege.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey, path:role",
+    "handler": "internal/access/adapters/http/project_roles.go: AccessService.DeleteProjectRole",
+    "direct_calls": [
+      "s.projectAccess",
+      "s.projectError",
+      "svc.DeleteRole"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:projectKey, path:role: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "DELETE /access/api/v1/projects/{projectKey}/users/{user}",
     "spec": "access.openapi.yaml",
     "operation_id": "deleteProjectUser",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Removes the user's direct roles in the project. Roles held through groups remain. Requires a platform admin, or a project admin of this project with the manage_members privilege.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey, path:user",
+    "handler": "internal/access/adapters/http/project_members.go: AccessService.DeleteProjectUser",
+    "direct_calls": [
+      "s.projectAccess",
+      "s.projectError",
+      "svc.DeleteMember"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:projectKey, path:user: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -2929,20 +2984,34 @@
     "route": "GET /access/api/v1/projects",
     "spec": "access.openapi.yaml",
     "operation_id": "getProjectsList",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns every project for a platform admin, and only the projects they administer for a project admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/access/adapters/http/projects.go: AccessService.GetProjectsList",
+    "direct_calls": [
+      "caller.decider.IsAdmin",
+      "caller.projectAllowed",
+      "fmt.Errorf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.Projects"
+    ],
+    "review_family": "project-administration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: administrator-defined projects, filtered against current project administration under one guarded metadata snapshot; project-administration: complete configuration/member lists collected under one project/authority transaction; lifecycle writes coordinate project administration and repository ownership atomically",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -2952,7 +3021,7 @@
     "state": "stub: 501",
     "contract": "Reports which project owns the repository and which projects it is shared with. Requires a platform admin.",
     "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
+    "review_family": "project-administration",
     "effects": "no operation effect; middleware still authenticates/admit-limits",
     "retry": "501 is not transient; do not retry until support changes; intended safe",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
@@ -2970,158 +3039,258 @@
     "route": "GET /access/api/v1/projects/{projectKey}",
     "spec": "access.openapi.yaml",
     "operation_id": "getProject",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns one project. Requires a platform admin or an admin of the project.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/access/adapters/http/projects.go: AccessService.GetProject",
+    "direct_calls": [
+      "accessgen.GetProject200JSONResponse",
+      "fmt.Errorf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.Project"
+    ],
+    "review_family": "project-administration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /access/api/v1/projects/{projectKey}/environments",
     "spec": "access.openapi.yaml",
     "operation_id": "getProjectEnvironments",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns the environments defined inside one project, which project roles and project repositories may reference in addition to the global ones. Requires a platform admin or an admin of the project.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/access/adapters/http/projects.go: AccessService.GetProjectEnvironments",
+    "direct_calls": [
+      "fmt.Errorf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.Environments"
+    ],
+    "review_family": "project-administration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: one project's configured environments, bounded by its environment limit and read whole; project-administration: complete configuration/member lists collected under one project/authority transaction; lifecycle writes coordinate project administration and repository ownership atomically",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /access/api/v1/projects/{projectKey}/groups",
     "spec": "access.openapi.yaml",
     "operation_id": "getProjectGroups",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns the groups holding a role in the project, with their roles. Requires a platform admin, or a project admin of this project with the manage_members privilege. A token scoped project:\u003ckey\u003e/members/groups:r is also accepted.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/access/adapters/http/project_members.go: AccessService.GetProjectGroups",
+    "direct_calls": [
+      "fmt.Errorf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.Members"
+    ],
+    "review_family": "project-administration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.members[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: one project's direct group-role assignments, read with current management authority in one guarded metadata snapshot; project-administration: complete configuration/member lists collected under one project/authority transaction; lifecycle writes coordinate project administration and repository ownership atomically",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /access/api/v1/projects/{projectKey}/groups/{group}",
     "spec": "access.openapi.yaml",
     "operation_id": "getProjectGroup",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns one group's roles in the project. Requires a platform admin, or a project admin of this project with the manage_members privilege.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/access/adapters/http/project_members.go: AccessService.GetProjectGroup",
+    "direct_calls": [
+      "accessgen.GetProjectGroup200JSONResponse",
+      "fmt.Errorf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.Member"
+    ],
+    "review_family": "project-administration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.roles[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /access/api/v1/projects/{projectKey}/roles",
     "spec": "access.openapi.yaml",
     "operation_id": "getProjectRoles",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns every role usable in the project: the predefined roles, the project's custom roles and global custom roles. Requires a platform admin or an admin of the project. A token scoped project:\u003ckey\u003e/roles:r is also accepted.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/access/adapters/http/project_roles.go: AccessService.GetProjectRoles",
+    "direct_calls": [
+      "fmt.Errorf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.Roles"
+    ],
+    "review_family": "project-administration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: one project's configured roles and current global definitions, combined and checked for ambiguous names before publication; project-administration: complete configuration/member lists collected under one project/authority transaction; lifecycle writes coordinate project administration and repository ownership atomically",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /access/api/v1/projects/{projectKey}/roles/{role}",
     "spec": "access.openapi.yaml",
     "operation_id": "getProjectRole",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns one role usable in the project. Requires a platform admin or an admin of the project.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/access/adapters/http/project_roles.go: AccessService.GetProjectRole",
+    "direct_calls": [
+      "accessgen.GetProjectRole200JSONResponse",
+      "fmt.Errorf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.Role"
+    ],
+    "review_family": "project-administration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.actions[]",
       "200 application/json.environments[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /access/api/v1/projects/{projectKey}/users",
     "spec": "access.openapi.yaml",
     "operation_id": "getProjectUsers",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns the users holding a direct role in the project, with their roles. Requires a platform admin, or a project admin of this project with the manage_members privilege. A token scoped project:\u003ckey\u003e/members/users:r is also accepted.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/access/adapters/http/project_members.go: AccessService.GetProjectUsers",
+    "direct_calls": [
+      "fmt.Errorf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.Members"
+    ],
+    "review_family": "project-administration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.members[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: one project's direct user-role assignments, read with current management authority in one guarded metadata snapshot; project-administration: complete configuration/member lists collected under one project/authority transaction; lifecycle writes coordinate project administration and repository ownership atomically",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /access/api/v1/projects/{projectKey}/users/{user}",
     "spec": "access.openapi.yaml",
     "operation_id": "getProjectUser",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns one user's roles in the project. Requires a platform admin, or a project admin of this project with the manage_members privilege.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/access/adapters/http/project_members.go: AccessService.GetProjectUser",
+    "direct_calls": [
+      "accessgen.GetProjectUser200JSONResponse",
+      "fmt.Errorf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.Member"
+    ],
+    "review_family": "project-administration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.roles[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -3785,12 +3954,21 @@
     "route": "GET /access/api/v2/projects",
     "spec": "access.openapi.yaml",
     "operation_id": "getProjectsForRole",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns, one cursor page at a time, the projects in which the named global role is assigned to a member. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/access/adapters/http/project_roles.go: AccessService.GetProjectsForRole",
+    "direct_calls": [
+      "fmt.Errorf",
+      "httpkit.BadRequestf",
+      "httpkit.Deref",
+      "httpkit.PtrTo",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.ProjectsForRole"
+    ],
+    "review_family": "project-role-pages",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "declared_page_controls": [
       "query cursor: Optional query parameter. The cursor from the previous page. Omitted starts at the first page.",
@@ -3799,10 +3977,14 @@
     "response_collections": [
       "200 application/json.projects[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared cursor",
+    "pagination_execution": "cursor (position cursor, size limit, next body:/cursor); project-role-pages: default1000, positive limit; exact direct role membership through correlated EXISTS, distinct projects in indexed bytewise display-name/key order in either direction; tuple seek and SQL LIMIT+1; opaque cursor binds role, direction and last name/key",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/core/project/role_projects.go",
+      "internal/access/adapters/sql/project_role_page.go",
+      "test/server/access/projects_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -14526,72 +14708,129 @@
     "route": "POST /access/api/v1/projects",
     "spec": "access.openapi.yaml",
     "operation_id": "createProject",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Creates a project with no members, the predefined roles and no repositories. The key is immutable afterwards. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on body:/project_key",
+    "handler": "internal/access/adapters/http/projects.go: AccessService.CreateProject",
+    "direct_calls": [
+      "accessgen.CreateProject201JSONResponse",
+      "fmt.Errorf",
+      "httpkit.BadRequestf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.CreateProject"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on body:/project_key: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /access/api/v1/projects/{projectKey}/environments",
     "spec": "access.openapi.yaml",
     "operation_id": "createProjectEnvironment",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Creates an environment scoped to the project and returns it with status 201. A project may hold at most ten environments by default. The name must not collide with a global environment. Requires a platform admin or an admin of the project.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey, body:/name",
+    "handler": "internal/access/adapters/http/projects.go: AccessService.CreateProjectEnvironment",
+    "direct_calls": [
+      "fmt.Errorf",
+      "httpkit.BadRequestf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.CreateEnvironment"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on path:projectKey, body:/name: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /access/api/v1/projects/{projectKey}/environments/{environmentName}/rename",
     "spec": "access.openapi.yaml",
     "operation_id": "renameProjectEnvironment",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Renames a project environment and updates the project's repositories and roles that reference it. Requires a platform admin or an admin of the project.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey, path:environmentName, body:/new_name",
+    "handler": "internal/access/adapters/http/projects.go: AccessService.RenameProjectEnvironment",
+    "direct_calls": [
+      "fmt.Errorf",
+      "httpkit.BadRequestf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.RenameEnvironment"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on path:projectKey, path:environmentName, body:/new_name: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /access/api/v1/projects/{projectKey}/roles",
     "spec": "access.openapi.yaml",
     "operation_id": "createProjectRole",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Defines a CUSTOM role in the project. Unknown actions and unknown environments are rejected with 400; a name already used in the project is rejected with 400. Requires a platform admin, or a project admin of this project with the manage_members privilege.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey, body:/name",
+    "handler": "internal/access/adapters/http/project_roles.go: AccessService.CreateProjectRole",
+    "direct_calls": [
+      "accessgen.CreateProjectRole201JSONResponse",
+      "fmt.Errorf",
+      "httpkit.BadRequestf",
+      "httpkit.Deref",
+      "model.RoleType",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.CreateRole",
+      "svc.Role"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on path:projectKey, body:/name: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "response_collections": [
       "201 application/json.actions[]",
       "201 application/json.environments[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -20379,7 +20618,7 @@
     "state": "stub: 501",
     "contract": "Makes targetProjectKey the owner of the repository, moving it from its current project when force is true. The assignment is visible synchronously: when the call returns, the repository's configuration (GET /artifactory/api/repositories/{key}) already carries projectKey. The repository key is not renamed. Requires a platform admin.",
     "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
+    "review_family": "project-administration",
     "effects": "no operation effect; middleware still authenticates/admit-limits",
     "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoName, path:targetProjectKey",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
@@ -20396,7 +20635,7 @@
     "state": "stub: 501",
     "contract": "Lets members of every project use the local or remote repository according to their roles in their own project. The owning project is unchanged. Requires a platform admin.",
     "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
+    "review_family": "project-administration",
     "effects": "no operation effect; middleware still authenticates/admit-limits",
     "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoName",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
@@ -20413,7 +20652,7 @@
     "state": "stub: 501",
     "contract": "Lets members of the target project use the local or remote repository according to their roles there, read-only when readOnly is true. Requires a platform admin.",
     "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
+    "review_family": "project-administration",
     "effects": "no operation effect; middleware still authenticates/admit-limits",
     "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoName, path:targetProjectKey",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
@@ -20427,78 +20666,140 @@
     "route": "PUT /access/api/v1/projects/{projectKey}",
     "spec": "access.openapi.yaml",
     "operation_id": "updateProject",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Changes the project's display name, description, quota and admin privileges. The key cannot change. Lowering the quota below current usage is accepted and blocks further deployments until usage drops (unless soft_limit is true). Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey",
+    "handler": "internal/access/adapters/http/projects.go: AccessService.UpdateProject",
+    "direct_calls": [
+      "accessgen.UpdateProject200JSONResponse",
+      "fmt.Errorf",
+      "httpkit.BadRequestf",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.Project",
+      "svc.UpdateProject"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:projectKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "PUT /access/api/v1/projects/{projectKey}/groups/{group}",
     "spec": "access.openapi.yaml",
     "operation_id": "updateProjectGroup",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Adds the group to the project with the given roles, or replaces the roles of a member group. The group must exist; every role must exist in the project. Requires a platform admin, or a project admin of this project with the manage_members privilege.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey, path:group",
+    "handler": "internal/access/adapters/http/project_members.go: AccessService.UpdateProjectGroup",
+    "direct_calls": [
+      "accessgen.UpdateProjectGroup200JSONResponse",
+      "fmt.Errorf",
+      "httpkit.BadRequestf",
+      "httpkit.Deref",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.PutMember"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:projectKey, path:group: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "response_collections": [
       "200 application/json.roles[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "PUT /access/api/v1/projects/{projectKey}/roles/{role}",
     "spec": "access.openapi.yaml",
     "operation_id": "updateProjectRole",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Replaces the role's description, environments and actions. Only CUSTOM roles can be changed; members holding the role get the new actions at once. Requires a platform admin, or a project admin of this project with the manage_members privilege.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey, path:role",
+    "handler": "internal/access/adapters/http/project_roles.go: AccessService.UpdateProjectRole",
+    "direct_calls": [
+      "accessgen.UpdateProjectRole200JSONResponse",
+      "fmt.Errorf",
+      "httpkit.BadRequestf",
+      "httpkit.Deref",
+      "model.RoleType",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.Role",
+      "svc.UpdateRole"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:projectKey, path:role: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "response_collections": [
       "200 application/json.actions[]",
       "200 application/json.environments[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "PUT /access/api/v1/projects/{projectKey}/users/{user}",
     "spec": "access.openapi.yaml",
     "operation_id": "addOrUpdateProjectUser",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Adds the user to the project with the given roles, or replaces the roles of an existing member. The user must exist; every role must exist in the project. Requires a platform admin, or a project admin of this project with the manage_members privilege.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
-    "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:projectKey, path:user",
+    "handler": "internal/access/adapters/http/project_members.go: AccessService.AddOrUpdateProjectUser",
+    "direct_calls": [
+      "accessgen.AddOrUpdateProjectUser200JSONResponse",
+      "fmt.Errorf",
+      "httpkit.BadRequestf",
+      "httpkit.Deref",
+      "s.projectAccess",
+      "s.projectError",
+      "svc.PutMember"
+    ],
+    "review_family": "project-administration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:projectKey, path:user: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "response_collections": [
       "200 application/json.roles[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/projects.go",
+      "internal/access/adapters/http/project_roles.go",
+      "internal/access/adapters/http/project_members.go",
+      "internal/access/core/project/lifecycle.go",
+      "internal/access/adapters/sql/project_lifecycle_test.go",
+      "test/server/access/projects_status_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

@@ -282,8 +282,8 @@ requirements, not a claim that public vendor docs settle every mixed-scope edge.
 
 During this audit the prerequisite work added a separate project-action
 vocabulary and private `project.Service` role/membership operations, followed by
-separate current-assignment and named-definition lookups. These have no activated
-project HTTP/authz workflow yet. The WIP preserves omitted/empty action and
+separate current-assignment and named-definition lookups. At that prerequisite
+snapshot they activated no project HTTP/authz workflow. The foundation preserves omitted/empty action and
 environment sets, adds no inferred 30-role REST limit, and refuses ambiguous
 global/project names instead of selecting a shadow winner. Those are explicit
 local development choices while the gaps below remain open; they are not a
@@ -297,10 +297,22 @@ The lookups ignore currently deleted identities and resolve definitions at use
 time. Identity deletion also clears direct project assignments inside the same
 transaction, guarded before identity rows; same-name recreation, real-backend
 rollback and concurrent assignment tests exercise that local lifecycle invariant.
-It is not a documented vendor cascade. Token authorization and HTTP integration
-remain required before enabling the full workflow.
+It is not a documented vendor cascade. Effective content and role-token
+authorization remain required before enabling the full workflow.
 ([Identity lifecycle audit](identity-deletion-project-grants-audit.md),
 [cleanup](../../internal/access/core/project/principals.go)). **[S/I]**
+
+P11 PRJ-01 now binds the documented administration routes through explicit
+[HTTP conversions](../../internal/access/adapters/http/project_wire.go) and
+[current transactional management checks](../../internal/access/adapters/http/project_access.go).
+The Project Admin storage type `ADMIN` projects to the authored project schema's
+`PREDEFINED`; its protected internal identity does not change. Lifecycle and
+environment-reference changes share the access/artifacts transaction, with
+[real SQL rollback tests](../../internal/access/adapters/sql/project_lifecycle_test.go).
+[Production-router cases](../../test/server/access/projects_status_test.go) cover
+own/foreign/group admins, ordinary members and revoked Manage Members delegation.
+These are local implementation facts. They do not settle the vendor inferences
+below, activate effective content grants (PRJ-02), or complete #487. **[S/I]**
 
 The bounded sources above do not settle role-name case/normalization,
 cross-category collision precedence/reservation, REST role-name length,

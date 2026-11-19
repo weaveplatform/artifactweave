@@ -101,6 +101,7 @@ func statusTable() []statusCase {
 		mirrorStatusRows(),
 		multipartStatusRows(),
 		roleStatusRows(),
+		projectStatusRows(),
 		keypairStatusRows(),
 		securityStatusRows(),
 		tokenStatusRows(),

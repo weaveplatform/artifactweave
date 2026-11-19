@@ -1,6 +1,4 @@
-// Package project implements the P11 project role and membership domain service.
-// Project lifecycle, quotas, environments and repository attachment remain work
-// for the complete project administration workflow.
+// Package project manages project lifecycle, environments, roles and membership.
 //
 // # Role
 //
@@ -8,9 +6,11 @@
 //
 // # Inputs
 //
-// Service takes the access port.Store and caller contexts. Its caller supplies
-// the project key and checks administration privileges before mutation. It has
-// no HTTP dependency and does not turn a management scope into artifact access.
+// Service takes the access port.Store and caller contexts, with
+// artifacts/api.Repositories for lifecycle and environment-reference changes.
+// Its caller supplies the project key and checks current administration
+// privileges in the same transaction before publication. It has no HTTP
+// dependency and does not turn a management scope into artifact access.
 //
 // # Outputs
 //
@@ -21,9 +21,11 @@
 // AssignedRoles and NamedRoles separately resolve current membership-based and
 // explicitly selected definitions. These lookups do not themselves grant access.
 //
-// No project HTTP routes or effective project-role authorization are activated
-// by these private services. The contract audit retains unresolved collision,
-// default-array and scope semantics before that integration can be complete.
+// Creation allocates project settings and its server-owned build-info repository
+// together. Deletion removes administration and unassigns repositories while
+// retaining their contents. Environment rename updates role, assignment and
+// repository references atomically; deletion refuses references still in use.
+// access/adapters/http binds administration with explicit wire conversions.
 // Every compound operation takes the project snapshot guard before its records,
 // and no transaction spans network I/O or streaming.
 //
@@ -46,10 +48,8 @@
 //
 // # Status
 //
-// P11 in progress, as prerequisites of issue 487. The full configuration,
-// sharing, current-role authorization and native acceptance matrix remains open.
-// Identity deletion now clears direct project assignments in its own
-// transaction, guarded before identity rows; real-backend fault and concurrent
-// assignment tests cover rollback and non-resurrection. Project HTTP views and
-// token mint/use policy still need composition before role authorization.
+// P11 PRJ-01 supplies administration over the delivered role and identity
+// foundations. PRJ-02 owns effective content grants and role-token mint/use
+// policy; repository attachment/sharing and quotas have separate P11 tickets.
+// The contract audit's unresolved vendor validation/scope edges remain qualified.
 package project

@@ -27,6 +27,9 @@
 //     binds them, for the tests of other modules that apply through them,
 //     with the artifacts record and store port those tests seed or wrap
 //     (Item, RepoFilter and RepoStore).
+//   - RunAccessArtifactsSQL and AccessArtifactsSQLStore: real SQLite and
+//     PostgreSQL composition for compound access/artifact transaction tests,
+//     with a fresh database or scratch schema for each factory call.
 //   - Format fixtures: npm publish bodies and tarballs, NuGet packages and
 //     PDBs, Helm charts, OCI images and manifests, Terraform repositories and
 //     the backend keyring, and the gzip-compressed tar archives of Conan and
@@ -41,5 +44,6 @@
 //
 // # Status
 //
-// Implemented P9b (issue 673).
+// Implemented P9b (issue 673). P11 adds the isolated access/artifact SQL factory
+// for compound project lifecycle and environment-reference tests.
 package support
