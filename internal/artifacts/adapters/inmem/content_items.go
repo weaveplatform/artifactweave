@@ -220,6 +220,7 @@ func (i items) Delete(
 			}
 		}
 		for _, it := range i.t().All(func(_ int64, it model.Item) bool { return match(it) }, nil) {
+			res.Removed = append(res.Removed, it)
 			if it.Folder {
 				res.Folders++
 			} else {
@@ -236,6 +237,7 @@ func (i items) Delete(
 	if err != nil {
 		return port.DeleteResult{}, err
 	}
+	slices.SortFunc(res.Removed, func(a, b model.Item) int { return strings.Compare(a.FullPath(), b.FullPath()) })
 	return res, nil
 }
 

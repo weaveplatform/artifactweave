@@ -130,6 +130,7 @@ func (s *Service) deleteSidecars(
 		if err != nil {
 			return res, fmt.Errorf("item: delete %s: %w", sc.FullPath(), err)
 		}
+		res.Removed = append(res.Removed, more.Removed...)
 		res.Files += more.Files
 		res.Folders += more.Folders
 		res.Bytes += more.Bytes
