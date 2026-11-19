@@ -353,7 +353,7 @@ func TestAccVirtualBrowseListsEveryMember(t *testing.T) {
 // upstream fails to list a folder leaves only its own live children out
 // of a virtual repository's index; the other members still list [I], as
 // 7.x's RemoteRepo.listRemoteResources answers a failure with no items
-// (RTFACT-6372). The remote's own index still answers the failure.
+// (RTFACT-6372). The direct remote now retains its cached children too (#1640).
 func TestAccVirtualBrowseUpstreamFailure(t *testing.T) {
 	w := virtualStorageWorld(t)
 	w.Upstream.Set("/dir/", fakeupstream.Resource{Status: http.StatusBadGateway})
@@ -366,8 +366,8 @@ func TestAccVirtualBrowseUpstreamFailure(t *testing.T) {
 		!slices.Equal(got, want) {
 		t.Errorf("vb/dir/ with its upstream failing: %d %v, want %v", rec.Code, got, want)
 	}
-	if rec := w.Request(http.MethodGet, "/artifactory/remote/dir/", "admin", ""); rec.Code <
-		http.StatusInternalServerError {
-		t.Errorf("remote/dir/ with its upstream failing: %d %s", rec.Code, rec.Body)
+	direct := w.Request(http.MethodGet, "/artifactory/remote/dir/", "admin", "")
+	if names := remoteFolderNames(direct); direct.Code != http.StatusOK || !slices.Equal(names, []string{"c.bin"}) {
+		t.Errorf("remote/dir/ with its upstream failing: %d %v, want cached c.bin", direct.Code, names)
 	}
 }

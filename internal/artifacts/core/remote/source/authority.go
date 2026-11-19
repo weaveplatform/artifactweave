@@ -117,3 +117,9 @@ func (a *Authority) CheckPermission(ctx context.Context, path string) error {
 func (a *Authority) CheckRead(ctx context.Context, path string) error {
 	return a.checks().CheckRead(ctx, path)
 }
+
+// CheckFolder checks a disclosed descendant folder with current folder Read,
+// download policy and source authority, within the originally admitted scope.
+func (a *Authority) CheckFolder(ctx context.Context, path string) error {
+	return a.checks().CheckFolder(ctx, path)
+}

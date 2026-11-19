@@ -34,7 +34,10 @@ type ListingBudget struct{ pages, entries int }
 // Call Revalidate immediately before disclosing the result, including HEAD.
 type FolderListing struct {
 	Entries []ListingEntry
-	checks  []func(context.Context) error
+	// HasChildren records valid canonical upstream children before caller Read
+	// and pattern filtering. It conveys presence, never permission to disclose.
+	HasChildren bool
+	checks      []func(context.Context) error
 }
 
 // Revalidate reruns, in order, the checks the listing gathered: each page's
@@ -82,6 +85,7 @@ func ListFolder(ctx context.Context, service *source.Service, q source.Request,
 			return FolderListing{}, listingError()
 		}
 		out.checks = append(out.checks, result.Revalidate)
+		out.HasChildren = out.HasChildren || len(page.entries) > 0
 		for _, entry := range page.entries {
 			if seen[entry] {
 				continue

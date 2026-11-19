@@ -889,12 +889,21 @@ func TestUnitAuthorityDoesNotReadBackendAndRechecksDescendants(t *testing.T) {
 	if err := authority.CheckRead(t.Context(), "outside/secret.tgz"); !errors.Is(err, source.ErrDenied) {
 		t.Fatal(err)
 	}
+	if err := authority.CheckFolder(t.Context(), "pkg/nested"); err != nil {
+		t.Fatal("authorized descendant folder", err)
+	}
+	if err := authority.CheckFolder(t.Context(), "outside"); !errors.Is(err, source.ErrDenied) {
+		t.Fatal("folder escaped authority scope", err)
+	}
 	if calls != 0 || checks < 2 {
 		t.Fatal(calls, checks)
 	}
 	generation = "changed"
 	if err := authority.Revalidate(t.Context()); !errors.Is(err, source.ErrSuperseded) {
 		t.Fatal(err)
+	}
+	if err := authority.CheckFolder(t.Context(), "pkg/nested"); !errors.Is(err, source.ErrSuperseded) {
+		t.Fatal("folder reused superseded authority", err)
 	}
 }
 

@@ -157,7 +157,7 @@ func TestAccListingPermissionFilteringAndFinalRevocation(t *testing.T) {
 	}
 	q.Repo.ExcludesPattern = ptr("public/**")
 	got, err = remote.ListFolder(t.Context(), s, q, "", &remote.ListingBudget{})
-	if err != nil || len(got.Entries) != 0 {
+	if err != nil || len(got.Entries) != 0 || !got.HasChildren {
 		t.Fatalf("pattern filtering %+v %v", got.Entries, err)
 	}
 }
@@ -169,6 +169,7 @@ func TestAccListingNoStoreFailuresAndSourceFence(t *testing.T) {
 		expected error
 	}{
 		{"empty-index", indexHTML(""), nil},
+		{"only-unsafe-links", indexHTML(`<a href="../escape">parent</a><a href="https://foreign.invalid/file">foreign</a>`), nil},
 		{"no-index", fakeupstream.Resource{Body: []byte("<html>Login required</html>"), Header: http.Header{"Content-Type": {"text/html"}}}, source.ErrUnsupported},
 		{"denied", fakeupstream.Resource{Status: 401}, &source.HTTPError{Status: 401}},
 		{"server-error", fakeupstream.Resource{Status: 500}, &source.HTTPError{Status: 502}},
@@ -180,7 +181,7 @@ func TestAccListingNoStoreFailuresAndSourceFence(t *testing.T) {
 			w.up.Set("/", tc.response)
 			got, err := remote.ListFolder(t.Context(), s, q, "", &remote.ListingBudget{})
 			if tc.expected == nil {
-				if err != nil || len(got.Entries) != 0 {
+				if err != nil || len(got.Entries) != 0 || got.HasChildren {
 					t.Fatal(err)
 				}
 			} else if err == nil {

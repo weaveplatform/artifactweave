@@ -2,14 +2,12 @@ package itemkit
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"html"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
-	"slices"
 	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
@@ -183,7 +181,7 @@ func (l *virtualListing) read(ctx context.Context, m repo.Config) (*memberChildr
 	cached := m.Class == repo.Remote
 	if !cached || m.StoreArtifactsLocally == nil || *m.StoreArtifactsLocally {
 		var err error
-		if mc.stored, mc.held, err = l.storedChildren(ctx, m.Key, cached); err != nil {
+		if mc.stored, mc.held, err = storedFolderChildren(ctx, l.st, m.Key, cached, l.folder); err != nil {
 			return nil, err
 		}
 	}
@@ -203,38 +201,6 @@ func (l *virtualListing) read(ctx context.Context, m repo.Config) (*memberChildr
 	return mc, nil
 }
 
-// storedChildren reads the children of the folder in the tree key and
-// cached name, and whether the tree holds the folder; a file there is no
-// folder to list (VirtualRepo.getChildrenNamesDeeply passes it over).
-func (l *virtualListing) storedChildren(
-	ctx context.Context,
-	key string,
-	cached bool,
-) ([]model.Item, bool, error) {
-	if l.folder != "" {
-		it, err := l.st.Items().Get(ctx, key, cached, l.folder)
-		if errors.Is(err, kernel.ErrNotFound) || err == nil && !it.Folder {
-			return nil, false, nil
-		}
-		if err != nil {
-			return nil, false, fmt.Errorf("folder in %s: %w", key, err)
-		}
-	}
-	var children []model.Item
-	page := kernel.Page{Limit: kernel.MaxLimit}
-	for {
-		batch, next, err := l.st.Items().Children(ctx, key, cached, l.folder, page)
-		if err != nil {
-			return nil, false, fmt.Errorf("children in %s: %w", key, err)
-		}
-		children = append(children, batch...)
-		if next == "" {
-			return children, true, nil
-		}
-		page.After = next
-	}
-}
-
 // merge is the index's entries and whether any member holds the folder.
 // Each upstream listing's authority is revalidated just before disclosure,
 // as remote.FolderListing asks. A failure aborts the whole response, including
@@ -252,13 +218,12 @@ func (l *virtualListing) merge(ctx context.Context) ([]indexEntry, bool, error) 
 	// A name several members hold is a folder when any holds a folder there
 	// [I]: 7.x keeps the first member's kind (RTFACT-25900 reports a file
 	// hiding a folder that way), which would hide the folder's children.
-	kinds := map[string]bool{}
+	entries := indexEntries{ownership: folderIndexKind}
 	add := func(rt listingRoute, p string, folder bool) {
 		if !browsable(rt.parent, p, folder) || !browsable(l.top, p, folder) {
 			return
 		}
-		name := path.Base(p)
-		kinds[name] = kinds[name] || folder
+		entries.add(p, folder)
 	}
 	for _, rt := range l.routes {
 		mc := l.members[rt.member.Key]
@@ -278,12 +243,7 @@ func (l *virtualListing) merge(ctx context.Context) ([]indexEntry, bool, error) 
 			}
 		}
 	}
-	entries := make([]indexEntry, 0, len(kinds))
-	for name, folder := range kinds {
-		entries = append(entries, indexEntry{name: name, folder: folder})
-	}
-	slices.SortFunc(entries, func(a, b indexEntry) int { return strings.Compare(a.name, b.name) })
-	return entries, held, nil
+	return entries.entries(), held, nil
 }
 
 // browsable is RepositoryBrowsingServiceImpl.virtualRepoAccepts: whether
