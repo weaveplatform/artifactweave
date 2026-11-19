@@ -29,13 +29,16 @@ type DeliveryFilter struct {
 type WebhookStore interface {
 	// Create stores w; kernel.ErrConflict when the key exists.
 	Create(ctx context.Context, w model.WebhookSubscription) error
-	// Get returns the subscription, secrets included.
+	// Get returns the subscription, secrets included. Inside a transaction it
+	// locks the subscription before reading secrets, so a read/merge/update
+	// cannot replace a concurrent rotation with an earlier secret value.
 	Get(ctx context.Context, key string) (model.WebhookSubscription, error)
 	// Update replaces the subscription.
 	Update(ctx context.Context, w model.WebhookSubscription) error
 	// Delete removes the subscription and its delivery records.
 	Delete(ctx context.Context, key string) error
-	// List returns matching subscriptions ordered by key.
+	// List returns matching subscriptions ordered by key. Inside a transaction
+	// it locks parents in that order before reading their secret rows.
 	List(ctx context.Context, f WebhookFilter) ([]model.WebhookSubscription, error)
 	// AddDelivery records a delivery attempt and returns it with its ID;
 	// kernel.ErrNotFound when the subscription does not exist.

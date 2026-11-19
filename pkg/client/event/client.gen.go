@@ -411,8 +411,11 @@ type WebhookHandlerRead struct {
 	// Proxy Optional within this object. The proxy key, when one is set.
 	Proxy *string `json:"proxy,omitempty"`
 
-	// Secret Optional within this object. Never the stored secret: absent when no secret is set, otherwise a fixed mask, so a client can tell that one exists.
+	// Secret Optional within this object. Always empty. The stored secret is never returned; use secret_configured to determine whether one is set (decision 0011).
 	Secret *string `json:"secret,omitempty"`
+
+	// SecretConfigured Optional within this object. Whether a non-empty secret is configured. The value itself is never returned.
+	SecretConfigured *bool `json:"secret_configured,omitempty"`
 
 	// Url Required within this object. The delivery URL.
 	Url string `json:"url"`

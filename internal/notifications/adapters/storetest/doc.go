@@ -17,9 +17,9 @@
 //
 // # Outputs
 //
-//   - Factory and Run.
+//   - Factory, Run and the reusable RunSecrets service contract.
 //   - The subtests, one per concern, each on a store of its own: Webhooks
-//     and WebhookDeliveries.
+//     and WebhookDeliveries, plus presence-aware secret updates and safe views.
 //
 // # Invariants
 //
@@ -48,6 +48,7 @@
 //
 // Implemented P2: the webhook cases, in the metadata store's contract (pull
 // request 3). Moved here in P9d, which added Factory and Run.
+// P11 WEB-01 adds the shared secret-merge and public-projection contract.
 //
 // # Testing
 //

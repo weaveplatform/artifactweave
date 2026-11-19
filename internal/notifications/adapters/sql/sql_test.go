@@ -14,5 +14,5 @@ func TestAccContract(t *testing.T) {
 	sqltest.RunModule(t, []dialect.Module{ntfsql.Module}, ntfsql.New,
 		func(t *testing.T, newStore func(*testing.T) *ntfsql.Store) {
 			ntfstoretest.Run(t, func(t *testing.T) port.Store { return newStore(t) })
-		})
+		}, sqltest.WithPostgres())
 }
