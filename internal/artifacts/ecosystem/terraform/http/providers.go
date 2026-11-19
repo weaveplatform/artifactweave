@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/archive"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/internal/platform/keymaterial"
 )
 
 type providerOp struct {
@@ -377,6 +378,9 @@ func (h handler) providerKeys(r *http.Request) ([]publicKey, error) {
 		}
 		if err != nil {
 			return nil, fmt.Errorf("terraform: key: %w", err)
+		}
+		if err := keymaterial.CheckPublic(keymaterial.GPG, k.PublicKey); err != nil {
+			return nil, apierror.New(409, "Repository GPG public key is invalid")
 		}
 		id, err := tf.KeyID(k.PublicKey)
 		if err != nil {

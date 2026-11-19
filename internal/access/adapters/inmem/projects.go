@@ -62,6 +62,7 @@ func (p projectStore) Create(ctx context.Context, v model.Project) error {
 			return memtx.Conflict("project", v.Key)
 		}
 		p.projects().Put(v.Key, v)
+		p.authorities().Put(v.Key, port.NewProjectAuthority())
 		return nil
 	})
 }
@@ -84,6 +85,7 @@ func (p projectStore) Update(ctx context.Context, v model.Project) error {
 			return memtx.NotFound("project", v.Key)
 		}
 		p.projects().Put(v.Key, v)
+		p.rotatePolicy(v.Key)
 		return nil
 	})
 }
@@ -93,14 +95,18 @@ func (p projectStore) Delete(ctx context.Context, key string) error {
 		if !p.projects().Del(key) {
 			return memtx.NotFound("project", key)
 		}
+		p.authorities().Del(key)
 		p.roles().DeleteWhere(func(k roleKey, _ model.Role) bool { return k.project == key })
 		p.environments().
 			DeleteWhere(func(_ string, e model.Environment) bool { return e.ProjectKey == key })
 		p.members().
 			DeleteWhere(func(k memberKey, _ model.ProjectMember) bool { return k.project == key })
-		p.assignments().
-			DeleteWhere(func(_ string, a model.RepositoryAssignment) bool { return a.ProjectKey == key })
 		for repo, a := range p.assignments().Rows {
+			if a.ProjectKey == key {
+				p.assignments().Del(repo)
+				p.sharingAuthorities().Del(repo)
+				continue
+			}
 			if slices.Contains(a.SharedWith, key) {
 				a = kernel.Clone(a)
 				a.SharedWith = slices.DeleteFunc(
@@ -108,6 +114,7 @@ func (p projectStore) Delete(ctx context.Context, key string) error {
 					func(k string) bool { return k == key },
 				)
 				p.assignments().Put(repo, a)
+				p.sharingAuthorities().Put(repo, port.NewSharingAuthority())
 			}
 		}
 		return nil
@@ -130,6 +137,7 @@ func (p projectStore) PutRole(ctx context.Context, r model.Role) error {
 			return err
 		}
 		p.roles().Put(roleKey{r.ProjectKey, r.Name}, r)
+		p.rotatePolicy(r.ProjectKey)
 		return nil
 	})
 }
@@ -161,6 +169,7 @@ func (p projectStore) DeleteRole(ctx context.Context, projectKey, name string) e
 		if !p.roles().Del(roleKey{projectKey, name}) {
 			return memtx.NotFound("role", projectKey+"/"+name)
 		}
+		p.rotatePolicy(projectKey)
 		return nil
 	})
 }
@@ -174,6 +183,7 @@ func (p projectStore) CreateEnvironment(ctx context.Context, e model.Environment
 			return memtx.Conflict("environment", e.Name)
 		}
 		p.environments().Put(e.Name, e)
+		p.rotatePolicy(e.ProjectKey)
 		return nil
 	})
 }
@@ -212,6 +222,7 @@ func (p projectStore) RenameEnvironment(ctx context.Context, projectKey, from, t
 				r = kernel.Clone(r)
 				renameEnv(r.Environments, from, to)
 				p.roles().Put(k, r)
+				p.rotatePolicy(r.ProjectKey)
 			}
 		}
 		for k, a := range p.assignments().Rows {
@@ -219,8 +230,10 @@ func (p projectStore) RenameEnvironment(ctx context.Context, projectKey, from, t
 				a = kernel.Clone(a)
 				renameEnv(a.Environments, from, to)
 				p.assignments().Put(k, a)
+				p.sharingAuthorities().Put(k, port.NewSharingAuthority())
 			}
 		}
+		p.rotatePolicy(projectKey)
 		return nil
 	})
 }
@@ -241,6 +254,7 @@ func (p projectStore) DeleteEnvironment(ctx context.Context, projectKey, name st
 			return memtx.NotFound("environment", projectKey+"/"+name)
 		}
 		p.environments().Del(name)
+		p.rotatePolicy(projectKey)
 		return nil
 	})
 }
@@ -251,6 +265,7 @@ func (p projectStore) PutMember(ctx context.Context, m model.ProjectMember) erro
 			return err
 		}
 		p.members().Put(memberKey{m.ProjectKey, m.Type, m.Name}, m)
+		p.rotatePolicy(m.ProjectKey)
 		return nil
 	})
 }
@@ -292,6 +307,7 @@ func (p projectStore) DeleteMember(
 		if !p.members().Del(memberKey{projectKey, typ, name}) {
 			return memtx.NotFound("member", fmt.Sprintf("%s/%s/%s", projectKey, typ, name))
 		}
+		p.rotatePolicy(projectKey)
 		return nil
 	})
 }
@@ -303,6 +319,7 @@ func (p projectStore) PutAssignment(ctx context.Context, a model.RepositoryAssig
 		}
 		a.SharedWith = slices.Compact(slices.Sorted(slices.Values(a.SharedWith)))
 		p.assignments().Put(a.RepoKey, a)
+		p.sharingAuthorities().Put(a.RepoKey, port.NewSharingAuthority())
 		return nil
 	})
 }
@@ -342,6 +359,7 @@ func (p projectStore) DeleteAssignment(ctx context.Context, repoKey string) erro
 		if !p.assignments().Del(repoKey) {
 			return memtx.NotFound("assignment", repoKey)
 		}
+		p.sharingAuthorities().Del(repoKey)
 		return nil
 	})
 }

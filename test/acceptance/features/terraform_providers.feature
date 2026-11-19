@@ -53,3 +53,31 @@ Feature: Terraform installs signed providers and network mirror archives
       | mode     |
       | registry |
       | mirror   |
+
+  @terraform_combined
+  Scenario: one virtual installs a local module and signed remote provider again from empty client caches
+    Given one Terraform virtual combines a local module and a private remote provider
+    And I clear the combined Terraform installation and plugin caches
+    When I run the combined Terraform "init -backend=false -no-color"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the output contains "self-signed"
+    And this init fetched the module and signed provider only through the combined virtual
+    And the combined Terraform installation preserves module and publisher bytes
+    When I run the combined Terraform "apply -auto-approve -no-color"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the output contains "1 added"
+    And the applied provider resource uses the combined module output
+    When I clear the combined Terraform installation and plugin caches
+    And I run the combined Terraform "init -backend=false -no-color"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the output contains "self-signed"
+    And this init fetched the module and signed provider only through the combined virtual
+    And the combined Terraform installation preserves module and publisher bytes
+    When I run the combined Terraform "apply -auto-approve -no-color"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the output contains "0 added"
+    And the applied provider resource uses the combined module output

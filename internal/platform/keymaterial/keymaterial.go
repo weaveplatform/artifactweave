@@ -34,18 +34,23 @@ func invalidf(format string, a ...any) error {
 // key of pairType, unlocking privateKey with passphrase when it is
 // encrypted.
 func CheckPair(pairType, privateKey, publicKey, passphrase string) error {
+	var err error
 	switch pairType {
 	case RSA:
-		return checkRSA(privateKey, publicKey, passphrase)
+		err = checkRSA(privateKey, publicKey, passphrase)
 	case GPG:
-		return checkGPG(privateKey, publicKey, passphrase)
+		err = checkGPG(privateKey, publicKey, passphrase)
 	case Ed25519:
-		return checkEd25519(privateKey, publicKey, passphrase)
+		err = checkEd25519(privateKey, publicKey, passphrase)
 	case ECDSA:
-		return checkECDSA(privateKey, publicKey, passphrase)
+		err = checkECDSA(privateKey, publicKey, passphrase)
 	default:
 		return invalidf("pairType must be RSA, GPG, Ed25519 or ECDSA, not %q", pairType)
 	}
+	if err != nil {
+		return err
+	}
+	return CheckPublic(pairType, publicKey)
 }
 
 func checkRSA(privateKey, publicKey, passphrase string) error {

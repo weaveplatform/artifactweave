@@ -4,6 +4,9 @@ Status: Proposed
 
 Checked against: Artifactory 7.161.32
 
+Project-aware sharing introduction checked separately against 7.173.4 SaaS and
+7.173.8 self-managed; see the [current contract audit](../project-scoped-remotes-contract-audit.md).
+
 ## Context
 
 JFrog projects group repositories, members and roles under a key that prefixes resource
@@ -118,12 +121,15 @@ subject and receiving project instead of an administrator's loopback credential.
 incarnations and generations fence cache reuse and publication, while current share and
 caller permissions gate every response, including explicit cache reads after unsharing.
 
-The sharing guide checked on 2026-10-21 describes a SaaS rollout with self-managed support
-still forthcoming. The design distinguishes that documented contract from **[I]**
-validation, cache and race decisions; it is not a live 7.161.32 observation. P11 owns
+The [2026-11-19 audit](../project-scoped-remotes-contract-audit.md) supersedes the older
+release and discovery-schema gaps. It distinguishes supported all-project sharing from
+the restricted All Projects connection context. The sharing-mode mutation wire contract
+remains unresolved; a read-only permission ceiling is not that mode. The design retains
+**[I]** validation, cache and race decisions and makes no live 7.161.32 observation. P11 owns
 sharing-mode administration, `projectScopedReadUpstream`, `upstreamRepoKey`,
 `upstreamProjectKey`, `connectableRepos`, `projectScopedConsumers`, authorization and
-native acceptance. Existing project store types do not implement those workflows.
+native acceptance. Durable project/policy/share records are internal foundations, not
+evidence that those administration and retrieval workflows are implemented.
 P9 keeps the current URL requirement and parity exceptions; this design does not close
 #487 or change this decision's Proposed status.
 

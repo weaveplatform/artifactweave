@@ -292,9 +292,11 @@ func TestAccVirtualPrefersAnExactMatrixMatch(t *testing.T) {
 		"Received request",
 		"Retrieving info from virtual repository 'virt-ab' type generic",
 		"Searching for the resource within a-local",
+		"Request includes query properties",
 		"Request query properties don't match those that annotate the artifact",
 		"Resource is not an exact match - keeping as closest match",
 		"Searching for the resource within b-local",
+		"Request includes query properties",
 		"Request query properties conflict with those that annotate the artifact - "+
 			"returning unfound resource",
 		"Unable to find an exact matching resource - returning closest match",

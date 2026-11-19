@@ -213,7 +213,14 @@ func (s *Kit) readRemoteItem(r *http.Request, c repo.Config, req ItemRequest,
 	// 7.x's RemoteRepoBase.internalGetInfo returns the PROPERTY_MISMATCH
 	// that DbStoringRepoMixin.getInfo answers for a cached copy
 	// (shouldReturnCachedResource), in 7.161.26.
-	if ok, matchErr := RemoteCopyMatches(ctx, s.Store, c, resource.Path, req); matchErr != nil {
+	// Folder visibility admits the trace, but only a file reader may learn
+	// from this new step that the cache holds that file. Source.Read keeps
+	// its own authorization and the existing matching verdicts unchanged.
+	matchTrace := t
+	if t != nil && len(req.Props) > 0 && !acc.File(c, resource.Path, accessapi.ActionRead) {
+		matchTrace = nil
+	}
+	if ok, matchErr := remoteCopyMatches(ctx, s.Store, c, resource.Path, req, matchTrace); matchErr != nil {
 		return failedRead(s.InternalError(ctx, "item properties", matchErr), errReadFault), true
 	} else if !ok {
 		t.stepf("Found resource in local cache, but property doesn't match.")
@@ -272,13 +279,25 @@ func MatchesMatrix(ctx context.Context, st Store, it model.Item, req ItemRequest
 func RemoteCopyMatches(
 	ctx context.Context, st Store, c repo.Config, path string, req ItemRequest,
 ) (bool, error) {
+	return remoteCopyMatches(ctx, st, c, path, req, nil)
+}
+
+// remoteCopyMatches records a cached file's successful property evaluation
+// before the remote read's verdict. Other matching callers remain untraced.
+func remoteCopyMatches(
+	ctx context.Context, st Store, c repo.Config, path string, req ItemRequest, t *resolutionTrace,
+) (bool, error) {
 	if len(req.Props) == 0 {
 		return true, nil
 	}
 	it, err := st.Items().Get(ctx, c.Key, true, path)
 	switch {
 	case err == nil && !it.Folder:
-		return matchesMatrix(ctx, st, it, req)
+		match, matchErr := matchesMatrix(ctx, st, it, req)
+		if matchErr == nil {
+			t.stepf("Request includes query properties")
+		}
+		return match, matchErr
 	case err != nil && !errors.Is(err, kernel.ErrNotFound):
 		return false, fmt.Errorf("cached copy of %s: %w", path, err)
 	}

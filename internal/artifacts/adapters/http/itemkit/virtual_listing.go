@@ -89,10 +89,14 @@ func (s *Kit) listVirtualFolder(
 		members: map[string]*memberChildren{}, budget: &remote.ListingBudget{},
 	}
 	if err := virtual.Walk(ctx, st.Repos(), v, l.visit(ctx)); err != nil {
-		httpkit.WriteErr(w, r, s.InternalError(ctx, "list folder", err))
+		httpkit.WriteErr(w, r, l.answerError(ctx, err))
 		return true
 	}
-	entries, held := l.merge(ctx)
+	entries, held, err := l.merge(ctx)
+	if err != nil {
+		httpkit.WriteErr(w, r, l.answerError(ctx, err))
+		return true
+	}
 	if !held && !found {
 		return false
 	}
@@ -185,26 +189,29 @@ func (l *virtualListing) read(ctx context.Context, m repo.Config) (*memberChildr
 		listing, err := remote.ListFolder(ctx, l.s.RemoteSources, source.Request{
 			Repo: m, Subject: accessapi.SubjectOf(l.p), Access: l.acc.Decider, Project: m.ProjectKey,
 		}, l.folder, l.budget)
-		// An upstream that fails to list leaves only this member's live
-		// children out [I]: 7.x's RemoteRepo.listRemoteResources answers a
-		// failure with no items (RTFACT-6372), and the rest of the index
-		// still lists.
+		// Upstream acquisition failures leave live children out (7.161.26
+		// RemoteRepoBase.listRemoteResources catches IOException). They do
+		// not make a failed current authority check safe to disclose.
 		if err == nil {
 			mc.live = &listing
+		} else if failure := listingReadError(ctx, err); failure != nil {
+			return nil, failure
 		}
 	}
 	return mc, nil
 }
 
 // merge is the index's entries and whether any member holds the folder.
-// Each upstream listing is revalidated just before it is shown, as
-// remote.FolderListing asks; one that fails is left out as a listing
-// failure is.
-func (l *virtualListing) merge(ctx context.Context) ([]indexEntry, bool) {
+// Each upstream listing's authority is revalidated just before disclosure,
+// as remote.FolderListing asks. A failure aborts the whole response, including
+// cached children and other members, rather than becoming an acquisition miss.
+func (l *virtualListing) merge(ctx context.Context) ([]indexEntry, bool, error) {
 	held := false
 	for _, mc := range l.members {
-		if mc.live != nil && mc.live.Revalidate(ctx) != nil {
-			mc.live = nil
+		if mc.live != nil {
+			if err := mc.live.Revalidate(ctx); err != nil {
+				return nil, false, newListingSourceError(ctx, err)
+			}
 		}
 		held = held || mc.held || mc.live != nil && len(mc.live.Entries) > 0
 	}
@@ -236,7 +243,7 @@ func (l *virtualListing) merge(ctx context.Context) ([]indexEntry, bool) {
 			}
 		}
 	}
-	return entries.entries(), held
+	return entries.entries(), held, nil
 }
 
 // browsable is RepositoryBrowsingServiceImpl.virtualRepoAccepts: whether

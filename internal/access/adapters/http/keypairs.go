@@ -38,11 +38,14 @@ func certificateNotFound(alias string) error {
 	return apierror.New(http.StatusNotFound, fmt.Sprintf("Certificate '%s' does not exist", alias))
 }
 
-func keypairSummary(k api.Keypair) artgen.KeyPairSummary {
+func (s SecurityAPI) keypairSummary(ctx context.Context, k api.Keypair) (artgen.KeyPairSummary, error) {
+	if err := keymaterial.CheckPublic(string(k.Type), k.PublicKey); err != nil {
+		return artgen.KeyPairSummary{}, s.internalError(ctx, "read key pair public material", err)
+	}
 	typ := string(k.Type)
 	return artgen.KeyPairSummary{
 		PairName: &k.Name, PairType: &typ, Alias: &k.Alias, PublicKey: &k.PublicKey,
-	}
+	}, nil
 }
 
 // keypairFrom validates a key pair body: the required fields, no vault key
@@ -104,7 +107,11 @@ func (s SecurityAPI) GetAllKeyPairs(
 	}
 	out := make(artgen.GetAllKeyPairs200JSONResponse, 0, len(pairs))
 	for _, k := range pairs {
-		out = append(out, keypairSummary(k))
+		summary, err := s.keypairSummary(ctx, k)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, summary)
 	}
 	return out, nil
 }
@@ -168,7 +175,8 @@ func (s SecurityAPI) UpdateKeyPair(
 	case err != nil:
 		return nil, s.internalError(ctx, "update key pair", err)
 	}
-	return artgen.UpdateKeyPair200JSONResponse(keypairSummary(k)), nil
+	summary, err := s.keypairSummary(ctx, k)
+	return artgen.UpdateKeyPair200JSONResponse(summary), err
 }
 
 // VerifyKeyPair checks a pair without storing it.
@@ -190,7 +198,8 @@ func (s SecurityAPI) VerifyKeyPair(
 // may read it, as 7.x lets any authenticated user, and anonymous while
 // anonymous access is on (getkeypair). That is safe only because the
 // projection carries the public half alone: keypairSummary must never gain
-// the private key or the passphrase.
+// the private key or the passphrase, and validates the complete stored public
+// field before exporting records admitted by older versions (#1727).
 func (s SecurityAPI) GetKeyPair(
 	ctx context.Context,
 	req artgen.GetKeyPairRequestObject,
@@ -205,7 +214,8 @@ func (s SecurityAPI) GetKeyPair(
 	case err != nil:
 		return nil, s.internalError(ctx, "get key pair", err)
 	default:
-		return artgen.GetKeyPair200JSONResponse(keypairSummary(k)), nil
+		summary, err := s.keypairSummary(ctx, k)
+		return artgen.GetKeyPair200JSONResponse(summary), err
 	}
 }
 
@@ -314,6 +324,9 @@ func (s SecurityAPI) GetKeyPairPublicKeyPerRepository(
 	case err != nil:
 		return nil, s.internalError(ctx, "get key pair", err)
 	default:
+		if err := keymaterial.CheckPublic(string(k.Type), k.PublicKey); err != nil {
+			return nil, s.internalError(ctx, "download key pair public material", err)
+		}
 		// An attachment with its file name, as the page's curl -O -J needs
 		// to save the key; FormatMediaType quotes or encodes an alias that
 		// is not a plain token.

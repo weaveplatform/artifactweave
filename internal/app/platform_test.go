@@ -635,8 +635,9 @@ func TestAccMigrateCommand(t *testing.T) {
 		t.Fatalf("version --module artifacts: %q", got)
 	}
 	want := "schema version 0 of 1 (sqlite, platform)\n" +
-		"schema version 7 of 7 (sqlite, artifacts)\n"
-	for _, m := range []string{"access", "notifications", "retention", "federation", "releases", "workers"} {
+		"schema version 7 of 7 (sqlite, artifacts)\n" +
+		"schema version 0 of 3 (sqlite, access)\n"
+	for _, m := range []string{"notifications", "retention", "federation", "releases", "workers"} {
 		want += "schema version 0 of 1 (sqlite, " + m + ")\n"
 	}
 	if got := run("version", 0, ""); got != want {

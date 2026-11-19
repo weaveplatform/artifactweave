@@ -102,8 +102,11 @@ while `server` proves only protocol behavior. A Go `TestAcc` client scenario is
 valid evidence too; Conan, Bazel and Swift clients are not silently replaced by
 HTTP-only Gherkin scenarios. The generator validates each named scenario/test
 anchor and the mechanism/class relationship. The [virtual guide](../operations/virtual-repositories.md)
-records family limits and existing #216 inference entries. #1571 owns final P10
-qualification; this inventory does not declare that phase done.
+records family limits and existing #216 inference entries. Final P10
+qualification belongs to [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528)
+after documentation PR #1708 closed #1571. The
+[qualification ledger](../testing/phase10-signoff.md) records the remaining work;
+this inventory does not declare that phase done.
 
 Deviation reconciliation against pre-P10 main `f79170f6e`: DV-202 was added for
 fixed browser/content-disposition system-property defaults; DV-057 was amended

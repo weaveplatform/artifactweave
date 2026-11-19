@@ -25,6 +25,7 @@ func (w *world) registerTerraformProviders(sc *godog.ScenarioContext) {
 	sc.Step(`^a null provider is published for the "(registry|mirror)"$`, w.publishNullProvider)
 	sc.Step(`^Terraform installs from the "(registry|mirror)"$`, w.configureNullProvider)
 	w.registerVirtualTerraformProviders(sc)
+	w.registerCombinedTerraform(sc)
 }
 
 func (w *world) publishNullProvider(mode string) error {

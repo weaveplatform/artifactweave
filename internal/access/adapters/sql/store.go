@@ -18,7 +18,7 @@ func New(db *dialect.Store) *Store { return &Store{Store: db} }
 
 // Module registers the access module with the SQL layer: its migration
 // stream, under the name that keys the stream's rows in schema_migrations;
-// the identity-search backfill, which runs after every migration; and the
+// the identity-search and project-authority backfills, run after migration; and the
 // sealed columns its token and key stores write. Each column keeps the
 // purpose and the row id the store seals with, because both are
 // authenticated with every value (decision 0017): a change to either makes
@@ -27,9 +27,14 @@ var Module = dialect.Module{
 	Name:       "access",
 	Migrations: migrations.FS,
 	// Go fills the lowercase search names that a row lacks, because
-	// the engines fold case by their own rules (decision 0043).
+	// the engines fold case by their own rules (decision 0043), then allocates
+	// the missing project lifetime and policy/share authority values.
 	AfterMigrate: func(ctx context.Context, s *dialect.Store) error {
-		return New(s).backfillIdentitySearch(ctx)
+		store := New(s)
+		if err := store.backfillIdentitySearch(ctx); err != nil {
+			return err
+		}
+		return store.backfillProjectAuthority(ctx)
 	},
 	Sealed: []dialect.SealedColumn{
 		{

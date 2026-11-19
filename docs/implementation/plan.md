@@ -39,7 +39,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P9b Newly identified Artifactory formats | Native paths implemented; qualification evidence #693 | LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages have their documented repository classes and native paths. NIM's documented NGC model API and separate Docker pull are implemented; target runtime wire parity remains #216 |
 | P9c Native package catalog coverage | Done (2026-11-04) | All 28 format tasks and #789/#791/#843/#844/#852/#853 follow-ups are merged. The [class/client matrix](package-format-matrix.md), [CI evidence](../testing/phase9c-ci-signoff.md) and [combined qualification ledger](../testing/phase9c-signoff.md) retain #810/#792's passing final merged-main and current-release gates. P29 to P33 must not count these implementations again |
 | P9d Modular-monolith migration | Done (2026-11-11) | Behaviour-preserving move to the layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md); code was staged under `migration/` and promoted to `internal/`, and [p9d-path-map.json](p9d-path-map.json) maps each legacy path to its final one. The [Phase 9d qualification record](../testing/phase9d-signoff.md) holds [PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104)'s merged-main, real-cloud and release evidence. |
-| P10 Virtual repositories | Implementation delivered; qualification in progress | **M3**; [qualification and epic closeout](../testing/phase10-signoff.md), #1571 |
+| P10 Virtual repositories | Implementation delivered; qualification in progress | **M3**; [qualification and epic closeout](../testing/phase10-signoff.md), final completion record in [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528) |
 | P11 Projects, webhooks, retention, replication | Not started | |
 | P12 Descriptor export, system configuration, LDAP | Not started | |
 | P13 Peer trust and federated repositories | Not started | |
@@ -1111,7 +1111,7 @@ Decision: [0008](../research/decisions/0008-virtual-repositories.md).
   adapters use the shared walk. The [format matrix](package-format-matrix.md) names
   the mechanism and anchored client/server evidence separately for all 49 types.
 - The [virtual operations guide](../operations/virtual-repositories.md) records
-  R1–R10, family exceptions and known open defects. Its
+  R1–R11, family exceptions and known open defects. Its
   [inference register](../operations/virtual-repositories.md#inference-register)
   links the existing #216 entries; these remain pending vendor comparison.
 - The [Terraform virtual configuration scenario](../../deploy/artifactweave/terraform/virtual-repositories)
@@ -1122,8 +1122,17 @@ Decision: [0008](../research/decisions/0008-virtual-repositories.md).
 
 The retained native scenarios cover local plus remote resolution, including Go,
 and the family-specific DDR publication flows. This is an implementation/evidence
-map, not the combined qualification record. [QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571)
-retains the final M3 run, decision 0008 acceptance and the phase status change.
+map, not the combined qualification record. GitHub closed
+[QUA-03 #1571](https://github.com/weaveplatform/artifactweave/issues/1571)
+with documentation PR #1708. [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528)
+retains the remaining acceptance work, final M3 run, decision 0008 acceptance
+and the completion update to this plan. P10 remains in qualification until that
+evidence is complete.
+The required acceptance and fault-correction PR gates have passed. Their
+maintainer merges remain pending, including the additional
+[source-fault blocker #1723 / PR #1726](https://github.com/weaveplatform/artifactweave/pull/1726).
+These PR results precede the final full validation on merged main; they do not
+mark M3 or P10 complete.
 P13 owns peer federation and P35 owns multi-node cache coordination.
 
 ## P11: Projects, webhooks, retention, replication

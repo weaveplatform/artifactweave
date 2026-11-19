@@ -182,6 +182,17 @@ The native fixture installs separate hosted and private remote publishers throug
 both a nested virtual registry and an HTTPS virtual network mirror with fresh
 client caches, without a direct mirror fallback.
 
+The [combined virtual scenario](../../test/acceptance/features/terraform_providers.feature)
+uses one virtual for a local member's module and an authenticated private remote
+member's signed provider. The applied `null_resource` takes its trigger from the
+module output. Each of two `init` runs starts with no `.terraform` installation
+and an empty, scenario-owned `TF_PLUGIN_CACHE_DIR`; state and the lockfile survive
+the repeat. Command-local access logs must show module versions, download and
+archive plus provider versions, package metadata, checksum, signature and archive
+requests through that virtual. Separate checks compare installed module/provider
+bytes and the selected publisher with the controlled origin. These checks run
+after the log audit, so they cannot substitute for native client requests.
+
 ## Evidence and remaining ownership
 
 The native content qualification uses Terraform 1.17.1 and the pinned null 3.3.2
