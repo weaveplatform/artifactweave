@@ -31,18 +31,44 @@ values support MD5, SHA-1, SHA-256 and SHA-512, with or without an algorithm pre
 They are enforced independently of optional upstream checksum-header policy.
 
 GitHub HTTPS Git locations (`git::https://github.com/org/repo.git?ref=...`) and
-`github.com/org/repo` shorthand map to GitHub's archive endpoint. `ref` selects the
+`github.com/org/repo` shorthand map to GitHub's archive endpoint. Additional shorthand
+path segments select a subdirectory; an explicit `//` selector is appended to them.
+`ref` selects the
 snapshot; positive `depth` does not change archive bytes. This is snapshot retrieval,
-not a general Git clone, submodule or LFS implementation. Additional source getters,
-HTTP vanity documents, checksum-file URLs and those Git semantics remain explicitly
-owned by [P28 #668](https://github.com/weaveplatform/artifactweave/issues/668).
+not a general Git clone, submodule or LFS implementation. The precise snapshot/ref
+matrix and full qualification remain owned by
+[P28 #668](https://github.com/weaveplatform/artifactweave/issues/668).
+
+Qualified HTTP(S) vanity sources receive a GET with exactly one `terraform-get=1`.
+A complete 200 response selects one nonempty `X-Terraform-Get` field, or, without
+that field, the first nonempty HTML `meta name="terraform-get"` content before the
+body/end of head. Header selection wins. HTML requires UTF-8/ASCII `text/html` or
+`application/xhtml+xml`; scripts, HTML base elements and other resources are never
+executed or fetched. Header source text is bounded to 8 KiB and each complete
+document to 16 MiB. Chains permit ten documents; requested/effective URL identities
+detect cycles, including during cached/offline resolution. Relative children use
+the sanitized final response base and their own queries. These bounded server rules
+are explicit local choices, not a claim that all native getter quirks match 7.x.
+
+`checksum=file:<absolute-http(s)-URL>` retrieves one bounded checksum document under
+the same destination/credential/current-source rules as the archive. It accepts a
+complete 200 UTF-8/ASCII `text/plain` or `application/octet-stream` file, at most
+16 MiB with 8 KiB lines. GNU text/binary/`?` records, BSD algorithm records and one
+standalone digest support MD5, SHA-1, SHA-256 and SHA-512. The selected filename is
+matched against the archive URL before its transport redirects; relative record
+paths use POSIX URL resolution. Malformed nonblank lines, missing or duplicate matches
+and conflicting files in one vanity chain fail. Local/relative checksum locations,
+recursive checksum getters, userinfo, fragments and HTTPS downgrade are refused.
+Checksum URL, filename and digest remain part of private archive identity; a new
+checksum cannot authorize bytes named by an older signed capability.
 
 A `//subdirectory` selector can include directory glob patterns. Admission requires
 exactly one real directory, including implicit parent directories. The client gets
 that concrete directory, because Terraform's registry installer treats this suffix
 literally. The complete package is delivered, preserving relative sibling
 module references. Registry module dependencies are rewritten as described below;
-archives needing no source edits retain their exact original bytes and format. Safe internal links are retained; absolute/escaping link targets,
+archives needing no source edits retain their exact original bytes and format,
+except the portable delivery conversions below. Safe internal links are retained; absolute/escaping link targets,
 special device entries, duplicate or traversal paths, and entries beneath any link
 are rejected regardless of entry order. Link targets are resolved component by component
 through the complete archive graph before consuming `..`; escaping chains and cycles are
@@ -97,8 +123,9 @@ the existing explicit authentication-forwarding policy.
 
 ## Cache and failures
 
-Raw discovery/version documents and the private validated projection of upstream 204
-locations use metadata TTLs independently from immutable source archives. Signed URLs
+Raw discovery/version documents and private validated projections of upstream 204
+locations, 200 vanity responses and checksum files use metadata TTLs independently
+from immutable source archives. Signed URLs
 and caller-specific lists are generated per request. `offline`, no-store, missing-entry
 cache periods, hard failure, metadata zap and source-generation fences follow the
 [shared retrieval contract](../implementation/remote-retrieval-contract.md).
@@ -106,7 +133,11 @@ cache periods, hard failure, metadata zap and source-generation fences follow th
 Missing versions return 404; denied or expired signed authorization returns 403;
 invalid metadata, unsafe source grammar, corrupt archives and ambiguous selectors
 return 502 without replacing valid cached content. A corrected malformed upstream
-response can succeed immediately without waiting for a negative-cache TTL. No-store
+response can succeed immediately without waiting for a negative-cache TTL. An archive
+acquisition/integrity failure mapped to 502 also rejects its exact stored checksum-file
+decision, so a corrected checksum file can be fetched immediately. This rejection
+rechecks current authority transactionally and uses the existing cache-generation CAS;
+it cannot evict a newer replacement or act from an offline/cache-only read. No-store
 bytes are validated in temporary storage and removed after delivery; offline requests
 cannot invent a cache entry for content that was never stored.
 
@@ -152,14 +183,28 @@ materializes these entries as ordinary files rather than following them. Relativ
 16 MiB for parsing, in addition to the existing complete archive limits.
 
 Cached source bytes and checksums remain the validated upstream originals. Delivery
-uses a separate derived archive only when a source changes: ZIP remains ZIP; TAR
-variants become tar.gz; changed single compressed files become gzip. Getter format,
+uses a separate derived archive when a source changes: ZIP remains ZIP and TAR
+variants become tar.gz. Plain TAR and single gzip/bzip2/XZ files always use a derived
+tar.gz package because the pinned clients cannot install their original representations
+as module directories. A single compressed file becomes one regular entry with its
+decoded URL filename minus the compression suffix; it is not interpreted as a TAR
+container. Getter format,
 public rewrite target and derived digest are signed. Delivered hashes, length,
 ETag, conditional responses and ranges describe the delivered bytes. Unchanged
-archives retain their byte content and compression without an output temporary copy.
+ZIP and compressed-TAR archives retain their byte content and compression without an
+output temporary copy when no rewrite is needed.
 Exact inferred syntax and representation choices are recorded for #216 in
 [the P10 research](../research/p10-terraform-modules.md).
 
 The [shared virtual rules](virtual-repositories.md) cover common order, hiding,
 patterns and member policy. Native Terraform publication is not implied by module
 or provider resolution; the delivered generic item/DDR path remains separate.
+
+`terraform_getters.feature` adds pinned Terraform 1.17.1 and OpenTofu 1.13.9 module
+acceptance through standalone SQLite/PostgreSQL servers and both direct/virtual
+registry coordinates. Each run checks native version selection, identifiable module
+outputs, relative siblings where applicable, exact cached original bytes and an
+upstream outage with a fresh client home/cache. Linux CI requires HTTPS discovery;
+macOS uses the established loopback service override because the pinned clients do
+not trust the fixture through `SSL_CERT_FILE`. Local results do not qualify Linux
+HTTPS discovery, other OpenTofu provider/backend paths or live Artifactory parity.

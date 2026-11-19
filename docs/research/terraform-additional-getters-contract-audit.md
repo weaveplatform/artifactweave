@@ -64,6 +64,12 @@ and existing trust procedure, retain exact binary `version`/embedded dependency
 evidence, and install neither client during this research-only task. This pin is a
 proposal for implementation, not an assertion that OpenTofu acceptance already exists.
 
+The later implementation now installs the pinned OpenTofu Linux archive alongside
+Terraform in the registry-client action, checks its recorded official SHA-256 and
+exports a separate executable path. The dependency catalog and generated native
+inventory/recipe record that pin. Local native results are qualified below; a new
+client pin still requires actual Linux CI success before its CI qualification.
+
 ## Registry location and HTTP vanity are different operations
 
 **[D]** The [Module Registry Protocol](https://developer.hashicorp.com/terraform/internals/module-registry-protocol)
@@ -303,6 +309,52 @@ Conditional Git/Hg/SSH/S3/GCS (and unrequested OCI) remain disabled unless their
 target and credential/transport contract is reviewed. Any later activation needs a
 named owner and the same complete matrix, rather than an implicit ambient getter.
 Closing #668 requires A–H implementation and qualification, not this audit alone.
+
+### Permanent standalone SQL/native acceptance progress (2026-11-19)
+
+The permanent `terraform_getters.feature` scenarios run pinned Terraform 1.17.1 and
+OpenTofu 1.13.9 against the standalone application with SQLite and isolated PostgreSQL
+17.12 scratch schemas, through both direct remote and virtual registry coordinates.
+Clients select the newer matching version from a list containing older valid
+locations. An unselected archive is never acquired. Each installation checks the
+selected version and concrete directory, distinguishable apply outputs, relative
+sibling modules where applicable and the exact cached original source bytes. It
+repeats after stopping the controlled upstream and setting the remote offline, with
+a fresh native HOME, configuration and module cache. Child environments are allowlisted;
+no ambient Git, SSH, cloud, netrc or CLI credentials enter them.
+
+Eight scenarios pass locally with 19 source forms and two cache phases: 304 module
+installations, zero skipped scenarios, 102.965 seconds including the test build, with
+the recorded runtime/acceptance source hashes unchanged. The forms are header/HTML/
+redirect-relative/chained vanity, GNU/BSD/standalone checksum files, a vanity-selected
+checksum file, plain TAR, tgz, tar.gz, tar.bz2, tbz2, tar.tbz2, tar.xz, txz and single
+gzip/bzip2/XZ files. The private evidence packet is
+`cover/terraform-getters/registry-native-fixed/{source.json,result.json,native.log}`.
+This extends the earlier source-URL probes with actual registry version negotiation;
+it does not turn the earlier in-memory probes into SQL evidence retroactively.
+
+Linux CI must perform native HTTPS service discovery through the TLS fixture,
+without a host-services override. On macOS the pinned executables do not trust the
+fixture through `SSL_CERT_FILE`, so local acceptance explicitly uses the existing
+loopback service override populated from the application's real discovery document.
+The proof labels that mode `local-service-override`. The local result qualifies
+registry versions/download/install behavior but does not claim native HTTPS discovery.
+
+The expanded matrix exposed another same-kind defect: both real clients reject a
+single compressed file when their module installer requests a directory, reporting
+that gzip/bzip2/XZ files can only unarchive to a single file. The frozen-source
+before packet `registry-native-expanded` records those failures across all eight
+scenarios. The inline correction derives a tar.gz with one decoded regular file,
+named from the selected URL without its compression suffix. Source config rewriting
+still applies to `.tf`/`.tf.json`; non-config data keeps the existing bounded streaming
+limit. Cached original bytes/digests remain separate from signed public format/digest.
+The direct/virtual HTTP regression covers all three formats with unchanged config,
+rewritten JSON config and non-config content, including format-tamper refusal.
+
+This is not complete #668 qualification: the remaining GitHub snapshot/ref/depth/
+submodule/LFS matrix, Linux HTTPS CI, existing local/provider/backend regression and
+final quality/coverage acceptance still need their own evidence. Generic Git/Hg/SSH/
+cloud getters remain disabled and live Artifactory behavior remains unobserved.
 
 ## Local same-kind TAR correction (2026-11-19)
 

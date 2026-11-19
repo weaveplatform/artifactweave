@@ -775,6 +775,17 @@ uses a complete refresh rather than conditional 304. It does not change generic
 HTTP status handling or cache keys. See the [source boundary](source-boundary.md#terraform-module-download-control-metadata)
 for header bounds, admission and disclosure requirements.
 
+Additional Terraform getter metadata uses distinct `ModuleVanityDocument` and
+`ModuleChecksumDocument` opt-ins: complete bounded 200 responses are projected into
+private control JSON before adapter validation/admission. Header source/HTML selection
+and checksum-file parsing do not relax generic HTTP success or MIME rules. Logical
+vanity identities and checksum selection remain in private representation identity;
+the adapter enforces its chain/acquisition bounds on warm/offline reads too. Stored
+online checksum results carry a narrow current-authority-checked rejection callback
+for archive failures, using the existing generation CAS rather than TTL manipulation.
+The [source boundary](source-boundary.md#terraform-vanity-and-checksum-file-control-metadata-668)
+records projection, validator and mutation constraints.
+
 ## Python remote checkpoint (#627)
 
 The [Python remote adapter](../operations/pypi-remote.md) consumes the common source
@@ -819,7 +830,9 @@ validated 204-location projections stay independent from immutable archives and 
 indexes. Complete archive validation precedes admission; selector resolution preserves
 original package bytes. Signed URLs retain original credential references for current
 scope/revocation/password/anonymous checks, in addition to source and digest binding.
-Additional getter/vanity qualification remains P28/#668, provider remotes #632 and
+P28/#668 adds bounded vanity chains, checksum files, GitHub shorthand selectors and
+portable delivery for plain TAR/single compressed files; its complete snapshot/native
+matrix and final qualification remain tracked there. Provider remotes retain #632 and
 virtual resolution P10. Controlled native proof does not replace #216 vendor captures.
 
 **Smart Remote checkpoint (#634).** [Runtime and evidence](smart-remote.md) now cover

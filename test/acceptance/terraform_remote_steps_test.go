@@ -15,6 +15,7 @@ import (
 )
 
 func (w *world) registerTerraformRemote(sc *godog.ScenarioContext) {
+	w.registerTerraformGetters(sc)
 	sc.Step(`^a Terraform remote parent depends on local and remote registry submodules$`, w.terraformVirtualUpstream)
 	sc.Step(
 		`^a Terraform registry upstream serves versioned ZIP and subdirectory archives$`,

@@ -4,7 +4,7 @@
 
 Read the [common setup and credential rules](README.md) first. [All recipes](index.md).
 
-Client: **Terraform 1.17.1; JFrog CLI 2.131.0**. Registered classes: **local, remote, virtual, federated**.
+Client: **Terraform 1.17.1; OpenTofu 1.13.9 (module getters); JFrog CLI 2.131.0**. Registered classes: **local, remote, virtual, federated**.
 
 Endpoint: `${AW_URL}/.well-known/terraform.json`
 
@@ -118,6 +118,7 @@ Classes outside **local, remote, virtual, federated** are not registered for thi
 - Module publication through a virtual requires defaultDeploymentRepo. The provider upload example targets a concrete PROVIDER repository; generic item uploads retain the virtual default-deployment target’s admission, while native provider API writes remain unsupported. Virtual provider/mirror reads preserve the selected member’s signature and bytes; registry exact-platform selection and mirror whole-version ownership are distinct. Remote repositories resolve only.
 - The HTTP host override in tests is a loopback fixture workaround; production clients should use HTTPS discovery.
 - The provider registry requires a valid publisher signature and configured verification key. The HTTPS network mirror is a separate installation mode that checks archive hashes and the lockfile; it does not claim publisher-signature verification.
+- Remote module sources support bounded HTTP(S) vanity headers/HTML, absolute HTTP(S) checksum-file URLs and portable archive delivery. OpenTofu qualification in this recipe covers module getters; provider and backend acceptance retain their separate Terraform evidence. GitHub sources are HTTP snapshots rather than recursive Git clones; generic Git/Hg/SSH/cloud getters remain disabled.
 
 ## Verification sources
 
@@ -125,6 +126,7 @@ These are the pinned client definitions and executable evidence from which this 
 
 - Client pin: [deploy/check.sh](../../deploy/check.sh).
 - Client pin: [.github/actions/jfrog-cli/action.yml](../../.github/actions/jfrog-cli/action.yml).
+- Client pin: [.github/actions/registry-clients/action.yml](../../.github/actions/registry-clients/action.yml).
 - Evidence: [test/acceptance/features/terraform_publish.feature](../../test/acceptance/features/terraform_publish.feature).
 - Evidence: [test/acceptance/features/terraform_registry.feature](../../test/acceptance/features/terraform_registry.feature).
 - Evidence: [test/acceptance/features/tokens.feature](../../test/acceptance/features/tokens.feature).
@@ -133,3 +135,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/terraform_remote.feature](../../test/acceptance/features/terraform_remote.feature).
 - Evidence: [test/acceptance/terraform_provider_virtual_steps_test.go](../../test/acceptance/terraform_provider_virtual_steps_test.go).
 - Evidence: [test/acceptance/terraform_combined_steps_test.go](../../test/acceptance/terraform_combined_steps_test.go).
+- Evidence: [test/acceptance/features/terraform_getters.feature](../../test/acceptance/features/terraform_getters.feature).
+- Evidence: [test/acceptance/terraform_getters_steps_test.go](../../test/acceptance/terraform_getters_steps_test.go).
