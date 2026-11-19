@@ -7,6 +7,14 @@ claim of complete wire parity.** The issue still requires effective project-auth
 retrieval and the entire P9 handoff matrix, including revocation of warm and in-flight
 reads; adding repository fields and discovery routes alone cannot close it.
 
+## Current phase allocation (2026-11-19)
+
+The maintainer moved #487 completion to the separate P19a phase after P19 observations.
+P11 retains documented project administration and the private authority/role services
+merged in #1730/#1731. This audit's dated source snapshot remains provenance; it does
+not erase those later foundations or claim effective source retrieval. The remaining
+sharing-mode and native/revocation contract is qualified in P19a.
+
 ## Evidence and scope
 
 Checked against current JFrog documentation and the **7.173.8 self-managed / 7.173.4 SaaS
@@ -198,7 +206,7 @@ project requirements/inferences, rather than independently captured vendor resul
 | [SQL repository create](../../internal/artifacts/adapters/sql/content.go), [in-memory create](../../internal/artifacts/adapters/inmem/content.go) | Both allocate `NewRemoteSource` on creation for every repository class, including local producers. Existing repository incarnation records are available foundations; there is no equivalent project lifetime in the project model. **[S]** |
 | [Source request/permit](../../internal/artifacts/core/remote/source/source.go), [authorization](../../internal/artifacts/core/remote/source/authority.go) | Request carries subject, access decider, original project and visited incarnations. Permit separates intent and network capability. Production authorization still accepts only `ExternalHTTP`; a project source fails unsupported before cache/network work. **[S]** |
 | [Package source request construction](../../internal/artifacts/adapters/http/pkgroute/source.go) | `Request.Project` already comes from the configured repository's `ProjectKey`, not a client-selected project header. **[S]** |
-| [Source seam](../implementation/source-boundary.md) | Existing source/credential/publication/admission fences are usable foundations, not project-sharing enforcement. Native metadata adapters and Docker have different route seams that P11 must compose. **[S]** |
+| [Source seam](../implementation/source-boundary.md) | Existing source/credential/publication/admission fences are usable foundations, not project-sharing enforcement. Native metadata adapters and Docker have different route seams that P19a must compose. **[S]** |
 
 The old design's “P8 baseline” source observations must not be copied as the current P9/P10
 state. Conversely, the existence of P9 identity types must not be reported as effective
@@ -225,7 +233,7 @@ settles them. Endpoint-schema parity does not discharge these runtime obligation
 | Filtered metadata | **[I]** Reauthorize every disclosed descendant and segregate/filter cached representations by authority. Broad/narrow principals, native metadata, version queries and rewritten locations cannot reuse a broader successful representation or disclose producer URLs that bypass project checks. |
 | Native/virtual consumers | At least two native ecosystems plus generic downloads exercise cold, warm and revoked behavior. Internal remote virtual membership must retain the original consumer context, visited chain and capability restrictions. Include Docker's separate source/delivery seam where relevant; do not assume one generic route proves every native path. |
 | Redirect admission | **[I]** Initially stream internal-project bytes through the registry. Ordinary object-store/CDN bearer URLs cannot satisfy later unsharing checks. A future redirect must recheck current connection/policy on redemption; prove revocation before admission/signing and redemption, including warm cached paths. Already-delivered bytes cannot be recalled. |
-| Completion evidence | Remove only implemented parity gaps; run generation/parity, status-table/principal matrices, meaningful success/denial/fault tests and native acceptance. Preserve the documented P11 boundary and record new inferences for #216/P19. Do not close #487 on design or API-only completion. |
+| Completion evidence | Remove only implemented parity gaps; run generation/parity, status-table/principal matrices, meaningful success/denial/fault tests and native acceptance. Preserve the documented P11/P19a boundary and record new inferences for #216/P19. Do not close #487 on design or API-only completion. |
 
 The service design also requires a source/grant revision changed transactionally with
 revocation; conditional publication and fresh post-wait admission checks use that revision.

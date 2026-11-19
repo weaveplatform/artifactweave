@@ -16,7 +16,10 @@ reclaims storage. Cron expressions use Quartz syntax (six or seven fields, with 
 ## Decision
 
 The trash can and garbage collection below are implemented. Package cleanup policies and
-their Quartz scheduler remain P11; cold-tier archive policies remain P16. P24 owns
+their Quartz scheduler remain P11. The additional path-pattern wire field whose
+contract is unsettled is deferred to P19 observations and P19a implementation; its
+absence does not defer documented package-policy execution. Build/bundle policies
+still belong to P24; cold-tier archive policies remain P16. P24 owns
 release-bundle lifecycle cleanup, P35 owns multi-node scheduling, and P38 owns background
 task inspection and pruning controls. These are separate exits in the
 [capability roadmap](../../implementation/capability-roadmap.md); the existing persistent

@@ -3,10 +3,10 @@
 Status: **Proposed design**, researched on **2026-10-21** for
 [#614](https://github.com/weaveplatform/artifactweave/issues/614). P9 provides the source
 extension point; [#487](https://github.com/weaveplatform/artifactweave/issues/487) remains
-open for P11 implementation and acceptance. The [2026-11-19 contract audit](../research/project-scoped-remotes-contract-audit.md)
+open for P19a implementation and acceptance after P19 observations. The [2026-11-19 contract audit](../research/project-scoped-remotes-contract-audit.md)
 refreshes the release and schema evidence below. The durable authority foundation is
-part of P11; project administration, source selection and retrieval still require the
-complete matrix. This document does not claim those APIs or downloads are implemented.
+part of P11. P11 owns documented project administration and standard sharing;
+P19a owns project-aware source selection/retrieval and the complete matrix. This document does not claim those APIs or downloads are implemented.
 
 The shared retrieval contract is owned by
 [#613](https://github.com/weaveplatform/artifactweave/issues/613), in
@@ -14,7 +14,7 @@ The shared retrieval contract is owned by
 [decision 0007](../research/decisions/0007-remote-repositories.md). Its cache/freshness
 rules apply unless this document adds a stricter project authorization boundary.
 [Decision 0013](../research/decisions/0013-projects-and-environments.md) owns projects;
-the [capability roadmap](capability-roadmap.md) preserves the P9/P11 split.
+the [capability roadmap](capability-roadmap.md) preserves the P9 design / P11 foundation / P19a completion split.
 
 ## Evidence and version boundary
 
@@ -67,7 +67,7 @@ records main `621523d38`. The P11 authority foundation preserves these activatio
   [Source requests](../../internal/artifacts/adapters/http/pkgroute/source.go) derive the
   receiving project from repository configuration. Existing production revalidation uses
   [current identity and a fresh permission decider](../../internal/artifacts/module.go),
-  which P11 must extend with current project/share authority. Ordinary item and Docker
+  which P19a must extend with current project/share authority. Ordinary item and Docker
   routes keep their distinct delivery seams under the same source policy.
 
 P9 registers only the external HTTP implementation. Neither a loopback URL nor an unknown
@@ -95,7 +95,7 @@ Standalone reads retain their existing value contract; a coherent combined snaps
 requires one caller transaction. No transaction may span upstream I/O or streaming.
 
 Project-aware publication must acquire the project guard before artifact repository/source
-and cache/item locks. P11 must compose that order into the existing publication checks;
+and cache/item locks. P19a must compose that order into the existing publication checks;
 the current external-only source does not acquire project authority. The foundation does
 not resolve the missing sharing-mode wire API or discharge the completion matrix below.
 
@@ -150,7 +150,9 @@ own configured credentials after the internal permission decision allows that fe
 The request's audit record retains the initiating subject, receiving project, consumer
 repository and producer; it never presents the fetch as an administrator's read.
 
-## P11 configuration and authorization
+<a id="p11-configuration-and-authorization"></a>
+
+## P19a configuration and authorization
 
 **[I] Proposed validation**, except where the evidence table gives an explicit contract:
 
@@ -160,11 +162,11 @@ repository and producer; it never presents the fetch as an administrator's read.
 | Internal remote | Require `rclass=remote`, a real consumer project and a different producer project, `projectScopedReadUpstream=true`, and a source of the same package type returned by the connectability policy. Bind `upstreamRepoKey` to the current producer incarnation. |
 | `upstreamProjectKey` | Derive the producer owner from authoritative assignment. If supplied, require agreement; do not trust it to grant access. Capture the exact input/output/default behavior before publishing the schema. |
 | Conflicting HTTP/internal settings | Refuse an internal source with a nonempty URL or explicit HTTP credentials/proxy/header/certificate overrides. Clear old transport secrets atomically when converting HTTP to internal; require an explicit mode switch and new URL to convert back. Vendor treatment of redundant URL fields remains a capture case. |
-| Source class | Initially local or remote, matching the sharing API's documented classes. A virtual/federated source must remain an explicit #487/P11 contract question, not an accidental consequence of recursive lookup. |
+| Source class | Initially local or remote, matching the sharing API's documented classes. A virtual/federated source must remain an explicit #487/P19a contract question, not an accidental consequence of recursive lookup. |
 | Self-reference or cycle | Refuse before commit, including a cycle introduced by a batch update. Runtime resolution also checks the visited-incarnation chain and a bounded depth, so stale/imported graphs cannot recurse indefinitely. |
 | Consumer project change | Revalidate the entire connection against the new project, rotate its source generation and reject an invalid new assignment atomically. Existing cache/grants cannot move implicitly with the key. |
 
-P11 must extend the assignment model with a repository-wide sharing mode (`Direct` or
+P19a must extend the assignment model with a repository-wide sharing mode (`Direct` or
 `ProjectAware`), a share permission ceiling and a durable revision. Keep the set of
 receiving projects, including all-project shares, distinct from the producer owner.
 Do not infer the new mode from `SharedReadOnly`: direct read-only sharing already exists
@@ -172,7 +174,7 @@ as a separate concept. The exact new wire field is unresolved; the model names h
 internal only. Connection rows bind both repository incarnations and project identities
 and support reverse lookup for `projectScopedConsumers`.
 
-For each request, the P11 authorizer performs these checks in order:
+For each request, the P19a source authorizer performs these checks in order:
 
 1. Resolve the consuming repository incarnation, project and source binding; authenticate
    the caller. Apply repository availability, include/exclude patterns and consumer Read
@@ -188,7 +190,7 @@ For each request, the P11 authorizer performs these checks in order:
    capability. The permission permits system cache population only; PUT/deploy remains
    disallowed through the internal remote.
 4. Apply later receiving-project governance hooks (P26/P27) before disclosing cached or
-   fetched content. Their absence remains visible; P11 does not claim scanning or Curation
+   fetched content. Their absence remains visible; P19a does not claim scanning or Curation
    complete. Preserve the receiving context needed for usage attribution and P40 services.
 
 These rules also apply to HEAD, conditional 304 responses, range reads, native metadata
@@ -235,7 +237,7 @@ on a concurrent caller's authorized external fill.
 | Consumer source or project changes | Conditionally publish only against the old expected generation; old fills/refreshes cannot overwrite the new connection's cache. |
 | Producer item removed but repository/share survives | Distinct from revocation: normal freshness rules determine cached-content reuse. Source item absence alone does not grant new rights or erase consumer cache. Capture exact vendor behavior under #487. |
 
-Revocation is a database state change, not a best-effort purge job. P11 must update the
+Revocation is a database state change, not a best-effort purge job. P19a must update the
 share/connection revision in the same transaction as the mutation. Revalidation reads
 that revision and current authorization; background jobs and flight waiters must not
 reuse an old permit. Cache commit uses a conditional generation/revision check. If a
@@ -249,7 +251,9 @@ ordinary object-store/CDN bearer URLs cannot enforce later unsharing. A future r
 needs a capability that rechecks the connection and policy on every redemption, and must
 remain tracked under #487 until that proof exists.
 
-## P11 completion matrix for #487
+<a id="p11-completion-matrix-for-487"></a>
+
+## P19a completion matrix for #487
 
 Use producer project `alpha`, consumer project `beta`, a same-format producer repository,
 and `beta-source` as the internal remote. A second consumer with different permissions
@@ -268,12 +272,12 @@ settle undocumented Artifactory statuses.
 | Admin boundaries | Project admin can query only its documented scope; a consumer-list query without project scope requires platform admin. Unauthorized filters reveal no other project's repositories. |
 | Credentials and representation | No loopback/admin credential, producer credential leakage or rewritten producer URL. Narrow and broad principals cannot share filtered metadata incorrectly. |
 | Native and virtual paths | At least two native ecosystems plus a generic download prove warm/cold/revoked behavior; P10 virtual membership uses the same permit and visited chain. P9 must not enable unfinished virtual behavior accidentally. |
-| Parity closure | Remove only gaps whose fields/routes and effective behavior pass; run generation/parity/status/principal checks. #487 closes only with the P11 matrix, not this design. |
+| Parity closure | Remove only gaps whose fields/routes and effective behavior pass; run generation/parity/status/principal checks. #487 closes only with the P19a matrix, not this design. |
 
 ## Remaining capture questions and handoff
 
 The fresh audit establishes the announced feature releases and discovery response schemas.
-P11/#487 still owns the sharing-mode API field, accepted producer-class edges, redundant
+P19a/#487 owns the sharing-mode API field, accepted producer-class edges, redundant
 HTTP settings, `upstreamProjectKey` input/default behavior and exact failure edges. The
 documented consumer `created` value is share time, not consumer repository creation time.
 Do not guess a wire field from an internal model name. Request source-backed fixtures
@@ -284,7 +288,7 @@ choices above: cache-only denial after unshare, incarnation/rebind behavior, aut
 race/admission semantics, filtered metadata partitioning, producer item deletion versus
 repository deletion, cycle rejection, direct-source denial exceptions and redirect
 revocation. Document any deliberate stronger boundary as a deviation; do not weaken
-revocation to mimic a vendor cache bypass. Root will add this inventory and the P9/P11
+revocation to mimic a vendor cache bypass. Root will add this inventory and the P9/P11/P19a
 split to #487/#216 when publishing the design PR; this document does not claim those
 GitHub updates have occurred.
 
@@ -298,7 +302,7 @@ boundary without enabling production HTTP retrieval; #617/#618 provide transport
 credential isolation; #619 owns durable repository/source identities and conditional
 cache publication; #620 supplies cache policy; #621 enables the generic remote route.
 Until those pieces are connected, existing runtime class gates remain. P10 alone enables
-virtual traversal, and P11 supplies project/share identity revisions and enforcement.
+virtual traversal, and P11 supplies authority foundations; P19a composes them into project-aware source enforcement.
 
 The implemented P9 injection API and its activation gates are documented in
 [Remote source read boundary](source-boundary.md).

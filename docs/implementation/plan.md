@@ -35,12 +35,12 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P6 Docker/OCI | Done (2026-10-16) | Epic #217; research 23 and decision 0031. Repository-path routing on `/v2` and Artifactory's prefix with the subdomain option; the Bearer challenge and short-lived registry tokens (#221, #248); blobs with resumable uploads and cross-repository mount; manifests in Artifactory's storage layout; manifest lists and indexes with `subject` and the referrers API; tags, catalogs and deletes; Docker tags in the package index with tag retention; promote and parent manifest lists. The OCI distribution-spec v1.1.1 suite passes all four categories (73 pass, 6 skipped by design, decision 0031), and `docker`, `crane`, `oras`, `cosign`, `jf docker push/pull`, `jf rt build-docker-create` and `jf rt docker-promote` round-trip in acceptance (#229). With P7, milestone M2 |
 | P7 npm, Go, Maven locals | Done (2026-10-19) | **M2** reached, with P6. Epic #261; research 24 to 27 and decisions 0032 to 0036. Format framework v2 with the `formattest` contract and the persistent work queue; npm packuments, publish, dist-tags, deprecate, unpublish, search, legacy login and logout, `api/npm/auth`, reindex and the strict-layout conversion; the GOPROXY reads and `jf go-publish`; Maven deploy rules, metadata at three levels, `snapshotVersionBehavior`, version tokens, `calculateMetadata`, `generatePom` and `maxUniqueSnapshots`, with the Gradle, Ivy and SBT layouts. npm 11 and 12, the `go` command, Maven 3.10 and 3.9, `jf npm`, `jf go-publish` and `jf mvn` round-trip in acceptance and the Terraform scenario applies the four repository types (#275, #284, #294, #295); `jf gradle` runs informationally. Web login (#262) and package signatures (#362) remain separately tracked follow-ups outside the completed P7 milestone |
 | P8 PyPI, NuGet, Helm, Terraform locals | Done (2026-10-21) | Epic #526; research 28 to 32 and decisions 0037 to 0041. PyPI, NuGet v2/v3 with PDB symbol serving, classic/OCI Helm, Terraform module/provider registries and the remote state backend round-trip with their native clients. Shared REST deploy, copy, delete, trash restore and completed reindexes preserve format reads; JFrog's Terraform providers manage all seven P8 repository types (#560). Browser approval (`login.v1`) remains #262; pasted-token Terraform login is verified |
-| P9 Remote repositories | Done (2026-10-22) | Shared source/HTTP/security/cache foundation, generic and native-format retrieval, [cache maintenance](remote-cache-maintenance.md), [Smart Remote synchronization](smart-remote.md), browsing, permission-safe upstream search (#213/#672), NuGet v2/symbols (#629), cached-package reindex (#700) and transitive AQL (#636) are implemented. The [all-15 public-upstream run](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314) and [#708 merged-main full gate](https://github.com/weaveplatform/artifactweave/actions/runs/39810238539) passed. #487's runtime sharing completion belongs to P11 |
+| P9 Remote repositories | Done (2026-10-22) | Shared source/HTTP/security/cache foundation, generic and native-format retrieval, [cache maintenance](remote-cache-maintenance.md), [Smart Remote synchronization](smart-remote.md), browsing, permission-safe upstream search (#213/#672), NuGet v2/symbols (#629), cached-package reindex (#700) and transitive AQL (#636) are implemented. The [all-15 public-upstream run](https://github.com/weaveplatform/artifactweave/actions/runs/39807833314) and [#708 merged-main full gate](https://github.com/weaveplatform/artifactweave/actions/runs/39810238539) passed. #487's runtime sharing completion belongs to P19a; P11 supplies project foundations |
 | P9b Newly identified Artifactory formats | Native paths implemented; qualification evidence #693 | LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages have their documented repository classes and native paths. NIM's documented NGC model API and separate Docker pull are implemented; target runtime wire parity remains #216 |
 | P9c Native package catalog coverage | Done (2026-11-04) | All 28 format tasks and #789/#791/#843/#844/#852/#853 follow-ups are merged. The [class/client matrix](package-format-matrix.md), [CI evidence](../testing/phase9c-ci-signoff.md) and [combined qualification ledger](../testing/phase9c-signoff.md) retain #810/#792's passing final merged-main and current-release gates. P29 to P33 must not count these implementations again |
 | P9d Modular-monolith migration | Done (2026-11-11) | Behaviour-preserving move to the layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md); code was staged under `migration/` and promoted to `internal/`, and [p9d-path-map.json](p9d-path-map.json) maps each legacy path to its final one. The [Phase 9d qualification record](../testing/phase9d-signoff.md) holds [PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104)'s merged-main, real-cloud and release evidence. |
 | P10 Virtual repositories | Implementation delivered; qualification in progress | **M3**; [qualification and epic closeout](../testing/phase10-signoff.md), final completion record in [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528) |
-| P11 Projects, webhooks, retention, replication | Not started | |
+| P11 Projects, events, cleanup and single replication | Foundations delivered; remaining implementation planned | Private project authority and role/membership services merged in #1730/#1731; documented APIs and runtime exits remain to be delivered |
 | P12 Descriptor export, system configuration, LDAP | Not started | |
 | P13 Peer trust and federated repositories | Not started | |
 | P14 Platform federation and topology | Not started | |
@@ -49,6 +49,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P17 Workers | Not started | **M4** |
 | P18 Hardening and release | Not started | Release-wide hardening and acceptance; published early releases do not complete this phase |
 | P19 Live Artifactory comparison and tidy-up | Not started | After P18. Brings artifactweave up to the latest Artifactory 7.x release: one comparison against a JFrog trial of that release for everything earlier phases could only infer (#216) |
+| P19a Observation-dependent compatibility | Not started | After P19: project-aware remotes #487, observed webhook delivery/test/troubleshooting and cleanup additions; separate implementation and qualification |
 | P20 Capability inventory and contract coverage | Not started | Operation/client/format ownership and an automated unmapped-gap check |
 | P21 Browser and enterprise authentication | Not started | #262; SAML, human OIDC/OAuth, Crowd, HTTP-SSO, sessions and MFA |
 | P22 SCIM and identity lifecycle | Not started | Provisioning, group reconciliation, deactivation and revocation |
@@ -81,7 +82,7 @@ of 2026-10-21, separate from the dated exit evidence above.
 | Issue | Current state and next dependency |
 |---|---|
 | [#213: upstream version searches](https://github.com/weaveplatform/artifactweave/issues/213) | P9 task 5 implemented: authoritative Maven metadata and bounded layout listings, cache-only aliases, current visibility and failure policy; [behavior and live-capture obligations](../operations/upstream-search.md) |
-| [#487: project-scoped remotes](https://github.com/weaveplatform/artifactweave/issues/487) | Fields, admin endpoints and upstream resolution remain absent. P9 owns the source design; P11 owns completion with project sharing and authorization |
+| [#487: project-scoped remotes](https://github.com/weaveplatform/artifactweave/issues/487) | P9 source design and merged P11 authority/role foundations are delivered; P11 owns documented project administration and standard sharing, while P19a owns observed project-aware connection/discovery/retrieval completion |
 | [#362: npm package signatures](https://github.com/weaveplatform/artifactweave/issues/362) | P28 owns local ECDSA signing, key discovery and native `npm audit signatures` acceptance; it can be pulled forward independently of P9 |
 | [#262: browser approval login](https://github.com/weaveplatform/artifactweave/issues/262) | P21 owns shared npm web login and Terraform `login.v1` with PKCE. P7 legacy npm login and P8 Terraform pasted-token login are implemented |
 | [#303: anonymous registry acceptance](https://github.com/weaveplatform/artifactweave/issues/303) | Explicitly blocked on P12 applying `security.anonAccessEnabled`; the scenario must grant anonymous Read rather than relying on the seed permission |
@@ -96,7 +97,7 @@ of 2026-10-21, separate from the dated exit evidence above.
 | M2 first ecosystems | P7 | Docker (repository-path method, OCI conformance green), npm, Go and Maven local repositories work with their native clients |
 | M3 proxy and virtual | P9b and P10 | The original eight format families resolve through remote and virtual repositories; P9b's five new types pass their documented class and native-client exits, including LuaRocks virtual resolution |
 | M4 peer services and distribution | P17 | Federated repositories converge across three artifactweave peers; users and permissions federate; a release bundle is signed, distributed to an edge peer and verified; an archive policy moves packages to the cold tier and restores them; TypeScript Workers run on download and create events |
-| Release hardening | P18 | Everything above plus projects, webhooks, cleanup policies, single replication, build-info, hardening, signed binaries and a container image |
+| Release hardening | P18 | Everything above plus the delivered P11 project/event/subscription-administration/cleanup/single-replication scope, build-info, hardening, signed binaries and a container image; P19a owns observation-dependent completion |
 | M5 enterprise identity | P22 | Browser/native login and external authentication work; SCIM provisioning/deactivation changes effective access |
 | M6 supply-chain governance | P27 | Evidence, releases, applications, security findings and admission decisions compose into a verified release workflow |
 | M7 ecosystem coverage | P33 | Every inventoried package type has native-client proof for its supported repository classes |
@@ -127,7 +128,7 @@ flowchart LR
   P8 --> P9
   P9 --> P9d[P9d Modular-monolith migration]
   P9d --> P10[P10 Virtual]
-  P5 --> P11[P11 Projects, webhooks, retention, replication]
+  P5 --> P11[P11 Projects, events, cleanup, single replication]
   P10 --> P11
   P11 --> P12[P12 Descriptor, system config, LDAP]
   P11 --> P13[P13 Peer trust + federated repos]
@@ -143,9 +144,10 @@ flowchart LR
   P17 --> P18
   P4b --> P18
   P18 --> P19[P19 Live Artifactory comparison]
+  P19 --> P19a[P19a Observation-dependent compatibility]
 ```
 
-**Critical path:** P0 → P1 → P1b → P2 → P3 → P4 → P6 → P9 → P9d → P10 → P11 → P13 → P15 → P18 → P19.
+**Critical path:** P0 → P1 → P1b → P2 → P3 → P4 → P6 → P9 → P9d → P10 → P11 → P13 → P15 → P18 → P19 → P19a.
 
 **Parallel lanes:** P16 and P17 run beside P13 to P15 once P11 has landed; P12 runs
 beside all of them. P5 runs beside P6 to P8. P6, P7 and P8 are independent of each other
@@ -163,7 +165,7 @@ Only a documented replacement and migration can justify excluding an older inter
 API-key creation is such a narrow case; an entire capability is not removed merely
 because one implementation or protocol is old.
 
-P9 to P19 keep their existing delivery sequence. P20 establishes the expanded contract
+P9 to P19 keep their delivery order with the revised independently completable P11 scope. P19a follows P19 for the deferred observation-dependent implementation. P20 establishes the expanded contract
 baseline after that first live comparison. P21/P22, P23 to P27, P28 to P33 and P34 to P38 are
 separate lanes once their named prerequisites hold; the numbering is not a requirement
 to serialize independent work. P39/P40 integrate the services and P41 qualifies the
@@ -172,7 +174,8 @@ provided its phase and issue keep the evidence and dependencies.
 
 ```mermaid
 flowchart LR
-  P19 --> P20[Contract inventory]
+  P19 --> P19a[Observation-dependent compatibility]
+  P19a --> P20[Contract inventory]
   P20 --> P21[Enterprise authentication] --> P22[SCIM]
   P20 --> P23[Evidence] --> P24[Lifecycle and RBv2] --> P25[AppTrust]
   P20 --> P26[Security intelligence] --> P27[Advanced Security and Curation]
@@ -1135,21 +1138,63 @@ These PR results precede the final full validation on merged main; they do not
 mark M3 or P10 complete.
 P13 owns peer federation and P35 owns multi-node cache coordination.
 
-## P11: Projects, webhooks, retention, replication
+<a id="p11-projects-webhooks-retention-replication"></a>
+
+## P11: Projects, events, cleanup and single replication
 
 Decisions: [0010](../research/decisions/0010-retention-trash-and-gc.md),
 [0011](../research/decisions/0011-webhooks.md),
-[0013](../research/decisions/0013-projects-and-environments.md).
+[0013](../research/decisions/0013-projects-and-environments.md),
+[0033](../research/decisions/0033-persistent-work-queue.md).
+
+**Allocation decision (2026-11-19).** P11 contains the documented behavior and
+project-owned infrastructure that can be implemented before vendor observations. It
+has its own complete exit; observation-dependent behavior belongs to the distinct
+[P19a](#p19a-observation-dependent-compatibility) phase after P19. This is a scope
+refactor, not a P11a/P11b split or a P11 sign-off waiting for P19.
+
+**Delivered foundations.** #1730 and #1731 provide private durable project authority,
+roles/membership services and identity-deletion cleanup. They do not activate the
+project administration or project-aware source workflows. Reuse their merged work.
+
+**Tracking.** [P11/P19a implementation baseline #1736](https://github.com/weaveplatform/artifactweave/issues/1736)
 
 **Tasks**
-1. Projects API with roles, membership, attach (204, synchronous `projectKey` on the repo), share, environments, key prefix enforcement, `soft_limit` and quota accounting.
-2. Webhooks with the exact event names, criteria, both handler types, signing, retries, delivery log, `test` and `troubleshooting`.
-3. Package cleanup policies with the scheduler, dry runs, run reports, enablement, force-disable.
-4. Single push and pull replication between two instances; replication config CRUD and `execute`.
+1. Serve project lifecycle, roles/membership, environments, synchronous repository
+   attach/detach and documented standard share/unshare. Enforce prefixes, effective
+   role/environment/token ceilings, granular administration, quota accounting and
+   configured soft/hard-limit behavior. Standard read-only sharing does not implement
+   the unresolved project-aware repository sharing mode.
+2. Generalize the existing transactional outbox for typed module events and independent
+   consumer positions. Emit artifact/property/Docker/build/user events in the service
+   mutation transaction and dispatch through durable work with rollback, lease-loss,
+   deduplication and restart proof. P12–P17 depend on the P11 contracts they consume.
+3. Implement webhook subscription CRUD, both handler configurations, criteria and
+   template validation, sealed-secret lifecycle and redacted reads. Qualify the 24
+   subscription resources required by the plan. Their management does not claim
+   outbound delivery, signature, test or troubleshooting support.
+4. Implement package cleanup policy administration, shared Quartz scheduling,
+   package-index/version-aware selection, enablement, dry runs, actual execution,
+   stop/force-stop/force-disable and accurate run reports. Preserve trash/GC semantics.
+   Unconfirmed additional path-pattern wire fields belong to P19a; build/bundle
+   cleanup and archive policies retain P24/P16 ownership.
+5. Implement single push and pull replication between two instances: configuration,
+   sealed credentials, applicable controls, execute/status, scheduling and recoverable
+   transfer. Reuse P9 transport/source controls and the durable work queue. P13 peer
+   pairing and P37 multi-push/event/checksum protocols are separate capabilities.
 
 **Exit criteria**
-- `jfrog/project` resources and the 24 webhook resources apply, plan clean, destroy.
-- Deliveries observed by a chi receiver; a cleanup dry run produces a report; replication syncs a repository.
+- Project provider resources and all 24 planned subscription resources apply, plan
+  clean and destroy with current authorization, secret-redaction and API-effect proof.
+- Committed service events reach independent consumers after restart; rolled-back
+  changes publish no event and unrelated events are never lost by queue coalescing.
+- A cleanup dry run reports eligible packages without changing bytes; an actual run,
+  cancellation and report agree with observed storage effects.
+- Single push and pull synchronize repositories consumed through a representative
+  native client, with truthful status and interruption/revocation/restart evidence.
+- The combined actual-main full gate meets the unchanged 95% total/90% per-package
+  floors and required SQL/client/provider/fault checks. No P19/P19a ticket blocks this
+  exit. #487 and vendor webhook execution remain visible P19a capabilities.
 
 ## P12: Descriptor export, system configuration, LDAP
 
@@ -1268,14 +1313,16 @@ Decision: [0016](../research/decisions/0016-observability-and-health.md).
 3. goreleaser with signed binaries and a distroless container image; operations docs completed.
    Landed early: the binaries, checksums, SBOMs and keyless signature with #507, and the
    signed multi-arch distroless image on GHCR with #510.
-4. Decision records moved to Accepted.
+4. Review decision records for the delivered scope and move settled decisions to Accepted.
+   Sections governing observation-dependent P19a behavior retain their unresolved
+   status and receiving owner; this release does not claim those capabilities.
 
 **Exit criteria**
-- A release covering the completed phases is tagged; the full Terraform fixture applies clean against a fresh instance; the manual smoke list in [testing/ci.md](../testing/ci.md) passes against the container image. Select its version at this milestone; the original `v0.1.0-rc` target predates the early releases noted above.
+- A release covering the completed pre-observation phases and revised P11 scope is tagged; the full applicable Terraform fixture applies clean against a fresh instance; the manual smoke list in [testing/ci.md](../testing/ci.md) passes against the container image. Select its version at this milestone; the original `v0.1.0-rc` target predates the early releases noted above.
 
 ## P19: Live Artifactory comparison and tidy-up
 
-Decided on 2026-10-16: P1 to P18 are implemented first, and the comparison with a real
+Decided on 2026-10-16, with P11 scope refactored on 2026-11-19: P1 to P18 are implemented first, and the comparison with a real
 Artifactory runs once, here, against a JFrog trial instance, rather than as captures along the
 way. Until then every phase labels what it can only infer, as [I] in the research documents and
 as entries in the [deviations register](deviations.md), and adds each such item to #216.
@@ -1293,6 +1340,13 @@ OSS 6.20 code is confirmed or corrected against it
 
 **Tracking.** Milestone "P19 Live Artifactory comparison and tidy-up", starting with #216.
 
+**P19a capture handoff.** Observe project-aware producer sharing/connection and the
+full #487 matrix; webhook signed/unsigned requests, byte-sensitive payloads, actor
+context, custom handlers, test and troubleshooting responses; and the additional
+cleanup path criteria. Capture the vendor even when artifactweave has not implemented
+that contract. P19a consumes those fixtures after this observation gate. P19 does not
+wait for P19a implementation, avoiding a circular prerequisite.
+
 **Tasks**
 1. Read the 7.x release notes from the release each research document was last checked
    against up to the trial's release. Add every behaviour change in an area artifactweave
@@ -1304,20 +1358,55 @@ OSS 6.20 code is confirmed or corrected against it
    claim sourced from the 6.20 code, and every related deviation whose Artifactory side is
    unconfirmed. Newly identified later-family captures retain their P20 to P41 owners.
 4. Replace inferred fixtures with captured ones. Each divergence becomes a fix, or a deviation
-   recorded with the captured evidence.
+   recorded with the captured evidence. Observation-dependent deferred scope becomes an
+   evidence-backed P19a implementation ticket; capture completion does not imply feature delivery.
 5. Settle the decisions that rest on inferences, amending them in place, and update each
    document's `Checked against` release.
 
 **Exit criteria**
-- Every item on #216 is either matched by a captured fixture or recorded as a deviation with
-  evidence; no [I] fact remains where a capture could settle it.
+- Every item on #216 has captured evidence and is matched by an implemented fixture,
+  recorded as a deviation, or assigned to its explicit P19a implementation ticket; no [I] fact remains where a capture could settle it.
 - Every research document and decision for P0 to P18 is checked against the trial's release,
   and no claim in that scope rests on the 6.20 source alone where the trial could settle it.
 
 
+## P19a: Observation-dependent compatibility
+
+**Depends on:** P19 captured contracts and the specific delivered P11 services used
+by each implementation. P11 has already completed its own exit. Existing P20–P41
+phase numbers are retained.
+
+**Tracking.** [P11/P19a implementation baseline #1736](https://github.com/weaveplatform/artifactweave/issues/1736); existing [#487](https://github.com/weaveplatform/artifactweave/issues/487)
+retains its feature scope, delivery history and complete acceptance matrix here.
+
+**Tasks**
+1. Complete project-scoped remote configuration, producer sharing-mode administration,
+   connectable/consumer discovery and effective native retrieval from P19 observations.
+   Prove warm/in-flight revocation, source/project delete-recreate, cycles, filtered
+   metadata and signed/redirect delivery authority before closing #487.
+2. Turn P19 webhook observations into sanitized byte-sensitive fixtures, then implement
+   serialization, signing/authentication, actor context, both handler executions,
+   durable per-delivery retry/order, attempt logs, test and troubleshooting operations.
+   Qualify delivered producer domains through a controlled receiver; later expanded
+   product phases retain their own producer completion.
+3. Implement the cleanup path criteria established by P19, including exact wire fields,
+   combined selection and dry-run/run/report effects, or retain evidence of absence or
+   supersession rather than inventing a schema.
+4. Qualify the full observed scope on actual merged main with native/provider/receiver,
+   SQL migration, authorization, rollback and recovery evidence.
+
+**Exit criteria**
+- Each feature traces to captured vendor contracts or an evidence-backed deviation;
+  no guessed public field or schema-only success stands in for runtime completion.
+- The #487 matrix, receiver-observed webhook delivery/test/troubleshooting and cleanup
+  additions pass, with the unchanged full 95% total/90% per-package gate.
+- P20 execution can use this completed baseline; inventory discovery/planning may
+  proceed independently before this exit. Epic closure remains maintainer-owned.
+
+
 ## P20: Capability inventory and contract coverage
 
-**Depends on:** P19's first comparison baseline. Scope planning and inventory discovery
+**Depends on:** P19's observation baseline and P19a implementation qualification. Scope planning and inventory discovery
 begin now; this phase delivers the contract tooling and executable coverage controls.
 
 **Tasks**

@@ -138,7 +138,9 @@ Alternatives considered:
   transit fails verification.
 - Retention v1 tests over synthetic bundle histories, including keep marks.
 - Terraform: `artifactory_distribution_public_key` and the release bundle and distribution
-  webhook domains apply and fire.
+  webhook domains apply in P15 and commit their typed producer events. Their
+  receiver-observed delivery is qualified by P19a after P19 captures the transport
+  contract; P15 does not wait for that deferred compatibility proof.
 
 ## References
 
