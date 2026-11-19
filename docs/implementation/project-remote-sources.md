@@ -3,8 +3,10 @@
 Status: **Proposed design**, researched on **2026-10-21** for
 [#614](https://github.com/weaveplatform/artifactweave/issues/614). P9 provides the source
 extension point; [#487](https://github.com/weaveplatform/artifactweave/issues/487) remains
-open for P11 implementation and acceptance. This document implements no project API,
-repository field or download behavior.
+open for P11 implementation and acceptance. The [2026-11-19 contract audit](../research/project-scoped-remotes-contract-audit.md)
+refreshes the release and schema evidence below. The durable authority foundation is
+part of P11; project administration, source selection and retrieval still require the
+complete matrix. This document does not claim those APIs or downloads are implemented.
 
 The shared retrieval contract is owned by
 [#613](https://github.com/weaveplatform/artifactweave/issues/613), in
@@ -21,25 +23,29 @@ the [capability roadmap](capability-roadmap.md) preserves the P9/P11 split.
 No live Artifactory instance was used. The ordinary compatibility baseline remains
 7.161.32; this newer feature must not be presented as observed in that release.
 
-| Primary source, checked 2026-10-21 | Contract established |
+| Primary source, refreshed 2026-11-19 | Contract established |
 |---|---|
 | [Remote repositories](https://docs.jfrog.com/artifactory/docs/remote-repositories) | **[D]** HTTP upstreams and same-platform project repository upstreams are distinct. The internal selector requires a compatible package type and a project-aware share. Native clients cannot deploy artifacts to a remote repository. |
-| [Sharing guide](https://docs.jfrog.com/projects/docs/share-repositories-across-multiple-projects) | **[D]** The feature is rolling out on SaaS; self-managed support is forthcoming. Internal requests retain user and receiving-project identity. Direct receiving-project reads of the producer key are refused. Share ceilings, project actions and platform permissions all constrain access. Read-only consumers use existing cache; filling a shared remote from its external upstream requires Write and a writable share. Shared local deployment is unavailable through an internal remote. Same-project and All Projects connections are unavailable. Source deletion breaks connections. |
+| [Sharing guide](https://docs.jfrog.com/projects/docs/share-repositories-across-multiple-projects) | **[D]** Internal requests retain user and receiving-project identity. Direct receiving-project reads of the producer key are refused. Share ceilings, project actions and platform permissions all constrain access. Read-only consumers use existing cache; filling a shared remote from its external upstream requires Write and a writable share. Shared local deployment is unavailable through an internal remote. All-project sharing is supported; the owner project and All Projects administrative context cannot create the connection. Source deletion breaks connections. |
 | [Create repository](https://docs.jfrog.com/artifactory/reference/createrepository) and [update repository](https://docs.jfrog.com/artifactory/reference/updaterepositoryconfiguration) | **[D]** `projectScopedReadUpstream: true` selects `upstreamRepoKey`; `url` is then optional. A source absent from the connectable list is a 400. Switching back requires `projectScopedReadUpstream: false` and a URL. |
-| [Connectable repositories](https://docs.jfrog.com/artifactory/reference/getconnectablerepositories) | **[D]** `GET /artifactory/api/admin/projects/{projectKey}/connectableRepos` requires that project's admin or a platform admin. Filters are `targetPackageType`, `keySearch`, `limit`. Documented responses: 200/400/401/403/503. |
-| [Project-scoped consumers](https://docs.jfrog.com/artifactory/reference/getprojectscopedconsumers) | **[D]** `GET /artifactory/api/admin/repositories/{repoKey}/projectScopedConsumers` requires a platform admin, or a project admin when `projectKey` is supplied. That query filters consumers; `limit` bounds results. Documented responses: 200/400/401/403/503. |
+| [Connectable repositories](https://docs.jfrog.com/artifactory/reference/getconnectablerepositories) | **[D]** `GET /artifactory/api/admin/projects/{projectKey}/connectableRepos` requires that project's admin or a platform admin. Filters are `targetPackageType`, `keySearch`, `limit`. Documented responses: 200/400/401/403/500/503. |
+| [Project-scoped consumers](https://docs.jfrog.com/artifactory/reference/getprojectscopedconsumers) | **[D]** `GET /artifactory/api/admin/repositories/{repoKey}/projectScopedConsumers` requires a platform admin, or a project admin when `projectKey` is supplied. That query filters consumers; `limit` bounds results. Documented responses: 200/400/401/403/500/503. |
 | [Unsharing](https://docs.jfrog.com/projects/docs/unshare-repositories-across-projects) | **[D]** Unsharing denies connected internal remote requests. The consumer repository remains until deleted or reconfigured. |
 | [Target share API](https://docs.jfrog.com/projects/reference/sharerepositorywithtargetproject), [all-project share API](https://docs.jfrog.com/projects/reference/sharerepositorywithallprojects) and [ownership changes](https://docs.jfrog.com/projects/docs/change-repository-ownership-from-project-to-project) | **[D]** Sharing requires platform administration and does not transfer ownership. The target API exposes `readOnly`; these references do not specify the new sharing-mode wire field. Ownership can be reassigned. |
 
-The SaaS and self-managed release histories were searched for project-aware and
-project-scoped remote introductions; no numbered introduction was verified. The sharing
-guide's rollout statement is the available version evidence. P11 must capture the first
-applicable build and its behavior; a repository-create endpoint's historical `Since`
-version is not the introduction date of these fields.
+The [SaaS release notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71734-saas)
+announce gradual rollout beginning with 7.173.4 (2026-10-08). The
+[self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71738-self-managed)
+include the feature in 7.173.8 (2026-10-26), enabled by
+`artifactory.project.context.repo.sharing.mode=true`. These establish the documented
+introduction, not a live tenant's activation or wire responses. An operation's historical
+`Since` version is not the introduction date of its new fields. The exact sharing-mode
+mutation API remains unresolved; see the fresh audit before publishing a public field.
 
 ## Current implementation and P9 boundary
 
-The source inspection for this design is against the P8 baseline:
+The [fresh source audit](../research/project-scoped-remotes-contract-audit.md#what-exists-at-the-audited-project-commit)
+records main `621523d38`. The P11 authority foundation preserves these activation gates:
 
 - **[S]** [repo.Config](../../internal/artifacts/api/repo/repo.go) has none of the three new
   fields; [validation](../../internal/artifacts/api/repo/validate.go) requires `url` for every
@@ -52,16 +58,17 @@ The source inspection for this design is against the P8 baseline:
   gaps across create/update/read/batch/list shapes and both missing admin operations.
   Those operations have no authored routes; do not describe them as implemented or as
   deliberate successful empty lists.
-- **[S]** [ProjectStore](../../internal/access/core/port/projects.go) and
-  [RepositoryAssignment](../../internal/access/core/model/project.go) already hold ownership, environments,
-  shares and a read-only flag. They do not model project-aware sharing mode, connection
-  identity or a monotonic authorization revision. [authz](../../internal/access/core/authz/authz.go)
-  evaluates current identity/permission/token rules; that is not proof of P11 sharing
-  administration or project-aware read enforcement.
-- **[S]** [pkgroute.Source](../../internal/artifacts/adapters/http/pkgroute/pkgroute.go) returns persisted
-  items. #616 extends that seam for remote metadata, queries and streams without importing
-  server packages into formats. Ordinary item and Docker routes must use the same source
-  policy even though their routing adapters differ.
+- **[S]** [ProjectStore](../../internal/access/core/port/projects.go) retains the existing
+  project/assignment value shapes and gains separate lifetime and policy/share authority
+  records. Those records fence changes; they do not grant access. Project-aware sharing
+  mode, connection administration and effective project-source reads remain unfinished.
+- **[S]** [Repository creation](../../internal/artifacts/adapters/sql/content.go) already
+  allocates durable source lifetimes for every repository class, including local sources.
+  [Source requests](../../internal/artifacts/adapters/http/pkgroute/source.go) derive the
+  receiving project from repository configuration. Existing production revalidation uses
+  [current identity and a fresh permission decider](../../internal/artifacts/module.go),
+  which P11 must extend with current project/share authority. Ordinary item and Docker
+  routes keep their distinct delivery seams under the same source policy.
 
 P9 registers only the external HTTP implementation. Neither a loopback URL nor an unknown
 JSON field selects a project source. A future explicit `ProjectRepository` source with no
@@ -69,6 +76,28 @@ registered resolver must fail as unsupported before any cache or network access,
 fall back to HTTP. P9 does not expose the new fields, loosen the URL validation, add share
 administration, remove parity exceptions, or close #487. This preserves current runtime
 behavior while making the planned source representable.
+
+### Durable authority foundation
+
+P11 keeps existing project and assignment value shapes separate from their internal authority.
+Project creation allocates a new lifetime; project/global role, environment and membership
+changes rotate policy revisions. Assignment changes, environment renames and incoming
+share removal rotate sharing revisions in the same transaction. Reattaching a repository
+or recreating a project cannot reuse its previous authority. Existing repository lifetimes
+already cover every repository class.
+
+The access migration stream adds the authority fields and a permanent snapshot guard.
+The bounded startup backfill fills missing values and preserves allocated values on retry
+or reopen. Transactional SQL reads and mutations take that guard first, including creation
+while a global policy changes. This deliberately serializes short project snapshots on
+PostgreSQL, matching the existing in-memory gate and SQLite immediate transactions.
+Standalone reads retain their existing value contract; a coherent combined snapshot
+requires one caller transaction. No transaction may span upstream I/O or streaming.
+
+Project-aware publication must acquire the project guard before artifact repository/source
+and cache/item locks. P11 must compose that order into the existing publication checks;
+the current external-only source does not acquire project authority. The foundation does
+not resolve the missing sharing-mode wire API or discharge the completion matrix below.
 
 ## Source and request contract for #616
 
@@ -243,11 +272,12 @@ settle undocumented Artifactory statuses.
 
 ## Remaining capture questions and handoff
 
-P11/#487 owns bounded research for the sharing-mode API field, discovery response schemas,
-first enabled vendor build, accepted producer classes, redundant HTTP settings,
-`upstreamProjectKey` mutability/defaulting and exact failure statuses. Do not guess a wire
-field from an internal model name. Request source-backed fixtures before marking those
-contracts implemented.
+The fresh audit establishes the announced feature releases and discovery response schemas.
+P11/#487 still owns the sharing-mode API field, accepted producer-class edges, redundant
+HTTP settings, `upstreamProjectKey` input/default behavior and exact failure edges. The
+documented consumer `created` value is share time, not consumer repository creation time.
+Do not guess a wire field from an internal model name. Request source-backed fixtures
+before marking the remaining contracts implemented.
 
 For [#216](https://github.com/weaveplatform/artifactweave/issues/216)/P19, capture the **[I]**
 choices above: cache-only denial after unshare, incarnation/rebind behavior, authorization

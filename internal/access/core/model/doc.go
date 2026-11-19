@@ -39,6 +39,9 @@
 //     MaxCustomGlobalRoles, BuiltinGlobalRoles, BuiltinGlobalRole,
 //     RoleActions, IsBuiltinEnvironment and
 //     ValidEnvironmentName.
+//   - ProjectAuthority, ProjectIncarnation, SharingAuthority and
+//     AuthorizationRevision: internal lifetime/policy fences kept separate
+//     from public project and assignment values; they do not grant access.
 //   - Token, Revocable, Subject and ParseSubject with the sentinel
 //     ErrInvalidSubject, the token defaults and
 //     TokenPurposeEncryptedPassword.

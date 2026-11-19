@@ -693,6 +693,11 @@ column platform_federations.connection_groups text
 column platform_federations.entities text
 constraint platform_federations.platform_federations_pkey PRIMARY KEY (id)
 index platform_federations.platform_federations_pkey CREATE UNIQUE INDEX platform_federations_pkey ON platform_federations USING btree (id)
+table project_authority_guard
+column project_authority_guard.id bigint NOT NULL
+constraint project_authority_guard.project_authority_guard_id_check CHECK ((id = 1))
+constraint project_authority_guard.project_authority_guard_pkey PRIMARY KEY (id)
+index project_authority_guard.project_authority_guard_pkey CREATE UNIQUE INDEX project_authority_guard_pkey ON project_authority_guard USING btree (id)
 table project_members
 column project_members.project_key text COLLATE "C" NOT NULL
 column project_members.principal_type text COLLATE "C" NOT NULL
@@ -708,6 +713,7 @@ column project_repositories.environments text
 column project_repositories.shared_with_all boolean NOT NULL DEFAULT false
 column project_repositories.shared_read_only boolean NOT NULL DEFAULT false
 column project_repositories.updated_at bigint
+column project_repositories.sharing_revision text COLLATE "C" NOT NULL DEFAULT ''::text
 constraint project_repositories.project_repositories_pkey PRIMARY KEY (repo_key)
 index project_repositories.project_repositories_pkey CREATE UNIQUE INDEX project_repositories_pkey ON project_repositories USING btree (repo_key)
 index project_repositories.project_repositories_project CREATE INDEX project_repositories_project ON project_repositories USING btree (project_key, repo_key)
@@ -726,6 +732,8 @@ column projects.storage_quota_bytes bigint NOT NULL DEFAULT 0
 column projects.soft_limit boolean NOT NULL DEFAULT false
 column projects.quota_email boolean NOT NULL DEFAULT false
 column projects.admin_privileges text
+column projects.incarnation text COLLATE "C" NOT NULL DEFAULT ''::text
+column projects.policy_revision text COLLATE "C" NOT NULL DEFAULT ''::text
 constraint projects.projects_pkey PRIMARY KEY (key)
 index projects.projects_pkey CREATE UNIQUE INDEX projects_pkey ON projects USING btree (key)
 table release_bundles
@@ -1107,4 +1115,5 @@ column workers.filter_doc text
 constraint workers.workers_pkey PRIMARY KEY (key)
 index workers.workers_action CREATE INDEX workers_action ON workers USING btree (action, key)
 index workers.workers_pkey CREATE UNIQUE INDEX workers_pkey ON workers USING btree (key)
+rows project_authority_guard 1
 rows request_budget_guard 1

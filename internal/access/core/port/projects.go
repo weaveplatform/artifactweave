@@ -2,6 +2,7 @@ package port
 
 import (
 	"context"
+	"crypto/rand"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 )
@@ -12,6 +13,19 @@ import (
 // environment, a membership, an assignment's owner) return
 // kernel.ErrNotFound when that project does not exist.
 type ProjectStore interface {
+	// Authority returns the project's lifetime and effective policy revision;
+	// kernel.ErrNotFound when the project does not exist. Within a transaction
+	// it takes the project snapshot guard before locking the project row. Read
+	// all required project/assignment values and authorities in that transaction
+	// for a coherent snapshot. Acquire this guard before artifact/source locks
+	// when composing a project-aware publication transaction.
+	Authority(ctx context.Context, projectKey string) (model.ProjectAuthority, error)
+	// SharingAuthority returns the assignment/share revision; kernel.ErrNotFound
+	// when the assignment does not exist. Within a transaction it locks that
+	// assignment after taking the same project snapshot guard. Read the value
+	// and authority in one transaction for a coherent snapshot. These records
+	// do not authorize a caller by themselves.
+	SharingAuthority(ctx context.Context, repoKey string) (model.SharingAuthority, error)
 	// Create stores p; kernel.ErrConflict when the key exists.
 	Create(ctx context.Context, p model.Project) error
 	// Get returns the project.
@@ -70,4 +84,17 @@ type ProjectStore interface {
 	Assignments(ctx context.Context, projectKey string) ([]model.RepositoryAssignment, error)
 	// DeleteAssignment removes a repository's assignment and shares.
 	DeleteAssignment(ctx context.Context, repoKey string) error
+}
+
+// NewProjectAuthority allocates a new lifetime and initial policy revision.
+func NewProjectAuthority() model.ProjectAuthority {
+	return model.ProjectAuthority{
+		Incarnation: model.ProjectIncarnation(rand.Text()),
+		Revision:    model.AuthorizationRevision(rand.Text()),
+	}
+}
+
+// NewSharingAuthority allocates a revision that cannot revive an older share.
+func NewSharingAuthority() model.SharingAuthority {
+	return model.SharingAuthority{Revision: model.AuthorizationRevision(rand.Text())}
 }
