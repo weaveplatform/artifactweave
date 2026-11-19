@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
@@ -108,4 +109,75 @@ func (s npmFailingEvents) AppendEvent(ctx context.Context, event outbox.Event) (
 		return outbox.Event{}, err
 	}
 	return outbox.Event{}, s.err
+}
+
+func TestUnitDeleteAndMoveHooksRetainInternalActor(t *testing.T) {
+	for _, move := range []bool{false, true} {
+		t.Run(map[bool]string{false: "delete", true: "move"}[move], func(t *testing.T) {
+			w := newWorld(t)
+			first := "left-pad/-/left-pad-1.0.0.tgz"
+			second := "left-pad/-/left-pad-2.0.0.tgz"
+			w.deploy(first, pkg("left-pad", "1.0.0", ""), nil)
+			w.deploy(second, pkg("left-pad", "2.0.0", ""), nil)
+			w.annotate(second, model.Properties{npm.PropDistTag: {"latest"}})
+			origin, err := instance.EnsureID(w.ctx, w.st)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := w.st.Events().RegisterConsumer(w.ctx, origin, "proof"); err != nil {
+				t.Fatal(err)
+			}
+			before, _, err := w.st.Events().Next(w.ctx, origin, "proof", 1000)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if move {
+				target := *repo.Defaults(&repo.Config{Key: "target-npm", Class: repo.Local, PackageType: repo.NPM})
+				if err := w.st.Repos().Create(w.ctx, target); err != nil {
+					t.Fatal(err)
+				}
+				result, err := w.items.Transfer(
+					w.ctx,
+					item.Transfer{
+						From:         item.Target{Repo: w.c, Path: second},
+						To:           item.Target{Repo: target, Path: second},
+						Move:         true,
+						CanOverwrite: true,
+						FailFast:     true,
+						By:           "operator",
+					},
+				)
+				if err != nil || result.Failed != 0 {
+					t.Fatalf("move=%+v err=%v", result, err)
+				}
+			} else {
+				if _, err := w.items.Delete(w.ctx, item.Target{Repo: w.c, Path: second}, "operator"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			after, _, err := w.st.Events().Next(w.ctx, origin, "proof", 1000)
+			if err != nil {
+				t.Fatal(err)
+			}
+			count := 0
+			for _, event := range after[len(before):] {
+				if event.Topic != artapi.PropertyAdded {
+					continue
+				}
+				var facts artapi.PropertyEvent
+				if err := json.Unmarshal(event.Payload, &facts); err != nil {
+					t.Fatal(err)
+				}
+				if facts.Item.Repository.Key == w.c.Key && facts.Item.Path == first && facts.Property == npm.PropDistTag {
+					count++
+					if facts.Actor.Name != "operator" || facts.Actor.System {
+						t.Fatalf("hook lost internal actor: %+v", facts.Actor)
+					}
+				}
+			}
+			if count != 1 {
+				t.Fatalf("surviving version property transitions=%d", count)
+			}
+		})
+	}
 }

@@ -742,6 +742,7 @@ func (s *Service) land(
 // reference the target now holds a new one of), then each moved folder left
 // empty, deepest first. Items that failed to move stay, with their folders.
 func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) error {
+	ctx = withPropertyActor(ctx, t.By)
 	items := s.Store.Items()
 	hooks, env := s.format(t.From.Repo.PackageType), s.env()
 	var versions []model.PackageVersion

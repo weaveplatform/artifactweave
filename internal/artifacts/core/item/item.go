@@ -960,6 +960,7 @@ func (s *Service) remove(
 	now := s.now()
 	var res port.DeleteResult
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		ctx = withPropertyActor(ctx, by)
 		invalidated, err := s.invalidateCache(ctx, t, by)
 		if err != nil {
 			return err

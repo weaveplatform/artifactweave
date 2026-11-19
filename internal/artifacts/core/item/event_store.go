@@ -32,17 +32,23 @@ type (
 	propertyOwnerKey struct{}
 	propertyOwner    struct {
 		id       int64
-		by       string
 		previous *propertyOwner
 	}
 )
 
-func ownPropertyEvents(ctx context.Context, id int64, by string) context.Context {
-	previous, _ := ctx.Value(propertyOwnerKey{}).(*propertyOwner)
-	if by == "" && previous != nil {
-		by = previous.by
+type propertyActorKey struct{}
+
+func withPropertyActor(ctx context.Context, by string) context.Context {
+	if by != "" {
+		return context.WithValue(ctx, propertyActorKey{}, by)
 	}
-	return context.WithValue(ctx, propertyOwnerKey{}, &propertyOwner{id: id, by: by, previous: previous})
+	return ctx
+}
+
+func ownPropertyEvents(ctx context.Context, id int64, by string) context.Context {
+	ctx = withPropertyActor(ctx, by)
+	previous, _ := ctx.Value(propertyOwnerKey{}).(*propertyOwner)
+	return context.WithValue(ctx, propertyOwnerKey{}, &propertyOwner{id: id, previous: previous})
 }
 
 func ownsPropertyEvents(ctx context.Context, id int64) bool {
@@ -121,9 +127,6 @@ func (i eventItems) Delete(ctx context.Context, repoKey string, cached bool, ful
 }
 
 func propertyActor(ctx context.Context) string {
-	owner, _ := ctx.Value(propertyOwnerKey{}).(*propertyOwner)
-	if owner != nil {
-		return owner.by
-	}
-	return ""
+	by, _ := ctx.Value(propertyActorKey{}).(string)
+	return by
 }

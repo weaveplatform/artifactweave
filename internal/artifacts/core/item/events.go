@@ -22,6 +22,9 @@ func (s *Service) emitWritten(ctx context.Context, it model.Item, by string, at 
 }
 
 func (s *Service) emitArtifact(ctx context.Context, topic string, it model.Item, source *artapi.EventArtifact, by string, at time.Time) error {
+	if by == "" {
+		by = propertyActor(ctx)
+	}
 	if err := artifactevents.EmitArtifact(ctx, s.Store, topic, it, source, by, at); err != nil {
 		return fmt.Errorf("item: stage artifact event: %w", err)
 	}
@@ -37,6 +40,9 @@ func (s *Service) propertySnapshot(ctx context.Context, it model.Item) (model.Pr
 }
 
 func (s *Service) emitPropertyChanges(ctx context.Context, it model.Item, before model.Properties, by string, at time.Time) error {
+	if by == "" {
+		by = propertyActor(ctx)
+	}
 	after, err := s.propertySnapshot(ctx, it)
 	if err != nil {
 		return err
@@ -75,6 +81,9 @@ func (s *Service) emitPropertyChanges(ctx context.Context, it model.Item, before
 // Raw metadata has no item row. Its source identity is the non-secret cache
 // key, never the upstream URL, retrieval headers or credentials.
 func (s *Service) emitRawCached(ctx context.Context, entry model.RemoteCacheEntry, by string, at time.Time) error {
+	if by == "" {
+		by = propertyActor(ctx)
+	}
 	if err := s.checkRawCacheBlob(ctx, entry.Blob.Checksums.SHA256); err != nil {
 		return err
 	}
@@ -85,6 +94,9 @@ func (s *Service) emitRawCached(ctx context.Context, entry model.RemoteCacheEntr
 }
 
 func (s *Service) emitRawDeleted(ctx context.Context, entry model.RemoteCacheEntry, by string) error {
+	if by == "" {
+		by = propertyActor(ctx)
+	}
 	if err := artifactevents.EmitRawCache(ctx, s.Store, artapi.ArtifactDeleted, entry, by, s.now()); err != nil {
 		return fmt.Errorf("item: stage raw cache deletion: %w", err)
 	}

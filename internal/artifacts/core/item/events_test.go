@@ -346,3 +346,33 @@ func TestUnitRawCacheDeletionEventsAndAppendRollback(t *testing.T) {
 		})
 	}
 }
+
+func TestUnitExistingFolderRestoreRetainsInternalActor(t *testing.T) {
+	w := newWorld(t)
+	read := watchEvents(t, w)
+	folder, err := w.db.Items().Put(t.Context(), model.Item{RepoKey: w.loc.Key, Name: "folder", Folder: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.svc.Restore(
+		t.Context(),
+		Target{Repo: w.loc, Path: "folder"},
+		model.TrashRecord{Item: folder, Properties: model.Properties{"key": {"value"}}},
+		"restorer",
+	); err != nil {
+		t.Fatal(err)
+	}
+	all := read()
+	if len(all) != 3 {
+		t.Fatalf("restore property facts=%+v", all)
+	}
+	for _, event := range all {
+		var facts artapi.PropertyEvent
+		if err := json.Unmarshal(event.Payload, &facts); err != nil {
+			t.Fatal(err)
+		}
+		if event.Topic != artapi.PropertyAdded || facts.Actor.Name != "restorer" || facts.Actor.System {
+			t.Fatalf("restored actor/facts=%+v topic=%s", facts, event.Topic)
+		}
+	}
+}

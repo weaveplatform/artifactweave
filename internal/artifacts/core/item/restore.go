@@ -33,6 +33,7 @@ func (s *Service) Restore(
 ) (model.Item, error) {
 	var restored model.Item
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		ctx = withPropertyActor(ctx, by)
 		if _, err := s.invalidateCache(ctx, t, by); err != nil {
 			return err
 		}
