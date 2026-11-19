@@ -135,6 +135,131 @@ func TestUnitTxRollbackRestoresTablesAndSequences(t *testing.T) {
 	})
 }
 
+func TestUnitTxPanicRestoresTablesAndSequences(t *testing.T) {
+	for _, nested := range []bool{false, true} {
+		name := "direct"
+		if nested {
+			name = "nested"
+		}
+		t.Run(name, func(t *testing.T) {
+			s := memtx.New()
+			mustDo(t, s, func() error {
+				items(s).Put("kept", 1)
+				items(s).Put("deleted", 2)
+				s.NextID("items")
+				return nil
+			})
+			marker := &struct{ message string }{"transaction panic"}
+			callbacks := 0
+			var recovered any
+			func() {
+				defer func() { recovered = recover() }()
+				_ = s.Tx(t.Context(), func(ctx context.Context) error {
+					items(s).Put("kept", 10)
+					s.AfterCommit(ctx, func() { callbacks++ })
+					mutate := func(ctx context.Context) error {
+						items(s).Del("deleted")
+						items(s).Put("added", 3)
+						memtx.TableOf[string, string](s, "created").Put("x", "y")
+						s.NextID("items")
+						s.NextID("other")
+						s.AfterCommit(ctx, func() { callbacks++ })
+						panic(marker)
+					}
+					if nested {
+						return s.Tx(ctx, mutate)
+					}
+					return mutate(ctx)
+				})
+			}()
+			if recovered != marker {
+				t.Fatalf("panic = %v; want original marker %v", recovered, marker)
+			}
+			if callbacks != 0 {
+				t.Errorf("AfterCommit ran %d times after panic", callbacks)
+			}
+			// A bounded fresh transaction also proves rollback released the gate.
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+			defer cancel()
+			if err := s.Tx(ctx, func(context.Context) error {
+				if got := items(s).All(nil, func(a, b int) int { return a - b }); !slices.Equal(got, []int{1, 2}) {
+					t.Errorf("rows after panic = %v; want [1 2]", got)
+				}
+				if n := len(memtx.TableOf[string, string](s, "created").Rows); n != 0 {
+					t.Errorf("new table retained %d rows after panic", n)
+				}
+				if next := s.NextID("items"); next != 2 {
+					t.Errorf("NextID(items) = %d; want 2", next)
+				}
+				if next := s.NextID("other"); next != 1 {
+					t.Errorf("NextID(other) = %d; want 1", next)
+				}
+				return nil
+			}); err != nil {
+				t.Fatalf("Tx after recovered panic: %v", err)
+			}
+		})
+	}
+}
+
+func TestUnitTxRecoveredNestedPanicCommits(t *testing.T) {
+	s := memtx.New()
+	marker := &struct{}{}
+	callbacks := 0
+	if err := s.Tx(t.Context(), func(ctx context.Context) error {
+		func() {
+			defer func() {
+				if got := recover(); got != marker {
+					t.Errorf("nested panic = %v; want original marker", got)
+				}
+			}()
+			_ = s.Tx(ctx, func(ctx context.Context) error {
+				items(s).Put("inner", 1)
+				s.AfterCommit(ctx, func() { callbacks++ })
+				panic(marker)
+			})
+		}()
+		items(s).Put("outer", 2)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mustDo(t, s, func() error {
+		if !items(s).Has("inner") || !items(s).Has("outer") || callbacks != 1 {
+			t.Errorf("recovered inner panic did not retain joined writes and callback: rows=%v, callbacks=%d", items(s).Rows, callbacks)
+		}
+		return nil
+	})
+}
+
+func TestUnitAfterCommitPanicRetainsCommittedState(t *testing.T) {
+	s := memtx.New()
+	marker := &struct{}{}
+	var recovered any
+	func() {
+		defer func() { recovered = recover() }()
+		_ = s.Tx(t.Context(), func(ctx context.Context) error {
+			items(s).Put("committed", 1)
+			s.NextID("items")
+			s.AfterCommit(ctx, func() { panic(marker) })
+			return nil
+		})
+	}()
+	if recovered != marker {
+		t.Fatalf("AfterCommit panic = %v; want original marker", recovered)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	if err := s.Do(ctx, func() error {
+		if !items(s).Has("committed") || s.NextID("items") != 2 {
+			t.Error("AfterCommit panic rolled back committed writes or sequences")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("Do after AfterCommit panic: %v", err)
+	}
+}
+
 func TestUnitTxNestedJoinsOuter(t *testing.T) {
 	s := memtx.New()
 	ctx := context.Background()

@@ -46,6 +46,10 @@
 //     all-or-nothing behaviour of the SQL stores; a table created inside it
 //     goes too. Restoring replaces the tables, so a *Table is looked up with
 //     TableOf on every use and never kept across a transaction.
+//   - A panic escaping the outer Tx callback restores that snapshot before
+//     the gate is released, preserves the panic value and suppresses
+//     AfterCommit. A panic recovered inside the callback leaves its commit
+//     decision intact; an AfterCommit panic cannot undo committed writes.
 //   - A nested Tx joins the outer one, and an inner error that the outer
 //     function drops rolls nothing back. The SQL unit of work fails the
 //     outer transaction instead, which is why each family of stores keeps a
@@ -97,6 +101,10 @@
 // # Testing
 //
 //   - memtx_test.go: TestUnitTxCommit; TestUnitTxRollbackRestoresTablesAndSequences;
+//     TestUnitTxPanicRestoresTablesAndSequences (direct/nested panic, original
+//     panic identity, callbacks, tables, sequences and gate reuse);
+//     TestUnitTxRecoveredNestedPanicCommits;
+//     TestUnitAfterCommitPanicRetainsCommittedState;
 //     TestUnitTxNestedJoinsOuter (an inner error the outer function returns
 //     rolls back both, one it drops rolls nothing back);
 //     TestUnitAfterCommit (order, after the commit with the gate free,
