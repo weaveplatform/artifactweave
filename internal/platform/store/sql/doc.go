@@ -7,14 +7,14 @@
 //
 // platform layer, adapter. Store implements the platform's ports
 // (work.WorkQueue, work.LeaseStore, settings.SettingsStore,
-// configdoc.ConfigStore, instance.InstanceStore, outbox.OutboxStore,
+// configdoc.ConfigStore, instance.InstanceStore, outbox.OutboxStore, outbox.EventStore,
 // session.UploadStore, idempotency.ReplayStore and
 // apilimit.RequestBudgetStore) over a shared dialect.Store, on SQLite and
 // PostgreSQL alike, so it serves every table of the platform stream. Module
 // registers the platform stream (platform/store/sql/migrations) and the
 // platform's sealed columns, first in the canonical module order. The
 // composite SQL store in app/adapters/sql builds one Store over its own
-// dialect store, delegates its nine platform accessors to it, registers the
+// dialect store, delegates its ten platform accessors to it, registers the
 // layout fence as a watch and names Module first in its module list. The
 // package imports the standard library, the kernel and platform packages
 // only: the ports, the dialect layer and the stream.
@@ -30,7 +30,7 @@
 // # Outputs
 //
 //   - Store, from New, with Settings, Leases, WorkQueue, Configs, Instance,
-//     Outbox, Uploads, Replays and RequestBudgets, and the dialect store's
+//     Outbox, Events, Uploads, Replays and RequestBudgets, and the dialect store's
 //     Tx, AfterCommit and Close.
 //   - Module: the name platform, the stream migrations.FS and the sealed
 //     columns config_secrets.value and instance.private_key.
@@ -42,25 +42,34 @@
 //     module's store began it (decision 0044, "Persistence"): an outbox
 //     entry commits with the change it records, and a replay receipt with
 //     its effect.
+//
 //   - The config store runs the watches of a document's kind inside the
 //     write's transaction, in the order given: after a Put that creates the
 //     document or changes its Document bytes, and after every successful
 //     Delete. A watch's error rolls the write back. A Put reads the document
 //     it replaces only when a watch is registered for the kind.
+//
 //   - Every column the stores seal is in Module, with the purpose and row id
 //     its store seals with, so key rotation re-seals all of them (decision
 //     0017). Neither ever changes: both are authenticated with every value.
 //     The outbox, upload, replay and request budget tables seal nothing.
+//
 //   - An append draws its sequence number by updating its stream's row of
 //     outbox_sequences, whose lock holds until commit, so concurrent
 //     appenders never share a number and a rolled-back append gives its
 //     number back (decision 0021).
+//
 //   - Request budgets are charged under the lock of the one row of
 //     request_budget_guard, which the platform stream's baseline seeds, so
 //     the counters of one request and the table's capacity are checked
 //     together.
+//
 //   - The SQL text, the table names and the error texts are those the
 //     metadata store's SQL store used before the platform owned them.
+//
+//   - Module events use the existing outbox sequence allocator. Independent
+//     consumer positions fence acknowledgements and protect the retained prefix
+//     during pruning; raw peer pruning cannot bypass that reserved stream.
 //
 // # References
 //
@@ -95,6 +104,9 @@
 // that use the layout (pull request 680). P9c: the replay and request budget
 // stores (issue 890, pull request 905). Moved here in P9d, which added Store,
 // New and Module, with the watches in place of the layout fence.
+//
+// P11 EVT-01 adds module-event consumers, compare-and-advance acknowledgements
+// and a retained floor, without changing peer cursors or applied markers.
 //
 // # Testing
 //

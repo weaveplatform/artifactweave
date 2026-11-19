@@ -25,3 +25,11 @@ func TestAccContract(t *testing.T) {
 			})
 		})
 }
+
+func TestAccEventContract(t *testing.T) {
+	sqltest.RunModule(t, []dialect.Module{platsql.Module},
+		func(db *dialect.Store) *platsql.Store { return platsql.New(db) },
+		func(t *testing.T, newStore func(*testing.T) *platsql.Store) {
+			storetest.RunEvents(t, func(t *testing.T) storetest.EventContractStore { return newStore(t) })
+		}, sqltest.WithPostgres())
+}

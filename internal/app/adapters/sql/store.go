@@ -127,6 +127,9 @@ func (s *Store) Instance() instance.InstanceStore { return s.platform.Instance()
 // Outbox is the platform's federation outbox store.
 func (s *Store) Outbox() outbox.OutboxStore { return s.platform.Outbox() }
 
+// Events is the module-event view of the same transactional platform outbox.
+func (s *Store) Events() outbox.EventStore { return s.platform.Events() }
+
 // Uploads is the platform's upload session store.
 func (s *Store) Uploads() session.UploadStore { return s.platform.Uploads() }
 

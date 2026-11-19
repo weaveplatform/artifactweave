@@ -25,7 +25,9 @@ type OutboxStore interface {
 	// ordered.
 	Streams(ctx context.Context, origin string) ([]string, error)
 	// Prune removes entries of a stream with Seq at most upTo and returns how
-	// many. The stream's sequence is not reset.
+	// many. The stream's sequence is not reset. The reserved ModuleEventStream
+	// additionally obeys EventStore.PruneAcknowledged, including its no-consumer
+	// retention rule; peer streams keep their existing pruning behavior.
 	Prune(ctx context.Context, origin, stream string, upTo int64) (int64, error)
 
 	// PutCursor creates or replaces a peer's position in a stream.

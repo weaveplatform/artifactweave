@@ -24,6 +24,7 @@ type Store interface {
 	Configs() configdoc.ConfigStore
 	Instance() instance.InstanceStore
 	Outbox() outbox.OutboxStore
+	Events() outbox.EventStore
 	Uploads() session.UploadStore
 	Replays() idempotency.ReplayStore
 	RequestBudgets() apilimit.RequestBudgetStore
@@ -51,6 +52,7 @@ func RunWithoutWatches(t *testing.T, newStore func(t *testing.T) Store) {
 	runWork(t, newStore)
 	runInstance(t, newStore)
 	runOutbox(t, newStore)
+	RunEvents(t, func(t *testing.T) EventContractStore { return newStore(t) })
 	runUploads(t, newStore)
 	runReplays(t, newStore)
 	runKeyedReplays(t, newStore)
