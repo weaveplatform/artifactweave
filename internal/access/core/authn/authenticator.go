@@ -28,8 +28,16 @@ const (
 	DefaultCacheTTL = 5 * time.Minute
 )
 
+// FailureRecorder owns atomic counter/status and event persistence.
+type FailureRecorder interface {
+	RecordFailedLogin(ctx context.Context, name string, lockAt int) error
+}
+
 // Options configures NewAuthenticator.
 type Options struct {
+	// Failures records durable lock transitions. The application supplies it;
+	// embedders without a composite store retain counter-only behavior.
+	Failures FailureRecorder
 	// CacheSize bounds how many verified passwords the cache holds; zero or
 	// less means DefaultCacheSize.
 	CacheSize int
@@ -58,6 +66,7 @@ type Options struct {
 
 // Authenticator verifies credentials against the user store.
 type Authenticator struct {
+	failures FailureRecorder
 	users    port.UserStore
 	settings settings.SettingsStore
 	now      func() time.Time
@@ -99,7 +108,7 @@ func NewAuthenticator(
 		o.Concurrency = runtime.GOMAXPROCS(0)
 	}
 	return &Authenticator{
-		users: users, settings: settings, now: o.Now, dummy: dummy, tokens: o.Tokens,
+		users: users, settings: settings, failures: o.Failures, now: o.Now, dummy: dummy, tokens: o.Tokens,
 		groups: o.Groups, restrictions: o.APIRestrictions,
 		cache: &verified{max: o.CacheSize, ttl: o.CacheTTL, m: map[[32]byte]time.Time{}},
 		slots: make(chan struct{}, o.Concurrency),

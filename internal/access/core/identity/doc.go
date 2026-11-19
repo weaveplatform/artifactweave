@@ -39,6 +39,11 @@
 //
 // # Invariants
 //
+// P11 EVT-02 delegates failed-password counting to core/login, which commits
+// a new account lock and its typed event atomically. Best-effort authentication
+// refusals are preserved after that transaction returns. Store also supplies
+// public instance identity and the event stream for this producer.
+//
 //   - A change that takes several store calls runs in one transaction of
 //     the Store, so a write that fails part way leaves nothing behind.
 //   - Deletion removes the principal's direct project assignments in that

@@ -184,7 +184,12 @@ func (us users) RecordLogin(ctx context.Context, name string, at time.Time) erro
 }
 
 func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) (bool, error) {
-	var locked bool
+	result, err := us.RecordFailedLoginResult(ctx, name, lockAt)
+	return result.Locked, err
+}
+
+func (us users) RecordFailedLoginResult(ctx context.Context, name string, lockAt int) (port.FailedLoginResult, error) {
+	var result port.FailedLoginResult
 	err := us.s.Do(ctx, func() error {
 		u, ok := us.s.usersT().Get(name)
 		if !ok {
@@ -194,12 +199,13 @@ func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) 
 		enabled := u.Status == "" || u.Status == model.UserEnabled
 		if lockAt > 0 && u.FailedLogins >= lockAt && enabled {
 			u.Status = model.UserLocked
+			result.NewlyLocked = true
 		}
-		locked = u.Status == model.UserLocked
+		result.Locked = u.Status == model.UserLocked
 		us.s.usersT().Put(name, u)
 		return nil
 	})
-	return locked, err
+	return result, err
 }
 
 func (us users) Unlock(ctx context.Context, names ...string) error {

@@ -720,7 +720,7 @@ func TestAccRotateKeys(t *testing.T) {
 	if err := RotateKeys(ctx, cfg, &out); err != nil {
 		t.Fatal(err)
 	}
-	if got := out.String(); !strings.Contains(got, "re-sealed 1 value(s) under key version 2") ||
+	if got := out.String(); !strings.Contains(got, "re-sealed 2 value(s) under key version 2") ||
 		!strings.Contains(got, "re-sealed 1 Terraform state(s) under key version 2") ||
 		!strings.Contains(got, "remove master_key_previous") {
 		t.Fatalf("output: %q", got)

@@ -9,10 +9,12 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -525,6 +527,14 @@ func Remove(ctx context.Context, st Store, key, by string) (int64, bool, error) 
 			res, err := st.Items().Delete(ctx, key, cached, "")
 			if err != nil {
 				return fmt.Errorf("delete content: %w", err)
+			}
+			for _, it := range res.Removed {
+				if it.Folder {
+					continue
+				}
+				if err := artifactevents.EmitArtifact(ctx, st, artifactsapi.ArtifactDeleted, it, nil, by, time.Now().UTC()); err != nil {
+					return fmt.Errorf("stage repository deletion event: %w", err)
+				}
 			}
 			files += res.Files
 			if err := release(ctx, st, res.BlobRefs, held); err != nil {

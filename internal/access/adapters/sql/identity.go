@@ -286,8 +286,18 @@ func (us users) RecordLogin(ctx context.Context, name string, at time.Time) erro
 // RecordFailedLogin counts and locks in one statement, so concurrent wrong
 // passwords cannot each read the old count and all stay below the limit.
 func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) (bool, error) {
-	var locked bool
+	result, err := us.RecordFailedLoginResult(ctx, name, lockAt)
+	return result.Locked, err
+}
+
+func (us users) RecordFailedLoginResult(ctx context.Context, name string, lockAt int) (port.FailedLoginResult, error) {
+	var result port.FailedLoginResult
 	err := us.s.Tx(ctx, func(ctx context.Context) error {
+		var before string
+		if err := us.s.Q(ctx).QueryRowContext(ctx,
+			us.s.Dialect().Rebind("SELECT status FROM users WHERE name = ?"+us.s.LockClause(ctx)), name).Scan(&before); err != nil {
+			return us.s.Wrap(fmt.Sprintf("read failed-login user %q", name), err)
+		}
 		if err := us.s.ExecOne(ctx, fmt.Sprintf("record failed login %q", name),
 			"UPDATE users SET failed_logins = failed_logins + 1, status = CASE "+
 				"WHEN ? > 0 AND failed_logins + 1 >= ? AND status IN ('', ?) THEN ? "+
@@ -302,10 +312,11 @@ func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) 
 			Scan(&status); err != nil {
 			return us.s.Wrap(fmt.Sprintf("read user %q", name), err)
 		}
-		locked = status == string(model.UserLocked)
+		result.Locked = status == string(model.UserLocked)
+		result.NewlyLocked = result.Locked && before != string(model.UserLocked)
 		return nil
 	})
-	return locked, err
+	return result, err
 }
 
 func (us users) Unlock(ctx context.Context, names ...string) error {

@@ -10,6 +10,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/idtoken"
+	"github.com/weaveplatform/artifactweave/internal/access/core/login"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
@@ -25,6 +26,7 @@ import (
 // module package never imports a module root, and because the handlers also
 // serve the OIDC configuration documents, which no binding reads.
 type Store interface {
+	login.Store
 	port.Store
 	// Settings holds the security policies, the basic authentication
 	// switch and the other access settings the handlers serve.

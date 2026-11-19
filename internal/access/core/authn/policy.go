@@ -179,6 +179,10 @@ func (a *Authenticator) recordFailure(ctx context.Context, name string) {
 	if err != nil || !lock.Enabled {
 		return
 	}
+	if a.failures != nil {
+		_ = a.failures.RecordFailedLogin(ctx, name, lock.LoginAttempts)
+		return
+	}
 	_, _ = a.users.RecordFailedLogin(ctx, name, lock.LoginAttempts)
 }
 

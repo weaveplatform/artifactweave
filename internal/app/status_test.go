@@ -285,6 +285,7 @@ func newStatusFixture(
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
+	seedFixtureIdentity(t, db)
 	if err := db.Users().
 		Create(ctx, accesstest.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)

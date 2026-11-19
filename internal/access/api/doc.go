@@ -170,9 +170,9 @@
 // API aggregate, and the context accessors WithCaller, WithDecider and
 // DeciderFrom. Added by #1432: FoldUsername and SameUsername, the user name
 // rule that access/core/model applies. Added by #1408: RepoSet,
-// RepoVisibility and Decider.VisibleRepos. The target layout's hooks.go,
-// with the token gate (P17), and events.go, with the access events (P11),
-// are not created yet.
+// RepoVisibility and Decider.VisibleRepos. P11 events.go publishes the typed
+// user.locked transition with public identity and sanitized actor facts. The
+// target layout's hooks.go token gate remains P17.
 //
 // # Testing
 //

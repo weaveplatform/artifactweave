@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -107,9 +108,11 @@ func (s *Service) promoteThen(
 				return errAborted
 			}
 			if then != nil {
-				return then(ctx, b.ID, pr.msgs)
+				if err := then(ctx, b.ID, pr.msgs); err != nil {
+					return err
+				}
 			}
-			return nil
+			return s.emitBuild(ctx, artapi.BuildPromoted, b.Run(), pr.target.Key, p.By, p.Copy)
 		})
 	}
 	switch {

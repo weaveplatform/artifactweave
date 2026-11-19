@@ -9,6 +9,12 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
+// FailedLoginResult distinguishes a new lock transition from an already locked user.
+type FailedLoginResult struct {
+	Locked      bool
+	NewlyLocked bool
+}
+
 // UserStore persists users. A user's Groups are its memberships, kept in
 // the group_members table shared with GroupStore.
 type UserStore interface {
@@ -33,6 +39,8 @@ type UserStore interface {
 	// user's Status to locked. It reports whether the user is locked
 	// afterwards. kernel.ErrNotFound when the user does not exist.
 	RecordFailedLogin(ctx context.Context, name string, lockAt int) (bool, error)
+	// RecordFailedLoginResult captures both states under the same user guard.
+	RecordFailedLoginResult(ctx context.Context, name string, lockAt int) (FailedLoginResult, error)
 	// Unlock sets locked users among names back to enabled and resets
 	// their FailedLogins; with no names it unlocks every locked user.
 	// Unknown names are ignored.

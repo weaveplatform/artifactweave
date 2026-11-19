@@ -44,6 +44,9 @@ func newOIDCWorld(t *testing.T) oidcWorld {
 	must(db.Groups().Create(ctx, accesstest.Group{Name: "everyone", AutoJoin: true}))
 	blobs, err := fs.New(t.TempDir())
 	must(err)
+	must(db.Instance().Init(ctx, instance.InstanceIdentity{
+		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
+	}))
 	items := &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For}
 	for key, group := range map[string]string{"team-local": "ci-team", "open-local": "everyone"} {
 		c := repo.Defaults(&repo.Config{Key: key, Class: repo.Local})
@@ -60,9 +63,6 @@ func newOIDCWorld(t *testing.T) oidcWorld {
 		})
 		must(err)
 	}
-	must(db.Instance().Init(ctx, instance.InstanceIdentity{
-		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
-	}))
 	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
 	must(err)
 	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{

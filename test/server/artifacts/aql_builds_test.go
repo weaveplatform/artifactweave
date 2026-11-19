@@ -31,6 +31,11 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.S
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
+		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Users().
 		Create(ctx, accesstest.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
@@ -86,11 +91,6 @@ func buildsAQLWorld(t *testing.T, tune ...func(*Config)) (http.Handler, *token.S
 				t.Fatal(err)
 			}
 		}
-	}
-	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
-		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
-	}); err != nil {
-		t.Fatal(err)
 	}
 	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
 	if err != nil {

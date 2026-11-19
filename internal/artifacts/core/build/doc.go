@@ -47,6 +47,10 @@
 //
 // # Invariants
 //
+// P11 EVT-02 records uploaded/deleted runs and successful non-dry promotions
+// through artifacts/api typed facts, in the owning transaction. Facts retain
+// run identity and sanitized actor context without copying build documents.
+//
 //   - A run's record and its document item change together or not at all,
 //     so the Builds API, the storage API and AQL agree (decision 0014).
 //   - A document whose module lists one file twice is refused, as 7.x does

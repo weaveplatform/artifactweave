@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
@@ -119,11 +120,18 @@ func (s *Service) derive(ctx context.Context, d format.Derived) (model.Item, err
 	}
 	var out model.Item
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
-		var err error
-		out, err = s.writeFile(ctx, dep, fileWrite{
+		now := s.now()
+		written, err := s.writeFile(ctx, dep, fileWrite{
 			actual: digestsOf(info), size: info.Size, shouldReplace: len(d.Properties) > 0,
-		}, s.now())
-		return err
+		}, now)
+		if err != nil {
+			return err
+		}
+		out = written.Item
+		if err := s.emitWritten(ctx, out, d.By, now); err != nil {
+			return err
+		}
+		return s.emitPropertyChanges(ctx, out, written.Before, d.By, now)
 	})
 	if err != nil {
 		return model.Item{}, err //nolint:wrapcheck // the transaction returns ours
@@ -149,6 +157,13 @@ func (s *Service) underive(ctx context.Context, c repo.Config, cached bool, p st
 		res, err := s.Store.Items().Delete(ctx, c.Key, cached, full)
 		if err != nil {
 			return fmt.Errorf("item: delete %s: %w", full, err)
+		}
+		for _, deleted := range res.Removed {
+			if !deleted.Folder {
+				if err := s.emitArtifact(ctx, artapi.ArtifactDeleted, deleted, nil, "", s.now()); err != nil {
+					return err
+				}
+			}
 		}
 		for sha, n := range res.BlobRefs {
 			if _, err := s.Store.Blobs().Unref(ctx, sha, n); err != nil {
@@ -273,14 +288,19 @@ func (s *Service) annotate(
 				return err //nolint:wrapcheck // the format's own error
 			}
 		}
+		before, err := s.propertySnapshot(ctx, it)
+		if err != nil {
+			return err
+		}
 		if err := s.Store.Items().PatchProperties(ctx, it.ID, set, remove, now); err != nil {
 			return fmt.Errorf("item: properties of %s: %w", it.FullPath(), err)
 		}
-		if _, ok := h.(format.Annotator); !ok {
-			return nil
+		if _, ok := h.(format.Annotator); ok {
+			if err := s.annotated(ctx, h, s.env(), c, it, format.Annotation{Set: set, Removed: remove, At: now}); err != nil {
+				return err
+			}
 		}
-		return s.annotated(ctx, h, s.env(), c, it,
-			format.Annotation{Set: set, Removed: remove, At: now})
+		return s.emitPropertyChanges(ctx, it, before, "", now)
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // the transaction returns ours

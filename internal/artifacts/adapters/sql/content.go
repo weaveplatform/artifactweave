@@ -167,6 +167,13 @@ func (r repos) Get(ctx context.Context, key string) (repo.Config, error) {
 	return configs[0], nil
 }
 
+func (r repos) EventContext(ctx context.Context, key string) (port.RepoEventContext, error) {
+	var out port.RepoEventContext
+	err := r.s.Q(ctx).QueryRowContext(ctx, r.s.Dialect().Rebind("SELECT key, project_key, package_type FROM repositories WHERE key = ?"), key).
+		Scan(&out.Key, &out.ProjectKey, &out.PackageType)
+	return out, r.s.Wrap("read repository event context", err)
+}
+
 func decodeRepo(doc string) (repo.Config, error) {
 	var c repo.Config
 	if err := json.Unmarshal([]byte(doc), &c); err != nil {

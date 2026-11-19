@@ -64,6 +64,11 @@
 //
 // # Invariants
 //
+// P11 EVT-02 records deployed/cached/deleted item facts, ordered transfer facts
+// and normalized property deltas in the same metadata transaction. Raw cache,
+// derived files, restore and maintenance deletion use those service boundaries.
+// Append failure rolls back metadata; blob bytes left unreferenced remain GC work.
+//
 //   - Content is written to the blob store before the transaction opens, so
 //     no blob write holds the write lock; the item and its blob reference
 //     then commit together or not at all.
@@ -98,8 +103,8 @@
 //
 // # Status
 //
-// Implemented P3 to P9c. Moved here in P9d. Roadmap: gate.go (P17), events.go
-// (P11).
+// Implemented P3 to P9c. Moved here in P9d. P11 adds typed durable producers
+// (events.go); gate.go remains P17.
 //
 // # Testing
 //

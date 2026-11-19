@@ -81,6 +81,10 @@ func (s *Service) restoreRecord(
 	if err != nil {
 		return model.Item{}, fmt.Errorf("item: put %s: %w", full, err)
 	}
+	before, err := s.propertySnapshot(ctx, stored)
+	if err != nil {
+		return model.Item{}, err
+	}
 	if exists && old.Actual.SHA256 != "" {
 		if _, err := s.Store.Blobs().Unref(ctx, old.Actual.SHA256, 1); err != nil {
 			return model.Item{}, fmt.Errorf("item: release replaced blob: %w", err)
@@ -97,6 +101,14 @@ func (s *Service) restoreRecord(
 	}
 	if err := s.annotated(ctx, hooks, env, t.Repo, stored,
 		format.Annotation{Set: rec.Properties, At: now}); err != nil {
+		return model.Item{}, err
+	}
+	if !stored.Folder {
+		if err := s.emitWritten(ctx, stored, by, now); err != nil {
+			return model.Item{}, err
+		}
+	}
+	if err := s.emitPropertyChanges(ctx, stored, before, by, now); err != nil {
 		return model.Item{}, err
 	}
 	return stored, nil

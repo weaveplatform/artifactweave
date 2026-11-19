@@ -8,6 +8,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/trash"
@@ -22,6 +23,7 @@ var _ artifactsapi.Repositories = repositories{}
 // its content moves to (trash.Store). Every call joins the transaction ctx
 // carries. Each composite store in app is a Store.
 type Store interface {
+	artifactevents.Store
 	trash.Store
 	Repos() port.RepoStore
 	Packages() port.PackageStore

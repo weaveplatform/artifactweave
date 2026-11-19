@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
@@ -144,7 +145,13 @@ func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	}
 	items := s.items()
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
+		changed := false
 		for _, folder := range p.Folders {
+			_, same, err := s.folderState(ctx, p.Owner, folder, m.Digest)
+			if err != nil {
+				return err
+			}
+			changed = changed || !same
 			if err := s.tagPlatforms(ctx, items, p, folder); err != nil {
 				return err
 			}
@@ -152,7 +159,13 @@ func (s *Service) PutManifest(ctx context.Context, p Push) error {
 				return err
 			}
 		}
-		return s.retain(ctx, items, p)
+		if err := s.retain(ctx, items, p); err != nil {
+			return err
+		}
+		if !changed {
+			return nil
+		}
+		return s.emitDocker(ctx, artapi.DockerPushed, p.Owner, pushReference(p), m.Digest, nil, false)
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // the transaction returns ours

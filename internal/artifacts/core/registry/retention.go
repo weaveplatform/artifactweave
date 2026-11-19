@@ -7,6 +7,7 @@ import (
 	"path"
 	"slices"
 
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -56,7 +57,7 @@ func (s *Service) RemoveTag(ctx context.Context, o Owner, tag string, r Removal)
 	return nil
 }
 
-func (s *Service) removeTag(
+func (s *Service) deleteTag(
 	ctx context.Context,
 	items *item.Service,
 	o Owner,
@@ -261,4 +262,19 @@ func (s *Service) retain(ctx context.Context, items *item.Service, p Push) error
 		}
 	}
 	return nil
+}
+
+// Both explicit deletion and tag-limit cleanup own the same logical transition.
+func (s *Service) removeTag(ctx context.Context, items *item.Service, o Owner, tag string, r Removal) error {
+	manifest, ok, err := layout.FolderManifest(ctx, s.Store.Items(), o.Repo.Key, false, o.Name+"/"+tag)
+	if err != nil {
+		return fmt.Errorf("registry: capture deleted manifest: %w", err)
+	}
+	if err := s.deleteTag(ctx, items, o, tag, r); err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	return s.emitDocker(ctx, artapi.DockerDeleted, o, tag, manifest.Actual.SHA256, nil, false)
 }
