@@ -1293,6 +1293,21 @@ OSS 6.20 code is confirmed or corrected against it
 
 **Tracking.** Milestone "P19 Live Artifactory comparison and tidy-up", starting with #216.
 
+The 2026-11-19 backlog recheck assigns these corrections to P19. Their missing
+prerequisite is the vendor contract captured through #216; they cannot be implemented
+from the current documentation alone. P19 retains the P1–P18 sequencing above.
+
+| Ticket | Evidence required before changing runtime behavior |
+| --- | --- |
+| [#1416](https://github.com/weaveplatform/artifactweave/issues/1416) — NuGet search rate limiting | Covered endpoints, default enablement, limit/window/scope, configuration and refusal status/body/headers. The wider P28 NuGet work is not a prerequisite. |
+| [#1373](https://github.com/weaveplatform/artifactweave/issues/1373) — Debian debug-package admission with indexing disabled | Local and single-node federated `.ddeb` deploy status, stored bytes/properties and `Packages` visibility with `ddebSupported` omitted/false/true. P13 cross-peer convergence is not a prerequisite. |
+| [#1271](https://github.com/weaveplatform/artifactweave/issues/1271) — Vagrant `/api/vagrant/auth` | Current route availability/precedence, credentials, response and token contract. The accelerated P9c Vagrant delivery does not require another P33 implementation. |
+
+The [contract recheck](../research/backlog-protocol-contract-recheck.md) records the
+current primary sources and bounded capture cases. Research and case preparation can
+proceed now; these allocations do not authorize an earlier live comparison or guessed
+runtime behavior.
+
 **Tasks**
 1. Read the 7.x release notes from the release each research document was last checked
    against up to the trial's release. Add every behaviour change in an area artifactweave
@@ -1381,6 +1396,16 @@ begin now; this phase delivers the contract tooling and executable coverage cont
 ## P23: Evidence and provenance
 
 **Depends on:** P20, P4 key/permission services, P5 builds and P15 signing foundations.
+
+**Independent package-signing slice.** [#1654](https://github.com/weaveplatform/artifactweave/issues/1654)
+owns instance-wide GPG administration and the Debian/RPM/Opkg signing fallback in task 2.
+It can proceed using the delivered P4 sealed named-key store and P9c metadata signers;
+the complete Evidence service, P20 inventory and P15 Distribution implementation are
+not prerequisites for this slice. This follows P28's allowance for independent signing
+work to land earlier. Preserve explicit repository-key precedence, staged public/private
+updates and normal metadata rebuild timing; Alpine keeps its RSA signing contract.
+The [source audit](../research/global-gpg-signing-source-audit.md) separates documented
+behavior from the remaining [I] timing and wire details. Delivery remains pending.
 
 **Tasks**
 1. Research and implement Evidence contracts, subject identity and association for artifacts,

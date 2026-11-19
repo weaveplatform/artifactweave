@@ -100,6 +100,8 @@ assigns implementation work and names what could not be verified from public sou
 | [32-terraform-backend.md](32-terraform-backend.md) | Terraform backend: the `remote` backend's discovery, the go-tfe calls each command makes with their bodies and the fields read back, the TFE API rules, what Artifactory serves under `/api/terraform/remote/v2/`, its `workspaces/<ws>/` storage, `locked.by`, `encryptStates`, the fixed 20 MB bug, cleanup, and the interim `terraform login` |
 | [33-package-formats.md](33-package-formats.md) | P9b LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages: class matrix, native contracts, SaaS/self-managed boundary, owner tickets and P19 captures |
 | [34-vcs.md](34-vcs.md) | VCS remote archive and ref REST contract, GitLab subgroup path evidence, upstream/security boundaries and inferred response shapes |
+| [backlog-protocol-contract-recheck.md](backlog-protocol-contract-recheck.md) | P19 ownership, current evidence gaps and capture cases for NuGet rate limits, Debian debug-package admission and Vagrant auth |
+| [global-gpg-signing-source-audit.md](global-gpg-signing-source-audit.md) | Instance-wide GPG API and signing-fallback evidence, P23 ownership and readiness for independent implementation |
 | [glossary.md](glossary.md) | Terms used across the set |
 | [decisions/](decisions/README.md) | Decision records, with their index |
 
