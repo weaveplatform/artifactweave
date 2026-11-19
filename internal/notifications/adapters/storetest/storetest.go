@@ -15,4 +15,5 @@ type Factory func(t *testing.T) port.Store
 func Run(t *testing.T, newStore Factory) {
 	t.Helper()
 	runWebhooks(t, newStore)
+	RunSecrets(t, newStore)
 }

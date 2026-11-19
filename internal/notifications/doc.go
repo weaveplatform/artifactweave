@@ -1,26 +1,25 @@
-// Package notifications will be the notifications module: the webhook
-// catalogue, criteria, signing and delivery.
+// Package notifications is the module root for the webhook catalogue,
+// subscription administration and delivery.
 //
 // # Role
 //
 // notifications module, module root. Only app imports a module root; other
 // modules reach notifications through notifications/api (decision 0044,
-// dependency rules). The target layout keeps this module small and flat, so
-// its logic will sit in this directory beside the constructor. Its storage
-// skeleton (the module's ports, models and store adapters) sits in
-// subpackages ahead of its phase; skeleton modules get no constructor until
-// then (decision 0044, composition and HTTP).
+// dependency rules). core/webhook supplies presence-aware secret updates and
+// safe views over the module's ports and store adapters. This root has no
+// constructor or HTTP binding until subscription administration is wired in
+// WEB-02 (decision 0044, composition and HTTP).
 //
 // # Inputs
 //
-// None yet. Planned: one subscription per catalogue topic on the event bus in
-// platform/events, and the Deps that app passes to New (target layout, lines
-// 730-734).
+// No module-root inputs yet. core/webhook accepts replacement subscription
+// configuration with omitted, empty and replacement secret values kept distinct.
 //
 // # Outputs
 //
-// None yet. Planned, in this directory (target layout, lines 318-321 and
-// 730-734):
+// core/webhook returns detached, nonsecret views. adapters/http converts handler
+// inputs and generated read variants without activating routes. Planned module
+// wiring (target layout, lines 318-321 and 730-734):
 //
 //   - module.go: New(Deps), which app calls in module order.
 //   - catalogue.go: JFrog event names mapped to module events.
@@ -47,5 +46,9 @@
 //
 // # Status
 //
-// Placeholder: implemented by P11.
+// Placeholder: implemented by P11. The module root awaits composition in WEB-02;
+// core/webhook and adapters/http supply WEB-01 secret handling and conversions.
+// WEB-02 owns
+// subscription authorization and route binding; P19a owns observed delivery,
+// signing, testing and troubleshooting.
 package notifications

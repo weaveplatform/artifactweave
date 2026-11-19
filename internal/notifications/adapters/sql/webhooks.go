@@ -162,7 +162,7 @@ func (w webhookStore) Create(ctx context.Context, v model.WebhookSubscription) e
 
 func (w webhookStore) Get(ctx context.Context, key string) (model.WebhookSubscription, error) {
 	v, err := scanWebhook(w.s.Q(ctx).QueryRowContext(ctx,
-		w.s.Dialect().Rebind("SELECT "+webhookCols+" FROM webhooks WHERE key = ?"), key))
+		w.s.Dialect().Rebind("SELECT "+webhookCols+" FROM webhooks WHERE key = ?"+w.s.LockClause(ctx)), key))
 	if err != nil {
 		return v, w.s.Wrap("get webhook "+key, err)
 	}
@@ -189,6 +189,13 @@ func (w webhookStore) Update(ctx context.Context, v model.WebhookSubscription) e
 
 func (w webhookStore) Delete(ctx context.Context, key string) error {
 	return w.s.Tx(ctx, func(ctx context.Context) error {
+		// Updates and transaction-aware reads lock the parent before its secret
+		// rows. Deletion follows that order without needing to unseal a secret.
+		var existing string
+		if err := w.s.Q(ctx).QueryRowContext(ctx, w.s.Dialect().Rebind(
+			"SELECT key FROM webhooks WHERE key = ?"+w.s.LockClause(ctx)), key).Scan(&existing); err != nil {
+			return w.s.Wrap("delete webhook "+key, err)
+		}
 		for _, q := range []string{
 			"DELETE FROM webhook_secrets WHERE webhook_key = ?",
 			"DELETE FROM webhook_deliveries WHERE webhook_key = ?",
@@ -218,7 +225,7 @@ func (w webhookStore) List(
 	}
 	var out []model.WebhookSubscription
 	err := w.s.Rows(ctx, "list webhooks", "SELECT "+webhookCols+" FROM webhooks WHERE "+
-		strings.Join(where, " AND ")+" ORDER BY key", args, func(r *sql.Rows) error {
+		strings.Join(where, " AND ")+" ORDER BY key"+w.s.LockClause(ctx), args, func(r *sql.Rows) error {
 		v, err := scanWebhook(r)
 		out = append(out, v)
 		return err
@@ -244,7 +251,7 @@ func (w webhookStore) AddDelivery(
 		ok, err := w.s.Exists(
 			ctx,
 			"find webhook "+d.WebhookKey,
-			"SELECT 1 FROM webhooks WHERE key = ?",
+			"SELECT 1 FROM webhooks WHERE key = ?"+w.s.LockClause(ctx),
 			d.WebhookKey,
 		)
 		if err != nil {

@@ -1,5 +1,5 @@
-// Package notificationshttp will serve the event service's endpoints: webhook
-// subscriptions, test deliveries and troubleshooting.
+// Package notificationshttp converts webhook handler requests and safe views
+// for the Event API; subscription route binding arrives in WEB-02.
 //
 // # Role
 //
@@ -8,14 +8,14 @@
 //
 // # Inputs
 //
-// None yet. Planned: requests to the event specification's operations,
-// through the generated strict server in platform/gen/event (target layout,
-// lines 735 and 812).
+// Generated Event API handler unions, whose secret fields retain omission
+// separately from explicit empty values, and nonsecret core/webhook views.
 //
 // # Outputs
 //
-// None yet. Planned: the module's part of that API, composed into the app
-// router as a partial strict server (decision 0044, composition and HTTP).
+// Presence-aware handler inputs and explicit generated read variants: plain
+// secrets are empty with secret_configured, and custom secrets expose names
+// only. These helpers activate no HTTP operation by themselves.
 //
 // # References
 //
@@ -35,5 +35,11 @@
 //
 // # Status
 //
-// Placeholder: implemented by P11.
+// P11 WEB-01 supplies safe handler conversions. WEB-02 binds subscription
+// administration; P19a owns observed delivery/test/troubleshooting behavior.
+//
+// # Testing
+//
+// handlers_test.go checks real generated response JSON, both handler types,
+// omitted/empty/replaced values and errors that do not echo private input.
 package notificationshttp

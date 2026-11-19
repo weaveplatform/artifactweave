@@ -389,10 +389,15 @@ components:
           description: Optional within this object. The proxy key, when one is set.
           type: string
         secret:
-          description: 'Optional within this object. Never the stored secret: absent when no secret is set, otherwise
-            a fixed mask, so a client can tell that one exists.'
+          description: 'Optional within this object. Always empty. The stored secret is never returned; use
+            secret_configured to determine whether one is set (decision 0011).'
           readOnly: true
           type: string
+        secret_configured:
+          description: Optional within this object. Whether a non-empty secret is configured. The value itself
+            is never returned.
+          readOnly: true
+          type: boolean
         url:
           description: Required within this object. The delivery URL.
           format: uri
