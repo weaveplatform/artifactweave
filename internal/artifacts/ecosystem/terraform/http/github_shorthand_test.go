@@ -100,3 +100,24 @@ func TestUnitGitHubShorthandRetainsDestinationPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestUnitGitHubSnapshotRefGrammarRejectsRevisionExpressions(t *testing.T) {
+	t.Parallel()
+	c := repo.Config{URL: "https://api.github.com"}
+	base := "https://registry.terraform.io/v1/modules/ns/name/aws/1.0.0/download"
+	for _, ref := range []string{"HEAD~1", "HEAD^", "main:README", "main..tag", "main@{1}", "@", "refs/heads/.hidden", "main.lock", "refs/tags/name.", "name with space", "name?", "name*", "name[", "name\t", "name\x7f", "/main", "main/", "refs//main"} {
+		t.Run(url.QueryEscape(ref), func(t *testing.T) {
+			if _, err := parseModuleSource("github.com/org/repo?ref="+url.QueryEscape(ref), base, c); err == nil {
+				t.Fatal("unqualified snapshot ref was admitted")
+			}
+		})
+	}
+	for _, ref := range []string{"HEAD", "main", "v1.0", "feature/native", "refs/heads/main", "refs/tags/v1.0", strings.Repeat("a", 40), "tag+plus", "release@team", "feature/日本語"} {
+		t.Run("valid-"+url.QueryEscape(ref), func(t *testing.T) {
+			got, err := parseModuleSource("github.com/org/repo?ref="+url.QueryEscape(ref), base, c)
+			if err != nil || got.Target != "https://github.com/org/repo/archive/"+url.PathEscape(ref)+".tar.gz" {
+				t.Fatal("valid snapshot identity was changed", err)
+			}
+		})
+	}
+}

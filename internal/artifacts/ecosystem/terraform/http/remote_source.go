@@ -33,6 +33,7 @@ type moduleSource struct {
 	Vanity       bool             `json:"vanity,omitempty"`
 	ChecksumURL  string           `json:"checksum_url,omitempty"`
 	ChecksumName string           `json:"checksum_name,omitempty"`
+	GitHubDepth  string           `json:"github_depth,omitempty"`
 	// Path is the archive's cache path, where its read checks Read
 	// permission and the remote's download policy and the cache keeps it.
 	Path string `json:"path"`
@@ -299,7 +300,7 @@ func githubModuleSource(
 	q url.Values,
 	c repo.Config,
 ) (moduleSource, error) {
-	out := moduleSource{Subdir: subdir, Archive: "tar.gz"}
+	out := moduleSource{Subdir: subdir, Archive: "tar.gz", GitHubDepth: q.Get("depth")}
 	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if u.Scheme != "https" || !strings.EqualFold(u.Host, "github.com") || len(parts) != 2 ||
 		parts[0] == "" ||
@@ -324,11 +325,17 @@ func githubModuleSource(
 	if ref == "" {
 		ref = "HEAD"
 	}
-	if strings.ContainsAny(ref, "\\\x00\r\n") || strings.HasPrefix(ref, "-") {
+	if strings.ContainsAny(ref, "\\ ~^:?*[") || strings.HasPrefix(ref, "-") ||
+		strings.HasSuffix(ref, ".") || strings.Contains(ref, "..") || strings.Contains(ref, "@{") || ref == "@" {
 		return out, remoteModuleError()
 	}
+	for _, c := range ref {
+		if c < 0x20 || c == 0x7f {
+			return out, remoteModuleError()
+		}
+	}
 	for _, part := range strings.Split(ref, "/") {
-		if part == ".." || part == "." || part == "" {
+		if part == "" || strings.HasPrefix(part, ".") || strings.HasSuffix(part, ".lock") {
 			return out, remoteModuleError()
 		}
 	}

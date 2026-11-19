@@ -542,6 +542,17 @@ discovery gate. Full #668 qualification, snapshot/ref limitations and vendor cap
 must remain visible until their corresponding evidence exists; this does not qualify
 OpenTofu providers, mirrors or state backend behavior.
 
+The snapshot matrix explicitly preserves positive-depth HTTP snapshot semantics,
+including full commits, and compares them with the pinned clients' file-only Git
+clone controls. Snapshot archives do not initialize submodules or hydrate LFS data;
+pointers and already-materialized bytes remain ordinary content. Literal ref-name
+validation excludes revision/reflog expressions. The complete normalized source
+descriptor is bound into remote module signatures with a keyed digest, so an old
+capability cannot follow query, selector, checksum-file or depth edits that retain
+the same archive bytes. These are explicit local choices with controlled native
+proof; GitHub collision precedence and Artifactory runtime behavior remain separate
+vendor captures under #216/P19.
+
 ## Constraints
 
 - **Namespace length.** A module namespace holds the key, `__` and the namespace within 64

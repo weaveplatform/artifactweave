@@ -204,6 +204,14 @@ Offline, cache-only and transient results cannot perform this mutation. Storage 
 authorization errors keep their own existing status/error identities. This narrow
 callback does not expose a generic cache deletion or change shared error sanitization.
 
+The Terraform adapter binds the complete normalized terminal source descriptor
+into its signed remote-module capability with a purpose-derived keyed digest. Query,
+selector, checksum-file identity and snapshot-depth changes therefore refuse an older
+capability even when the immutable archive bytes match. No private descriptor URL or
+query enters the public claim, and its keyed digest prevents offline parameter
+guesses. This is separate from the common source-incarnation/credential/digest fences;
+local/provider capabilities do not acquire the remote-module descriptor contract.
+
 
 ## Transient Smart AQL
 

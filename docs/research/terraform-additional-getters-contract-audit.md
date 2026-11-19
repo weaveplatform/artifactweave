@@ -496,3 +496,85 @@ registry discovery/version negotiation, standalone/SQL qualification, the remain
 snapshot/compression matrix, permanent two-client CI acceptance and final operations/
 ADR/roadmap handoff remain required. #668 remains open; no live vendor comparison
 or final repository-wide coverage qualification is claimed.
+
+## Snapshot and source-capability qualification progress (2026-11-19)
+
+The later snapshot matrix runs both pinned clients against the actual application
+router and SQLite/PostgreSQL stores. Its immutable fixture bindings supply DNS,
+certificate trust and physical dial addresses for the controlled registry/GitHub/
+codeload HTTPS servers. The production resolver, pool, TLS server-name verification,
+redirect policy, credential handling and current-authority callbacks remain active.
+This is an in-process application-router proof, distinct from the 19-form feature's
+standalone-process proof and from live GitHub/Artifactory observations.
+
+Fourteen source/ref/content forms cover omitted ref/HEAD, optional `.git`, additional
+shorthand paths, explicit and combined selectors, forced GitHub HTTPS, slash branch,
+qualified branch/tag, unqualified collision, full commit, commit plus positive depth,
+LFS pointer data and already-materialized LFS data. Each runs cold, with an upstream
+branch moved while the server cache is fresh, and offline with a new native HOME and
+module cache. Selected versions/directories, sibling modules, outputs and exact
+original bytes retain identity. An absent submodule produces the pinned client's
+bounded directory refusal; neither `.gitmodules` nor `.lfsconfig` causes auxiliary
+source requests. The collision fixture proves preservation of the requested ref;
+it does not establish GitHub or Artifactory's live branch/tag precedence.
+
+The two pinned clients also run eight real native clone controls against disposable
+local Git repositories with file-only transport, no inherited Git configuration or
+credentials, and no SSH/cloud access. Tags, positive-depth named branches and ordinary
+commits install; a full commit plus positive clone depth is refused as an unavailable
+named ref. The snapshot's accepted commit/depth combination is therefore an explicit
+HTTP snapshot choice, not shallow-clone parity. These controls do not assert history
+depth for local Git file transport.
+
+All snapshot/control cases passed in 108.093 seconds including the test build, with
+recorded production/fixture hashes unchanged. A subsequent combined coverage-enabled
+run passed the 19-form standalone features, snapshot matrix and clone controls in
+334.540 seconds; **all 3,414 Go-source hashes remained unchanged**. It covers 304
+standalone getter installs plus 336 snapshot installs, 24 expected missing-submodule
+refusals and eight clone controls (six installs, two expected depth/ref refusals).
+Both native suites explicitly label the macOS loopback service override; Linux
+must still perform HTTPS discovery without it. Private source/results/log/covdata
+packets are retained under `cover/terraform-getters/snapshot-native` and
+`combined-native-final`. Acceptance-only coverage is not the repository quality gate.
+
+**[D/I]** Git's [ref-name contract](https://git-scm.com/docs/git-check-ref-format)
+separates literal names from revision/reflog expressions. The adapter now applies
+that literal grammar before URL mapping, while retaining one-level names, HEAD,
+qualified refs, Unicode names and commit IDs. Unsafe operators, controls, dot/lock
+components and malformed separators fail before admission. No Git command is added
+to the server. Location validation moves to v4 and vanity validation to v3 so older
+control admissions are not reused under the stricter grammar.
+
+The audit exposed a same-kind capability gap: six direct/virtual controls showed
+that an old signed module download still answered 200 after source query,
+checksum-file URL or selector changes when archive bytes were identical. The inline
+repair binds the normalized terminal source descriptor into the capability using a
+purpose-derived keyed digest. GitHub depth is retained in that descriptor even
+though it does not change HTTP snapshot bytes. Missing/malformed binding claims are
+refused before acquisition; current normalized source identity is checked again
+before signed archive reads. Public claims disclose no source URL/query, and the
+keyed digest prevents offline parameter guesses. The same six controls now refuse
+old capabilities 403 and serve fresh capabilities with unchanged original bytes.
+This Terraform-only correction remains inline; local/provider capability contracts
+and shared source error sanitization are unchanged.
+
+The native snapshot/clone checks have a required Terraform-selected Linux CI step
+whose Go covdata joins the native acceptance artifact. ADR0040, operations, source/
+retrieval contracts, recipe source, dependency pin references and the roadmap now
+record these exact forms and limits. Full exact-head Linux/native/95%-aggregate/
+90%-each qualification and the existing registry/provider/backend regressions remain
+required before #668 closes. #1291 remains explicitly deferred; generic Git/Hg/SSH/
+cloud transports remain inactive, with #216/P19 retaining the conditional target and
+live-vendor capture obligations.
+
+After normally integrating maintainer-merged main
+`3ae2fc2aa624b0d9cd7c915e91a4e4b675729970`, the complete getter/snapshot/clone matrix
+passed again in **228.840 seconds**, with **all 3,428 Go-source hashes unchanged**
+and the same 640 installs, 24 expected missing-submodule refusals and eight clone
+controls. The full Terraform HTTP race/shuffle suite passed on the integrated code
+at **3,085/3,421 statements (90.178%)**. Architecture/CI-selector/recipe tests,
+test-name checks, all 36 dependency-sync tests and runtime/acceptance lint passed;
+the combined standalone and in-process native covdata also merged successfully.
+The integrated evidence packet is `cover/terraform-getters/integrated-final`.
+These remain local results; fresh exact-head full Linux qualification is still
+required, with no replacement of the repository's 95%/90% gates.

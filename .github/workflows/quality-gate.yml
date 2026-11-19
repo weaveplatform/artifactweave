@@ -813,6 +813,17 @@ jobs:
           ARTIFACTWEAVE_BAZEL_CLIENT: '1'
         run: go test ./internal/artifacts/ecosystem/bazelmodules/http -run '^TestAccBazelClient$' -count=1 -timeout=7m -v
 
+      - name: Terraform and OpenTofu GitHub snapshot native acceptance
+        if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',terraform,')
+        env:
+          SNAPSHOT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
+          ARTIFACTWEAVE_GOCOVERDIR: ''
+        run: |
+          mkdir -p cover/accept
+          go test -cover -covermode=atomic -coverpkg="${SNAPSHOT_COVERPKG:-github.com/weaveplatform/artifactweave/...}" \
+            ./test/acceptance -run '^TestAccTerraformGit(HubSnapshots|CloneDepthControl)$' \
+            -count=1 -timeout=10m -v -args -test.gocoverdir="$PWD/cover/accept"
+
       - name: Record native client image identities
         if: always()
         run: |

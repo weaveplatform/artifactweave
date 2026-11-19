@@ -40,15 +40,16 @@ type claims struct {
 	// Module is the remote module version a remote module URL serves,
 	// <ns>/<name>/<system>/<version>: its archive's cache path follows the
 	// upstream location, so Path does not name it.
-	Module     string                     `json:"module,omitempty"`
-	Credential *kernel.DownloadCredential `json:"credential,omitempty"`
-	Source     *model.SourceIdentity      `json:"source,omitempty"`
-	Subject    string                     `json:"sub"`
-	Repo       string                     `json:"repo"`
-	Path       string                     `json:"path"`
-	SHA256     string                     `json:"sha256"`
-	Issued     int64                      `json:"iat"`
-	Expires    int64                      `json:"exp"`
+	Module       string                     `json:"module,omitempty"`
+	ModuleSource string                     `json:"module_source,omitempty"`
+	Credential   *kernel.DownloadCredential `json:"credential,omitempty"`
+	Source       *model.SourceIdentity      `json:"source,omitempty"`
+	Subject      string                     `json:"sub"`
+	Repo         string                     `json:"repo"`
+	Path         string                     `json:"path"`
+	SHA256       string                     `json:"sha256"`
+	Issued       int64                      `json:"iat"`
+	Expires      int64                      `json:"exp"`
 }
 
 func (h handler) downloadURL(r *http.Request, it model.Item) (string, error) {
@@ -239,9 +240,10 @@ func downloadPrefix(c repo.Config) string {
 func (h handler) remoteDownloadURL(
 	r *http.Request,
 	m tf.Module,
-	path, digest string,
+	location moduleSource,
+	digest string,
 	identity model.SourceIdentity,
-	subdir, archive string,
+	subdir string,
 	variants ...moduleRewrite,
 ) (string, error) {
 	p, _ := kernel.FromContext(r.Context())
@@ -251,23 +253,45 @@ func (h handler) remoteDownloadURL(
 	}
 	now := h.o.Now()
 	c := claims{
-		Subject:    p.Name,
-		Repo:       pkgroute.RequestFrom(r).Repo.Key,
-		Path:       path,
-		SHA256:     digest,
-		Issued:     now.Unix(),
-		Expires:    now.Add(90 * time.Second).Unix(),
-		Source:     &identity,
-		Credential: &reference,
-		Module:     m.Package() + "/" + m.Version,
+		Subject:      p.Name,
+		Repo:         pkgroute.RequestFrom(r).Repo.Key,
+		Path:         location.Path,
+		SHA256:       digest,
+		Issued:       now.Unix(),
+		Expires:      now.Add(90 * time.Second).Unix(),
+		Source:       &identity,
+		Credential:   &reference,
+		Module:       m.Package() + "/" + m.Version,
+		ModuleSource: h.moduleSourceDigest(location),
 	}
 	c.Rewrite = moduleRewriteTarget(r)
-	c.Archive = archive
+	c.Archive = location.Archive
 	if len(variants) > 0 {
 		c.DeliveredSHA256 = variants[0].digest
 		c.Archive = variants[0].archive
 	}
 	return h.moduleDownloadURL(r, c, subdir, c.Archive)
+}
+
+// moduleSourceDigest binds the complete normalized source decision, including
+// selectors, query, checksum-file identity and snapshot depth. Keyed hashing keeps
+// private URL/query material out of the public capability and offline guesses.
+func (h handler) moduleSourceDigest(location moduleSource) string {
+	if h.o.Keys == nil {
+		return ""
+	}
+	descriptor, _ := json.Marshal(location)
+	mac := hmac.New(sha256.New, h.o.Keys.Derive("terraform-module-source"))
+	_, _ = mac.Write(descriptor)
+	return encoding.EncodeToString(mac.Sum(nil))
+}
+
+// remoteModuleClaim validates the remote-only claim shape before metadata or
+// archive acquisition. Current source/credential authority is checked separately.
+func remoteModuleClaim(c claims) (tf.Module, bool) {
+	m, ok := tf.ParseModule(c.Module + ".zip")
+	binding, err := encoding.DecodeString(c.ModuleSource)
+	return m, ok && c.Source != nil && err == nil && len(binding) == sha256.Size
 }
 
 func (h handler) moduleDownloadURL(r *http.Request, c claims, subdir, archive string) (string, error) {

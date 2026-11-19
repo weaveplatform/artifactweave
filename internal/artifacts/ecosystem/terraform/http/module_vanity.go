@@ -129,7 +129,7 @@ func (h handler) resolveModuleVanity(
 			Path:        "module-metadata/vanity",
 			ExternalURL: target, CheckURL: moduleURLGuard(c, target),
 			PermissionFolder: true, PermissionPath: m.Package(), BlackoutOnly: true,
-			Variant: "terraform-module-vanity-v2:url-policy-v2",
+			Variant: "terraform-module-vanity-v3:url-policy-v2",
 			Accept:  "text/html, application/xhtml+xml", ExpectedContentType: "application/json",
 			ModuleVanityDocument: true,
 		}

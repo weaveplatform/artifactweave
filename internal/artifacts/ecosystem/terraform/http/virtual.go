@@ -325,6 +325,7 @@ func (h handler) virtualModuleURL(r *http.Request, m tf.Module, v virtualModuleV
 	c.Credential = &reference
 	c.Source = &artifact.Identity
 	c.Module = m.Package() + "/" + m.Version
+	c.ModuleSource = h.moduleSourceDigest(v.location)
 	selected, err := h.moduleDirectory(v.member, artifact, v.location)
 	if err != nil {
 		return "", err
@@ -401,7 +402,7 @@ func (h handler) virtualSignedModule(w http.ResponseWriter, r *http.Request) {
 		}
 		// A remote capability remains bound to that source incarnation even if
 		// legacy state replaces the member with hosted identical bytes.
-		if c.Source != nil || c.Credential != nil || c.Module != "" {
+		if c.Source != nil || c.Credential != nil || c.Module != "" || c.ModuleSource != "" {
 			h.k.Error(w, r, forbidden)
 			return
 		}

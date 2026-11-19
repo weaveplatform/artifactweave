@@ -238,7 +238,7 @@ func (w *world) terraformGetterCommand(program, dir string, env []string, args .
 		if writeErr != nil || closeErr != nil {
 			return nil, fmt.Errorf("native %s failed; private diagnostic write failed", args[0])
 		}
-		return nil, fmt.Errorf("native %s failed: %w; private diagnostics: %s", args[0], err, file.Name())
+		return out, fmt.Errorf("native %s failed: %w; private diagnostics: %s", args[0], err, file.Name())
 	}
 	return out, nil
 }

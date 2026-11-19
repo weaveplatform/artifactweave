@@ -168,7 +168,7 @@ func (h handler) upstreamModuleLocation(
 		"module-metadata/"+m.Package()+"/"+m.Version+"/download",
 		endpoint,
 		m.Package(),
-		"terraform-module-location-v3",
+		"terraform-module-location-v4",
 		true,
 		func(body io.Reader, actual string) error { _, e := parseModuleLocation(body, actual, c); return e },
 	)
@@ -262,11 +262,10 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 	public, err := h.remoteDownloadURL(
 		r,
 		q.module,
-		path,
+		location,
 		digest,
 		artifact.Identity,
 		selected,
-		location.Archive,
 		representation,
 	)
 	if err != nil {
@@ -488,8 +487,8 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 	// The archive's cache path follows its location, so the URL names the
 	// module it was issued for, and the location read now must name the
 	// same path.
-	m, ok := tf.ParseModule(c.Module + ".zip")
-	if !ok || c.Source == nil {
+	m, ok := remoteModuleClaim(c)
+	if !ok {
 		h.k.Error(w, r, forbidden)
 		return
 	}
@@ -502,7 +501,7 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 		h.k.Error(w, r, signedMemberError(c, err))
 		return
 	}
-	if location.Path != c.Path || metadata.Identity != *c.Source {
+	if location.Path != c.Path || metadata.Identity != *c.Source || c.ModuleSource != h.moduleSourceDigest(location) {
 		h.k.Error(w, r, forbidden)
 		return
 	}

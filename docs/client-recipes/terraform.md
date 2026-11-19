@@ -137,3 +137,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/terraform_combined_steps_test.go](../../test/acceptance/terraform_combined_steps_test.go).
 - Evidence: [test/acceptance/features/terraform_getters.feature](../../test/acceptance/features/terraform_getters.feature).
 - Evidence: [test/acceptance/terraform_getters_steps_test.go](../../test/acceptance/terraform_getters_steps_test.go).
+- Evidence: [test/acceptance/terraform_snapshot_test.go](../../test/acceptance/terraform_snapshot_test.go).
+- Evidence: [.github/workflows/quality-gate.yml](../../.github/workflows/quality-gate.yml).

@@ -33,11 +33,25 @@ They are enforced independently of optional upstream checksum-header policy.
 GitHub HTTPS Git locations (`git::https://github.com/org/repo.git?ref=...`) and
 `github.com/org/repo` shorthand map to GitHub's archive endpoint. Additional shorthand
 path segments select a subdirectory; an explicit `//` selector is appended to them.
-`ref` selects the
-snapshot; positive `depth` does not change archive bytes. This is snapshot retrieval,
+`ref` selects the snapshot; positive `depth` does not change archive bytes but remains
+bound into the private source decision and signed capability. A full commit with
+positive depth is supported as a snapshot, while the pinned clients' Git clone mode
+rejects that combination as an unavailable named clone ref. Literal HEAD, branch/tag
+names, qualified refs and commits use the documented Git ref-name grammar; revision
+expressions such as `HEAD~1` or reflog expressions are refused before admission.
+GitHub chooses an unqualified branch/tag-name collision; the server does not invent
+precedence. Mutable-ref snapshots follow normal cache freshness/offline rules and
+may retain older bytes while fresh; a ref is not inherently immutable.
+This is snapshot retrieval,
 not a general Git clone, submodule or LFS implementation. The precise snapshot/ref
 matrix and full qualification remain owned by
 [P28 #668](https://github.com/weaveplatform/artifactweave/issues/668).
+
+Snapshot delivery preserves `.gitmodules`, LFS pointers and already-materialized
+LFS data as archive content. It does not initialize submodules, follow `.lfsconfig`
+or hydrate pointer files. A module requiring an absent submodule fails native
+initialization; no auxiliary Git/LFS source is contacted. The GitHub producer's
+archive settings and live Artifactory behavior remain separate capture obligations.
 
 Qualified HTTP(S) vanity sources receive a GET with exactly one `terraform-get=1`.
 A complete 200 response selects one nonempty `X-Terraform-Get` field, or, without
@@ -113,6 +127,14 @@ revocation are re-read from the token store. Basic authentication retains a pass
 revision, and anonymous access must still be enabled. User/permission changes and
 source/credential/epoch changes fence publication and delivery. No password or bearer
 token is copied into the URL or sent upstream.
+
+The capability additionally binds a keyed digest of the complete normalized source
+decision, including query, selected directory, checksum-file URL/name and snapshot
+depth. Changing one of those controls invalidates an earlier URL even when archive
+bytes are identical. The public digest reveals no upstream URL/query value and does
+not permit offline guesses of private source parameters. A client obtains a fresh
+`/download` answer after a source-control change; old capabilities without this binding
+are refused. Local/provider download capabilities keep their separate contracts.
 
 Source archives must remain inside the configured registry/storage prefixes, the
 configured GitHub storage pair, or explicit `externalDependenciesPatterns` with
@@ -208,3 +230,14 @@ upstream outage with a fresh client home/cache. Linux CI requires HTTPS discover
 macOS uses the established loopback service override because the pinned clients do
 not trust the fixture through `SSL_CERT_FILE`. Local results do not qualify Linux
 HTTPS discovery, other OpenTofu provider/backend paths or live Artifactory parity.
+
+`TestAccTerraformGitHubSnapshots` runs both clients over the actual application
+router and SQLite/PostgreSQL stores. Its controlled GitHub/registry HTTPS fixture
+replaces immutable test DNS/trust/dial bindings while retaining the production
+transport's URL, TLS-name, redirect, credential and current-authority checks. Fourteen
+source/ref/content forms run cold, with an upstream branch moved while the server
+cache is fresh, and offline with a fresh client home. `TestAccTerraformGitCloneDepthControl`
+separately compares the pinned clients' actual clone behavior using a disposable
+local repository, file-only transport and empty Git configuration. Neither fixture
+is a live GitHub/Artifactory capture or a standalone process claim for the snapshot
+matrix; the 19-form getter feature above supplies the standalone-process proof.

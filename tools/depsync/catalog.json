@@ -926,6 +926,18 @@
       "path": "test/acceptance/terraform_getters_steps_test.go",
       "pattern": "(\"ARTIFACTWEAVE_TOFU_BIN\", \")[0-9.]+(\")",
       "replacement": "\\g<1>{{opentofu}}\\g<2>"
+    },
+    {
+      "path": "test/acceptance/terraform_snapshot_test.go",
+      "pattern": "(\"ARTIFACTWEAVE_TERRAFORM_BIN\", \")[0-9.]+(\")",
+      "replacement": "\\g<1>{{terraform}}\\g<2>",
+      "count": 2
+    },
+    {
+      "path": "test/acceptance/terraform_snapshot_test.go",
+      "pattern": "(\"ARTIFACTWEAVE_TOFU_BIN\", \")[0-9.]+(\")",
+      "replacement": "\\g<1>{{opentofu}}\\g<2>",
+      "count": 2
     }
   ],
   "images": [

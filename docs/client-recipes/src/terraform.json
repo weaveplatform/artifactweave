@@ -172,6 +172,25 @@
         "/.well-known/terraform.json",
         "terraformGetterIdentity"
       ]
+    },
+    {
+      "path": "test/acceptance/terraform_snapshot_test.go",
+      "contains": [
+        "TestAccTerraformGitHubSnapshots",
+        "TestAccTerraformGitCloneDepthControl",
+        "warm-moved-ref",
+        "lfs-pointer",
+        "absent-submodule",
+        "GIT_ALLOW_PROTOCOL=file"
+      ]
+    },
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "contains": [
+        "Terraform and OpenTofu GitHub snapshot native acceptance",
+        "^TestAccTerraformGit(HubSnapshots|CloneDepthControl)$",
+        "-test.gocoverdir="
+      ]
     }
   ]
 }

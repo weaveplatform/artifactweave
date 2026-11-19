@@ -786,6 +786,13 @@ for archive failures, using the existing generation CAS rather than TTL manipula
 The [source boundary](source-boundary.md#terraform-vanity-and-checksum-file-control-metadata-668)
 records projection, validator and mutation constraints.
 
+Remote module signatures also bind the complete normalized source decision through
+a keyed descriptor digest, distinct from the immutable archive hash and common source
+incarnation. A query/selector/checksum-file/depth edit invalidates older capabilities
+even when it selects identical bytes. The digest is opaque to clients; private URL
+parameters remain outside public claims. The adapter revalidates the current source
+decision before acquiring or delivering the signed archive.
+
 ## Python remote checkpoint (#627)
 
 The [Python remote adapter](../operations/pypi-remote.md) consumes the common source
