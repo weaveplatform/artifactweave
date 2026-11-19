@@ -81,6 +81,11 @@
 //     assumed-offline circuit does not count, and otherwise maps that
 //     error as before
 //     (https://github.com/weaveplatform/artifactweave/issues/1269).
+//   - A statement failure while publishing an existing copy's validation
+//     clock is local storage work. It retains its cause and answers as a
+//     server fault even when the driver wraps a timeout, while the request
+//     is still live; store verdicts and ended requests keep their prior
+//     mappings (https://github.com/weaveplatform/artifactweave/issues/1704).
 //
 // # References
 //
