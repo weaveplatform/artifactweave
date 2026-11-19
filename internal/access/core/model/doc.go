@@ -36,6 +36,7 @@
 //     with RoleType, Environment and PrincipalType; ValidateProjectKey,
 //     ProjectRepoKey and the sentinel ErrInvalidProjectKey; and the role and
 //     environment vocabulary: GlobalRoleActions, IsGlobalRoleAction,
+//     ProjectRoleActions, IsProjectRoleAction,
 //     MaxCustomGlobalRoles, BuiltinGlobalRoles, BuiltinGlobalRole,
 //     RoleActions, IsBuiltinEnvironment and
 //     ValidEnvironmentName.
@@ -115,6 +116,8 @@
 //     and a user who never logged in.
 //   - roles_test.go: the global role vocabulary, the built-in roles,
 //     environment names, RoleActions and the developer default.
+//   - project_roles_test.go: the distinct project action vocabulary, including
+//     management actions that must not become global or artifact grants.
 //   - model_test.go: TestUnitToken (Expired, Revocable, the default expiry
 //     and ParseSubject), TestUnitProject (ValidateProjectKey and
 //     ProjectRepoKey) and TestUnitSigningKeyJSON (a signing key's secrets
