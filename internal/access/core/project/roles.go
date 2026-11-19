@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/access/core/roles"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
@@ -39,6 +40,9 @@ var (
 type Service struct {
 	// Store provides the access records and their shared transaction runner.
 	Store port.Store
+	// Repositories joins the access transaction when project lifecycle changes
+	// its server-owned build-info repository. Role-only services need no binding.
+	Repositories artifactsapi.Repositories
 }
 
 func (s Service) tx(ctx context.Context, fn func(context.Context) error) error {

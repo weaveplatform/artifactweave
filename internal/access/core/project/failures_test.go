@@ -29,6 +29,13 @@ type failingProjects struct {
 	fail string
 }
 
+func (s failingProjects) RoleProjects(ctx context.Context, q port.ProjectRoleQuery) ([]model.Project, bool, error) {
+	if s.fail == "role project page" {
+		return nil, false, errStoreFailure
+	}
+	return s.ProjectStore.RoleProjects(ctx, q)
+}
+
 func (s failingProjects) PutMember(ctx context.Context, m model.ProjectMember) error {
 	if s.fail == "put member" {
 		return errStoreFailure

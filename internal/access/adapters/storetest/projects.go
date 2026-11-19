@@ -12,6 +12,7 @@ import (
 
 // runProjects covers projects (decision 0013).
 func runProjects(t *testing.T, newStore Factory) {
+	t.Run("ProjectRolePages", func(t *testing.T) { RunProjectRolePages(t, newStore) })
 	t.Run("Projects", func(t *testing.T) { testProjects(t, newStore(t)) })
 	t.Run("Roles", func(t *testing.T) { testRoles(t, newStore(t)) })
 	t.Run("Environments", func(t *testing.T) { testEnvironments(t, newStore(t)) })

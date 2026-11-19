@@ -39,6 +39,8 @@ type (
 	Role = model.Role
 	// Environment is a deployment stage that repositories are assigned to.
 	Environment = model.Environment
+	// ProjectMember is one direct user or group role assignment in a project.
+	ProjectMember = model.ProjectMember
 
 	// UserStore stores users.
 	UserStore = port.UserStore

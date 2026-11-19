@@ -609,10 +609,15 @@ func apiReviewCompleteText(e *apiReviewOperation) string {
 // content is known only once every element is read, so writing it as it
 // is read would change the bytes.
 var apiReviewCollected = map[string]string{
-	"GET /access/api/v1/environments":                           "administrator-defined environments, which the store reads whole",
-	"GET /access/api/v1/oidc":                                   "administrator OIDC configurations, which the store reads whole",
-	"GET /access/api/v1/oidc/{provider_name}/identity_mappings": "one provider's identity mappings, administrator configuration the store reads whole",
-	"GET /access/api/v1/roles":                                  "administrator-defined roles, which the store reads whole",
+	"GET /access/api/v1/environments":                                                  "administrator-defined environments, which the store reads whole",
+	"GET /access/api/v1/oidc":                                                          "administrator OIDC configurations, which the store reads whole",
+	"GET /access/api/v1/oidc/{provider_name}/identity_mappings":                        "one provider's identity mappings, administrator configuration the store reads whole",
+	"GET /access/api/v1/roles":                                                         "administrator-defined roles, which the store reads whole",
+	"GET /access/api/v1/projects":                                                      "administrator-defined projects, filtered against current project administration under one guarded metadata snapshot",
+	"GET /access/api/v1/projects/{projectKey}/environments":                            "one project's configured environments, bounded by its environment limit and read whole",
+	"GET /access/api/v1/projects/{projectKey}/roles":                                   "one project's configured roles and current global definitions, combined and checked for ambiguous names before publication",
+	"GET /access/api/v1/projects/{projectKey}/users":                                   "one project's direct user-role assignments, read with current management authority in one guarded metadata snapshot",
+	"GET /access/api/v1/projects/{projectKey}/groups":                                  "one project's direct group-role assignments, read with current management authority in one guarded metadata snapshot",
 	"GET /artifactory/api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}": "the files of one build run, which that run's record names",
 	"GET /artifactory/api/repositories/configurations":                                 "repository configurations, bounded by configuration and grouped by class",
 	"GET /artifactory/api/search/gavc":                                                 "local hits merge with an upstream's answer, deduplicated by path, and the result limit applies after the merge",
@@ -786,6 +791,24 @@ func apiReviewPersistence(path string) (string, string, []string) {
 			"internal/access/adapters/http/access_identity.go",
 			"internal/access/adapters/sql/identity_query.go",
 			"internal/access/adapters/storetest/identity_query.go",
+		}
+	}
+	if path == "/access/api/v2/projects" {
+		return "project-role-pages", "default1000, positive limit; exact direct role membership through correlated EXISTS, distinct projects in indexed bytewise display-name/key order in either direction; tuple seek and SQL LIMIT+1; opaque cursor binds role, direction and last name/key", []string{
+			"internal/access/adapters/http/project_roles.go",
+			"internal/access/core/project/role_projects.go",
+			"internal/access/adapters/sql/project_role_page.go",
+			"test/server/access/projects_test.go",
+		}
+	}
+	if strings.HasPrefix(path, "/access/api/v1/projects") {
+		return "project-administration", "complete configuration/member lists collected under one project/authority transaction; lifecycle writes coordinate project administration and repository ownership atomically", []string{
+			"internal/access/adapters/http/projects.go",
+			"internal/access/adapters/http/project_roles.go",
+			"internal/access/adapters/http/project_members.go",
+			"internal/access/core/project/lifecycle.go",
+			"internal/access/adapters/sql/project_lifecycle_test.go",
+			"test/server/access/projects_status_test.go",
 		}
 	}
 	if strings.HasPrefix(path, "/access/") ||

@@ -96,8 +96,8 @@ func Validate(c *Config) error {
 // ValidateStored is Validate for an update, which keeps the stored key: it
 // skips the key rules, which that key met when a client created it or which
 // the server set aside when it created the repository under a name they
-// reserve. The server's build-info repository also keeps its package type,
-// buildinfo, which no class allows a client to choose.
+// reserve. Server-owned global and project build-info repositories also keep
+// their package type, buildinfo, which no class allows a client to choose.
 func ValidateStored(c *Config) error {
 	return validate(c, false)
 }
@@ -196,7 +196,12 @@ func validate(c *Config, keyRules bool) error {
 			}
 		}
 	}
-	storedBuildInfo := !keyRules && c.Key == buildInfoKey && c.PackageType == BuildInfo
+	// Project deletion unassigns repositories without destroying their contents,
+	// so a retained build-info repository can no longer depend on ProjectKey.
+	// Creation still rejects buildinfo and Merge forbids changing a stored type.
+	projectBuildInfo := strings.HasSuffix(c.Key, "-build-info") && len(c.Key) > len("-build-info")
+	storedBuildInfo := !keyRules && class == Local && c.PackageType == BuildInfo &&
+		(c.Key == buildInfoKey || projectBuildInfo)
 	if c.PackageType != "" && class != "" && !storedBuildInfo {
 		if allowed := AllowedPackageTypes(
 			class,

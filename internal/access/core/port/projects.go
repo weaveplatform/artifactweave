@@ -13,6 +13,9 @@ import (
 // environment, a membership, an assignment's owner) return
 // kernel.ErrNotFound when that project does not exist.
 type ProjectStore interface {
+	// Guard acquires the project administration snapshot inside a transaction,
+	// without loading a collection. Acquire it before identity/artifact locks.
+	Guard(ctx context.Context) error
 	// Authority returns the project's lifetime and effective policy revision;
 	// kernel.ErrNotFound when the project does not exist. Within a transaction
 	// it takes the project snapshot guard before locking the project row. Read
@@ -37,6 +40,10 @@ type ProjectStore interface {
 	Delete(ctx context.Context, key string) error
 	// List returns every project ordered by key.
 	List(ctx context.Context) ([]model.Project, error)
+	// RoleProjects reads one page of distinct projects with direct user/group
+	// assignments naming q.RoleName. Order is display name then key, bytewise,
+	// reversed when Descending. More reports an additional matching project.
+	RoleProjects(ctx context.Context, q ProjectRoleQuery) ([]model.Project, bool, error)
 
 	// PutRole creates or replaces the role (r.ProjectKey, r.Name).
 	PutRole(ctx context.Context, r model.Role) error
@@ -84,6 +91,17 @@ type ProjectStore interface {
 	Assignments(ctx context.Context, projectKey string) ([]model.RepositoryAssignment, error)
 	// DeleteAssignment removes a repository's assignment and shares.
 	DeleteAssignment(ctx context.Context, repoKey string) error
+}
+
+// ProjectRoleQuery selects a role-usage page. Limit must be positive; an empty
+// AfterKey starts at the first row. The service validates global role identity
+// and decodes its bound cursor before passing the last name/key tuple here.
+type ProjectRoleQuery struct {
+	RoleName   string
+	Descending bool
+	AfterName  string
+	AfterKey   string
+	Limit      int
 }
 
 // NewProjectAuthority allocates a new lifetime and initial policy revision.

@@ -22,6 +22,8 @@ func (s *Store) Projects() port.ProjectStore { return projectStore{s} }
 // which is research 15's roles and project_roles in one.
 type projectStore struct{ s *Store }
 
+func (p projectStore) Guard(ctx context.Context) error { return p.guard(ctx) }
+
 const projectCols = "key, display_name, description, storage_quota_bytes, soft_limit, quota_email, admin_privileges"
 
 func projectArgs(v model.Project) ([]any, error) {

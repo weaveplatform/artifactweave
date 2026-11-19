@@ -205,6 +205,27 @@ func TestUnitValidateStoredKeepsTheBuildInfoType(t *testing.T) {
 	}
 }
 
+func TestUnitProjectBuildInfoUpdatesSurviveProjectUnassignment(t *testing.T) {
+	for _, project := range []string{"alpha", ""} {
+		c := repo.Config{
+			Key: "alpha-build-info", Class: repo.Local, PackageType: repo.BuildInfo,
+			ProjectKey: project, Description: "updated",
+		}
+		if err := repo.ValidateStored(&c); err != nil {
+			t.Errorf("project=%q: stored build-info update: %v", project, err)
+		}
+		if err := repo.Validate(&c); err == nil || !strings.Contains(err.Error(), "packageType") {
+			t.Errorf("project=%q: client selected server-owned package type: %v", project, err)
+		}
+	}
+	for _, class := range []repo.Class{repo.Remote, repo.Virtual, repo.Federated} {
+		c := repo.Config{Key: "alpha-build-info", Class: class, PackageType: repo.BuildInfo, URL: "https://example.test"}
+		if err := repo.ValidateStored(&c); err == nil || !strings.Contains(err.Error(), "packageType") {
+			t.Errorf("server-owned package type allowed for %s: %v", class, err)
+		}
+	}
+}
+
 // terraformType is read in any case and must then be MODULE or PROVIDER;
 // the refusal echoes the value upper-cased, as it would be stored
 // (decision 0040).

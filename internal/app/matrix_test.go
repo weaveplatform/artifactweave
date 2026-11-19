@@ -586,6 +586,7 @@ func matrixTable() []matrixRow {
 		trashMatrix(),
 		keypairMatrix(),
 		roleMatrix(),
+		projectMatrix(),
 		permissionMatrix(),
 		tokenMatrix(),
 		securityMatrix(),
