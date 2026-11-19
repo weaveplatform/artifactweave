@@ -17,6 +17,7 @@ import (
 )
 
 func TestAccModuleEventMigrationPreservesPeerStreams(t *testing.T) {
+	eventModule := moduleThrough(t, 2)
 	baseline := platsql.Module
 	files := fstest.MapFS{}
 	for _, backend := range []string{"sqlite", "postgres"} {
@@ -55,12 +56,12 @@ func TestAccModuleEventMigrationPreservesPeerStreams(t *testing.T) {
 			if _, err := dialect.Migrate(ctx, db.DB(), db.Dialect(), []dialect.Module{broken}, "platform"); !errors.Is(err, dialect.ErrMigration) {
 				t.Fatalf("injected migration failure: %v", err)
 			}
-			versions := storekit.Get[[]dialect.StreamVersion](t)(dialect.Version(ctx, db.DB(), db.Dialect(), []dialect.Module{platsql.Module}))
+			versions := storekit.Get[[]dialect.StreamVersion](t)(dialect.Version(ctx, db.DB(), db.Dialect(), []dialect.Module{eventModule}))
 			if len(versions) != 1 || versions[0].Current != 1 {
 				t.Fatalf("failed migration advanced history: %+v", versions)
 			}
 			for range 2 {
-				_, err := dialect.Migrate(ctx, db.DB(), db.Dialect(), []dialect.Module{platsql.Module}, "platform")
+				_, err := dialect.Migrate(ctx, db.DB(), db.Dialect(), []dialect.Module{eventModule}, "platform")
 				storekit.Must(t, err)
 				storekit.Same(t, "legacy event after upgrade", []outbox.OutboxEntry{before},
 					storekit.Get[[]outbox.OutboxEntry](t)(st.Outbox().Read(ctx, "legacy-origin", "repo:libs", 0, 0)))
@@ -71,7 +72,7 @@ func TestAccModuleEventMigrationPreservesPeerStreams(t *testing.T) {
 			}
 			// Rolling back the additive, not-yet-used consumer schema preserves
 			// the old application's stream/HLC/cursor data and next sequence.
-			_, err := dialect.Rollback(ctx, db.DB(), db.Dialect(), []dialect.Module{platsql.Module}, "platform", 1)
+			_, err := dialect.Rollback(ctx, db.DB(), db.Dialect(), []dialect.Module{eventModule}, "platform", 1)
 			storekit.Must(t, err)
 			storekit.Same(t, "legacy event after rollback", []outbox.OutboxEntry{before},
 				storekit.Get[[]outbox.OutboxEntry](t)(st.Outbox().Read(ctx, "legacy-origin", "repo:libs", 0, 0)))
@@ -80,7 +81,7 @@ func TestAccModuleEventMigrationPreservesPeerStreams(t *testing.T) {
 			if got := storekit.Get[outbox.OutboxEntry](t)(st.Outbox().Append(ctx, next)); got.Seq != 2 {
 				t.Fatalf("rollback reset peer sequence: %d", got.Seq)
 			}
-			_, err = dialect.Migrate(ctx, db.DB(), db.Dialect(), []dialect.Module{platsql.Module}, "platform")
+			_, err = dialect.Migrate(ctx, db.DB(), db.Dialect(), []dialect.Module{eventModule}, "platform")
 			storekit.Must(t, err)
 			p := storekit.Get[outbox.Position](t)(st.Events().RegisterConsumer(ctx, "legacy-origin", "new-consumer"))
 			if p.Seq != 0 {

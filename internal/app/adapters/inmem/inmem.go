@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
+	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	platinmem "github.com/weaveplatform/artifactweave/internal/platform/store/inmem"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx/memtx"
@@ -82,6 +83,9 @@ func (s *Store) Outbox() outbox.OutboxStore { return s.platform.Outbox() }
 
 // Events is the module-event view of the same transactional platform outbox.
 func (s *Store) Events() outbox.EventStore { return s.platform.Events() }
+
+// Schedules is the platform's durable logical schedule state.
+func (s *Store) Schedules() schedule.Store { return s.platform.Schedules() }
 
 // Uploads is the platform's upload session store.
 func (s *Store) Uploads() session.UploadStore { return s.platform.Uploads() }

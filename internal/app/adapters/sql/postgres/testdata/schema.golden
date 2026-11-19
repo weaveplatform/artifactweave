@@ -874,6 +874,17 @@ column roles.environments text
 column roles.actions text
 constraint roles.roles_pkey PRIMARY KEY (project_key, name)
 index roles.roles_pkey CREATE UNIQUE INDEX roles_pkey ON roles USING btree (project_key, name)
+table schedules
+column schedules.kind text COLLATE "C" NOT NULL
+column schedules.key text COLLATE "C" NOT NULL
+column schedules.revision text NOT NULL
+column schedules.expression text NOT NULL
+column schedules.timezone text NOT NULL
+column schedules.enabled boolean NOT NULL
+column schedules.next_fire bigint
+constraint schedules.schedules_pkey PRIMARY KEY (kind, key)
+index schedules.schedules_due CREATE INDEX schedules_due ON schedules USING btree (enabled, next_fire, kind, key)
+index schedules.schedules_pkey CREATE UNIQUE INDEX schedules_pkey ON schedules USING btree (kind, key)
 table settings
 column settings.key text COLLATE "C" NOT NULL
 column settings.value text NOT NULL

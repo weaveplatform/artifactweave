@@ -70,6 +70,7 @@ index repositories_project repositories CREATE INDEX repositories_project ON rep
 index repository_keypairs_name repository_keypairs CREATE INDEX repository_keypairs_name ON repository_keypairs(keypair_name,repo_key)
 index repository_members_member repository_members CREATE INDEX repository_members_member ON repository_members(member_key,virtual_key)
 index request_budgets_expiry request_budgets CREATE INDEX request_budgets_expiry ON request_budgets(resets_at,key_hash)
+index schedules_due schedules CREATE INDEX schedules_due ON schedules(enabled,next_fire,kind,key)
 index sqlite_autoindex_access_federation_targets_1 access_federation_targets
 index sqlite_autoindex_api_replays_1 api_replays
 index sqlite_autoindex_api_restrictions_1 api_restrictions
@@ -135,6 +136,7 @@ index sqlite_autoindex_repository_secrets_1 repository_secrets
 index sqlite_autoindex_request_budget_guard_1 request_budget_guard
 index sqlite_autoindex_request_budgets_1 request_budgets
 index sqlite_autoindex_roles_1 roles
+index sqlite_autoindex_schedules_1 schedules
 index sqlite_autoindex_settings_1 settings
 index sqlite_autoindex_signing_keys_1 signing_keys
 index sqlite_autoindex_tokens_1 tokens
@@ -252,6 +254,7 @@ table repository_secrets repository_secrets CREATE TABLE repository_secrets(repo
 table request_budget_guard request_budget_guard CREATE TABLE request_budget_guard(id BIGINT PRIMARY KEY CHECK(id = 1))
 table request_budgets request_budgets CREATE TABLE request_budgets(key_hash TEXT PRIMARY KEY,used BIGINT NOT NULL CHECK(used >= 0),resets_at BIGINT NOT NULL)
 table roles roles CREATE TABLE roles(project_key TEXT NOT NULL DEFAULT '',name TEXT NOT NULL,type TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',environments TEXT,actions TEXT,PRIMARY KEY(project_key,name))
+table schedules schedules CREATE TABLE schedules(kind TEXT NOT NULL,key TEXT NOT NULL,revision TEXT NOT NULL,expression TEXT NOT NULL,timezone TEXT NOT NULL,enabled BOOLEAN NOT NULL,next_fire BIGINT,PRIMARY KEY(kind,key))
 table settings settings CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)
 table signing_keys signing_keys CREATE TABLE signing_keys(alias TEXT PRIMARY KEY,public_key TEXT NOT NULL DEFAULT '',private_key BLOB,passphrase BLOB,is_default BOOLEAN NOT NULL DEFAULT FALSE)
 table sqlite_sequence sqlite_sequence CREATE TABLE sqlite_sequence(name,seq)

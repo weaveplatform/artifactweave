@@ -32,11 +32,29 @@ run reports and the run status enumeration. Version-based criteria (`keepLastNVe
 `includedPackageVersions`) are evaluated over the package index
 ([0018](0018-package-index.md)) with the package type's comparator, never by path globbing.
 
-**Scheduler.** `internal/scheduler` runs cleanup policies, replication, trash purge and
-GC in process. Cron expressions are parsed by a Quartz-syntax parser; the candidates are
-`github.com/reugn/go-quartz` and `github.com/influxdata/cron`, chosen by a conformance
-test over every cron string in JFrog's documentation. Runs are recorded with a trigger id
-so `/runs/view`, `/runs/{policyKey}/{triggerId}` and the CSV report work.
+**Scheduler (P11 CLN-01).** `internal/platform/schedule` supplies the shared Quartz
+evaluator and durable logical positions for cleanup and single replication. It accepts
+the documented six/seven-field grammar, named ranges and day modifiers, with the
+[Quartz 2.3 year bound](https://www.quartz-scheduler.org/documentation/quartz-2.3.0/tutorials/crontrigger.html).
+The bounded evaluator searches real calendar dates: a leap-day or impossible February
+date cannot silently normalize into March. The originally proposed parser candidates
+were checked before implementation; `go-quartz@v0.15.2` failed those two calendar
+controls, and `influxdata/cron` lacks the required day modifiers. No parser dependency
+was added.
+
+Schedule position and a distinct occurrence's work enqueue share one metadata
+transaction. Fresh revisions fence edits, disablement and recreation; worker admission
+rechecks revision, enabled state and queue lease generation. The existing work queue
+retains its at-least-once execution, retry and shutdown contract. Completed queue rows
+can disappear without losing the logical position. Lock order is owner/domain state,
+schedule, then queue; business/network work runs outside admission transactions.
+
+Project scheduling policy is explicit: UTC by default, optional named IANA timezones,
+skip nonexistent civil times and use the first instant of repeated civil times. Missed
+fires catch up from the persisted logical fire in bounded passes. These are project
+choices, not claimed vendor runtime observations. Cleanup/replication execution tickets
+consume this foundation and own their run/report APIs. Existing fixed-interval trash,
+GC and format maintenance jobs retain their current behavior.
 
 **Trash can.** Deleting an item, or a repository with its content, moves the items to the
 trash with the original repository and path; `trashcanConfig.retentionPeriodDays` governs
