@@ -3,12 +3,14 @@
 Checked against: Artifactory 7.161.32
 
 Three platform features that GitOps users manage through Terraform and that artifactweave
-plans to implement in P11: event subscriptions (`/event/api/v1`), package cleanup policies
+allocates between P11 administration/documented execution and P19a observed compatibility: event subscriptions (`/event/api/v1`), package cleanup policies
 (`/artifactory/api/cleanup`) and projects (`/access/api/v1/projects`). Each section records
 the exact names, shapes and status codes the `jfrog/artifactory` and `jfrog/project`
 providers depend on.
 
-P11 has not started at the P8 closeout. The schemas and storage contracts were built
+At the historical P8 closeout P11 had not started. By 2026-11-19 private project
+authority and role/membership foundations have merged (#1730/#1731); this does not
+activate the remaining public workflows. The schemas and storage contracts were built
 earlier; they do not make event delivery, cleanup-policy execution or project
 management available. Global environments and repository `projectKey` persistence
 already exist, but are not the full project lifecycle described below. See the
@@ -21,6 +23,11 @@ https://docs.jfrog.com/projects/reference/llms.txt, plus the provider sources. I
 *(unverified)* lack a primary source.
 
 ## Webhooks (`/event/api/v1`)
+
+**Current phase ownership:** P11 implements subscription CRUD, validation and secret
+management, with the 24 required Terraform resources. P19a implements observed
+serialization/signing, actual handler delivery, test and troubleshooting after P19.
+The routes and shapes below remain the contract inventory, not a delivery claim.
 
 Auth: platform admin, project admin (limited to the domains `artifact`, `artifact_property`,
 `docker`, `build`), the Manage Webhooks role (7.137+), or a token scoped
@@ -80,7 +87,7 @@ https://docs.jfrog.com/integrations/docs/webhook-event-types):
 | `app_trust` | gate, application, version and release lifecycle events | `projectKey, applicationKeys[], stages[]`; P25 producer, not emitted today |
 | `curation` | block, waiver and policy events | none; P27 producer, not emitted today |
 
-The planned P11 delivery engine emits `artifact`, `artifact_property`, `docker`,
+P11 service producers emit internal events; the P19a delivery engine serializes `artifact`, `artifact_property`, `docker`,
 `build` and `user` events. All Event routes currently inherit generated 501 handlers;
 subscriptions do not yet apply or deliver. Release/Distribution producers belong to
 P15, archive/restore to P16, RBv2 to P24, AppTrust to P25, Xray to P26 and Curation to
@@ -92,7 +99,7 @@ estate/pipeline integration events belong to P40 under the
 Signing: the `X-JFrog-Event-Auth` request header carries the raw secret when
 `use_secret_for_signing` is false and the hex HMAC-SHA256 of the body when it is true. This
 comes from JFrog's guide text; no reference page in the index documents the header
-*(unverified)*, so a real delivery is captured before the format is fixed
+*(unverified)*, so P19 captures a real delivery before P19a fixes the format
 (see [12-open-questions.md](12-open-questions.md)). The current webhook pages still do not
 document it: **[I]**, unconfirmed for 7.x. From 7.161.15, artifact event payloads carry a
 `user_context` naming the user or token that caused the event ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)); the
@@ -150,7 +157,8 @@ Later additions in the release notes: version patterns (7.125.7, SaaS 7.127.0), 
 stages and optional path patterns (SaaS 7.147.1, self-managed 7.161.15), and time, property
 and version conditions combined in one policy (SaaS 7.161.5, self-managed 7.161.15)
 ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)). The published create-policy definition has no path-pattern field
-yet, so its name is **[I]**.
+yet, so its name is **[I]**. P19 observes that addition and P19a implements it;
+documented selection criteria and package-policy execution remain P11.
 
 Run status enum: `IN_PROGRESS`, `IN_PROGRESS_WITH_ERRORS`, `COMPLETED`,
 `COMPLETED_WITH_ERRORS`, `STOPPED`, `STOPPING`, `FAILED`, `PENDING_WARM`, `PARTIAL_WARMED`,

@@ -113,8 +113,14 @@ provider is unusable and the `projectKey` fields on repositories mean nothing.
 
 ## Project-scoped remote source boundary (#614)
 
+**Phase allocation (2026-11-19):** P11 owns documented project lifecycle, current
+role authorization, environments, attachment, standard sharing and quotas. The
+observation-dependent project-aware connection feature #487 belongs to P19a after
+P19, with its full native/revocation matrix. Merged private authority and role services
+remain credited P11 foundations; standard readOnly sharing is not the missing mode.
+
 The [project remote source design](../../implementation/project-remote-sources.md)
-defines the P9 source extension and P11 completion cases for
+defines the P9 source extension and P19a completion cases for
 [#487](https://github.com/weaveplatform/artifactweave/issues/487). HTTP and same-platform
 project sources have distinct identities; an internal connection carries the initiating
 subject and receiving project instead of an administrator's loopback credential. Source
@@ -125,7 +131,7 @@ The [2026-11-19 audit](../project-scoped-remotes-contract-audit.md) supersedes t
 release and discovery-schema gaps. It distinguishes supported all-project sharing from
 the restricted All Projects connection context. The sharing-mode mutation wire contract
 remains unresolved; a read-only permission ceiling is not that mode. The design retains
-**[I]** validation, cache and race decisions and makes no live 7.161.32 observation. P11 owns
+**[I]** validation, cache and race decisions and makes no live 7.161.32 observation. P19a owns
 sharing-mode administration, `projectScopedReadUpstream`, `upstreamRepoKey`,
 `upstreamProjectKey`, `connectableRepos`, `projectScopedConsumers`, authorization and
 native acceptance. Durable project/policy/share records are internal foundations, not

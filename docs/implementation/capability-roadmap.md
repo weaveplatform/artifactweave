@@ -51,21 +51,21 @@ P9c [INV-01](package-format-matrix.md) adds a versioned format/class/client
 inventory and unmapped-format CI guard. P20 still owns the wider operation-level
 inventory across products, APIs and clients.
 
-## Work already owned by P9–P19
+## Work already owned by P9–P19a
 
 | Capability | Owner and completion boundary |
 |---|---|
 | Upstream fetch/cache, credentials, metadata rewrite, remote version searches, Smart Remote synchronization/transitive lookup | P9, [epic #612](https://github.com/weaveplatform/artifactweave/issues/612); the [retrieval contract](remote-retrieval-contract.md) maps every field to an owner and tests. Generic remote retrieval, [npm remote retrieval](../operations/npm-remote.md), [Python remote retrieval](../operations/pypi-remote.md), [NuGet v2/v3 and symbol remote retrieval](../operations/nuget-remote.md), [classic Helm remote retrieval](../operations/helm-remote.md), the shared source/transport/security/cache foundation and [cache maintenance](remote-cache-maintenance.md) are implemented. NuGet remote/cache reindex (#700) rebuilds index rows only from verified cached archives. [Maven-family remote retrieval](../operations/maven-remote-repositories.md) is implemented with native Maven evidence; [Terraform module remote retrieval](../operations/terraform-remote-modules.md) and [provider remote retrieval](../operations/terraform-remote-providers.md) are implemented with pinned native cold/offline evidence; [Smart Remote synchronization](smart-remote.md) is implemented with current-wire #216 and external-peer P37 qualification retained; [remote folder browsing](../operations/remote-repositories.md#remote-folder-browsing) is implemented with bounded HTML/Smart listings; [transitive AQL](../operations/transitive-aql.md) is implemented with direct/virtual member bounds and native CLI evidence. [#213 upstream search](../operations/upstream-search.md) discovers authoritative metadata/listings without binary prefetch, including permission-safe differing layouts through #672. The [P9 sign-off ledger](../testing/phase9-signoff.md) records the passing all-15 public conformance run (#638) and exact-head combined-tree exit through #639 after the provider compatibility fix (#701) |
 | LuaRocks, NVIDIA NIM, Skills, Agent Plugins and Agent Packages | P9b implements repository management and native protocols for every documented supported class. These five were missing from the original 44-type inventory and are separate from P9c's 28 generic-fallback formats |
 | Virtual resolution and metadata merging | Implemented P10 mechanisms and retained client/server evidence are mapped in the [virtual guide](../operations/virtual-repositories.md) and [type matrix](package-format-matrix.md); [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528) owns final phase qualification |
-| Projects, webhook delivery, package cleanup, single push/pull replication | P11; project-scoped remote resolution (#487) spans P9's source model and P11's sharing/authorization, with closure in P11 |
+| Projects, webhook delivery, package cleanup, single push/pull replication | P11 owns documented project administration, event foundations, subscription management, package cleanup and single replication. P19a owns project-scoped remotes #487, observed webhook execution and unconfirmed cleanup additions after P19 |
 | Full descriptor, system configuration, LDAP, anonymous access and configured mail notifications | P12; #303 includes native anonymous reads with an explicit permission grant; mail settings must result in delivery. Proxy obligations include NTLM/domain/ntHost, `redirectedToHosts` credential behavior and broader proxy compatibility; #618 supports HTTP(S) Basic proxies and requires CONNECT for DNS-named HTTP sources |
 | Repository and Access Federation, topology | P13/P14 for artifactweave peers; external interoperability is additionally owned by P37/P40 |
 | Release bundles v1 and Distribution | P15, including the bundle-delete `archive` flag contract; accepting and ignoring it is not completion. Coordinate archive effects with P16; v2 compatibility and distribution remain explicitly in P24 |
 | Cold storage and archive/restore policies | P16; accepting `cold_blob` settings alone does not satisfy it |
 | Workers | P17; scheduled/event execution, language/runtime contract and sandbox behavior, not configuration CRUD alone; security/runtime event producers integrate in P27 |
 | Incoming API budgets, temporary principal restriction/recovery, optional durable build-append retries and bounded Access identity pages | P18, [#890](https://github.com/weaveplatform/artifactweave/issues/890); [operation ledger and execution review](../research/api-reliability/README.md), fault/load/paging evidence and full quality gate. P19/#216 owns live wire confirmation; P20 retains the wider product/client inventory |
-| First delivery sequence: hardening and live comparison | P18/P19; does not imply completion of the newly scheduled P20–P41 capabilities |
+| First delivery sequence: hardening and live comparison | P18/P19 followed by P19a observation-dependent implementation; does not imply completion of the newly scheduled P20–P41 capabilities |
 
 ## P20 onward: capability ownership
 
@@ -187,7 +187,7 @@ links every family and its retained evidence. `native merge`, `item routes` and
 `first member wins` are implementation mechanisms; the inventory's separate
 client/server references determine the evidence strength.
 
-P10 does not qualify cross-peer federation (P13), project-source sharing (P11),
+P10 does not qualify cross-peer federation (P13), project-source sharing (P19a, using P11 authority foundations),
 multi-node cache coordination (P35) or unrelated unfinished protocol/API surface
 (P28 and the named format owners). The merged cache is bounded per process as
 recorded by the [remote cache policy](remote-cache-policy.md#concurrency-and-publication).
@@ -205,12 +205,12 @@ there; P10 is not yet marked done.
 |---|---|
 | #213 | P9 upstream version search exit |
 | #672 | P9 permission-safe differing-layout discovery prerequisite for #213; canonical authorization and layout/source/credential mutation fences, with no binary prefetch |
-| #487 | Design in P9; complete project sharing and security proof in P11 |
+| #487 | Design in P9; merged private authority/role foundations and documented project administration in P11; complete observed project-aware sharing and native/security proof in P19a |
 | #262 | P21 shared browser approval/native login exit |
 | #303 | P12 anonymous-access configuration and native acceptance |
 | #362 | Delivered: npm local and federated signing and the native `npm audit signatures` proof; remote key relay is #1318 and virtual signature merging #1319 |
 | #523 | Delivered: `jf mvn` runs on Maven 3.10 with the JFrog Maven extractor 2.44.1 that `jf` 2.131.0 downloads |
-| #216 | P19 first live comparison; P20 onward adds new capture work to its owning phases and P41 verifies the expanded result |
+| #216 | P19 first live comparison; P19a implements the explicitly deferred observed contracts; P20 onward adds new capture work to its owning phases and P41 verifies the expanded result |
 
 Applicability research is bounded work, not permission to erase a row. For example,
 P28 must distinguish Artifactory's Terraform state/output contract from a complete
