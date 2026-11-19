@@ -690,6 +690,9 @@ func lookupMemberPath(
 		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 			return Found{}, passedOver, fmt.Errorf("properties of %s: %w", f.Item.FullPath(), err)
 		}
+		if !f.Item.Folder {
+			dl.stepf("Request includes query properties")
+		}
 		if !dl.matrix.Matches(props) {
 			dl.stepf("Request query properties conflict with those that annotate the artifact - " +
 				"returning unfound resource")

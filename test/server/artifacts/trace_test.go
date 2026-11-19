@@ -3,6 +3,7 @@ package artifacts_test
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -15,7 +16,11 @@ import (
 // its steps without their times, checking the shape Artifactory's trace has.
 func traceOf(t *testing.T, w *itemWorld, method, path, as string) (map[string]string, []string) {
 	t.Helper()
-	rec := w.do(method, path, as, "")
+	return traceResponse(t, w.do(method, path, as, ""), path)
+}
+
+func traceResponse(t *testing.T, rec *httptest.ResponseRecorder, path string) (map[string]string, []string) {
+	t.Helper()
 	wantStatus(t, rec, http.StatusOK)
 	if ct := rec.Header().Get("Content-Type"); ct != "text/plain" {
 		t.Fatalf("%s: Content-Type %q", path, ct)
@@ -142,9 +147,19 @@ func TestAccTraceResolution(t *testing.T) {
 		// it (7.161.26, 516-530), as the walk through a virtual repository
 		// does (#1630): a conflict is unfound, and a key the file lacks
 		// still serves it.
+		{"/artifactory/libs-local/d/a.txt;team=core?trace", "admin", []string{
+			"Received request",
+			"Retrieving info from local repository 'libs-local' type generic",
+			"Request includes query properties",
+			"Returning found resource from libs-local:d/a.txt",
+			"Identified requested resource as a file",
+			"Responding with found resource",
+			"Request succeeded",
+		}},
 		{"/artifactory/libs-local/d/a.txt;team=other?trace", "admin", []string{
 			"Received request",
 			"Retrieving info from local repository 'libs-local' type generic",
+			"Request includes query properties",
 			"Request query properties conflict with those that annotate the artifact - " +
 				"returning unfound resource",
 			"Responding with unfound resource",
@@ -155,6 +170,7 @@ func TestAccTraceResolution(t *testing.T) {
 		{"/artifactory/libs-local/d/a.txt;other=x?trace", "admin", []string{
 			"Received request",
 			"Retrieving info from local repository 'libs-local' type generic",
+			"Request includes query properties",
 			"Request query properties don't match those that annotate the artifact",
 			"Returning found resource from libs-local:d/a.txt",
 			"Identified requested resource as a file",

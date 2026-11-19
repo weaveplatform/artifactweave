@@ -485,6 +485,49 @@ func TestUnitVirtualUpstreamStepTrace(t *testing.T) {
 	}
 }
 
+func TestUnitRemoteTraceQueryPropertiesKeepsReadBoundaries(t *testing.T) {
+	t.Run("file unreadable", func(t *testing.T) {
+		w := newMemberWorld(t)
+		w.Put(t, w.Remote, true, "a.txt", []byte("cached"))
+		acc := itemkit.Access{Decider: &accessapitest.Decider{AllowsFolderFunc: func(
+			accessapi.ResourceType, accessapi.Repo, string, accessapi.Actions,
+		) bool {
+			return true
+		}}}
+		got := w.get(t, http.MethodGet, "/artifactory/libs-remote/a.txt;k=v?trace", acc)
+		if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), "status '403'") ||
+			strings.Contains(got.Body.String(), "Request includes query properties") || len(w.src.reads) != 0 {
+			t.Fatalf("new step disclosed an unreadable file: %d %s", got.Code, got.Body)
+		}
+	})
+	t.Run("property read failed", func(t *testing.T) {
+		w := newMemberWorld(t)
+		w.Put(t, w.Remote, true, "a.txt", []byte("cached"))
+		w.k = w.Kit(itemkit.Deps{Store: failingItems{w.Store}, RemoteSources: w.k.RemoteSources})
+		got := w.get(t, http.MethodGet, "/artifactory/libs-remote/a.txt;k=v?trace")
+		if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), "status '500'") ||
+			strings.Contains(got.Body.String(), "Request includes query properties") || len(w.src.reads) != 0 {
+			t.Fatalf("failed property read traced a verdict or reached the source: %d %s", got.Code, got.Body)
+		}
+	})
+	t.Run("document without an item", func(t *testing.T) {
+		w := newMemberWorld(t)
+		document := model.RemoteCacheEntry{Blob: blob.Blob{Checksums: kernel.Checksums{
+			SHA256: strings.Repeat("0", 64),
+		}}}
+		st := copyStore{Store: w.Store, exact: map[string]copyPage{"": {entries: []model.RemoteCacheEntry{document}}}}
+		w.k = w.Kit(itemkit.Deps{Store: st, RemoteSources: w.k.RemoteSources})
+		w.src.answer = func(source.Request) (source.Result, error) {
+			return streamed("document", kernel.Checksums{}, nil), nil
+		}
+		got := w.get(t, http.MethodGet, "/artifactory/libs-remote/a.txt;k=v?trace")
+		if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), "Request succeeded") ||
+			strings.Contains(got.Body.String(), "Request includes query properties") || len(w.src.reads) != 1 {
+			t.Fatalf("document-only cache claimed a stored-file evaluation: %d %s", got.Code, got.Body)
+		}
+	})
+}
+
 // TestUnitVirtualUpstreamStepTracesAPolicyRefusalOnce (#1535): a remote
 // member whose download policy refuses its upstream read is traced once,
 // as a direct read of it is, and the walk passes over it: the refusal is
