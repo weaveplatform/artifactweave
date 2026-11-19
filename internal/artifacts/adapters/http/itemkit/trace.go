@@ -312,6 +312,9 @@ func traceMatrix(
 	if err != nil {
 		return false, fmt.Errorf("properties of %s: %w", it.FullPath(), err)
 	}
+	if !it.Folder {
+		t.stepf("Request includes query properties")
+	}
 	m := req.matrix()
 	switch {
 	case !m.Matches(props):

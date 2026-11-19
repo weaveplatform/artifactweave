@@ -42,8 +42,8 @@
     "steps": [
       {
         "language": "sh",
-        "code": "helm search repo aw/acme --versions\nhelm pull aw/acme --version 0.1.0 --destination \"$AW_WORK/pulled\"",
-        "note": ""
+        "code": "helm search repo aw/acme --versions\nhelm pull aw/acme --version 0.1.0 --destination \"$AW_WORK/pulled\"\nhelm install preview aw/acme --version 0.1.0 --dry-run=client",
+        "note": "Client-side install dry-run renders the repository chart without connecting to Kubernetes."
       }
     ]
   },
@@ -72,7 +72,9 @@
       "contains": [
         "repo add aw {url}/api/helm/helm-virtual",
         "dependency update parent",
-        "pull aw/acme --version 0.1.0 --verify"
+        "pull aw/acme --version 0.1.0 --verify",
+        "install preview-remote aw/acme --version 0.1.0 --dry-run=client",
+        "install preview-local aw/web --version 0.1.0 --dry-run=client"
       ]
     },
     {

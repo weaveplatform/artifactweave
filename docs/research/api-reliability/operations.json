@@ -8211,6 +8211,7 @@
     "direct_calls": [
       "s.adminStore",
       "s.internalError",
+      "s.keypairSummary",
       "st.Keys",
       "st.Keys().Keypairs"
     ],
@@ -8244,6 +8245,7 @@
       "apierror.New",
       "errors.Is",
       "fmt.Sprintf",
+      "keymaterial.CheckPublic",
       "mime.FormatMediaType",
       "s.content",
       "s.deps.Repositories.Get",
@@ -8279,6 +8281,7 @@
       "errors.Is",
       "s.content",
       "s.internalError",
+      "s.keypairSummary",
       "st.Keys",
       "st.Keys().Keypair"
     ],
@@ -21903,6 +21906,7 @@
       "errors.Is",
       "s.adminStore",
       "s.internalError",
+      "s.keypairSummary",
       "st.Keys",
       "st.Keys().UpdateKeypair"
     ],

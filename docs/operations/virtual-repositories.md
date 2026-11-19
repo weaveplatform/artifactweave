@@ -7,9 +7,10 @@ separates the resolution mechanism from client/server evidence. Registered `V` i
 not itself a native-client qualification claim. A federated member here is the
 one-node repository contract; cross-peer convergence belongs to P13.
 
-This guide describes merged implementation through main `901a11a5c` (2026-11-18).
+This guide describes merged implementation through main `621523d38` (2026-11-18).
 The [qualification and epic closeout record](../testing/phase10-signoff.md)
-distinguishes delivered work from the remaining final gate. [#1571](https://github.com/weaveplatform/artifactweave/issues/1571)
+distinguishes delivered work from the remaining final gate. GitHub closed #1571
+with documentation PR #1708; [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528)
 owns final qualification, the plan status and decision 0008's acceptance. The
 [source-backed rules](../research/decisions/0008-virtual-repositories.md) retain
 unsettled compatibility choices as [I]. The [inference register](#inference-register)
@@ -76,6 +77,16 @@ preserves source lookup SQL faults and their original cause before consumer
 classification; the former #1692 loss of storage identity is fixed. The separate
 existing-copy clock-write fault in [#1704](https://github.com/weaveplatform/artifactweave/issues/1704)
 remains tracked by the qualification record until its correction merges.
+At the recorded merged baseline, a source lookup SQL failure is still suppressed
+into a cached 200 index in virtual folder browsing.
+[#1723 / PR #1726](https://github.com/weaveplatform/artifactweave/pull/1726)
+corrects that separate cross-kind defect: trusted source failures and failed
+final authority checks abort the complete index; ordinary initial upstream
+listing fallback remains intentional. Its
+[full CI](https://github.com/weaveplatform/artifactweave/actions/runs/44430053878)
+passed at `d19d9787c0f62fbfd812cc84f79173f4bf19aeb4`; maintainer merge is still
+required before final qualification. The correction retains the observed
+project source-authority answer without claiming a vendor HTML 500 response.
 [Merged #1705](https://github.com/weaveplatform/artifactweave/pull/1705) retains a
 complete expired repository file after an explicit origin 404 and advances its
 validation clock. Physical index files retain that file contract; native API
@@ -152,7 +163,7 @@ A merged-document cache is separate from every remote's raw/artifact cache.
 | Chef | Cookbook/version documents; catalog/search remain request-paged. |
 | Conan | Merged revision, search and package documents; files retain source/member resolution. |
 | Conda | Each remote member's subdir part; local/federated records remain live. |
-| Ansible | Per-request; the existing ADP-04 comparison entry retains an older cached-as-Chef proposal, rather than an updated claim about this implementation. |
+| Ansible | Per-request; the [published comparison correction](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6991066992) identifies the older ADP-04 cached-as-Chef proposal as superseded. |
 | Other virtual types | Per-request merge/first-holder lookup; declaring the field does not create a merged cache. |
 
 Artifactweave defaults this field to 7200 seconds; stored explicit periods remain effective. Zero
@@ -203,7 +214,7 @@ cross-peer federation are not silently enabled by virtual membership.
 
 The matrix's anchored proof distinguishes actual native-client scenarios from
 server-only controls. These links identify retained implementation evidence;
-final release/P10 qualification remains #1571.
+final release/P10 qualification remains in #1528.
 
 | Type | Operator guide/recipe | Retained virtual evidence |
 | --- | --- | --- |

@@ -690,6 +690,9 @@ func lookupMemberPath(
 		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 			return Found{}, passedOver, fmt.Errorf("properties of %s: %w", f.Item.FullPath(), err)
 		}
+		if !f.Item.Folder {
+			dl.stepf("Request includes query properties")
+		}
 		if !dl.matrix.Matches(props) {
 			dl.stepf("Request query properties conflict with those that annotate the artifact - " +
 				"returning unfound resource")
@@ -1202,6 +1205,16 @@ func (s *Kit) serveFile(
 	}
 	ctx := r.Context()
 	it := f.Item
+	var content io.ReadSeekCloser
+	var err error
+	if rpmPublicKeyArtifact(f) {
+		content, err = s.publicKeyContent(ctx, f)
+		if err != nil {
+			httpkit.WriteErr(w, r, s.InternalError(ctx, "validate public key export", err))
+			return
+		}
+		defer func() { _ = content.Close() }()
+	}
 	// Before the redirect, so that a redirecting repository answers the
 	// conditional request as a streamed download does.
 	r = downloadRequest(r)
@@ -1246,14 +1259,16 @@ func (s *Kit) serveFile(
 		return
 	}
 	browserView(h, r, f.Repo, it.Name)
-	content, _, err := s.Blobs.Open(ctx, it.Actual.SHA256)
-	if err != nil {
-		// The index names content the blob store does not hold: data loss,
-		// not a client error.
-		httpkit.WriteErr(w, r, s.InternalError(ctx, "open blob", err))
-		return
+	if content == nil {
+		content, _, err = s.Blobs.Open(ctx, it.Actual.SHA256)
+		if err != nil {
+			// The index names content the blob store does not hold: data loss,
+			// not a client error.
+			httpkit.WriteErr(w, r, s.InternalError(ctx, "open blob", err))
+			return
+		}
+		defer func() { _ = content.Close() }()
 	}
-	defer func() { _ = content.Close() }()
 	// A range that does not overlap answers 416 as 7.x's does: Content-Range
 	// alone, without the file's headers or http.Error's text.
 	sw := &StatusWriter{ResponseWriter: &pkgroute.RangeRefusalWriter{ResponseWriter: w}}

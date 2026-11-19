@@ -2,6 +2,10 @@ package accesshttp
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -35,7 +39,7 @@ func TestAccPublicKeyFile(t *testing.T) {
 	db := inmem.New()
 	if err := db.Keys().CreateKeypair(ctx, api.Keypair{
 		Name: "kp-spaced", Type: api.KeypairRSA, Alias: "my key",
-		PrivateKey: "private", PublicKey: "public",
+		PrivateKey: "private", PublicKey: keypairPublicFixture(t),
 	}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -184,7 +188,7 @@ func usedKeypair(t *testing.T) *inmem.Store {
 	db := inmem.New()
 	if err := db.Keys().CreateKeypair(ctx, api.Keypair{
 		Name: "kp-used", Type: api.KeypairRSA, Alias: "used",
-		PrivateKey: "private", PublicKey: "public",
+		PrivateKey: "private", PublicKey: keypairPublicFixture(t),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -230,4 +234,17 @@ func TestUnitDeleteKeyPairIsOneTransaction(t *testing.T) {
 	if _, err := db.Keys().Keypair(ctx, "kp-used"); err != nil {
 		t.Errorf("the pair after the failed delete: %v", err)
 	}
+}
+
+func keypairPublicFixture(t *testing.T) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	public, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: public}))
 }

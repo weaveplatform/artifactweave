@@ -132,3 +132,4 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/terraform_provider_steps_test.go](../../test/acceptance/terraform_provider_steps_test.go).
 - Evidence: [test/acceptance/features/terraform_remote.feature](../../test/acceptance/features/terraform_remote.feature).
 - Evidence: [test/acceptance/terraform_provider_virtual_steps_test.go](../../test/acceptance/terraform_provider_virtual_steps_test.go).
+- Evidence: [test/acceptance/terraform_combined_steps_test.go](../../test/acceptance/terraform_combined_steps_test.go).
