@@ -448,10 +448,10 @@ jobs:
     # Exercise Docker 29's containerd image store during ubuntu-latest's
     # mixed 24.04/26.04 rollout, including single-image build-info proof.
     runs-on: ubuntu-26.04
-    # The 45m acceptance wrapper includes image readiness and compilation
-    # outside Go's 35m test timer. Leave time for the remaining native checks and
-    # coverage upload after it finishes.
-    timeout-minutes: 55
+    # Image readiness and acceptance each have a bounded 45m watchdog. The
+    # latter includes compilation outside Go's 35m timer. Reserve another 10m
+    # for setup, the remaining native checks and coverage upload.
+    timeout-minutes: 100
     env:
       # Image extraction can exhaust the runner disk. Keep the build result
       # on tmpfs so the acceptance monitor can still report that failure.
@@ -724,8 +724,8 @@ jobs:
               wait "$accept_pid" || true
             fi
           }
-          # Bound image readiness, compilation and the suite together. Client
-          # readiness timers must not include the sequential image build queue.
+          # Bound image preparation independently of compilation and tests:
+          # a cold image queue must not spend Go's acceptance time allowance.
           deadline=$((SECONDS + 2700))
           while :; do
             if [[ -f "$CLIENT_IMAGES_STATUS" ]]; then
@@ -739,6 +739,7 @@ jobs:
               images_done=1
             fi
             if (( images_done )) && [[ -z "$accept_pid" ]]; then
+              deadline=$((SECONDS + 2700))
               if [ "$PROFILE" = full ]; then
                 setsid make accept ACCEPT_TIMEOUT=35m &
               else
