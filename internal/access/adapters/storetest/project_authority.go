@@ -89,13 +89,13 @@ func testProjectAuthorities(t *testing.T, newStore Factory) {
 		ps := authorityProjects(t, s)
 		before, share := authorityProject(t, ps, "alpha"), authoritySharing(t, ps)
 		assignment := storekit.Get[model.RepositoryAssignment](t)(ps.Assignment(t.Context(), "alpha-libs"))
-		rollback := errors.New("rollback project changes")
+		rollback := errors.New("rollback project changes") //nolint:err113 // the test matches it by identity
 		err := s.Tx(t.Context(), func(ctx context.Context) error {
 			if err := ps.PutMember(ctx, model.ProjectMember{ProjectKey: "alpha", Type: model.PrincipalUser, Name: "ann"}); err != nil {
-				return err
+				return err //nolint:wrapcheck // the transaction returns the store's own error
 			}
 			if err := ps.PutAssignment(ctx, model.RepositoryAssignment{RepoKey: "alpha-libs", ProjectKey: "alpha"}); err != nil {
-				return err
+				return err //nolint:wrapcheck // the transaction returns the store's own error
 			}
 			return rollback
 		})

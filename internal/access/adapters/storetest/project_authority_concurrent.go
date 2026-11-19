@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/storekit"
 )
 
+//nolint:wrapcheck // callbacks retain store errors; the shared snapshot runner adds operation context
 func testProjectAuthoritySnapshots(t *testing.T, newStore Factory) {
 	for _, order := range []struct {
 		name           string
@@ -81,6 +82,8 @@ type authoritySnapshotOps[V any] struct {
 // testAuthoritySnapshots records the expected public value before each writer
 // commits. Readers can therefore validate a just-committed revision without a
 // bookkeeping race. The mailboxes bound how far the writer can outrun readers.
+//
+//nolint:err113 // these errors are contract assertion diagnostics carried through worker result channels
 func testAuthoritySnapshots[V any](t *testing.T, s port.Store, authorityFirst bool, initial V, ops authoritySnapshotOps[V]) {
 	t.Helper()
 	const generations = 24
@@ -93,39 +96,38 @@ func testAuthoritySnapshots[V any](t *testing.T, s port.Store, authorityFirst bo
 	history := map[model.AuthorizationRevision]V{revision: storekit.Want(initial)}
 	var historyMu sync.Mutex
 	updates := []chan struct{}{make(chan struct{}, 1), make(chan struct{}, 1)}
-	workers := []func(context.Context) error{
-		func(ctx context.Context) error {
-			for generation := 1; generation <= generations; generation++ {
-				if err := s.Tx(ctx, func(ctx context.Context) error {
-					want, err := ops.change(ctx, generation)
-					if err != nil {
-						return fmt.Errorf("mutate generation %d: %w", generation, err)
-					}
-					revision, err := ops.authority(ctx)
-					if err != nil {
-						return fmt.Errorf("read changed authority: %w", err)
-					}
-					historyMu.Lock()
-					defer historyMu.Unlock()
-					if _, exists := history[revision]; exists || revision == "" {
-						return fmt.Errorf("generation %d reused or omitted its authority revision", generation)
-					}
-					history[revision] = storekit.Want(want)
-					return nil
-				}); err != nil {
-					return fmt.Errorf("writer transaction: %w", err)
+	workers := make([]func(context.Context) error, 0, 1+len(updates))
+	workers = append(workers, func(ctx context.Context) error {
+		for generation := 1; generation <= generations; generation++ {
+			if err := s.Tx(ctx, func(ctx context.Context) error {
+				want, err := ops.change(ctx, generation)
+				if err != nil {
+					return fmt.Errorf("mutate generation %d: %w", generation, err)
 				}
-				for _, update := range updates {
-					select {
-					case update <- struct{}{}:
-					case <-ctx.Done():
-						return fmt.Errorf("notify snapshot readers: %w", ctx.Err())
-					}
+				revision, err := ops.authority(ctx)
+				if err != nil {
+					return fmt.Errorf("read changed authority: %w", err)
+				}
+				historyMu.Lock()
+				defer historyMu.Unlock()
+				if _, exists := history[revision]; exists || revision == "" {
+					return fmt.Errorf("generation %d reused or omitted its authority revision", generation)
+				}
+				history[revision] = storekit.Want(want)
+				return nil
+			}); err != nil {
+				return fmt.Errorf("writer transaction: %w", err)
+			}
+			for _, update := range updates {
+				select {
+				case update <- struct{}{}:
+				case <-ctx.Done():
+					return fmt.Errorf("notify snapshot readers: %w", ctx.Err())
 				}
 			}
-			return nil
-		},
-	}
+		}
+		return nil
+	})
 	for _, update := range updates {
 		workers = append(workers, func(ctx context.Context) error {
 			seen := map[model.AuthorizationRevision]bool{}

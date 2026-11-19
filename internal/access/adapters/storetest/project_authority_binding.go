@@ -37,6 +37,7 @@ func testProjectBindingSnapshots(t *testing.T, newStore Factory) {
 				storekit.Must(t, ps.CreateEnvironment(t.Context(), model.Environment{ProjectKey: "alpha", Name: "stage-0"}))
 				storekit.Must(t, ps.PutRole(t.Context(), initial.Role))
 				storekit.Must(t, ps.PutAssignment(t.Context(), initial.Assignment))
+				//nolint:wrapcheck // callbacks retain store errors; the shared snapshot runner adds operation context
 				ops := authoritySnapshotOps[projectBindingValues]{
 					authority: func(ctx context.Context) (model.AuthorizationRevision, error) {
 						var a model.SharingAuthority
