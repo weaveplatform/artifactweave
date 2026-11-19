@@ -294,9 +294,13 @@ claim of end-to-end project administration or vendor collision parity.
 [definition lookups](../../internal/access/core/project/assignments.go)). **[S/I]**
 
 The lookups ignore currently deleted identities and resolve definitions at use
-time; they are not a replacement for identity deletion/recreation cleanup or
-token authorization. Those lifecycle and policy hooks must be composed before
-enabling the HTTP and artifact authorization workflow. **[S]**
+time. Identity deletion also clears direct project assignments inside the same
+transaction, guarded before identity rows; same-name recreation, real-backend
+rollback and concurrent assignment tests exercise that local lifecycle invariant.
+It is not a documented vendor cascade. Token authorization and HTTP integration
+remain required before enabling the full workflow.
+([Identity lifecycle audit](identity-deletion-project-grants-audit.md),
+[cleanup](../../internal/access/core/project/principals.go)). **[S/I]**
 
 The bounded sources above do not settle role-name case/normalization,
 cross-category collision precedence/reservation, REST role-name length,

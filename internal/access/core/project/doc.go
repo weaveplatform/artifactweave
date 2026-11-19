@@ -48,7 +48,8 @@
 //
 // P11 in progress, as prerequisites of issue 487. The full configuration,
 // sharing, current-role authorization and native acceptance matrix remains open.
-// Identity deletion/recreation cleanup, project HTTP views and token mint/use
-// policy must be composed before activating role authorization. Ignoring a
-// currently missing identity is not a lifecycle cleanup implementation.
+// Identity deletion now clears direct project assignments in its own
+// transaction, guarded before identity rows; real-backend fault and concurrent
+// assignment tests cover rollback and non-resurrection. Project HTTP views and
+// token mint/use policy still need composition before role authorization.
 package project

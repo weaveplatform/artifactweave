@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
+	"github.com/weaveplatform/artifactweave/internal/access/core/project"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
@@ -323,7 +324,7 @@ func (s *Service) admins(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
-// DeleteUser removes a user, its group memberships and its tokens. The
+// DeleteUser removes a user, its group/project memberships and its tokens. The
 // seeded admin and anonymous users and the last administrator stay, in
 // whatever case the request spells them.
 func (s *Service) DeleteUser(ctx context.Context, name string) error {
@@ -337,6 +338,9 @@ func (s *Service) DeleteUser(ctx context.Context, name string) error {
 		)
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
+		if err := (project.Service{Store: s.Store}).RemovePrincipalMemberships(ctx, model.PrincipalUser, name); err != nil {
+			return fmt.Errorf("project assignments: %w", err)
+		}
 		u, err := s.Store.Users().Get(ctx, name)
 		if err != nil {
 			return err //nolint:wrapcheck // ErrNotFound is the handler's 404
@@ -513,13 +517,16 @@ func (s *Service) PatchGroup(ctx context.Context, name string, p GroupPatch) err
 	})
 }
 
-// DeleteGroup removes a group, its memberships and, in the same
+// DeleteGroup removes a group, its group/project memberships and, in the same
 // transaction, its grants in every permission: a grant left behind would
 // pass to a later group of the same name. The seeded readers group is no
 // exception (no JFrog source protects it, and jf rt group-delete makes
 // none); seeding runs once, so it does not come back.
 func (s *Service) DeleteGroup(ctx context.Context, name string) error {
 	return s.tx(ctx, func(ctx context.Context) error {
+		if err := (project.Service{Store: s.Store}).RemovePrincipalMemberships(ctx, model.PrincipalGroup, name); err != nil {
+			return fmt.Errorf("project assignments: %w", err)
+		}
 		if err := s.Store.Groups().Delete(ctx, name); err != nil {
 			return err //nolint:wrapcheck // ErrNotFound is the handler's 404
 		}
