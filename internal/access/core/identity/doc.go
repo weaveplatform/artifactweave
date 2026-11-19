@@ -12,7 +12,8 @@
 // Service over the configured store and call it; other modules reach users and
 // groups only through access/api. The package imports the standard library,
 // the kernel, platform/settings, and the module's core/authn (the password
-// hash and the lock and expiration policy reads), core/model and core/port.
+// hash and the lock and expiration policy reads), core/model, core/port and
+// core/project (project-assignment cleanup on deletion).
 //
 // # Inputs
 //
@@ -40,6 +41,10 @@
 //
 //   - A change that takes several store calls runs in one transaction of
 //     the Store, so a write that fails part way leaves nothing behind.
+//   - Deletion removes the principal's direct project assignments in that
+//     same transaction. Cleanup takes the project guard before identity
+//     rows, so a concurrent assignment cannot outlive deletion or pass to
+//     a recreated identity. Same-name users and groups remain independent.
 //   - Every user name a method is given is folded (model.FoldUsername)
 //     before it reaches a store, so the stores hold lower-case names only and
 //     BOB names bob everywhere (#1432). A user row stored in mixed case
@@ -97,6 +102,9 @@
 //     TestUnitUnknownGroupOrMember and TestUnitUnknownGroupStoreFailures
 //     (user names in any case, and the service's wording of an unknown group
 //     or member, #1432 and #1433).
+//   - project_membership_test.go: user/group deletion and recreation clear
+//     assignments across projects, preserve the other principal type and
+//     rotate only affected project policies.
 //
 // The tests run on the metadata store's in-memory store, seeded with the
 // built-in principals through a stand-in for the artifacts module's
