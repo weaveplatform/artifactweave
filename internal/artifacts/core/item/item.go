@@ -451,6 +451,7 @@ func (s *Service) putFile(
 		return model.Item{}, err
 	}
 	stored := written.Item
+	ctx = ownPropertyEvents(ctx, stored.ID, d.By)
 	if err := h.Deployed(ctx, env, d.Repo, stored); err != nil {
 		return model.Item{}, hookFault(ctx, d, err)
 	}
@@ -959,7 +960,7 @@ func (s *Service) remove(
 	now := s.now()
 	var res port.DeleteResult
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		invalidated, err := s.invalidateCache(ctx, t)
+		invalidated, err := s.invalidateCache(ctx, t, by)
 		if err != nil {
 			return err
 		}
@@ -981,6 +982,7 @@ func (s *Service) remove(
 			if _, err := s.invalidateCache(
 				ctx,
 				Target{Repo: t.Repo, Cached: t.Cached, Path: sc.FullPath()},
+				by,
 			); err != nil {
 				return err
 			}

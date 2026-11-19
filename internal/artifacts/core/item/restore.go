@@ -33,7 +33,7 @@ func (s *Service) Restore(
 ) (model.Item, error) {
 	var restored model.Item
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		if _, err := s.invalidateCache(ctx, t); err != nil {
+		if _, err := s.invalidateCache(ctx, t, by); err != nil {
 			return err
 		}
 		var err error
@@ -93,6 +93,7 @@ func (s *Service) restoreRecord(
 	if err := items.SetProperties(ctx, stored.ID, rec.Properties, now); err != nil {
 		return model.Item{}, fmt.Errorf("item: properties of %s: %w", full, err)
 	}
+	ctx = ownPropertyEvents(ctx, stored.ID, by)
 	hooks, env := s.format(t.Repo.PackageType), s.env()
 	if !stored.Folder {
 		if err := hooks.Deployed(ctx, env, t.Repo, stored); err != nil {

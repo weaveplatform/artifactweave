@@ -248,7 +248,10 @@ func (s *Service) cleanupCacheEntry(
 		if !cleanupUnused(c, s.now(), latestUse(e.LastUsed, e.FetchedAt)) {
 			return nil
 		}
-		return s.Store.RemoteCache().Evict(ctx, token)
+		if err := s.Store.RemoteCache().Evict(ctx, token); err != nil {
+			return cacheMaintenanceError(err)
+		}
+		return s.emitRawDeleted(ctx, e, "")
 	})
 }
 

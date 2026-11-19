@@ -129,3 +129,44 @@ func (s registryFailingEvents) AppendEvent(ctx context.Context, e outbox.Event) 
 	}
 	return outbox.Event{}, s.err
 }
+
+func TestAccMultiArchDeletionEmitsOneDockerEvent(t *testing.T) {
+	each(t, func(t *testing.T, w *world, _ func() registry.Store) {
+		platforms := w.platforms()
+		body, digest := indexOf(layout.MediaTypeOCIIndex, platforms[0], platforms[1])
+		if err := w.pushAs(layout.MediaTypeOCIIndex, body, digest, "multi"); err != nil {
+			t.Fatal(err)
+		}
+		origin, err := instance.EnsureID(t.Context(), w.db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.db.Events().RegisterConsumer(t.Context(), origin, "proof"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.svc.DeleteMultiArch(t.Context(), w.owner("app"), "multi"); err != nil {
+			t.Fatal(err)
+		}
+		all, _, err := w.db.Events().Next(t.Context(), origin, "proof", 1000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		count := 0
+		for _, event := range all {
+			if event.Topic != artapi.DockerDeleted {
+				continue
+			}
+			count++
+			var facts artapi.DockerEvent
+			if err := json.Unmarshal(event.Payload, &facts); err != nil {
+				t.Fatal(err)
+			}
+			if facts.Image.Tag != "multi" || facts.Image.Digest != digest {
+				t.Fatalf("multiarch deletion=%+v", facts)
+			}
+		}
+		if count != 1 {
+			t.Fatalf("Docker delete events=%d", count)
+		}
+	})
+}

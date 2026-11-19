@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
@@ -287,5 +288,61 @@ func TestUnitDerivedAndMaintenanceEventsFollowMutation(t *testing.T) {
 	}
 	if !slices.Equal(topics, []string{artapi.ArtifactDeployed, artapi.PropertyAdded, artapi.ArtifactDeleted, artapi.ArtifactDeployed, artapi.ArtifactDeleted}) {
 		t.Fatalf("derived/maintenance=%v", topics)
+	}
+}
+
+func TestUnitRawCacheDeletionEventsAndAppendRollback(t *testing.T) {
+	for _, cleanup := range []bool{false, true} {
+		t.Run(map[bool]string{false: "explicit", true: "cleanup"}[cleanup], func(t *testing.T) {
+			w, u := remoteWorld(t)
+			read := watchEvents(t, w)
+			hours := 1
+			u.Repo.UnusedArtifactsCleanupPeriodHours = &hours
+			if err := w.db.Repos().Update(t.Context(), u.Repo); err != nil {
+				t.Fatal(err)
+			}
+			cached := cacheContent(t, w, u, "index", model.RemoteMetadata, "metadata")
+			source, err := w.db.RemoteCache().Source(t.Context(), u.Repo.Key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.svc.Now = func() time.Time { return at.Add(2 * time.Hour) }
+			remove := func() error {
+				if cleanup {
+					return w.svc.cleanupCacheEntry(t.Context(), cacheCleanupCursor{Repository: u.Repo.Key, Incarnation: source.Repository}, cached.Entry)
+				}
+				_, err := w.svc.Delete(t.Context(), Target{Repo: u.Repo, Cached: true, Path: "index"}, "deleter")
+				return err
+			}
+			marker := errors.New("append failed")
+			w.svc.Store = itemAppendFailure{Store: w.db, err: marker}
+			if err := remove(); !errors.Is(err, marker) {
+				t.Fatalf("failed raw delete=%v", err)
+			}
+			if _, err := w.db.RemoteCache().Read(t.Context(), cached.Entry.Token.Key); err != nil || w.refs(cached.Info.Digests.SHA256) != 1 || len(read()) != 1 {
+				t.Fatalf("failed append retained deletion: %v", err)
+			}
+			w.svc.Store = w.db
+			if err := remove(); err != nil {
+				t.Fatal(err)
+			}
+			events := read()
+			if len(events) != 2 || events[1].Topic != artapi.ArtifactDeleted {
+				t.Fatalf("raw deletion=%+v", events)
+			}
+			var facts artapi.ArtifactEvent
+			if err := json.Unmarshal(events[1].Payload, &facts); err != nil {
+				t.Fatal(err)
+			}
+			if facts.Item.ID != 0 || !facts.Item.Cached || facts.Item.Path != "index" || facts.SHA256 != cached.Info.Digests.SHA256 {
+				t.Fatalf("raw deleted facts=%+v", facts)
+			}
+			if !cleanup && facts.Actor.Name != "deleter" {
+				t.Fatalf("internal delete actor=%+v", facts.Actor)
+			}
+			if w.refs(cached.Info.Digests.SHA256) != 0 {
+				t.Fatal("raw reference retained")
+			}
+		})
 	}
 }

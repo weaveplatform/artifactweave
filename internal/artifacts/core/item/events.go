@@ -78,25 +78,15 @@ func (s *Service) emitRawCached(ctx context.Context, entry model.RemoteCacheEntr
 	if err := s.checkRawCacheBlob(ctx, entry.Blob.Checksums.SHA256); err != nil {
 		return err
 	}
-	key := entry.Token.Key
-	repository, err := artifactevents.Repository(ctx, s.Store, key.RepoKey)
-	if err != nil {
-		return fmt.Errorf("item: capture cache repository: %w", err)
+	if err := artifactevents.EmitRawCache(ctx, s.Store, artapi.ArtifactCached, entry, by, at); err != nil {
+		return fmt.Errorf("item: stage raw cache event: %w", err)
 	}
-	facts := artapi.ArtifactEvent{
-		EventMetadata: artifactevents.Metadata(ctx, by),
-		Item:          artapi.EventArtifact{Repository: repository, Path: key.Path, Cached: true, Variant: key.Variant},
-		Size:          entry.Blob.Size, SHA256: entry.Blob.Checksums.SHA256,
-	}
-	if err := artifactevents.Emit(
-		ctx,
-		s.Store,
-		artapi.ArtifactCached,
-		artifactevents.Key("cache", key.RepoKey, key.Path, key.Variant, key.SettingsRevision),
-		at,
-		facts,
-	); err != nil {
-		return fmt.Errorf("item: stage cache event: %w", err)
+	return nil
+}
+
+func (s *Service) emitRawDeleted(ctx context.Context, entry model.RemoteCacheEntry, by string) error {
+	if err := artifactevents.EmitRawCache(ctx, s.Store, artapi.ArtifactDeleted, entry, by, s.now()); err != nil {
+		return fmt.Errorf("item: stage raw cache deletion: %w", err)
 	}
 	return nil
 }

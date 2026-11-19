@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
@@ -150,8 +151,15 @@ func (s *Service) DeleteMultiArch(ctx context.Context, o Owner, tag string) ([]s
 		if err != nil {
 			return err
 		}
+		manifest, err := s.TagManifest(ctx, o, tag)
+		if err != nil {
+			return err
+		}
 		removed = slices.Concat([]string{tag}, tags, platforms)
-		return removeFolders(ctx, s.items(), o, removed)
+		if err := removeFolders(ctx, s.items(), o, removed); err != nil {
+			return err
+		}
+		return s.emitDocker(ctx, artapi.DockerDeleted, o, tag, manifest.Actual.SHA256, nil, false)
 	})
 	if err != nil {
 		return nil, err //nolint:wrapcheck // the transaction returns ours

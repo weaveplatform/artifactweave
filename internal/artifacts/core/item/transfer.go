@@ -573,7 +573,7 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step, res *Tran
 		if err := s.carry(ctx, t, st, landed, props, now); err != nil {
 			return err
 		}
-		if err := s.landed(ctx, hooks, env, t.To.Repo, st, landed, props, now); err != nil {
+		if err := s.landed(ownPropertyEvents(ctx, landed.ID, t.By), hooks, env, t.To.Repo, st, landed, props, now); err != nil {
 			return err
 		}
 		topic := artapi.ArtifactCopied

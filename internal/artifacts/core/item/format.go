@@ -38,8 +38,12 @@ func (s *Service) format(t repo.PackageType) format.Handler {
 func (s *Service) Env() format.Env { return s.env() }
 
 func (s *Service) env() format.Env {
+	var store format.Store
+	if s.Store != nil {
+		store = eventFormatStore{Store: s.Store, service: s}
+	}
 	env := format.Env{
-		Store:    s.Store,
+		Store:    store,
 		Keys:     s.Keys,
 		Now:      s.now,
 		Layouts:  &layouts{s: s, seen: map[string]*layout.Layout{}},
@@ -292,6 +296,7 @@ func (s *Service) annotate(
 		if err != nil {
 			return err
 		}
+		ctx = ownPropertyEvents(ctx, it.ID, "")
 		if err := s.Store.Items().PatchProperties(ctx, it.ID, set, remove, now); err != nil {
 			return fmt.Errorf("item: properties of %s: %w", it.FullPath(), err)
 		}

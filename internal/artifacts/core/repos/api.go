@@ -23,7 +23,7 @@ var _ artifactsapi.Repositories = repositories{}
 // its content moves to (trash.Store). Every call joins the transaction ctx
 // carries. Each composite store in app is a Store.
 type Store interface {
-	artifactevents.Store
+	artifactevents.CacheStore
 	trash.Store
 	Repos() port.RepoStore
 	Packages() port.PackageStore
