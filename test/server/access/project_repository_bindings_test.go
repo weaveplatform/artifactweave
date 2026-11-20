@@ -1,15 +1,44 @@
 package access_test
 
 import (
+	"bytes"
+	"context"
+	"errors"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/model"
+	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
+	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
+	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func TestAccProjectRepositoryBindingsSharesAndRecreation(t *testing.T) {
-	h, _ := seededHandler(t)
+	projectRepositoryBindings(t, inmem.New())
+}
+
+func projectRepositoryHandler(t *testing.T, db harness.Store) http.Handler {
+	t.Helper()
+	auth, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{Hash: testHash, Groups: db.Groups()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return New(Config{Store: db, Auth: auth, PasswordHash: testHash})
+}
+
+func projectRepositoryBindings(t *testing.T, db harness.Store) {
+	t.Helper()
+	support.Seed(t, db)
+	h := projectRepositoryHandler(t, db)
 	for _, key := range []string{"alpha", "beta"} {
 		projectRequest(t, h, "POST", "", "admin", `{"project_key":"`+key+`","display_name":"`+key+`"}`, 201)
 	}
@@ -38,6 +67,11 @@ func TestAccProjectRepositoryBindingsSharesAndRecreation(t *testing.T) {
 	configuration = decodeObject(t, artifact("GET", "/"+key, "", 200).Body.String())
 	if configuration["projectKey"] != "beta" {
 		t.Fatal("force attach answered 204 with the wrong owner")
+	}
+	artifact("POST", "/"+key, `{"environments":["missing"]}`, 400)
+	configuration = decodeObject(t, artifact("GET", "/"+key, "", 200).Body.String())
+	if configuration["projectKey"] != "beta" || configuration["environments"].([]any)[0] != "DEV" {
+		t.Fatalf("invalid environment changed canonical binding: %+v", configuration)
 	}
 	projectRequest(t, h, "PUT", share+"/alpha?readOnly=true", "admin", "", 204)
 	projectRequest(t, h, "PUT", share+"?readOnly=true", "admin", "", 204)
@@ -71,6 +105,61 @@ func TestAccProjectRepositoryBindingsSharesAndRecreation(t *testing.T) {
 	if a["assigned_to"] != "alpha" {
 		t.Fatal("direct project repository creation omitted its Access binding")
 	}
+	projectRepositoryBatchRollback(t, db, h)
+}
+
+type bindingFailureStore struct{ harness.Store }
+
+func (s bindingFailureStore) Projects() port.ProjectStore {
+	return bindingFailureProjects{s.Store.Projects()}
+}
+
+type bindingFailureProjects struct{ port.ProjectStore }
+
+func (s bindingFailureProjects) PutAssignment(ctx context.Context, a model.RepositoryAssignment) error {
+	if err := s.ProjectStore.PutAssignment(ctx, a); err != nil {
+		return err
+	}
+	if a.RepoKey == "alpha-batch-second" {
+		return errors.New("injected binding publication failure")
+	}
+	return nil
+}
+
+func projectRepositoryBatchRollback(t *testing.T, db harness.Store, h http.Handler) {
+	t.Helper()
+	failing := projectRepositoryHandler(t, bindingFailureStore{db})
+	const batch = "/artifactory/api/v2/repositories/batch"
+	const first = "alpha-batch-first"
+	const second = "alpha-batch-second"
+	body := `[{"key":"` + first + `","rclass":"local","packageType":"generic","projectKey":"alpha"},{"key":"` + second + `","rclass":"local","packageType":"generic","projectKey":"alpha"}]`
+	wantStatus(t, do(t, failing, "PUT", batch, jsonAs(basic("admin", "pw")), body), 500)
+	for _, key := range []string{first, second} {
+		wantStatus(t, do(t, h, "GET", "/artifactory/api/repositories/"+key, basic("admin", "pw"), ""), 404)
+		projectRequest(t, h, "GET", "/_/repositories/"+key, "admin", "", 404)
+		if _, err := db.Projects().Assignment(t.Context(), key); !errors.Is(err, kernel.ErrNotFound) {
+			t.Fatalf("failed batch create left an assignment for %s: %v", key, err)
+		}
+		wantStatus(t, do(t, h, "PUT", "/artifactory/api/repositories/"+key, jsonAs(basic("admin", "pw")), `{"rclass":"local","packageType":"generic","projectKey":"alpha"}`), 200)
+	}
+	update := `[{"key":"` + first + `","projectKey":"beta"},{"key":"` + second + `","projectKey":"beta"}]`
+	wantStatus(t, do(t, failing, "POST", batch, jsonAs(basic("admin", "pw")), update), 500)
+	for _, key := range []string{first, second} {
+		configuration := decodeObject(t, do(t, h, "GET", "/artifactory/api/repositories/"+key, basic("admin", "pw"), "").Body.String())
+		assignment := decodeObject(t, projectRequest(t, h, "GET", "/_/repositories/"+key, "admin", "", 200).Body.String())
+		if configuration["projectKey"] != "alpha" || assignment["assigned_to"] != "alpha" {
+			t.Fatalf("failed batch update split canonical ownership: configuration=%+v assignment=%+v", configuration, assignment)
+		}
+	}
+}
+
+func TestAccProjectRepositoryBindingSQLRoutes(t *testing.T) {
+	keys, err := crypt.New(bytes.Repeat([]byte{7}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqltest.RunModule(t, appsql.Modules(), func(s *dialect.Store) *appsql.Store { return appsql.New(s.DB(), s.Dialect(), keys) },
+		func(t *testing.T, newStore func(*testing.T) *appsql.Store) { projectRepositoryBindings(t, newStore(t)) }, sqltest.WithPostgres(), sqltest.WithKeyring(keys))
 }
 
 func TestAccProjectRepositorySharesUseCurrentConsumerRole(t *testing.T) {
