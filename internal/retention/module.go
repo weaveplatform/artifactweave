@@ -63,7 +63,7 @@ func (p policy) Allows(project string) bool {
 }
 func (p policy) Name() string { return p.name }
 
-func (d Deps) currentPolicy(ctx context.Context, _ kernel.ScopeActions) (cleanup.Policy, error) {
+func (d Deps) currentPolicy(ctx context.Context) (cleanup.Policy, error) {
 	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("cleanup caller: %w", err)

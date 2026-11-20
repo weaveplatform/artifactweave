@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
-	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/cleanup"
@@ -25,7 +24,7 @@ func TestUnitPackagePolicyHTTPStatusesAndWireRoundTrip(t *testing.T) {
 	db := inmem.New()
 	s := PackagePoliciesAPI{Policies: &cleanup.Service{
 		Store: db, Schedules: db.Schedules(), Repositories: db.Repos(), Guard: db.Projects().Guard,
-		Authorize: func(ctx context.Context, _ kernel.ScopeActions) (cleanup.Policy, error) {
+		Authorize: func(ctx context.Context) (cleanup.Policy, error) {
 			return fullPolicy{}, db.Projects().Guard(ctx)
 		},
 	}}

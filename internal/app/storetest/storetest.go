@@ -57,6 +57,7 @@ func Run(t *testing.T, newStore Factory) {
 	// is not part of the artifacts contract.
 	t.Run("RemoteLayoutFences", func(t *testing.T) { testRemoteLayoutFences(t, newStore(t)) })
 	t.Run("CleanupPolicyGenerations", func(t *testing.T) { testCleanupPolicyGenerations(t, newStore(t)) })
+	t.Run("CleanupPolicyConcurrentDisable", func(t *testing.T) { testCleanupPolicyConcurrentDisable(t, newStore(t)) })
 	accstoretest.Run(t, func(t *testing.T) accport.Store { return newStore(t) })
 	ntfstoretest.Run(t, func(t *testing.T) ntfport.Store { return newStore(t) })
 	retstoretest.Run(t, func(t *testing.T) retport.Store { return newStore(t) })

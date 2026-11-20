@@ -106,6 +106,7 @@
       "api_restrictions_parts_test.go",
       "bootstrap_test.go",
       "builds_status_test.go",
+      "cleanup_policies_test.go",
       "docker_list_errors_test.go",
       "error_profiles_p8_test.go",
       "fixtures_test.go",

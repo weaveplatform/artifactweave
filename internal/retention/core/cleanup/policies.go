@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
@@ -42,7 +43,7 @@ type Service struct {
 	Schedules     schedule.Store
 	Repositories  RepositoryReader
 	ProjectExists func(context.Context, string) error
-	Authorize     func(context.Context, kernel.ScopeActions) (Policy, error)
+	Authorize     func(context.Context) (Policy, error)
 	Guard         func(context.Context) error
 	Now           func() time.Time
 	// Zone is the server's configured IANA timezone; empty uses deterministic UTC.
@@ -56,7 +57,7 @@ func (s Service) now() time.Time {
 	return time.Now().UTC().Truncate(time.Microsecond)
 }
 
-func (s Service) run(ctx context.Context, action kernel.ScopeActions, fn func(context.Context, Policy) error) error {
+func (s Service) run(ctx context.Context, fn func(context.Context, Policy) error) error {
 	if s.Store == nil {
 		return fmt.Errorf("cleanup store is unavailable: %w", kernel.ErrStore)
 	}
@@ -64,7 +65,7 @@ func (s Service) run(ctx context.Context, action kernel.ScopeActions, fn func(co
 		return kernel.ErrForbidden
 	}
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		policy, err := s.Authorize(ctx, action)
+		policy, err := s.Authorize(ctx)
 		if err != nil {
 			return fmt.Errorf("current cleanup authority: %w", err)
 		}
@@ -97,7 +98,7 @@ func (s Service) policy(ctx context.Context, key string, authority Policy) (mode
 // operation. The schedule and private generation commit with the policy.
 func (s Service) Create(ctx context.Context, key string, in model.CleanupPolicy) (model.CleanupPolicy, error) {
 	var out model.CleanupPolicy
-	err := s.run(ctx, kernel.ScopeWrite, func(ctx context.Context, authority Policy) error {
+	err := s.run(ctx, func(ctx context.Context, authority Policy) error {
 		if !authority.Allows(in.ProjectKey) {
 			return kernel.ErrForbidden
 		}
@@ -128,7 +129,7 @@ func (s Service) Create(ctx context.Context, key string, in model.CleanupPolicy)
 // audit and enablement. Even a criteria-only edit fences old queued work.
 func (s Service) Update(ctx context.Context, key string, in model.CleanupPolicy) (model.CleanupPolicy, error) {
 	var out model.CleanupPolicy
-	err := s.run(ctx, kernel.ScopeWrite, func(ctx context.Context, authority Policy) error {
+	err := s.run(ctx, func(ctx context.Context, authority Policy) error {
 		old, err := s.policy(ctx, key, authority)
 		if err != nil {
 			return err
@@ -140,6 +141,10 @@ func (s Service) Update(ctx context.Context, key string, in model.CleanupPolicy)
 			return err
 		}
 		in.Created, in.CreatedBy, in.Enabled = old.Created, old.CreatedBy, old.Enabled
+		if old.Revision != "" && reflect.DeepEqual(configuration(in), configuration(old)) {
+			out = old
+			return nil
+		}
 		if err := s.replace(ctx, &in, authority.Name()); err != nil {
 			return err
 		}
@@ -156,7 +161,7 @@ func (s Service) Update(ctx context.Context, key string, in model.CleanupPolicy)
 // literal repository keys without modifying stored criteria or their patterns.
 func (s Service) Get(ctx context.Context, key string, checkAvailability bool) (model.CleanupPolicy, error) {
 	var out model.CleanupPolicy
-	err := s.run(ctx, kernel.ScopeRead, func(ctx context.Context, authority Policy) error {
+	err := s.run(ctx, func(ctx context.Context, authority Policy) error {
 		var err error
 		out, err = s.policy(ctx, key, authority)
 		if err != nil || !checkAvailability {
@@ -179,7 +184,7 @@ func (s Service) Get(ctx context.Context, key string, checkAvailability bool) (m
 // package policies. An empty store filter must not turn global into all projects.
 func (s Service) List(ctx context.Context, project string) ([]model.CleanupPolicy, error) {
 	out := []model.CleanupPolicy{}
-	err := s.run(ctx, kernel.ScopeRead, func(ctx context.Context, authority Policy) error {
+	err := s.run(ctx, func(ctx context.Context, authority Policy) error {
 		if !authority.Allows(project) {
 			return kernel.ErrForbidden
 		}
@@ -203,10 +208,13 @@ func (s Service) List(ctx context.Context, project string) ([]model.CleanupPolic
 // Enable changes scheduled and manual-run eligibility without stopping a run
 // already admitted. The new generation makes earlier queue entries stale.
 func (s Service) Enable(ctx context.Context, key string, enabled bool) error {
-	return s.run(ctx, kernel.ScopeWrite, func(ctx context.Context, authority Policy) error {
+	return s.run(ctx, func(ctx context.Context, authority Policy) error {
 		p, err := s.policy(ctx, key, authority)
 		if err != nil {
 			return err
+		}
+		if p.Enabled == enabled && p.Revision != "" {
+			return nil
 		}
 		p.Enabled = enabled
 		return s.replace(ctx, &p, authority.Name())
@@ -216,7 +224,7 @@ func (s Service) Enable(ctx context.Context, key string, enabled bool) error {
 // DisableAll is the emergency switch for the requested global/project scope,
 // including stored future item types. It preserves run history and admitted runs.
 func (s Service) DisableAll(ctx context.Context, project string) error {
-	return s.run(ctx, kernel.ScopeWrite, func(ctx context.Context, authority Policy) error {
+	return s.run(ctx, func(ctx context.Context, authority Policy) error {
 		if !authority.Allows(project) {
 			return kernel.ErrForbidden
 		}
@@ -225,7 +233,7 @@ func (s Service) DisableAll(ctx context.Context, project string) error {
 			return fmt.Errorf("list policies for force disable: %w", err)
 		}
 		for _, p := range all {
-			if p.ProjectKey != project {
+			if p.ProjectKey != project || !p.Enabled && p.Revision != "" {
 				continue
 			}
 			p.Enabled = false
@@ -240,7 +248,7 @@ func (s Service) DisableAll(ctx context.Context, project string) error {
 // Delete removes policy configuration and scheduling, keeping existing runs.
 // Removing the policy also makes its queued generations ineligible for admission.
 func (s Service) Delete(ctx context.Context, key string) error {
-	return s.run(ctx, kernel.ScopeDelete, func(ctx context.Context, authority Policy) error {
+	return s.run(ctx, func(ctx context.Context, authority Policy) error {
 		p, err := s.policy(ctx, key, authority)
 		if err != nil {
 			return err
@@ -251,6 +259,30 @@ func (s Service) Delete(ctx context.Context, key string) error {
 		p.Enabled, p.CronExp = false, ""
 		return s.publishSchedule(ctx, p)
 	})
+}
+
+func configuration(p model.CleanupPolicy) model.CleanupPolicy {
+	c := p.Criteria
+	// SQL JSON omits empty optional collections; the in-memory adapter retains
+	// them. Compare their stored meaning so an identical PUT cannot invalidate
+	// queued work merely because a backend round-trip changed [] into nil.
+	for _, list := range []*[]string{&c.ExcludedRepos, &c.ExcludedPackages, &c.IncludedProjects, &c.IncludedStages, &c.IncludedPackageVersions, &c.ExcludedPackageVersions} {
+		if len(*list) == 0 {
+			*list = nil
+		}
+	}
+	if len(c.IncludedProperties) == 0 {
+		c.IncludedProperties = nil
+	}
+	if len(c.ExcludedProperties) == 0 {
+		c.ExcludedProperties = nil
+	}
+	allStages := c.IncludeAllStages == nil || *c.IncludeAllStages
+	c.IncludeAllStages = &allStages
+	return model.CleanupPolicy{
+		Key: p.Key, Description: p.Description, CronExp: p.CronExp, ProjectKey: p.ProjectKey,
+		ItemType: p.ItemType, DurationMinutes: p.DurationMinutes, Enabled: p.Enabled, SkipTrashcan: p.SkipTrashcan, Criteria: c,
+	}
 }
 
 func (s Service) replace(ctx context.Context, p *model.CleanupPolicy, by string) error {

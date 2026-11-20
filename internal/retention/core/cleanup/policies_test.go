@@ -3,6 +3,7 @@ package cleanup_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
 	"github.com/weaveplatform/artifactweave/internal/retention/api"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/cleanup"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/model"
@@ -34,7 +36,7 @@ func world(t *testing.T, authority string) (cleanup.Service, *inmem.Store) {
 		Store: db, Schedules: db.Schedules(), Repositories: db.Repos(), Guard: db.Projects().Guard,
 		Now:           func() time.Time { return time.Date(2026, 11, 20, 1, 0, 0, 0, time.UTC) },
 		ProjectExists: func(ctx context.Context, key string) error { _, err := db.Projects().Get(ctx, key); return err },
-		Authorize: func(ctx context.Context, _ kernel.ScopeActions) (cleanup.Policy, error) {
+		Authorize: func(ctx context.Context) (cleanup.Policy, error) {
 			if err := db.Projects().Guard(ctx); err != nil {
 				return nil, err
 			}
@@ -131,6 +133,62 @@ func TestUnitPolicyLifecycleFencesQueuedGenerationsAndKeepsHistory(t *testing.T)
 	}
 }
 
+func TestUnitPolicyIdenticalEnableAndUpdateKeepQueuedOccurrence(t *testing.T) {
+	s, db := world(t, "*")
+	ctx := t.Context()
+	now := s.Now()
+	s.Now = func() time.Time { return now }
+	in := input("idempotent-policy", "")
+	_, err := s.Create(ctx, in.Key, in)
+	must(t, err)
+	must(t, s.Enable(ctx, in.Key, true))
+	active, err := s.Get(ctx, in.Key, false)
+	must(t, err)
+	now = now.Add(2 * time.Hour)
+	scheduler := schedule.Service{Store: db, Now: func() time.Time { return now }}
+	queued, err := scheduler.Tick(ctx, 1)
+	must(t, err)
+	if queued != 1 {
+		t.Fatal("daily occurrence was not queued")
+	}
+	items, err := db.WorkQueue().Lease(ctx, work.WorkLease{Holder: "idempotence", Kinds: []string{schedule.WorkKind}, Limit: 1, Now: now, Until: now.Add(time.Minute)})
+	must(t, err)
+	if len(items) != 1 {
+		t.Fatal("queued occurrence was not leased")
+	}
+	before, err := db.Schedules().Get(ctx, schedule.Reference{Kind: cleanup.ScheduleKind, Key: in.Key})
+	must(t, err)
+	must(t, s.Enable(ctx, in.Key, true))
+	updated, err := s.Update(ctx, in.Key, in)
+	must(t, err)
+	after, err := db.Schedules().Get(ctx, before.Reference)
+	must(t, err)
+	if updated.Revision != active.Revision || !reflect.DeepEqual(after, before) {
+		t.Fatal("identical enablement/configuration changed the queued generation or logical position")
+	}
+	admitted := false
+	err = scheduler.Execute(ctx, items[0], map[string]schedule.Handler{cleanup.ScheduleKind: func(ctx context.Context, trigger schedule.Trigger) error {
+		var err error
+		admitted, err = s.WithPolicy(ctx, trigger.Reference.Key, trigger.Revision, func(ctx context.Context, p model.CleanupPolicy) error {
+			_, err := db.Cleanup().CreateRun(ctx, model.CleanupRun{PolicyKey: p.Key, ItemType: p.ItemType, Status: api.RunInProgress})
+			if err != nil {
+				return fmt.Errorf("persist admitted cleanup run: %w", err)
+			}
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("admit unchanged cleanup policy: %w", err)
+		}
+		return nil
+	}})
+	must(t, err)
+	if !admitted {
+		t.Fatal("retry silently discarded the queued daily occurrence")
+	}
+	_, err = db.Cleanup().LastRun(ctx, in.Key)
+	must(t, err)
+}
+
 func TestUnitPolicyProjectFiltersAndRepositoryCriteriaStayBounded(t *testing.T) {
 	admin, db := world(t, "*")
 	ctx := t.Context()
@@ -141,7 +199,7 @@ func TestUnitPolicyProjectFiltersAndRepositoryCriteriaStayBounded(t *testing.T) 
 		must(t, admin.Enable(ctx, key, true))
 	}
 	project := admin
-	project.Authorize = func(ctx context.Context, _ kernel.ScopeActions) (cleanup.Policy, error) {
+	project.Authorize = func(ctx context.Context) (cleanup.Policy, error) {
 		return policyAuthority("alpha"), db.Projects().Guard(ctx)
 	}
 	all, err := project.List(ctx, "alpha")

@@ -380,6 +380,17 @@ func apiReviewCollections(
 
 func apiReviewPolicy(e *apiReviewOperation) {
 	method, path, _ := strings.Cut(e.Route, " ")
+	cleanupPolicy := false
+	switch e.OperationID {
+	case "getAllPackageCleanupPolicies",
+		"createPackageCleanupPolicy",
+		"getPackageCleanupPolicy",
+		"updatePackageCleanupPolicy",
+		"deletePackageCleanupPolicy",
+		"enableDisablePackageCleanupPolicy",
+		"disableAllCleanupPolicies":
+		cleanupPolicy = e.State == "implemented"
+	}
 	r := &http.Request{Method: method, URL: &url.URL{Path: path}}
 	e.Admission = "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue"
 	if expensiveRequest(r) {
@@ -394,6 +405,9 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	if accesshttp.APIRecoveryRequest(r) {
 		e.Admission = "administrator recovery reserve: 2 concurrent and 60/min per process; 5s deadline"
 	}
+	if cleanupPolicy {
+		e.Admission += "; current platform/project administration refreshed under the project guard before disclosure/publication; project administrators require own-project collection filter"
+	}
 	e.Effects = "resource mutation/action; see served contract and handler calls"
 	e.Retry = "no key support; reconcile ambiguous completion before retrying"
 	switch method {
@@ -403,6 +417,15 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	case "PUT", "DELETE":
 		e.Effects = "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible"
 		e.Retry = "reconcile the addressed resource; verb alone is not proof of safe retry for every mode"
+	}
+	if cleanupPolicy {
+		if method == "GET" {
+			e.Effects = "authorized policy configuration read; optional repository availability projection never rewrites stored criteria"
+		} else {
+			e.Effects = "atomic policy generation and schedule position publication; create is disabled, enablement is separate, and deletion retains run history; no candidate selection or artifact deletion"
+			e.Retry = "no Idempotency-Key; reconcile policy state after ambiguous completion; identical configuration/enablement preserves generation and queued position, while edits and disablement fence old queued work"
+		}
+		e.Evidence = append(e.Evidence, "internal/retention/core/cleanup/policies.go", "test/server/retention/policies_test.go", "internal/app/storetest/cleanup_policies.go")
 	}
 	if strings.Contains(path, "/move-archives") {
 		e.Effects, e.Retry = "CRAN archive move even on GET", "reconcile source/destination; no request deduplication"
@@ -612,6 +635,7 @@ func apiReviewCompleteText(e *apiReviewOperation) string {
 // is read would change the bytes.
 var apiReviewCollected = map[string]string{
 	"GET /event/api/v1/subscriptions":                                                  "complete configuration snapshot is authorized, secret-redacted and committed before response bytes; visibility or commit failure must not expose a partial list; no keyset or constant-memory claim",
+	"GET /artifactory/api/cleanup/packages/policies":                                   "administrator-defined policy configuration, read whole within the explicitly authorized global or project scope",
 	"GET /access/api/v1/environments":                                                  "administrator-defined environments, which the store reads whole",
 	"GET /access/api/v1/oidc":                                                          "administrator OIDC configurations, which the store reads whole",
 	"GET /access/api/v1/oidc/{provider_name}/identity_mappings":                        "one provider's identity mappings, administrator configuration the store reads whole",

@@ -146,6 +146,26 @@ func policyRoutes(t *testing.T, db harness.Store) {
 
 func TestAccPackageCleanupPolicyRoutes(t *testing.T) { policyRoutes(t, inmem.New()) }
 
+func TestAccPackageCleanupUnavailableStoreReturns501(t *testing.T) {
+	h := harness.Router(harness.Config{})
+	const one = policies + "/offline-policy"
+	body := policyBody("offline-policy", "", "**")
+	for _, request := range []struct{ method, path, body string }{
+		{"GET", policies, ""},
+		{"GET", one, ""},
+		{"POST", one, body},
+		{"PUT", one, body},
+		{"DELETE", one, ""},
+		{"POST", one + "/enablement", `{"enabled":true}`},
+		{"PUT", "/artifactory/api/cleanup/policies/forceDisableAll", ""},
+	} {
+		r := support.Do(t, h, request.method, request.path, map[string]string{"Content-Type": "application/json"}, request.body)
+		if r.Code != http.StatusNotImplemented {
+			t.Fatalf("unavailable policy store: %s %s returned %d: %s", request.method, request.path, r.Code, r.Body.String())
+		}
+	}
+}
+
 func TestAccPackageCleanupPolicySQLRoutes(t *testing.T) {
 	keys, err := crypt.New(bytes.Repeat([]byte{7}, 32))
 	if err != nil {
