@@ -51,7 +51,17 @@ func (b projects) RemoveRepository(ctx context.Context, key string) error {
 		if err := b.Guard(ctx); err != nil {
 			return err
 		}
-		if err := b.st.Projects().DeleteAssignment(ctx, key); err != nil && !errors.Is(err, kernel.ErrNotFound) {
+		// A missing binding is valid for a repository predating this lifecycle.
+		// Detect it before DeleteAssignment's nested transaction can mark the
+		// enclosing SQL transaction for rollback. The guard keeps this read
+		// and the removal in the same authority snapshot.
+		if _, err := b.st.Projects().Assignment(ctx, key); err != nil {
+			if errors.Is(err, kernel.ErrNotFound) {
+				return nil
+			}
+			return fmt.Errorf("read repository binding: %w", err)
+		}
+		if err := b.st.Projects().DeleteAssignment(ctx, key); err != nil {
 			return fmt.Errorf("remove repository binding: %w", err)
 		}
 		return nil

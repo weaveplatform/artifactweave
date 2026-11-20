@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
@@ -45,6 +46,20 @@ func projectRepositoryBindings(t *testing.T, db harness.Store) {
 		rec := do(t, h, method, "/artifactory/api/repositories"+path, headers, body)
 		wantStatus(t, rec, status)
 		return rec
+	}
+	// Older repository configurations can exist without an Access binding.
+	// Removing one must still commit its canonical deletion on every store.
+	const legacy = "legacy-unbound"
+	if err := db.Repos().Create(t.Context(), *repo.Defaults(&repo.Config{Key: legacy, Class: repo.Local})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Projects().Assignment(t.Context(), legacy); !errors.Is(err, kernel.ErrNotFound) {
+		t.Fatalf("legacy fixture unexpectedly has an Access binding: %v", err)
+	}
+	artifact("DELETE", "/"+legacy, "", 200)
+	artifact("GET", "/"+legacy, "", 404)
+	if _, err := db.Repos().Get(t.Context(), legacy); !errors.Is(err, kernel.ErrNotFound) {
+		t.Fatalf("legacy repository deletion did not commit: %v", err)
 	}
 	const key = "existing-arbitrary-key"
 	artifact("PUT", "/"+key, `{"rclass":"local","packageType":"generic"}`, 200)
@@ -100,6 +115,66 @@ func projectRepositoryBindings(t *testing.T, db harness.Store) {
 		t.Fatal("direct project repository creation omitted its Access binding")
 	}
 	projectRepositoryBatchRollback(t, db, h)
+	projectRepositoryRemovalRollback(t, db, h)
+}
+
+type bindingRemovalStore struct {
+	harness.Store
+	operation string
+}
+
+func (s bindingRemovalStore) Projects() accesstest.ProjectStore {
+	return bindingRemovalProjects{ProjectStore: s.Store.Projects(), operation: s.operation}
+}
+
+type bindingRemovalProjects struct {
+	accesstest.ProjectStore
+	operation string
+}
+
+func (p bindingRemovalProjects) Assignment(ctx context.Context, key string) (accesstest.RepositoryAssignment, error) {
+	if p.operation == "read" {
+		return accesstest.RepositoryAssignment{}, errors.New("injected binding read failure")
+	}
+	return p.ProjectStore.Assignment(ctx, key)
+}
+
+func (p bindingRemovalProjects) DeleteAssignment(ctx context.Context, key string) error {
+	if err := p.ProjectStore.DeleteAssignment(ctx, key); err != nil {
+		return err
+	}
+	return errors.New("injected binding removal failure")
+}
+
+func projectRepositoryRemovalRollback(t *testing.T, db harness.Store, h http.Handler) {
+	t.Helper()
+	const key = "binding-removal-failure"
+	const path = "/artifactory/api/repositories/" + key
+	wantStatus(t, do(t, h, "PUT", path, jsonAs(basic("admin", "pw")), `{"rclass":"local","packageType":"generic"}`), 200)
+	projectRequest(t, h, "PUT", "/_/share/repositories/"+key+"/alpha?readOnly=true", "admin", "", 204)
+	before, err := db.Projects().Assignment(t.Context(), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authority, err := db.Projects().SharingAuthority(t.Context(), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, operation := range []string{"read", "delete"} {
+		failing := projectRepositoryHandler(t, bindingRemovalStore{Store: db, operation: operation})
+		wantStatus(t, do(t, failing, "DELETE", path, basic("admin", "pw"), ""), 500)
+		wantStatus(t, do(t, h, "GET", path, basic("admin", "pw"), ""), 200)
+		stored, err := db.Projects().Assignment(t.Context(), key)
+		if err != nil || !reflect.DeepEqual(stored, before) {
+			t.Fatalf("binding %s failure changed ownership or shares: before=%+v after=%+v error=%v", operation, before, stored, err)
+		}
+		storedAuthority, err := db.Projects().SharingAuthority(t.Context(), key)
+		if err != nil || storedAuthority != authority {
+			t.Fatalf("binding %s failure changed sharing authority: before=%+v after=%+v error=%v", operation, authority, storedAuthority, err)
+		}
+	}
+	wantStatus(t, do(t, h, "DELETE", path, basic("admin", "pw"), ""), 200)
+	wantStatus(t, do(t, h, "GET", path, basic("admin", "pw"), ""), 404)
 }
 
 type bindingFailureStore struct{ harness.Store }
