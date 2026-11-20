@@ -214,7 +214,7 @@ func configurationWire(v replication.View) (artgen.ReplicationConfigRequest, err
 	return artgen.ReplicationConfigRequest{
 		RepoKey: &v.RepoKey, ReplicationKey: &v.Key, Url: &v.URL, Username: &v.Username, Password: &v.Password,
 		Enabled: &v.Enabled, CronExp: &v.CronExp, SyncDeletes: &v.SyncDeletes, SyncProperties: &v.SyncProperties, SyncStatistics: &v.SyncStatistics,
-		IncludePathPrefixPattern: &v.IncludePathPrefix, ExcludePathPrefixPattern: &v.ExcludePathPrefix, Proxy: &v.Proxy, DisableProxy: &v.DisableProxy,
+		IncludePathPrefixPattern: &v.IncludePathPrefix, ExcludePathPrefixPattern: &v.ExcludePathPrefix, Proxy: &v.Proxy, ProxyRef: &v.Proxy, DisableProxy: &v.DisableProxy,
 		EnableEventReplication: httpkit.PtrTo(false), CheckBinaryExistenceInFilestore: httpkit.PtrTo(false),
 		SocketTimeoutMillis: httpkit.PtrTo(int32(millis)),
 	}, nil

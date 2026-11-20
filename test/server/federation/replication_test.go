@@ -92,6 +92,9 @@ func (w *replicationWorld) requestAs(actor, method, path, body string, want int)
 func (w *replicationWorld) configuration(key string) map[string]any {
 	w.t.Helper()
 	r := w.request("GET", replicationPath+key, "", 200)
+	if !strings.HasPrefix(r.Header().Get("Content-Type"), "application/json") {
+		w.t.Fatal("configuration read did not return the authored/provider JSON media type")
+	}
 	var config map[string]any
 	if err := json.Unmarshal(r.Body.Bytes(), &config); err != nil {
 		w.t.Fatal(err)
@@ -107,8 +110,15 @@ func TestAccSingleReplicationConfigurationLifecycle(t *testing.T) {
 
 func replicationConfigurationLifecycle(t *testing.T, w *replicationWorld) {
 	t.Helper()
+	headers := support.Basic("admin", "pw")
+	headers["Content-Type"] = "application/yaml"
+	proxy := support.Do(t, w.h, "PATCH", "/artifactory/api/system/configuration", headers,
+		`{"proxies":{"fixture-proxy":{"host":"127.0.0.1","port":3128}}}`)
+	if proxy.Code != http.StatusOK {
+		t.Fatal("fixture proxy was not configured", proxy.Code, proxy.Body.String())
+	}
 	const secret = "fake-replication-password"
-	const create = `{"url":"https://target.example/artifactory/destination","username":"replicator","password":"` + secret + `","enabled":false,"syncDeletes":true,"repoKey":"spoofed","replicationKey":"caller-owned"}`
+	const create = `{"url":"https://target.example/artifactory/destination","username":"replicator","password":"` + secret + `","enabled":false,"syncDeletes":true,"proxy":"fixture-proxy","proxyRef":"ignored-input","repoKey":"spoofed","replicationKey":"caller-owned"}`
 	w.request("PUT", replicationPath+"local", create, 201)
 	first := w.configuration("local")
 	key, ok := first["replicationKey"].(string)
@@ -117,6 +127,9 @@ func replicationConfigurationLifecycle(t *testing.T, w *replicationWorld) {
 	}
 	if first["enabled"] != false || first["syncProperties"] != true || first["socketTimeoutMillis"] != float64(15000) {
 		t.Fatalf("native configuration defaults lost: %+v", first)
+	}
+	if first["proxy"] != "fixture-proxy" || first["proxyRef"] != "fixture-proxy" {
+		t.Fatal("provider proxy refresh field did not preserve the selected proxy")
 	}
 	if password, ok := first["password"].(string); !ok || password == secret || password == "" {
 		t.Fatal("configured password was not masked")
@@ -132,7 +145,7 @@ func replicationConfigurationLifecycle(t *testing.T, w *replicationWorld) {
 	}
 	w.request("PUT", replicationPath+"local", `{"url":"https://target.example/artifactory/destination"}`, 201)
 	replaced := w.configuration("local")
-	if replaced["replicationKey"] != key || replaced["syncDeletes"] != false {
+	if replaced["replicationKey"] != key || replaced["syncDeletes"] != false || replaced["proxyRef"] != "" {
 		t.Fatal("whole configuration replacement behaved as a patch or changed stable identity")
 	}
 	targets, err = w.db.Replications().ForRepo(t.Context(), "local")

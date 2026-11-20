@@ -89,6 +89,7 @@ func must(t *testing.T, err error) {
 		t.Fatal(err)
 	}
 }
+
 func stored(t *testing.T, w *world, repository string) model.Replication {
 	t.Helper()
 	rows, err := w.db.Replications().ForRepo(t.Context(), repository)
