@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -437,17 +438,21 @@ func testItems(t *testing.T, s port.ItemStore) {
 	}, usage)
 
 	// Deleting a file, a folder subtree, a cache and an empty root.
+	wantRemoved := deletionFacts(t, s, "r", false, "a/x.txt")
 	res := storekit.Get[port.DeleteResult](t)(s.Delete(ctx, "r", false, "a/x.txt"))
 	storekit.Same(t, "Delete file", port.DeleteResult{
-		Files: 1, Bytes: 300,
+		Removed: wantRemoved,
+		Files:   1, Bytes: 300,
 		BlobRefs: map[string]int64{testBlob(3).Checksums.SHA256: 1},
 	}, res)
 	_, err = s.Get(ctx, "r", false, "a/x.txt")
 	storekit.WantErr(t, err, kernel.ErrNotFound)
 	_, err = s.Delete(ctx, "r", false, "a/x.txt")
 	storekit.WantErr(t, err, kernel.ErrNotFound)
+	wantRemoved = deletionFacts(t, s, "r", false, "a")
 	res = storekit.Get[port.DeleteResult](t)(s.Delete(ctx, "r", false, "a"))
 	storekit.Same(t, "Delete folder", port.DeleteResult{
+		Removed: wantRemoved,
 		Files:   2,
 		Folders: 2,
 		Bytes:   800,
@@ -464,9 +469,11 @@ func testItems(t *testing.T, s port.ItemStore) {
 			func(p kernel.Page) ([]model.Item, string, error) { return s.Descendants(ctx, "r", false, ".", p) },
 		),
 	)
+	wantRemoved = deletionFacts(t, s, "r", true, "")
 	res = storekit.Get[port.DeleteResult](t)(s.Delete(ctx, "r", true, ""))
 	storekit.Same(t, "Delete cache", port.DeleteResult{
-		Files: 1, Bytes: 100,
+		Removed: wantRemoved,
+		Files:   1, Bytes: 100,
 		BlobRefs: map[string]int64{one.SHA256: 1},
 	}, res)
 	storekit.Same(t, "Delete empty root", port.DeleteResult{},
@@ -527,9 +534,11 @@ func testColonPaths(t *testing.T, s port.ItemStore) {
 	storekit.Same(t, "$match across both folders",
 		[]string{"img/sha256:ab/manifest.json", "img/sha256__ab/manifest.json"},
 		search(`items.find({"repo":"r","path":{"$match":"img/sha256*"}}).sort({"$asc":["path"]})`))
+	wantRemoved := deletionFacts(t, s, "r", false, "img/sha256:ab")
 	res := storekit.Get[port.DeleteResult](t)(s.Delete(ctx, "r", false, "img/sha256:ab"))
 	storekit.Same(t, "Delete the digest folder", port.DeleteResult{
-		Files: 1, Folders: 1, Bytes: testBlob(1).Size,
+		Removed: wantRemoved,
+		Files:   1, Folders: 1, Bytes: testBlob(1).Size,
 		BlobRefs: map[string]int64{testBlob(1).Checksums.SHA256: 1},
 	}, res)
 	if _, err := s.Get(ctx, "r", false, "img/sha256__ab/manifest.json"); err != nil {
@@ -1277,4 +1286,29 @@ func testPackages(t *testing.T, st port.Store) {
 		[]string{},
 		versionNames(versions(s.Versions(ctx, pkg.ID))),
 	)
+}
+
+func deletionFacts(t *testing.T, s port.ItemStore, repository string, cached bool, full string) []model.Item {
+	t.Helper()
+	var result []model.Item
+	if full != "" && full != "." {
+		target, err := s.Get(t.Context(), repository, cached, full)
+		storekit.Must(t, err)
+		result = append(result, target)
+		if !target.Folder {
+			return result
+		}
+	}
+	page := kernel.Page{Limit: kernel.MaxLimit}
+	for {
+		batch, next, err := s.Descendants(t.Context(), repository, cached, full, page)
+		storekit.Must(t, err)
+		result = append(result, batch...)
+		if next == "" {
+			break
+		}
+		page.After = next
+	}
+	slices.SortFunc(result, func(a, b model.Item) int { return strings.Compare(a.FullPath(), b.FullPath()) })
+	return result
 }

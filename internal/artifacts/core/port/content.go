@@ -135,6 +135,9 @@ type Download struct {
 // the file references removed, which is what the caller passes to
 // BlobIndex.Unref.
 type DeleteResult struct {
+	// Removed contains the actual deleted rows, ordered by full path, so
+	// producers do not mistake a pre-delete listing for the committed set.
+	Removed  []model.Item
 	Files    int64
 	Folders  int64
 	Bytes    int64

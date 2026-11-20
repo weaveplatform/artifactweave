@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -436,40 +437,29 @@ func (i items) Delete(
 				args = append(args, it.ID)
 			}
 		}
-		err := i.s.Rows(
-			ctx,
-			"delete items",
-			"SELECT type, size, sha256 FROM items WHERE "+where,
-			args,
+		return i.s.Rows(ctx, "delete items", "DELETE FROM items WHERE "+where+" RETURNING "+itemCols, args,
 			func(rs *sql.Rows) error {
-				var (
-					typ, sha string
-					size     int64
-				)
-				if err := rs.Scan(&typ, &size, &sha); err != nil {
-					return err //nolint:wrapcheck // wrapped by Rows
+				it, err := scanItem(rs)
+				if err != nil {
+					return err
 				}
-				if typ == typeFolder {
+				res.Removed = append(res.Removed, it)
+				if it.Folder {
 					res.Folders++
 					return nil
 				}
 				res.Files++
-				res.Bytes += size
-				if sha != "" {
-					res.BlobRefs[sha]++
+				res.Bytes += it.Size
+				if it.Actual.SHA256 != "" {
+					res.BlobRefs[it.Actual.SHA256]++
 				}
 				return nil
-			},
-		)
-		if err != nil {
-			return err
-		}
-		_, err = i.s.Exec(ctx, "delete items", "DELETE FROM items WHERE "+where, args...)
-		return err
+			})
 	})
 	if err != nil {
 		return port.DeleteResult{}, err
 	}
+	slices.SortFunc(res.Removed, func(a, b model.Item) int { return strings.Compare(a.FullPath(), b.FullPath()) })
 	return res, nil
 }
 
