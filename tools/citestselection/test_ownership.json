@@ -81,6 +81,7 @@
     "test/server/artifacts/terraformbackend": "terraformbackend",
     "test/server/artifacts/vcs": "vcs",
     "test/server/configuration": "shared",
+    "test/server/federation": "shared",
     "test/server/notifications": "shared",
     "test/server/retention": "shared"
   },
@@ -132,6 +133,8 @@
       "projects_status_test.go",
       "registry_shared_test.go",
       "reindex_internal_test.go",
+      "replication_matrix_test.go",
+      "replication_status_test.go",
       "run_test.go",
       "runtime_test.go",
       "searches_routes_test.go",
@@ -352,32 +355,8 @@
       "service_id_test.go",
       "system_health_test.go"
     ],
-    "internal/artifacts/adapters/http/pkgroute": [
-      "conditional_test.go",
-      "document_test.go",
-      "download_test.go",
-      "etag_test.go",
-      "external_test.go",
-      "folder_test.go",
-      "form_test.go",
-      "item_test.go",
-      "lifecycle_test.go",
-      "merged_test.go",
-      "merged_wait_test.go",
-      "path_test.go",
-      "pkgroute_test.go",
-      "publication_test.go",
-      "resolve_test.go",
-      "root_test.go",
-      "served_test.go",
-      "source_delivery_test.go",
-      "source_head_test.go",
-      "source_result_test.go",
-      "source_storage_test.go",
-      "source_test.go",
-      "storeonce_test.go",
-      "upstream_matrix_test.go",
-      "virtual_test.go"
+    "test/server/federation": [
+      "replication_test.go"
     ],
     "test/server/notifications": [
       "subscriptions_test.go"
