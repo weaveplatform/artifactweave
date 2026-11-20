@@ -81,7 +81,8 @@
     "test/server/artifacts/terraformbackend": "terraformbackend",
     "test/server/artifacts/vcs": "vcs",
     "test/server/configuration": "shared",
-    "test/server/notifications": "shared"
+    "test/server/notifications": "shared",
+    "test/server/retention": "shared"
   },
   "shared_files": {
     "internal/access/adapters/http": [
