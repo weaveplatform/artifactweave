@@ -148,6 +148,16 @@ func policyRoutes(t *testing.T, db harness.Store) {
 
 func policyRepositoryClasses(w policyWorld) {
 	w.t.Helper()
+	federated := repo.Config{Key: "alpha-scope-federated", Class: repo.Federated, PackageType: repo.NPM, ProjectKey: "alpha"}
+	if err := w.store.Repos().Create(w.t.Context(), *repo.Defaults(&federated)); err != nil {
+		w.t.Fatal(err)
+	}
+	body := policyBody("federated-policy", "alpha", federated.Key)
+	w.request("POST", policies+"/federated-policy", "admin", body, 201)
+	w.request("PUT", policies+"/federated-policy", "admin", body, 200)
+	if projected := w.request("GET", policies+"/federated-policy?checkRepoAvailability=true", "admin", "", 200); !strings.Contains(projected.Body.String(), federated.Key) {
+		w.t.Fatal("remote/virtual exclusion removed a supported federated policy reference", projected.Body.String())
+	}
 	for _, class := range []repo.Class{repo.Remote, repo.Virtual} {
 		c := repo.Config{Key: "alpha-scope-" + string(class), Class: class, PackageType: repo.NPM, ProjectKey: "alpha"}
 		if err := w.store.Repos().Create(w.t.Context(), *repo.Defaults(&c)); err != nil {

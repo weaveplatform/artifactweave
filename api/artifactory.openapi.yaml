@@ -3005,7 +3005,7 @@ paths:
           required: true
           schema:
             type: string
-        - description: Optional query parameter. When true the server also resolves the repository keys named explicitly in searchCriteria.repos and excludedRepos against local repositories currently eligible in the policy's project scope, and omits unavailable or unsupported keys from the returned searchCriteria (patterns are returned as stored). The stored policy never changes. Defaults to false, which returns the policy exactly as stored.
+        - description: Optional query parameter. When true the server also resolves the repository keys named explicitly in searchCriteria.repos and excludedRepos against local or federated repositories currently eligible in the policy's project scope, and omits unavailable or unsupported keys from the returned searchCriteria (patterns are returned as stored). The stored policy never changes. Defaults to false, which returns the policy exactly as stored.
           in: query
           name: checkRepoAvailability
           required: false
@@ -26507,7 +26507,7 @@ components:
             type: string
           type: array
         repos:
-          description: Required within this object. Repository keys or wildcard patterns the policy runs on, at least one. ** selects local repositories of the listed types. Remote caches and virtual repositories are excluded; a literal remote or virtual repository key is rejected with 400.
+          description: Required within this object. Repository keys or wildcard patterns the policy runs on, at least one. Local and federated repository criteria are accepted. Remote caches and virtual repositories are excluded; a literal remote or virtual repository key is rejected with 400. Current candidate selection evaluates local repositories; federated candidate evaluation is not yet implemented.
           items:
             type: string
           type: array

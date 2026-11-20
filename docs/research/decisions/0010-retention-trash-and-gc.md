@@ -35,10 +35,17 @@ run reports and the run status enumeration. Version-based criteria (`keepLastNVe
 **Candidate selection (P11 CLN-03).** Retention freezes a detached policy and
 clock, then reads bounded package-index projections. Repository type, canonical
 project, environment and exclusions narrow the query before paging. Package
-cleanup selects local repositories; remote caches and virtual repositories are
-excluded, as the [current cleanup guide](https://docs.jfrog.com/administration/docs/cleanup-policies)
-requires. The generic index reader can describe remote indexes for other owners;
-retention explicitly requests the local class and refuses stale/foreign parents.
+cleanup excludes remote caches and virtual repositories, as the
+[current cleanup guide](https://docs.jfrog.com/administration/docs/cleanup-policies)
+requires. That guide supports federated repositories too and requires checking
+downloads across their members. Federated policy configuration and availability
+remain accepted. P11 selection currently evaluates local repositories only;
+peer-aware federated selection belongs to P13
+([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)), whose peer
+identity/evidence contracts are required before local statistics can safely
+represent a federation. This is an explicit implementation gap, not a vendor
+limitation. The generic index reader can describe remote indexes for other
+owners; retention requests the local class and refuses stale/foreign parents.
 
 Keep-last-N protects the comparator-newest versions before inclusion filters;
 zero still protects the newest. Version strings break comparator ties and supply

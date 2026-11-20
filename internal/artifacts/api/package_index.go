@@ -15,8 +15,9 @@ import (
 // stored spelling in results. This query is not an authorization capability.
 type IndexRepositoryQuery struct {
 	Projects, Repositories, ExcludedRepositories []string
-	// Class optionally narrows stored local/remote indexes. Cleanup supplies
-	// Local: remote/virtual repositories are outside package cleanup scope.
+	// Class optionally narrows stored local/remote indexes. P11 cleanup supplies
+	// Local. Remote/virtual are unsupported; peer-aware federated selection
+	// depends on P13 and is outside this reader's current projection.
 	Class        repo.Class
 	PackageTypes []repo.PackageType
 	Environments []string

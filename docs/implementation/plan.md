@@ -1225,7 +1225,12 @@ Decisions: [0021](../research/decisions/0021-peer-trust-and-sync-protocol.md),
 2. Federated repositories: create and convert, member management, event sync of
    deploy, delete, move, copy and property changes, conflict rule, full and forced
    sync, status, lag, inconsistent repositories, failed-binary replay.
-3. A Linux `acceptance-peers` CI job that runs multi-instance scenarios.
+3. Extend P11 package cleanup selection to federated repositories using current
+   membership and member download evidence; local statistics alone cannot decide
+   whether a federated package is unused. Preserve federated policy CRUD and
+   qualify one-node and multi-peer selection/publication races
+   ([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)).
+4. A Linux `acceptance-peers` CI job that runs multi-instance scenarios.
 
 **Exit criteria**
 - Three instances converge after deploys, deletes and property changes on each; full

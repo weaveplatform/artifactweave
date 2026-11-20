@@ -66,8 +66,8 @@ func (s Service) validate(ctx context.Context, key string, p *model.CleanupPolic
 			if p.ProjectKey != "" && r.ProjectKey != p.ProjectKey {
 				return fmt.Errorf("repository criteria exceed the policy project: %w", kernel.ErrForbidden)
 			}
-			if r.Class != repo.Local {
-				return fmt.Errorf("package cleanup requires a local repository: %w", kernel.ErrInvalid)
+			if r.Class != repo.Local && r.Class != repo.Federated {
+				return fmt.Errorf("package cleanup requires a local or federated repository: %w", kernel.ErrInvalid)
 			}
 		}
 	}
@@ -136,7 +136,7 @@ func (s Service) available(ctx context.Context, project string, keys []string) (
 		if err != nil {
 			return nil, fmt.Errorf("check cleanup repository availability: %w", err)
 		}
-		if r.Class == repo.Local && (project == "" || r.ProjectKey == project) {
+		if (r.Class == repo.Local || r.Class == repo.Federated) && (project == "" || r.ProjectKey == project) {
 			out = append(out, key)
 		}
 	}

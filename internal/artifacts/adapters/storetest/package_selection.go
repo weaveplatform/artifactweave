@@ -159,7 +159,7 @@ func indexFileSnapshots(t *testing.T, st port.Store, reader api.PackageIndex, se
 	var original api.IndexFile
 	for _, path := range []string{"one.pkg", "two.pkg", "three.pkg"} {
 		item, err := st.Items().
-			Put(ctx, model.Item{RepoKey: cfg.Key, Name: path, Size: 7, Actual: kernel.Checksums{SHA256: "old-content"}, Created: now, Modified: now, Updated: now})
+			Put(ctx, model.Item{RepoKey: selected.Package.Repository.Key, Name: path, Size: 7, Actual: kernel.Checksums{SHA256: "old-content"}, Created: now, Modified: now, Updated: now})
 		if err != nil {
 			t.Fatal(err)
 		}
