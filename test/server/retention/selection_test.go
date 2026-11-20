@@ -209,6 +209,12 @@ func selectionContract(t *testing.T, newStore func(*testing.T) app.RouterStore) 
 		t.Run(string(tc.kind), func(t *testing.T) {
 			w := newSelectionWorld(t, newStore(t))
 			ctx := t.Context()
+			for _, class := range []repo.Class{repo.Remote, repo.Virtual} {
+				c := repo.Config{Key: "aa-" + string(class), Class: class, PackageType: tc.kind, ProjectKey: "alpha", Environments: []string{"DEV"}}
+				if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+					t.Fatal(err)
+				}
+			}
 			for _, r := range []struct{ key, project string }{{"aa-foreign", "beta"}, {"alpha-main", "alpha"}, {"alpha-safe", "alpha"}} {
 				w.repository(r.key, r.project, tc.kind)
 			}
@@ -263,6 +269,15 @@ func selectionContract(t *testing.T, newStore func(*testing.T) app.RouterStore) 
 			selection, err := w.service.Select(ctx, p.Key)
 			if err != nil {
 				t.Fatal(err)
+			}
+			repositories, nextRepository, err := selection.Repositories(ctx, kernel.Page{Limit: 1})
+			if err != nil || len(repositories) != 1 || repositories[0].Key != "alpha-main" || nextRepository != "" {
+				t.Fatal("foreign, remote, virtual or excluded repositories consumed a page", repositories, nextRepository, err)
+			}
+			literal := selectionInput(tc.kind)
+			literal.Key, literal.Criteria.Repos = "remote-policy", []string{"aa-remote"}
+			if _, err := w.service.Create(ctx, literal.Key, literal); !errors.Is(err, kernel.ErrInvalid) {
+				t.Fatal("a literal remote cleanup policy was admitted", err)
 			}
 			rows, reasons := collectSelection(t, selection, 1)
 			if len(rows) == 0 || reasons[tc.newest] != cleanup.ReasonProtected || reasons[tc.excluded] != cleanup.ReasonVersionExcluded {

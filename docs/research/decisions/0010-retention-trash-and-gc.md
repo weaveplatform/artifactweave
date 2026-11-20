@@ -32,6 +32,43 @@ run reports and the run status enumeration. Version-based criteria (`keepLastNVe
 `includedPackageVersions`) are evaluated over the package index
 ([0018](0018-package-index.md)) with the package type's comparator, never by path globbing.
 
+**Candidate selection (P11 CLN-03).** Retention freezes a detached policy and
+clock, then reads bounded package-index projections. Repository type, canonical
+project, environment and exclusions narrow the query before paging. Package
+cleanup selects local repositories; remote caches and virtual repositories are
+excluded, as the [current cleanup guide](https://docs.jfrog.com/administration/docs/cleanup-policies)
+requires. The generic index reader can describe remote indexes for other owners;
+retention explicitly requests the local class and refuses stale/foreign parents.
+
+Keep-last-N protects the comparator-newest versions before inclusion filters;
+zero still protects the newest. Version strings break comparator ties and supply
+stable traversal keys. Age uses the supplied evaluation clock, complete 24-hour
+days and 30-day legacy months. A never-downloaded lead uses its creation time;
+missing creation time cannot become an invented old date. Matching excluded
+properties wins over inclusion; all included property keys must match, with any
+listed value sufficient for one key.
+
+The owning format identifies lead files from existing index identity/metadata.
+Selection reads no blob and keeps no whole-version metadata collection. Maven
+unique snapshots use the current POM build order rather than checksum identity;
+npm uses its canonical scoped tarball; Debian preserves admitted architectures;
+Docker/OCI uses the canonical manifest preference; Go uses its module descriptor;
+Helm and NuGet use the archive named by existing version metadata. Formats not
+yet supplying a classifier explicitly yield `lead_contract_unavailable` for age
+or property evaluation: expanding that coverage remains CLN-03 implementation
+work, not a vendor unsupported-format claim. For several leads in one version,
+all must satisfy the rule; this conservative project choice preserves the whole
+version rather than selecting an arbitrary architecture.
+
+Each file snapshot carries actual ID/path/checksums/size, content and property
+timestamps, download time and requested properties. Selection confirms lead
+evidence and current comparator protection after its bounded candidate read;
+changed lead evidence produces no candidates. These facts and internal reasons
+are descriptive, not vendor report fields or deletion permissions. CLN-04 must
+recheck current authority, item facts, keep protection and run/lease admission
+before effects; CLN-05 owns report serialization. Selection itself changes no
+items, bytes, usage, work or schedules.
+
 **Scheduler (P11 CLN-01).** `internal/platform/schedule` supplies the shared Quartz
 evaluator and durable logical positions for cleanup and single replication. It accepts
 the documented six/seven-field grammar, named ranges and day modifiers, with the

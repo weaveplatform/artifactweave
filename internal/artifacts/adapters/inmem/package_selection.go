@@ -79,6 +79,7 @@ func (r repos) IndexRepositories(ctx context.Context, query api.IndexRepositoryQ
 	err = r.s.Do(ctx, func() error {
 		for _, value := range r.t().Rows {
 			if value.Class != repo.Local && value.Class != repo.Remote || !slices.Contains(query.PackageTypes, value.PackageType) ||
+				query.Class != "" && query.Class != value.Class ||
 				!query.AllProjects && !slices.Contains(query.Projects, value.ProjectKey) ||
 				len(after) > 0 && value.Key <= after[0] || !indexMatches(include, value.Key) || indexMatches(exclude, value.Key) {
 				continue

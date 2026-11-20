@@ -57,6 +57,10 @@ func (r repos) IndexRepositories(ctx context.Context, query api.IndexRepositoryQ
 	for _, kind := range query.PackageTypes {
 		args = append(args, string(kind))
 	}
+	if query.Class != "" {
+		condition += " AND rclass = ?"
+		args = append(args, string(query.Class))
+	}
 	if !query.AllProjects {
 		condition += " AND project_key IN (" + dialect.Placeholders(len(query.Projects)) + ")"
 		for _, project := range query.Projects {

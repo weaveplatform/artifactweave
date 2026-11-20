@@ -60,6 +60,12 @@ func RunPackageIndexSelection(t *testing.T, newStore Factory) {
 		if !slices.Equal(keys, []string{"alpha-one", "alpha-two"}) {
 			t.Fatalf("scoped repository pages = %v", keys)
 		}
+		query.Class = repo.Local
+		rows, next, err := reader.Repositories(ctx, query, kernel.Page{Limit: 1})
+		if err != nil || len(rows) != 1 || rows[0].Key != "alpha-one" || next != "" {
+			t.Fatal("cleanup class admission did not filter before paging", rows, next, err)
+		}
+		query.Class = ""
 		query.Repositories = []string{"ALPHA*"}
 		if rows, _, err := reader.Repositories(ctx, query, kernel.Page{}); err != nil || len(rows) != 0 {
 			t.Fatal("repository wildcard folded identity case", err)

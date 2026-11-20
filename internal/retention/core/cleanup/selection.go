@@ -78,6 +78,7 @@ func (s *Selection) run(ctx context.Context, fn func(context.Context) error) err
 func (s *Selection) repositoryQuery() artifactsapi.IndexRepositoryQuery {
 	p, c := s.snapshot.Policy, s.snapshot.Policy.Criteria
 	q := artifactsapi.IndexRepositoryQuery{
+		Class:        repo.Local,
 		Repositories: slices.Clone(c.Repos), ExcludedRepositories: slices.Clone(c.ExcludedRepos),
 		Projects: slices.Clone(c.IncludedProjects), AllProjects: c.IncludeAllProjects,
 	}
