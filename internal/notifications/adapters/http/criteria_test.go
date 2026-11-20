@@ -38,7 +38,7 @@ func TestUnitWebhookCriteriaWireAndStorageRemainDistinct(t *testing.T) {
 	if err := json.Unmarshal(data, &restored); err != nil {
 		t.Fatal(err)
 	}
-	if got := criteriaRead(restored); !reflect.DeepEqual(got, filter.Criteria) {
+	if got := criteriaRead(restored, model.DomainArtifact); !reflect.DeepEqual(got, filter.Criteria) {
 		t.Fatalf("criteria changed across wire/storage round trip: got=%+v want=%+v", got, filter.Criteria)
 	}
 	filter.Criteria.RepoKeys = nil
@@ -46,11 +46,36 @@ func TestUnitWebhookCriteriaWireAndStorageRemainDistinct(t *testing.T) {
 	if restored.RepoKeys[0] != "libs" || stored.Extra["futureCondition"].(map[string]any)["nested"].([]any)[0] != "unchanged" {
 		t.Fatal("criteria input aliases the request")
 	}
-	view := criteriaRead(restored)
+	view := criteriaRead(restored, model.DomainArtifact)
 	(*view.RepoKeys)[0] = "changed"
 	view.AdditionalProperties["futureCondition"].(map[string]any)["nested"].([]any)[0] = "changed"
 	if restored.RepoKeys[0] != "libs" || restored.Extra["futureCondition"].(map[string]any)["nested"].([]any)[0] != "unchanged" {
 		t.Fatal("criteria output aliases storage")
+	}
+}
+
+func TestUnitWebhookEmptyRepositorySelectorRemainsAnArray(t *testing.T) {
+	for _, domain := range []model.WebhookDomain{model.DomainArtifact, model.DomainArtifactProperty, model.DomainDocker, model.DomainUser} {
+		t.Run(string(domain), func(t *testing.T) {
+			view := criteriaRead(model.WebhookCriteria{}, domain)
+			if domain == model.DomainUser {
+				if view.RepoKeys != nil {
+					t.Fatal("unrelated domain acquired a repository selector")
+				}
+				return
+			}
+			data, err := json.Marshal(view)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got map[string]json.RawMessage
+			if err := json.Unmarshal(data, &got); err != nil {
+				t.Fatal(err)
+			}
+			if string(got["repoKeys"]) != "[]" {
+				t.Fatal("empty required repository selector became null or absent")
+			}
+		})
 	}
 }
 
@@ -59,7 +84,7 @@ func TestUnitWebhookCriteriaPresenceIsDomainSpecific(t *testing.T) {
 		t.Run(domain, func(t *testing.T) {
 			filter := eventgen.EventFilter{Domain: domain}
 			_, err := criteriaInput(filter)
-			optional := domain == "user" || domain == "curation"
+			optional := domain == "user" || domain == "curation" || domain == "artifact_lifecycle"
 			if optional && err != nil || !optional && !errors.Is(err, kernel.ErrInvalid) {
 				t.Fatalf("missing criteria: %v", err)
 			}
