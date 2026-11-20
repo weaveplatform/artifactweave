@@ -16,6 +16,9 @@
 // atomic bulk enablement and global pause controls. An omitted credential is
 // merged before the store's whole-row replacement. WithTarget guards bounded
 // metadata bookkeeping; it never holds a transaction over network I/O.
+// The push path scope combines an exact requested root with repository-relative
+// Ant include/exclude criteria; exclusions win for both enumeration and exact
+// destination reconciliation. A path match grants no content permission.
 //
 // # References
 //
