@@ -10,9 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/access/core/model"
-	"github.com/weaveplatform/artifactweave/internal/access/core/port"
-	"github.com/weaveplatform/artifactweave/internal/access/core/project"
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
@@ -73,18 +71,18 @@ func (s bindingDeleteStore) Tx(ctx context.Context, fn func(context.Context) err
 	return nil
 }
 
-func (s bindingDeleteStore) Projects() port.ProjectStore {
+func (s bindingDeleteStore) Projects() accesstest.ProjectStore {
 	return bindingDeleteProjects{ProjectStore: s.Store.Projects(), reads: s.reads}
 }
 
 type bindingDeleteProjects struct {
-	port.ProjectStore
+	accesstest.ProjectStore
 	reads *atomic.Int32
 }
 
-func (p bindingDeleteProjects) Get(ctx context.Context, key string) (model.Project, error) {
+func (p bindingDeleteProjects) Get(ctx context.Context, key string) (accesstest.Project, error) {
 	if err := ctx.Err(); err != nil {
-		return model.Project{}, fmt.Errorf("lifecycle read began after its deadline: %w", err)
+		return accesstest.Project{}, fmt.Errorf("lifecycle read began after its deadline: %w", err)
 	}
 	p.reads.Add(1)
 	value, err := p.ProjectStore.Get(ctx, key)
@@ -98,15 +96,15 @@ func projectRepositoryLifetime(t *testing.T, db harness.Store) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	for _, key := range []string{"alpha", "beta"} {
-		storekit.Must(t, db.Projects().Create(ctx, model.Project{Key: key, DisplayName: key}))
+		storekit.Must(t, db.Projects().Create(ctx, accesstest.Project{Key: key, DisplayName: key}))
 	}
 	const key = "existing-arbitrary-key"
 	storekit.Must(t, db.Repos().Create(ctx, *repo.Defaults(&repo.Config{Key: key, Class: repo.Local, PackageType: repo.Generic})))
 	repositories := support.Repositories(db)
-	s := project.Service{Store: db, Repositories: repositories}
+	s := accesstest.ProjectAdministration(db, repositories)
 	storekit.Must(t, s.AttachRepository(ctx, key, "alpha", false))
 	storekit.Must(t, s.ShareRepository(ctx, key, "beta", false, true))
-	before := storekit.Get[model.ProjectAuthority](t)(db.Projects().Authority(ctx, "beta"))
+	before := storekit.Get[accesstest.ProjectAuthority](t)(db.Projects().Authority(ctx, "beta"))
 	atRead, release := make(chan struct{}), make(chan struct{})
 	unblock := sync.OnceFunc(func() { close(release) })
 	var running sync.WaitGroup
@@ -123,9 +121,9 @@ func projectRepositoryLifetime(t *testing.T, db harness.Store) {
 	var entered atomic.Bool
 	var reads, listed atomic.Int32
 	deletingStore := bindingDeleteStore{Store: db, entered: &entered, reads: &reads}
-	deleter := project.Service{Store: deletingStore, Repositories: bindingDeleteRepositories{
+	deleter := accesstest.ProjectAdministration(deletingStore, bindingDeleteRepositories{
 		Repositories: repositories, listed: &listed,
-	}}
+	})
 	// Call deletion synchronously while attachment holds the snapshot. Its
 	// deadline must expire before it can read canonical ownership. Recording
 	// the actual transaction/read entry avoids a delayed second goroutine
@@ -152,8 +150,8 @@ func projectRepositoryLifetime(t *testing.T, db harness.Store) {
 		t.Fatal("guarded attachment did not complete")
 	}
 	storekit.Must(t, s.DeleteProject(ctx, "beta"))
-	storekit.Must(t, s.CreateProject(ctx, model.Project{Key: "beta", DisplayName: "replacement"}))
-	after := storekit.Get[model.ProjectAuthority](t)(db.Projects().Authority(ctx, "beta"))
+	storekit.Must(t, s.CreateProject(ctx, accesstest.Project{Key: "beta", DisplayName: "replacement"}))
+	after := storekit.Get[accesstest.ProjectAuthority](t)(db.Projects().Authority(ctx, "beta"))
 	if after.Incarnation == before.Incarnation {
 		t.Fatal("the project was not recreated with a fresh lifetime")
 	}
@@ -161,7 +159,7 @@ func projectRepositoryLifetime(t *testing.T, db harness.Store) {
 	if configuration.ProjectKey != "" || len(configuration.Environments) != 0 {
 		t.Fatalf("recreated project inherited the obsolete canonical attachment: %+v", configuration)
 	}
-	status := storekit.Get[model.RepositoryAssignment](t)(s.RepositoryStatus(ctx, key))
+	status := storekit.Get[accesstest.RepositoryAssignment](t)(s.RepositoryStatus(ctx, key))
 	if status.ProjectKey != "" || len(status.Environments) != 0 || len(status.SharedWith) != 0 {
 		t.Fatalf("Access status retained an obsolete owner or target share: %+v", status)
 	}

@@ -10,8 +10,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
-	"github.com/weaveplatform/artifactweave/internal/access/core/model"
-	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/test/server/support"
@@ -106,13 +104,13 @@ func projectRepositoryBindings(t *testing.T, db harness.Store) {
 
 type bindingFailureStore struct{ harness.Store }
 
-func (s bindingFailureStore) Projects() port.ProjectStore {
+func (s bindingFailureStore) Projects() accesstest.ProjectStore {
 	return bindingFailureProjects{s.Store.Projects()}
 }
 
-type bindingFailureProjects struct{ port.ProjectStore }
+type bindingFailureProjects struct{ accesstest.ProjectStore }
 
-func (s bindingFailureProjects) PutAssignment(ctx context.Context, a model.RepositoryAssignment) error {
+func (s bindingFailureProjects) PutAssignment(ctx context.Context, a accesstest.RepositoryAssignment) error {
 	if err := s.ProjectStore.PutAssignment(ctx, a); err != nil {
 		return err
 	}
@@ -128,8 +126,8 @@ func projectRepositoryBatchRollback(t *testing.T, db harness.Store, h http.Handl
 	const batch = "/artifactory/api/v2/repositories/batch"
 	const first = "alpha-batch-first"
 	const second = "alpha-batch-second"
-	bindings := map[string]model.RepositoryAssignment{}
-	authorities := map[string]model.SharingAuthority{}
+	bindings := map[string]accesstest.RepositoryAssignment{}
+	authorities := map[string]accesstest.SharingAuthority{}
 	body := `[{"key":"` + first + `","rclass":"local","packageType":"generic","projectKey":"alpha"},{"key":"` + second + `","rclass":"local","packageType":"generic","projectKey":"alpha"}]`
 	wantStatus(t, do(t, failing, "PUT", batch, jsonAs(basic("admin", "pw")), body), 500)
 	for _, key := range []string{first, second} {

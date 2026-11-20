@@ -35,6 +35,12 @@ type (
 	Token = model.Token
 	// Project groups repositories, members and roles under a key.
 	Project = model.Project
+	// RepositoryAssignment is the persisted project owner, environments and shares.
+	RepositoryAssignment = model.RepositoryAssignment
+	// ProjectAuthority identifies a project's lifetime and current policy.
+	ProjectAuthority = model.ProjectAuthority
+	// SharingAuthority identifies the current repository sharing revision.
+	SharingAuthority = model.SharingAuthority
 	// Role is a named set of actions over environments.
 	Role = model.Role
 	// Environment is a deployment stage that repositories are assigned to.
@@ -44,6 +50,8 @@ type (
 
 	// UserStore stores users.
 	UserStore = port.UserStore
+	// ProjectStore is the project store that lifecycle and failure probes wrap.
+	ProjectStore = port.ProjectStore
 	// PermissionStore stores permissions.
 	PermissionStore = port.PermissionStore
 	// PermissionQuery asks PermissionStore.Page for one page of
