@@ -24,14 +24,15 @@ type Deps struct {
 	Store        Store
 	Access       accessapi.API
 	Repositories artifactsapi.ProjectRepositoryLookup
+	PackageIndex artifactsapi.PackageIndex
 	// Zone is the server's schedule timezone; empty means UTC.
 	Zone string
 }
 
 var errNoStore = errors.New("retention: Deps.Store is required")
 
-// Module owns package policy administration. Cleanup selection, execution and
-// reports keep their CLN-03/04 owners; archive/restore keep their P16 owners.
+// Module owns package policy administration and metadata-only selection.
+// Execution/reports retain their CLN-04/05 owners; archive/restore retain P16.
 type Module struct{ deps Deps }
 
 // New constructs the module without starting a scheduler or doing any I/O.
@@ -46,6 +47,7 @@ func New(d Deps) (*Module, error) {
 func (m *Module) Policies() cleanup.Service {
 	d := m.deps
 	s := cleanup.Service{Store: d.Store, Schedules: d.Store.Schedules(), Repositories: d.Repositories, Zone: d.Zone, Authorize: d.currentPolicy}
+	s.PackageIndex = d.PackageIndex
 	if d.Access.Projects != nil {
 		s.Guard, s.ProjectExists = d.Access.Projects.Guard, d.Access.Projects.Exists
 	}

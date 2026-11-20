@@ -56,31 +56,53 @@ func matchesSelection(patterns []*regexp.Regexp, value string) bool {
 }
 
 func (c versionCriteria) eligible(v versionFacts) bool {
-	if v.Protected || slices.Contains(c.criteria.ExcludedPackages, v.Package) ||
-		!matchesSelection(c.packages, v.Package) || matchesSelection(c.excludedVersions, v.Version) {
-		return false
+	return c.reason(v) == ReasonSelected
+}
+
+func (c versionCriteria) identityReason(v versionFacts) Reason {
+	if v.Protected {
+		return ReasonProtected
+	}
+	if slices.Contains(c.criteria.ExcludedPackages, v.Package) {
+		return ReasonPackageExcluded
+	}
+	if !matchesSelection(c.packages, v.Package) {
+		return ReasonPackageNotIncluded
+	}
+	if matchesSelection(c.excludedVersions, v.Version) {
+		return ReasonVersionExcluded
 	}
 	if len(c.versions) > 0 && !matchesSelection(c.versions, v.Version) {
-		return false
+		return ReasonVersionNotIncluded
+	}
+	return ReasonSelected
+}
+
+func (c versionCriteria) reason(v versionFacts) Reason {
+	if reason := c.identityReason(v); reason != ReasonSelected {
+		return reason
 	}
 	for key, excluded := range c.criteria.ExcludedProperties {
 		if slices.ContainsFunc(v.LeadProperties[key], func(value string) bool { return slices.Contains(excluded, value) }) {
-			return false
+			return ReasonPropertyExcluded
 		}
 	}
 	for key, included := range c.criteria.IncludedProperties {
 		if !slices.ContainsFunc(v.LeadProperties[key], func(value string) bool { return slices.Contains(included, value) }) {
-			return false
+			return ReasonPropertyNotIncluded
 		}
 	}
 	if !selectionAge(v.Created, c.now, c.criteria.CreatedBeforeInDays, c.criteria.CreatedBeforeInMonths) {
-		return false
+		return ReasonCreated
 	}
 	downloaded := v.LastDownloaded
 	if downloaded.IsZero() {
 		downloaded = v.Created
 	}
-	return selectionAge(downloaded, c.now, c.criteria.LastDownloadedBeforeInDays, c.criteria.LastDownloadedBeforeInMonths)
+	if !selectionAge(downloaded, c.now, c.criteria.LastDownloadedBeforeInDays, c.criteria.LastDownloadedBeforeInMonths) {
+		return ReasonDownloaded
+	}
+	return ReasonSelected
 }
 
 func selectionAge(at, now time.Time, days, months int) bool {

@@ -1,4 +1,4 @@
-// Package cleanup administers package cleanup policies and durable enablement.
+// Package cleanup administers package cleanup policies and selects candidates.
 //
 // # Role
 //
@@ -17,6 +17,12 @@
 // queued generation remains enabled under the publication guard. Deletion
 // retains existing run history.
 //
+// Selection freezes a detached policy and clock, traverses the package index in
+// bounded pages and explains comparator protection and format-owned lead facts.
+// Each page refreshes authority and ownership; no candidate permits deletion.
+// Selection changes no content, usage, work, or policy state. A changed lead
+// during evaluation yields no candidates; execution must revalidate snapshots.
+//
 // # References
 //
 //   - docs/implementation/plan.md#p11-projects-webhooks-retention-replication.
@@ -25,6 +31,6 @@
 //
 // # Status
 //
-// Implemented P11 policy administration (CLN-02). Candidate evaluation,
-// execution, stop operations and reports retain their CLN-03/04 owners.
+// Implemented P11 policy administration and candidate evaluation (CLN-02/03).
+// Execution, stop operations and reports retain their CLN-04/05 owners.
 package cleanup

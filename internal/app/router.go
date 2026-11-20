@@ -33,6 +33,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/multipart"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/smart"
@@ -509,8 +510,14 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		subscriptions.Subscriptions = cfg.Notifications.Subscriptions()
 	}
 	if cfg.Store != nil && cfg.Retention == nil {
+		formats := cfg.Formats
+		if formats == nil {
+			formats = cfg.FormatSettings.For
+		}
 		// New refuses only a nil store, excluded above.
-		if m, err := retention.New(retention.Deps{Store: cfg.Store, Access: cfg.Access, Repositories: repos.NewProjectRepositoryLookup(cfg.Store)}); err == nil {
+		if m, err := retention.New(retention.Deps{
+			Store: cfg.Store, Access: cfg.Access, Repositories: repos.NewProjectRepositoryLookup(cfg.Store), PackageIndex: pkgindex.NewReader(cfg.Store, formats),
+		}); err == nil {
 			cfg.Retention = m
 		}
 	}
