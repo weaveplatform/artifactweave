@@ -200,7 +200,7 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 			return storeFault(ctx, err)
 		}
 		if e.ItemID == 0 {
-			return s.checkRawCacheBlob(ctx, actual.SHA256)
+			return s.emitRawCached(ctx, out.Entry, d.By, now)
 		}
 		return nil
 	}

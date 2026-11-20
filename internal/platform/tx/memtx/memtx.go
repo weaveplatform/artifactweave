@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	platformtx "github.com/weaveplatform/artifactweave/internal/platform/tx"
 )
 
 // Store is one in-memory database: named tables and sequences behind one
@@ -30,7 +31,10 @@ func New() *Store {
 
 type (
 	txKey       struct{ s *Store }
-	transaction struct{ after []func() }
+	transaction struct {
+		after  []func()
+		before platformtx.Finalizers
+	}
 )
 
 // AfterCommit implements tx.Runner. It defers fn until the Tx that ctx is
@@ -101,8 +105,8 @@ func (s *Store) lock(ctx context.Context) error {
 // outer fn drops rolls nothing back, unlike the SQL unit of work (see
 // tx.Runner).
 func (s *Store) Tx(ctx context.Context, fn func(context.Context) error) error {
-	if ctx.Value(txKey{s}) != nil {
-		return fn(ctx)
+	if current, ok := ctx.Value(txKey{s}).(*transaction); ok {
+		return fn(current.before.Bind(ctx))
 	}
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("inmem: %w", err)
@@ -120,6 +124,7 @@ func (s *Store) Tx(ctx context.Context, fn func(context.Context) error) error {
 			}
 		}
 	}()
+	defer tx.before.Close()
 	tables := make(map[string]snapshotter, len(s.tables))
 	for name, t := range s.tables {
 		tables[name] = t.snapshot()
@@ -131,7 +136,14 @@ func (s *Store) Tx(ctx context.Context, fn func(context.Context) error) error {
 			s.tables, s.seqs = tables, seqs
 		}
 	}()
-	if err := fn(context.WithValue(ctx, txKey{s}, tx)); err != nil {
+	ctx = tx.before.Bind(context.WithValue(ctx, txKey{s}, tx))
+	err := fn(ctx)
+	if err == nil {
+		if err := tx.before.Run(ctx); err != nil {
+			return fmt.Errorf("inmem: finalize transaction: %w", err)
+		}
+	}
+	if err != nil {
 		return err
 	}
 	committed = true

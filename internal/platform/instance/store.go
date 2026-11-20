@@ -10,6 +10,8 @@ type InstanceStore interface {
 	// Get returns the identity; kernel.ErrNotFound before Init, which
 	// EnsureInstance reads as a first start.
 	Get(ctx context.Context) (InstanceIdentity, error)
+	// ID reads only the public persisted identifier, without loading keys.
+	ID(ctx context.Context) (string, error)
 	// Update replaces the identity, for key rotation; kernel.ErrNotFound
 	// before Init.
 	Update(ctx context.Context, id InstanceIdentity) error

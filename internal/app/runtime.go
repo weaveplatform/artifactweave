@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/login"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/internal/app/config"
@@ -136,7 +137,7 @@ func OpenRuntime(
 		return nil, errors.Join(err, st.Close())
 	}
 	authenticator, err := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{
-		Hash: opts.PasswordHash, Tokens: tokens, Groups: st.Groups(),
+		Hash: opts.PasswordHash, Tokens: tokens, Groups: st.Groups(), Failures: login.Failures{Store: st},
 		APIRestrictions: st.APIRestrictions(),
 	})
 	if err != nil {

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
@@ -125,6 +127,7 @@ func (s *Service) folderState(
 // The repository's tag limits then apply to the image, all in one
 // transaction.
 func (s *Service) PutManifest(ctx context.Context, p Push) error {
+	ctx = artifactevents.WithActor(ctx, p.By)
 	m := p.Manifest
 	if err := s.childrenPresent(ctx, p.Owner, m.Manifests); err != nil {
 		return err
@@ -144,7 +147,13 @@ func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	}
 	items := s.items()
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
+		changed := false
 		for _, folder := range p.Folders {
+			_, same, err := s.folderState(ctx, p.Owner, folder, m.Digest)
+			if err != nil {
+				return err
+			}
+			changed = changed || !same
 			if err := s.tagPlatforms(ctx, items, p, folder); err != nil {
 				return err
 			}
@@ -152,7 +161,13 @@ func (s *Service) PutManifest(ctx context.Context, p Push) error {
 				return err
 			}
 		}
-		return s.retain(ctx, items, p)
+		if err := s.retain(ctx, items, p); err != nil {
+			return err
+		}
+		if !changed {
+			return nil
+		}
+		return s.emitDocker(ctx, artapi.DockerPushed, p.Owner, pushReference(p), m.Digest, nil, false)
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // the transaction returns ours

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	platformtx "github.com/weaveplatform/artifactweave/internal/platform/tx"
 )
 
 // ErrTransaction reports a transaction that could not begin or commit.
@@ -28,6 +30,7 @@ type unit struct {
 	mu     sync.Mutex
 	err    error
 	commit []func()
+	before platformtx.Finalizers
 }
 
 func currentUnit(ctx context.Context) *unit {
@@ -76,7 +79,7 @@ func afterCommit(ctx context.Context, fn func()) {
 // and its error poisons the outer transaction even if the caller drops it.
 func runTx(ctx context.Context, db *sql.DB, d Dialect, fn func(context.Context) error) error {
 	if u := currentUnit(ctx); u != nil && u.db == db {
-		return fail(ctx, fn(ctx))
+		return fail(ctx, fn(u.before.Bind(ctx)))
 	}
 	opts := &sql.TxOptions{Isolation: sql.LevelReadCommitted}
 	if d.ForUpdate == "" {
@@ -99,7 +102,17 @@ func runTx(ctx context.Context, db *sql.DB, d Dialect, fn func(context.Context) 
 			f()
 		}
 	}()
-	err = fn(context.WithValue(ctx, unitKey{}, u))
+	defer u.before.Close()
+	ctx = u.before.Bind(context.WithValue(ctx, unitKey{}, u))
+	err = fn(ctx)
+	u.mu.Lock()
+	err = errors.Join(err, u.err)
+	u.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	err = u.before.Run(ctx)
+	// A finalizer can join Tx and drop its error, just like business work.
 	u.mu.Lock()
 	err = errors.Join(err, u.err)
 	u.mu.Unlock()

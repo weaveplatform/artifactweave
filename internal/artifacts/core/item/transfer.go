@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -525,6 +527,7 @@ func (s *Service) loadLayout(ctx context.Context, name string) (*layout.Layout, 
 // then, for a move, removes the sources.
 func (s *Service) apply(ctx context.Context, t Transfer, steps []step, res *TransferResult) error {
 	now := s.now()
+	var sourceRepo artapi.EventRepository
 	items := s.Store.Items()
 	hooks, env := s.format(t.To.Repo.PackageType), s.env()
 	var applied []step
@@ -552,14 +555,36 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step, res *Tran
 			}
 			continue
 		}
+		if sourceRepo.Key == "" {
+			var err error
+			sourceRepo, err = artifactevents.Repository(ctx, s.Store, t.From.Repo.Key)
+			if err != nil {
+				return fmt.Errorf("item: source event context: %w", err)
+			}
+		}
 		landed, err := s.land(ctx, t, st, now)
+		if err != nil {
+			return err
+		}
+		before, err := s.propertySnapshot(ctx, landed)
 		if err != nil {
 			return err
 		}
 		if err := s.carry(ctx, t, st, landed, props, now); err != nil {
 			return err
 		}
-		if err := s.landed(ctx, hooks, env, t.To.Repo, st, landed, props, now); err != nil {
+		if err := s.landed(ownPropertyEvents(ctx, landed.ID, t.By), hooks, env, t.To.Repo, st, landed, props, now); err != nil {
+			return err
+		}
+		topic := artapi.ArtifactCopied
+		if t.Move {
+			topic = artapi.ArtifactMoved
+		}
+		source := artifactevents.Artifact(sourceRepo, st.src)
+		if err := s.emitArtifact(ctx, topic, landed, &source, t.By, now); err != nil {
+			return err
+		}
+		if err := s.emitPropertyChanges(ctx, landed, before, t.By, now); err != nil {
 			return err
 		}
 		if st.src.Folder {
@@ -717,6 +742,7 @@ func (s *Service) land(
 // reference the target now holds a new one of), then each moved folder left
 // empty, deepest first. Items that failed to move stay, with their folders.
 func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) error {
+	ctx = artifactevents.WithActor(ctx, t.By)
 	items := s.Store.Items()
 	hooks, env := s.format(t.From.Repo.PackageType), s.env()
 	var versions []model.PackageVersion

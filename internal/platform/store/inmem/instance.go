@@ -44,6 +44,19 @@ func (i instanceStore) Get(ctx context.Context) (instance.InstanceIdentity, erro
 	return out, err
 }
 
+func (i instanceStore) ID(ctx context.Context) (string, error) {
+	var id string
+	err := i.s.Do(ctx, func() error {
+		row, ok := i.t().Rows[instanceRowKey]
+		if !ok {
+			return memtx.NotFound("instance identity", "")
+		}
+		id = row.InstanceID
+		return nil
+	})
+	return id, err
+}
+
 func (i instanceStore) Update(ctx context.Context, id instance.InstanceIdentity) error {
 	return i.s.Do(ctx, func() error {
 		if !i.t().Has(instanceRowKey) {

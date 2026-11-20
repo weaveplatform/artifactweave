@@ -86,9 +86,11 @@
 // Repositories, Layouts and API implemented in P9d. Not created, because no
 // other module calls them today (decision 0044): the target layout's Items,
 // Packages, Builds and Search; Gate (hooks.go), with the download and deploy
-// gates of P17; the artifacts events (events.go, P11); and
+// gates of P17; and
 // Repositories.SetProject, which a project attach will call (P11). The
-// artifacts settings are not published here (decision 0044).
+// artifacts settings are not published here (decision 0044). P11 events.go
+// publishes typed artifact/property, Docker and build topics and immutable
+// fact values, independently of vendor webhook envelopes.
 //
 // # Testing
 //

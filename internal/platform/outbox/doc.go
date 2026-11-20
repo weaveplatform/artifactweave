@@ -14,7 +14,9 @@
 // values, so they are declared beside it and the package imports no module.
 // The platform's store adapters (platform/store/sql and platform/store/inmem)
 // implement OutboxStore and EventStore; the composite metadata store forwards
-// both views. The package imports the standard library and kernel sentinels.
+// both views. Stage uses platform/tx before-commit finalization so domain locks
+// precede the event-stream append lock. ActorFrom copies only public actor facts.
+// The package imports the standard library, kernel sentinels and platform/tx.
 //
 // # Inputs
 //

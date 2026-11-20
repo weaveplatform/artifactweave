@@ -13,6 +13,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/project"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
@@ -21,6 +23,10 @@ import (
 // Deletion reads no account settings. These fixtures migrate the real access
 // module alone; a future settings dependency must update the fixture explicitly.
 type lifecycleStore struct{ port.Store }
+
+// Lifecycle fixtures exercise no login transition or event capability.
+func (lifecycleStore) Events() outbox.EventStore        { return nil }
+func (lifecycleStore) Instance() instance.InstanceStore { return nil }
 
 func (lifecycleStore) Settings() settings.SettingsStore { return nil }
 

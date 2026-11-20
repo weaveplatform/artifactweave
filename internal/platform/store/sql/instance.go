@@ -2,8 +2,11 @@ package sql
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 )
 
 // purposeInstanceKey seals the instance's Ed25519 private key; the row id is
@@ -37,9 +40,26 @@ func (i instanceStore) Init(ctx context.Context, id instance.InstanceIdentity) e
 	if err != nil {
 		return err
 	}
-	_, err = i.s.Exec(ctx, "init instance",
-		"INSERT INTO instance (id, "+instanceCols+") VALUES (1, ?, ?, ?, ?, ?)", args...)
-	return err
+	// Lazy event-origin initialization can join a producer transaction. A
+	// losing initializer must not abort that enclosing PostgreSQL unit.
+	n, err := i.s.Exec(
+		ctx,
+		"init instance",
+		dialect.InsertIgnore("instance", []string{"id", "instance_id", "public_key", "private_key", "namespace_id", "protocol_version"}, []string{"id"}),
+		append([]any{1}, args...)...)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("instance identity exists: %w", kernel.ErrConflict)
+	}
+	return nil
+}
+
+func (i instanceStore) ID(ctx context.Context) (string, error) {
+	var id string
+	err := i.s.Q(ctx).QueryRowContext(ctx, "SELECT instance_id FROM instance WHERE id = 1").Scan(&id)
+	return id, i.s.Wrap("read instance id", err)
 }
 
 func (i instanceStore) Get(ctx context.Context) (instance.InstanceIdentity, error) {

@@ -33,7 +33,8 @@
 //   - ValidateInstanceID, with its sentinel ErrInvalidInstanceID, and
 //     ProtocolVersion, the peer protocol version this build speaks.
 //   - The port: InstanceStore, with Init, Get and Update; and Store, what
-//     EnsureInstance takes.
+//     EnsureInstance takes. ID reads only the public origin; EnsureID lazily
+//     initializes it and returns the persisted winner without unsealing keys.
 //   - EnsureInstance, which returns nil once an identity is stored, or an
 //     error whose text starts "instance identity:".
 //
@@ -49,6 +50,8 @@
 //   - The private key is sealed at rest whenever a master key is configured
 //     (decision 0017) and never serialised: InstanceIdentity's JSON form
 //     leaves it out.
+//   - ID never reads sealed key material. Producers use the current persisted
+//     origin rather than caching a generated candidate.
 //   - Get returns copies of the keys, so a caller that changes a returned
 //     key changes nothing that is stored.
 //

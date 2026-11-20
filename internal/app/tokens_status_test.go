@@ -8,7 +8,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
-	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 )
 
 // subjectOf is the subject of name's tokens, as access/adapters/http writes
@@ -43,11 +42,7 @@ type statusSecrets map[string]string
 func seedTokens(t *testing.T, db RouterStore) (*token.Service, statusSecrets) {
 	t.Helper()
 	ctx := context.Background()
-	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
-		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
-	}); err != nil {
-		t.Fatal(err)
-	}
+	seedFixtureIdentity(t, db)
 	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
 	if err != nil {
 		t.Fatal(err)

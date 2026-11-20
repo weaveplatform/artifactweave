@@ -8,7 +8,9 @@ import (
 	"slices"
 	"strings"
 
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
@@ -91,6 +93,7 @@ func (s *Service) TagManifest(ctx context.Context, o Owner, tag string) (model.I
 // moves, keeping its history, and the platform manifests nothing left in the
 // source image names go too. All of it is one transaction.
 func (s *Service) Promote(ctx context.Context, p Promotion) error {
+	ctx = artifactevents.WithActor(ctx, p.To.By)
 	for _, r := range p.Tags {
 		if p.From.Repo.Key == p.To.Repo.Key && p.From.Name == p.To.Name && r.From == r.To {
 			return ErrSamePlace
@@ -100,8 +103,19 @@ func (s *Service) Promote(ctx context.Context, p Promotion) error {
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		var landed, platforms []string
 		for _, r := range p.Tags {
+			manifest, err := s.TagManifest(ctx, p.From, r.From)
+			if err != nil {
+				return err
+			}
+			source, err := s.imageFacts(ctx, p.From, r.From, manifest.Actual.SHA256)
+			if err != nil {
+				return err
+			}
 			children, err := s.promoteTag(ctx, items, p, r)
 			if err != nil {
+				return err
+			}
+			if err := s.emitDocker(ctx, artapi.DockerPromoted, p.To, r.To, manifest.Actual.SHA256, &source, p.Copy); err != nil {
 				return err
 			}
 			landed = append(landed, r.To)

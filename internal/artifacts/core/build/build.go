@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -130,6 +132,7 @@ func (s *Service) Publish(
 	by string,
 	a Access,
 ) (Published, error) {
+	ctx = artifactevents.WithActor(ctx, by)
 	projectKey = ProjectKey(projectKey)
 	b, err := Parse(projectKey, doc)
 	if err != nil {
@@ -179,13 +182,15 @@ func (s *Service) Publish(
 		}
 		it, err := s.writeDocument(ctx, c, b, by)
 		out = Published{Run: b, SHA256: it.Actual.SHA256}
-		if err != nil || !retains {
+		if err != nil {
 			return err
 		}
-		if err := s.Store.Builds().PutRetention(ctx, retention); err != nil {
-			return fmt.Errorf("build: store retention: %w", err)
+		if retains {
+			if err := s.Store.Builds().PutRetention(ctx, retention); err != nil {
+				return fmt.Errorf("build: store retention: %w", err)
+			}
 		}
-		return nil
+		return s.emitBuild(ctx, artapi.BuildUploaded, b.Run(), "", by, false)
 	})
 	if err != nil {
 		return Published{}, err //nolint:wrapcheck // the transaction returns ours
@@ -413,6 +418,7 @@ func (s *Service) deleteThen(
 	a Access,
 	then func(context.Context, []model.BuildRun) error,
 ) ([]model.BuildRun, error) {
+	ctx = artifactevents.WithActor(ctx, d.By)
 	if !d.All && len(d.Numbers) == 0 {
 		return nil, fmt.Errorf("%w: no build numbers to delete", ErrInvalid)
 	}
@@ -465,7 +471,14 @@ func (s *Service) deleteThen(
 			}
 		}
 		if then != nil {
-			return then(ctx, gone)
+			if err := then(ctx, gone); err != nil {
+				return err
+			}
+		}
+		for _, run := range gone {
+			if err := s.emitBuild(ctx, artapi.BuildDeleted, run, "", d.By, false); err != nil {
+				return err
+			}
 		}
 		return nil
 	})

@@ -27,6 +27,8 @@ func (f fakeInstance) Get(context.Context) (instance.InstanceIdentity, error) {
 	return instance.InstanceIdentity{}, f.getErr
 }
 
+func (f fakeInstance) ID(context.Context) (string, error) { return "", f.getErr }
+
 func (f fakeInstance) Update(context.Context, instance.InstanceIdentity) error { return nil }
 
 func TestAccEnsureInstance(t *testing.T) {
@@ -46,3 +48,17 @@ func TestAccEnsureInstance(t *testing.T) {
 		}
 	}
 }
+
+// A producer must receive the original storage failure instead of appending
+// with an empty or freshly generated origin after initialization failed.
+func TestUnitEnsureIDPreservesInitializationFailure(t *testing.T) {
+	boom := errors.New("identity storage unavailable")
+	st := instanceOf{idBeforeInitFailure{fakeInstance: fakeInstance{getErr: kernel.ErrNotFound, initErr: boom}}}
+	if id, err := instance.EnsureID(t.Context(), st); id != "" || !errors.Is(err, boom) {
+		t.Fatalf("failed initialization returned origin %q, %v", id, err)
+	}
+}
+
+type idBeforeInitFailure struct{ fakeInstance }
+
+func (idBeforeInitFailure) ID(context.Context) (string, error) { return "", kernel.ErrNotFound }

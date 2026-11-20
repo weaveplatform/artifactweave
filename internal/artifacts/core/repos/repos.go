@@ -9,10 +9,12 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/trash"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -509,6 +511,11 @@ func Remove(ctx context.Context, st Store, key, by string) (int64, bool, error) 
 	}
 	var files int64
 	err = st.Tx(ctx, func(ctx context.Context) error {
+		if c.Class == repo.Remote {
+			if err := stageRawRepositoryDeletion(ctx, st, key, by); err != nil {
+				return err
+			}
+		}
 		caches := []bool{false}
 		if c.Class == repo.Remote {
 			caches = append(caches, true)
@@ -525,6 +532,14 @@ func Remove(ctx context.Context, st Store, key, by string) (int64, bool, error) 
 			res, err := st.Items().Delete(ctx, key, cached, "")
 			if err != nil {
 				return fmt.Errorf("delete content: %w", err)
+			}
+			for _, it := range res.Removed {
+				if it.Folder {
+					continue
+				}
+				if err := artifactevents.EmitArtifact(ctx, st, artifactsapi.ArtifactDeleted, it, nil, by, time.Now().UTC()); err != nil {
+					return fmt.Errorf("stage repository deletion event: %w", err)
+				}
 			}
 			files += res.Files
 			if err := release(ctx, st, res.BlobRefs, held); err != nil {
@@ -603,6 +618,20 @@ func release(ctx context.Context, st Store, removed, held map[string]int64) erro
 		}
 		if _, err := st.Blobs().Unref(ctx, sha, n); err != nil {
 			return fmt.Errorf("release blob %s: %w", sha, err)
+		}
+	}
+	return nil
+}
+
+func stageRawRepositoryDeletion(ctx context.Context, store Store, key, by string) error {
+	raw, err := artifactevents.RawCache(ctx, store, key, "")
+	if err != nil {
+		return fmt.Errorf("capture repository cache deletion: %w", err)
+	}
+	now := time.Now().UTC()
+	for _, entry := range raw {
+		if err := artifactevents.EmitRawCache(ctx, store, artifactsapi.ArtifactDeleted, entry, by, now); err != nil {
+			return fmt.Errorf("stage repository cache deletion: %w", err)
 		}
 	}
 	return nil

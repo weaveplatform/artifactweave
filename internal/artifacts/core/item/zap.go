@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 )
 
 // Zap expires upstream metadata and clears negative state while retaining all
@@ -39,13 +40,22 @@ func (s *Service) Zap(ctx context.Context, t Target) (int, error) {
 }
 
 // invalidateCache joins item mutations to the durable retrieval fence.
-func (s *Service) invalidateCache(ctx context.Context, t Target) (int64, error) {
+func (s *Service) invalidateCache(ctx context.Context, t Target, by string) (int64, error) {
 	if !t.Cached || t.Repo.Class != repo.Remote {
 		return 0, nil
+	}
+	raw, err := artifactevents.RawCache(ctx, s.Store, t.Repo.Key, t.Path)
+	if err != nil {
+		return 0, fmt.Errorf("item: capture invalidated cache: %w", err)
 	}
 	n, err := s.Store.RemoteCache().Invalidate(ctx, t.Repo.Key, strings.Trim(t.Path, "/"), false)
 	if err != nil {
 		return 0, fmt.Errorf("item: invalidate cache: %w", err)
+	}
+	for _, entry := range raw {
+		if err := s.emitRawDeleted(ctx, entry, by); err != nil {
+			return 0, err
+		}
 	}
 	return n, nil
 }

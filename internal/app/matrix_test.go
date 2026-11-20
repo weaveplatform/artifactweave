@@ -26,7 +26,6 @@ import (
 	dockerhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker/http"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
-	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
@@ -1543,6 +1542,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
+	seedFixtureIdentity(t, db)
 	seedKeys(t, db)
 	names := make([]string, 0, len(matrixPrincipals))
 	for _, p := range matrixPrincipals {
@@ -1748,9 +1748,7 @@ func seedMatrixTokens(t *testing.T, db *inmem.Store) (*token.Service, map[string
 			t.Fatal(err)
 		}
 	}
-	must(db.Instance().Init(ctx, instance.InstanceIdentity{
-		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
-	}))
+	seedFixtureIdentity(t, db)
 	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
 	must(err)
 	// A service an hour and a half behind, over the same key, issues

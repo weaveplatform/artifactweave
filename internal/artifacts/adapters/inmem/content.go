@@ -57,6 +57,19 @@ func (r repos) Get(ctx context.Context, key string) (repo.Config, error) {
 	return out, err
 }
 
+func (r repos) EventContext(ctx context.Context, key string) (port.RepoEventContext, error) {
+	var out port.RepoEventContext
+	err := r.s.Do(ctx, func() error {
+		row, ok := r.t().Rows[key]
+		if !ok {
+			return memtx.NotFound("repository", key)
+		}
+		out = port.RepoEventContext{Key: row.Key, ProjectKey: row.ProjectKey, PackageType: row.PackageType}
+		return nil
+	})
+	return out, err
+}
+
 func (r repos) Update(ctx context.Context, c repo.Config) error {
 	return r.s.Tx(ctx, func(ctx context.Context) error {
 		if !r.t().Has(c.Key) {

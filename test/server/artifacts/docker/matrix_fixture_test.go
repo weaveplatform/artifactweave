@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
@@ -81,12 +82,13 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 				}},
 			}))
 		}
-		seedMatrixRegistry(t, f)
-		seedMatrixManifests(t, f)
+		// Seed the token issuer before deployments can lazily create an event origin.
 		must(cfg.Store.Instance().Init(ctx, instance.InstanceIdentity{
 			InstanceID:      "jfrt@01234567-89ab-4cde-8f01-23456789abcd",
 			ProtocolVersion: 1,
 		}))
+		seedMatrixRegistry(t, f)
+		seedMatrixManifests(t, f)
 		tokens, err := token.New(ctx, cfg.Store, token.Options{KeyBits: 1024})
 		must(err)
 		cfg.Tokens = tokens
@@ -196,6 +198,46 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	}
 	rec := do(t, f.h, r.method(), fill.Replace(r.path), headers, body)
 	return rec.Code, rec.Body.String()
+}
+
+func TestAccDockerFixturesKeepSeededEventOrigin(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		store func(*testing.T) harness.Store
+	}{
+		{"principal matrix", func(t *testing.T) harness.Store { return newMatrixFixture(t).db }},
+		{"status table", func(t *testing.T) harness.Store {
+			var db harness.Store
+			newStatusFixture(t, false, func(c *Config) { db = c.Store })
+			return db
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			db := tc.store(t)
+			const origin = "jfrt@01234567-89ab-4cde-8f01-23456789abcd"
+			if id, err := db.Instance().ID(t.Context()); err != nil || id != origin {
+				t.Fatalf("fixture identity = %q, %v; want %q", id, err, origin)
+			}
+			if _, err := db.Events().RegisterConsumer(t.Context(), origin, "fixture-origin"); err != nil {
+				t.Fatal(err)
+			}
+			events, _, err := db.Events().Next(t.Context(), origin, "fixture-origin", 1000)
+			if err != nil {
+				t.Fatal(err)
+			}
+			topics := make(map[string]bool)
+			for _, event := range events {
+				if event.Origin != origin {
+					t.Fatalf("seed event origin = %q; want %q", event.Origin, origin)
+				}
+				topics[event.Topic] = true
+			}
+			if !topics[artapi.ArtifactDeployed] || !topics[artapi.DockerPushed] {
+				t.Fatalf("seed event topics = %v; want artifact deployment and Docker push", topics)
+			}
+		})
+	}
 }
 
 func TestAccDockerRoutePrincipalMatrix(t *testing.T) {

@@ -40,6 +40,7 @@ import (
 // protocols reach the access module through access/api. Each composite
 // store in app is a Store.
 type Store interface {
+	item.Store
 	port.Store
 	Settings() settings.SettingsStore
 	Configs() configdoc.ConfigStore

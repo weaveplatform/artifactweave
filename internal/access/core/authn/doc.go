@@ -54,6 +54,11 @@
 //
 // # Invariants
 //
+// The application supplies Options.Failures from core/login so counters, a
+// new locked status and user.locked commit together. Failed event persistence
+// rolls back that account mutation without changing authentication refusals.
+// Embedders without this recorder retain the documented counter-only path.
+//
 //   - A credential reference never authenticates a new request: Current,
 //     CurrentRegistry and RestoreDownload only recheck a credential that
 //     Basic or Token verified, against the user, token, policy and

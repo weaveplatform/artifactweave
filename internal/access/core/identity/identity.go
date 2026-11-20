@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/login"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/access/core/project"
@@ -37,6 +38,7 @@ var ErrExists = errors.New("identity: already exists")
 // account policies. The application passes its composite store, which
 // satisfies it.
 type Store interface {
+	login.Store
 	port.Store
 	// Settings returns the settings store, which holds the user lock,
 	// password expiration and password policies. Its calls join the
@@ -692,7 +694,7 @@ func (s *Service) recordFailure(ctx context.Context, name string) {
 	if err != nil || !p.Enabled {
 		return
 	}
-	_, _ = s.Store.Users().RecordFailedLogin(ctx, name, p.LoginAttempts)
+	_ = (login.Failures{Store: s.Store, Now: s.Now}).RecordFailedLogin(ctx, name, p.LoginAttempts)
 }
 
 // Locked returns the names of locked users.

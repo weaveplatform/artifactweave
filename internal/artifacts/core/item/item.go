@@ -11,7 +11,9 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
@@ -19,6 +21,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
@@ -63,6 +67,8 @@ type Store interface {
 	Configs() configdoc.ConfigStore
 	WorkQueue() work.WorkQueue
 	Leases() work.LeaseStore
+	Instance() instance.InstanceStore
+	Events() outbox.EventStore
 }
 
 // Service writes items into a store and its blob store.
@@ -434,7 +440,7 @@ func (s *Service) putFile(
 		return model.Item{}, hookFault(ctx, d, err)
 	}
 	d.Path, d.Properties = w.Path, w.Properties
-	stored, err := s.writeFile(ctx, d, fileWrite{
+	written, err := s.writeFile(ctx, d, fileWrite{
 		actual: actual, size: size, declared: declared, shouldReplace: replace,
 	}, now)
 	if err != nil {
@@ -445,12 +451,20 @@ func (s *Service) putFile(
 		}
 		return model.Item{}, err
 	}
+	stored := written.Item
+	ctx = ownPropertyEvents(ctx, stored.ID, d.By)
 	if err := h.Deployed(ctx, env, d.Repo, stored); err != nil {
 		return model.Item{}, hookFault(ctx, d, err)
 	}
 	if err := s.annotated(ctx, h, env, d.Repo, stored,
 		format.Annotation{Set: d.Properties, At: now}); err != nil {
 		return model.Item{}, hookFault(ctx, d, err)
+	}
+	if err := s.emitWritten(ctx, stored, d.By, now); err != nil {
+		return model.Item{}, err
+	}
+	if err := s.emitPropertyChanges(ctx, stored, written.Before, d.By, now); err != nil {
+		return model.Item{}, err
 	}
 	return stored, nil
 }
@@ -467,6 +481,11 @@ type fileWrite struct {
 	shouldReplace bool
 }
 
+type writtenFile struct {
+	Item   model.Item
+	Before model.Properties
+}
+
 // writeFile writes, inside the caller's transaction, the item for stored
 // content without any hook: parent folders, the item (replacing a file at
 // the path), the blob reference (and the release of an overwritten file's)
@@ -476,11 +495,11 @@ func (s *Service) writeFile(
 	d Deploy,
 	fw fileWrite,
 	now time.Time,
-) (model.Item, error) {
+) (writtenFile, error) {
 	actual, size, declared := fw.actual, fw.size, fw.declared
 	full := strings.Trim(d.Path, "/")
 	if err := s.ensureFolders(ctx, d.Target, path.Dir(full), d.By, now); err != nil {
-		return model.Item{}, err
+		return writtenFile{}, err
 	}
 	items := s.Store.Items()
 	// Otherwise Artifactory records the SHA-256 it computes as the client's
@@ -505,15 +524,15 @@ func (s *Service) writeFile(
 	old, err := items.Get(ctx, d.Repo.Key, d.Cached, full)
 	switch {
 	case err == nil && d.IfAbsent:
-		return model.Item{}, fmt.Errorf("%w: %s", ErrExists, full)
+		return writtenFile{}, fmt.Errorf("%w: %s", ErrExists, full)
 	case err == nil && old.Folder:
-		return model.Item{}, fmt.Errorf("%w: %s is a folder", ErrConflict, full)
+		return writtenFile{}, fmt.Errorf("%w: %s is a folder", ErrConflict, full)
 	case err == nil && !d.mayReplace(full, old, declared, actual):
-		return model.Item{}, &OverwriteDeniedError{Repo: d.Repo.Key, Path: full, User: d.By}
+		return writtenFile{}, &OverwriteDeniedError{Repo: d.Repo.Key, Path: full, User: d.By}
 	case err == nil:
 		it.Created, it.CreatedBy = old.Created, old.CreatedBy
 	case !errors.Is(err, kernel.ErrNotFound):
-		return model.Item{}, fmt.Errorf("item: get %s: %w", full, err)
+		return writtenFile{}, fmt.Errorf("item: get %s: %w", full, err)
 	}
 	write := items.Put
 	if d.IfAbsent {
@@ -521,19 +540,24 @@ func (s *Service) writeFile(
 	}
 	stored, err := write(ctx, it)
 	if d.IfAbsent && errors.Is(err, kernel.ErrConflict) {
-		return model.Item{}, fmt.Errorf("%w: %s", ErrExists, full)
+		return writtenFile{}, fmt.Errorf("%w: %s", ErrExists, full)
 	}
 	if err != nil {
-		return model.Item{}, fmt.Errorf("item: put %s: %w", full, err)
+		return writtenFile{}, fmt.Errorf("item: put %s: %w", full, err)
+	}
+	// Put holds the item guard; capture before changing normalized properties.
+	before, err := s.propertySnapshot(ctx, stored)
+	if err != nil {
+		return writtenFile{}, err
 	}
 	ref, err := s.Store.Blobs().Ref(ctx, blob.Blob{
 		Checksums: actual, Size: size, Created: now,
 	}, 1)
 	if errors.Is(err, port.ErrDeleting) {
-		return model.Item{}, fmt.Errorf("%w: %w", ErrCollected, err)
+		return writtenFile{}, fmt.Errorf("%w: %w", ErrCollected, err)
 	}
 	if err != nil {
-		return model.Item{}, fmt.Errorf("item: reference blob: %w", err)
+		return writtenFile{}, fmt.Errorf("item: reference blob: %w", err)
 	}
 	// Content garbage collection removed recently may have gone after this
 	// deploy wrote it: the row only says when it went. Checked inside the
@@ -542,22 +566,22 @@ func (s *Service) writeFile(
 	if !ref.Deleted.IsZero() {
 		ok, err := s.Blobs.Exists(ctx, actual.SHA256)
 		if err != nil {
-			return model.Item{}, fmt.Errorf("item: blob exists: %w", err)
+			return writtenFile{}, fmt.Errorf("item: blob exists: %w", err)
 		}
 		if !ok {
-			return model.Item{}, ErrCollected
+			return writtenFile{}, ErrCollected
 		}
 	}
 	if old.ID != 0 && old.Actual.SHA256 != "" {
 		if _, err := s.Store.Blobs().Unref(ctx, old.Actual.SHA256, 1); err != nil {
-			return model.Item{}, fmt.Errorf("item: release overwritten blob: %w", err)
+			return writtenFile{}, fmt.Errorf("item: release overwritten blob: %w", err)
 		}
 	}
 	fresh := old.ID != 0 && old.Actual.SHA256 != actual.SHA256 && !nonUniqueSnapshot(full)
 	if err := s.settle(ctx, stored, d.Properties, fresh, fw.shouldReplace, now); err != nil {
-		return model.Item{}, err
+		return writtenFile{}, err
 	}
-	return stored, nil
+	return writtenFile{Item: stored, Before: before}, nil
 }
 
 // settle gives a file just written its properties and statistics. With
@@ -638,6 +662,7 @@ func (s *Service) MakeFolder(
 	props model.Properties,
 	by string,
 ) (model.Item, error) {
+	ctx = artifactevents.WithActor(ctx, by)
 	now := s.now()
 	full := strings.Trim(t.Path, "/")
 	var folder model.Item
@@ -937,7 +962,8 @@ func (s *Service) remove(
 	now := s.now()
 	var res port.DeleteResult
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		invalidated, err := s.invalidateCache(ctx, t)
+		ctx = artifactevents.WithActor(ctx, by)
+		invalidated, err := s.invalidateCache(ctx, t, by)
 		if err != nil {
 			return err
 		}
@@ -959,6 +985,7 @@ func (s *Service) remove(
 			if _, err := s.invalidateCache(
 				ctx,
 				Target{Repo: t.Repo, Cached: t.Cached, Path: sc.FullPath()},
+				by,
 			); err != nil {
 				return err
 			}
@@ -1007,6 +1034,14 @@ func (s *Service) remove(
 		}
 		if err := hooks.Deleted(ctx, env, t.Repo, removed); err != nil {
 			return err //nolint:wrapcheck // the format's own error
+		}
+		for _, it := range res.Removed {
+			if it.Folder {
+				continue
+			}
+			if err := s.emitArtifact(ctx, artapi.ArtifactDeleted, it, nil, by, now); err != nil {
+				return err
+			}
 		}
 		if trash {
 			return nil

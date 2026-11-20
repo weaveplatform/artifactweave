@@ -9,7 +9,9 @@ import (
 	"slices"
 	"strings"
 
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -136,6 +138,7 @@ func (s *Service) unreferenced(
 // Delete on the image, which covers its digest folders. DELETE
 // /artifactory/api/docker/<repo>/v2/delete (#226) calls it.
 func (s *Service) DeleteMultiArch(ctx context.Context, o Owner, tag string) ([]string, error) {
+	ctx = artifactevents.WithActor(ctx, o.By)
 	var removed []string
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		dir := o.Name + "/" + tag
@@ -150,8 +153,15 @@ func (s *Service) DeleteMultiArch(ctx context.Context, o Owner, tag string) ([]s
 		if err != nil {
 			return err
 		}
+		manifest, err := s.TagManifest(ctx, o, tag)
+		if err != nil {
+			return err
+		}
 		removed = slices.Concat([]string{tag}, tags, platforms)
-		return removeFolders(ctx, s.items(), o, removed)
+		if err := removeFolders(ctx, s.items(), o, removed); err != nil {
+			return err
+		}
+		return s.emitDocker(ctx, artapi.DockerDeleted, o, tag, manifest.Actual.SHA256, nil, false)
 	})
 	if err != nil {
 		return nil, err //nolint:wrapcheck // the transaction returns ours

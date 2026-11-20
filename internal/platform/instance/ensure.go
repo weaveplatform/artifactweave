@@ -17,6 +17,24 @@ type Store interface {
 	Instance() InstanceStore
 }
 
+// EnsureID returns the persisted identifier without reading private keys on
+// the steady path. Direct service users get the same first-start identity as
+// the application runtime. Always reread after initialization: a concurrent
+// initializer may have stored a different winning candidate.
+func EnsureID(ctx context.Context, st Store) (string, error) {
+	id, err := st.Instance().ID(ctx)
+	if errors.Is(err, kernel.ErrNotFound) {
+		if err := EnsureInstance(ctx, st); err != nil {
+			return "", err
+		}
+		id, err = st.Instance().ID(ctx)
+	}
+	if err != nil {
+		return "", fmt.Errorf("instance identity id: %w", err)
+	}
+	return id, nil
+}
+
 // EnsureInstance creates this instance's identity on first start: the
 // jfrt@<uuid> id Artifactory reports as its service id, from which the
 // Access issuer jfac@<uuid> is derived, and the Ed25519 key peers know it by

@@ -99,6 +99,10 @@ type RepoStore interface {
 	Create(ctx context.Context, c repo.Config) error
 	// Get returns the configuration, including passwords and sensitive headers.
 	Get(ctx context.Context, key string) (repo.Config, error)
+	// EventContext reads only the descriptive key/project/type tuple. It joins
+	// the current snapshot without unsealing credentials or adding late locks;
+	// it is not an authorization or repository-lifetime fence.
+	EventContext(ctx context.Context, key string) (RepoEventContext, error)
 	// Update replaces the stored configuration; kernel.ErrNotFound when absent.
 	Update(ctx context.Context, c repo.Config) error
 	// Delete removes the configuration only. Content is removed through
@@ -118,6 +122,13 @@ type RepoStore interface {
 	// UsingKeypair returns the keys of repositories whose primary or
 	// secondary key pair is name, ordered.
 	UsingKeypair(ctx context.Context, name string) ([]string, error)
+}
+
+// RepoEventContext is the secret-free storage projection used by producers.
+type RepoEventContext struct {
+	Key         string
+	ProjectKey  string
+	PackageType repo.PackageType
 }
 
 // Download is one recorded download of an item. Remote marks a download
@@ -236,6 +247,8 @@ type ItemStore interface {
 	// Properties returns the item's properties (empty when it has none). This
 	// and the other property and statistics methods return kernel.ErrNotFound
 	// for a missing item. A key given with no values is not stored.
+	// Inside a transaction Properties holds the item guard until that outer
+	// transaction ends, so a read/change/read captures actual serialized deltas.
 	//
 	// SetProperties and PatchProperties take the time of the write, at. A write
 	// that changes the properties sets the item's PropertiesModified to at, or

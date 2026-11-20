@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -33,7 +34,8 @@ func (s *Service) Restore(
 ) (model.Item, error) {
 	var restored model.Item
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		if _, err := s.invalidateCache(ctx, t); err != nil {
+		ctx = artifactevents.WithActor(ctx, by)
+		if _, err := s.invalidateCache(ctx, t, by); err != nil {
 			return err
 		}
 		var err error
@@ -81,6 +83,10 @@ func (s *Service) restoreRecord(
 	if err != nil {
 		return model.Item{}, fmt.Errorf("item: put %s: %w", full, err)
 	}
+	before, err := s.propertySnapshot(ctx, stored)
+	if err != nil {
+		return model.Item{}, err
+	}
 	if exists && old.Actual.SHA256 != "" {
 		if _, err := s.Store.Blobs().Unref(ctx, old.Actual.SHA256, 1); err != nil {
 			return model.Item{}, fmt.Errorf("item: release replaced blob: %w", err)
@@ -89,6 +95,7 @@ func (s *Service) restoreRecord(
 	if err := items.SetProperties(ctx, stored.ID, rec.Properties, now); err != nil {
 		return model.Item{}, fmt.Errorf("item: properties of %s: %w", full, err)
 	}
+	ctx = ownPropertyEvents(ctx, stored.ID, by)
 	hooks, env := s.format(t.Repo.PackageType), s.env()
 	if !stored.Folder {
 		if err := hooks.Deployed(ctx, env, t.Repo, stored); err != nil {
@@ -97,6 +104,14 @@ func (s *Service) restoreRecord(
 	}
 	if err := s.annotated(ctx, hooks, env, t.Repo, stored,
 		format.Annotation{Set: rec.Properties, At: now}); err != nil {
+		return model.Item{}, err
+	}
+	if !stored.Folder {
+		if err := s.emitWritten(ctx, stored, by, now); err != nil {
+			return model.Item{}, err
+		}
+	}
+	if err := s.emitPropertyChanges(ctx, stored, before, by, now); err != nil {
 		return model.Item{}, err
 	}
 	return stored, nil

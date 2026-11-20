@@ -43,6 +43,10 @@
 //
 // # Invariants
 //
+// P11 EVT-02 records one Docker topic event per logical push, deletion or
+// promoted tag. Physical manifest/layer/history changes can independently emit
+// artifact topics; they never emit an additional Docker wrapper event.
+//
 //   - Backend ("docker") names the sessions' rows in the uploads table, so
 //     it is stored and never changes, as are the upload rows' contents and
 //     the _uploads item paths.

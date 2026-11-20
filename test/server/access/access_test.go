@@ -28,6 +28,11 @@ func accessWorld(t *testing.T) (http.Handler, *token.Service) {
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
+	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
+		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	for _, g := range []accesstest.Group{{Name: "devs"}, {Name: "admins", AdminPrivileges: true}} {
 		if err := db.Groups().Create(ctx, g); err != nil {
 			t.Fatal(err)
@@ -73,11 +78,6 @@ func accessWorld(t *testing.T) (http.Handler, *token.Service) {
 				t.Fatal(err)
 			}
 		}
-	}
-	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
-		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
-	}); err != nil {
-		t.Fatal(err)
 	}
 	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
 	if err != nil {

@@ -1099,6 +1099,7 @@ func buildsAQLWorld(t *testing.T, tune ...func(*RouterConfig)) (http.Handler, *t
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
+	seedFixtureIdentity(t, db)
 	if err := db.Users().
 		Create(ctx, accesstest.User{Name: "dev", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
@@ -1154,11 +1155,6 @@ func buildsAQLWorld(t *testing.T, tune ...func(*RouterConfig)) (http.Handler, *t
 				t.Fatal(err)
 			}
 		}
-	}
-	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
-		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
-	}); err != nil {
-		t.Fatal(err)
 	}
 	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
 	if err != nil {
@@ -1726,4 +1722,24 @@ var cheapHash = support.CheapHash
 func cheapSeed(t *testing.T, db *inmem.Store) {
 	t.Helper()
 	support.Seed(t, db)
+}
+
+// Seed identity before fixture mutations, just as startup does before serving
+// requests. Events and later token services must use the same durable origin.
+func seedFixtureIdentity(t *testing.T, st instance.Store) {
+	t.Helper()
+	const id = "jfrt@01234567-89ab-4cde-8f01-23456789abcd"
+	current, err := st.Instance().ID(t.Context())
+	if errors.Is(err, kernel.ErrNotFound) {
+		if err := st.Instance().Init(t.Context(), instance.InstanceIdentity{InstanceID: id, ProtocolVersion: 1}); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current != id {
+		t.Fatalf("fixture mutated before identity initialization: %s", current)
+	}
 }

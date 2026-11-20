@@ -158,6 +158,9 @@ func newStatusFixture(
 			t.Fatal(err)
 		}
 	}
+	// Producers resolve their origin on the first mutation. Seed the fixture's
+	// fixed token issuer before deploying content so they share one identity.
+	tokens, secrets := seedTokens(t, db)
 	shared := true
 	for _, c := range append([]repo.Config{
 		{Key: "libs-local", Class: repo.Local},
@@ -200,7 +203,6 @@ func newStatusFixture(
 		artmodel.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	tokens, secrets := seedTokens(t, db)
 	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{
 		Hash: testHash, Tokens: tokens,
 	})
