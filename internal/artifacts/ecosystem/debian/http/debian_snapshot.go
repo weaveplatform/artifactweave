@@ -296,7 +296,7 @@ func (s DebianAPI) createDebianSnapshot(
 		}
 		staged[name] = info
 	}
-	err = s.Tx(kernel.WithPrincipal(ctx, p), func(ctx context.Context) error {
+	err = s.Tx(accessapi.WithCaller(ctx, p, acc.Decider), func(ctx context.Context) error {
 		p, acc, err := s.ItemCaller(ctx, st)
 		if err != nil {
 			return err

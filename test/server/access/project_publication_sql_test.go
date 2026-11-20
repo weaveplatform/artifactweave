@@ -1,4 +1,4 @@
-package artifactshttp
+package access_test
 
 import (
 	"bytes"
@@ -18,6 +18,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	artifactshttp "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -31,6 +33,13 @@ import (
 type publicationSQLStore struct {
 	*appsql.Store
 	attempt func()
+}
+
+type publicationSQLEnd func()
+
+func (end publicationSQLEnd) Read([]byte) (int, error) {
+	end()
+	return 0, io.EOF
 }
 
 func (s publicationSQLStore) Tx(ctx context.Context, fn func(context.Context) error) error {
@@ -103,14 +112,17 @@ func TestAccProjectPublicationWaitsForCurrentSQLAuthority(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				svc := newArtifactoryAPI(Config{Store: st, Blobs: blobs, Access: access})
+				svc := artifactshttp.New(artifactshttp.Deps{
+					Store: st,
+					Deps:  itemkit.Deps{Blobs: blobs, Access: access, Private: artifactshttp.PrivateItem},
+				})
 				router := chi.NewRouter()
 				svc.RegisterItemRoutes(router)
 				// The writer starts only at body EOF, after request-side lookups.
 				// It commits when publication attempts its outer transaction. This
 				// works for SQLite's BEGIN lock and PostgreSQL's guard row alike,
 				// without holding the publication transaction over client streaming.
-				body := io.MultiReader(strings.NewReader("payload"), publicationEnd(func() {
+				body := io.MultiReader(strings.NewReader("payload"), publicationSQLEnd(func() {
 					if db.InTx(ctx) {
 						t.Fatal("client streaming is inside publication transaction")
 					}

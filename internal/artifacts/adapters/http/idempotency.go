@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
@@ -316,7 +317,7 @@ func (s ArtifactoryAPI) currentBuildAccess(
 		if s.cfg.Access.Authenticator == nil {
 			return nil, build.ErrForbidden
 		}
-		_, a, err := s.CurrentAccess(kernel.WithPrincipal(ctx, p))
+		_, a, err := s.CurrentAccess(accessapi.WithCaller(ctx, p, nil))
 		if err != nil {
 			if errors.Is(err, kernel.ErrBadCredentials) ||
 				errors.Is(err, kernel.ErrPasswordExpired) ||

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -44,10 +43,9 @@ type claims struct {
 	Expires int64  `json:"exp"`
 	// Keep a token's original ceiling: looking up only its user's current
 	// permissions would silently turn a scoped capability into a full grant.
-	Scope               *string              `json:"scope,omitempty"`
-	Identity            kernel.TokenIdentity `json:"identity,omitempty"`
-	ProjectKey          string               `json:"project,omitempty"`
-	ProjectIncarnations map[string]string    `json:"project_incarnations,omitempty"`
+	Scope    *string              `json:"scope,omitempty"`
+	Identity kernel.TokenIdentity `json:"identity,omitempty"`
+	accessapi.ProjectScope
 }
 
 func (h handler) uploadURL(
@@ -67,17 +65,17 @@ func (h handler) uploadURL(
 		expiry = p.TokenExpires
 	}
 	c := claims{
-		ID:         st.ID(),
-		Subject:    p.Name,
-		MD5:        md5,
-		Serial:     st.Meta.Serial,
-		Record:     ws.RecordID,
-		Created:    ws.Created.UnixMilli(),
-		Issued:     now.Unix(),
-		Expires:    expiry.Unix(),
-		Scope:      scopeText(p),
-		Identity:   identity,
-		ProjectKey: p.TokenProject, ProjectIncarnations: maps.Clone(p.ProjectIncarnations),
+		ID:           st.ID(),
+		Subject:      p.Name,
+		MD5:          md5,
+		Serial:       st.Meta.Serial,
+		Record:       ws.RecordID,
+		Created:      ws.Created.UnixMilli(),
+		Issued:       now.Unix(),
+		Expires:      expiry.Unix(),
+		Scope:        scopeText(p),
+		Identity:     identity,
+		ProjectScope: accessapi.ProjectScopeOf(p),
 	}
 	raw, _ := json.Marshal(c)
 	body := encoding.EncodeToString(raw)
@@ -172,10 +170,9 @@ func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl
 		}
 		scope = &parsed
 	}
-	subject := accessapi.Subject{
+	subject := (accessapi.Subject{
 		Name: u.Name, Admin: u.Admin, Groups: u.Groups, Scope: scope,
-		ProjectKey: cl.ProjectKey, ProjectIncarnations: maps.Clone(cl.ProjectIncarnations),
-	}
+	}).WithProjectScope(cl.ProjectScope)
 	// Named-group tokens act through their named groups even when the user
 	// is not a member, as accessapi.SubjectOf does for bearer requests.
 	if scope != nil {
