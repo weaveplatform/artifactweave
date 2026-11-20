@@ -1,0 +1,31 @@
+{
+  "provider": "jfrog/artifactory",
+  "version": "12.11.14",
+  "source": "https://github.com/jfrog/terraform-provider-artifactory/tree/v12.11.14/pkg/artifactory/resource/webhook",
+  "resources": [
+    {"type": "artifactory_artifact_webhook", "domain": "artifact", "handler": "standard", "event": "deployed"},
+    {"type": "artifactory_artifact_custom_webhook", "domain": "artifact", "handler": "custom", "event": "deployed"},
+    {"type": "artifactory_artifact_property_webhook", "domain": "artifact_property", "handler": "standard", "event": "added"},
+    {"type": "artifactory_artifact_property_custom_webhook", "domain": "artifact_property", "handler": "custom", "event": "added"},
+    {"type": "artifactory_artifact_lifecycle_webhook", "domain": "artifact_lifecycle", "handler": "standard", "event": "archive"},
+    {"type": "artifactory_artifact_lifecycle_custom_webhook", "domain": "artifact_lifecycle", "handler": "custom", "event": "archive"},
+    {"type": "artifactory_docker_webhook", "domain": "docker", "handler": "standard", "event": "pushed"},
+    {"type": "artifactory_docker_custom_webhook", "domain": "docker", "handler": "custom", "event": "pushed"},
+    {"type": "artifactory_build_webhook", "domain": "build", "handler": "standard", "event": "uploaded"},
+    {"type": "artifactory_build_custom_webhook", "domain": "build", "handler": "custom", "event": "uploaded"},
+    {"type": "artifactory_release_bundle_webhook", "domain": "release_bundle", "handler": "standard", "event": "signed"},
+    {"type": "artifactory_release_bundle_custom_webhook", "domain": "release_bundle", "handler": "custom", "event": "signed"},
+    {"type": "artifactory_distribution_webhook", "domain": "distribution", "handler": "standard", "event": "distribute_started"},
+    {"type": "artifactory_distribution_custom_webhook", "domain": "distribution", "handler": "custom", "event": "distribute_started"},
+    {"type": "artifactory_artifactory_release_bundle_webhook", "domain": "artifactory_release_bundle", "handler": "standard", "event": "received"},
+    {"type": "artifactory_artifactory_release_bundle_custom_webhook", "domain": "artifactory_release_bundle", "handler": "custom", "event": "received"},
+    {"type": "artifactory_destination_webhook", "domain": "destination", "handler": "standard", "event": "received"},
+    {"type": "artifactory_destination_custom_webhook", "domain": "destination", "handler": "custom", "event": "received"},
+    {"type": "artifactory_user_webhook", "domain": "user", "handler": "standard", "event": "locked"},
+    {"type": "artifactory_user_custom_webhook", "domain": "user", "handler": "custom", "event": "locked"},
+    {"type": "artifactory_release_bundle_v2_webhook", "domain": "release_bundle_v2", "handler": "standard", "event": "release_bundle_v2_started"},
+    {"type": "artifactory_release_bundle_v2_custom_webhook", "domain": "release_bundle_v2", "handler": "custom", "event": "release_bundle_v2_started"},
+    {"type": "artifactory_release_bundle_v2_promotion_webhook", "domain": "release_bundle_v2_promotion", "handler": "standard", "event": "release_bundle_v2_promotion_started"},
+    {"type": "artifactory_release_bundle_v2_promotion_custom_webhook", "domain": "release_bundle_v2_promotion", "handler": "custom", "event": "release_bundle_v2_promotion_started"}
+  ]
+}
