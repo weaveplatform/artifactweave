@@ -89,6 +89,9 @@ type Decider interface {
 	// ManagesProject checks the current administrator role and token management
 	// ceiling. An empty project key asks for platform-wide administration.
 	ManagesProject(projectKey string, operation ProjectOperation) bool
+	// HasProjectAdministration admits a policy collection before its owner is
+	// read. ManagesProject still checks each immutable owner and token ceiling.
+	HasProjectAdministration() bool
 	// ManagesWebhook checks subscription administration independently of content
 	// permissions. serviceURL is the configured JFrog platform URL, never the
 	// webhook receiver or a request-supplied Host. Project administrators are

@@ -27,6 +27,8 @@ type CleanupCriteria struct {
 	ExcludedPackages             []string            `json:"excluded_packages,omitempty"`
 	IncludeAllProjects           bool                `json:"include_all_projects,omitempty"`
 	IncludedProjects             []string            `json:"included_projects,omitempty"`
+	IncludeAllStages             *bool               `json:"include_all_stages,omitempty"`
+	IncludedStages               []string            `json:"included_stages,omitempty"`
 	CreatedBeforeInDays          int                 `json:"created_before_in_days,omitempty"`
 	CreatedBeforeInMonths        int                 `json:"created_before_in_months,omitempty"`
 	LastDownloadedBeforeInDays   int                 `json:"last_downloaded_before_in_days,omitempty"`

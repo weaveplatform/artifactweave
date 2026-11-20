@@ -1,40 +1,30 @@
-// Package retentionhttp will serve the retention endpoints: cleanup and
-// archive policies, their runs, and restores.
+// Package retentionhttp serves package cleanup policy administration.
 //
 // # Role
 //
-// retention module, adapter layer (HTTP). The package is named retentionhttp
-// so that it does not shadow net/http.
+// retention module, HTTP adapter. PackagePoliciesAPI is a partial strict server
+// composed by app with the generated Artifactory server and remaining stubs.
 //
 // # Inputs
 //
-// None yet. Planned: requests to the cleanup and archive operations of the
-// Artifactory specification, through the generated strict server in
-// platform/gen/artifactory (target layout, line 810).
+// Generated policy requests and the retention service. Explicit mapping
+// translates public camelCase searchCriteria into the stored model.
 //
 // # Outputs
 //
-// None yet. Planned: the module's part of that API, composed into the app
-// router as a partial strict server (decision 0044, composition and HTTP).
+// Disabled create 201, reads/replacement/delete 200, enablement 200 and scoped
+// force-disable 200. Private revisions and audit fields stay out of the wire
+// representation. Current service authorization precedes repository reads.
 //
 // # References
 //
-//   - Target layout:
-//     docs/research/architecture-options/5-modular-monolith.md, "Full package
-//     tree", line 329, and "Generated code and API specifications", line 810.
-//   - Plan:
-//     docs/implementation/plan.md#p11-projects-webhooks-retention-replication,
-//     #p16-cold-storage-archive-and-retention.
-//   - Context map: the retention row, restated in the module root's doc.go;
-//     https://github.com/weaveplatform/artifactweave/issues/958 holds the
-//     map.
-//   - Decision 0010: docs/research/decisions/0010-retention-trash-and-gc.md.
-//   - Decision 0024: docs/research/decisions/0024-cold-storage-tier.md.
-//   - Decision 0044:
-//     docs/research/decisions/0044-modular-monolith-migration.md,
-//     "Placeholders".
+//   - api/src/artifactory/paths-cleanup.yaml.
+//   - docs/implementation/plan.md#p11-projects-webhooks-retention-replication.
+//   - docs/research/decisions/0010-retention-trash-and-gc.md.
+//   - docs/research/decisions/0044-modular-monolith-migration.md.
 //
 // # Status
 //
-// Placeholder: implemented by P11, P16.
+// Implemented P11 package policy administration (CLN-02). Execution and report
+// operations retain CLN-03/04; archive and restore remain P16.
 package retentionhttp

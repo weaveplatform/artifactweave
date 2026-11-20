@@ -293,6 +293,9 @@ func TestUnitCurrentProjectAdministrationUsesSelectedRolesAndCeilings(t *testing
 					t.Fatal("selected role or management ceiling was not retained")
 				}
 			}
+			if d.HasProjectAdministration() != tc.want {
+				t.Fatal("administrative collection gate ignored selected roles or token ceiling")
+			}
 			if d.ManagesProject("alpha", 0) {
 				t.Fatal("unknown operation permitted")
 			}

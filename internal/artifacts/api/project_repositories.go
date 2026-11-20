@@ -23,3 +23,9 @@ type ProjectRepository struct {
 type ProjectRepositoryReader interface {
 	ProjectRepositories(ctx context.Context, projectKey string, page kernel.Page) ([]ProjectRepository, string, error)
 }
+
+// ProjectRepositoryLookup reads one repository's current owner and environments
+// without hydrating configuration secrets or deciding administration authority.
+type ProjectRepositoryLookup interface {
+	ProjectRepository(ctx context.Context, key string) (ProjectRepository, error)
+}

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"log/slog"
 	"maps"
 	"os"
@@ -638,7 +639,11 @@ func TestAccMigrateCommand(t *testing.T) {
 		"schema version 7 of 7 (sqlite, artifacts)\n" +
 		"schema version 0 of 5 (sqlite, access)\n"
 	for _, m := range []string{"notifications", "retention", "federation", "releases", "workers"} {
-		want += "schema version 0 of 1 (sqlite, " + m + ")\n"
+		latest := 1
+		if m == "retention" {
+			latest = 2
+		}
+		want += fmt.Sprintf("schema version 0 of %d (sqlite, %s)\n", latest, m)
 	}
 	if got := run("version", 0, ""); got != want {
 		t.Fatalf("version of every stream: %q; want %q", got, want)

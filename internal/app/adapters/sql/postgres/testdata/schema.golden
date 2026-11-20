@@ -321,6 +321,7 @@ column cleanup_policies.created_at bigint
 column cleanup_policies.created_by text NOT NULL DEFAULT ''::text
 column cleanup_policies.updated_at bigint
 column cleanup_policies.updated_by text NOT NULL DEFAULT ''::text
+column cleanup_policies.revision text NOT NULL DEFAULT ''::text
 constraint cleanup_policies.cleanup_policies_pkey PRIMARY KEY (key)
 index cleanup_policies.cleanup_policies_pkey CREATE UNIQUE INDEX cleanup_policies_pkey ON cleanup_policies USING btree (key)
 table cleanup_runs

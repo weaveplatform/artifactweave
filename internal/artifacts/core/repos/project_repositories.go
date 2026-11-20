@@ -14,8 +14,17 @@ func NewProjectRepositoryReader(store interface{ Repos() port.RepoStore }) api.P
 	return projectRepositoryReader{store: store}
 }
 
+// NewProjectRepositoryLookup binds single-key ownership reads without secrets.
+func NewProjectRepositoryLookup(store interface{ Repos() port.RepoStore }) api.ProjectRepositoryLookup {
+	return projectRepositoryReader{store: store}
+}
+
 type projectRepositoryReader struct {
 	store interface{ Repos() port.RepoStore }
+}
+
+func (r projectRepositoryReader) ProjectRepository(ctx context.Context, key string) (api.ProjectRepository, error) {
+	return r.store.Repos().ProjectRepository(ctx, key) //nolint:wrapcheck // repository port supplies its context
 }
 
 func (r projectRepositoryReader) ProjectRepositories(ctx context.Context, key string, page kernel.Page) ([]api.ProjectRepository, string, error) {
