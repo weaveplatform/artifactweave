@@ -40,9 +40,9 @@ def inventory(root):
     expected = {(r["type"], r["domain"] + "_" + r["handler"]) for r in rows["resources"]}
     assert len(declarations) == 24 and set(declarations) == expected, "webhook fixture is missing, repeating or substituting a resource"
     makefile = (root / "Makefile").read_text()
-    assert re.search(r'^TERRAFORM_SCENARIOS\s*\?=.*?(?=\n\n)', makefile, re.M | re.S), "default provider scenarios missing"
-    scenarios = re.search(r'^TERRAFORM_SCENARIOS\s*\?=.*?(?=\n\n)', makefile, re.M | re.S).group()
-    assert "deploy/artifactweave/terraform/webhooks" in scenarios, "webhooks omitted from required provider scenarios"
+    scenarios = re.search(r'^TERRAFORM_SCENARIOS\s*\?=.*?(?=\n\n)', makefile, re.M | re.S)
+    assert scenarios, "default provider scenarios missing"
+    assert "deploy/artifactweave/terraform/webhooks" in scenarios.group(), "webhooks omitted from required provider scenarios"
     return rows["resources"]
 
 
