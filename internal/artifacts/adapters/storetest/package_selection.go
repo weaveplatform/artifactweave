@@ -71,14 +71,14 @@ func RunPackageIndexSelection(t *testing.T, newStore Factory) {
 	})
 
 	for _, tc := range []struct {
-		name     string
-		kind     repo.PackageType
-		versions []string
-		newest   string
+		name           string
+		kind           repo.PackageType
+		versions       []string
+		newest, second string
 	}{
-		{"maven snapshots", repo.Maven, []string{"2", "9", "10", "10.1-20261101.120000-1", "10.1-20261102.120000-2"}, "10.1-20261102.120000-2"},
-		{"npm scoped prerelease", repo.NPM, []string{"1.0.0-beta.1", "1.0.0", "2.0.0"}, "2.0.0"},
-		{"debian epoch and revision", repo.Debian, []string{"1.0~rc1-1", "1.0-9", "1.0-10", "2:0.1-1"}, "2:0.1-1"},
+		{"maven snapshots", repo.Maven, []string{"2", "9", "10", "10.1-20261101.120000-1", "10.1-20261102.120000-2"}, "10.1-20261102.120000-2", "10.1-20261101.120000-1"},
+		{"npm scoped prerelease", repo.NPM, []string{"1.0.0-beta.1", "1.0.0", "2.0.0"}, "2.0.0", "1.0.0"},
+		{"debian epoch and revision", repo.Debian, []string{"1.0~rc1-1", "1.0-9", "1.0-10", "2:0.1-1"}, "2:0.1-1", "1.0-10"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			st := newStore(t)
@@ -168,11 +168,37 @@ func RunPackageIndexSelection(t *testing.T, newStore Factory) {
 			if updated[0].ID != original.ID || !updated[0].Created.Equal(original.Created) || updated[0].Actual == original.Actual || updated[0].LastDownloaded.IsZero() {
 				t.Fatal("overwrite/download snapshot did not capture mutable evidence")
 			}
+			var newest, second api.IndexVersion
+			for _, version := range all {
+				if version.Version == tc.newest {
+					newest = version
+				}
+				if version.Version == tc.second {
+					second = version
+				}
+			}
+			// Descriptive snapshots can be stale or forged. Recompute protection
+			// from the full current comparator set, not the supplied boolean.
+			second.Protected = true
+			current, err := reader.Version(ctx, second, 0)
+			if err != nil || current.Protected {
+				t.Fatal("current version trusted a supplied protection flag", err)
+			}
+			if err := st.Packages().DeleteVersion(ctx, newest.ID); err != nil {
+				t.Fatal(err)
+			}
+			current, err = reader.Version(ctx, second, 0)
+			if err != nil || !current.Protected || current.ID != second.ID {
+				t.Fatal("deleting newest did not refresh protection of the same version identity", err)
+			}
 			if err := st.Packages().DeleteVersion(ctx, selected.ID); err != nil {
 				t.Fatal(err)
 			}
 			if _, _, err := reader.Files(ctx, selected, nil, kernel.Page{}); !errors.Is(err, kernel.ErrNotFound) {
 				t.Fatal("stale version identity survived deletion", err)
+			}
+			if _, err := reader.Version(ctx, selected, 0); !errors.Is(err, kernel.ErrNotFound) {
+				t.Fatal("current version lookup revived deleted identity", err)
 			}
 			cfg.ProjectKey = "beta"
 			if err := st.Repos().Update(ctx, cfg); err != nil {

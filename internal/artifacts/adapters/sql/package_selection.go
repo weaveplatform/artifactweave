@@ -53,6 +53,21 @@ func (p packages) IndexPackages(ctx context.Context, ref api.IndexRepository, pa
 }
 
 func (p packages) IndexVersions(ctx context.Context, ref api.IndexPackage, keep int, page kernel.Page) ([]api.IndexVersion, string, error) {
+	return p.indexVersions(ctx, ref, keep, page, nil)
+}
+
+func (p packages) IndexVersion(ctx context.Context, ref api.IndexVersion, keep int) (api.IndexVersion, error) {
+	rows, _, err := p.indexVersions(ctx, ref.Package, keep, kernel.Page{Limit: 1}, &ref)
+	if err != nil {
+		return api.IndexVersion{}, err
+	}
+	if len(rows) == 0 {
+		return api.IndexVersion{}, kernel.ErrNotFound
+	}
+	return rows[0], nil
+}
+
+func (p packages) indexVersions(ctx context.Context, ref api.IndexPackage, keep int, page kernel.Page, selected *api.IndexVersion) ([]api.IndexVersion, string, error) {
 	page, err := page.Normalize()
 	if err != nil {
 		return nil, "", fmt.Errorf("index version page: %w", err)
@@ -68,11 +83,16 @@ func (p packages) IndexVersions(ctx context.Context, ref api.IndexPackage, keep 
 	// Traversal uses immutable version strings. Protection uses the existing
 	// comparator index, including its version-string tie breaker, in this same
 	// statement snapshot; inserting/deleting a version cannot shift a cursor.
+	versionWhere := cursor
+	if selected != nil {
+		versionWhere += " AND v.id = ? AND v.version = ?"
+		cursorArgs = append(cursorArgs, selected.ID, selected.Version)
+	}
 	query := "WITH target AS (SELECT p.id FROM packages p JOIN repositories r ON r.key = p.repo_key WHERE " + where + "), " +
 		"cutoff AS (SELECT order_key, version FROM package_versions WHERE package_id = (SELECT id FROM target) ORDER BY order_key DESC, version DESC LIMIT 1 OFFSET ?) " +
 		"SELECT v.id, v.version, v.order_key, v.created_at, v.last_downloaded_at, " +
 		"CASE WHEN cutoff.order_key IS NULL OR v.order_key > cutoff.order_key OR (v.order_key = cutoff.order_key AND v.version >= cutoff.version) THEN TRUE ELSE FALSE END " +
-		"FROM package_versions v JOIN target ON target.id = v.package_id LEFT JOIN cutoff ON TRUE WHERE " + cursor + " ORDER BY v.version LIMIT ?"
+		"FROM package_versions v JOIN target ON target.id = v.package_id LEFT JOIN cutoff ON TRUE WHERE " + versionWhere + " ORDER BY v.version LIMIT ?"
 	args = append(args, max(1, keep)-1)
 	args = append(args, cursorArgs...)
 	args = append(args, page.Limit+1)

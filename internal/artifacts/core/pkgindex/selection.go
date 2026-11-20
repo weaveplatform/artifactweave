@@ -135,6 +135,29 @@ func (r indexReader) Versions(ctx context.Context, ref api.IndexPackage, keep in
 	return out, next, nil
 }
 
+func (r indexReader) Version(ctx context.Context, ref api.IndexVersion, keep int) (api.IndexVersion, error) {
+	if keep < 0 {
+		return api.IndexVersion{}, fmt.Errorf("negative version retention: %w", kernel.ErrInvalid)
+	}
+	repositories, packages, err := r.sources()
+	if err != nil {
+		return api.IndexVersion{}, err
+	}
+	var out api.IndexVersion
+	err = r.store.Tx(ctx, func(ctx context.Context) error {
+		if err := r.packageReference(ctx, repositories, ref.Package); err != nil {
+			return err
+		}
+		var err error
+		out, err = packages.IndexVersion(ctx, ref, keep)
+		return err
+	})
+	if err != nil {
+		return api.IndexVersion{}, fmt.Errorf("current indexed version: %w", err)
+	}
+	return out, nil
+}
+
 func (r indexReader) Files(ctx context.Context, ref api.IndexVersion, properties map[string][]string, page kernel.Page) ([]api.IndexFile, string, error) {
 	repositories, packages, err := r.sources()
 	if err != nil {

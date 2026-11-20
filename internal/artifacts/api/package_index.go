@@ -84,5 +84,8 @@ type PackageIndex interface {
 	Repositories(context.Context, IndexRepositoryQuery, kernel.Page) ([]IndexRepository, string, error)
 	Packages(context.Context, IndexRepository, kernel.Page) ([]IndexPackage, string, error)
 	Versions(context.Context, IndexPackage, int, kernel.Page) ([]IndexVersion, string, error)
+	// Version refreshes identity and protection against the current complete
+	// version set; a snapshot's old Protected value cannot authorize selection.
+	Version(context.Context, IndexVersion, int) (IndexVersion, error)
 	Files(context.Context, IndexVersion, map[string][]string, kernel.Page) ([]IndexFile, string, error)
 }

@@ -145,6 +145,21 @@ func (p packages) IndexPackages(ctx context.Context, ref api.IndexRepository, pa
 }
 
 func (p packages) IndexVersions(ctx context.Context, ref api.IndexPackage, keep int, page kernel.Page) ([]api.IndexVersion, string, error) {
+	return p.indexVersions(ctx, ref, keep, page, nil)
+}
+
+func (p packages) IndexVersion(ctx context.Context, ref api.IndexVersion, keep int) (api.IndexVersion, error) {
+	rows, _, err := p.indexVersions(ctx, ref.Package, keep, kernel.Page{Limit: 1}, &ref)
+	if err != nil {
+		return api.IndexVersion{}, err
+	}
+	if len(rows) == 0 {
+		return api.IndexVersion{}, kernel.ErrNotFound
+	}
+	return rows[0], nil
+}
+
+func (p packages) indexVersions(ctx context.Context, ref api.IndexPackage, keep int, page kernel.Page, selected *api.IndexVersion) ([]api.IndexVersion, string, error) {
 	page, err := page.Normalize()
 	if err != nil {
 		return nil, "", fmt.Errorf("index versions page: %w", err)
@@ -163,6 +178,9 @@ func (p packages) IndexVersions(ctx context.Context, ref api.IndexPackage, keep 
 		}
 		for _, value := range p.versions().Rows {
 			if value.PackageID != ref.ID || len(after) > 0 && value.Version <= after[0] {
+				continue
+			}
+			if selected != nil && (value.ID != selected.ID || value.Version != selected.Version) {
 				continue
 			}
 			entry := api.IndexVersion{

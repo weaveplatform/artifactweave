@@ -22,5 +22,6 @@ type RepositoryIndexPages interface {
 type PackageIndexPages interface {
 	IndexPackages(context.Context, api.IndexRepository, kernel.Page) ([]api.IndexPackage, string, error)
 	IndexVersions(context.Context, api.IndexPackage, int, kernel.Page) ([]api.IndexVersion, string, error)
+	IndexVersion(context.Context, api.IndexVersion, int) (api.IndexVersion, error)
 	IndexFiles(context.Context, api.IndexVersion, map[string][]string, kernel.Page) ([]api.IndexFile, string, error)
 }
