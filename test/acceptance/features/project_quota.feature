@@ -4,7 +4,7 @@ Feature: Project storage quota notifications
   Delivery retries retain the occurrence identity, and falling below the
   threshold rearms a different occurrence. Disabled notifications send nothing.
 
-  Scenario: Native quota warnings retry, rearm and respect disabled notifications
+  Background:
     Given the registry is running
     And a loopback quota mail receiver loses the first acknowledgement
     When I PUT "/artifactory/api/security/users/quota-owner" as admin with body:
@@ -27,6 +27,8 @@ Feature: Project storage quota notifications
       {"rclass":"local","packageType":"generic","projectKey":"alpha"}
       """
     Then the response status is 200
+
+  Scenario: Native quota warnings retry, rearm and respect disabled notifications
     When I upload 75 quota bytes to "/artifactory/alpha-generic/item.bin"
     Then the quota warning is retried with the same identity for "alpha"
     When I upload 80 quota bytes to "/artifactory/alpha-generic/item.bin"
@@ -44,5 +46,12 @@ Feature: Project storage quota notifications
     Then the response status is 204
     When I upload 75 quota bytes to "/artifactory/alpha-generic/item.bin"
     Then no additional quota mail arrives
+    When I GET "/artifactory/alpha-generic/item.bin" as admin
+    Then the response status is 200
+
+  Scenario: A queued warning and its identity survive an application process restart
+    When I upload 75 quota bytes to "/artifactory/alpha-generic/item.bin"
+    Then the quota warning survives a process restart with the same identity for "alpha"
+    And no additional quota mail arrives
     When I GET "/artifactory/alpha-generic/item.bin" as admin
     Then the response status is 200

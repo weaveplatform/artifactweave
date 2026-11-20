@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/mail"
 	"net/textproto"
+	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -39,6 +41,7 @@ func (w *world) registerProjectQuota(sc *godog.ScenarioContext) {
 	sc.Step(`^a loopback quota mail receiver loses the first acknowledgement$`, w.startQuotaMail)
 	sc.Step(`^I upload (\d+) quota bytes to "([^"]*)"$`, w.uploadQuotaBytes)
 	sc.Step(`^the quota warning is retried with the same identity for "([^"]*)"$`, w.quotaMailRetried)
+	sc.Step(`^the quota warning survives a process restart with the same identity for "([^"]*)"$`, w.quotaMailRestarted)
 	sc.Step(`^a new quota warning arrives for "([^"]*)"$`, w.quotaMailRearmed)
 	sc.Step(`^no additional quota mail arrives$`, w.noQuotaMail)
 }
@@ -186,6 +189,38 @@ func (w *world) quotaMailRetried(project string) error {
 	}
 	if first.Get("Message-ID") != second.Get("Message-ID") || first.Get("Date") != second.Get("Date") {
 		return fmt.Errorf("quota retry changed its occurrence identity or date")
+	}
+	w.quotaMailID = second.Get("Message-ID")
+	return nil
+}
+
+func (w *world) quotaMailRestarted(project string) error {
+	first, err := w.readQuotaMail(project)
+	if err != nil {
+		return err
+	}
+	if w.server == nil {
+		return fmt.Errorf("quota application is not running")
+	}
+	// Restart exactly this scenario's binary over its existing data directory
+	// and sealed key. The receiver survives; no shared database is reopened or
+	// reset by the fixture. The first DATA acknowledgement was already lost.
+	args, environment := slices.Clone(w.server.Args[1:]), slices.Clone(w.server.Env)
+	w.stop()
+	w.server = exec.Command(binary, args...)
+	w.server.Env, w.server.Stderr = environment, &w.stderr
+	if err := w.server.Start(); err != nil {
+		return err
+	}
+	if err := w.waitReady(); err != nil {
+		return err
+	}
+	second, err := w.readQuotaMail(project)
+	if err != nil {
+		return err
+	}
+	if first.Get("Message-ID") != second.Get("Message-ID") || first.Get("Date") != second.Get("Date") {
+		return fmt.Errorf("process restart changed the durable quota occurrence")
 	}
 	w.quotaMailID = second.Get("Message-ID")
 	return nil
