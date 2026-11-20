@@ -22,8 +22,9 @@ var _ accessapi.Authorizer = authorizer{}
 // Every Decider it returns goes through authz.AsAPI, so a nil evaluator is a
 // nil interface, never a typed nil.
 type authorizer struct {
-	st           Store
-	repositories artifactsapi.ProjectRepositoryReader
+	st            Store
+	repositories  artifactsapi.ProjectRepositoryReader
+	authenticator *authn.Authenticator
 }
 
 // sources is what an evaluation reads, read through the caller's context.
@@ -63,12 +64,24 @@ func (b authorizer) identity(ctx context.Context, p kernel.Principal) (kernel.Pr
 	}
 	u, err := b.st.Users().Get(ctx, model.FoldUsername(p.Name))
 	if errors.Is(err, kernel.ErrNotFound) && p.Identity == kernel.IdentityTransient {
-		groups, err := b.st.Groups().AutoJoin(ctx)
-		if err != nil {
-			return kernel.Principal{}, fmt.Errorf("current transient groups: %w", err)
+		// Auto-join selection belongs to the configured authenticator. A
+		// standalone authenticator without Groups must not acquire the
+		// store's default groups merely by evaluating permissions here.
+		if b.authenticator == nil {
+			return p, nil
 		}
-		p.Admin, p.Groups = false, slices.Clone(groups)
-		return p, nil
+		if p.Registry != nil {
+			current, err := b.authenticator.CurrentRegistry(ctx, p, b.st.Tokens())
+			if err != nil {
+				return kernel.Principal{}, fmt.Errorf("current transient registry identity: %w", err)
+			}
+			return current, nil
+		}
+		current, err := b.authenticator.Current(ctx, p, b.st.Tokens())
+		if err != nil {
+			return kernel.Principal{}, fmt.Errorf("current transient identity: %w", err)
+		}
+		return current, nil
 	}
 	if errors.Is(err, kernel.ErrNotFound) {
 		return kernel.Principal{}, kernel.ErrBadCredentials

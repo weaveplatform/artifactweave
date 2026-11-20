@@ -75,7 +75,7 @@ func New(d Deps) (*Module, error) {
 	}
 	m := &Module{
 		api: accessapi.API{
-			Authorizer:      authorizer{st: d.Store, repositories: d.ProjectRepositories},
+			Authorizer:      authorizer{st: d.Store, repositories: d.ProjectRepositories, authenticator: d.Authenticator},
 			Tokens:          TokensOf(d.Store, d.Tokens),
 			Keys:            KeysOf(d.Store),
 			Identity:        identity{st: d.Store},
