@@ -7,6 +7,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/multipart"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/smart"
@@ -54,6 +55,9 @@ type Deps struct {
 	// gives the kit as its store too; nil answers every route like an
 	// unimplemented operation, as the kit's Content does.
 	Store Store
+	// RepositoryLifecycle joins guarded repository creation/removal to consumer
+	// configuration cleanup. Runtime and direct router assembly supply the same binding.
+	RepositoryLifecycle artifactsapi.RepositoryLifecycle
 	// RemoteHTTP drops the connection pool of a repository that is
 	// deleted. Assign it only a pool that exists, or leave it nil: a nil
 	// *upstream.Pool stored in it is a non-nil interface, so a delete would

@@ -18,7 +18,7 @@ import (
 // Store is federation's metadata plus the instance settings and proxy catalogue
 // read by replication configuration. All methods share one unit of work.
 type Store interface {
-	port.Store
+	port.ConfigurationStore
 	Settings() settings.SettingsStore
 	Configs() configdoc.ConfigStore
 }
@@ -66,6 +66,31 @@ func (m *Module) Configurations() replication.Service {
 		s.Guard = d.Access.Projects.Guard
 	}
 	return s
+}
+
+// RepositoryLifecycle invalidates replication targets and their runs when the
+// canonical repository starts or ends a lifetime. Artifacts invokes this before
+// content-event stream locks, under its shared transaction and project guard.
+func (m *Module) RepositoryLifecycle() artifactsapi.RepositoryLifecycle {
+	return repositoryLifecycle{deps: m.deps}
+}
+
+type repositoryLifecycle struct{ deps Deps }
+
+func (l repositoryLifecycle) ResetRepository(ctx context.Context, key string) error {
+	if l.deps.Access.Projects == nil {
+		return fmt.Errorf("replication repository guard is unavailable: %w", kernel.ErrStore)
+	}
+	err := l.deps.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := l.deps.Access.Projects.Guard(ctx); err != nil {
+			return fmt.Errorf("guard replication repository lifetime: %w", err)
+		}
+		return l.deps.Store.Replications().DeleteForRepo(ctx, key)
+	})
+	if err != nil {
+		return fmt.Errorf("reset repository replications: %w", err)
+	}
+	return nil
 }
 
 type policy struct{ decider accessapi.Decider }

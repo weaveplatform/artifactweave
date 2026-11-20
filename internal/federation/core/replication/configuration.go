@@ -20,6 +20,10 @@ import (
 // advanced-replication owner instead of silently reading or replacing one row.
 var ErrMultipleTargets = errors.New("replication: multiple targets are not supported")
 
+// ErrAdvancedConfiguration retains legacy advanced options with their owner
+// instead of publishing them as an executing single-target configuration.
+var ErrAdvancedConfiguration = errors.New("replication: advanced configuration is not supported")
+
 // Policy is current configuration authority, refreshed under the project guard.
 // Any gates repository existence checks; Allows applies the current owner/class
 // privilege. Platform is required for instance-wide configuration controls.
@@ -67,7 +71,7 @@ func view(r model.Replication) View {
 // work. Repository configuration and proxy reads happen only after authority
 // checks. Guard supplies the same ordering to private worker admission.
 type Service struct {
-	Store        port.Store
+	Store        port.ConfigurationStore
 	Ownership    artifactsapi.ProjectRepositoryLookup
 	Repositories interface {
 		Get(context.Context, string) (repo.Config, error)
@@ -143,6 +147,9 @@ func (s Service) Get(ctx context.Context, key string) (View, error) {
 		r, err := s.target(ctx, key)
 		if err != nil {
 			return err
+		}
+		if r.EventReplication || r.CheckBinaryExistence {
+			return ErrAdvancedConfiguration
 		}
 		out = view(r)
 		return nil

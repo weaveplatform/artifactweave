@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nimmodel/http"
 	"github.com/weaveplatform/artifactweave/internal/configuration"
+	"github.com/weaveplatform/artifactweave/internal/federation"
 	"github.com/weaveplatform/artifactweave/internal/notifications"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
@@ -30,6 +31,7 @@ type modules struct {
 	artifacts     *artifacts.Module
 	configuration *configuration.Module
 	retention     *retention.Module
+	federation    *federation.Module
 	events        *events.Bus
 	notifications *notifications.Module
 }
@@ -42,6 +44,7 @@ type moduleStore interface {
 	configuration.Store
 	notifications.Store
 	retention.Store
+	federation.Store
 }
 
 // moduleDeps is what OpenRuntime opens before the modules and buildModules
@@ -84,9 +87,17 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 		return modules{}, fmt.Errorf("access: %w", err)
 	}
 	accessAPI := acc.API()
+	fed, err := federation.New(federation.Deps{
+		Store: d.store, Access: accessAPI, Ownership: repos.NewProjectRepositoryLookup(d.store),
+		Repositories: repos.NewRepositories(d.store, accessAPI.Keys, accessAPI.Projects),
+	})
+	if err != nil {
+		return modules{}, fmt.Errorf("federation: %w", err)
+	}
 	art, err := artifacts.New(artifacts.Deps{
 		Store: d.store, Blobs: d.blobs, Keys: d.keys, Access: accessAPI,
-		Work: d.work, GC: d.gc, Settings: cfg.Artifacts(), Log: d.log,
+		RepositoryLifecycle: fed.RepositoryLifecycle(),
+		Work:                d.work, GC: d.gc, Settings: cfg.Artifacts(), Log: d.log,
 		// The artifacts module root may not import an ecosystem's http
 		// package, where NIM's upload preparation lives; app may.
 		PrepareNIMModelUpload: nimmodelhttp.PrepareUpload,
@@ -116,7 +127,7 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	if err != nil {
 		return modules{}, fmt.Errorf("retention: %w", err)
 	}
-	return modules{access: acc, artifacts: art, configuration: conf, retention: ret, events: d.events, notifications: notify}, nil
+	return modules{access: acc, artifacts: art, configuration: conf, retention: ret, federation: fed, events: d.events, notifications: notify}, nil
 }
 
 // tokenKeyBits is the access-token RSA key size OpenRuntime uses when its

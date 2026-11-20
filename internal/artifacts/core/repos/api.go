@@ -3,6 +3,9 @@ package repos
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"slices"
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
@@ -12,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/trash"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
@@ -42,14 +46,16 @@ func NewRepositories(
 	st Store,
 	keys accessapi.Keys,
 	projects accessapi.Projects,
+	lifecycles ...artifactsapi.RepositoryLifecycle,
 ) artifactsapi.Repositories {
-	return repositories{st: st, keys: keys, projects: projects}
+	return repositories{st: st, keys: keys, projects: projects, lifecycles: slices.Clone(lifecycles)}
 }
 
 type repositories struct {
-	st       Store
-	keys     accessapi.Keys
-	projects accessapi.Projects
+	st         Store
+	keys       accessapi.Keys
+	projects   accessapi.Projects
+	lifecycles []artifactsapi.RepositoryLifecycle
 }
 
 func (r repositories) ProjectRepository(ctx context.Context, key string) (artifactsapi.ProjectRepository, error) {
@@ -79,6 +85,9 @@ func (r repositories) Create(ctx context.Context, c repo.Config) error {
 		if err := r.st.Repos().Create(ctx, c); err != nil {
 			return err //nolint:wrapcheck // preserves upstream error identity
 		}
+		if err := r.resetRepository(ctx, c.Key); err != nil {
+			return err
+		}
 		if r.projects != nil {
 			return r.projects.BindRepository(ctx, c.Key, c.ProjectKey, c.Environments, true) //nolint:wrapcheck // access owns binding context
 		}
@@ -102,6 +111,9 @@ func (r repositories) Remove(ctx context.Context, key, by string) (int64, bool, 
 	var removed int64
 	var trashed bool
 	err := r.tx(ctx, func(ctx context.Context) error {
+		if err := r.prepareRemoval(ctx, key); err != nil {
+			return err
+		}
 		var err error
 		removed, trashed, err = Remove(ctx, r.st, key, by)
 		if err == nil && r.projects != nil {
@@ -110,6 +122,34 @@ func (r repositories) Remove(ctx context.Context, key, by string) (int64, bool, 
 		return err //nolint:wrapcheck // preserves removal/binding error identity for the caller
 	})
 	return removed, trashed, err
+}
+
+func (r repositories) resetRepository(ctx context.Context, key string) error {
+	for _, lifecycle := range r.lifecycles {
+		if lifecycle != nil {
+			if err := lifecycle.ResetRepository(ctx, key); err != nil {
+				return fmt.Errorf("reset repository lifetime: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+func (r repositories) prepareRemoval(ctx context.Context, key string) error {
+	if !slices.ContainsFunc(r.lifecycles, func(lifecycle artifactsapi.RepositoryLifecycle) bool { return lifecycle != nil }) {
+		return nil
+	}
+	// Missing-key deletion keeps its existing response/effects. For an existing
+	// key, reset dependent rows before Remove can emit content events: acquiring
+	// their domain locks after the stream lock would reverse producer ordering.
+	_, err := r.ProjectRepository(ctx, key)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read repository lifetime: %w", err)
+	}
+	return r.resetRepository(ctx, key)
 }
 
 func (r repositories) tx(ctx context.Context, fn func(context.Context) error) error {
