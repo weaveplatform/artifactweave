@@ -19,6 +19,11 @@
 // The push path scope combines an exact requested root with repository-relative
 // Ant include/exclude criteria; exclusions win for both enumeration and exact
 // destination reconciliation. A path match grants no content permission.
+// Target routes append escaped file-name segments to the configured repository
+// and derive storage metadata routes under its deployment prefix. File names
+// cannot become URL references or matrix/query parameters. These helpers perform
+// no HTTP requests; the executing transfer must still enforce current authority,
+// credentials, destination policy and durable acknowledgement checkpoints.
 //
 // # References
 //
