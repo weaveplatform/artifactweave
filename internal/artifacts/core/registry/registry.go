@@ -364,8 +364,11 @@ func uploadDeploy(o Owner, hex string) item.Deploy {
 		Declared: kernel.Checksums{SHA256: hex}, By: o.By, Trusted: true,
 	}
 	if o.CheckCurrent != nil {
-		d.CheckCurrent = func(ctx context.Context, _ string, _ bool, want accessapi.Actions) error {
-			return o.checkCurrent(ctx, o.Name+"/", want)
+		d.CheckCurrent = func(ctx context.Context, _ string, _ bool, _ accessapi.Actions) error {
+			// A verified digest names the same bytes on every upload or mount.
+			// Repeating it needs Write; mutable tag replacement checks Delete
+			// separately when publishing its manifest.
+			return o.checkCurrent(ctx, o.Name+"/", accessapi.ActionWrite)
 		}
 	}
 	return d
