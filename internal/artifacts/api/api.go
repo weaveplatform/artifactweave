@@ -5,4 +5,5 @@ package api
 type API struct {
 	Repositories Repositories
 	Layouts      Layouts
+	PackageIndex PackageIndex
 }

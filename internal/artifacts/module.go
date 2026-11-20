@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
@@ -169,6 +170,7 @@ func New(d Deps) (*Module, error) {
 		api: artifactsapi.API{
 			Repositories: repos.NewRepositories(d.Store, d.Access.Keys, d.Access.Projects, d.RepositoryLifecycle),
 			Layouts:      layout.Checker{},
+			PackageIndex: pkgindex.NewReader(d.Store),
 		},
 		formats:      formats,
 		virtualCache: cache,
@@ -192,7 +194,7 @@ func New(d Deps) (*Module, error) {
 	return m, nil
 }
 
-// API returns the module's published surface: Repositories and Layouts,
+// API returns the module's published repository, layout and package-index contracts,
 // bound by New.
 func (m *Module) API() artifactsapi.API { return m.api }
 
