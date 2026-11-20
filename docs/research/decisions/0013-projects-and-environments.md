@@ -105,6 +105,32 @@ provider is unusable and the `projectKey` fields on repositories mean nothing.
 - *Flat tenancy with naming conventions only*: no quotas, no project roles, provider
   incompatible.
 
+## Storage accounting boundary (PRJ-04)
+
+The [project creation guide](https://docs.jfrog.com/projects/docs/create-a-project)
+defines quota over the total virtual size of assigned repositories and documents
+the 75% warning and deployment refusal. Accounting uses owned logical content,
+before CAS deduplication: live item rows, separately retained raw remote bodies
+and virtual-owned transformed copies. Item-backed cache is counted through its
+item; a standard share adds no receiving-project charge. Archive quotas remain P16.
+The precise treatment of these internal representations is an **[I]** local
+accounting decision, not a vendor runtime observation.
+
+Actual deltas settle for the complete metadata transaction before event/lease
+publication fences. This admits net-zero moves above a lowered quota and rolls
+back refused ownership transfers with their counters. Quota/email edits settle
+zero bytes, so warning enablement and threshold rearming do not await another
+upload. Durable warnings retain a project incarnation and occurrence identity;
+SMTP delivery cannot promise exactly once after acknowledgement loss.
+
+Refusals use the existing route envelope with HTTP 403 and the generic message
+`project storage quota exceeded`, without owner names, usage totals or an
+authentication challenge. Status and wording are **[I]** choices: primary quota
+documentation establishes refusal but does not establish that wire answer.
+The [mail-server guide](https://docs.jfrog.com/administration/docs/mail-server-configuration)
+identifies project quota notifications as a mail-server use case. PRJ-04 supplies
+its narrow configuration/delivery path; full descriptor administration remains P12.
+
 ## Constraints
 
 - Project-scoped tokens and roles are evaluated by the permission model

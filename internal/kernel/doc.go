@@ -51,6 +51,8 @@
 //   - The auth sentinels, API errors with an HTTP status: ErrBadCredentials
 //     and ErrUnauthenticated (401), and ErrForbidden, ErrAPIRestricted,
 //     ErrPasswordExpired and ErrAccountLocked (403).
+//   - ErrStorageQuota: a generic project-storage refusal in the current route's
+//     envelope, carrying no private owner/usage data or authentication challenge.
 //   - Credential references: CredentialReference, with RegistryReference
 //     for a registry token's caller, is what queued work keeps of the
 //     principal that scheduled it, and DownloadCredential is what a signed

@@ -84,13 +84,13 @@ func (p projectStore) Get(ctx context.Context, key string) (model.Project, error
 }
 
 func (p projectStore) Update(ctx context.Context, v model.Project) error {
-	return p.s.Do(ctx, func() error {
+	return p.s.projectWrite(ctx, func(ctx context.Context) error {
 		if !p.projects().Has(v.Key) {
 			return memtx.NotFound("project", v.Key)
 		}
 		p.projects().Put(v.Key, v)
 		p.rotatePolicy(v.Key)
-		return nil
+		return p.s.storageChanged(ctx, v.Key)
 	})
 }
 

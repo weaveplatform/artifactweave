@@ -82,7 +82,7 @@ func New() *Store {
 	s.Store = memtx.NewWithMiddleware(accounting.Middleware)
 	s.artifacts = artinmem.NewWithStorageWatch(s.Store, accounting)
 	s.platform = platinmem.New(s.Store, s.artifacts.LayoutWatch())
-	s.access = accinmem.New(s.Store)
+	s.access = accinmem.NewWithStorageWatch(s.Store, accounting.Policy)
 	s.notifications = ntfinmem.New(s.Store)
 	s.retention = retinmem.New(s.Store)
 	s.federation = fedinmem.New(s.Store)

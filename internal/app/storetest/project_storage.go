@@ -33,6 +33,7 @@ func RunProjectStorage(t *testing.T, newStore Factory) {
 		"raw cache and virtual copies":          projectStorageRepresentations,
 		"orphan repository reuse":               projectStorageReuse,
 		"durable warning and publication fence": projectStorageWarning,
+		"quota policy warning transitions":      projectStoragePolicy,
 	} {
 		t.Run(name, func(t *testing.T) { run(t, newStore(t)) })
 	}
@@ -267,4 +268,106 @@ func projectStorageWarning(t *testing.T, s Store) {
 	_, err = s.Items().Get(ctx, "local", false, "after-fence")
 	storekit.WantErr(t, err, kernel.ErrNotFound)
 	storageBytes(t, s, "alpha", 76)
+}
+
+func projectStoragePolicy(t *testing.T, s Store) {
+	ctx := t.Context()
+	storageProject(t, s, "alpha", 100, false)
+	storageRepo(t, s, "local", "alpha", repo.Local)
+	storageItem(t, s, "local", "base", 75)
+	warnings := func(want int64) {
+		t.Helper()
+		stats := storekit.Get[[]work.WorkStats](t)(s.WorkQueue().Stats(ctx))
+		var got int64
+		for _, row := range stats {
+			if row.Kind == project.StorageWarningKind {
+				got += row.Pending + row.Leased + row.Parked
+			}
+		}
+		if got != want {
+			t.Fatalf("durable warning occurrences = %d, want %d", got, want)
+		}
+	}
+	state := func() accmodel.ProjectStorage {
+		t.Helper()
+		got, exists, err := s.Projects().Storage(ctx, "alpha")
+		if err != nil || !exists || got.Bytes != 75 {
+			t.Fatal("policy edit changed logical bytes", got, exists, err)
+		}
+		return got
+	}
+	warnings(0)
+	p := storekit.Get[accmodel.Project](t)(s.Projects().Get(ctx, "alpha"))
+	p.QuotaEmail = true
+	storekit.Must(t, s.Projects().Update(ctx, p))
+	first := state().WarningKey
+	if first == "" {
+		t.Fatal("enabling warnings above the threshold did not create an occurrence")
+	}
+	warnings(1)
+	p.QuotaEmail = false
+	storekit.Must(t, s.Projects().Update(ctx, p))
+	if state().WarningKey != "" {
+		t.Fatal("disabling warning notifications did not rearm the transition")
+	}
+	p.QuotaEmail = true
+	err := s.Tx(ctx, func(ctx context.Context) error {
+		if err := s.Projects().Update(ctx, p); err != nil {
+			return fmt.Errorf("change rollback warning policy: %w", err)
+		}
+		return errBoom
+	})
+	storekit.WantErr(t, err, errBoom)
+	if state().WarningKey != "" {
+		t.Fatal("failed policy transaction retained its warning identity")
+	}
+	warnings(1)
+	storekit.Must(t, s.Projects().Update(ctx, p))
+	if state().WarningKey == "" || state().WarningKey == first {
+		t.Fatal("rearmed warning reused an earlier occurrence")
+	}
+	warnings(2)
+	p.StorageQuotaBytes = 200
+	storekit.Must(t, s.Projects().Update(ctx, p))
+	if state().WarningKey != "" {
+		t.Fatal("raising the limit below the warning threshold did not rearm")
+	}
+	p.StorageQuotaBytes = 100
+	storekit.Must(t, s.Projects().Update(ctx, p))
+	current := state().WarningKey
+	warnings(3)
+	p.Description = "ordinary metadata edit"
+	storekit.Must(t, s.Projects().Update(ctx, p))
+	if state().WarningKey != current {
+		t.Fatal("metadata-only edit changed the warning occurrence")
+	}
+	warnings(3)
+	err = s.Tx(ctx, func(ctx context.Context) error {
+		if err := tx.CheckPublication(ctx); err != nil {
+			return fmt.Errorf("settle quota-policy fixture: %w", err)
+		}
+		late := p
+		late.Description = "must roll back"
+		_ = s.Projects().Update(ctx, late)
+		return nil
+	})
+	storekit.WantErr(t, err, kernel.ErrConflict)
+	retained := storekit.Get[accmodel.Project](t)(s.Projects().Get(ctx, "alpha"))
+	if retained.Description != p.Description {
+		t.Fatal("dropped post-publication policy refusal retained the metadata write")
+	}
+	p.StorageQuotaBytes = 50
+	storekit.Must(t, s.Projects().Update(ctx, p))
+	storageBytes(t, s, "alpha", 75)
+	_, err = s.Items().Put(ctx, model.Item{RepoKey: "local", Name: "hard-refused", Size: 1})
+	storekit.WantErr(t, err, project.ErrStorageQuota)
+	p.SoftLimit = true
+	storekit.Must(t, s.Projects().Update(ctx, p))
+	storageItem(t, s, "local", "soft-accepted", 200)
+	storageBytes(t, s, "alpha", 275)
+	p.StorageQuotaBytes = -1
+	storekit.Must(t, s.Projects().Update(ctx, p))
+	storageItem(t, s, "local", "unlimited-accepted", 1000)
+	storageBytes(t, s, "alpha", 1275)
+	warnings(3)
 }

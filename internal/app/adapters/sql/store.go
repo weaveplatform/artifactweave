@@ -126,7 +126,7 @@ func New(db *sql.DB, d dialect.Dialect, keys *crypt.Keyring) *Store {
 	s.Store = dialect.NewWithMiddleware(db, d, keys, accounting.Middleware)
 	s.artifacts = artsql.NewWithStorageWatch(s.Store, accounting)
 	s.platform = platsql.New(s.Store, s.artifacts.LayoutWatch())
-	s.access = accsql.New(s.Store)
+	s.access = accsql.NewWithStorageWatch(s.Store, accounting.Policy)
 	s.notifications = ntfsql.New(s.Store)
 	s.retention = retsql.New(s.Store)
 	s.federation = fedsql.New(s.Store)

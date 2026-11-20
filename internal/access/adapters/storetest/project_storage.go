@@ -32,6 +32,11 @@ func RunProjectStorage(t *testing.T, newStore Factory) {
 	storekit.Must(t, ps.SetStorage(ctx, "alpha", first))
 	read("alpha", first, true)
 	read("beta", model.ProjectStorage{}, false)
+	// The persistence seam round-trips a synthetic occurrence above. Clear it
+	// before changing a policy with email disabled: application composition
+	// owns real warning rearming, covered by its quota-policy contracts.
+	first.WarningKey = ""
+	storekit.Must(t, ps.SetStorage(ctx, "alpha", first))
 	storekit.Must(t, ps.Update(ctx, model.Project{Key: "alpha", DisplayName: "lowered quota", StorageQuotaBytes: 50}))
 	read("alpha", first, true)
 	rollback := errors.New("abort accounting publication") //nolint:err113 // matched by identity

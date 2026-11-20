@@ -80,12 +80,15 @@ func (p projectStore) Update(ctx context.Context, v model.Project) error {
 		return err
 	}
 	return p.tx(ctx, func(ctx context.Context) error {
-		return p.s.ExecOne(
+		if err := p.s.ExecOne(
 			ctx,
 			"update project "+v.Key,
 			"UPDATE projects SET display_name = ?, description = ?, "+
 				"storage_quota_bytes = ?, soft_limit = ?, quota_email = ?, admin_privileges = ?, policy_revision = ? WHERE key = ?",
-			append(args[1:], port.NewProjectAuthority().Revision, v.Key)...)
+			append(args[1:], port.NewProjectAuthority().Revision, v.Key)...); err != nil {
+			return err
+		}
+		return p.s.storageChanged(ctx, v.Key)
 	})
 }
 

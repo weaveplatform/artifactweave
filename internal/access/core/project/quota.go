@@ -3,7 +3,6 @@ package project
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"math"
 
@@ -79,7 +78,7 @@ func (s Service) ChangeStorage(ctx context.Context, key string, delta int64, pub
 
 // ErrStorageQuota refuses positive logical growth beyond a hard project quota.
 // It carries no project names or usage totals that an HTTP error could disclose.
-var ErrStorageQuota = errors.New("project storage quota exceeded")
+var ErrStorageQuota = kernel.ErrStorageQuota
 
 // AdmitStorage computes a logical byte delta under the caller's transactional
 // project/accounting guard. Reaching the quota exactly is allowed. Lowering a

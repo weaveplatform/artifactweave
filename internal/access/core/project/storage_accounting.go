@@ -74,6 +74,37 @@ func (a *StorageAccounting) current(ctx context.Context) (*storageChanges, error
 	return changes, nil
 }
 
+// Policy records a project's quota/email edit without changing its
+// byte total. The final policy decides warnings for the whole transaction.
+// A refusal poisons the root even if a caller drops a joined memory error.
+func (a *StorageAccounting) Policy(ctx context.Context, key string) error {
+	err := a.policy(ctx, key)
+	if err == nil {
+		return nil
+	}
+	if bind := tx.BeforeCommit(ctx, func(context.Context) error { return err }); bind != nil {
+		return errors.Join(err, fmt.Errorf("bind quota policy refusal: %w", bind))
+	}
+	return err
+}
+
+func (a *StorageAccounting) policy(ctx context.Context, key string) error {
+	c, err := a.current(ctx)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err := c.open(); err != nil {
+		return err
+	}
+	_, err = c.entry(ctx, key)
+	if err != nil {
+		c.err = err
+	}
+	return err
+}
+
 func (c *storageChanges) open() error {
 	if c.closed || c.sealed {
 		return fmt.Errorf("storage publication is already fenced: %w", kernel.ErrConflict)

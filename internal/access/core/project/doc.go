@@ -34,6 +34,8 @@
 // together before event acknowledgment and lease fences. Lazy initialization
 // uses canonical scalar totals before mutation. The durable warning handoff
 // shares that transaction; mail delivery is a separate worker concern.
+// Quota and email-policy edits settle a zero byte delta, so enabling/disabling
+// notifications or changing the threshold does not wait for another upload.
 //
 // # References
 //
