@@ -49,6 +49,7 @@
     "internal/artifacts/ecosystem/vcs/http": "vcs",
     "internal/configuration/adapters/http": "shared",
     "internal/notifications/adapters/http": "shared",
+    "internal/retention/adapters/http": "shared",
     "test/server/access": "shared",
     "test/server/artifacts": "shared",
     "test/server/artifacts/agentpackages": "agentpackages",
@@ -80,7 +81,8 @@
     "test/server/artifacts/terraformbackend": "terraformbackend",
     "test/server/artifacts/vcs": "vcs",
     "test/server/configuration": "shared",
-    "test/server/notifications": "shared"
+    "test/server/notifications": "shared",
+    "test/server/retention": "shared"
   },
   "shared_files": {
     "internal/access/adapters/http": [
@@ -104,6 +106,7 @@
       "api_restrictions_parts_test.go",
       "bootstrap_test.go",
       "builds_status_test.go",
+      "cleanup_policies_test.go",
       "docker_list_errors_test.go",
       "error_profiles_p8_test.go",
       "fixtures_test.go",
@@ -189,6 +192,33 @@
       "virtual_read_test.go",
       "virtual_selection_test.go"
     ],
+    "internal/artifacts/adapters/http/pkgroute": [
+      "conditional_test.go",
+      "document_test.go",
+      "download_test.go",
+      "etag_test.go",
+      "external_test.go",
+      "folder_test.go",
+      "form_test.go",
+      "item_test.go",
+      "lifecycle_test.go",
+      "merged_test.go",
+      "merged_wait_test.go",
+      "path_test.go",
+      "pkgroute_test.go",
+      "publication_test.go",
+      "resolve_test.go",
+      "root_test.go",
+      "served_test.go",
+      "source_delivery_test.go",
+      "source_head_test.go",
+      "source_result_test.go",
+      "source_storage_test.go",
+      "source_test.go",
+      "storeonce_test.go",
+      "upstream_matrix_test.go",
+      "virtual_test.go"
+    ],
     "internal/configuration/adapters/http": [
       "descriptor_test.go",
       "reverseproxy_test.go",
@@ -199,6 +229,9 @@
       "criteria_test.go",
       "handlers_test.go",
       "subscriptions_test.go"
+    ],
+    "internal/retention/adapters/http": [
+      "policies_test.go"
     ],
     "test/server/access": [
       "access_identity_test.go",

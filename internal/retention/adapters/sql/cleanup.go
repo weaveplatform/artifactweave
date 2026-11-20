@@ -18,7 +18,7 @@ func (s *Store) Cleanup() port.CleanupStore { return cleanupStore{s} }
 // cleanupStore keeps cleanup_policies and cleanup_runs.
 type cleanupStore struct{ s *Store }
 
-const policyCols = "key, description, cron_exp, project_key, item_type, duration_minutes, enabled, " +
+const policyCols = "key, revision, description, cron_exp, project_key, item_type, duration_minutes, enabled, " +
 	"skip_trashcan, criteria, created_at, created_by, updated_at, updated_by"
 
 func policyArgs(p model.CleanupPolicy) ([]any, error) {
@@ -27,7 +27,7 @@ func policyArgs(p model.CleanupPolicy) ([]any, error) {
 		return nil, err
 	}
 	return []any{
-		p.Key, p.Description, p.CronExp, p.ProjectKey, p.ItemType, p.DurationMinutes, p.Enabled,
+		p.Key, p.Revision, p.Description, p.CronExp, p.ProjectKey, p.ItemType, p.DurationMinutes, p.Enabled,
 		p.SkipTrashcan, criteria, dialect.Micros(p.Created), p.CreatedBy, dialect.Micros(p.Updated),
 		p.UpdatedBy,
 	}, nil
@@ -41,6 +41,7 @@ func scanPolicy(row interface{ Scan(...any) error }) (model.CleanupPolicy, error
 	)
 	if err := row.Scan(
 		&p.Key,
+		&p.Revision,
 		&p.Description,
 		&p.CronExp,
 		&p.ProjectKey,

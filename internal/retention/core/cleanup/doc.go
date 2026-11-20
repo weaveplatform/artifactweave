@@ -1,37 +1,30 @@
-// Package cleanup will run package cleanup policies: scheduling, dry runs,
-// run reports, enablement and force-disable.
+// Package cleanup administers package cleanup policies and durable enablement.
 //
 // # Role
 //
-// retention module, core layer.
+// retention module, core layer. Policy publication and schedule positions join
+// one metadata transaction after current project administration is guarded.
 //
 // # Inputs
 //
-// None yet. Planned: cleanup policies, created disabled and enabled through
-// /enablement, whose version criteria are evaluated over the package index
-// with the package type's comparator, never by path globbing (decision 0010).
+// Package configuration, Quartz schedules, current authority and secret-free
+// repository ownership. Creation is disabled; enablement is a separate operation.
 //
 // # Outputs
 //
-// None yet. Planned: runs recorded with a trigger id, with their status and
-// their reports (decision 0010; plan P11, task 3).
+// Validated policies, project-filtered reads, schedule positions and opaque
+// generations. WithPolicy admits bounded local effects only while the exact
+// queued generation remains enabled under the publication guard. Deletion
+// retains existing run history.
 //
 // # References
 //
-//   - Target layout:
-//     docs/research/architecture-options/5-modular-monolith.md, "Full package
-//     tree", line 328.
-//   - Plan:
-//     docs/implementation/plan.md#p11-projects-webhooks-retention-replication.
-//   - Context map: the retention row, restated in the module root's doc.go;
-//     https://github.com/weaveplatform/artifactweave/issues/958 holds the
-//     map.
-//   - Decision 0010: docs/research/decisions/0010-retention-trash-and-gc.md.
-//   - Decision 0044:
-//     docs/research/decisions/0044-modular-monolith-migration.md,
-//     "Placeholders".
+//   - docs/implementation/plan.md#p11-projects-webhooks-retention-replication.
+//   - docs/research/decisions/0010-retention-trash-and-gc.md.
+//   - docs/research/decisions/0044-modular-monolith-migration.md.
 //
 // # Status
 //
-// Placeholder: implemented by P11.
+// Implemented P11 policy administration (CLN-02). Candidate evaluation,
+// execution, stop operations and reports retain their CLN-03/04 owners.
 package cleanup

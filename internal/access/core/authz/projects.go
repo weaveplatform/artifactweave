@@ -232,3 +232,17 @@ func (d *Decider) ManagesProject(key string, op accessapi.ProjectOperation) bool
 	}
 	return op == accessapi.ProjectManage || d.repoAdmins[key].ManageMembers
 }
+
+// HasProjectAdministration admits an administrative policy lookup without
+// exposing its owner first. Every returned object still needs ManagesProject.
+func (d *Decider) HasProjectAdministration() bool {
+	if d.ManagesProject("", accessapi.ProjectManage) {
+		return true
+	}
+	for key := range d.projectAdmins {
+		if d.ManagesProject(key, accessapi.ProjectManage) {
+			return true
+		}
+	}
+	return false
+}

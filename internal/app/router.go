@@ -82,6 +82,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
+	"github.com/weaveplatform/artifactweave/internal/retention"
+	retentionhttp "github.com/weaveplatform/artifactweave/internal/retention/adapters/http"
 )
 
 // RouterStore is the metadata store NewRouter hands to the handlers,
@@ -92,6 +94,7 @@ import (
 // composite SQL store is a RouterStore, as is the in-memory composite that
 // the tests build routers over.
 type RouterStore interface {
+	retention.Store
 	// The artifacts handlers, with their item kit, package routes and
 	// replays.
 	artifactshttp.Store
@@ -193,6 +196,9 @@ type RouterConfig struct {
 	// Store is set, NewRouter binds one over Store and Access with the
 	// descriptor core, as it binds Access. Without a store it stays zero.
 	Configuration configapi.API
+	// Retention owns package policy administration; a router with only Store
+	// binds the same module after Access, as runtime module assembly does.
+	Retention *retention.Module
 	// AllowBasicAuthTokens lets a password sent with Basic create tokens
 	// through POST /access/api/v1/tokens (token.allow_basic_auth); the zero
 	// value refuses it, as Artifactory 7.x does by default.
@@ -471,6 +477,17 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	if cfg.Notifications != nil {
 		subscriptions.Subscriptions = cfg.Notifications.Subscriptions()
 	}
+	if cfg.Store != nil && cfg.Retention == nil {
+		// New refuses only a nil store, excluded above.
+		if m, err := retention.New(retention.Deps{Store: cfg.Store, Access: cfg.Access, Repositories: repos.NewProjectRepositoryLookup(cfg.Store)}); err == nil {
+			cfg.Retention = m
+		}
+	}
+	cleanupOps := retentionhttp.PackagePoliciesAPI{}
+	if cfg.Retention != nil {
+		policies := cfg.Retention.Policies()
+		cleanupOps.Policies = &policies
+	}
 	logger := cfg.Logger
 	if logger == nil {
 		logger = slog.Default()
@@ -675,15 +692,16 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		}
 		artgen.HandlerWithOptions(
 			artgen.NewStrictHandlerWithOptions(artifactoryServer{
-				SecurityAPI:    accessHTTP.Security,
-				SystemAPI:      sysAPI,
-				ArtifactoryAPI: &artAPI,
-				VCSAPI:         &vcsOps,
-				NPMAPI:         &npmOps,
-				DockerAPI:      &dockerOps,
-				DebianAPI:      &debianOps,
-				CranAPI:        &cranOps,
-				RPMAPI:         &rpmOps,
+				SecurityAPI:        accessHTTP.Security,
+				SystemAPI:          sysAPI,
+				ArtifactoryAPI:     &artAPI,
+				VCSAPI:             &vcsOps,
+				NPMAPI:             &npmOps,
+				DockerAPI:          &dockerOps,
+				DebianAPI:          &debianOps,
+				CranAPI:            &cranOps,
+				RPMAPI:             &rpmOps,
+				PackagePoliciesAPI: &cleanupOps,
 			}, append(keyed.artifactory(), vcshttp.KeepRequest), strictOpts),
 			artgen.ChiServerOptions{
 				BaseURL:          "/artifactory",
@@ -1232,6 +1250,7 @@ type artifactoryServer struct {
 	*debianhttp.DebianAPI
 	*cranhttp.CranAPI
 	*rpmhttp.RPMAPI
+	*retentionhttp.PackagePoliciesAPI
 	artifactoryStubs
 }
 

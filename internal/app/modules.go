@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/events"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
+	"github.com/weaveplatform/artifactweave/internal/retention"
 )
 
 // modules are the modules app builds, which the runtime holds for serve and
@@ -28,6 +29,7 @@ type modules struct {
 	access        *access.Module
 	artifacts     *artifacts.Module
 	configuration *configuration.Module
+	retention     *retention.Module
 	events        *events.Bus
 	notifications *notifications.Module
 }
@@ -39,6 +41,7 @@ type moduleStore interface {
 	artifacts.Store
 	configuration.Store
 	notifications.Store
+	retention.Store
 }
 
 // moduleDeps is what OpenRuntime opens before the modules and buildModules
@@ -65,7 +68,7 @@ type moduleDeps struct {
 	log *slog.Logger
 }
 
-// buildModules builds the access, artifacts, configuration and notifications modules over
+// buildModules builds the access, artifacts, configuration, notifications and retention modules over
 // d with cfg's settings, in that order, each over the APIs of the ones
 // before it. The constructors do no I/O, so building them once the work
 // queue is open moves none of OpenRuntime's I/O; a constructor's refusal is
@@ -109,7 +112,11 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	if err != nil {
 		return modules{}, fmt.Errorf("notifications: %w", err)
 	}
-	return modules{access: acc, artifacts: art, configuration: conf, events: d.events, notifications: notify}, nil
+	ret, err := retention.New(retention.Deps{Store: d.store, Access: accessAPI, Repositories: repos.NewProjectRepositoryLookup(d.store)})
+	if err != nil {
+		return modules{}, fmt.Errorf("retention: %w", err)
+	}
+	return modules{access: acc, artifacts: art, configuration: conf, retention: ret, events: d.events, notifications: notify}, nil
 }
 
 // tokenKeyBits is the access-token RSA key size OpenRuntime uses when its

@@ -30,13 +30,20 @@ var implemented = routeUnion(append(
 // generatedRoutes are the generated operations with real handlers outside
 // the formats' parts.
 var generatedRoutes = map[string]bool{
-	"GET /artifactory/api/system/version":          true,
-	"GET /artifactory/api/system/license":          true,
-	"GET /artifactory/api/system/service_id":       true,
-	"GET /artifactory/api/v1/system/readiness":     true,
-	"GET /artifactory/api/v1/system/liveness":      true,
-	"POST /artifactory/api/deb/{repoKey}/snapshot": true,
-	"GET /access/api/v1/system/version":            true,
+	"GET /artifactory/api/cleanup/packages/policies":                         true,
+	"POST /artifactory/api/cleanup/packages/policies/{policyKey}":            true,
+	"GET /artifactory/api/cleanup/packages/policies/{policyKey}":             true,
+	"PUT /artifactory/api/cleanup/packages/policies/{policyKey}":             true,
+	"DELETE /artifactory/api/cleanup/packages/policies/{policyKey}":          true,
+	"POST /artifactory/api/cleanup/packages/policies/{policyKey}/enablement": true,
+	"PUT /artifactory/api/cleanup/policies/forceDisableAll":                  true,
+	"GET /artifactory/api/system/version":                                    true,
+	"GET /artifactory/api/system/license":                                    true,
+	"GET /artifactory/api/system/service_id":                                 true,
+	"GET /artifactory/api/v1/system/readiness":                               true,
+	"GET /artifactory/api/v1/system/liveness":                                true,
+	"POST /artifactory/api/deb/{repoKey}/snapshot":                           true,
+	"GET /access/api/v1/system/version":                                      true,
 
 	// Subscription administration (WEB-02); delivery tests and troubleshooting
 	// retain the generated501 implementations owned by P19a.

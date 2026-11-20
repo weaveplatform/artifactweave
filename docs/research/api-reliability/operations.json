@@ -1169,17 +1169,22 @@
     "route": "DELETE /artifactory/api/cleanup/packages/policies/{policyKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "deletePackageCleanupPolicy",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation. Requires a platform admin, or a project admin when the policy belongs to their project.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:policyKey",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:policyKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -5033,32 +5038,37 @@
     "route": "GET /artifactory/api/cleanup/packages/policies",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getAllPackageCleanupPolicies",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Returns every package cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project. Package policies are evaluated by the in-process scheduler over the package index.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: administrator-defined policy configuration, read whole within the explicitly authorized global or project scope; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /artifactory/api/cleanup/packages/policies/{policyKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getPackageCleanupPolicy",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Returns one package cleanup policy. Requires a platform admin, or a project admin when the policy belongs to their project.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.searchCriteria.excludedPackageVersions[]",
@@ -5071,10 +5081,15 @@
       "200 application/json.searchCriteria.packageTypes[]",
       "200 application/json.searchCriteria.repos[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -15888,12 +15903,12 @@
     "route": "POST /artifactory/api/cleanup/packages/policies/{policyKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "createPackageCleanupPolicy",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation. Requires a platform admin, or a project admin when the policy belongs to their project.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:policyKey",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on path:policyKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "response_collections": [
       "201 application/json.searchCriteria.excludedPackageVersions[]",
@@ -15906,27 +15921,37 @@
       "201 application/json.searchCriteria.packageTypes[]",
       "201 application/json.searchCriteria.repos[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /artifactory/api/cleanup/packages/policies/{policyKey}/enablement",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "enableDisablePackageCleanupPolicy",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:policyKey",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on path:policyKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -21440,12 +21465,12 @@
     "route": "PUT /artifactory/api/cleanup/packages/policies/{policyKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "updatePackageCleanupPolicy",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:policyKey",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:policyKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "response_collections": [
       "200 application/json.searchCriteria.excludedPackageVersions[]",
@@ -21458,10 +21483,15 @@
       "200 application/json.searchCriteria.packageTypes[]",
       "200 application/json.searchCriteria.repos[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -21485,17 +21515,22 @@
     "route": "PUT /artifactory/api/cleanup/policies/forceDisableAll",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "disableAllCleanupPolicies",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Emergency switch: disables every cleanup policy of every item type at the global level, or only those of projectKey. Runs already in progress continue; stop them with the stop-all operation. Requires a platform admin, or a project admin for their own project.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on route",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on route: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

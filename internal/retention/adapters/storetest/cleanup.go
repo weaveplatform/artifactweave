@@ -21,6 +21,7 @@ func runCleanup(t *testing.T, newStore Factory) {
 func cleanupPolicy(key string, item model.CleanupItemType, project string) model.CleanupPolicy {
 	return model.CleanupPolicy{
 		Key:             key,
+		Revision:        "original-" + key,
 		Description:     "policy " + key,
 		CronExp:         "0 0 2 * * ?",
 		ProjectKey:      project,
@@ -92,6 +93,7 @@ func testCleanupPolicies(t *testing.T, s port.Store) {
 	)
 
 	k1.Enabled, k1.Criteria, k1.Updated = false, model.CleanupCriteria{}, storekit.At(9)
+	k1.Revision = "disabled-generation"
 	storekit.Must(t, cs.UpdatePolicy(ctx, k1))
 	storekit.Same(t, "after Update", k1, storekit.Get[model.CleanupPolicy](t)(cs.Policy(ctx, "k1")))
 	storekit.WantErr(

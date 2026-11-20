@@ -27,6 +27,8 @@ type CleanupCriteria struct {
 	ExcludedPackages             []string            `json:"excluded_packages,omitempty"`
 	IncludeAllProjects           bool                `json:"include_all_projects,omitempty"`
 	IncludedProjects             []string            `json:"included_projects,omitempty"`
+	IncludeAllStages             *bool               `json:"include_all_stages,omitempty"`
+	IncludedStages               []string            `json:"included_stages,omitempty"`
 	CreatedBeforeInDays          int                 `json:"created_before_in_days,omitempty"`
 	CreatedBeforeInMonths        int                 `json:"created_before_in_months,omitempty"`
 	LastDownloadedBeforeInDays   int                 `json:"last_downloaded_before_in_days,omitempty"`
@@ -40,7 +42,10 @@ type CleanupCriteria struct {
 
 // CleanupPolicy is a scheduled retention rule (decision 0010).
 type CleanupPolicy struct {
-	Key             string
+	Key string
+	// Revision fences queued work across edits, disablement and recreation.
+	// It is private state, not a field of the vendor policy representation.
+	Revision        string
 	Description     string
 	CronExp         string
 	ProjectKey      string
