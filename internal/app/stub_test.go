@@ -30,13 +30,13 @@ var implemented = routeUnion(append(
 // generatedRoutes are the generated operations with real handlers outside
 // the formats' parts.
 var generatedRoutes = map[string]bool{
-	"GET /artifactory/api/cleanup/packages/policies":                         true,
-	"POST /artifactory/api/cleanup/packages/policies/{policyKey}":            true,
-	"GET /artifactory/api/cleanup/packages/policies/{policyKey}":             true,
-	"PUT /artifactory/api/cleanup/packages/policies/{policyKey}":             true,
-	"DELETE /artifactory/api/cleanup/packages/policies/{policyKey}":          true,
-	"POST /artifactory/api/cleanup/packages/policies/{policyKey}/enablement": true,
-	"PUT /artifactory/api/cleanup/policies/forceDisableAll":                  true,
+	"GET /artifactory/api/cleanup/packages/policies":                                    true,
+	"POST /artifactory/api/cleanup/packages/policies/{policyKey}":                       true,
+	"GET /artifactory/api/cleanup/packages/policies/{policyKey}":                        true,
+	"PUT /artifactory/api/cleanup/packages/policies/{policyKey}":                        true,
+	"DELETE /artifactory/api/cleanup/packages/policies/{policyKey}":                     true,
+	"POST /artifactory/api/cleanup/packages/policies/{policyKey}/enablement":            true,
+	"PUT /artifactory/api/cleanup/policies/forceDisableAll":                             true,
 	"GET /access/api/v1/projects/_/repositories/{repoName}":                             true,
 	"PUT /access/api/v1/projects/_/attach/repositories/{repoName}/{targetProjectKey}":   true,
 	"DELETE /access/api/v1/projects/_/attach/repositories/{repoName}":                   true,
