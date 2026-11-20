@@ -10954,7 +10954,7 @@ type ClientInterface interface {
 
 	// DeleteRepository Delete a repository
 	//
-	// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
+	// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Requires platform administration or the current delete privilege for the repository class from its owning project. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
 	//
 	// Corresponds with DELETE /api/repositories/{repoKey} (the `DeleteRepository` operationId).
 	DeleteRepository(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10968,7 +10968,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10977,7 +10977,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfiguration Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10986,7 +10986,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 	//
@@ -10995,7 +10995,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 	//
@@ -11004,7 +11004,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 	//
@@ -11013,7 +11013,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 	//
@@ -11022,7 +11022,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11031,7 +11031,7 @@ type ClientInterface interface {
 
 	// CreateRepository Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11040,7 +11040,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 	//
@@ -11049,7 +11049,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 	//
@@ -11058,7 +11058,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 	//
@@ -11067,7 +11067,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 	//
@@ -12521,7 +12521,7 @@ type ClientInterface interface {
 
 	// DeleteRepositoriesWithBody Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Every key must pass current platform or owning project class-specific delete authorization before the first deletion. Each independent deletion rechecks that authority.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -12530,7 +12530,7 @@ type ClientInterface interface {
 
 	// DeleteRepositories Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Every key must pass current platform or owning project class-specific delete authorization before the first deletion. Each independent deletion rechecks that authority.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -12546,7 +12546,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositoriesWithBody Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -12555,7 +12555,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositories Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -12564,7 +12564,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 	//
@@ -12573,7 +12573,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 	//
@@ -12582,7 +12582,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 	//
@@ -12591,7 +12591,7 @@ type ClientInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 	//
@@ -12600,7 +12600,7 @@ type ClientInterface interface {
 
 	// CreateMultipleRepositoriesWithBody Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -12609,7 +12609,7 @@ type ClientInterface interface {
 
 	// CreateMultipleRepositories Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -12618,7 +12618,7 @@ type ClientInterface interface {
 
 	// CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 	//
@@ -12627,7 +12627,7 @@ type ClientInterface interface {
 
 	// CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 	//
@@ -12636,7 +12636,7 @@ type ClientInterface interface {
 
 	// CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 	//
@@ -12645,7 +12645,7 @@ type ClientInterface interface {
 
 	// CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 	//
@@ -16288,7 +16288,7 @@ func (c *Client) GetRemoteRepositoryConfiguration(ctx context.Context, remoteRep
 
 // DeleteRepository Delete a repository
 //
-// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
+// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Requires platform administration or the current delete privilege for the repository class from its owning project. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
 //
 // Corresponds with DELETE /api/repositories/{repoKey} (the `DeleteRepository` operationId).
 func (c *Client) DeleteRepository(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16322,7 +16322,7 @@ func (c *Client) GetRepositoryConfiguration(ctx context.Context, repoKey RepoKey
 
 // UpdateRepositoryConfigurationWithBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16341,7 +16341,7 @@ func (c *Client) UpdateRepositoryConfigurationWithBody(ctx context.Context, repo
 
 // UpdateRepositoryConfiguration Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16360,7 +16360,7 @@ func (c *Client) UpdateRepositoryConfiguration(ctx context.Context, repoKey Repo
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 //
@@ -16379,7 +16379,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 //
@@ -16398,7 +16398,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 //
@@ -16417,7 +16417,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 //
@@ -16436,7 +16436,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16455,7 +16455,7 @@ func (c *Client) CreateRepositoryWithBody(ctx context.Context, repoKey RepoKey, 
 
 // CreateRepository Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16474,7 +16474,7 @@ func (c *Client) CreateRepository(ctx context.Context, repoKey RepoKey, body Cre
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 //
@@ -16493,7 +16493,7 @@ func (c *Client) CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositori
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 //
@@ -16512,7 +16512,7 @@ func (c *Client) CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositori
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 //
@@ -16531,7 +16531,7 @@ func (c *Client) CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositori
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 //
@@ -19754,7 +19754,7 @@ func (c *Client) GetFederatedRepositoryStatusV2(ctx context.Context, repoKey str
 
 // DeleteRepositoriesWithBody Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Every key must pass current platform or owning project class-specific delete authorization before the first deletion. Each independent deletion rechecks that authority.
 //
 // Takes any type of body and a specified content type.
 //
@@ -19773,7 +19773,7 @@ func (c *Client) DeleteRepositoriesWithBody(ctx context.Context, contentType str
 
 // DeleteRepositories Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Every key must pass current platform or owning project class-specific delete authorization before the first deletion. Each independent deletion rechecks that authority.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -19809,7 +19809,7 @@ func (c *Client) GetBatchOfRepositoriesByName(ctx context.Context, params *GetBa
 
 // UpdateMultipleRepositoriesWithBody Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes any type of body and a specified content type.
 //
@@ -19828,7 +19828,7 @@ func (c *Client) UpdateMultipleRepositoriesWithBody(ctx context.Context, content
 
 // UpdateMultipleRepositories Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -19847,7 +19847,7 @@ func (c *Client) UpdateMultipleRepositories(ctx context.Context, body UpdateMult
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 //
@@ -19866,7 +19866,7 @@ func (c *Client) UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 //
@@ -19885,7 +19885,7 @@ func (c *Client) UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 //
@@ -19904,7 +19904,7 @@ func (c *Client) UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 //
@@ -19923,7 +19923,7 @@ func (c *Client) UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // CreateMultipleRepositoriesWithBody Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes any type of body and a specified content type.
 //
@@ -19942,7 +19942,7 @@ func (c *Client) CreateMultipleRepositoriesWithBody(ctx context.Context, content
 
 // CreateMultipleRepositories Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -19961,7 +19961,7 @@ func (c *Client) CreateMultipleRepositories(ctx context.Context, body CreateMult
 
 // CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 //
@@ -19980,7 +19980,7 @@ func (c *Client) CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 //
@@ -19999,7 +19999,7 @@ func (c *Client) CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 //
@@ -20018,7 +20018,7 @@ func (c *Client) CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactory
 
 // CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 //
@@ -38549,7 +38549,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteRepositoryWithResponse Delete a repository
 	//
-	// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
+	// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Requires platform administration or the current delete privilege for the repository class from its owning project. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38567,7 +38567,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38576,7 +38576,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38585,7 +38585,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38594,7 +38594,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38603,7 +38603,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38612,7 +38612,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38621,7 +38621,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38630,7 +38630,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38639,7 +38639,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38648,7 +38648,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38657,7 +38657,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38666,7 +38666,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40328,7 +40328,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteRepositoriesWithBodyWithResponse Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Every key must pass current platform or owning project class-specific delete authorization before the first deletion. Each independent deletion rechecks that authority.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40337,7 +40337,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteRepositoriesWithResponse Delete several repositories
 	//
-	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
+	// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Every key must pass current platform or owning project class-specific delete authorization before the first deletion. Each independent deletion rechecks that authority.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40355,7 +40355,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithBodyWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40364,7 +40364,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40373,7 +40373,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40382,7 +40382,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40391,7 +40391,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40400,7 +40400,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 	//
-	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+	// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40409,7 +40409,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateMultipleRepositoriesWithBodyWithResponse Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40418,7 +40418,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateMultipleRepositoriesWithResponse Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40427,7 +40427,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40436,7 +40436,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40445,7 +40445,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -40454,7 +40454,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Create several repositories
 	//
-	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+	// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -76712,7 +76712,7 @@ func (c *ClientWithResponses) GetRemoteRepositoryConfigurationWithResponse(ctx c
 
 // DeleteRepositoryWithResponse Delete a repository
 //
-// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
+// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Requires platform administration or the current delete privilege for the repository class from its owning project. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -76742,7 +76742,7 @@ func (c *ClientWithResponses) GetRepositoryConfigurationWithResponse(ctx context
 
 // UpdateRepositoryConfigurationWithBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76757,7 +76757,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithBodyWithResponse(
 
 // UpdateRepositoryConfigurationWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76772,7 +76772,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithResponse(ctx cont
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76787,7 +76787,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76802,7 +76802,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76817,7 +76817,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76832,7 +76832,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // CreateRepositoryWithBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76847,7 +76847,7 @@ func (c *ClientWithResponses) CreateRepositoryWithBodyWithResponse(ctx context.C
 
 // CreateRepositoryWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76862,7 +76862,7 @@ func (c *ClientWithResponses) CreateRepositoryWithResponse(ctx context.Context, 
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76877,7 +76877,7 @@ func (c *ClientWithResponses) CreateRepositoryWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76892,7 +76892,7 @@ func (c *ClientWithResponses) CreateRepositoryWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76907,7 +76907,7 @@ func (c *ClientWithResponses) CreateRepositoryWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79643,7 +79643,7 @@ func (c *ClientWithResponses) GetFederatedRepositoryStatusV2WithResponse(ctx con
 
 // DeleteRepositoriesWithBodyWithResponse Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Every key must pass current platform or owning project class-specific delete authorization before the first deletion. Each independent deletion rechecks that authority.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79658,7 +79658,7 @@ func (c *ClientWithResponses) DeleteRepositoriesWithBodyWithResponse(ctx context
 
 // DeleteRepositoriesWithResponse Delete several repositories
 //
-// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.
+// Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Every key must pass current platform or owning project class-specific delete authorization before the first deletion. Each independent deletion rechecks that authority.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79688,7 +79688,7 @@ func (c *ClientWithResponses) GetBatchOfRepositoriesByNameWithResponse(ctx conte
 
 // UpdateMultipleRepositoriesWithBodyWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79703,7 +79703,7 @@ func (c *ClientWithResponses) UpdateMultipleRepositoriesWithBodyWithResponse(ctx
 
 // UpdateMultipleRepositoriesWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79718,7 +79718,7 @@ func (c *ClientWithResponses) UpdateMultipleRepositoriesWithResponse(ctx context
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79733,7 +79733,7 @@ func (c *ClientWithResponses) UpdateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79748,7 +79748,7 @@ func (c *ClientWithResponses) UpdateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79763,7 +79763,7 @@ func (c *ClientWithResponses) UpdateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // UpdateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update several repository configurations
 //
-// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.
+// Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79778,7 +79778,7 @@ func (c *ClientWithResponses) UpdateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // CreateMultipleRepositoriesWithBodyWithResponse Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79793,7 +79793,7 @@ func (c *ClientWithResponses) CreateMultipleRepositoriesWithBodyWithResponse(ctx
 
 // CreateMultipleRepositoriesWithResponse Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79808,7 +79808,7 @@ func (c *ClientWithResponses) CreateMultipleRepositoriesWithResponse(ctx context
 
 // CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79823,7 +79823,7 @@ func (c *ClientWithResponses) CreateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79838,7 +79838,7 @@ func (c *ClientWithResponses) CreateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -79853,7 +79853,7 @@ func (c *ClientWithResponses) CreateMultipleRepositoriesWithApplicationVndOrgJfr
 
 // CreateMultipleRepositoriesWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Create several repositories
 //
-// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.
+// Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
