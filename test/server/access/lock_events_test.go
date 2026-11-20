@@ -8,7 +8,6 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
-	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
@@ -30,7 +29,7 @@ func TestAccAccountLockProducerPreservesAuthenticationRefusals(t *testing.T) {
 			if err := rt.Store.Users().Create(ctx, accesstest.User{Name: "event-user", PasswordHash: support.CheapHash}); err != nil {
 				t.Fatal(err)
 			}
-			if err := rt.Store.Settings().Put(ctx, settings.SettingUserLockPolicy, model.UserLockPolicy{Enabled: true, LoginAttempts: 2}); err != nil {
+			if err := rt.Store.Settings().Put(ctx, settings.SettingUserLockPolicy, accesstest.UserLockPolicy{Enabled: true, LoginAttempts: 2}); err != nil {
 				t.Fatal(err)
 			}
 			rt.Auth.ForgetPolicies()
