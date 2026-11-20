@@ -18,7 +18,7 @@ import (
 // disappear from the status API.
 func (s Service) RepositoryStatus(ctx context.Context, key string) (model.RepositoryAssignment, error) {
 	var out model.RepositoryAssignment
-	err := s.repositoryTransaction(ctx, key, func(_ context.Context, _ repo.Config, a model.RepositoryAssignment) error {
+	err := s.repositoryTransaction(ctx, key, false, func(_ context.Context, _ repo.Config, a model.RepositoryAssignment) error {
 		out = a
 		return nil
 	})
@@ -32,7 +32,7 @@ func (s Service) RepositoryStatus(ctx context.Context, key string) (model.Reposi
 // canonical environments and assignment publication share the same transaction;
 // a validation or persistence failure leaves both representations unchanged.
 func (s Service) AttachRepository(ctx context.Context, key, projectKey string, force bool) error {
-	return s.repositoryTransaction(ctx, key, func(ctx context.Context, c repo.Config, a model.RepositoryAssignment) error {
+	return s.repositoryTransaction(ctx, key, true, func(ctx context.Context, c repo.Config, a model.RepositoryAssignment) error {
 		if err := s.requireProject(ctx, projectKey); err != nil {
 			return err
 		}
@@ -51,7 +51,7 @@ func (s Service) AttachRepository(ctx context.Context, key, projectKey string, f
 // repository environment validator clears its project environment selection;
 // its content, key and unrelated configuration remain unchanged.
 func (s Service) DetachRepository(ctx context.Context, key string) error {
-	return s.repositoryTransaction(ctx, key, func(ctx context.Context, c repo.Config, a model.RepositoryAssignment) error {
+	return s.repositoryTransaction(ctx, key, true, func(ctx context.Context, c repo.Config, a model.RepositoryAssignment) error {
 		c.ProjectKey = ""
 		if err := s.Repositories.CheckEnvironments(ctx, &c); err != nil {
 			return fmt.Errorf("project: validate detached repository: %w", err)
@@ -64,7 +64,7 @@ func (s Service) DetachRepository(ctx context.Context, key string) error {
 // owner. Sharing has one repository-wide permission ceiling, as represented by
 // the status API; readOnly never selects a producer-side sharing mode.
 func (s Service) ShareRepository(ctx context.Context, key, target string, all, readOnly bool) error {
-	return s.repositoryTransaction(ctx, key, func(ctx context.Context, c repo.Config, a model.RepositoryAssignment) error {
+	return s.repositoryTransaction(ctx, key, false, func(ctx context.Context, c repo.Config, a model.RepositoryAssignment) error {
 		if c.Class != repo.Local && c.Class != repo.Remote {
 			return fmt.Errorf("only local and remote repositories can be shared: %w", ErrInvalid)
 		}
@@ -87,7 +87,7 @@ func (s Service) ShareRepository(ctx context.Context, key, target string, all, r
 // all-project share keeps explicit targets, and removing an explicit target
 // keeps the all-project share. Neither operation changes canonical ownership.
 func (s Service) UnshareRepository(ctx context.Context, key, target string, all bool) error {
-	return s.repositoryTransaction(ctx, key, func(ctx context.Context, _ repo.Config, a model.RepositoryAssignment) error {
+	return s.repositoryTransaction(ctx, key, false, func(ctx context.Context, _ repo.Config, a model.RepositoryAssignment) error {
 		if all {
 			a.SharedWithAll = false
 		} else {
@@ -109,7 +109,7 @@ func (s Service) publishRepositoryShares(ctx context.Context, a model.Repository
 }
 
 func (s Service) repositoryTransaction(
-	ctx context.Context, key string,
+	ctx context.Context, key string, configuration bool,
 	fn func(context.Context, repo.Config, model.RepositoryAssignment) error,
 ) error {
 	if s.Repositories == nil {
@@ -119,12 +119,20 @@ func (s Service) repositoryTransaction(
 		if err := s.Guard(ctx); err != nil {
 			return err
 		}
-		c, err := s.Repositories.Get(ctx, key)
+		var c repo.Config
+		metadata, err := s.Repositories.ProjectRepository(ctx, key)
 		if errors.Is(err, kernel.ErrNotFound) {
 			return fmt.Errorf("repository %q: %w", key, ErrNotFound)
 		}
 		if err != nil {
 			return fmt.Errorf("project: read repository %q: %w", key, err)
+		}
+		c.Key, c.Class, c.ProjectKey, c.Environments = metadata.Key, metadata.Class, metadata.ProjectKey, metadata.Environments
+		if configuration {
+			c, err = s.Repositories.Get(ctx, key)
+			if err != nil {
+				return fmt.Errorf("project: read repository binding %q: %w", key, err)
+			}
 		}
 		a, err := s.Store.Projects().Assignment(ctx, c.Key)
 		if err != nil && !errors.Is(err, kernel.ErrNotFound) {

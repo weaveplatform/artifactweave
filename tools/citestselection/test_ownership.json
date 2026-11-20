@@ -92,6 +92,7 @@
       "keypairs_internal_test.go",
       "permissions_fault_test.go",
       "project_access_test.go",
+      "project_repositories_test.go",
       "project_wire_test.go",
       "roles_internal_test.go",
       "tokens_internal_test.go"
@@ -251,6 +252,7 @@
       "project_publication_sql_test.go",
       "project_publication_test.go",
       "project_repositories_test.go",
+      "project_repository_bindings_test.go",
       "project_tokens_test.go",
       "projects_status_test.go",
       "projects_test.go",

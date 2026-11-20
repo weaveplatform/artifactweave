@@ -53,6 +53,10 @@ type repositories struct {
 	projects accessapi.Projects
 }
 
+func (r repositories) ProjectRepository(ctx context.Context, key string) (artifactsapi.ProjectRepository, error) {
+	return r.st.Repos().ProjectRepository(ctx, key) //nolint:wrapcheck // preserves upstream error identity
+}
+
 func (r repositories) Get(ctx context.Context, key string) (repo.Config, error) {
 	//nolint:wrapcheck // preserves upstream error identity
 	return r.st.Repos().Get(ctx, key)
@@ -70,13 +74,28 @@ func (r repositories) UsingKeypair(ctx context.Context, name string) ([]string, 
 
 func (r repositories) Create(ctx context.Context, c repo.Config) error {
 	return r.tx(ctx, func(ctx context.Context) error {
-		return r.st.Repos().Create(ctx, c) //nolint:wrapcheck // preserves upstream error identity
+		if err := CheckProjectPrefix(c); err != nil {
+			return err
+		}
+		if err := r.st.Repos().Create(ctx, c); err != nil {
+			return err //nolint:wrapcheck // preserves upstream error identity
+		}
+		if r.projects != nil {
+			return r.projects.BindRepository(ctx, c.Key, c.ProjectKey, c.Environments, true) //nolint:wrapcheck // access owns binding context
+		}
+		return nil
 	})
 }
 
 func (r repositories) Update(ctx context.Context, c repo.Config) error {
 	return r.tx(ctx, func(ctx context.Context) error {
-		return r.st.Repos().Update(ctx, c) //nolint:wrapcheck // preserves upstream error identity
+		if err := r.st.Repos().Update(ctx, c); err != nil {
+			return err //nolint:wrapcheck // preserves upstream error identity
+		}
+		if r.projects != nil {
+			return r.projects.BindRepository(ctx, c.Key, c.ProjectKey, c.Environments, false) //nolint:wrapcheck // access owns binding context
+		}
+		return nil
 	})
 }
 
@@ -86,7 +105,10 @@ func (r repositories) Remove(ctx context.Context, key, by string) (int64, bool, 
 	err := r.tx(ctx, func(ctx context.Context) error {
 		var err error
 		removed, trashed, err = Remove(ctx, r.st, key, by)
-		return err
+		if err == nil && r.projects != nil {
+			err = r.projects.RemoveRepository(ctx, key)
+		}
+		return err //nolint:wrapcheck // preserves removal/binding error identity for the caller
 	})
 	return removed, trashed, err
 }

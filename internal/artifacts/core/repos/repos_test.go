@@ -956,7 +956,7 @@ func TestUnitCheckEnvironments(t *testing.T) {
 	ctx := context.Background()
 	projects := &accessapitest.Projects{
 		Global: []string{"QA"},
-		Projects: map[string]accessapitest.Project{"proj": {Environments: []string{
+		Projects: map[string]accessapitest.Project{"ghost": {}, "proj": {Environments: []string{
 			"stage",       // stored without the prefix
 			"proj-canary", // stored with it
 		}}},
@@ -995,7 +995,8 @@ func TestUnitCheckEnvironments(t *testing.T) {
 		}
 	}
 	for name, c := range map[string]repo.Config{
-		"unknown": {Key: "r", ProjectKey: "proj", Environments: []string{"DEV", "nope"}},
+		"missing project": {Key: "r", ProjectKey: "missing", Environments: []string{"PROD"}},
+		"unknown":         {Key: "r", ProjectKey: "proj", Environments: []string{"DEV", "nope"}},
 		"a project environment without its prefix": {
 			Key: "r", ProjectKey: "proj", Environments: []string{"stage"},
 		},

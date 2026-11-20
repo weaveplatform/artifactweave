@@ -2324,6 +2324,12 @@ type AttachRepositoryToProjectParams struct {
 	Force *bool `form:"force,omitempty" json:"force,omitempty"`
 }
 
+// ShareRepositoryWithAllProjectsParams defines parameters for ShareRepositoryWithAllProjects.
+type ShareRepositoryWithAllProjectsParams struct {
+	// ReadOnly Optional query parameter supported by the JFrog Project provider. When true, the repository-wide sharing permission ceiling permits reads only. Defaults to false.
+	ReadOnly *bool `form:"readOnly,omitempty" json:"readOnly,omitempty"`
+}
+
 // ShareRepositoryWithTargetProjectParams defines parameters for ShareRepositoryWithTargetProject.
 type ShareRepositoryWithTargetProjectParams struct {
 	// ReadOnly Optional query parameter. When true the target project's members get read access only, whatever their roles. Defaults to false.
@@ -3639,7 +3645,7 @@ type ClientInterface interface {
 	// Lets members of every project use the local or remote repository according to their roles in their own project. The owning project is unchanged. Requires a platform admin.
 	//
 	// Corresponds with PUT /api/v1/projects/_/share/repositories/{repoName} (the `ShareRepositoryWithAllProjects` operationId).
-	ShareRepositoryWithAllProjects(ctx context.Context, repoName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ShareRepositoryWithAllProjects(ctx context.Context, repoName string, params *ShareRepositoryWithAllProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UnshareRepositoryWithTargetProject Stop sharing a repository with one project
 	//
@@ -6162,8 +6168,8 @@ func (c *Client) UnshareRepositoryWithAllProjects(ctx context.Context, repoName 
 // Lets members of every project use the local or remote repository according to their roles in their own project. The owning project is unchanged. Requires a platform admin.
 //
 // Corresponds with PUT /api/v1/projects/_/share/repositories/{repoName} (the `ShareRepositoryWithAllProjects` operationId).
-func (c *Client) ShareRepositoryWithAllProjects(ctx context.Context, repoName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewShareRepositoryWithAllProjectsRequest(c.Server, repoName)
+func (c *Client) ShareRepositoryWithAllProjects(ctx context.Context, repoName string, params *ShareRepositoryWithAllProjectsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShareRepositoryWithAllProjectsRequest(c.Server, repoName, params)
 	if err != nil {
 		return nil, err
 	}
@@ -10737,7 +10743,7 @@ func NewUnshareRepositoryWithAllProjectsRequest(server string, repoName string) 
 }
 
 // NewShareRepositoryWithAllProjectsRequest constructs an http.Request for the ShareRepositoryWithAllProjects method
-func NewShareRepositoryWithAllProjectsRequest(server string, repoName string) (*http.Request, error) {
+func NewShareRepositoryWithAllProjectsRequest(server string, repoName string, params *ShareRepositoryWithAllProjectsParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -10760,6 +10766,33 @@ func NewShareRepositoryWithAllProjectsRequest(server string, repoName string) (*
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.ReadOnly != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "readOnly", *params.ReadOnly, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
@@ -15825,7 +15858,7 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/v1/projects/_/share/repositories/{repoName} (the `ShareRepositoryWithAllProjects` operationId).
-	ShareRepositoryWithAllProjectsWithResponse(ctx context.Context, repoName string, reqEditors ...RequestEditorFn) (*ShareRepositoryWithAllProjectsResponse, error)
+	ShareRepositoryWithAllProjectsWithResponse(ctx context.Context, repoName string, params *ShareRepositoryWithAllProjectsParams, reqEditors ...RequestEditorFn) (*ShareRepositoryWithAllProjectsResponse, error)
 
 	// UnshareRepositoryWithTargetProjectWithResponse Stop sharing a repository with one project
 	//
@@ -32518,8 +32551,8 @@ func (c *ClientWithResponses) UnshareRepositoryWithAllProjectsWithResponse(ctx c
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /api/v1/projects/_/share/repositories/{repoName} (the `ShareRepositoryWithAllProjects` operationId).
-func (c *ClientWithResponses) ShareRepositoryWithAllProjectsWithResponse(ctx context.Context, repoName string, reqEditors ...RequestEditorFn) (*ShareRepositoryWithAllProjectsResponse, error) {
-	rsp, err := c.ShareRepositoryWithAllProjects(ctx, repoName, reqEditors...)
+func (c *ClientWithResponses) ShareRepositoryWithAllProjectsWithResponse(ctx context.Context, repoName string, params *ShareRepositoryWithAllProjectsParams, reqEditors ...RequestEditorFn) (*ShareRepositoryWithAllProjectsResponse, error) {
+	rsp, err := c.ShareRepositoryWithAllProjects(ctx, repoName, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

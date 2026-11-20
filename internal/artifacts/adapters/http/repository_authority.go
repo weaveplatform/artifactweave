@@ -7,6 +7,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 )
@@ -73,6 +74,11 @@ func createdRepositoryPermissions(ctx context.Context, configs []repo.Config) er
 	for _, c := range configs {
 		if err := repositoryPermission(ctx, c, accessapi.RepositoryCreate); err != nil {
 			return err
+		}
+	}
+	for _, c := range configs {
+		if err := repos.CheckProjectPrefix(c); err != nil {
+			return fmt.Errorf("repository project prefix: %w", err)
 		}
 	}
 	return nil

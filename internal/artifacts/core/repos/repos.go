@@ -67,6 +67,15 @@ func PrepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error) {
 	return c, nil
 }
 
+// CheckProjectPrefix validates newly created project resources. Existing
+// arbitrary keys may be attached or reassigned without renaming them.
+func CheckProjectPrefix(c repo.Config) error {
+	if c.ProjectKey != "" && !strings.HasPrefix(c.Key, c.ProjectKey+"-") {
+		return badRequestf("A repository created in project '%s' must use the '%s-' key prefix", c.ProjectKey, c.ProjectKey)
+	}
+	return nil
+}
+
 // moveURLCredentials moves a user name and password written into a remote's
 // URL into its username and password, as 7.161.26's
 // RemoteRepoConfig.processUrlCredentials does on every create and update
@@ -342,14 +351,19 @@ func OwesReindex(stored, updated repo.Config) bool {
 //
 // In a project it reads the global and the project's environment names
 // through projects, with ctx, so inside a store transaction the reads take
-// part in it; a project that does not exist has only the built-in and
-// global environments. An unknown name answers 400 "Environment '<name>'
+// part in it; an unknown project is refused before it can acquire a binding.
+// An unknown name answers 400 "Environment '<name>'
 // does not exist"; an error reading the names is wrapped as "repos: global
 // environments: %w" or "repos: environments of project <key>: %w".
 func CheckEnvironments(ctx context.Context, projects accessapi.Projects, c *repo.Config) error {
 	if c.ProjectKey == "" {
 		c.Environments = nil
 		return nil
+	}
+	if err := projects.Exists(ctx, c.ProjectKey); errors.Is(err, kernel.ErrNotFound) {
+		return badRequestf("Project '%s' does not exist", c.ProjectKey)
+	} else if err != nil {
+		return fmt.Errorf("repos: project %s: %w", c.ProjectKey, err)
 	}
 	if len(c.Environments) == 0 {
 		c.Environments = []string{accessapi.EnvironmentDev}

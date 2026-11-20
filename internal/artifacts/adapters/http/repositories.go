@@ -792,7 +792,7 @@ func (s ArtifactoryAPI) createRepository(
 	if err := createdRepositoryPermissions(ctx, created); err != nil {
 		return nil, err
 	}
-	switch err := createAll(ctx, st, created); {
+	switch err := createAll(ctx, st, created, s.cfg.Access.Projects); {
 	case errors.Is(err, kernel.ErrConflict):
 		return nil, httpkit.BadRequestf(msgKeyExists)
 	case err != nil:
@@ -891,7 +891,7 @@ func (s ArtifactoryAPI) createMultipleRepositories(
 	if err := createdRepositoryPermissions(ctx, append(created, prepared...)); err != nil {
 		return nil, err
 	}
-	switch err := createAll(ctx, st, append(created, prepared...)); {
+	switch err := createAll(ctx, st, append(created, prepared...), s.cfg.Access.Projects); {
 	case errors.Is(err, kernel.ErrConflict):
 		return nil, apierror.New(http.StatusConflict, msgKeyExists)
 	case err != nil:
@@ -908,10 +908,11 @@ func (s ArtifactoryAPI) createMultipleRepositories(
 // repository and the remote repositories it was planned with are created
 // together or not at all. A taken key stays kernel.ErrConflict under the
 // wrapping, for the caller to tell it from a failure.
-func createAll(ctx context.Context, st Store, cs []repo.Config) error {
+func createAll(ctx context.Context, st Store, cs []repo.Config, projects accessapi.Projects) error {
+	bindings := repos.NewRepositories(st, nil, projects)
 	err := st.Tx(ctx, func(ctx context.Context) error {
 		for _, c := range cs {
-			if err := st.Repos().Create(ctx, c); err != nil {
+			if err := bindings.Create(ctx, c); err != nil {
 				return fmt.Errorf("create %s: %w", c.Key, err)
 			}
 		}
@@ -1039,8 +1040,9 @@ func (s ArtifactoryAPI) writeUpdates(
 		by = p.Name
 	}
 	err := st.Tx(ctx, func(ctx context.Context) error {
+		bindings := repos.NewRepositories(st, s.cfg.Access.Keys, s.cfg.Access.Projects)
 		for _, c := range created {
-			switch err := st.Repos().Create(ctx, c); {
+			switch err := bindings.Create(ctx, c); {
 			case errors.Is(err, kernel.ErrConflict):
 				return fmt.Errorf("%w: %s", errCreatedKeyTaken, c.Key)
 			case err != nil:
@@ -1048,7 +1050,7 @@ func (s ArtifactoryAPI) writeUpdates(
 			}
 		}
 		for i, c := range updated {
-			if err := st.Repos().Update(ctx, c); err != nil {
+			if err := bindings.Update(ctx, c); err != nil {
 				return fmt.Errorf("update %s: %w", c.Key, err)
 			}
 			if repos.OwesReindex(stored[i], c) {
@@ -1270,8 +1272,14 @@ func (s ArtifactoryAPI) DeleteRepository(
 		p, _ := kernel.FromContext(ctx)
 		return artgen.DeleteRepository403JSONResponse(failed(key, fmt.Sprintf(msgNoRight, key, p.Name, key))), nil
 	}
+	if errors.Is(err, errRemoveRepository) {
+		_ = s.InternalError(ctx, "delete repository", err)
+		return artgen.DeleteRepository500JSONResponse(failed(key, fmt.Sprintf("Cannot delete repository: '%s'. See the server log.", key))), nil
+	}
 	return out, err
 }
+
+var errRemoveRepository = errors.New("repository removal failed")
 
 func (s ArtifactoryAPI) deleteRepository(
 	ctx context.Context, req artgen.DeleteRepositoryRequestObject,
@@ -1291,13 +1299,12 @@ func (s ArtifactoryAPI) deleteRepository(
 		return artgen.DeleteRepository400JSONResponse(failed(key, msg)), nil
 	}
 	p, _ := kernel.FromContext(ctx)
-	files, found, err := repos.Remove(ctx, st, key, p.Name)
+	files, found, err := repos.NewRepositories(st, s.cfg.Access.Keys, s.cfg.Access.Projects).Remove(ctx, key, p.Name)
 	switch {
 	case err != nil:
-		_ = s.InternalError(ctx, "delete repository", err)
-		return artgen.DeleteRepository500JSONResponse(
-			failed(key, fmt.Sprintf("Cannot delete repository: '%s'. See the server log.", key)),
-		), nil
+		// Let the outer transaction roll back configuration, contents and
+		// assignment before rendering the native per-repository failure report.
+		return nil, fmt.Errorf("%w: %w", errRemoveRepository, err)
 	case !found:
 		return artgen.DeleteRepository404JSONResponse(noConfig(key)), nil
 	}
@@ -1372,7 +1379,7 @@ func (s ArtifactoryAPI) DeleteRepositories(
 				return repositoryRemoval{}, err
 			}
 			p, _ := kernel.FromContext(ctx)
-			files, found, err := repos.Remove(ctx, st, key, p.Name)
+			files, found, err := repos.NewRepositories(st, s.cfg.Access.Keys, s.cfg.Access.Projects).Remove(ctx, key, p.Name)
 			if err != nil {
 				return repositoryRemoval{}, fmt.Errorf("remove repository %s: %w", key, err)
 			}

@@ -58,6 +58,9 @@ func IsNull(raw json.RawMessage) bool { return bytes.Equal(bytes.TrimSpace(raw),
 // the descriptor and config apply all show unchanged, so every entry point
 // refuses a bad configuration with the same text.
 type Repositories interface {
+	// ProjectRepository reads canonical ownership and environments without
+	// opening upstream credentials or other sealed configuration fields.
+	ProjectRepository(ctx context.Context, key string) (ProjectRepository, error)
 	// Get returns the configuration stored under key, which must match
 	// exactly, including remote passwords and sensitive header values: a
 	// caller that shows it masks them first (repo.Masked).
@@ -154,8 +157,8 @@ type Repositories interface {
 	// project's own, named "<projectKey>-<name>"; names compare without
 	// regard to case and are rewritten in the environment's own spelling,
 	// once each. It reads the environment names through access with ctx, and
-	// a project that does not exist has only the built-in and global
-	// environments. An unknown name answers a 400 apierror "Environment
+	// an unknown project is refused with a 400 apierror before binding.
+	// An unknown name answers a 400 apierror "Environment
 	// '<name>' does not exist"; an error reading the names is wrapped as
 	// "repos: global environments: %w" or "repos: environments of project
 	// <key>: %w".
