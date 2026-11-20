@@ -262,6 +262,48 @@ func selectionScopeAndLeadPages(t *testing.T, newStore func(*testing.T) app.Rout
 			t.Fatal("a project administrator continued a global selection", err)
 		}
 	})
+	t.Run("empty-members federation matches local selection", func(t *testing.T) {
+		w := newSelectionWorld(t, newStore(t))
+		w.repository("alpha-main", "alpha", repo.NPM)
+		w.repository("alpha-local", "alpha", repo.NPM)
+		c, err := w.db.Repos().Get(t.Context(), "alpha-main")
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.Class = repo.Federated
+		if err := w.db.Repos().Update(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+		var federated artifactsapi.IndexVersion
+		for _, key := range []string{"alpha-main", "alpha-local"} {
+			old := w.version(key, repo.NPM, "widget", "1.0.0", []string{npm.CanonicalPath("widget", "1.0.0")})
+			w.version(key, repo.NPM, "widget", "2.0.0", []string{npm.CanonicalPath("widget", "2.0.0")})
+			if key == c.Key {
+				federated = old
+				federated.Package.Repository.Class = repo.Federated
+			}
+		}
+		p := selectionInput(repo.NPM)
+		if _, err := w.service.Create(t.Context(), p.Key, p); err != nil {
+			t.Fatal(err)
+		}
+		selection, err := w.service.Select(t.Context(), p.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files, _ := collectSelection(t, selection, 1)
+		if len(files) != 2 || files[0].Path != files[1].Path || files[0].Version.Version != "1.0.0" || files[1].Version.Version != "1.0.0" ||
+			files[0].Version.Package.Repository.Class != repo.Local || files[1].Version.Package.Repository.Class != repo.Federated {
+			t.Fatal("empty-members federation differed from local candidate selection", files)
+		}
+		c.Members = []repo.Member{{URL: "https://peer.example/private-repository"}}
+		if err := w.db.Repos().Update(t.Context(), c); err != nil {
+			t.Fatal(err)
+		}
+		if page, err := selection.Candidates(t.Context(), federated, kernel.Page{Limit: 1}); !errors.Is(err, kernel.ErrForbidden) || len(page.Items) != 0 {
+			t.Fatal("member added between pages did not fence local-only evidence", page, err)
+		}
+	})
 	t.Run("lead beyond first maximum page", func(t *testing.T) {
 		w := newSelectionWorld(t, newStore(t))
 		w.repository("alpha-main", "alpha", repo.Maven)

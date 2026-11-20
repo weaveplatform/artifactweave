@@ -15,13 +15,14 @@ import (
 // stored spelling in results. This query is not an authorization capability.
 type IndexRepositoryQuery struct {
 	Projects, Repositories, ExcludedRepositories []string
-	// Class optionally narrows stored local/remote indexes. P11 cleanup supplies
-	// Local. Remote/virtual are unsupported; peer-aware federated selection
-	// depends on P13 and is outside this reader's current projection.
-	Class        repo.Class
-	PackageTypes []repo.PackageType
-	Environments []string
-	AllProjects  bool
+	// Classes optionally narrows stored local, remote and federated indexes.
+	// NoFederatedMembers excludes federated repositories with any configured
+	// member before paging; local statistics cannot stand for peer downloads.
+	Classes            []repo.Class
+	NoFederatedMembers bool
+	PackageTypes       []repo.PackageType
+	Environments       []string
+	AllProjects        bool
 }
 
 // IndexRepository captures ownership without opening repository credentials.
@@ -31,6 +32,9 @@ type IndexRepository struct {
 	Class        repo.Class
 	PackageType  repo.PackageType
 	Environments []string
+	// HasFederatedMembers exposes membership presence without member URLs.
+	// Parent checks refresh it along with ownership and environment identity.
+	HasFederatedMembers bool
 }
 
 // IndexPackage identifies one existing index row in an admitted repository.
@@ -96,7 +100,7 @@ type IndexLead struct {
 type PackageIndex interface {
 	// Repositories filters before LIMIT and orders by repository key, bytewise.
 	// Empty types/repositories/project scope admits none; AllProjects explicitly
-	// opens the project scope. Only stored local/remote indexes are available.
+	// opens the project scope. Stored local/remote/federated indexes are available.
 	Repositories(context.Context, IndexRepositoryQuery, kernel.Page) ([]IndexRepository, string, error)
 	// Packages orders existing index rows by opaque package name, bytewise.
 	Packages(context.Context, IndexRepository, kernel.Page) ([]IndexPackage, string, error)

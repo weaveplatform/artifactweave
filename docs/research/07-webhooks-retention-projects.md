@@ -188,8 +188,9 @@ version comparator.
 P11 selection now supplies bounded metadata snapshots with fresh project and
 environment admission, a fixed policy/clock, lead-based age/properties and
 current comparator protection. Remote and virtual repositories are excluded
-from cleanup; federated policy configuration remains accepted, with peer-aware
-selection explicitly owned by P13
+from cleanup. Federated policy configuration remains accepted, and the
+empty-members subset uses the same indexed selection as local content.
+Selection requiring configured-member download evidence is owned by P13
 ([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)). Index reads
 remain generic. See [ADR 0010's candidate selection
 contract](decisions/0010-retention-trash-and-gc.md) for snapshot revalidation,

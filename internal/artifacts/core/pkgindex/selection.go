@@ -63,10 +63,11 @@ func (r indexReader) repository(ctx context.Context, source port.RepositoryIndex
 	if err != nil {
 		return fmt.Errorf("package repository context: %w", err)
 	}
-	if actual.Class != repo.Local && actual.Class != repo.Remote {
+	if actual.Class != repo.Local && actual.Class != repo.Remote && actual.Class != repo.Federated {
 		return fmt.Errorf("repository has no stored package index: %w", kernel.ErrInvalid)
 	}
 	if actual.Project != expected.Project || actual.Class != expected.Class || actual.PackageType != expected.PackageType ||
+		actual.HasFederatedMembers != expected.HasFederatedMembers ||
 		!slices.Equal(actual.Environments, expected.Environments) {
 		return fmt.Errorf("package repository context changed: %w", kernel.ErrConflict)
 	}

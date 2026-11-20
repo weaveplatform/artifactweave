@@ -29,10 +29,10 @@ func (r repos) IndexRepository(ctx context.Context, key string) (api.IndexReposi
 	var out api.IndexRepository
 	found := false
 	err := r.s.Rows(ctx, "index repository context",
-		"SELECT key, rclass, package_type, project_key, "+r.projectEnvironmentsSQL()+" FROM repositories WHERE key = ?", []any{key},
+		"SELECT key, rclass, package_type, project_key, "+r.projectEnvironmentsSQL()+", "+r.federatedMembersSQL()+" FROM repositories WHERE key = ?", []any{key},
 		func(row *sql.Rows) error {
 			var environments string
-			if err := row.Scan(&out.Key, &out.Class, &out.PackageType, &out.Project, &environments); err != nil {
+			if err := row.Scan(&out.Key, &out.Class, &out.PackageType, &out.Project, &environments, &out.HasFederatedMembers); err != nil {
 				return err //nolint:wrapcheck // Rows supplies context
 			}
 			if err := json.Unmarshal([]byte(environments), &out.Environments); err != nil {
@@ -63,13 +63,18 @@ func (r repos) IndexRepositories(ctx context.Context, query api.IndexRepositoryQ
 		query.Environments != nil && len(query.Environments) == 0 {
 		return nil, "", nil
 	}
-	condition += " AND rclass IN ('local', 'remote') AND package_type IN (" + dialect.Placeholders(len(query.PackageTypes)) + ")"
+	condition += " AND rclass IN ('local', 'remote', 'federated') AND package_type IN (" + dialect.Placeholders(len(query.PackageTypes)) + ")"
 	for _, kind := range query.PackageTypes {
 		args = append(args, string(kind))
 	}
-	if query.Class != "" {
-		condition += " AND rclass = ?"
-		args = append(args, string(query.Class))
+	if len(query.Classes) != 0 {
+		condition += " AND rclass IN (" + dialect.Placeholders(len(query.Classes)) + ")"
+		for _, class := range query.Classes {
+			args = append(args, string(class))
+		}
+	}
+	if query.NoFederatedMembers {
+		condition += " AND NOT (" + r.federatedMembersSQL() + ")"
 	}
 	if !query.AllProjects {
 		condition += " AND project_key IN (" + dialect.Placeholders(len(query.Projects)) + ")"
@@ -99,11 +104,11 @@ func (r repos) IndexRepositories(ctx context.Context, query api.IndexRepositoryQ
 	}
 	var out []api.IndexRepository
 	err = r.s.Rows(ctx, "index repositories",
-		"SELECT key, rclass, package_type, project_key, "+r.projectEnvironmentsSQL()+" FROM repositories WHERE "+condition+" ORDER BY key LIMIT ?",
+		"SELECT key, rclass, package_type, project_key, "+r.projectEnvironmentsSQL()+", "+r.federatedMembersSQL()+" FROM repositories WHERE "+condition+" ORDER BY key LIMIT ?",
 		append(args, page.Limit+1), func(row *sql.Rows) error {
 			var entry api.IndexRepository
 			var environments string
-			if err := row.Scan(&entry.Key, &entry.Class, &entry.PackageType, &entry.Project, &environments); err != nil {
+			if err := row.Scan(&entry.Key, &entry.Class, &entry.PackageType, &entry.Project, &environments, &entry.HasFederatedMembers); err != nil {
 				return err //nolint:wrapcheck // Rows supplies context
 			}
 			if err := json.Unmarshal([]byte(environments), &entry.Environments); err != nil {
@@ -117,6 +122,13 @@ func (r repos) IndexRepositories(ctx context.Context, query api.IndexRepositoryQ
 	}
 	out, next := kernel.Trim(out, page.Limit, func(entry api.IndexRepository) []string { return []string{entry.Key} })
 	return out, next, nil
+}
+
+func (r repos) federatedMembersSQL() string {
+	if r.s.Dialect().Name == "postgres" {
+		return "(rclass = 'federated' AND jsonb_array_length(COALESCE(NULLIF(doc::jsonb -> 'members', 'null'::jsonb), '[]'::jsonb)) > 0)"
+	}
+	return "(rclass = 'federated' AND json_array_length(COALESCE(json_extract(doc, '$.members'), '[]')) > 0)"
 }
 
 func (r repos) indexRepositoryPatterns(patterns []string) (string, []any) {

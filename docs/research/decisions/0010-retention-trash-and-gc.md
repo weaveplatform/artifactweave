@@ -39,13 +39,18 @@ cleanup excludes remote caches and virtual repositories, as the
 [current cleanup guide](https://docs.jfrog.com/administration/docs/cleanup-policies)
 requires. That guide supports federated repositories too and requires checking
 downloads across their members. Federated policy configuration and availability
-remain accepted. P11 selection currently evaluates local repositories only;
-peer-aware federated selection belongs to P13
+remain accepted. P11 selection evaluates local repositories and federated
+repositories with an empty membership list: decision 0022 permits omitting the
+self entry, so this subset needs no external-member download evidence. A bounded
+membership-presence projection filters before paging and refreshes parent
+identity; adding a member between pages refuses further local-only evaluation.
+Federated repositories with configured members need peer-aware selection in P13
 ([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)), whose peer
 identity/evidence contracts are required before local statistics can safely
-represent a federation. This is an explicit implementation gap, not a vendor
-limitation. The generic index reader can describe remote indexes for other
-owners; retention requests the local class and refuses stale/foreign parents.
+represent a federation. This is an explicit implementation gap for configured
+members, not a vendor limitation. The generic index reader can describe remote
+and federated indexes for other owners; retention requests the admitted hosted
+classes with no federation members and refuses stale/foreign parents.
 
 Keep-last-N protects the comparator-newest versions before inclusion filters;
 zero still protects the newest. Version strings break comparator ties and supply

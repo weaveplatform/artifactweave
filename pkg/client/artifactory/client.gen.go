@@ -5221,7 +5221,7 @@ type PackageCleanupSearchCriteria struct {
 	// PackageTypes Required within this object. Package types the policy applies to, at least one, using the repository packageType names (for example npm, docker, maven). Versions are identified and ordered with each type's own rules through the package index.
 	PackageTypes []string `json:"packageTypes"`
 
-	// Repos Required within this object. Repository keys or wildcard patterns the policy runs on, at least one. Local and federated repository criteria are accepted. Remote caches and virtual repositories are excluded; a literal remote or virtual repository key is rejected with 400. Current candidate selection evaluates local repositories; federated candidate evaluation is not yet implemented.
+	// Repos Required within this object. Repository keys or wildcard patterns the policy runs on, at least one. Local and federated repository criteria are accepted. Remote caches and virtual repositories are excluded; a literal remote or virtual repository key is rejected with 400. Current candidate selection evaluates local repositories and federated repositories with no configured members. Federated repositories with configured members require peer download evidence and are not yet evaluated.
 	Repos []string `json:"repos"`
 }
 

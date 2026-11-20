@@ -57,6 +57,7 @@ func (r repos) IndexRepository(ctx context.Context, key string) (api.IndexReposi
 		out = api.IndexRepository{
 			Key: value.Key, Project: value.ProjectKey, Class: value.Class,
 			PackageType: value.PackageType, Environments: slices.Clone(value.Environments),
+			HasFederatedMembers: value.Class == repo.Federated && len(value.Members) != 0,
 		}
 		return nil
 	})
@@ -91,8 +92,9 @@ func (r repos) IndexRepositories(ctx context.Context, query api.IndexRepositoryQ
 	var out []api.IndexRepository
 	err = r.s.Do(ctx, func() error {
 		for _, value := range r.t().Rows {
-			if value.Class != repo.Local && value.Class != repo.Remote || !slices.Contains(query.PackageTypes, value.PackageType) ||
-				query.Class != "" && query.Class != value.Class ||
+			if value.Class != repo.Local && value.Class != repo.Remote && value.Class != repo.Federated || !slices.Contains(query.PackageTypes, value.PackageType) ||
+				len(query.Classes) != 0 && !slices.Contains(query.Classes, value.Class) ||
+				query.NoFederatedMembers && value.Class == repo.Federated && len(value.Members) != 0 ||
 				!query.AllProjects && !slices.Contains(query.Projects, value.ProjectKey) ||
 				len(after) > 0 && value.Key <= after[0] || !indexMatches(include, value.Key) || indexMatches(exclude, value.Key) {
 				continue
@@ -105,6 +107,7 @@ func (r repos) IndexRepositories(ctx context.Context, query api.IndexRepositoryQ
 			entry := api.IndexRepository{
 				Key: value.Key, Project: value.ProjectKey, Class: value.Class,
 				PackageType: value.PackageType, Environments: slices.Clone(value.Environments),
+				HasFederatedMembers: value.Class == repo.Federated && len(value.Members) != 0,
 			}
 			out = indexFirst(out, entry, page.Limit+1, func(a, b api.IndexRepository) int { return strings.Compare(a.Key, b.Key) })
 		}
@@ -119,7 +122,8 @@ func (r repos) IndexRepositories(ctx context.Context, query api.IndexRepositoryQ
 
 func (p packages) indexRepositoryCurrent(ref api.IndexRepository) bool {
 	value, ok := repos(p).t().Get(ref.Key)
-	return ok && value.Class == ref.Class && value.ProjectKey == ref.Project && value.PackageType == ref.PackageType
+	return ok && value.Class == ref.Class && value.ProjectKey == ref.Project && value.PackageType == ref.PackageType &&
+		(value.Class == repo.Federated && len(value.Members) != 0) == ref.HasFederatedMembers
 }
 
 func (p packages) indexPackageCurrent(ref api.IndexPackage) bool {

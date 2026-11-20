@@ -736,7 +736,8 @@ components:
           description: Required within this object. Repository keys or wildcard patterns the policy runs on, at
             least one. Local and federated repository criteria are accepted. Remote caches and virtual repositories
             are excluded; a literal remote or virtual repository key is rejected with 400. Current candidate selection
-            evaluates local repositories; federated candidate evaluation is not yet implemented.
+            evaluates local repositories and federated repositories with no configured members. Federated repositories
+            with configured members require peer download evidence and are not yet evaluated.
           items:
             type: string
           type: array

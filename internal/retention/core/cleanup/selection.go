@@ -78,7 +78,7 @@ func (s *Selection) run(ctx context.Context, fn func(context.Context) error) err
 func (s *Selection) repositoryQuery() artifactsapi.IndexRepositoryQuery {
 	p, c := s.snapshot.Policy, s.snapshot.Policy.Criteria
 	q := artifactsapi.IndexRepositoryQuery{
-		Class:        repo.Local,
+		Classes: []repo.Class{repo.Local, repo.Federated}, NoFederatedMembers: true,
 		Repositories: slices.Clone(c.Repos), ExcludedRepositories: slices.Clone(c.ExcludedRepos),
 		Projects: slices.Clone(c.IncludedProjects), AllProjects: c.IncludeAllProjects,
 	}
@@ -130,7 +130,8 @@ func (s *Selection) repository(ctx context.Context, ref artifactsapi.IndexReposi
 		return kernel.ErrForbidden
 	}
 	actual := rows[0]
-	if actual.Project != ref.Project || actual.Class != ref.Class || actual.PackageType != ref.PackageType || !slices.Equal(actual.Environments, ref.Environments) {
+	if actual.Project != ref.Project || actual.Class != ref.Class || actual.PackageType != ref.PackageType || actual.HasFederatedMembers != ref.HasFederatedMembers ||
+		!slices.Equal(actual.Environments, ref.Environments) {
 		return fmt.Errorf("cleanup repository context changed: %w", kernel.ErrConflict)
 	}
 	return nil

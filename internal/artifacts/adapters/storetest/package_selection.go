@@ -22,6 +22,9 @@ func RunPackageIndexSelection(t *testing.T, newStore Factory) {
 	t.Run("scope before paging", func(t *testing.T) {
 		indexRepositoryScope(t, newStore)
 	})
+	t.Run("federated membership before paging", func(t *testing.T) {
+		indexFederatedMembership(t, newStore(t))
+	})
 
 	for _, tc := range []struct {
 		name           string
@@ -94,6 +97,54 @@ func RunPackageIndexSelection(t *testing.T, newStore Factory) {
 	}
 }
 
+func indexFederatedMembership(t *testing.T, st port.Store) {
+	t.Helper()
+	ctx := t.Context()
+	peer := repo.Config{
+		Key:         "aa-membered",
+		Class:       repo.Federated,
+		PackageType: repo.NPM,
+		ProjectKey:  "alpha",
+		Members:     []repo.Member{{URL: "https://peer.example/private-repository"}},
+	}
+	empty := peer
+	empty.Key, empty.Members = "zz-one-node", nil
+	for _, c := range []repo.Config{peer, empty} {
+		if err := st.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reader := pkgindex.NewReader(st, nil)
+	q := api.IndexRepositoryQuery{
+		Classes:            []repo.Class{repo.Local, repo.Federated},
+		NoFederatedMembers: true,
+		Projects:           []string{"alpha"},
+		Repositories:       []string{"*"},
+		PackageTypes:       []repo.PackageType{repo.NPM},
+	}
+	rows, next, err := reader.Repositories(ctx, q, kernel.Page{Limit: 1})
+	if err != nil || len(rows) != 1 || rows[0].Key != empty.Key || rows[0].HasFederatedMembers || next != "" {
+		t.Fatal("membered federation consumed the empty-members page", rows, next, err)
+	}
+	ref := rows[0]
+	q.NoFederatedMembers = false
+	rows, next, err = reader.Repositories(ctx, q, kernel.Page{Limit: 1})
+	if err != nil || len(rows) != 1 || !rows[0].HasFederatedMembers || next == "" {
+		t.Fatal("generic projection lost membership presence", rows, next, err)
+	}
+	empty.Members = peer.Members
+	if err := st.Repos().Update(ctx, empty); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := reader.Packages(ctx, ref, kernel.Page{}); !errors.Is(err, kernel.ErrConflict) {
+		t.Fatal("stale empty-members identity was reused after a member was added", err)
+	}
+	q.NoFederatedMembers = true
+	if rows, next, err := reader.Repositories(ctx, q, kernel.Page{Limit: 1}); err != nil || len(rows) != 0 || next != "" {
+		t.Fatal("membered repositories escaped current membership filtering", rows, next, err)
+	}
+}
+
 func indexRepositoryScope(t *testing.T, newStore Factory) {
 	t.Helper()
 	st := newStore(t)
@@ -137,12 +188,12 @@ func indexRepositoryScope(t *testing.T, newStore Factory) {
 	if !slices.Equal(keys, []string{"alpha-one", "alpha-two"}) {
 		t.Fatalf("scoped repository pages = %v", keys)
 	}
-	query.Class = repo.Local
+	query.Classes = []repo.Class{repo.Local}
 	rows, next, err := reader.Repositories(ctx, query, kernel.Page{Limit: 1})
 	if err != nil || len(rows) != 1 || rows[0].Key != "alpha-one" || next != "" {
 		t.Fatal("cleanup class admission did not filter before paging", rows, next, err)
 	}
-	query.Class = ""
+	query.Classes = nil
 	query.Repositories = []string{"ALPHA*"}
 	if rows, _, err := reader.Repositories(ctx, query, kernel.Page{}); err != nil || len(rows) != 0 {
 		t.Fatal("repository wildcard folded identity case", err)
