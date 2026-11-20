@@ -274,6 +274,7 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 		"internal/artifacts/adapters/http",
 		"internal/artifacts/ecosystem/*/http",
 		"internal/configuration/adapters/http",
+		"internal/federation/adapters/http",
 		"internal/notifications/adapters/http",
 	} {
 		found, err := filepath.Glob(filepath.Join(root, dir, "*.go"))
@@ -296,6 +297,7 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 		"SystemAPI":        "artifactory",
 		"AccessService":    "access",
 		"SubscriptionsAPI": "event",
+		"ReplicationAPI":   "artifactory",
 	}
 	out := map[string]apiReviewHandler{}
 	for _, file := range files {
@@ -662,6 +664,7 @@ func apiReviewCompleteText(e *apiReviewOperation) string {
 // content is known only once every element is read, so writing it as it
 // is read would change the bytes.
 var apiReviewCollected = map[string]string{
+	"GET /artifactory/api/replications/{repoKey}":                                      "one repository's single configured target is authorized and redacted under its metadata guard before publication; legacy multi-target configurations are rejected, never published as a list",
 	"GET /event/api/v1/subscriptions":                                                  "complete configuration snapshot is authorized, secret-redacted and committed before response bytes; visibility or commit failure must not expose a partial list; no keyset or constant-memory claim",
 	"GET /artifactory/api/cleanup/packages/policies":                                   "administrator-defined policy configuration, read whole within the explicitly authorized global or project scope",
 	"GET /access/api/v1/environments":                                                  "administrator-defined environments, which the store reads whole",

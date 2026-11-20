@@ -7891,19 +7891,19 @@ type StopSha256MigrationParams struct {
 
 // BlockSystemReplicationParams defines parameters for BlockSystemReplication.
 type BlockSystemReplicationParams struct {
-	// Push Optional query parameter. true (default) blocks push replications; false leaves them running.
+	// Push Optional query parameter. true (default) blocks push replications; false leaves the current push setting unchanged.
 	Push *string `form:"push,omitempty" json:"push,omitempty"`
 
-	// Pull Optional query parameter. true (default) blocks pull replications; false leaves them running.
+	// Pull Optional query parameter. true (default) blocks pull replications; false leaves the current pull setting unchanged.
 	Pull *string `form:"pull,omitempty" json:"pull,omitempty"`
 }
 
 // UnblockSystemReplicationParams defines parameters for UnblockSystemReplication.
 type UnblockSystemReplicationParams struct {
-	// Push Optional query parameter. true (default) unblocks push replications; false leaves them blocked.
+	// Push Optional query parameter. true (default) unblocks push replications; false leaves the current push setting unchanged.
 	Push *string `form:"push,omitempty" json:"push,omitempty"`
 
-	// Pull Optional query parameter. true (default) unblocks pull replications; false leaves them blocked.
+	// Pull Optional query parameter. true (default) unblocks pull replications; false leaves the current pull setting unchanged.
 	Pull *string `form:"pull,omitempty" json:"pull,omitempty"`
 }
 
@@ -10890,12 +10890,12 @@ type ClientInterface interface {
 
 	// DeleteRepositoryReplicationConfiguration performs a DELETE /api/replications/{repoKey} (the `DeleteRepositoryReplicationConfiguration` operationId) request.
 	//
-	// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it every configuration of the repository is removed. Administrators only.
+	// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it the single configuration of the repository is removed. Requires platform or current project repository management.
 	DeleteRepositoryReplicationConfiguration(ctx context.Context, repoKey string, params *DeleteRepositoryReplicationConfigurationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRepositoryReplicationConfiguration performs a GET /api/replications/{repoKey} (the `GetRepositoryReplicationConfiguration` operationId) request.
 	//
-	// Returns the replication configuration of a local or remote repository. A local repository with several push targets returns an array; otherwise a single object. password is returned masked. The caller needs manage permission on the repository.
+	// Returns the replication configuration of a local or remote repository. A local repository with several push targets belongs to the advanced-replication owner and answers 501; a single target returns one object. password is returned masked. The caller needs current platform or project repository management.
 	GetRepositoryReplicationConfiguration(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateRepositoryReplicationConfigurationWithBody performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request,
@@ -10913,13 +10913,13 @@ type ClientInterface interface {
 	// SetRepositoryReplicationConfigurationWithBody performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Requires platform or current project repository management. Answers 201 when the configuration is stored.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 	SetRepositoryReplicationConfigurationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetRepositoryReplicationConfiguration performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Requires platform or current project repository management. Answers 201 when the configuration is stored.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 	SetRepositoryReplicationConfiguration(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRepositoriesByTypeAndProject List repositories
@@ -12166,12 +12166,12 @@ type ClientInterface interface {
 
 	// BlockSystemReplication performs a POST /api/system/replications/block (the `BlockSystemReplication` operationId) request.
 	//
-	// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction running. Scheduled and on-demand runs are refused while blocked. Administrators only.
+	// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. The pause flags fence worker admission; configuration does not execute a run. Administrators only.
 	BlockSystemReplication(ctx context.Context, params *BlockSystemReplicationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UnblockSystemReplication performs a POST /api/system/replications/unblock (the `UnblockSystemReplication` operationId) request.
 	//
-	// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction blocked. Administrators only.
+	// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. Administrators only.
 	UnblockSystemReplication(ctx context.Context, params *UnblockSystemReplicationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetCertificates List client certificates
@@ -16125,7 +16125,7 @@ func (c *Client) CreateOrReplaceMultiPushReplication(ctx context.Context, repoKe
 
 // DeleteRepositoryReplicationConfiguration performs a DELETE /api/replications/{repoKey} (the `DeleteRepositoryReplicationConfiguration` operationId) request.
 //
-// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it every configuration of the repository is removed. Administrators only.
+// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it the single configuration of the repository is removed. Requires platform or current project repository management.
 func (c *Client) DeleteRepositoryReplicationConfiguration(ctx context.Context, repoKey string, params *DeleteRepositoryReplicationConfigurationParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteRepositoryReplicationConfigurationRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -16140,7 +16140,7 @@ func (c *Client) DeleteRepositoryReplicationConfiguration(ctx context.Context, r
 
 // GetRepositoryReplicationConfiguration performs a GET /api/replications/{repoKey} (the `GetRepositoryReplicationConfiguration` operationId) request.
 //
-// Returns the replication configuration of a local or remote repository. A local repository with several push targets returns an array; otherwise a single object. password is returned masked. The caller needs manage permission on the repository.
+// Returns the replication configuration of a local or remote repository. A local repository with several push targets belongs to the advanced-replication owner and answers 501; a single target returns one object. password is returned masked. The caller needs current platform or project repository management.
 func (c *Client) GetRepositoryReplicationConfiguration(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetRepositoryReplicationConfigurationRequest(c.Server, repoKey)
 	if err != nil {
@@ -16188,7 +16188,7 @@ func (c *Client) UpdateRepositoryReplicationConfiguration(ctx context.Context, r
 // SetRepositoryReplicationConfigurationWithBody performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 // with any type of body and a specified content type.
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Requires platform or current project repository management. Answers 201 when the configuration is stored.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 func (c *Client) SetRepositoryReplicationConfigurationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetRepositoryReplicationConfigurationRequestWithBody(c.Server, repoKey, contentType, body)
 	if err != nil {
@@ -16204,7 +16204,7 @@ func (c *Client) SetRepositoryReplicationConfigurationWithBody(ctx context.Conte
 // SetRepositoryReplicationConfiguration performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Requires platform or current project repository management. Answers 201 when the configuration is stored.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 func (c *Client) SetRepositoryReplicationConfiguration(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetRepositoryReplicationConfigurationRequest(c.Server, repoKey, body)
 	if err != nil {
@@ -18930,7 +18930,7 @@ func (c *Client) GetGlobalSystemReplicationConfiguration(ctx context.Context, re
 
 // BlockSystemReplication performs a POST /api/system/replications/block (the `BlockSystemReplication` operationId) request.
 //
-// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction running. Scheduled and on-demand runs are refused while blocked. Administrators only.
+// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. The pause flags fence worker admission; configuration does not execute a run. Administrators only.
 func (c *Client) BlockSystemReplication(ctx context.Context, params *BlockSystemReplicationParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBlockSystemReplicationRequest(c.Server, params)
 	if err != nil {
@@ -18945,7 +18945,7 @@ func (c *Client) BlockSystemReplication(ctx context.Context, params *BlockSystem
 
 // UnblockSystemReplication performs a POST /api/system/replications/unblock (the `UnblockSystemReplication` operationId) request.
 //
-// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction blocked. Administrators only.
+// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. Administrators only.
 func (c *Client) UnblockSystemReplication(ctx context.Context, params *UnblockSystemReplicationParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUnblockSystemReplicationRequest(c.Server, params)
 	if err != nil {
@@ -38469,14 +38469,14 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteRepositoryReplicationConfigurationWithResponse performs a DELETE /api/replications/{repoKey} (the `DeleteRepositoryReplicationConfiguration` operationId) request.
 	//
-	// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it every configuration of the repository is removed. Administrators only.
+	// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it the single configuration of the repository is removed. Requires platform or current project repository management.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DeleteRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, params *DeleteRepositoryReplicationConfigurationParams, reqEditors ...RequestEditorFn) (*DeleteRepositoryReplicationConfigurationResponse, error)
 
 	// GetRepositoryReplicationConfigurationWithResponse performs a GET /api/replications/{repoKey} (the `GetRepositoryReplicationConfiguration` operationId) request.
 	//
-	// Returns the replication configuration of a local or remote repository. A local repository with several push targets returns an array; otherwise a single object. password is returned masked. The caller needs manage permission on the repository.
+	// Returns the replication configuration of a local or remote repository. A local repository with several push targets belongs to the advanced-replication owner and answers 501; a single target returns one object. password is returned masked. The caller needs current platform or project repository management.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetRepositoryReplicationConfigurationResponse, error)
@@ -38498,7 +38498,7 @@ type ClientWithResponsesInterface interface {
 	// SetRepositoryReplicationConfigurationWithBodyWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Requires platform or current project repository management. Answers 201 when the configuration is stored.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SetRepositoryReplicationConfigurationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error)
@@ -38506,7 +38506,7 @@ type ClientWithResponsesInterface interface {
 	// SetRepositoryReplicationConfigurationWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Requires platform or current project repository management. Answers 201 when the configuration is stored.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 	SetRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error)
 
 	// GetRepositoriesByTypeAndProjectWithResponse List repositories
@@ -39913,14 +39913,14 @@ type ClientWithResponsesInterface interface {
 
 	// BlockSystemReplicationWithResponse performs a POST /api/system/replications/block (the `BlockSystemReplication` operationId) request.
 	//
-	// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction running. Scheduled and on-demand runs are refused while blocked. Administrators only.
+	// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. The pause flags fence worker admission; configuration does not execute a run. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	BlockSystemReplicationWithResponse(ctx context.Context, params *BlockSystemReplicationParams, reqEditors ...RequestEditorFn) (*BlockSystemReplicationResponse, error)
 
 	// UnblockSystemReplicationWithResponse performs a POST /api/system/replications/unblock (the `UnblockSystemReplication` operationId) request.
 	//
-	// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction blocked. Administrators only.
+	// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	UnblockSystemReplicationWithResponse(ctx context.Context, params *UnblockSystemReplicationParams, reqEditors ...RequestEditorFn) (*UnblockSystemReplicationResponse, error)
@@ -76572,7 +76572,7 @@ func (c *ClientWithResponses) CreateOrReplaceMultiPushReplicationWithResponse(ct
 
 // DeleteRepositoryReplicationConfigurationWithResponse performs a DELETE /api/replications/{repoKey} (the `DeleteRepositoryReplicationConfiguration` operationId) request.
 //
-// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it every configuration of the repository is removed. Administrators only.
+// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it the single configuration of the repository is removed. Requires platform or current project repository management.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DeleteRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, params *DeleteRepositoryReplicationConfigurationParams, reqEditors ...RequestEditorFn) (*DeleteRepositoryReplicationConfigurationResponse, error) {
@@ -76585,7 +76585,7 @@ func (c *ClientWithResponses) DeleteRepositoryReplicationConfigurationWithRespon
 
 // GetRepositoryReplicationConfigurationWithResponse performs a GET /api/replications/{repoKey} (the `GetRepositoryReplicationConfiguration` operationId) request.
 //
-// Returns the replication configuration of a local or remote repository. A local repository with several push targets returns an array; otherwise a single object. password is returned masked. The caller needs manage permission on the repository.
+// Returns the replication configuration of a local or remote repository. A local repository with several push targets belongs to the advanced-replication owner and answers 501; a single target returns one object. password is returned masked. The caller needs current platform or project repository management.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetRepositoryReplicationConfigurationResponse, error) {
@@ -76625,7 +76625,7 @@ func (c *ClientWithResponses) UpdateRepositoryReplicationConfigurationWithRespon
 // SetRepositoryReplicationConfigurationWithBodyWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 // with any type of body and a specified content type.
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Requires platform or current project repository management. Answers 201 when the configuration is stored.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) SetRepositoryReplicationConfigurationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error) {
@@ -76639,7 +76639,7 @@ func (c *ClientWithResponses) SetRepositoryReplicationConfigurationWithBodyWithR
 // SetRepositoryReplicationConfigurationWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Requires platform or current project repository management. Answers 201 when the configuration is stored.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 func (c *ClientWithResponses) SetRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error) {
 	rsp, err := c.SetRepositoryReplicationConfiguration(ctx, repoKey, body, reqEditors...)
 	if err != nil {
@@ -78946,7 +78946,7 @@ func (c *ClientWithResponses) GetGlobalSystemReplicationConfigurationWithRespons
 
 // BlockSystemReplicationWithResponse performs a POST /api/system/replications/block (the `BlockSystemReplication` operationId) request.
 //
-// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction running. Scheduled and on-demand runs are refused while blocked. Administrators only.
+// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. The pause flags fence worker admission; configuration does not execute a run. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) BlockSystemReplicationWithResponse(ctx context.Context, params *BlockSystemReplicationParams, reqEditors ...RequestEditorFn) (*BlockSystemReplicationResponse, error) {
@@ -78959,7 +78959,7 @@ func (c *ClientWithResponses) BlockSystemReplicationWithResponse(ctx context.Con
 
 // UnblockSystemReplicationWithResponse performs a POST /api/system/replications/unblock (the `UnblockSystemReplication` operationId) request.
 //
-// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction blocked. Administrators only.
+// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) UnblockSystemReplicationWithResponse(ctx context.Context, params *UnblockSystemReplicationParams, reqEditors ...RequestEditorFn) (*UnblockSystemReplicationResponse, error) {
