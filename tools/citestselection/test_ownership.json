@@ -48,6 +48,7 @@
     "internal/artifacts/ecosystem/vagrant/http": "vagrant",
     "internal/artifacts/ecosystem/vcs/http": "vcs",
     "internal/configuration/adapters/http": "shared",
+    "internal/federation/adapters/http": "shared",
     "internal/notifications/adapters/http": "shared",
     "internal/retention/adapters/http": "shared",
     "test/server/access": "shared",
@@ -229,6 +230,9 @@
       "reverseproxy_test.go",
       "service_id_test.go",
       "system_health_test.go"
+    ],
+    "internal/federation/adapters/http": [
+      "replication_test.go"
     ],
     "internal/notifications/adapters/http": [
       "criteria_test.go",
