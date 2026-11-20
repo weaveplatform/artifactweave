@@ -118,6 +118,9 @@ func (s *Service) Transfer(ctx context.Context, t Transfer) (TransferResult, err
 				return err
 			}
 			for _, st := range steps {
+				if err := t.From.checkCurrent(ctx, st.src.FullPath(), st.src.Folder, want); err != nil {
+					return err
+				}
 				want := accessapi.ActionWrite
 				if st.replace.ID != 0 && !st.replace.Folder {
 					want |= accessapi.ActionDelete

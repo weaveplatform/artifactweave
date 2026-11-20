@@ -31,11 +31,12 @@ import (
 )
 
 type fixture struct {
-	t       *testing.T
-	router  http.Handler
-	db      *inmem.Store
-	items   *item.Service
-	sources *source.Service
+	currentAccess func(context.Context) (kernel.Principal, api.Decider, error)
+	t             *testing.T
+	router        http.Handler
+	db            *inmem.Store
+	items         *item.Service
+	sources       *source.Service
 	// faults are the errors the router kit logged as unexpected.
 	faults []error
 	// logs holds what the router kit logged, its warnings for a virtual
@@ -64,7 +65,8 @@ func (f *fixture) mount(svc *source.Service) {
 		return kernel.Principal{Name: user, Admin: user == "admin"}
 	}))
 	options := pkgroute.Options{
-		Store: f.db, Items: func() *item.Service { return f.items },
+		CurrentAccess: f.currentAccess,
+		Store:         f.db, Items: func() *item.Service { return f.items },
 		Logger: slog.New(slog.NewTextHandler(&f.logs, nil)),
 		Fault:  func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 		ItemError: func(_ context.Context, _ string, err error) error {

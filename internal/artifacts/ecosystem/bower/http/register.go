@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	bowerfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/bower"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
@@ -107,6 +108,12 @@ func (h handler) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err = h.k.Tx(r.Context(), func(ctx context.Context) error {
+		original := h.k.Bind(r.WithContext(ctx), c)
+		member := h.k.Bind(target.WithContext(ctx), selected)
+		if !h.k.CanFolder(original, name, api.ActionWrite) || !h.k.CanFolder(member, name, api.ActionWrite) {
+			p, _ := kernel.FromContext(ctx)
+			return httpkit.Denied(p)
+		}
 		current, err := h.k.DB().RemoteCache().Source(ctx, selected.Key)
 		if err != nil {
 			return fmt.Errorf("bower registration source: %w", err)
