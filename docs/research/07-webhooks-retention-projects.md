@@ -33,6 +33,20 @@ Auth: platform admin, project admin (limited to the domains `artifact`, `artifac
 `docker`, `build`), the Manage Webhooks role (7.137+), or a token scoped
 `system:webhooks@<project_key>/<jfrog_url>:r|w|d|x` (7.135+).
 
+The qualified URL names the configured JFrog platform, not the webhook receiver or
+an incoming Host header. The implementation compares it exactly and retains any
+token project boundary and stored project lifetime. Unqualified `system:webhooks`
+uses the existing service-wide system-capability grammar as a local interpretation;
+this is not a captured vendor authorization result. Project administrators' current
+role selection stays limited to their own four documented domains; content Read and
+repository management are not webhook administration privileges.
+
+CRUD validates Go-template syntax and the documented `json` function without
+rendering templates, resolving hosts or sending requests. Each URL/header/payload
+template is limited to 64 KiB as a local parser bound. Delivery must validate the
+rendered URL separately when its deferred owner is implemented.
+
+
 | Method | Path | Status | Notes |
 |---|---|---|---|
 | GET | `/event/api/v1/subscriptions` | 200 | array of subscriptions, secrets redacted. From SaaS 7.172.1 ([release notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71721-saas)) both GET endpoints return an empty `secret` and a boolean `secret_configured`; not yet in self-managed 7.161.32 |
@@ -88,8 +102,9 @@ https://docs.jfrog.com/integrations/docs/webhook-event-types):
 | `curation` | block, waiver and policy events | none; P27 producer, not emitted today |
 
 P11 service producers emit internal events; the P19a delivery engine serializes `artifact`, `artifact_property`, `docker`,
-`build` and `user` events. All Event routes currently inherit generated 501 handlers;
-subscriptions do not yet apply or deliver. Release/Distribution producers belong to
+`build` and `user` events. WEB-02 serves the five protected subscription CRUD operations;
+configuration can be enabled and round-tripped without starting delivery. Subscription
+test execution and troubleshooting retain their generated 501 owners. Release/Distribution producers belong to
 P15, archive/restore to P16, RBv2 to P24, AppTrust to P25, Xray to P26 and Curation to
 P27. P20 maps every accepted domain to its producer and executable delivery test;
 accepting a domain that never fires is not its completion criterion. Additional

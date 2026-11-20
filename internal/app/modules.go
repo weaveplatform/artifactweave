@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nimmodel/http"
 	"github.com/weaveplatform/artifactweave/internal/configuration"
+	"github.com/weaveplatform/artifactweave/internal/notifications"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	"github.com/weaveplatform/artifactweave/internal/platform/events"
@@ -28,6 +29,7 @@ type modules struct {
 	artifacts     *artifacts.Module
 	configuration *configuration.Module
 	events        *events.Bus
+	notifications *notifications.Module
 }
 
 // moduleStore is the metadata store the modules are built over: the store
@@ -36,6 +38,7 @@ type moduleStore interface {
 	access.Store
 	artifacts.Store
 	configuration.Store
+	notifications.Store
 }
 
 // moduleDeps is what OpenRuntime opens before the modules and buildModules
@@ -62,7 +65,7 @@ type moduleDeps struct {
 	log *slog.Logger
 }
 
-// buildModules builds the access, artifacts and configuration modules over
+// buildModules builds the access, artifacts, configuration and notifications modules over
 // d with cfg's settings, in that order, each over the APIs of the ones
 // before it. The constructors do no I/O, so building them once the work
 // queue is open moves none of OpenRuntime's I/O; a constructor's refusal is
@@ -100,7 +103,13 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	if err != nil {
 		return modules{}, fmt.Errorf("configuration: %w", err)
 	}
-	return modules{access: acc, artifacts: art, configuration: conf, events: d.events}, nil
+	notify, err := notifications.New(notifications.Deps{
+		Store: d.store, Access: accessAPI, Repositories: artifactsAPI.Repositories, ServiceURL: cfg.BaseURL,
+	})
+	if err != nil {
+		return modules{}, fmt.Errorf("notifications: %w", err)
+	}
+	return modules{access: acc, artifacts: art, configuration: conf, events: d.events, notifications: notify}, nil
 }
 
 // tokenKeyBits is the access-token RSA key size OpenRuntime uses when its

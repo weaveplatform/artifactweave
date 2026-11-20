@@ -79,7 +79,8 @@
     "test/server/artifacts/terraform": "terraform",
     "test/server/artifacts/terraformbackend": "terraformbackend",
     "test/server/artifacts/vcs": "vcs",
-    "test/server/configuration": "shared"
+    "test/server/configuration": "shared",
+    "test/server/notifications": "shared"
   },
   "shared_files": {
     "internal/access/adapters/http": [
@@ -147,6 +148,8 @@
       "tokens_fixture_test.go",
       "tokens_status_test.go",
       "vcs_tables_test.go",
+      "webhooks_matrix_test.go",
+      "webhooks_status_test.go",
       "xz_test.go"
     ],
     "internal/artifacts/adapters/http": [
@@ -193,7 +196,9 @@
       "system_health_test.go"
     ],
     "internal/notifications/adapters/http": [
-      "handlers_test.go"
+      "criteria_test.go",
+      "handlers_test.go",
+      "subscriptions_test.go"
     ],
     "test/server/access": [
       "access_identity_test.go",
@@ -336,6 +341,9 @@
       "storeonce_test.go",
       "upstream_matrix_test.go",
       "virtual_test.go"
+    ],
+    "test/server/notifications": [
+      "subscriptions_test.go"
     ]
   },
   "format_dependencies": {

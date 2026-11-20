@@ -1,4 +1,4 @@
-// Package webhook manages subscription secret updates and safe read views.
+// Package webhook manages guarded subscription configuration and safe read views.
 //
 // # Role
 //
@@ -41,5 +41,6 @@
 // # Status
 //
 // P11 WEB-01 supplies secret handling for WEB-02 subscription administration.
-// Authorization/criteria routing is WEB-02; observed delivery/signing is P19a.
+// WEB-02 adds transactional authorization and criteria/template validation;
+// observed delivery/signing is P19a.
 package webhook

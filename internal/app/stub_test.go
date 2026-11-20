@@ -38,6 +38,14 @@ var generatedRoutes = map[string]bool{
 	"POST /artifactory/api/deb/{repoKey}/snapshot": true,
 	"GET /access/api/v1/system/version":            true,
 
+	// Subscription administration (WEB-02); delivery tests and troubleshooting
+	// retain the generated501 implementations owned by P19a.
+	"GET /event/api/v1/subscriptions":          true,
+	"POST /event/api/v1/subscriptions":         true,
+	"GET /event/api/v1/subscriptions/{key}":    true,
+	"PUT /event/api/v1/subscriptions/{key}":    true,
+	"DELETE /event/api/v1/subscriptions/{key}": true,
+
 	// Project administration (PRJ-01); content grants and repository sharing
 	// are separate P11 tickets and retain their existing status inventory.
 	"GET /access/api/v1/projects":                                                     true,

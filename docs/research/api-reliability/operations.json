@@ -2350,17 +2350,26 @@
     "route": "DELETE /event/api/v1/subscriptions/{key}",
     "spec": "event.openapi.yaml",
     "operation_id": "deleteWebhookSubscription",
-    "state": "stub: 501",
-    "contract": "Deletes the subscription. Deliveries already in flight finish; no new ones start. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@\u003cproject\u003e/\u003curl\u003e with d.",
-    "handler": "internal/platform/gen/event/unimplemented.gen.go",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:key",
+    "state": "implemented",
+    "contract": "Deletes the subscription configuration and its owned metadata. Administration performs no receiver requests; delivery execution is not currently implemented. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@\u003cproject\u003e/\u003curl\u003e with d.",
+    "handler": "internal/notifications/adapters/http/subscriptions.go: SubscriptionsAPI.DeleteWebhookSubscription",
+    "direct_calls": [
+      "s.Subscriptions.Delete"
+    ],
+    "review_family": "webhook-administration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:key: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/event/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/notifications/module.go",
+      "internal/notifications/adapters/http/subscriptions.go",
+      "internal/notifications/core/webhook/administration.go",
+      "internal/notifications/core/webhook/validation.go",
+      "internal/notifications/adapters/sql/webhooks.go",
+      "test/server/notifications/subscriptions_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -11370,32 +11379,49 @@
     "route": "GET /event/api/v1/subscriptions",
     "spec": "event.openapi.yaml",
     "operation_id": "getWebhookSubscriptions",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns every subscription the caller may manage, global and project ones, with secrets redacted. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@\u003cproject\u003e/\u003curl\u003e with r.",
-    "handler": "internal/platform/gen/event/unimplemented.gen.go",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/notifications/adapters/http/subscriptions.go: SubscriptionsAPI.GetWebhookSubscriptions",
+    "direct_calls": [
+      "apierror.New",
+      "httpkit.NoteCause",
+      "s.Subscriptions.List"
+    ],
+    "review_family": "webhook-administration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: complete configuration snapshot is authorized, secret-redacted and committed before response bytes; visibility or commit failure must not expose a partial list; no keyset or constant-memory claim; webhook-administration: complete authorized configuration list under one current project/identity/policy transaction; singular CRUD retains immutable project and sealed secret replacement; no receiver requests or delivery claim",
     "evidence": [
-      "internal/platform/gen/event/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/notifications/module.go",
+      "internal/notifications/adapters/http/subscriptions.go",
+      "internal/notifications/core/webhook/administration.go",
+      "internal/notifications/core/webhook/validation.go",
+      "internal/notifications/adapters/sql/webhooks.go",
+      "test/server/notifications/subscriptions_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /event/api/v1/subscriptions/{key}",
     "spec": "event.openapi.yaml",
     "operation_id": "getWebhookSubscription",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns one subscription with secrets redacted. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@\u003cproject\u003e/\u003curl\u003e with r.",
-    "handler": "internal/platform/gen/event/unimplemented.gen.go",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/notifications/adapters/http/subscriptions.go: SubscriptionsAPI.GetWebhookSubscription",
+    "direct_calls": [
+      "apierror.New",
+      "eventgen.GetWebhookSubscription200JSONResponse",
+      "httpkit.NoteCause",
+      "s.Subscriptions.Get"
+    ],
+    "review_family": "webhook-administration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.event_filter.criteria.applicationKeys[]",
@@ -11409,10 +11435,16 @@
       "200 application/json.event_filter.event_types[]",
       "200 application/json.handlers[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/event/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/notifications/module.go",
+      "internal/notifications/adapters/http/subscriptions.go",
+      "internal/notifications/core/webhook/administration.go",
+      "internal/notifications/core/webhook/validation.go",
+      "internal/notifications/adapters/sql/webhooks.go",
+      "test/server/notifications/subscriptions_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -20022,12 +20054,18 @@
     "route": "POST /event/api/v1/subscriptions",
     "spec": "event.openapi.yaml",
     "operation_id": "createWebhookSubscription",
-    "state": "stub: 501",
-    "contract": "Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@\u003cproject\u003e/\u003curl\u003e with w.",
-    "handler": "internal/platform/gen/event/unimplemented.gen.go",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on body:/key",
+    "state": "implemented",
+    "contract": "Stores a new subscription configuration. Answers 201. Administration is implemented; enabled is retained configuration and does not start delivery. Delivery, signing, subscription test execution and troubleshooting are not currently implemented. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@\u003cproject\u003e/\u003curl\u003e with w.",
+    "handler": "internal/notifications/adapters/http/subscriptions.go: SubscriptionsAPI.CreateWebhookSubscription",
+    "direct_calls": [
+      "apierror.New",
+      "eventgen.CreateWebhookSubscription201JSONResponse",
+      "httpkit.NoteCause",
+      "s.Subscriptions.Create"
+    ],
+    "review_family": "webhook-administration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on body:/key: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "response_collections": [
       "201 application/json.event_filter.criteria.applicationKeys[]",
@@ -20041,10 +20079,16 @@
       "201 application/json.event_filter.event_types[]",
       "201 application/json.handlers[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/event/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/notifications/module.go",
+      "internal/notifications/adapters/http/subscriptions.go",
+      "internal/notifications/core/webhook/administration.go",
+      "internal/notifications/core/webhook/validation.go",
+      "internal/notifications/adapters/sql/webhooks.go",
+      "test/server/notifications/subscriptions_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -22818,17 +22862,26 @@
     "route": "PUT /event/api/v1/subscriptions/{key}",
     "spec": "event.openapi.yaml",
     "operation_id": "updateWebhookSubscription",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@\u003cproject\u003e/\u003curl\u003e with w.",
-    "handler": "internal/platform/gen/event/unimplemented.gen.go",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:key",
+    "handler": "internal/notifications/adapters/http/subscriptions.go: SubscriptionsAPI.UpdateWebhookSubscription",
+    "direct_calls": [
+      "s.Subscriptions.Update"
+    ],
+    "review_family": "webhook-administration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:key: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/event/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/notifications/module.go",
+      "internal/notifications/adapters/http/subscriptions.go",
+      "internal/notifications/core/webhook/administration.go",
+      "internal/notifications/core/webhook/validation.go",
+      "internal/notifications/adapters/sql/webhooks.go",
+      "test/server/notifications/subscriptions_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

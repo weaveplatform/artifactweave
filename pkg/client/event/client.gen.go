@@ -1186,7 +1186,7 @@ type ClientInterface interface {
 
 	// CreateWebhookSubscriptionWithBody Create a webhook subscription
 	//
-	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Stores a new subscription configuration. Answers 201. Administration is implemented; enabled is retained configuration and does not start delivery. Delivery, signing, subscription test execution and troubleshooting are not currently implemented. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1195,7 +1195,7 @@ type ClientInterface interface {
 
 	// CreateWebhookSubscription Create a webhook subscription
 	//
-	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Stores a new subscription configuration. Answers 201. Administration is implemented; enabled is retained configuration and does not start delivery. Delivery, signing, subscription test execution and troubleshooting are not currently implemented. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1222,7 +1222,7 @@ type ClientInterface interface {
 
 	// DeleteWebhookSubscription Delete a webhook subscription
 	//
-	// Deletes the subscription. Deliveries already in flight finish; no new ones start. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
+	// Deletes the subscription configuration and its owned metadata. Administration performs no receiver requests; delivery execution is not currently implemented. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
 	//
 	// Corresponds with DELETE /api/v1/subscriptions/{key} (the `DeleteWebhookSubscription` operationId).
 	DeleteWebhookSubscription(ctx context.Context, key string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1279,7 +1279,7 @@ func (c *Client) GetWebhookSubscriptions(ctx context.Context, reqEditors ...Requ
 
 // CreateWebhookSubscriptionWithBody Create a webhook subscription
 //
-// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Stores a new subscription configuration. Answers 201. Administration is implemented; enabled is retained configuration and does not start delivery. Delivery, signing, subscription test execution and troubleshooting are not currently implemented. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1298,7 +1298,7 @@ func (c *Client) CreateWebhookSubscriptionWithBody(ctx context.Context, contentT
 
 // CreateWebhookSubscription Create a webhook subscription
 //
-// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Stores a new subscription configuration. Answers 201. Administration is implemented; enabled is retained configuration and does not start delivery. Delivery, signing, subscription test execution and troubleshooting are not currently implemented. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1355,7 +1355,7 @@ func (c *Client) TestWebhookSubscription(ctx context.Context, body TestWebhookSu
 
 // DeleteWebhookSubscription Delete a webhook subscription
 //
-// Deletes the subscription. Deliveries already in flight finish; no new ones start. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
+// Deletes the subscription configuration and its owned metadata. Administration performs no receiver requests; delivery execution is not currently implemented. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
 //
 // Corresponds with DELETE /api/v1/subscriptions/{key} (the `DeleteWebhookSubscription` operationId).
 func (c *Client) DeleteWebhookSubscription(ctx context.Context, key string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1821,7 +1821,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateWebhookSubscriptionWithBodyWithResponse Create a webhook subscription
 	//
-	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Stores a new subscription configuration. Answers 201. Administration is implemented; enabled is retained configuration and does not start delivery. Delivery, signing, subscription test execution and troubleshooting are not currently implemented. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1830,7 +1830,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateWebhookSubscriptionWithResponse Create a webhook subscription
 	//
-	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Stores a new subscription configuration. Answers 201. Administration is implemented; enabled is retained configuration and does not start delivery. Delivery, signing, subscription test execution and troubleshooting are not currently implemented. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1857,7 +1857,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteWebhookSubscriptionWithResponse Delete a webhook subscription
 	//
-	// Deletes the subscription. Deliveries already in flight finish; no new ones start. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
+	// Deletes the subscription configuration and its owned metadata. Administration performs no receiver requests; delivery execution is not currently implemented. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2668,7 +2668,7 @@ func (c *ClientWithResponses) GetWebhookSubscriptionsWithResponse(ctx context.Co
 
 // CreateWebhookSubscriptionWithBodyWithResponse Create a webhook subscription
 //
-// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Stores a new subscription configuration. Answers 201. Administration is implemented; enabled is retained configuration and does not start delivery. Delivery, signing, subscription test execution and troubleshooting are not currently implemented. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2683,7 +2683,7 @@ func (c *ClientWithResponses) CreateWebhookSubscriptionWithBodyWithResponse(ctx 
 
 // CreateWebhookSubscriptionWithResponse Create a webhook subscription
 //
-// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Stores a new subscription configuration. Answers 201. Administration is implemented; enabled is retained configuration and does not start delivery. Delivery, signing, subscription test execution and troubleshooting are not currently implemented. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2728,7 +2728,7 @@ func (c *ClientWithResponses) TestWebhookSubscriptionWithResponse(ctx context.Co
 
 // DeleteWebhookSubscriptionWithResponse Delete a webhook subscription
 //
-// Deletes the subscription. Deliveries already in flight finish; no new ones start. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
+// Deletes the subscription configuration and its owned metadata. Administration performs no receiver requests; delivery execution is not currently implemented. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
 //
 // Returns a wrapper object for the known response body format(s).
 //

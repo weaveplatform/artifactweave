@@ -102,6 +102,7 @@ func statusTable() []statusCase {
 		multipartStatusRows(),
 		roleStatusRows(),
 		projectStatusRows(),
+		webhookStatusRows(),
 		keypairStatusRows(),
 		securityStatusRows(),
 		tokenStatusRows(),

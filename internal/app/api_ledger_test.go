@@ -274,6 +274,7 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 		"internal/artifacts/adapters/http",
 		"internal/artifacts/ecosystem/*/http",
 		"internal/configuration/adapters/http",
+		"internal/notifications/adapters/http",
 	} {
 		found, err := filepath.Glob(filepath.Join(root, dir, "*.go"))
 		if err != nil {
@@ -284,16 +285,17 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	// The artifactory spec's operations are split over partials, which the
 	// router's composites embed; each receiver keys its handlers by its spec.
 	specOf := map[string]string{
-		"ArtifactoryAPI": "artifactory",
-		"VCSAPI":         "artifactory",
-		"NPMAPI":         "artifactory",
-		"DockerAPI":      "artifactory",
-		"DebianAPI":      "artifactory",
-		"CranAPI":        "artifactory",
-		"RPMAPI":         "artifactory",
-		"SecurityAPI":    "artifactory",
-		"SystemAPI":      "artifactory",
-		"AccessService":  "access",
+		"ArtifactoryAPI":   "artifactory",
+		"VCSAPI":           "artifactory",
+		"NPMAPI":           "artifactory",
+		"DockerAPI":        "artifactory",
+		"DebianAPI":        "artifactory",
+		"CranAPI":          "artifactory",
+		"RPMAPI":           "artifactory",
+		"SecurityAPI":      "artifactory",
+		"SystemAPI":        "artifactory",
+		"AccessService":    "access",
+		"SubscriptionsAPI": "event",
 	}
 	out := map[string]apiReviewHandler{}
 	for _, file := range files {
@@ -609,6 +611,7 @@ func apiReviewCompleteText(e *apiReviewOperation) string {
 // content is known only once every element is read, so writing it as it
 // is read would change the bytes.
 var apiReviewCollected = map[string]string{
+	"GET /event/api/v1/subscriptions":                                                  "complete configuration snapshot is authorized, secret-redacted and committed before response bytes; visibility or commit failure must not expose a partial list; no keyset or constant-memory claim",
 	"GET /access/api/v1/environments":                                                  "administrator-defined environments, which the store reads whole",
 	"GET /access/api/v1/oidc":                                                          "administrator OIDC configurations, which the store reads whole",
 	"GET /access/api/v1/oidc/{provider_name}/identity_mappings":                        "one provider's identity mappings, administrator configuration the store reads whole",
@@ -771,6 +774,16 @@ func (c *apiReviewClasses) pagingText() string {
 }
 
 func apiReviewPersistence(path string) (string, string, []string) {
+	if path == "/event/api/v1/subscriptions" || path == "/event/api/v1/subscriptions/{key}" {
+		return "webhook-administration", "complete authorized configuration list under one current project/identity/policy transaction; singular CRUD retains immutable project and sealed secret replacement; no receiver requests or delivery claim", []string{
+			"internal/notifications/module.go",
+			"internal/notifications/adapters/http/subscriptions.go",
+			"internal/notifications/core/webhook/administration.go",
+			"internal/notifications/core/webhook/validation.go",
+			"internal/notifications/adapters/sql/webhooks.go",
+			"test/server/notifications/subscriptions_test.go",
+		}
+	}
 	if strings.HasPrefix(path, apiRestrictionPath) || path == apiRestrictionAuditPath {
 		return "restriction", "audit: default100/max1000, sequence DESC strict id<cursor; filter+administrator-bound cursor; other operations singular", []string{
 			"internal/access/adapters/http/api_restrictions.go",
