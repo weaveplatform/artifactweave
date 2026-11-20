@@ -62,6 +62,8 @@ import (
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/configuration/core/descriptor"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/notifications"
+	notificationshttp "github.com/weaveplatform/artifactweave/internal/notifications/adapters/http"
 	"github.com/weaveplatform/artifactweave/internal/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
@@ -106,6 +108,8 @@ type RouterStore interface {
 	instance.Store
 	// The receipts of the keyed operations' replay (keyed.go).
 	Replays() idempotency.ReplayStore
+	// Subscription administration and its sealed handler secrets.
+	notifications.Store
 }
 
 var _ RouterStore = (*appsql.Store)(nil)
@@ -179,6 +183,10 @@ type RouterConfig struct {
 	// hand, as tests build it, answers as the application's does. Without a
 	// store it stays zero.
 	Access accessapi.API
+	// Notifications is the runtime's subscription administration module. A
+	// router built directly over Store constructs one with the same access and
+	// repository bindings when this is nil.
+	Notifications *notifications.Module
 	// Configuration is the configuration module's API, through which PATCH
 	// /api/system/configuration applies the descriptor and the item routes
 	// read its minimum redirect size. When both its contracts are nil and
@@ -451,6 +459,18 @@ func newArtifactoryAPI(cfg RouterConfig) artifactshttp.ArtifactoryAPI {
 // RouterConfig.Access and RouterConfig.Configuration describe.
 func NewRouter(cfg RouterConfig) http.Handler {
 	cfg = withConfiguration(withAccess(cfg))
+	if cfg.Notifications == nil && cfg.Store != nil {
+		// New refuses only a nil store and performs no I/O.
+		cfg.Notifications, _ = notifications.New(notifications.Deps{
+			Store: cfg.Store, Access: cfg.Access,
+			Repositories: repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
+			ServiceURL:   cfg.BaseURL,
+		})
+	}
+	subscriptions := &notificationshttp.SubscriptionsAPI{}
+	if cfg.Notifications != nil {
+		subscriptions.Subscriptions = cfg.Notifications.Subscriptions()
+	}
 	logger := cfg.Logger
 	if logger == nil {
 		logger = slog.Default()
@@ -692,7 +712,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		eventgen.HandlerWithOptions(
-			eventgen.NewStrictHandlerWithOptions(eventService{}, keyed.event(), eventOpts),
+			eventgen.NewStrictHandlerWithOptions(eventService{SubscriptionsAPI: subscriptions}, keyed.event(), eventOpts),
 			eventgen.ChiServerOptions{
 				BaseURL:          "/event",
 				BaseRouter:       g,
@@ -1224,10 +1244,14 @@ type accessServer struct {
 	accessStubs
 }
 
-// eventService serves /event (webhook subscriptions). Nothing is implemented
-// until the webhooks phase; the embedded stub answers 501 for every operation.
+// eventStubs leaves observed delivery tests and troubleshooting with their
+// deferred owners. Its extra depth lets the concrete CRUD partial win promotion.
+type eventStubs struct{ eventgen.UnimplementedStrict }
+
+// eventService composes subscription administration into /event.
 type eventService struct {
-	eventgen.UnimplementedStrict
+	*notificationshttp.SubscriptionsAPI
+	eventStubs
 }
 
 // The services brought into scope in P1b (research 16) start with every

@@ -105,6 +105,7 @@ func serve(
 			Multipart:     rt.multipart,
 			Tokens:        rt.Tokens,
 			Access:        accessAPI,
+			Notifications: rt.modules.notifications,
 			Configuration: rt.modules.configuration.API(),
 			Redirect: itemkit.Redirect{
 				MinSize: artifactsSettings.RedirectMinSize, TTL: artifactsSettings.RedirectTTL,

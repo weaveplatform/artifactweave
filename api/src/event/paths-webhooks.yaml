@@ -572,7 +572,9 @@ paths:
       x-pagination: complete
       x-pagination-next: none
     post:
-      description: Stores a new subscription and starts delivering matching events if it is enabled. Answers 201.
+      description: Stores a new subscription configuration. Answers 201. Administration is implemented;
+        enabled is retained configuration and does not start delivery. Delivery, signing, subscription test
+        execution and troubleshooting are not currently implemented.
         A key that already exists is rejected with 400.
         Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker
         and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with
@@ -668,7 +670,8 @@ paths:
       x-cost: expensive
   /api/v1/subscriptions/{key}:
     delete:
-      description: Deletes the subscription. Deliveries already in flight finish; no new ones start. Requires a
+      description: Deletes the subscription configuration and its owned metadata. Administration performs no
+        receiver requests; delivery execution is not currently implemented. Requires a
         platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build
         domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
       operationId: deleteWebhookSubscription

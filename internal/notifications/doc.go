@@ -6,22 +6,24 @@
 // notifications module, module root. Only app imports a module root; other
 // modules reach notifications through notifications/api (decision 0044,
 // dependency rules). core/webhook supplies presence-aware secret updates and
-// safe views over the module's ports and store adapters. This root has no
-// constructor or HTTP binding until subscription administration is wired in
-// WEB-02 (decision 0044, composition and HTTP).
+// safe views over the module's ports and store adapters. New builds guarded
+// subscription administration; app composes its Subscriptions into the Event
+// HTTP partial (decision 0044, composition and HTTP).
 //
 // # Inputs
 //
-// No module-root inputs yet. core/webhook accepts replacement subscription
-// configuration with omitted, empty and replacement secret values kept distinct.
+// Deps supplies the shared store, access and repository APIs, and the configured
+// platform URL. core/webhook accepts replacement configuration with omitted,
+// empty and replacement secret values kept distinct.
 //
 // # Outputs
 //
 // core/webhook returns detached, nonsecret views. adapters/http converts handler
-// inputs and generated read variants without activating routes. Planned module
-// wiring (target layout, lines 318-321 and 730-734):
+// inputs and generated read variants. The module supplies Subscriptions to its
+// adapter at app composition. Module ownership (target layout, lines 318-321
+// and 730-734):
 //
-//   - module.go: New(Deps), which app calls in module order.
+//   - module.go: New(Deps) and current guarded administration, called by app.
 //   - catalogue.go: JFrog event names mapped to module events.
 //   - criteria.go, delivery.go, signing.go, retry.go and troubleshoot.go:
 //     subscription criteria, delivery with retries and its log, request
@@ -46,9 +48,13 @@
 //
 // # Status
 //
-// Placeholder: implemented by P11. The module root awaits composition in WEB-02;
-// core/webhook and adapters/http supply WEB-01 secret handling and conversions.
-// WEB-02 owns
-// subscription authorization and route binding; P19a owns observed delivery,
-// signing, testing and troubleshooting.
+// P11 WEB-01/WEB-02 supply safe secret handling and protected subscription CRUD.
+// P19a owns observed delivery, signing, test execution and troubleshooting;
+// administration starts no delivery loop and performs no receiver requests.
+//
+// # Testing
+//
+// module_test.go checks construction without I/O and guard-before-credential-
+// policy ordering, missing services and failure responses. The assembled HTTP
+// and real SQLite/PostgreSQL suites are in test/server/notifications.
 package notifications

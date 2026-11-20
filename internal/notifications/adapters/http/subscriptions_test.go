@@ -3,6 +3,7 @@ package notificationshttp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -143,5 +144,43 @@ func TestUnitWebhookHTTPRefusesMalformedInputAndUnknownStoredHandlers(t *testing
 	}
 	if _, err := subscriptionRead(webhook.View{Handlers: []webhook.HandlerView{{Type: model.HandlerType("unknown")}}}); err == nil {
 		t.Fatal("unknown stored handler was projected as a valid API handler")
+	}
+}
+
+func TestUnitWebhookHTTPUnavailableAuthorityDoesNotDiscloseConfiguration(t *testing.T) {
+	const body = `{"key":"hook","enabled":true,"event_filter":{"domain":"artifact","event_types":["deployed"],"criteria":{}},"handlers":[{"handler_type":"webhook","url":"https://receiver.example/hook"}]}`
+	for _, available := range []bool{false, true} {
+		service := webhook.Administration{}
+		want := http.StatusNotImplemented
+		if available {
+			service.Service.Store = inmem.New(memtx.New())
+			service.Authorize = func(context.Context, kernel.ScopeActions) (webhook.Policy, error) {
+				return nil, errors.New("private credential store failure")
+			}
+			want = http.StatusInternalServerError
+		}
+		router := subscriptionRouter(service)
+		for _, tc := range []struct{ method, path string }{
+			{http.MethodGet, "subscriptions"},
+			{http.MethodGet, "subscriptions/hook"},
+			{http.MethodPost, "subscriptions"},
+			{http.MethodPut, "subscriptions/hook"},
+			{http.MethodDelete, "subscriptions/hook"},
+		} {
+			r := httptest.NewRequest(tc.method, "/event/api/v1/"+tc.path, strings.NewReader(body)).WithContext(t.Context())
+			r.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, r)
+			if w.Code != want || strings.Contains(w.Body.String(), "private credential") || strings.Contains(w.Body.String(), "receiver.example") {
+				t.Fatalf("%s %s unavailable=%t: status=%d body=%s", tc.method, tc.path, !available, w.Code, w.Body.String())
+			}
+		}
+	}
+	api := SubscriptionsAPI{Subscriptions: webhook.Administration{Service: webhook.Service{Store: inmem.New(memtx.New())}}}
+	if _, err := api.CreateWebhookSubscription(t.Context(), eventgen.CreateWebhookSubscriptionRequestObject{}); err == nil {
+		t.Fatal("direct create accepted an absent body")
+	}
+	if _, err := api.UpdateWebhookSubscription(t.Context(), eventgen.UpdateWebhookSubscriptionRequestObject{Key: "hook"}); err == nil {
+		t.Fatal("direct replacement accepted an absent body")
 	}
 }

@@ -103,6 +103,9 @@ func subscriptionError(ctx context.Context, err error) error {
 
 // GetWebhookSubscriptions returns the complete authorized collection, including an empty array when none match.
 func (s SubscriptionsAPI) GetWebhookSubscriptions(ctx context.Context, _ eventgen.GetWebhookSubscriptionsRequestObject) (eventgen.GetWebhookSubscriptionsResponseObject, error) {
+	if s.Subscriptions.Service.Store == nil {
+		return nil, apierror.ErrNotImplemented
+	}
 	list, err := s.Subscriptions.List(ctx, port.WebhookFilter{})
 	if err != nil {
 		return nil, subscriptionError(ctx, err)
@@ -124,6 +127,9 @@ func (s SubscriptionsAPI) CreateWebhookSubscription(
 	ctx context.Context,
 	req eventgen.CreateWebhookSubscriptionRequestObject,
 ) (eventgen.CreateWebhookSubscriptionResponseObject, error) {
+	if s.Subscriptions.Service.Store == nil {
+		return nil, apierror.ErrNotImplemented
+	}
 	in, err := createInput(req.Body)
 	if err != nil {
 		return nil, subscriptionError(ctx, err)
@@ -142,6 +148,9 @@ func (s SubscriptionsAPI) CreateWebhookSubscription(
 
 // GetWebhookSubscription returns 200 with the safe projection of an authorized subscription.
 func (s SubscriptionsAPI) GetWebhookSubscription(ctx context.Context, req eventgen.GetWebhookSubscriptionRequestObject) (eventgen.GetWebhookSubscriptionResponseObject, error) {
+	if s.Subscriptions.Service.Store == nil {
+		return nil, apierror.ErrNotImplemented
+	}
 	view, err := s.Subscriptions.Get(ctx, req.Key)
 	if err != nil {
 		return nil, subscriptionError(ctx, err)
@@ -159,6 +168,9 @@ func (s SubscriptionsAPI) UpdateWebhookSubscription(
 	ctx context.Context,
 	req eventgen.UpdateWebhookSubscriptionRequestObject,
 ) (eventgen.UpdateWebhookSubscriptionResponseObject, error) {
+	if s.Subscriptions.Service.Store == nil {
+		return nil, apierror.ErrNotImplemented
+	}
 	in, err := updateInput(req.Key, req.Body)
 	if err != nil {
 		return nil, subscriptionError(ctx, err)
@@ -174,6 +186,9 @@ func (s SubscriptionsAPI) DeleteWebhookSubscription(
 	ctx context.Context,
 	req eventgen.DeleteWebhookSubscriptionRequestObject,
 ) (eventgen.DeleteWebhookSubscriptionResponseObject, error) {
+	if s.Subscriptions.Service.Store == nil {
+		return nil, apierror.ErrNotImplemented
+	}
 	if err := s.Subscriptions.Delete(ctx, req.Key); err != nil {
 		return nil, subscriptionError(ctx, err)
 	}

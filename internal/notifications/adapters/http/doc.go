@@ -1,5 +1,5 @@
 // Package notificationshttp converts webhook handler requests and safe views
-// for the Event API; subscription route binding arrives in WEB-02.
+// for the Event API and serves the subscription CRUD partial.
 //
 // # Role
 //
@@ -15,7 +15,8 @@
 //
 // Presence-aware handler inputs and explicit generated read variants: plain
 // secrets are empty with secret_configured, and custom secrets expose names
-// only. These helpers activate no HTTP operation by themselves.
+// only. SubscriptionsAPI serves the five CRUD operations through current guarded
+// Administration. Test execution and troubleshooting remain generated501 owners.
 //
 // # References
 //
@@ -36,10 +37,12 @@
 // # Status
 //
 // P11 WEB-01 supplies safe handler conversions. WEB-02 binds subscription
-// administration; P19a owns observed delivery/test/troubleshooting behavior.
+// administration in app; P19a owns observed delivery/test/troubleshooting behavior.
 //
 // # Testing
 //
 // handlers_test.go checks real generated response JSON, both handler types,
 // omitted/empty/replaced values and errors that do not echo private input.
+// subscriptions_test.go drives generated bindings through chi and checks CRUD,
+// status/error envelopes, immutable ownership and deferred-operation controls.
 package notificationshttp
