@@ -277,7 +277,7 @@ type ErrorResponse struct {
 
 // EventFilter Selects the domain, the event types and the resources whose events are delivered.
 type EventFilter struct {
-	// Criteria Optional within this object. Resource conditions for the domain. Required for every domain except user and curation.
+	// Criteria Optional within this object. Resource conditions for the domain. Required for every domain except artifact_lifecycle, user and curation.
 	Criteria *EventFilterCriteria `json:"criteria,omitempty"`
 
 	// Domain Required within this object. One of artifact, artifact_property, docker, build, user, release_bundle, distribution, artifactory_release_bundle, destination, release_bundle_v2, release_bundle_v2_promotion, artifact_lifecycle, xray_scan_status, app_trust or curation. Subscriptions are accepted for every domain, but events are emitted only for artifact, artifact_property, docker, build and user. Project admins may only use artifact, artifact_property, docker and build.
@@ -287,7 +287,7 @@ type EventFilter struct {
 	EventTypes []string `json:"event_types"`
 }
 
-// EventFilterCriteria Resource conditions for the domain. Which fields apply depends on the domain: artifact, artifact_property, docker and artifact_lifecycle use anyLocal, anyRemote, anyFederated, repoKeys and the patterns; build uses anyBuild, selectedBuilds and the patterns; release_bundle, distribution, artifactory_release_bundle and destination use anyReleaseBundle and registeredReleaseBundlesNames; release_bundle_v2 uses anyReleaseBundle and selectedReleaseBundles; release_bundle_v2_promotion uses selectedEnvironments; app_trust uses applicationKeys and stages; user and curation take no criteria. Fields that do not apply to the domain are stored and echoed but have no effect. Unknown fields are kept as given.
+// EventFilterCriteria Resource conditions for the domain. Which fields apply depends on the domain: artifact, artifact_property, docker use anyLocal, anyRemote, anyFederated, repoKeys and the patterns; build uses anyBuild, selectedBuilds and the patterns; release_bundle, distribution, artifactory_release_bundle and destination use anyReleaseBundle and registeredReleaseBundlesNames; release_bundle_v2 uses anyReleaseBundle and selectedReleaseBundles; release_bundle_v2_promotion uses selectedEnvironments; app_trust uses applicationKeys and stages; artifact_lifecycle, user and curation require no criteria. Fields that do not apply to the domain are stored and echoed but have no effect. Unknown fields are kept as given.
 type EventFilterCriteria struct {
 	// AnyBuild Optional within this object. Build domain: match every build.
 	AnyBuild *bool `json:"anyBuild,omitempty"`

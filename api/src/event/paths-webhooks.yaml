@@ -150,7 +150,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/EventFilterCriteria'
           description: Optional within this object. Resource conditions for the domain. Required for every domain
-            except user and curation.
+            except artifact_lifecycle, user and curation.
         domain:
           description: Required within this object. One of artifact, artifact_property, docker, build, user, release_bundle,
             distribution, artifactory_release_bundle, destination, release_bundle_v2, release_bundle_v2_promotion,
@@ -180,11 +180,11 @@ components:
     EventFilterCriteria:
       additionalProperties: true
       description: 'Resource conditions for the domain. Which fields apply depends on the domain: artifact, artifact_property,
-        docker and artifact_lifecycle use anyLocal, anyRemote, anyFederated, repoKeys and the patterns; build uses
+        docker use anyLocal, anyRemote, anyFederated, repoKeys and the patterns; build uses
         anyBuild, selectedBuilds and the patterns; release_bundle, distribution, artifactory_release_bundle and
         destination use anyReleaseBundle and registeredReleaseBundlesNames; release_bundle_v2 uses anyReleaseBundle
         and selectedReleaseBundles; release_bundle_v2_promotion uses selectedEnvironments; app_trust uses applicationKeys
-        and stages; user and curation take no criteria. Fields that do not apply to the domain are stored and echoed
+        and stages; artifact_lifecycle, user and curation require no criteria. Fields that do not apply to the domain are stored and echoed
         but have no effect. Unknown fields are kept as given.'
       properties:
         anyBuild:

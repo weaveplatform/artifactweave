@@ -132,6 +132,19 @@ func subscriptionRouteContract(t *testing.T, store app.RouterStore) {
 	}
 	custom := `{"key":"custom","enabled":true,"project_key":"alpha","event_filter":{"domain":"release_bundle_v2","event_types":["release_bundle_v2_completed"],"criteria":{"selectedReleaseBundles":{"bundle":[]}}},"handlers":[{"handler_type":"custom-webhook","url":"` + receiver.URL + `/{{.secrets.token}}","method":"PATCH","payload":"{{json .data}}","secrets":[{"name":"token","value":"` + privateValue + `"}],"http_headers":[{"name":"X-Token","value":"{{.secrets.token}}"}]}]}`
 	w.request(http.MethodPost, subscriptions, "admin", custom, http.StatusCreated)
+	// Both lifecycle resources in jfrog/artifactory 12.11.14 omit criteria on
+	// create and update; other domains must retain their presence validation.
+	for _, handler := range []string{"webhook", "custom-webhook"} {
+		lifecycle := subscriptionBody("lifecycle-"+handler, "", "artifact_lifecycle", "archive", receiver.URL)
+		lifecycle = strings.ReplaceAll(lifecycle, `,"criteria":{}`, "")
+		lifecycle = strings.ReplaceAll(lifecycle, `"handler_type":"webhook"`, `"handler_type":"`+handler+`"`)
+		if handler == "custom-webhook" {
+			lifecycle = strings.ReplaceAll(lifecycle, `,"secret":"`+privateValue+`"`, "")
+		}
+		w.request(http.MethodPost, subscriptions, "admin", lifecycle, http.StatusCreated)
+		w.request(http.MethodPut, subscriptions+"/lifecycle-"+handler, "admin", lifecycle, http.StatusNoContent)
+		w.request(http.MethodGet, subscriptions+"/lifecycle-"+handler, "admin", "", http.StatusOK)
+	}
 	r := w.request(http.MethodGet, subscriptions+"/custom", "admin", "", http.StatusOK)
 	if !strings.Contains(r.Body.String(), `"http_headers"`) || strings.Contains(r.Body.String(), `"headers"`) || strings.Contains(r.Body.String(), `"type"`) {
 		t.Fatal("custom handler storage fields leaked", r.Body.String())

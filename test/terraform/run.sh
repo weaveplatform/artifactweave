@@ -38,6 +38,7 @@ mode=${1:-validate}
 shift || true
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
+python3 -I "$here/check-webhooks.py" --inventory "$root"
 scenarios=("$@")
 [ ${#scenarios[@]} -gt 0 ] || scenarios=(deploy/artifactweave/terraform/repositories)
 work=${TERRAFORM_WORK:-}
@@ -87,12 +88,15 @@ mirror_provider() {
 		mv "$dir/$zip.part" "$dir/$zip"
 	fi
 }
-mirror_provider artifactory "$ARTIFACTORY_VERSION"
-mirror_provider platform "$PLATFORM_VERSION"
+mirror=${TERRAFORM_PROVIDER_MIRROR:-$work/mirror}
+if [ -z "${TERRAFORM_PROVIDER_MIRROR:-}" ]; then
+	mirror_provider artifactory "$ARTIFACTORY_VERSION"
+	mirror_provider platform "$PLATFORM_VERSION"
+fi
 cat >"$work/terraformrc" <<RC
 provider_installation {
   filesystem_mirror {
-    path    = "$work/mirror"
+    path    = "$mirror"
     include = ["registry.terraform.io/jfrog/artifactory", "registry.terraform.io/jfrog/platform"]
   }
   direct {
@@ -121,7 +125,9 @@ done
 # match the acceptance build: unit tests run with -race, which forces atomic
 # counters, and covdata merge refuses to mix counter modes.
 module=$(cd "$root" && go list -m)
-(cd "$root" && go build -cover -covermode=atomic -coverpkg="$module/..." -o "$work/artifactweave" ./cmd/artifactweave)
+echo "Terraform provider conformance: application $(git -C "$root" rev-parse HEAD)"
+terraform version
+(cd "$root" && go build -cover -covermode=atomic -coverpkg="${TERRAFORM_COVERPKG:-$module/...}" -o "$work/artifactweave" ./cmd/artifactweave)
 port=${TERRAFORM_PORT:-18081}
 url="http://127.0.0.1:$port"
 password=terraform-admin
@@ -342,6 +348,22 @@ apply_virtual_repositories() {
 	check_virtual_members
 }
 
+# Administration only: these receivers are stored, never contacted. Both
+# revisions must refresh cleanly without reading the write-only secret back.
+apply_webhooks() {
+	export TF_VAR_receiver_url="$url/controlled-webhook-receiver" \
+		TF_VAR_revision=1 TF_VAR_handler_secret=Terraform-webhook-secret-1
+	tf apply -auto-approve
+	tf plan -detailed-exitcode
+	tf output -json webhook_keys >"$work/webhook-keys.json"
+	python3 -I "$here/check-webhooks.py" --check "$root" "$work/webhook-keys.json" "$dir/terraform.tfstate" "$work/data"
+	export TF_VAR_revision=2 TF_VAR_handler_secret=Terraform-webhook-secret-2
+	tf apply -auto-approve
+	tf plan -detailed-exitcode
+	python3 -I "$here/check-webhooks.py" --check "$root" "$work/webhook-keys.json" "$dir/terraform.tfstate" "$work/data"
+	python3 -I "$here/check-webhooks.py" --controls
+}
+
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
 	case $scenario in
@@ -351,6 +373,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/cdn-repositories) apply_cdn_repositories ;;
 	deploy/artifactweave/terraform/remote-repositories) apply_remote_repositories ;;
 	deploy/artifactweave/terraform/virtual-repositories) apply_virtual_repositories ;;
+	deploy/artifactweave/terraform/webhooks) apply_webhooks ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1
@@ -362,5 +385,8 @@ for scenario in "${scenarios[@]}"; do
 	tf destroy -auto-approve
 	if [ "$scenario" = deploy/artifactweave/terraform/remote-repositories ]; then
 		python3 -I "$here/check-remotes.py" --remove-proxy
+	fi
+	if [ "$scenario" = deploy/artifactweave/terraform/webhooks ]; then
+		python3 -I "$here/check-webhooks.py" --deleted "$work/webhook-keys.json"
 	fi
 done
