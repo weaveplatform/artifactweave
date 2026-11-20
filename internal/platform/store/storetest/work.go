@@ -19,6 +19,7 @@ func runWork(t *testing.T, newStore func(*testing.T) Store) {
 	t.Run("WorkLifecycle", func(t *testing.T) { testWorkLifecycle(t, newStore(t)) })
 	t.Run("WorkCoalescing", func(t *testing.T) { testWorkCoalescing(t, newStore(t)) })
 	t.Run("WorkFencing", func(t *testing.T) { testWorkFencing(t, newStore(t)) })
+	t.Run("WorkLeaseGuard", func(t *testing.T) { RunWorkLeaseGuard(t, newStore(t)) })
 	t.Run("WorkFailures", func(t *testing.T) { testWorkFailures(t, newStore(t)) })
 	t.Run("WorkLeaseKey", func(t *testing.T) { testWorkLeaseKey(t, newStore(t)) })
 	t.Run("WorkTransactions", func(t *testing.T) { testWorkTransactions(t, newStore(t)) })

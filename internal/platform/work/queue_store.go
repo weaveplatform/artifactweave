@@ -48,6 +48,14 @@ type WorkQueue interface {
 	// Extend moves the lease of the run with generation gen to until.
 	// kernel.ErrConflict when that run no longer holds the item.
 	Extend(ctx context.Context, kind, key string, gen int64, until, now time.Time) error
+	// GuardLease locks the current leased generation through the caller's
+	// transaction and returns its current expiry. It requires an active
+	// transaction of this store (kernel.ErrInvalid otherwise); a missing,
+	// pending or replaced generation is kernel.ErrConflict. Compare the
+	// returned expiry with a fresh clock value AFTER the lock returns.
+	// Event dispatch acquires it after domain effects and stream Ack; no
+	// domain lock may follow it. This is independent of lease settlement.
+	GuardLease(ctx context.Context, kind, key string, gen int64) (time.Time, error)
 	// Complete ends the run with generation gen successfully. The item is
 	// deleted, or, when work was asked for again during the run, pending
 	// again from now with its attempts reset. kernel.ErrConflict when the

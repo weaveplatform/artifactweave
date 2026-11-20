@@ -40,3 +40,10 @@ func TestAccScheduleContract(t *testing.T) {
 			storetest.RunSchedules(t, func(t *testing.T) storetest.Store { return newStore(t) })
 		}, sqltest.WithPostgres())
 }
+
+func TestAccWorkLeaseGuard(t *testing.T) {
+	sqltest.RunModule(t, []dialect.Module{platsql.Module}, func(db *dialect.Store) *platsql.Store { return platsql.New(db) },
+		func(t *testing.T, newStore func(*testing.T) *platsql.Store) {
+			storetest.RunWorkLeaseGuard(t, newStore(t))
+		}, sqltest.WithPostgres())
+}

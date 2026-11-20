@@ -192,9 +192,13 @@ func OpenRuntime(
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
+	eventBus, err := openEventBus(ctx, st, queue)
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
 	mods, err := buildModules(cfg, moduleDeps{
 		store: st, keys: keys, auth: authenticator, tokens: tokens,
-		blobs: hot.store, work: queue, gc: collector, log: log,
+		blobs: hot.store, work: queue, events: eventBus, gc: collector, log: log,
 	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
@@ -204,6 +208,9 @@ func OpenRuntime(
 	// service, with the format settings the server writes with, and its
 	// kinds must be known before Run leases.
 	if err := art.RegisterWork(ctx); err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	if err := mods.events.RegisterWork(ctx); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
 	// The loops outlive startup's context and stop only through close, after

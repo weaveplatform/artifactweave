@@ -190,6 +190,22 @@ func (w workQueue) Extend(
 	})
 }
 
+func (w workQueue) GuardLease(ctx context.Context, kind, key string, gen int64) (time.Time, error) {
+	if !w.s.InTx(ctx) {
+		return time.Time{}, fmt.Errorf("work lease guard requires its transaction: %w", kernel.ErrInvalid)
+	}
+	var until time.Time
+	err := w.s.Do(ctx, func() error {
+		it, ok := w.items().Get(workKey{kind, key})
+		if !ok || it.State != work.WorkLeased || it.Generation != gen {
+			return fmt.Errorf("work item %s/%s run %d: %w", kind, key, gen, kernel.ErrConflict)
+		}
+		until = it.LeaseUntil
+		return nil
+	})
+	return until, err
+}
+
 func (w workQueue) Complete(
 	ctx context.Context,
 	kind, key string,

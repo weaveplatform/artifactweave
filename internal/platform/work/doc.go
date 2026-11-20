@@ -68,6 +68,11 @@
 //     lease every half lease. A run whose lease is lost is cancelled and
 //     recorded as lost, and its generation can no longer complete or fail
 //     the item.
+//   - GuardLease requires the caller's metadata transaction and holds the
+//     current leased generation through commit. Event dispatch uses it after
+//     domain effects and event Ack, then compares its returned expiry with a
+//     fresh clock value. A stale generation rolls back effects and Ack; no
+//     domain/delivery-work lock may follow the dispatch guard.
 //   - A failed run is retried after Backoff, and parked once the item has
 //     used MaxAttempts or the handler returns ErrPermanent, until the key is
 //     enqueued again; a panic counts as a failure. A run cut short because
@@ -79,8 +84,8 @@
 //     github.com/weaveplatform/artifactweave/internal/platform/work, set
 //     once in P9d (decision 0044), so dashboards and alert rules that select
 //     on it change once.
-//   - Every port method is given the time it acts at, so no adapter reads a
-//     clock.
+//   - Time-bearing mutations are given their time, so no adapter reads a
+//     clock. GuardLease returns the stored expiry for a post-lock clock check.
 //
 // # References
 //
