@@ -142,6 +142,18 @@ Feature: OIDC token exchange
     And the files "own/a.txt" and "a.txt" are identical
 
   Scenario: A project roles mapping without a username, as the jfrog/platform provider's example sends it, exchanges for a synthetic subject
+    When I POST "/access/api/v1/projects" as admin with body:
+      """
+      {"project_key":"my-project","display_name":"OIDC project"}
+      """
+    Then the response status is 201
+    When I PUT "/artifactory/api/repositories/my-project-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"generic","projectKey":"my-project"}
+      """
+    Then the response status is 200
+    When I run jf "rt u a.txt my-project-local/ --url {url} --user admin --password {password}"
+    Then the command succeeds
     When I POST "/access/api/v1/oidc/ci/identity_mappings" as admin with body:
       """
       {"name":"project-roles","priority":1,"claims":{"repository":"roles-org/*"},
@@ -158,9 +170,41 @@ Feature: OIDC token exchange
     Then the command succeeds
     And the server answered no request with 500 since the last command
     And the output contains "oidc-ci-project-roles"
+    And I keep the JSON field "AccessToken" of the output as "roles-token"
+    When I run jf "rt dl my-project-local/a.txt project-role/ --flat --fail-no-op --url {url} --access-token {roles-token}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the files "project-role/a.txt" and "a.txt" are identical
     When I PUT "/access/api/v1/oidc/ci/identity_mappings/project-roles" as admin with body:
       """
       {"name":"project-roles","claims":{"repository":"roles-org/*"},
        "token_spec":{"scope":"applied-permissions/roles:other-project:Developer"}}
       """
     Then the response status is 400
+    When I DELETE "/access/api/v1/projects/my-project" as admin
+    Then the response status is 204
+    When I run jf "rt dl my-project-local/a.txt revoked/ --flat --fail-no-op --url {url} --access-token {roles-token}"
+    Then the command fails
+    And the server answered no request with 500 since the last command
+    # Project deletion retains repositories; free its empty build-info key.
+    When I DELETE "/artifactory/api/repositories/my-project-build-info" as admin
+    Then the response status is 200
+    When I POST "/access/api/v1/projects" as admin with body:
+      """
+      {"project_key":"my-project","display_name":"Recreated OIDC project"}
+      """
+    Then the response status is 201
+    When I GET "/access/api/v1/tokens/me" with the kept token "roles-token"
+    Then the response status is 401
+    When I POST "/artifactory/api/repositories/my-project-local" as admin with body:
+      """
+      {"projectKey":"my-project"}
+      """
+    Then the response status is 200
+    When I run jf "eot ci {roles} --url {platform}/ --oidc-provider-type GenericOidc --oidc-audience jfrog"
+    Then the command succeeds
+    And I keep the JSON field "AccessToken" of the output as "current-roles-token"
+    When I run jf "rt dl my-project-local/a.txt current-project-role/ --flat --fail-no-op --url {url} --access-token {current-roles-token}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    And the files "current-project-role/a.txt" and "a.txt" are identical
