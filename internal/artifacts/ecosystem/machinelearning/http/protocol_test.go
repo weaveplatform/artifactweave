@@ -51,7 +51,7 @@ func newFixture(t *testing.T, class repo.Class, configure ...func(*harness.Confi
 		items: &item.Service{Store: db, Blobs: b, Formats: ecosystem.For},
 	}
 	kit := accesstest.Over(t, db)
-	for _, name := range []string{"admin", "writer", "other", "reader"} {
+	for _, name := range []string{"admin", "writer", "other", "reader", "outsider", "manager", "manifest-only", "no-code"} {
 		if err := db.Users().Create(t.Context(), accesstest.User{
 			Name: name, Admin: name == "admin", PasswordHash: accesstest.HashPassword(t, "pw"),
 		}); err != nil {
@@ -73,7 +73,7 @@ func newFixture(t *testing.T, class repo.Class, configure ...func(*harness.Confi
 		}
 		p, err := kit.API().Authenticator.Basic(r.Context(), name, "pw")
 		if err != nil {
-			t.Error(err)
+			t.Errorf("authenticate test actor %q: %v", name, err)
 		}
 		return p
 	})
