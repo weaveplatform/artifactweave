@@ -47,6 +47,11 @@ type remoteFixture struct {
 func newRemoteFixture(t *testing.T) *remoteFixture {
 	t.Helper()
 	f := newFixture(t)
+	blobs := &fixtureBlobs{Store: f.items.Blobs}
+	f.items.Blobs = blobs
+	// Cleanup runs in reverse order: stop the upstream first, quiesce its
+	// filesystem writes next, then let newFixture's TempDir cleanup run.
+	t.Cleanup(blobs.close)
 	up := fakeupstream.New(t, fakeupstream.Options{})
 	c, _ := f.db.Repos().Get(t.Context(), "remote")
 	c.URL = up.URL
