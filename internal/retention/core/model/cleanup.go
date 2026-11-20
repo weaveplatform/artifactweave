@@ -40,7 +40,10 @@ type CleanupCriteria struct {
 
 // CleanupPolicy is a scheduled retention rule (decision 0010).
 type CleanupPolicy struct {
-	Key             string
+	Key string
+	// Revision fences queued work across edits, disablement and recreation.
+	// It is private state, not a field of the vendor policy representation.
+	Revision        string
 	Description     string
 	CronExp         string
 	ProjectKey      string

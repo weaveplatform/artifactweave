@@ -14,5 +14,5 @@ func TestAccContract(t *testing.T) {
 	sqltest.RunModule(t, []dialect.Module{retsql.Module}, retsql.New,
 		func(t *testing.T, newStore func(*testing.T) *retsql.Store) {
 			retstoretest.Run(t, func(t *testing.T) port.Store { return newStore(t) })
-		})
+		}, sqltest.WithPostgres())
 }
