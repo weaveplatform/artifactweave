@@ -29,6 +29,8 @@
 //     Blobs, Replicas, GitLFSLocks, BowerRegistrations, UploadDigests,
 //     Builds, ArchivedItems, ColdBlobs and ColdReplicas, LayoutWatch, and memtx's
 //     Tx, AfterCommit and Close.
+//   - Repos also supplies port.StorageUsage, summing canonical owned item and
+//     raw-cache bytes in place, without copying configurations or content.
 //
 // # Invariants
 //
