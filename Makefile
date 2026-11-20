@@ -123,7 +123,8 @@ TERRAFORM_SCENARIOS ?= deploy/artifactweave/terraform/repositories \
 	deploy/artifactweave/terraform/identity deploy/artifactweave/terraform/oidc \
 	deploy/artifactweave/terraform/cdn-repositories \
 	deploy/artifactweave/terraform/remote-repositories \
-	deploy/artifactweave/terraform/virtual-repositories
+	deploy/artifactweave/terraform/virtual-repositories \
+	deploy/artifactweave/terraform/webhooks
 
 ## terraform: validate the Terraform scenarios against the pinned providers from a filesystem mirror (TERRAFORM_MODE=apply also applies, plans and destroys each against one -cover server)
 # Apply writes the server's coverage to cover/terraform for make cover; CI
