@@ -244,7 +244,7 @@ tests run as part of `make deploy-check`.
 | `acceptance-gradle` | `ubuntu-latest` | P9 | Runs the `@gradle` scenario independently as informational evidence, records its outcome and uploads `cover-gradle` when available. Its outcome does not gate merge |
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestAccSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes. When a family's own `llms.txt` fails, the fetch takes the family's pages from the section of its parent index that lists the pages `api/oracle-inventory.json` records for it. A family that still has no page in the cache fails `TestAccSpecParity`, which names the family and its index URL, and `make parity-baseline` and `make oracle-inventory` refuse that cache; `actions/cache` saves only after a passing job, so such a crawl is not kept for the week ([#1308](https://github.com/weaveplatform/artifactweave/issues/1308)) |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
-| `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc, cdn-repositories, remote-repositories and virtual-repositories. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
+| `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc, cdn-repositories, remote-repositories, virtual-repositories and webhooks. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
 | `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
 
 The required native acceptance partitions, `oci-conformance` and `terraform` are listed in
@@ -1334,7 +1334,14 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
      virtual field set away from its default, require an empty refreshed plan, and read
      each virtual through `GET /artifactory/api/repositories/{key}` to check its members'
      order and deployment repository; then apply revision 2, which reverses every member
-     list and changes one field of each virtual, and repeat both checks (#1531).
+     list and changes one field of each virtual, and repeat both checks (#1531);
+   - **webhooks:** apply the 24 resources in `test/terraform/webhook-cases.json`,
+     require an empty plan, and check every subscription's GET/list representation,
+     domain/event type, criteria, handler fields and secret redaction. Rotate the
+     handler secrets and update every resource, then repeat both checks. Separately
+     prove project isolation, immutable ownership and rejected malformed URL/template
+     updates. After destroy, require GET 404 and collection absence for every key
+     (#1754). This qualifies administration only; no delivery is asserted.
 4. Require `terraform plan -detailed-exitcode` to exit 0.
 5. Destroy.
 
@@ -1383,6 +1390,24 @@ reads from every virtual's configuration. What it did find is the expensive budg
 A local Go 1.27.3 darwin/arm64 run of all six provider scenarios, including the coverage
 build and destroy, completed in 37 seconds. Configuration round-trips do not prove
 resolution through a virtual, which the P10 family scenarios cover.
+
+The P11 webhook fixture (#1754) covers twelve domains with both standard and custom
+handlers using Artifactory provider 12.11.14. Terraform 1.16.4 and Go 1.27.4 on
+darwin/arm64 completed a local 24-create / 24-update / 24-delete run with empty
+plans after both revisions. Direct HTTP checks passed for all 24 resources after
+each revision and after deletion, including secret redaction and sealed database
+bytes. This local run used the existing locked provider mirror and instrumented
+only `internal/notifications/...`; required CI retains whole-module coverage.
+
+The native fixture found two webhook compatibility defects, fixed with it:
+lifecycle resources omit the criteria object, so their create/update must accept
+that omission; artifact, property and Docker resources require an empty `repoKeys`
+array on refresh rather than an omitted field. The required inventory check fails
+before provider installation if a case is missing, duplicated or removed from the
+default scenario list. Provider init remains mandatory and cannot silently skip.
+The pinned promotion resource transmits only selected environments; its exposed
+pattern attributes are omitted by its request conversion, so the fixture uses
+the supported selector. The fixture README links those primary source conversions.
 
 ## Deployment Terraform checks
 

@@ -12,7 +12,9 @@ import (
 func criteriaInput(filter eventgen.EventFilter) (model.WebhookCriteria, error) {
 	b := filter.Criteria
 	if b == nil {
-		if filter.Domain != string(model.DomainUser) && filter.Domain != string(model.DomainCuration) {
+		// The pinned provider's lifecycle resources have no criteria block and
+		// omit this object, just like user subscriptions.
+		if filter.Domain != string(model.DomainUser) && filter.Domain != string(model.DomainCuration) && filter.Domain != string(model.DomainArtifactLifecycle) {
 			return model.WebhookCriteria{}, fmt.Errorf("criteria are required for this event domain: %w", kernel.ErrInvalid)
 		}
 		return model.WebhookCriteria{}, nil
@@ -31,8 +33,8 @@ func criteriaInput(filter eventgen.EventFilter) (model.WebhookCriteria, error) {
 	}, nil
 }
 
-func criteriaRead(b model.WebhookCriteria) *eventgen.EventFilterCriteria {
-	return &eventgen.EventFilterCriteria{
+func criteriaRead(b model.WebhookCriteria, domain model.WebhookDomain) *eventgen.EventFilterCriteria {
+	out := &eventgen.EventFilterCriteria{
 		AnyLocal: httpkit.PtrTo(b.AnyLocal), AnyRemote: httpkit.PtrTo(b.AnyRemote),
 		AnyFederated: httpkit.PtrTo(b.AnyFederated), AnyBuild: httpkit.PtrTo(b.AnyBuild),
 		AnyReleaseBundle: httpkit.PtrTo(b.AnyReleaseBundle), RepoKeys: optionalCriteriaList(b.RepoKeys),
@@ -44,6 +46,13 @@ func criteriaRead(b model.WebhookCriteria) *eventgen.EventFilterCriteria {
 		ApplicationKeys:               optionalCriteriaList(b.ApplicationKeys), Stages: optionalCriteriaList(b.Stages),
 		AdditionalProperties: kernel.Clone(b.Extra),
 	}
+	// These provider resources require repo_keys even for match-any criteria.
+	// Omitting the empty list turns the refreshed set into null and causes a
+	// perpetual Terraform diff; storage intentionally normalizes empty lists.
+	if out.RepoKeys == nil && (domain == model.DomainArtifact || domain == model.DomainArtifactProperty || domain == model.DomainDocker) {
+		out.RepoKeys = httpkit.PtrTo([]string{})
+	}
+	return out
 }
 
 func optionalCriteriaList(values []string) *[]string {

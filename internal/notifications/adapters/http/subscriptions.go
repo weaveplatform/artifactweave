@@ -33,7 +33,7 @@ func subscriptionRead(view webhook.View) (eventgen.WebhookSubscription, error) {
 	return eventgen.WebhookSubscription{
 		Key: httpkit.PtrTo(view.Key), Description: httpkit.PtrTo(view.Description),
 		ProjectKey: optionalString(view.ProjectKey), Enabled: httpkit.PtrTo(view.Enabled), Debug: httpkit.PtrTo(view.Debug),
-		EventFilter: &eventgen.EventFilter{Domain: string(view.Domain), EventTypes: kernel.Clone(view.EventTypes), Criteria: criteriaRead(view.Criteria)},
+		EventFilter: &eventgen.EventFilter{Domain: string(view.Domain), EventTypes: kernel.Clone(view.EventTypes), Criteria: criteriaRead(view.Criteria, view.Domain)},
 		Handlers:    &handlers,
 	}, nil
 }
