@@ -12,6 +12,9 @@ import (
 // than falling back to whole secret-bearing configuration documents.
 type RepositoryIndexPages interface {
 	IndexRepository(context.Context, string) (api.IndexRepository, error)
+	// IndexRepositoryLayout reads only the current layout reference, without
+	// hydrating the repository document or any credentials.
+	IndexRepositoryLayout(context.Context, string) (string, error)
 	IndexRepositories(context.Context, api.IndexRepositoryQuery, kernel.Page) ([]api.IndexRepository, string, error)
 }
 

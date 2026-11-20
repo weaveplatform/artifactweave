@@ -2,6 +2,7 @@ package format
 
 import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 )
 
@@ -16,3 +17,10 @@ type CleanupLeadResolver interface {
 // CleanupLeadSelector supplies bounded facts that can be reduced across pages.
 // The reader never substitutes an arbitrary first file for a missing lead.
 type CleanupLeadSelector func(api.IndexFile) api.IndexLead
+
+// CleanupLayoutLeadResolver needs the current compiled descriptor layout in
+// addition to existing version metadata. The index reader resolves it without
+// opening repository credentials; the selector still performs no I/O.
+type CleanupLayoutLeadResolver interface {
+	CleanupLeadWithLayout(*layout.Layout, model.PackageVersion) (CleanupLeadSelector, error)
+}

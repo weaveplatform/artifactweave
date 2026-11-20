@@ -1,13 +1,16 @@
 package pkgindex
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx"
@@ -24,14 +27,20 @@ type IndexStore interface {
 type indexReader struct {
 	store   IndexStore
 	formats format.Registry
+	layouts format.Layouts
 }
 
 // NewReader publishes index metadata without exposing artifacts' core models.
 // It performs no I/O. The caller supplies current authority; each member read
 // also checks its descriptive parent context so a stale/mixed reference cannot
-// cross a repository's ownership or package identity.
-func NewReader(store IndexStore, formats format.Registry) api.PackageIndex {
-	return indexReader{store: store, formats: formats}
+// cross a repository's ownership or package identity. The optional layout reader
+// resolves descriptor overrides; an embedding without one uses bundled layouts.
+func NewReader(store IndexStore, formats format.Registry, layouts ...format.Layouts) api.PackageIndex {
+	r := indexReader{store: store, formats: formats}
+	if len(layouts) > 0 {
+		r.layouts = layouts[0]
+	}
+	return r
 }
 
 func (r indexReader) sources() (port.RepositoryIndexPages, port.PackageIndexPages, error) {
@@ -178,11 +187,28 @@ func (r indexReader) Files(ctx context.Context, ref api.IndexVersion, properties
 		}
 		var selectLead format.CleanupLeadSelector
 		if r.formats != nil {
-			if resolver, ok := r.formats(ref.Package.Repository.PackageType).(format.CleanupLeadResolver); ok {
-				selectLead, err = resolver.CleanupLead(current)
-				if err != nil {
-					return fmt.Errorf("classify indexed version lead: %w", err)
+			handler := r.formats(ref.Package.Repository.PackageType)
+			if resolver, ok := handler.(format.CleanupLayoutLeadResolver); ok {
+				name, layoutErr := repositories.IndexRepositoryLayout(ctx, ref.Package.Repository.Key)
+				if layoutErr != nil {
+					return fmt.Errorf("index descriptor layout reference: %w", layoutErr)
 				}
+				name = cmp.Or(name, repo.LayoutMaven2)
+				var compiled *layout.Layout
+				if r.layouts != nil {
+					compiled, layoutErr = r.layouts.Layout(ctx, name)
+				} else {
+					compiled, layoutErr = layout.Lookup(name)
+				}
+				if layoutErr != nil && !errors.Is(layoutErr, layout.ErrPattern) {
+					return fmt.Errorf("index descriptor layout: %w", layoutErr)
+				}
+				selectLead, err = resolver.CleanupLeadWithLayout(compiled, current)
+			} else if resolver, ok := handler.(format.CleanupLeadResolver); ok {
+				selectLead, err = resolver.CleanupLead(current)
+			}
+			if err != nil {
+				return fmt.Errorf("classify indexed version lead: %w", err)
 			}
 		}
 		out, next, err = packages.IndexFiles(ctx, ref, properties, page)

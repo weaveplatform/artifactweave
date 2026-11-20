@@ -3,6 +3,8 @@ package retention_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,10 +14,12 @@ import (
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	artifactmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/retention"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/cleanup"
 	"github.com/weaveplatform/artifactweave/test/server/support"
@@ -36,6 +40,7 @@ func (h *selectionReadHook) Files(ctx context.Context, v artifactsapi.IndexVersi
 
 func selectionChangesContract(t *testing.T, newStore func(*testing.T) app.RouterStore) {
 	t.Helper()
+	selectionScopeAndLeadPages(t, newStore)
 	setup := func(t *testing.T) (*selectionWorld, artifactsapi.IndexVersion) {
 		t.Helper()
 		w := newSelectionWorld(t, newStore(t))
@@ -77,7 +82,7 @@ func selectionChangesContract(t *testing.T, newStore func(*testing.T) app.Router
 			t.Fatal("new selection ignored the changed policy", page, err)
 		}
 	})
-	for _, change := range []string{"download", "overwrite", "delete", "property", "revoke"} {
+	for _, change := range []string{"download", "nonlead download", "overwrite", "delete", "property", "revoke"} {
 		t.Run("during evaluation/"+change, func(t *testing.T) {
 			w, v := setup(t)
 			original := w.service.Authorize
@@ -92,6 +97,12 @@ func selectionChangesContract(t *testing.T, newStore func(*testing.T) app.Router
 					switch change {
 					case "download":
 						err = w.db.Items().RecordDownload(ctx, lead.ID, port.Download{At: w.now, By: "reader"})
+					case "nonlead download":
+						id := w.items[1].ID
+						err = w.db.Items().RecordDownload(ctx, id, port.Download{At: w.now, By: "reader"})
+						if err == nil {
+							err = pkgindex.RecordDownload(ctx, w.db, id, w.now)
+						}
 					case "overwrite":
 						lead.Size, lead.Actual.SHA256, lead.Modified = 99, "replacement-content", w.now
 						_, err = w.db.Items().Put(ctx, lead)
@@ -142,6 +153,30 @@ func selectionChangesContract(t *testing.T, newStore func(*testing.T) app.Router
 			t.Fatal("download between pages remained eligible", second, err)
 		}
 	})
+	t.Run("nonlead download between pages", func(t *testing.T) {
+		w, v := setup(t)
+		selection, err := w.service.Select(t.Context(), "selection-policy")
+		if err != nil {
+			t.Fatal(err)
+		}
+		first, err := selection.Candidates(t.Context(), v, kernel.Page{Limit: 1})
+		if err != nil || len(first.Items) != 1 || first.Next == "" {
+			t.Fatal("first page missing", first.Reason, err)
+		}
+		if err := w.db.Tx(t.Context(), func(ctx context.Context) error {
+			id := w.items[1].ID
+			if err := w.db.Items().RecordDownload(ctx, id, port.Download{At: w.now, By: "reader"}); err != nil {
+				return err
+			}
+			return pkgindex.RecordDownload(ctx, w.db, id, w.now)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		second, err := selection.Candidates(t.Context(), v, kernel.Page{Limit: 1, After: first.Next})
+		if err != nil || second.Reason != cleanup.ReasonDownloaded || len(second.Items) != 0 {
+			t.Fatal("a newly accessed linked file left its version eligible", second.Reason, err)
+		}
+	})
 	for _, change := range []string{"owner", "environment", "delete", "revoke"} {
 		t.Run("current repository/"+change, func(t *testing.T) {
 			w, v := setup(t)
@@ -171,6 +206,126 @@ func selectionChangesContract(t *testing.T, newStore func(*testing.T) app.Router
 			page, err := selection.Candidates(t.Context(), v, kernel.Page{Limit: 1})
 			if !errors.Is(err, kernel.ErrForbidden) || len(page.Items) != 0 {
 				t.Fatal("stale repository scope disclosed candidates", page, err)
+			}
+		})
+	}
+}
+
+func selectionScopeAndLeadPages(t *testing.T, newStore func(*testing.T) app.RouterStore) {
+	t.Helper()
+	t.Run("explicit global project scope", func(t *testing.T) {
+		w := newSelectionWorld(t, newStore(t))
+		w.authority = "*"
+		for _, r := range []struct{ key, project string }{{"unassigned", ""}, {"alpha-main", "alpha"}, {"beta-main", "beta"}} {
+			w.repository(r.key, r.project, repo.NPM)
+			for _, v := range []string{"1.0.0", "2.0.0"} {
+				w.version(r.key, repo.NPM, "widget", v, []string{npm.CanonicalPath("widget", v)})
+			}
+		}
+		p := selectionInput(repo.NPM)
+		p.Key, p.ProjectKey, p.Criteria.IncludedProjects = "global-default", "", []string{"default"}
+		if _, err := w.service.Create(t.Context(), p.Key, p); err != nil {
+			t.Fatal(err)
+		}
+		selection, err := w.service.Select(t.Context(), p.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files, _ := collectSelection(t, selection, 1)
+		if len(files) != 1 || files[0].Version.Package.Repository.Key != "unassigned" || files[0].Version.Package.Repository.Project != "" {
+			t.Fatal("default scope included an assigned project", files)
+		}
+		p.Criteria.IncludedProjects = nil
+		if _, err := w.service.Update(t.Context(), p.Key, p); err != nil {
+			t.Fatal(err)
+		}
+		selection, err = w.service.Select(t.Context(), p.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if files, _ := collectSelection(t, selection, 1); len(files) != 0 {
+			t.Fatal("empty global scope silently opened all projects")
+		}
+		p.Criteria.IncludeAllProjects = true
+		if _, err := w.service.Update(t.Context(), p.Key, p); err != nil {
+			t.Fatal(err)
+		}
+		selection, err = w.service.Select(t.Context(), p.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if files, _ := collectSelection(t, selection, 1); len(files) != 3 {
+			t.Fatal("explicit all-project scope lost owned or unassigned content", len(files))
+		}
+		w.authority = "alpha"
+		if _, _, err := selection.Repositories(t.Context(), kernel.Page{}); !errors.Is(err, kernel.ErrForbidden) {
+			t.Fatal("a project administrator continued a global selection", err)
+		}
+	})
+	t.Run("lead beyond first maximum page", func(t *testing.T) {
+		w := newSelectionWorld(t, newStore(t))
+		w.repository("alpha-main", "alpha", repo.Maven)
+		paths := []string{"org/example/widget/1.0-SNAPSHOT/widget-1.0-20261120.120000-9.pom"}
+		for i := range kernel.MaxLimit {
+			paths = append(paths, fmt.Sprintf("org/example/widget/1.0-SNAPSHOT/widget-1.0-20261120.120000-%d.jar", i+11))
+		}
+		paths = append(paths, "org/example/widget/1.0-SNAPSHOT/widget-1.0-20261120.120000-10.pom")
+		var v artifactsapi.IndexVersion
+		if err := w.db.Tx(t.Context(), func(ctx context.Context) error {
+			v = w.versionIn(ctx, "alpha-main", repo.Maven, "org.example:widget", "1.0-SNAPSHOT", paths)
+			w.versionIn(ctx, "alpha-main", repo.Maven, "org.example:widget", "2.0", []string{"org/example/widget/2.0/widget-2.0.pom"})
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		p := selectionInput(repo.Maven)
+		if _, err := w.service.Create(t.Context(), p.Key, p); err != nil {
+			t.Fatal(err)
+		}
+		selection, err := w.service.Select(t.Context(), p.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		page, err := selection.Candidates(t.Context(), v, kernel.Page{Limit: 2})
+		if err != nil || page.Reason != cleanup.ReasonSelected || len(page.Items) != 2 || page.Next == "" || page.LeadFingerprint == "" {
+			t.Fatal("a fresh lower-build POM hid the older current lead on the next page", page.Reason, len(page.Items), err)
+		}
+	})
+	for _, kind := range []repo.PackageType{repo.SBT, repo.Ivy} {
+		t.Run("descriptor layout/"+string(kind), func(t *testing.T) {
+			w := newSelectionWorld(t, newStore(t))
+			w.repository("alpha-main", "alpha", kind)
+			prefix := "org.example/widget/1.0/ivys/ivy-1.0.xml"
+			if kind == repo.SBT {
+				prefix = "org.example/widget/scala_2.13/sbt_1.0/1.0/ivys/ivy.xml"
+			}
+			v := w.version("alpha-main", kind, "org.example:widget", "1.0", []string{prefix})
+			w.version("alpha-main", kind, "org.example:widget", "2.0", []string{strings.ReplaceAll(prefix, "1.0", "2.0")})
+			p := selectionInput(kind)
+			if _, err := w.service.Create(t.Context(), p.Key, p); err != nil {
+				t.Fatal(err)
+			}
+			selection, err := w.service.Select(t.Context(), p.Key)
+			if err != nil {
+				t.Fatal(err)
+			}
+			page, err := selection.Candidates(t.Context(), v, kernel.Page{Limit: 1})
+			if err != nil || page.Reason != cleanup.ReasonSelected || len(page.Items) != 1 {
+				t.Fatal("the configured XML descriptor was not eligible", page.Reason, err)
+			}
+			c, err := w.db.Repos().Get(t.Context(), "alpha-main")
+			if err != nil {
+				t.Fatal(err)
+			}
+			doc := []byte(
+				`{"artifactPathPattern":"[org]/[module]/[baseRev]/[module].[ext]","distinctiveDescriptorPathPattern":true,"descriptorPathPattern":"[org]/[module]/[baseRev]/other.xml"}`,
+			)
+			if err := w.db.Configs().Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigLayout, Key: c.RepoLayoutRef, Document: doc}); err != nil {
+				t.Fatal(err)
+			}
+			page, err = selection.Candidates(t.Context(), v, kernel.Page{Limit: 1})
+			if err != nil || page.Reason != cleanup.ReasonNoLead || len(page.Items) != 0 {
+				t.Fatal("a layout override retained the old descriptor selection", page.Reason, err)
 			}
 		})
 	}

@@ -44,19 +44,36 @@ Keep-last-N protects the comparator-newest versions before inclusion filters;
 zero still protects the newest. Version strings break comparator ties and supply
 stable traversal keys. Age uses the supplied evaluation clock, complete 24-hour
 days and 30-day legacy months. A never-downloaded lead uses its creation time;
-missing creation time cannot become an invented old date. Matching excluded
+missing creation time cannot become an invented old date. The last-download
+predicate also preserves the existing version-level aggregate when a linked
+archive was downloaded more recently than its descriptor; a change to that
+statistic during evaluation invalidates the candidate page. This project choice
+keeps active package content when a client's descriptor is already cached.
+Matching excluded
 properties wins over inclusion; all included property keys must match, with any
 listed value sufficient for one key.
 
 The owning format identifies lead files from existing index identity/metadata.
-Selection reads no blob and keeps no whole-version metadata collection. Maven
+Selection reads no blob; file traversal retains one bounded page and lead
+evidence rather than collecting the version's items. A classifier may read the
+one existing opaque version-metadata document. Maven
 unique snapshots use the current POM build order rather than checksum identity;
 npm uses its canonical scoped tarball; Debian preserves admitted architectures;
 Docker/OCI uses the canonical manifest preference; Go uses its module descriptor;
-Helm and NuGet use the archive named by existing version metadata. Formats not
-yet supplying a classifier explicitly yield `lead_contract_unavailable` for age
-or property evaluation: expanding that coverage remains CLN-03 implementation
-work, not a vendor unsupported-format claim. For several leads in one version,
+Helm and NuGet use the archive named by existing version metadata. The remaining
+indexed formats reuse their canonical archive/descriptor validators, excluding
+generated metadata, signatures and staged transactions. Ivy/SBT and custom Maven
+descriptors follow the current compiled repository layout, including overrides;
+an arbitrary XML file is never substituted. Hugging Face recognizes its documented
+model/dataset metadata names; a snapshot without that lead is retained for
+age/property evaluation rather than using an arbitrary model file.
+
+A missing documented lead yields `missing_lead`; an embedding without a format
+classifier explicitly yields `lead_contract_unavailable`. Neither invents old
+timestamps or a substitute file. Existing formats without a populated package
+index (including Generic, Cargo and Composer) retain the P28 ownership in
+[0018](0018-package-index.md); cleanup builds no second index and performs no
+item-tree/blob scan to fabricate package identities. For several leads in one version,
 all must satisfy the rule; this conservative project choice preserves the whole
 version rather than selecting an arbitrary architecture.
 

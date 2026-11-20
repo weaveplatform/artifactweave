@@ -17,6 +17,7 @@ import (
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	artifactmodel "github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
@@ -55,7 +56,11 @@ func newSelectionWorld(t *testing.T, db app.RouterStore) *selectionWorld {
 	}
 	formats := ecosystem.Settings{}
 	w.service = cleanup.Service{
-		Store: db, Schedules: db.Schedules(), Repositories: db.Repos(), PackageIndex: pkgindex.NewReader(db, formats.For), Now: func() time.Time { return w.now },
+		Store:         db,
+		Schedules:     db.Schedules(),
+		Repositories:  db.Repos(),
+		PackageIndex:  pkgindex.NewReader(db, formats.For, &item.Service{Store: db}),
+		Now:           func() time.Time { return w.now },
 		ProjectExists: func(ctx context.Context, key string) error { _, err := db.Projects().Get(ctx, key); return err },
 		Authorize: func(ctx context.Context) (cleanup.Policy, error) {
 			if err := db.Projects().Guard(ctx); err != nil {
@@ -76,8 +81,11 @@ func (w *selectionWorld) repository(key, project string, kind repo.PackageType) 
 }
 
 func (w *selectionWorld) version(repository string, kind repo.PackageType, name, version string, paths []string) artifactsapi.IndexVersion {
+	return w.versionIn(w.t.Context(), repository, kind, name, version, paths)
+}
+
+func (w *selectionWorld) versionIn(ctx context.Context, repository string, kind repo.PackageType, name, version string, paths []string) artifactsapi.IndexVersion {
 	w.t.Helper()
-	ctx := w.t.Context()
 	p, err := w.db.Packages().Ensure(ctx, artifactmodel.Package{RepoKey: repository, Type: kind, Name: name})
 	if err != nil {
 		w.t.Fatal(err)

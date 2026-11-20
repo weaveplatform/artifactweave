@@ -30,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/gc"
+	itemcore "github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/multipart"
@@ -516,7 +517,8 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		}
 		// New refuses only a nil store, excluded above.
 		if m, err := retention.New(retention.Deps{
-			Store: cfg.Store, Access: cfg.Access, Repositories: repos.NewProjectRepositoryLookup(cfg.Store), PackageIndex: pkgindex.NewReader(cfg.Store, formats),
+			Store: cfg.Store, Access: cfg.Access, Repositories: repos.NewProjectRepositoryLookup(cfg.Store),
+			PackageIndex: pkgindex.NewReader(cfg.Store, formats, &itemcore.Service{Store: cfg.Store}),
 		}); err == nil {
 			cfg.Retention = m
 		}

@@ -734,8 +734,8 @@ components:
           type: array
         repos:
           description: Required within this object. Repository keys or wildcard patterns the policy runs on, at
-            least one. ** selects every repository of the listed types. Only local repositories and remote caches
-            hold packages that can be deleted; virtual repositories are skipped.
+            least one. ** selects local repositories of the listed types. Remote caches and virtual repositories
+            are excluded; a literal remote or virtual repository key is rejected with 400.
           items:
             type: string
           type: array

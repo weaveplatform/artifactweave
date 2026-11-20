@@ -119,6 +119,10 @@ func (s *Selection) Candidates(ctx context.Context, ref artifactsapi.IndexVersio
 		out.Version, out.Reason = latest, ReasonProtected
 		return out, nil
 	}
+	if s.needsLead() && !latest.LastDownloaded.Equal(current.LastDownloaded) {
+		out.Version, out.Reason = latest, ReasonChanged
+		return out, nil
+	}
 	out.Items, out.Next = items, next
 	return out, nil
 }
@@ -152,6 +156,12 @@ func leadEvidence(file artifactsapi.IndexFile) any {
 func (s *Selection) leadReason(file artifactsapi.IndexFile) Reason {
 	v := versionIdentity(file.Version)
 	v.Created, v.LastDownloaded, v.LeadProperties = file.Created, file.LastDownloaded, file.Properties
+	// Item downloads also update the existing version-level statistic. A
+	// recent linked archive access must protect the version even when its
+	// descriptor was cached by the client and not downloaded again.
+	if file.Version.LastDownloaded.After(v.LastDownloaded) {
+		v.LastDownloaded = file.Version.LastDownloaded
+	}
 	return s.criteria.reason(v)
 }
 

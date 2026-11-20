@@ -20,6 +20,19 @@ var (
 	_ port.PackageIndexPages    = packages{}
 )
 
+func (r repos) IndexRepositoryLayout(ctx context.Context, key string) (string, error) {
+	var out string
+	err := r.s.Do(ctx, func() error {
+		value, ok := r.t().Get(key)
+		if !ok {
+			return kernel.ErrNotFound
+		}
+		out = value.RepoLayoutRef
+		return nil
+	})
+	return out, err
+}
+
 // indexFirst retains only the requested page plus its continuation witness;
 // table iteration must not clone/sort every version's opaque metadata.
 func indexFirst[T any](rows []T, value T, limit int, compare func(T, T) int) []T {

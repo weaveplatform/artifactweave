@@ -170,7 +170,6 @@ func New(d Deps) (*Module, error) {
 		api: artifactsapi.API{
 			Repositories: repos.NewRepositories(d.Store, d.Access.Keys, d.Access.Projects, d.RepositoryLifecycle),
 			Layouts:      layout.Checker{},
-			PackageIndex: pkgindex.NewReader(d.Store, formats.For),
 		},
 		formats:      formats,
 		virtualCache: cache,
@@ -186,6 +185,7 @@ func New(d Deps) (*Module, error) {
 		},
 	}
 	m.items.GuardAuthority = m.guardAuthority
+	m.api.PackageIndex = pkgindex.NewReader(d.Store, formats.For, m.items)
 	// Assigned only when present: a nil queue in the interface would be a
 	// typed nil, which the item service would call instead of skipping.
 	if d.Work != nil {

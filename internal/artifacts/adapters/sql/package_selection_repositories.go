@@ -15,6 +15,16 @@ import (
 
 var _ port.RepositoryIndexPages = repos{}
 
+func (r repos) IndexRepositoryLayout(ctx context.Context, key string) (string, error) {
+	expression := "COALESCE(json_extract(doc, '$.repoLayoutRef'), '')"
+	if r.s.Dialect().Name == "postgres" {
+		expression = "COALESCE(doc::jsonb ->> 'repoLayoutRef', '')"
+	}
+	var out string
+	err := r.s.Q(ctx).QueryRowContext(ctx, r.s.Dialect().Rebind("SELECT "+expression+" FROM repositories WHERE key = ?"), key).Scan(&out)
+	return out, r.s.Wrap("read index repository layout", err)
+}
+
 func (r repos) IndexRepository(ctx context.Context, key string) (api.IndexRepository, error) {
 	var out api.IndexRepository
 	found := false
