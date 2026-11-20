@@ -16,3 +16,10 @@ func TestAccWebhookSubscriptionFamiliesAndFutureCriteria(t *testing.T) {
 			storetest.RunSubscriptionFamilies(t, func(t *testing.T) port.Store { return newStore(t) })
 		}, sqltest.WithPostgres())
 }
+
+func TestAccWebhookSubscriptionAdministration(t *testing.T) {
+	sqltest.RunModule(t, []dialect.Module{ntfsql.Module}, ntfsql.New,
+		func(t *testing.T, newStore func(*testing.T) *ntfsql.Store) {
+			storetest.RunSubscriptionAdministration(t, func(t *testing.T) port.Store { return newStore(t) })
+		}, sqltest.WithPostgres())
+}

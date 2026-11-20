@@ -35,13 +35,33 @@ func criteriaRead(b model.WebhookCriteria) *eventgen.EventFilterCriteria {
 	return &eventgen.EventFilterCriteria{
 		AnyLocal: httpkit.PtrTo(b.AnyLocal), AnyRemote: httpkit.PtrTo(b.AnyRemote),
 		AnyFederated: httpkit.PtrTo(b.AnyFederated), AnyBuild: httpkit.PtrTo(b.AnyBuild),
-		AnyReleaseBundle: httpkit.PtrTo(b.AnyReleaseBundle), RepoKeys: httpkit.PtrTo(kernel.Clone(b.RepoKeys)),
-		SelectedBuilds:  httpkit.PtrTo(kernel.Clone(b.SelectedBuilds)),
-		IncludePatterns: httpkit.PtrTo(kernel.Clone(b.IncludePatterns)), ExcludePatterns: httpkit.PtrTo(kernel.Clone(b.ExcludePatterns)),
-		RegisteredReleaseBundlesNames: httpkit.PtrTo(kernel.Clone(b.RegisteredReleaseBundleNames)),
-		SelectedReleaseBundles:        httpkit.PtrTo(kernel.Clone(b.SelectedReleaseBundles)),
-		SelectedEnvironments:          httpkit.PtrTo(kernel.Clone(b.SelectedEnvironments)),
-		ApplicationKeys:               httpkit.PtrTo(kernel.Clone(b.ApplicationKeys)), Stages: httpkit.PtrTo(kernel.Clone(b.Stages)),
+		AnyReleaseBundle: httpkit.PtrTo(b.AnyReleaseBundle), RepoKeys: optionalCriteriaList(b.RepoKeys),
+		SelectedBuilds:  optionalCriteriaList(b.SelectedBuilds),
+		IncludePatterns: optionalCriteriaList(b.IncludePatterns), ExcludePatterns: optionalCriteriaList(b.ExcludePatterns),
+		RegisteredReleaseBundlesNames: optionalCriteriaList(b.RegisteredReleaseBundleNames),
+		SelectedReleaseBundles:        bundleVersionsRead(b.SelectedReleaseBundles),
+		SelectedEnvironments:          optionalCriteriaList(b.SelectedEnvironments),
+		ApplicationKeys:               optionalCriteriaList(b.ApplicationKeys), Stages: optionalCriteriaList(b.Stages),
 		AdditionalProperties: kernel.Clone(b.Extra),
 	}
+}
+
+func optionalCriteriaList(values []string) *[]string {
+	if len(values) == 0 {
+		return nil
+	}
+	return httpkit.PtrTo(kernel.Clone(values))
+}
+
+func bundleVersionsRead(values map[string][]string) *map[string][]string {
+	if len(values) == 0 {
+		return nil
+	}
+	out := kernel.Clone(values)
+	for name, versions := range out {
+		if len(versions) == 0 {
+			out[name] = []string{}
+		}
+	}
+	return &out
 }
