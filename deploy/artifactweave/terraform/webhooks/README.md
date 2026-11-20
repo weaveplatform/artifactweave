@@ -1,16 +1,75 @@
-# Webhook subscription administration
+# webhooks: webhook subscription administration
 
-This reference contains exactly 24 resources: twelve event domains with standard
-and custom handlers, using `jfrog/artifactory` 12.11.14. The required inventory is
-in [webhook-cases.json](../../../../test/terraform/webhook-cases.json), derived from
+This reference configures exactly 24 webhook subscriptions in a running
+ArtifactWeave, using `jfrog/artifactory` 12.11.14. Use it to manage subscription
+configuration for twelve event domains with standard and custom handlers. It
+creates no cloud resources and qualifies **subscription administration only**.
+Storing a receiver, event type or future domain makes no delivery or signing
+assertion.
+
+## What it configures
+
+Each domain has one standard resource (`artifactory_<domain>_webhook`) and one
+custom resource (`artifactory_<domain>_custom_webhook`):
+
+- `artifact`: artifact deployment subscriptions.
+- `artifact_property`: artifact property subscriptions.
+- `artifact_lifecycle`: artifact lifecycle subscriptions.
+- `docker`: Docker image subscriptions.
+- `build`: build subscriptions.
+- `release_bundle`: release bundle subscriptions.
+- `distribution`: distribution subscriptions.
+- `artifactory_release_bundle`: Artifactory release bundle subscriptions.
+- `destination`: destination subscriptions.
+- `user`: user subscriptions.
+- `release_bundle_v2`: release bundle v2 subscriptions.
+- `release_bundle_v2_promotion`: release bundle v2 promotion subscriptions.
+
+The exact required inventory is in
+[webhook-cases.json](../../../../test/terraform/webhook-cases.json), derived from
 the [pinned provider source](https://github.com/jfrog/terraform-provider-artifactory/tree/v12.11.14/pkg/artifactory/resource/webhook).
+The pinned provider deprecates both `artifactory_release_bundle` domain resources
+in favour of `destination`; both remain required here to qualify the planned API.
+The subscriptions use fixed `tf-webhook-...` keys, so use a separate instance or
+check for existing subscriptions with those keys before applying.
 
-Supply `url`, a platform administrator `access_token`, `receiver_url`, and
-`handler_secret` through `TF_VAR_…` environment variables. Apply revision 1,
-require an empty `terraform plan -detailed-exitcode`, then set `revision=2` and
-rotate `handler_secret`. Apply and require an empty plan again. Revision 2 changes
-handler URLs, headers, custom methods/payloads, signing flags, and applicable
-criteria. `terraform destroy` deletes all 24 subscriptions.
+## Prerequisites
+
+- A running ArtifactWeave and its base URL, without `/artifactory`.
+- A platform administrator access token for subscription administration.
+- Terraform 1.6 or later, which installs `jfrog/artifactory` 12.11.14 as pinned in
+  `versions.tf` and `.terraform.lock.hcl`.
+- A receiver URL to store in the handler configurations. This reference does not
+  contact the receiver.
+
+## Inputs to set
+
+Set the non-secret inputs in `terraform.tfvars`:
+
+```hcl
+url          = "https://artifacts.example.com"
+receiver_url = "https://receiver.example.com/webhooks"
+revision     = 1
+```
+
+Supply the sensitive inputs through `TF_VAR_access_token` and
+`TF_VAR_handler_secret` environment variables. `revision` defaults to `1`; setting
+it to `2` changes handler URLs, headers, custom methods/payloads, signing flags,
+and applicable criteria.
+
+## Applying it
+
+With the inputs above and sensitive environment variables set, run:
+
+```sh
+terraform init
+terraform apply
+terraform plan -detailed-exitcode
+```
+
+The plan must exit with code 0, showing no changes after refresh. Then set
+`revision = 2`, rotate `TF_VAR_handler_secret`, apply again, and require another
+empty plan. Each apply creates or updates all 24 subscriptions.
 
 The pinned promotion resource sends only `selectedEnvironments`; the fixture
 therefore exercises that selector. Its shared schema exposes pattern attributes
@@ -20,27 +79,45 @@ the `release-bundles-v2` map key. The direct API assertions use those actual
 and [RBv2](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/webhook/resource_artifactory_webhook_release_bundle_v2.go)
 conversions, with no delivery inference.
 
-The provider's standard/custom resources do not expose project scope. Project
-isolation and immutable ownership are checked separately through HTTP, including
-rejected foreign reads/writes/deletes and malformed URL/template updates.
-
-This scenario qualifies **subscription administration only**. Storing a receiver,
-event type or future domain makes no delivery or signing assertion. The receiver
-uses a controlled loopback path in the test runner and receives no test traffic.
-The pinned provider deprecates both `artifactory_release_bundle` domain resources
-in favour of `destination`; both remain required here to qualify the planned API.
+## Security
 
 API reads redact secrets. ArtifactWeave seals them in its database. Terraform
-marks the supplied secret sensitive but retains it in local state, so keep that
-state private. The fixture passes credentials through environment variables and
-its checker reports only case names and field/status outcomes.
+marks the access token and handler secret sensitive but retains sensitive values
+in local state, so keep that state private. Pass credentials through environment
+variables and protect the environment as well.
 
-`make terraform TERRAFORM_MODE=apply` runs this scenario in the required provider
-lane: all creates, empty plans, direct GET/list field and redaction checks, handler
-and secret updates, another empty plan, project/validation controls, and all
-deletes observed as GET 404 and absent from the collection. Missing or duplicate
-inventory cases fail before provider installation; a missing provider fails init.
-Coverage joins the existing 95% total / 90% per-package CI gate.
+The provider's standard/custom resources do not expose project scope, so these
+subscriptions are global. This configuration grants no user or group permissions.
+
+## Teardown
+
+```sh
+terraform destroy
+```
+
+Destroy deletes all 24 subscriptions. It leaves the running ArtifactWeave and the
+receiver unchanged. Protect any local state or backup files that remain because
+they can retain sensitive values.
+
+## How this scenario is tested
+
+`make terraform TERRAFORM_MODE=apply` runs `test/terraform/run.sh` against a fresh
+`-cover` ArtifactWeave in the required provider lane. It passes the server URL and
+an administrator token, `receiver_url = <server URL>/controlled-webhook-receiver`,
+`revision = 1` and the fixture-only `handler_secret = Terraform-webhook-secret-1`.
+The receiver uses a controlled loopback path and receives no test traffic.
+
+The driver checks all creates, an empty plan, direct GET/list field and redaction
+checks, then applies `revision = 2` with the fixture-only
+`handler_secret = Terraform-webhook-secret-2`. It requires another empty plan,
+checks the changed handler and criteria fields and verifies that persisted
+application database bytes do not contain the plaintext fixture secrets. Separate
+HTTP controls check project isolation and immutable ownership, including rejected
+foreign reads/writes/deletes and unchanged state after malformed URL/template
+updates. All deletes are observed as GET 404 and absent from the collection.
+Missing or duplicate inventory cases fail before provider installation; a missing
+provider fails init. Coverage joins the existing 95% total / 90% per-package CI
+gate.
 
 For local diagnosis, `TERRAFORM_PROVIDER_MIRROR` may name an existing filesystem
 mirror; committed lock checksums and provider versions still apply. CI uses the
@@ -48,6 +125,8 @@ default SHA-256-checked release mirror. `TERRAFORM_COVERPKG` may scope local bui
 instrumentation; CI retains whole-module instrumentation by default.
 
 ## Reference
+
+Generated by terraform-docs (`make deploy-docs`).
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
