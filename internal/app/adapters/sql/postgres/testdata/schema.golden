@@ -806,6 +806,7 @@ column replications.proxy text NOT NULL DEFAULT ''::text
 column replications.disable_proxy boolean NOT NULL DEFAULT false
 column replications.check_binary_existence boolean NOT NULL DEFAULT false
 column replications.socket_timeout_ms bigint NOT NULL DEFAULT 0
+column replications.private_revision text NOT NULL DEFAULT ''::text
 constraint replications.replications_pkey PRIMARY KEY (replication_key)
 index replications.replications_pkey CREATE UNIQUE INDEX replications_pkey ON replications USING btree (replication_key)
 index replications.replications_repo CREATE INDEX replications_repo ON replications USING btree (repo_key, replication_key)

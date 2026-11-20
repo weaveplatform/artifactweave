@@ -9,8 +9,11 @@ import (
 // Replication is one replication target of a repository. Key is the
 // server-assigned replicationKey; Password is sealed.
 type Replication struct {
-	RepoKey              string
-	Key                  string
+	RepoKey string
+	Key     string
+	// Revision is private worker authority. Administration rotates it when
+	// configuration changes, independently of the stable public target key.
+	Revision             string `json:"-"`
 	URL                  string
 	Username             string
 	Password             string `json:"-"`
