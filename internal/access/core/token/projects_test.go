@@ -8,8 +8,59 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
+	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
+
+func TestUnitRoleMintValidatesCurrentDefinitionsBeforePersistence(t *testing.T) {
+	for _, tc := range []struct {
+		name, role, projectKey string
+		ambiguous, missing     bool
+	}{
+		{name: "built-in", role: "Viewer"},
+		{name: "current custom", role: "reader"},
+		{name: "missing definition", role: "missing", missing: true},
+		{name: "ambiguous project and global", role: "reader", ambiguous: true},
+		{name: "project boundary mismatch", role: "Viewer", projectKey: "beta"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, db, _ := world(t)
+			for _, key := range []string{"alpha", "beta"} {
+				if err := db.Projects().Create(t.Context(), model.Project{Key: key}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := db.Projects().
+				PutRole(t.Context(), model.Role{Name: "reader", ProjectKey: "alpha", Type: model.RoleCustom, Actions: []string{"READ_REPOSITORY"}, Environments: []string{"DEV"}}); err != nil {
+				t.Fatal(err)
+			}
+			if tc.ambiguous {
+				if err := db.Projects().PutRole(t.Context(), model.Role{Name: "reader", Type: model.RoleCustomGlobal}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			scope, err := kernel.ParseScope("applied-permissions/roles:alpha:" + tc.role)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out, err := s.Issue(t.Context(), Request{Username: "alice", Scope: scope, ProjectKey: tc.projectKey, Refreshable: true, IncludeReference: true})
+			denied := tc.ambiguous || tc.missing || tc.projectKey != ""
+			if denied && !errors.Is(err, ErrInvalidRequest) || !denied && err != nil {
+				t.Fatalf("role admission: %v", err)
+			}
+			rows, _, listErr := db.Tokens().List(t.Context(), port.TokenFilter{}, kernel.Page{})
+			if listErr != nil {
+				t.Fatal(listErr)
+			}
+			if denied && (len(rows) != 0 || out.AccessToken != "" || out.RefreshToken != "" || out.ReferenceToken != "") {
+				t.Fatal("invalid role selection published credential state")
+			}
+			if !denied && (len(rows) != 1 || out.Record.ProjectIncarnations["alpha"] == "") {
+				t.Fatal("valid role selection lost its current lifetime")
+			}
+		})
+	}
+}
 
 func TestUnitProjectTokenLifetimeIncludesRefreshReferenceAndRegistry(t *testing.T) {
 	for _, scope := range []string{

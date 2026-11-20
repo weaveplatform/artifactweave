@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
+	"github.com/weaveplatform/artifactweave/internal/access/core/project"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	accessgen "github.com/weaveplatform/artifactweave/internal/platform/gen/access"
@@ -89,6 +90,43 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	if err != nil {
 		return token.Issued{}, fmt.Errorf("tokens: %w", err)
 	}
+	if t.deps.Store == nil || t.deps.API.Authenticator == nil || t.deps.API.Authorizer == nil {
+		return token.Issued{}, apierror.ErrNotImplemented
+	}
+	var issued token.Issued
+	err = t.deps.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := t.deps.Store.Projects().Guard(ctx); err != nil {
+			return fmt.Errorf("guard token mint: %w", err)
+		}
+		current, err := t.deps.API.Authenticator.Current(ctx, p)
+		if errors.Is(err, kernel.ErrNotFound) {
+			return kernel.ErrBadCredentials
+		}
+		if err != nil {
+			return fmt.Errorf("current token mint credential: %w", err)
+		}
+		decider, err := t.deps.API.Authorizer.For(ctx, current)
+		if err != nil {
+			return fmt.Errorf("current token mint permissions: %w", err)
+		}
+		if decider == nil {
+			return kernel.ErrForbidden
+		}
+		current.Admin, current.Groups = decider.IsAdmin(), decider.Groups()
+		ctx = accessapi.WithCaller(ctx, current, decider)
+		issued, err = t.mintCurrent(ctx, svc, m, current, decider)
+		return err
+	})
+	if err != nil {
+		return token.Issued{}, err //nolint:wrapcheck // preserve token API's existing error envelope
+	}
+	return issued, nil
+}
+
+// mintCurrent runs after the mint owner has refreshed the caller under the
+// project guard. Credential insertion joins this same metadata transaction.
+func (t tokenAPI) mintCurrent(ctx context.Context, svc *token.Service, m mintRequest, p kernel.Principal, decider accessapi.Decider) (token.Issued, error) {
+	var err error
 	// Only the Access route honours token.allow_basic_auth. The legacy route
 	// is Artifactory's own, which in 7.x authenticates the caller itself and
 	// asks Access for the token as a service: jf c add with a password swaps
@@ -137,10 +175,24 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 			return token.Issued{}, httpkit.BadRequestf("%v", err)
 		}
 		if !p.Admin && !onlyUserScope(req.Scope) {
-			return token.Issued{}, apierror.New(
-				http.StatusForbidden,
-				"Only an administrator can create tokens with a scope other than applied-permissions/user",
-			)
+			allowed, err := t.projectRoleMint(ctx, p, decider, req.Scope, req.ProjectKey)
+			if err != nil {
+				return token.Issued{}, err
+			}
+			if !allowed {
+				return token.Issued{}, apierror.New(
+					http.StatusForbidden,
+					"Only an administrator can create tokens with a scope other than applied-permissions/user",
+				)
+			}
+		}
+	}
+	if selectsProjectRoles(req.Scope) {
+		if hasMintResourceCeiling(p) {
+			return token.Issued{}, kernel.ErrForbidden
+		}
+		if p.TokenID != "" {
+			req.NotAfter = p.TokenExpires
 		}
 	}
 	switch {
@@ -174,6 +226,44 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 		return token.Issued{}, t.internalError(ctx, "issue token", err)
 	}
 	return issued, nil
+}
+
+func selectsProjectRoles(scope kernel.Scope) bool {
+	return slices.ContainsFunc(scope.Entries, func(e kernel.ScopeEntry) bool { return e.Kind == kernel.ScopeRoles })
+}
+
+func hasMintResourceCeiling(p kernel.Principal) bool {
+	return p.TokenID != "" && slices.ContainsFunc(p.Scope.Entries, func(e kernel.ScopeEntry) bool {
+		return e.Kind == kernel.ScopeArtifact || e.Kind == kernel.ScopeBuild || e.Kind == kernel.ScopeRepo || e.Kind == kernel.ScopeProject
+	})
+}
+
+func (t tokenAPI) projectRoleMint(ctx context.Context, p kernel.Principal, decider accessapi.Decider, scope kernel.Scope, projectKey string) (bool, error) {
+	if len(scope.Entries) == 0 || hasMintResourceCeiling(p) {
+		return false, nil
+	}
+	svc := project.Service{Store: t.deps.Store}
+	caller := projectCaller{principal: p, decider: decider}
+	for _, e := range scope.Entries {
+		if e.Kind != kernel.ScopeRoles || projectKey != "" && e.Project != projectKey {
+			return false, nil
+		}
+		current, err := svc.Project(ctx, e.Project)
+		if errors.Is(err, project.ErrNotFound) {
+			return false, nil
+		}
+		if err != nil {
+			return false, fmt.Errorf("token mint project: %w", err)
+		}
+		allowed, err := caller.projectAllowed(ctx, svc, current, projectAdministrator)
+		if err != nil {
+			return false, fmt.Errorf("token mint project administration: %w", err)
+		}
+		if !allowed {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 // refresh exchanges m's refresh token. The refresh token is the credential:
@@ -289,7 +379,12 @@ func (t tokenAPI) asTransientCaller(
 	p kernel.Principal,
 	req *token.Request,
 ) error {
-	req.Identity, req.Scope, req.NotAfter = p.Identity, p.Scope, p.TokenExpires
+	req.Identity, req.NotAfter = p.Identity, p.TokenExpires
+	// A live project administrator's explicit role selection must not be
+	// replaced by its transient parent's broader identity scope.
+	if !selectsProjectRoles(req.Scope) {
+		req.Scope = p.Scope
+	}
 	if !req.Refreshable {
 		return nil
 	}

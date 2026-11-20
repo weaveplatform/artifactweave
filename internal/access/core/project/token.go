@@ -20,6 +20,9 @@ func BindToken(ctx context.Context, projects port.ProjectStore, token *model.Tok
 	}
 	token.ProjectIncarnations = make(map[string]string, len(keys))
 	for _, key := range keys {
+		if token.ProjectKey != "" && key != token.ProjectKey {
+			return fmt.Errorf("scope names project %q outside project_key %q: %w", key, token.ProjectKey, ErrInvalid)
+		}
 		authority, err := projects.Authority(ctx, key)
 		if err != nil {
 			return fmt.Errorf("token project %q: %w", key, err)

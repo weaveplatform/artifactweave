@@ -7,7 +7,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 func TestUnitModuleProjectRolesUseCurrentMembershipAndCanonicalRepositories(t *testing.T) {
@@ -30,7 +30,7 @@ func TestUnitModuleProjectRolesUseCurrentMembershipAndCanonicalRepositories(t *t
 	}))
 	p, err := w.api.Authenticator.Basic(ctx, "ann", "secret")
 	must(t, err)
-	m, err := access.New(access.Deps{Store: w.st, ProjectRepositories: repos.NewProjectRepositoryReader(w.st)})
+	m, err := access.New(access.Deps{Store: w.st, ProjectRepositories: support.ProjectRepositories(w.st)})
 	must(t, err)
 	authorizer := m.API().Authorizer
 	for _, key := range []string{"alpha-dev", "alpha-prod", "beta-dev"} {

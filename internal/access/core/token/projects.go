@@ -20,10 +20,23 @@ func (s *Service) storeIssued(ctx context.Context, rec *model.Token) error {
 			return fmt.Errorf("token: guard issuance: %w", err)
 		}
 		if err := project.BindToken(ctx, s.st.Projects(), rec); err != nil {
-			if errors.Is(err, kernel.ErrNotFound) {
+			if errors.Is(err, kernel.ErrNotFound) || errors.Is(err, project.ErrInvalid) {
 				return fmt.Errorf("%w: %w", ErrInvalidRequest, err)
 			}
 			return fmt.Errorf("token: bind project lifetimes: %w", err)
+		}
+		for _, e := range rec.Scope.Entries {
+			if e.Kind != kernel.ScopeRoles {
+				continue
+			}
+			for _, name := range e.Names {
+				if _, err := project.ResolveRole(ctx, s.st.Projects(), e.Project, name); err != nil {
+					if errors.Is(err, project.ErrNotFound) || errors.Is(err, project.ErrAmbiguousRole) {
+						return fmt.Errorf("%w: %w", ErrInvalidRequest, err)
+					}
+					return fmt.Errorf("token: current selected role: %w", err)
+				}
+			}
 		}
 		return s.st.Tokens().Create(ctx, *rec)
 	})

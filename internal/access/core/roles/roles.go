@@ -335,7 +335,14 @@ func (s Service) Roles(ctx context.Context) ([]model.Role, error) {
 // Role returns the global role called name: a built-in one with any stored
 // change to its actions and environments, or a custom one.
 func (s Service) Role(ctx context.Context, name string) (model.Role, error) {
-	r, err := s.Store.Projects().Role(ctx, "", name)
+	return Lookup(ctx, s.Store.Projects(), name)
+}
+
+// Lookup reads the effective global definition through the narrow project
+// store. It shares the built-in/override rules with token admission, which
+// holds the project guard in its own issuance transaction.
+func Lookup(ctx context.Context, projects port.ProjectStore, name string) (model.Role, error) {
+	r, err := projects.Role(ctx, "", name)
 	if b, ok := model.BuiltinGlobalRole(name); ok {
 		switch {
 		case err == nil:
