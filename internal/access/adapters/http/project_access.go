@@ -170,6 +170,9 @@ func (s AccessService) projectError(ctx context.Context, operation string, err e
 		return nil
 	case errors.As(err, &response):
 		return err
+	case errors.Is(err, kernel.ErrBadCredentials), errors.Is(err, kernel.ErrForbidden),
+		errors.Is(err, kernel.ErrPasswordExpired), errors.Is(err, kernel.ErrAPIRestricted):
+		return err
 	case errors.Is(err, project.ErrNotFound):
 		return apierror.New(http.StatusNotFound, err.Error())
 	case errors.Is(err, project.ErrConflict):

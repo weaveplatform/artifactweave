@@ -190,6 +190,9 @@ func (s *Kit) Items(st Store) *item.Service {
 		Formats:          s.Format,
 		ReindexAuthorize: reindexauth.New(s.Access.Authenticator, s.Access.Authorizer),
 	}
+	if s.Access.Projects != nil {
+		svc.GuardAuthority = s.Access.Projects.Guard
+	}
 	// A nil queue must not become a non-nil Enqueuer.
 	if s.Work != nil {
 		svc.Work = s.Work

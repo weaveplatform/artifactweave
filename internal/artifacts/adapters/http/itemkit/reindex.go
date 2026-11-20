@@ -428,8 +428,8 @@ func (s *Kit) expireRemote(ctx context.Context, st Store, c repo.Config, paths [
 	return nil
 }
 
-// queueRemoteReindex locks the source lifetime before refreshing the caller and
-// checking Manage again. The accepted payload and its source are one commit.
+// queueRemoteReindex takes current authority before the source lifetime lock,
+// refreshes the caller and checks Manage again. The payload and source commit together.
 func (s *Kit) queueRemoteReindex(
 	ctx context.Context,
 	st Store,
@@ -439,6 +439,11 @@ func (s *Kit) queueRemoteReindex(
 	err := st.Tx(
 		ctx,
 		func(ctx context.Context) error {
+			if s.Access.Projects != nil {
+				if err := s.Access.Projects.Guard(ctx); err != nil {
+					return s.InternalError(ctx, "reindex authority", err)
+				}
+			}
 			identity, err := st.RemoteCache().Source(ctx, c.Key)
 			if err != nil {
 				return s.InternalError(ctx, "reindex source", err)

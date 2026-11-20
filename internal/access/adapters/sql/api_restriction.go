@@ -44,7 +44,7 @@ func (a apiRestrictions) Put(
 		return r, fmt.Errorf("API restriction: %w", err)
 	}
 	r = kernel.Normalise(r)
-	err := a.s.Tx(ctx, func(ctx context.Context) error {
+	err := projectStore(a).tx(ctx, func(ctx context.Context) error {
 		var name string
 		if err := a.s.Q(ctx).
 			QueryRowContext(ctx, a.s.Dialect().Rebind("SELECT name FROM users WHERE name = ? "+a.s.Dialect().ForUpdate), r.User).

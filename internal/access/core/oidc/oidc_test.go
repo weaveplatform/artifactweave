@@ -9,6 +9,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/access/core/idtoken/idtokentest"
+	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/oidc"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
@@ -89,6 +90,12 @@ func newWorld(t *testing.T) world {
 	t.Helper()
 	ctx := context.Background()
 	db := &faulty{Store: inmem.New()}
+	// Role mappings issue credentials bound to an existing project lifetime.
+	for _, key := range []string{"p1", "p2", "my-project"} {
+		if err := db.Projects().Create(ctx, model.Project{Key: key}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := db.Instance().Init(ctx, instance.InstanceIdentity{
 		InstanceID: "jfrt@01234567-89ab-4cde-8f01-23456789abcd", ProtocolVersion: 1,
 	}); err != nil {

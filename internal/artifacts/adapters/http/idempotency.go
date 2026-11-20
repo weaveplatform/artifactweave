@@ -23,12 +23,19 @@ var errRequestType = errors.New("artifacts: replay binding got another operation
 // operation ID. The router gives them to the shared replay
 // (idempotency.Strict), which runs the handler as the effect.
 func (s ArtifactoryAPI) KeyedBindings() map[string]idempotency.Binding {
-	return map[string]idempotency.Binding{
+	bindings := map[string]idempotency.Binding{
 		"appendBuild":          s.appendBinding(),
 		"deleteBuilds":         s.deleteBinding(),
 		"deleteBuildsMultiple": s.deleteMultipleBinding(),
 		"promoteBuild":         s.promoteBinding(),
 	}
+	if s.cfg.Access.Projects != nil {
+		for name, binding := range bindings {
+			binding.Guard = s.cfg.Access.Projects.Guard
+			bindings[name] = binding
+		}
+	}
+	return bindings
 }
 
 // reportRetention is how long a keyed delete's or promotion's report is

@@ -351,6 +351,7 @@ func withConfiguration(cfg RouterConfig) RouterConfig {
 		Layouts:         layout.Checker{},
 		Configs:         cfg.Store.Configs(),
 		AnonymousAccess: cfg.Access.AnonymousAccess,
+		Projects:        cfg.Access.Projects,
 	})
 	return cfg
 }

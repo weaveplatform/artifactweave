@@ -238,12 +238,9 @@ func (ts tokens) List(
 }
 
 func (ts tokens) Delete(ctx context.Context, id string) error {
-	return ts.s.ExecOne(
-		ctx,
-		fmt.Sprintf("delete token %q", id),
-		"DELETE FROM tokens WHERE id = ?",
-		id,
-	)
+	return projectStore(ts).tx(ctx, func(ctx context.Context) error {
+		return ts.s.ExecOne(ctx, fmt.Sprintf("delete token %q", id), "DELETE FROM tokens WHERE id = ?", id)
+	})
 }
 
 func (ts tokens) Touch(ctx context.Context, id string, at time.Time) error {
@@ -252,8 +249,14 @@ func (ts tokens) Touch(ctx context.Context, id string, at time.Time) error {
 }
 
 func (ts tokens) DeleteExpired(ctx context.Context, before time.Time) (int64, error) {
-	return ts.s.Exec(ctx, "delete expired tokens",
-		"DELETE FROM tokens WHERE expires_at IS NOT NULL AND expires_at < ?", before.UnixMicro())
+	var removed int64
+	err := projectStore(ts).tx(ctx, func(ctx context.Context) error {
+		var err error
+		removed, err = ts.s.Exec(ctx, "delete expired tokens",
+			"DELETE FROM tokens WHERE expires_at IS NOT NULL AND expires_at < ?", before.UnixMicro())
+		return err
+	})
+	return removed, err
 }
 
 // --- Keys ------------------------------------------------------------------

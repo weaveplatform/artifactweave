@@ -94,6 +94,11 @@ func New(ctx context.Context, src Sources, s accessapi.Subject) (*Decider, error
 		return nil, err
 	}
 	if !current {
+		if src.Projects != nil {
+			// Management read-scope helpers also inspect the verified subject;
+			// an empty content decider alone cannot revoke an ended token.
+			return nil, fmt.Errorf("authz: project token lifetime ended: %w", kernel.ErrBadCredentials)
+		}
 		return &Decider{}, nil
 	}
 	sc := analyse(s.Scope)

@@ -44,6 +44,9 @@ type Deps struct {
 	// AnonymousAccess reads and writes the security section's anonymous
 	// access switch.
 	AnonymousAccess accessapi.AnonymousAccess
+	// Projects serializes planning and publication before repository locks,
+	// including a descriptor that also changes anonymous credential policy.
+	Projects accessapi.Projects
 }
 
 // NewAPI binds the configuration module's API over d. Its Descriptor parses

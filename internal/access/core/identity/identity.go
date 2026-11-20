@@ -66,7 +66,12 @@ func (s *Service) now() time.Time {
 
 // tx runs fn in one transaction. The wrap keeps fn's error for errors.Is.
 func (s *Service) tx(ctx context.Context, fn func(ctx context.Context) error) error {
-	if err := s.Store.Tx(ctx, fn); err != nil {
+	if err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := s.Store.Projects().Guard(ctx); err != nil {
+			return fmt.Errorf("guard current identity authority: %w", err)
+		}
+		return fn(ctx)
+	}); err != nil {
 		return fmt.Errorf("identity: %w", err)
 	}
 	return nil
@@ -765,8 +770,9 @@ func (s *Service) SetExpirationPolicy(
 	if p.MaxAgeDays < 1 {
 		return p, invalidf("passwordMaxAge must be at least 1 day")
 	}
-	if err := s.Store.Settings().
-		Put(ctx, settings.SettingPasswordExpirationPolicy, p); err != nil {
+	if err := s.tx(ctx, func(ctx context.Context) error {
+		return s.Store.Settings().Put(ctx, settings.SettingPasswordExpirationPolicy, p)
+	}); err != nil {
 		return p, err //nolint:wrapcheck // a store error
 	}
 	return p, nil

@@ -870,8 +870,12 @@ func (s AccessService) SetBasicAuthenticationStatus(
 	if req.Body == nil {
 		return nil, httpkit.BadRequestf("a body with enabled is required")
 	}
-	if err := svc.Store.Settings().
-		Put(ctx, settings.SettingBasicAuthEnabled, req.Body.Enabled); err != nil {
+	if err := svc.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := svc.Store.Projects().Guard(ctx); err != nil {
+			return fmt.Errorf("guard basic authentication switch: %w", err)
+		}
+		return svc.Store.Settings().Put(ctx, settings.SettingBasicAuthEnabled, req.Body.Enabled)
+	}); err != nil {
 		return nil, s.identityErr(ctx, "set basic authentication switch", "", err)
 	}
 	s.forgetPolicies()

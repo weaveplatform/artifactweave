@@ -50,6 +50,22 @@ func Apply(
 	now time.Time,
 	dryRun bool,
 ) (configapi.Result, error) {
+	if d.Projects == nil {
+		return applyPlan(ctx, d, p, now, dryRun)
+	}
+	var result configapi.Result
+	err := d.Tx.Tx(ctx, func(ctx context.Context) error {
+		if err := d.Projects.Guard(ctx); err != nil {
+			return fmt.Errorf("guard configuration authority: %w", err)
+		}
+		var err error
+		result, err = applyPlan(ctx, d, p, now, dryRun)
+		return err
+	})
+	return result, err //nolint:wrapcheck // preserve the descriptor's authored errors
+}
+
+func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool) (configapi.Result, error) {
 	res := configapi.Result{Changes: p.Changes, DryRun: dryRun}
 	deletes, writes, err := planRepos(ctx, d.Repositories, p.Repos, &res)
 	if err != nil {

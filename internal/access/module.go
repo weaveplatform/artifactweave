@@ -125,8 +125,6 @@ func TokensOf(st Store, svc *token.Service) accessapi.Tokens {
 // AnonymousAccessOf returns the AnonymousAccess binding over st alone, for
 // code that holds a store before any module exists, such as applying the
 // bootstrap descriptor. The errors are the store's, unwrapped.
-func AnonymousAccessOf(
-	st interface{ Settings() settings.SettingsStore },
-) accessapi.AnonymousAccess {
+func AnonymousAccessOf(st Store) accessapi.AnonymousAccess {
 	return anonymousAccess{st: st}
 }

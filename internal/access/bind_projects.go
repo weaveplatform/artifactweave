@@ -15,6 +15,10 @@ var _ accessapi.Projects = projects{}
 // kernel.ErrNotFound) and each caller's own wrap still apply.
 type projects struct{ st port.Store }
 
+func (b projects) Guard(ctx context.Context) error {
+	return b.st.Projects().Guard(ctx) //nolint:wrapcheck // preserve the shared guard failure
+}
+
 func (b projects) Environments(ctx context.Context, project string) ([]string, error) {
 	envs, err := b.st.Projects().Environments(ctx, project)
 	if err != nil {

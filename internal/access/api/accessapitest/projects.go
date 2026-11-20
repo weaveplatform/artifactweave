@@ -27,6 +27,8 @@ type Project struct {
 // instead, as a store that cannot be read does. It may be used from several
 // goroutines while no one changes its fields.
 type Projects struct {
+	// GuardFunc can observe or refuse transactional authority admission.
+	GuardFunc func(context.Context) error
 	// Projects maps a project key to the project.
 	Projects map[string]Project
 	// Global is the global environments' names, in any order, which
@@ -34,6 +36,14 @@ type Projects struct {
 	Global []string
 	// Err, when set, is every call's error.
 	Err error
+}
+
+// Guard runs GuardFunc, when supplied, or returns Err.
+func (p *Projects) Guard(ctx context.Context) error {
+	if p.GuardFunc != nil {
+		return p.GuardFunc(ctx)
+	}
+	return p.Err
 }
 
 // Environments returns the names of project's environments, or of the

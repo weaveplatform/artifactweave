@@ -48,17 +48,17 @@ func reindexRemote(ctx context.Context, env format.Env, c repo.Config) error {
 	err = env.Store.Tx(
 		ctx,
 		func(ctx context.Context) error {
+			if env.CheckReindex != nil {
+				if err := env.CheckReindex(ctx); err != nil {
+					return fmt.Errorf("nuget: current reindex authority: %w", err)
+				}
+			}
 			current, err := env.Store.RemoteCache().Source(ctx, c.Key)
 			if errors.Is(err, kernel.ErrNotFound) || err == nil && current != source {
 				return staleReindex()
 			}
 			if err != nil {
 				return fmt.Errorf("nuget: reindex publication source: %w", err)
-			}
-			if env.CheckReindex != nil {
-				if err := env.CheckReindex(ctx); err != nil {
-					return fmt.Errorf("nuget: current reindex authority: %w", err)
-				}
 			}
 			// Source() locks the repository lifetime until commit. No current cache
 			// admission or deletion can pass us after this snapshot is checked.

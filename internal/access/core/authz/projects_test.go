@@ -145,6 +145,11 @@ func TestUnitNamedAndGlobalProjectRolesRemainInsideResourceCeilings(t *testing.T
 	if !d.AllowsAll(accessapi.ResourceArtifact, dev, "allowed", r) || d.AllowsAll(accessapi.ResourceArtifact, dev, "", r) {
 		t.Fatal("whole-folder decision did not retain the resource path ceiling")
 	}
+	administrator := subject
+	administrator.Scope = scope(t, `applied-permissions/roles:alpha:"Project Admin" artifact:alpha-dev:r`)
+	if projectDecider(t, src, administrator).ManagesRepository("alpha", "local", accessapi.RepositoryDelete) {
+		t.Fatal("mixed role/resource token manufactured repository administration outside its read ceiling")
+	}
 	for _, target := range []accessapi.Repo{dev, {Key: "alpha-prod", Class: "remote"}, {Key: "beta-dev", Class: "local"}} {
 		if d.VisibleRepos().Has(target) != d.IsRepoVisible(target) {
 			t.Fatalf("SQL listing filter differs from visibility: %+v", target)
@@ -193,8 +198,8 @@ func TestUnitProjectTokenBoundsAdministratorAndDefinitionScopeGrantsNoRead(t *te
 		t.Fatal(err)
 	}
 	subject.Scope = scope(t, "applied-permissions/admin")
-	if stale := projectDecider(t, src, subject); stale.IsAdmin() || stale.Allows(accessapi.ResourceArtifact, accessapi.Repo{Key: "alpha-dev"}, "file", r) {
-		t.Fatal("recreated project revived prior administrator scope")
+	if stale, err := New(t.Context(), src, subject); stale != nil || !errors.Is(err, kernel.ErrBadCredentials) {
+		t.Fatalf("recreated project revived prior administrator or management scope: %+v %v", stale, err)
 	}
 }
 

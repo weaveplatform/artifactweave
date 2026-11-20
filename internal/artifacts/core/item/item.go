@@ -98,7 +98,10 @@ type Service struct {
 	// ReindexAuthorize checks the original caller of queued remote maintenance.
 	// A remote job fails closed when this runtime hook is absent.
 	ReindexAuthorize func(context.Context, repo.Config, format.WorkRequest) error
-	readLayouts      map[string]readLayout
+	// GuardAuthority takes the current project/credential fence at transaction
+	// entry, before source or item locks. Nil is a service without access policy.
+	GuardAuthority func(context.Context) error
+	readLayouts    map[string]readLayout
 }
 
 func (s *Service) now() time.Time {

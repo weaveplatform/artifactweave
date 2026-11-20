@@ -168,6 +168,14 @@ func (d *Decider) inProject(key string) bool {
 // ManagesRepository reads effective granular privileges, never legacy fallback
 // flags: explicit false class privileges must remain false after normalization.
 func (d *Decider) ManagesRepository(projectKey, class string, op accessapi.RepositoryOperation) bool {
+	if d.scope != nil && slices.ContainsFunc(d.scope.Entries, func(entry kernel.ScopeEntry) bool {
+		return entry.Kind == kernel.ScopeArtifact || entry.Kind == kernel.ScopeBuild ||
+			entry.Kind == kernel.ScopeRepo || entry.Kind == kernel.ScopeProject
+	}) {
+		// Applied roles cannot turn a content/configuration read ceiling
+		// into create/delete authority. Management scopes are kept separate.
+		return false
+	}
 	if d.isAdmin {
 		return true
 	}

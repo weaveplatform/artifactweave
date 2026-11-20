@@ -86,6 +86,9 @@ type Policy struct {
 	Pool         Upstream
 	Options      func(context.Context, repo.Config) (Options, error)
 	CheckCurrent func(context.Context, Store, source.Request, source.Permit, string) error
+	// GuardAuthority joins publication's transaction before a source, work or
+	// admission lock. CheckCurrent still refreshes the credential and policy.
+	GuardAuthority func(context.Context) error
 	// Key is a stable keyring-derived HMAC key, never a logged cache identifier.
 	Key           []byte
 	Now           func() time.Time
@@ -93,6 +96,15 @@ type Policy struct {
 	flights       FlightGroup[fillResult]
 	probes        FlightGroup[fillResult]
 	capacity      Admission
+}
+
+// Guard takes the application's authority fence before consumer-owned locks.
+// A standalone policy without project authorization has no guard to acquire.
+func (p *Policy) Guard(ctx context.Context) error {
+	if p.GuardAuthority == nil {
+		return nil
+	}
+	return p.GuardAuthority(ctx) //nolint:wrapcheck // preserve the authority refusal
 }
 
 type fillResult struct {

@@ -50,6 +50,9 @@ func (s *Smart) enqueue(
 	}
 	jobKey := smartWorkKey(key, permit.Identity, statistics)
 	err := s.policy.Store.Tx(ctx, func(tx context.Context) error {
+		if err := s.policy.Guard(tx); err != nil {
+			return smartError("authority", err)
+		}
 		if err := s.admit(tx, jobKey); err != nil {
 			return smartError("operation", err)
 		}

@@ -109,7 +109,12 @@ func notFound(name string) error {
 
 // tx runs fn in one transaction; the wrap keeps fn's error for errors.Is.
 func (s Service) tx(ctx context.Context, fn func(ctx context.Context) error) error {
-	if err := s.Store.Tx(ctx, fn); err != nil {
+	if err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := s.Store.Projects().Guard(ctx); err != nil {
+			return fmt.Errorf("guard current permission authority: %w", err)
+		}
+		return fn(ctx)
+	}); err != nil {
 		return fmt.Errorf("permission: %w", err)
 	}
 	return nil
