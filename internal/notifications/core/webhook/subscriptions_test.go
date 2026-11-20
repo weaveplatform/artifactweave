@@ -19,6 +19,10 @@ func TestUnitWebhookSecretContract(t *testing.T) {
 	storetest.RunSecrets(t, func(*testing.T) port.Store { return inmem.New(memtx.New()) })
 }
 
+func TestUnitWebhookSubscriptionFamiliesAndFutureCriteria(t *testing.T) {
+	storetest.RunSubscriptionFamilies(t, func(*testing.T) port.Store { return inmem.New(memtx.New()) })
+}
+
 var errFailure = errors.New("injected storage failure")
 
 type brokenStore struct {

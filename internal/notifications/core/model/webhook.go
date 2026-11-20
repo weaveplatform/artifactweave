@@ -100,6 +100,9 @@ func ValidateEventTypes(d WebhookDomain, types []string) error {
 // WebhookCriteria select which events of the domain fire. Stored with the
 // subscription as one document.
 type WebhookCriteria struct {
+	// Extra preserves unknown vendor criteria verbatim. It is configuration
+	// echo only; a producer/delivery owner must opt into any matching meaning.
+	Extra                        map[string]any      `json:"extra,omitempty"`
 	AnyLocal                     bool                `json:"any_local,omitempty"`
 	AnyRemote                    bool                `json:"any_remote,omitempty"`
 	AnyFederated                 bool                `json:"any_federated,omitempty"`
