@@ -127,6 +127,7 @@
       "oidc_status_test.go",
       "permissions_status_test.go",
       "platform_test.go",
+      "project_repositories_test.go",
       "projects_matrix_test.go",
       "projects_status_test.go",
       "registry_shared_test.go",
