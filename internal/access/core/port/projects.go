@@ -35,6 +35,15 @@ type ProjectStore interface {
 	Get(ctx context.Context, key string) (model.Project, error)
 	// Update replaces the project.
 	Update(ctx context.Context, p model.Project) error
+	// Storage returns private accounting and whether initialization occurred.
+	// It returns ErrNotFound for a missing project. Compound reads/changes hold
+	// Guard before artifact locks and keep initialization and delta publication
+	// in the same transaction; this record alone reserves no capacity.
+	Storage(ctx context.Context, key string) (model.ProjectStorage, bool, error)
+	// SetStorage persists accounting with the caller's transaction. Bytes must
+	// be nonnegative. A missing project is ErrNotFound; deleting a project drops
+	// its accounting, so a recreated key always needs fresh initialization.
+	SetStorage(ctx context.Context, key string, value model.ProjectStorage) error
 	// Delete removes the project with its roles, environments, members,
 	// the assignments of repositories it owns and its shares of others.
 	Delete(ctx context.Context, key string) error

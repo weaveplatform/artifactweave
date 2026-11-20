@@ -100,6 +100,7 @@ func (p projectStore) Delete(ctx context.Context, key string) error {
 			return memtx.NotFound("project", key)
 		}
 		p.authorities().Del(key)
+		p.storage().Del(key)
 		p.roles().DeleteWhere(func(k roleKey, _ model.Role) bool { return k.project == key })
 		p.environments().
 			DeleteWhere(func(_ string, e model.Environment) bool { return e.ProjectKey == key })
