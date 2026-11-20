@@ -259,6 +259,7 @@
       "permissions_walk_test.go",
       "project_publication_sql_test.go",
       "project_publication_test.go",
+      "project_quota_test.go",
       "project_repositories_test.go",
       "project_repository_bindings_sql_test.go",
       "project_repository_bindings_test.go",
@@ -356,6 +357,7 @@
       "descriptor_test.go",
       "fixture_test.go",
       "forwarded_test.go",
+      "mail_test.go",
       "service_id_test.go",
       "system_health_test.go"
     ],

@@ -131,6 +131,23 @@ The [mail-server guide](https://docs.jfrog.com/administration/docs/mail-server-c
 identifies project quota notifications as a mail-server use case. PRJ-04 supplies
 its narrow configuration/delivery path; full descriptor administration remains P12.
 
+The worker resolves current enabled project administrators, including current
+group membership, under the project administration guard. It repeats the
+project lifetime, warning nonce, current notification condition, recipient,
+mail configuration and work-lease checks before SMTP DATA, with no metadata
+transaction held during SMTP. Removed recipients and deleted/recreated projects
+cannot reuse a queued warning. The remaining external race after that final
+check cannot be made atomic with SMTP.
+
+**[I]** delivery choices: missing/disabled mail transport follows the existing
+queue retry/parking policy; obsolete warnings and occurrences without a current
+deliverable project administrator are suppressed. An absent sender uses
+`artifactweave@localhost`. Message wording reports the immutable transition's
+logical bytes and quota, with a stable Message-ID and enqueue-time Date. TLS
+certificates are verified; SMTP PLAIN authentication follows the standard
+library's requirement for encryption except on localhost. These are local
+delivery choices, not captured vendor notification text or SMTP observations.
+
 ## Constraints
 
 - Project-scoped tokens and roles are evaluated by the permission model

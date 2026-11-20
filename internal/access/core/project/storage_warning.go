@@ -25,9 +25,13 @@ func EnqueueStorageWarning(ctx context.Context, queue work.WorkQueue, warning mo
 	if err != nil {
 		return fmt.Errorf("encode project storage warning: %w", err)
 	}
-	key := warning.ProjectKey + "/" + string(warning.Incarnation) + "/" + warning.WarningKey
+	key := storageWarningKey(warning)
 	if err := queue.Enqueue(ctx, StorageWarningKind, key, payload, now); err != nil {
 		return fmt.Errorf("queue project storage warning: %w", err)
 	}
 	return nil
+}
+
+func storageWarningKey(warning model.ProjectStorageWarning) string {
+	return warning.ProjectKey + "/" + string(warning.Incarnation) + "/" + warning.WarningKey
 }

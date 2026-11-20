@@ -379,9 +379,13 @@ paths:
       x-cost: ordinary
     patch:
       description: 'The configuration-as-code entry point (decision 0009). The body is a YAML document in the descriptor
-        format with any of the top-level sections `localRepositories`, `remoteRepositories`, `virtualRepositories`,
-        `proxies`, `propertySets` and `repoLayouts`, each a map keyed by entity name, and `downloadRedirectConfig`,
-        whose one field `fileMinimumSize` is the smallest file, in whole MB, that a repository with
+        format with any of the top-level sections `localRepositories`, `remoteRepositories`, `virtualRepositories`, `federatedRepositories`,
+        `proxies`, `propertySets` and `repoLayouts`, each a map keyed by entity name, and the singleton `mailServer`
+        and `downloadRedirectConfig` sections. `mailServer` accepts the documented `enabled`, `host`, `port`,
+        `username`, `password`, `from`, `subjectPrefix`, `artifactoryUrl`, `tls` and `ssl` fields. Its password is
+        sealed separately from the public configuration document; omitted fields are retained, and null clears
+        a string field. Disable it with `enabled: false`; whole-section null is refused. The
+        `security` section currently accepts `anonAccessEnabled`. The `downloadRedirectConfig.fileMinimumSize` field sets the smallest file, in whole MB, that a repository with
         `downloadRedirect` or `cdnRedirect` answers with a redirect, a value that may not be null. Any other
         top-level section
         answers 400 naming it, and nothing is applied. Named entities that do not exist are created, existing ones

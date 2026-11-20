@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/login"
+	"github.com/weaveplatform/artifactweave/internal/access/core/project"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/internal/app/config"
@@ -29,6 +30,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/internal/platform/mail"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 	"github.com/weaveplatform/artifactweave/internal/platform/xzfile"
 )
@@ -212,6 +214,10 @@ func OpenRuntime(
 		return nil, errors.Join(err, st.Close())
 	}
 	if err := mods.events.RegisterWork(ctx); err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	warnings := project.WarningDelivery{Store: st, Queue: st.WorkQueue(), Mail: mods.configuration.API().Mail, Sender: mail.Sender{}}
+	if err := queue.Handle(project.StorageWarningKind, warnings.Handle); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
 	// The loops outlive startup's context and stop only through close, after

@@ -12,6 +12,7 @@ import (
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
+	"github.com/weaveplatform/artifactweave/internal/configuration/core/system"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -334,6 +335,9 @@ func planConfigs(
 	var ops []configOp
 	for _, c := range changes {
 		name := c.Section + "." + c.Key
+		if c.Kind == configdoc.ConfigMailServer {
+			name = c.Section
+		}
 		cur, err := d.Configs.Get(ctx, c.Kind, c.Key)
 		found := err == nil
 		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
@@ -355,11 +359,23 @@ func planConfigs(
 		if err := validateConfig(d.Layouts, c.Kind, c.Key, doc); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
+		enabled, sameEnabled := true, true
+		if c.Kind == configdoc.ConfigMailServer {
+			if flag, present := doc["enabled"].(bool); present {
+				enabled = flag
+			}
+			sameEnabled = cur.Enabled == enabled
+			// ConfigStore omits empty secrets. Normalize before comparison so
+			// reapplying an empty mail password is a real no-op.
+			if secrets["password"] == "" {
+				delete(secrets, "password")
+			}
+		}
 		encoded, err := json.Marshal(doc)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s: %w", ErrInvalid, name, err)
 		}
-		if found && sameDocument(cur, encoded, secrets) {
+		if found && sameEnabled && sameDocument(cur, encoded, secrets) {
 			res.Unchanged = append(res.Unchanged, name)
 			continue
 		}
@@ -371,7 +387,7 @@ func planConfigs(
 		ops = append(ops, configOp{name: name, doc: configdoc.ConfigDocument{
 			Kind:     c.Kind,
 			Key:      c.Key,
-			Enabled:  true,
+			Enabled:  enabled,
 			Document: encoded,
 			Secrets:  secrets,
 			Updated:  now,
@@ -444,6 +460,9 @@ func validateConfig(
 	doc map[string]any,
 ) error {
 	switch kind {
+	case configdoc.ConfigMailServer:
+		_, err := system.MailServerFields(doc)
+		return err //nolint:wrapcheck // the mail validator names its field and ErrInvalid
 	case configdoc.ConfigProxy:
 		if host, _ := doc["host"].(string); host == "" {
 			return fmt.Errorf("%w: a proxy needs a host", ErrInvalid)

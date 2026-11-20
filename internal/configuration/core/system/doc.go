@@ -1,5 +1,5 @@
-// Package system will hold the system configuration: base URL, web server,
-// mail server, proxies and the system message.
+// Package system validates and reads the mail-server settings needed by quota
+// delivery. The remaining system administration belongs to P12.
 //
 // # Role
 //
@@ -7,14 +7,14 @@
 //
 // # Inputs
 //
-// None yet. Planned: the system sections of the descriptor and their
-// endpoints, such as baseUrl, webServer, mailServer and systemMessageConfig
-// (plan P12, tasks 1 and 2).
+// The mailServer descriptor mapping and the shared configuration store, runner
+// and authority guard. Secret values live separately in ConfigDocument.Secrets.
 //
 // # Outputs
 //
-// None yet. Planned: validated system settings behind the System contract of
-// configuration/api, Get and Patch (target layout, lines 305 and 309).
+// Validated mail settings behind configuration/api.Mail. Every read captures
+// public settings and the password under one guarded metadata transaction,
+// completed before SMTP starts. No function here opens a network connection.
 //
 // # References
 //
@@ -33,5 +33,6 @@
 //
 // # Status
 //
-// Placeholder: implemented by P12.
+// PRJ-04 supplies the narrow documented mailServer dependency for quota warnings.
+// Full system and mail administration remain P12.
 package system

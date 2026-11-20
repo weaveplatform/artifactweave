@@ -163,8 +163,8 @@ func TestAccPatchConfigurationErrors(t *testing.T) {
 			expected: 400, message: "repoLayouts.mine: name theirs does not match the entry key",
 		},
 		"unapplied sections": {
-			as: "admin", body: "security:\n  anonAccessEnabled: true\nmailServer:\n  host: smtp\n",
-			expected: 400, message: "sections not supported: mailServer",
+			as: "admin", body: "security:\n  anonAccessEnabled: true\nbackups:\n  nightly: {}\n",
+			expected: 400, message: "sections not supported: backups",
 		},
 		"null on a boolean": {
 			as: "admin", body: "localRepositories:\n  x-local:\n    blackedOut: null\n",

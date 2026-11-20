@@ -50,6 +50,8 @@ var aqlCapture = os.Getenv("ARTIFACTWEAVE_AQL_CAPTURE")
 
 // world is one scenario's state.
 type world struct {
+	quotaMail         *quotaMailReceiver
+	quotaMailID       string
 	chefMetadataReads *atomic.Int64
 	chefUp            *httptest.Server
 	puppetUp          *httptest.Server
@@ -219,6 +221,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerTerraformProviderRemote(sc)
 	w.registerPackageWiring(sc)
 	w.registerWaits(sc)
+	w.registerProjectQuota(sc)
 	sc.Step(`^the registry is running$`, w.start)
 	sc.Step(`^the registry is running with environment "([^"]*)"$`, w.startWith)
 	sc.Step(`^I GET "([^"]*)"$`, w.get)

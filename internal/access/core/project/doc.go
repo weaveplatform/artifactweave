@@ -33,7 +33,17 @@
 // Actual item, retained raw-cache, transformed-copy and ownership deltas settle
 // together before event acknowledgment and lease fences. Lazy initialization
 // uses canonical scalar totals before mutation. The durable warning handoff
-// shares that transaction; mail delivery is a separate worker concern.
+// shares that transaction. WarningDelivery resolves current enabled project
+// administrators and mail configuration, then submits SMTP outside metadata
+// transactions. Its pre-DATA snapshot checks the current lifetime, occurrence,
+// recipients, configuration and lease generation again. Missing or disabled
+// mail transport follows the queue's existing retry/parking policy; an obsolete
+// warning or one with no deliverable current administrators is suppressed.
+// Message-ID and Date derive from the durable occurrence and enqueue time;
+// acknowledgement loss can resend that identity. An omitted sender uses the
+// local artifactweave@localhost fallback, an implementation choice rather than
+// an observed vendor address. Message wording is likewise a local choice and
+// reports immutable transition facts, not a new public storage-usage endpoint.
 // Quota and email-policy edits settle a zero byte delta, so enabling/disabling
 // notifications or changing the threshold does not wait for another upload.
 //

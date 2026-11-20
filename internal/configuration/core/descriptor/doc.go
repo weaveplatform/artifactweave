@@ -32,7 +32,7 @@
 //     and left alone.
 //   - DownloadRedirectMinSize: the minimum redirect size that
 //     downloadRedirectConfig.fileMinimumSize set, in bytes.
-//   - NewAPI: configapi.API, with Descriptor and System bound over Deps.
+//   - NewAPI: configapi.API, with Descriptor, System and Mail bound over Deps.
 //   - The section names (SectionLocal and the rest) and Lookup.
 //
 // # Invariants
@@ -81,6 +81,8 @@
 // (decision 0029), the security section's anonymous access switch and the
 // bootstrap descriptor. Moved here in P9d behind configuration/api. Planned
 // for P12: the XML descriptor and the remaining YAML sections.
+// PRJ-04 adds the documented singleton mailServer settings for quota delivery,
+// with its password separated before persistence and guarded configuration reads.
 //
 // # Testing
 //
@@ -96,4 +98,6 @@
 //   - layout_name_test.go: the bodies of the artifactory_repository_layout
 //     Terraform resource, whose layouts repeat their own name.
 //   - redirect_test.go: downloadRedirectConfig and DownloadRedirectMinSize.
+//   - mail_test.go: singleton mail settings, secret retention/clearing, no-op
+//     enablement, validation, dry-run and enclosing transaction rollback.
 package descriptor

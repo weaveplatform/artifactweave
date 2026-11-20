@@ -192,6 +192,9 @@ func Parse(doc []byte, env Lookup) (*Patch, error) {
 	if err := parseDownloadRedirect(top, p); err != nil {
 		return nil, err
 	}
+	if err := parseMailServer(top, p); err != nil {
+		return nil, err
+	}
 	if err := parseSecurity(top, p); err != nil {
 		return nil, err
 	}
@@ -260,6 +263,7 @@ var applied = []string{
 	SectionPropertySets,
 	SectionLayouts,
 	SectionDownloadRedirect,
+	SectionMailServer,
 	SectionSecurity,
 }
 
