@@ -43,7 +43,7 @@ type tokens struct{ s *Store }
 
 const tokenCols = "id, subject, access_digest, refresh_digest, reference_digest, scope, audience, " +
 	"description, project_key, issued_at, expires_at, refreshable, revocable, last_used_at, " +
-	"purpose, secret, identity"
+	"purpose, secret, identity, project_incarnations"
 
 // tokenKey is the keyset of the token list; issued_at is never NULL (0 for
 // an unset time) so both engines sort and compare it the same way.
@@ -76,6 +76,7 @@ func (ts tokens) scan(row interface{ Scan(...any) error }) (model.Token, error) 
 		expires, used    sql.NullInt64
 		access, ref, rfr []byte
 		secret           []byte
+		projects         sql.NullString
 	)
 	if err := row.Scan(
 		&t.ID,
@@ -95,8 +96,12 @@ func (ts tokens) scan(row interface{ Scan(...any) error }) (model.Token, error) 
 		&t.Purpose,
 		&secret,
 		&t.Identity,
+		&projects,
 	); err != nil {
 		return t, err //nolint:wrapcheck // wrapped by the caller
+	}
+	if err := dialect.FromJSON(projects, &t.ProjectIncarnations); err != nil {
+		return t, err
 	}
 	var err error
 	if t.Secret, err = ts.s.Unseal(purposeTokenSecret, t.ID, secret); err != nil {
@@ -126,6 +131,13 @@ func (ts tokens) scan(row interface{ Scan(...any) error }) (model.Token, error) 
 }
 
 func (ts tokens) Create(ctx context.Context, t model.Token) error {
+	projects, err := dialect.ToJSON(t.ProjectIncarnations)
+	if err != nil {
+		return err
+	}
+	if projects == nil {
+		projects = "{}"
+	}
 	secret, err := ts.s.Seal(purposeTokenSecret, t.ID, t.Secret)
 	if err != nil {
 		return err
@@ -151,6 +163,7 @@ func (ts tokens) Create(ctx context.Context, t model.Token) error {
 		t.Purpose,
 		secret,
 		string(t.Identity),
+		projects,
 	)
 	return err
 }

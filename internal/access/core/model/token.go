@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -42,20 +43,24 @@ const TokenPurposeEncryptedPassword = "encrypted_password"
 // revoke by value and to resolve refresh and reference tokens. A zero
 // ExpiresAt means the token never expires.
 type Token struct {
-	ID              string
-	Subject         string
-	Scope           kernel.Scope
-	Audience        string
-	Description     string
-	ProjectKey      string
-	IssuedAt        time.Time
-	ExpiresAt       time.Time
-	Refreshable     bool
-	Revocable       bool
-	LastUsed        time.Time
-	AccessDigest    []byte `json:"-"`
-	RefreshDigest   []byte `json:"-"`
-	ReferenceDigest []byte `json:"-"`
+	ID          string
+	Subject     string
+	Scope       kernel.Scope
+	Audience    string
+	Description string
+	ProjectKey  string
+	// ProjectIncarnations binds every project named by this token's boundary
+	// or role/management scopes to its lifetime at issuance. It is server-side
+	// metadata, never a JWT claim or a public token response.
+	ProjectIncarnations map[string]string `json:"-"`
+	IssuedAt            time.Time
+	ExpiresAt           time.Time
+	Refreshable         bool
+	Revocable           bool
+	LastUsed            time.Time
+	AccessDigest        []byte `json:"-"`
+	RefreshDigest       []byte `json:"-"`
+	ReferenceDigest     []byte `json:"-"`
 	// Purpose marks a token with a special role; empty for an ordinary one.
 	// A subject has at most one token of each purpose.
 	Purpose string
@@ -75,6 +80,22 @@ type Token struct {
 // Expired reports whether the token has expired at now.
 func (t Token) Expired(now time.Time) bool {
 	return !t.ExpiresAt.IsZero() && !now.Before(t.ExpiresAt)
+}
+
+// ProjectKeys returns every project whose lifetime bounds the stored token.
+// Management scopes bind a lifetime even though they grant no content action.
+func (t Token) ProjectKeys() []string {
+	var out []string
+	if t.ProjectKey != "" {
+		out = append(out, t.ProjectKey)
+	}
+	for _, e := range t.Scope.Entries {
+		if e.Kind == kernel.ScopeRoles || e.Kind == kernel.ScopeProject {
+			out = append(out, e.Project)
+		}
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 // Revocable applies Access's rule: a token is revocable when it never

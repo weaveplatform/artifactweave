@@ -66,6 +66,11 @@ type Principal struct {
 	// revalidation, which checks it against the parent token and resolves it
 	// to the user again. Only access and the kernel read or set it.
 	TokenSubject string
+	// TokenProject and ProjectIncarnations are verified server-side token
+	// limits. Only access and the kernel read or set them; changing a project
+	// key's lifetime must never revive an old named-role delegation.
+	TokenProject        string
+	ProjectIncarnations map[string]string
 }
 
 // Anonymous is the principal of a request without credentials when

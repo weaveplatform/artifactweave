@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
@@ -61,6 +62,7 @@ func (a *Authenticator) Token(ctx context.Context, raw, user string) (kernel.Pri
 	p := tokenPrincipal(u, t.Scope)
 	p.TokenID, p.TokenExpires, p.Identity = t.ID, t.ExpiresAt, t.Identity
 	p.TokenSubject = t.Subject
+	p.TokenProject, p.ProjectIncarnations = t.ProjectKey, maps.Clone(t.ProjectIncarnations)
 	if t.Registry != nil {
 		p.Registry, p.TokenParent = t.Registry, t.Parent
 		p.PasswordRevision = sha256.Sum256(u.PasswordHash)

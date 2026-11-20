@@ -13,7 +13,7 @@ import (
 )
 
 func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
-	for _, change := range []string{"unchanged", "user groups", "user disabled", "user deleted", "password changed", "expired", "parent revoked", "parent expired", "parent scope", "parent identity", "anonymous disabled"} {
+	for _, change := range []string{"unchanged", "user groups", "user disabled", "user deleted", "password changed", "expired", "parent bound unchanged", "parent revoked", "parent expired", "parent scope", "parent identity", "parent project", "parent lifetime", "anonymous disabled"} {
 		t.Run(change, func(t *testing.T) {
 			ctx := t.Context()
 			db := inmem.New()
@@ -56,6 +56,9 @@ func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
 			}
 			if len(change) >= 6 && change[:6] == "parent" {
 				rec.Parent = parent.ID
+				rec.ProjectKey, parent.ProjectKey = "alpha", "alpha"
+				rec.ProjectIncarnations = map[string]string{"alpha": "original-lifetime"}
+				parent.ProjectIncarnations = map[string]string{"alpha": "original-lifetime"}
 				if err := db.Tokens().Create(ctx, parent); err != nil {
 					t.Fatal(err)
 				}
@@ -98,6 +101,10 @@ func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
 				parent.Scope = scope(t, "artifact:other:r")
 			case "parent identity":
 				parent.Identity = kernel.IdentitySynthetic
+			case "parent project":
+				parent.ProjectKey = "beta"
+			case "parent lifetime":
+				parent.ProjectIncarnations = map[string]string{"alpha": "recreated-lifetime"}
 			case "anonymous disabled":
 				if err := db.Settings().
 					Put(ctx, settings.SettingAnonymousAccess, false); err != nil {
@@ -123,7 +130,7 @@ func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
 				}
 			}
 			fresh, err := a.CurrentRegistry(ctx, p, db.Tokens())
-			if change != "unchanged" && change != "user groups" {
+			if change != "unchanged" && change != "user groups" && change != "parent bound unchanged" {
 				if err == nil {
 					t.Fatal("changed credential accepted")
 				}
@@ -131,6 +138,8 @@ func TestUnitCurrentRegistryKeepsGrantAndRechecksCredential(t *testing.T) {
 			}
 			if err != nil || !reflect.DeepEqual(fresh.Registry, p.Registry) ||
 				fresh.TokenExpires != p.TokenExpires ||
+				fresh.TokenProject != p.TokenProject ||
+				!reflect.DeepEqual(fresh.ProjectIncarnations, p.ProjectIncarnations) ||
 				fresh.Scope.String() != p.Scope.String() {
 				t.Fatalf("current grant: %+v %v", fresh, err)
 			}

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -81,6 +82,8 @@ type Store interface {
 	// APIRestrictions holds the API restrictions that issuance and refresh
 	// check.
 	APIRestrictions() port.APIRestrictionStore
+	// Projects binds project-scoped tokens to the lifetime they were issued for.
+	Projects() port.ProjectStore
 }
 
 // Service issues and verifies tokens over a store.
@@ -279,7 +282,7 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 	if r.Purpose != "" {
 		rec.Secret = out.ReferenceToken
 	}
-	if err := s.st.Tokens().Create(ctx, rec); err != nil {
+	if err := s.storeIssued(ctx, &rec); err != nil {
 		return Issued{}, fmt.Errorf("token: store: %w", err)
 	}
 	out.Record = rec
@@ -399,6 +402,9 @@ func (s *Service) Verify(ctx context.Context, raw string) (model.Token, error) {
 	if err != nil {
 		return model.Token{}, err
 	}
+	if err := s.currentProjects(ctx, rec); err != nil {
+		return model.Token{}, err
+	}
 	now := s.now()
 	if rec.Expired(now) {
 		return model.Token{}, fmt.Errorf("%w: expired", authn.ErrInvalidToken)
@@ -421,7 +427,14 @@ func (s *Service) VerifyExpired(ctx context.Context, raw string) (model.Token, e
 	if accessapi.IsReferenceToken(raw) {
 		return model.Token{}, fmt.Errorf("%w: not an access token", authn.ErrInvalidToken)
 	}
-	return s.verifyJWT(ctx, raw, true)
+	rec, err := s.verifyJWT(ctx, raw, true)
+	if err != nil {
+		return model.Token{}, err
+	}
+	if err := s.currentProjects(ctx, rec); err != nil {
+		return model.Token{}, err
+	}
+	return rec, nil
 }
 
 func (s *Service) verifyJWT(
@@ -478,13 +491,18 @@ func (s *Service) registryRecord(
 	if err != nil || rec.Parent == "" {
 		return rec, err
 	}
-	_, err = s.st.Tokens().Get(ctx, rec.Parent)
+	parent, err := s.st.Tokens().Get(ctx, rec.Parent)
 	if errors.Is(err, kernel.ErrNotFound) {
 		return model.Token{}, fmt.Errorf("%w: its parent token was revoked", authn.ErrInvalidToken)
 	}
 	if err != nil {
 		return model.Token{}, fmt.Errorf("token: parent of a registry token: %w", err)
 	}
+	if parent.Expired(s.now()) || parent.Subject != rec.Subject ||
+		parent.Scope.String() != rec.Scope.String() || parent.Identity != rec.Identity {
+		return model.Token{}, fmt.Errorf("%w: its parent token changed", authn.ErrInvalidToken)
+	}
+	rec.ProjectKey, rec.ProjectIncarnations = parent.ProjectKey, maps.Clone(parent.ProjectIncarnations)
 	return rec, nil
 }
 
@@ -573,8 +591,14 @@ func (s *Service) RefreshAs(
 ) (Issued, error) {
 	var out Issued
 	err := s.st.Tx(ctx, func(ctx context.Context) error {
+		if err := s.st.Projects().Guard(ctx); err != nil {
+			return fmt.Errorf("token: guard refresh: %w", err)
+		}
 		old, err := s.byDigest(ctx, port.DigestRefresh, refreshToken)
 		if err != nil {
+			return err
+		}
+		if err := s.currentProjects(ctx, old); err != nil {
 			return err
 		}
 		if !old.ExpiresAt.IsZero() &&

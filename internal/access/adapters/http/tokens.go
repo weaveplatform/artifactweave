@@ -324,7 +324,9 @@ var errBasicTokenCreation = apierror.New(http.StatusUnauthorized,
 // than its user's identity. Such a token must not mint a broader credential,
 // a token or a password: a resource- or group-scoped token doing so would
 // escalate past its own scope.
-func narrowedToken(p kernel.Principal) bool { return p.TokenID != "" && !identityScope(p.Scope) }
+func narrowedToken(p kernel.Principal) bool {
+	return p.TokenID != "" && (p.TokenProject != "" || !identityScope(p.Scope))
+}
 
 // identityScope reports whether a scope acts as its user or as an
 // administrator, rather than narrowing to groups or resources.

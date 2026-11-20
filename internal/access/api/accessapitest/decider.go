@@ -60,6 +60,17 @@ type Decider struct {
 	) bool
 	// SystemFunc answers System.
 	SystemFunc func(area string, want kernel.ScopeActions) bool
+	// ManagesRepositoryFunc answers configuration administration separately
+	// from content actions; nil answers Admin.
+	ManagesRepositoryFunc func(projectKey, class string, operation accessapi.RepositoryOperation) bool
+}
+
+// ManagesRepository answers the configured project administration question.
+func (d *Decider) ManagesRepository(projectKey, class string, operation accessapi.RepositoryOperation) bool {
+	if d.ManagesRepositoryFunc != nil {
+		return d.ManagesRepositoryFunc(projectKey, class, operation)
+	}
+	return d.Admin
 }
 
 // IsAdmin reports Admin.

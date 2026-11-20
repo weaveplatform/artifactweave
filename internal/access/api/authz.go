@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"maps"
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -18,6 +19,10 @@ type Subject struct {
 	// Scope is the scope of the token the request carries; nil for password
 	// authentication, which acts with everything the subject holds.
 	Scope *kernel.Scope
+	// ProjectKey and ProjectIncarnations are verified server-side token
+	// boundaries, empty for a subject without a project-bound token.
+	ProjectKey          string
+	ProjectIncarnations map[string]string
 }
 
 // Repo identifies a permission target: a repository's key and class (local,
@@ -76,6 +81,11 @@ type Decider interface {
 	// administrator may, anyone else only through a token's system scope
 	// that covers the area and the actions.
 	System(area string, want kernel.ScopeActions) bool
+	// ManagesRepository checks current project administration independently of
+	// content actions. class is local, remote or virtual; an unowned repository
+	// requires platform administration. Granular class privileges are already
+	// normalized by project administration, so a false value stays a denial.
+	ManagesRepository(projectKey, class string, operation RepositoryOperation) bool
 }
 
 // Authorizer evaluates a principal's permissions (decision 0006), once for a
@@ -121,6 +131,7 @@ func SubjectOf(p kernel.Principal) Subject {
 		Name: p.Name, Groups: slices.Clone(p.Groups), Admin: p.Admin, Anonymous: p.Anonymous,
 	}
 	if p.IsTokenAuthenticated {
+		s.ProjectKey, s.ProjectIncarnations = p.TokenProject, maps.Clone(p.ProjectIncarnations)
 		sc := p.Scope
 		s.Scope = &sc
 		// A groups scope acts through the groups it names whether or not
