@@ -1250,7 +1250,7 @@ for example `make oci-conformance OCI_TEST_CONTENT_MANAGEMENT=0`, runs without t
 ## Terraform scenarios
 
 `make terraform` runs `test/terraform/run.sh` over `TERRAFORM_SCENARIOS`: the repositories,
-identity, OIDC, CDN repositories, remote repositories, virtual repositories and single
+identity, OIDC, CDN repositories, remote repositories, virtual repositories, webhooks and single
 replication references in `deploy/artifactweave/terraform/`. `test/terraform/` holds only
 the driver.
 - It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` and
