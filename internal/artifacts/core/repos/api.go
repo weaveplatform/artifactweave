@@ -32,13 +32,12 @@ type Store interface {
 
 // NewRepositories returns the artifacts module's Repositories over st, which
 // reads key pairs through keys and environments through projects for
-// CheckKeypairs and CheckEnvironments. Each method calls st's repository
-// store or work queue, or this package's function of the same name, once,
-// and returns its results as they are, so a caller sees exactly what a
-// direct call returns. Every call uses the context it is given, so it takes
-// part in a transaction of st that the context carries; keys and projects
-// must take part in that transaction too, as the access module's bindings
-// over st do. Nothing is read or checked until a method is called.
+// CheckKeypairs and CheckEnvironments. Create, Update and Remove coordinate
+// canonical configuration with access-owned bindings and shares when projects
+// is supplied; their writes and failures commit or roll back together. Reads
+// and validation preserve the underlying operation's error identity. Every
+// call joins the transaction ctx carries; keys and projects must use that same
+// unit of work. Nothing is read or checked until a method is called.
 func NewRepositories(
 	st Store,
 	keys accessapi.Keys,
@@ -74,7 +73,7 @@ func (r repositories) UsingKeypair(ctx context.Context, name string) ([]string, 
 
 func (r repositories) Create(ctx context.Context, c repo.Config) error {
 	return r.tx(ctx, func(ctx context.Context) error {
-		if err := CheckProjectPrefix(c); err != nil {
+		if err := checkProjectPrefix(c); err != nil {
 			return err
 		}
 		if err := r.st.Repos().Create(ctx, c); err != nil {

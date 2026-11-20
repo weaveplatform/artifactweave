@@ -53,6 +53,9 @@ func Protected(key string) bool {
 // create follow from it (repo.CreateDefaults).
 func PrepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error) {
 	repo.Defaults(&c)
+	if err := checkProjectPrefix(c); err != nil {
+		return c, err
+	}
 	if err := repo.Validate(&c); err != nil {
 		return c, badRequestf("%s", err.Error())
 	}
@@ -67,9 +70,9 @@ func PrepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error) {
 	return c, nil
 }
 
-// CheckProjectPrefix validates newly created project resources. Existing
+// checkProjectPrefix validates newly created project resources. Existing
 // arbitrary keys may be attached or reassigned without renaming them.
-func CheckProjectPrefix(c repo.Config) error {
+func checkProjectPrefix(c repo.Config) error {
 	if c.ProjectKey != "" && !strings.HasPrefix(c.Key, c.ProjectKey+"-") {
 		return badRequestf("A repository created in project '%s' must use the '%s-' key prefix", c.ProjectKey, c.ProjectKey)
 	}

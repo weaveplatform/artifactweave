@@ -15,9 +15,10 @@ import (
 
 var _ accessapi.Projects = projects{}
 
-// projects reads projects, their environments and their user members
-// (decision 0013). Errors are the store's, unwrapped, so errors.Is(err,
-// kernel.ErrNotFound) and each caller's own wrap still apply.
+// projects reads project definitions and coordinates repository bindings
+// (decision 0013). Reads preserve store errors; binding writes add operation
+// context and share the caller's guarded transaction. errors.Is still finds
+// the store's sentinels through each caller's wrapping.
 type projects struct{ st port.Store }
 
 func (b projects) Guard(ctx context.Context) error {

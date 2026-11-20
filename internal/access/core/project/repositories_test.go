@@ -62,7 +62,7 @@ func TestUnitRepositoryBindingIsSynchronousAndDetachKeepsShares(t *testing.T) {
 	}
 }
 
-type assignmentFailure struct{ port.Store }
+type assignmentFailure struct{ *inmem.Store }
 
 func (s assignmentFailure) Projects() port.ProjectStore {
 	return assignmentWriteFailure{s.Store.Projects()}
@@ -83,7 +83,8 @@ func TestUnitRepositoryBindingRollsBackBothRepresentations(t *testing.T) {
 	must(t, db.Projects().Create(ctx, model.Project{Key: "alpha"}))
 	c := *repo.Defaults(&repo.Config{Key: "existing-local", Class: repo.Local, PackageType: repo.Generic})
 	must(t, db.Repos().Create(ctx, c))
-	s := project.Service{Store: assignmentFailure{db}, Repositories: support.Repositories(db)}
+	failing := assignmentFailure{db}
+	s := project.Service{Store: failing, Repositories: support.Repositories(failing)}
 	if err := s.AttachRepository(ctx, c.Key, "alpha", false); !errors.Is(err, errStoreFailure) {
 		t.Fatalf("expected failure after both writes: %v", err)
 	}

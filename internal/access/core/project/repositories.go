@@ -32,7 +32,7 @@ func (s Service) RepositoryStatus(ctx context.Context, key string) (model.Reposi
 // canonical environments and assignment publication share the same transaction;
 // a validation or persistence failure leaves both representations unchanged.
 func (s Service) AttachRepository(ctx context.Context, key, projectKey string, force bool) error {
-	return s.repositoryTransaction(ctx, key, true, func(ctx context.Context, c repo.Config, a model.RepositoryAssignment) error {
+	return s.repositoryTransaction(ctx, key, true, func(ctx context.Context, c repo.Config, _ model.RepositoryAssignment) error {
 		if err := s.requireProject(ctx, projectKey); err != nil {
 			return err
 		}
@@ -43,7 +43,7 @@ func (s Service) AttachRepository(ctx context.Context, key, projectKey string, f
 		if err := s.Repositories.CheckEnvironments(ctx, &c); err != nil {
 			return fmt.Errorf("project: validate repository environments: %w", err)
 		}
-		return s.publishRepositoryBinding(ctx, c, a)
+		return s.publishRepositoryBinding(ctx, c)
 	})
 }
 
@@ -51,12 +51,12 @@ func (s Service) AttachRepository(ctx context.Context, key, projectKey string, f
 // repository environment validator clears its project environment selection;
 // its content, key and unrelated configuration remain unchanged.
 func (s Service) DetachRepository(ctx context.Context, key string) error {
-	return s.repositoryTransaction(ctx, key, true, func(ctx context.Context, c repo.Config, a model.RepositoryAssignment) error {
+	return s.repositoryTransaction(ctx, key, true, func(ctx context.Context, c repo.Config, _ model.RepositoryAssignment) error {
 		c.ProjectKey = ""
 		if err := s.Repositories.CheckEnvironments(ctx, &c); err != nil {
 			return fmt.Errorf("project: validate detached repository: %w", err)
 		}
-		return s.publishRepositoryBinding(ctx, c, a)
+		return s.publishRepositoryBinding(ctx, c)
 	})
 }
 
@@ -146,14 +146,9 @@ func (s Service) repositoryTransaction(
 	})
 }
 
-func (s Service) publishRepositoryBinding(ctx context.Context, c repo.Config, a model.RepositoryAssignment) error {
+func (s Service) publishRepositoryBinding(ctx context.Context, c repo.Config) error {
 	if err := s.Repositories.Update(ctx, c); err != nil {
 		return fmt.Errorf("project: update repository binding: %w", err)
-	}
-	a.ProjectKey, a.Environments = c.ProjectKey, slices.Clone(c.Environments)
-	a.Updated = time.Now().UTC()
-	if err := s.Store.Projects().PutAssignment(ctx, a); err != nil {
-		return fmt.Errorf("project: publish repository assignment: %w", err)
 	}
 	return nil
 }
