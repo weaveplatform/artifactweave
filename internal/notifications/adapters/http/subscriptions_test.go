@@ -47,7 +47,7 @@ func subscriptionRouter(service webhook.Administration) http.Handler {
 		}), eventgen.ChiServerOptions{BaseURL: "/event", BaseRouter: router, ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest)})
 }
 
-func TestUnitWebhookSubscriptionHTTPContract(t *testing.T) {
+func TestAccWebhookSubscriptionHTTPContract(t *testing.T) {
 	st := inmem.New(memtx.New())
 	var currentError error
 	service := webhook.Administration{
@@ -147,7 +147,7 @@ func TestUnitWebhookHTTPRefusesMalformedInputAndUnknownStoredHandlers(t *testing
 	}
 }
 
-func TestUnitWebhookHTTPUnavailableAuthorityDoesNotDiscloseConfiguration(t *testing.T) {
+func TestAccWebhookHTTPUnavailableAuthorityDoesNotDiscloseConfiguration(t *testing.T) {
 	const body = `{"key":"hook","enabled":true,"event_filter":{"domain":"artifact","event_types":["deployed"],"criteria":{}},"handlers":[{"handler_type":"webhook","url":"https://receiver.example/hook"}]}`
 	for _, available := range []bool{false, true} {
 		service := webhook.Administration{}

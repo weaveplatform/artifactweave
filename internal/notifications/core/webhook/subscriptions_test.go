@@ -19,11 +19,11 @@ func TestUnitWebhookSecretContract(t *testing.T) {
 	storetest.RunSecrets(t, func(*testing.T) port.Store { return inmem.New(memtx.New()) })
 }
 
-func TestUnitWebhookSubscriptionFamiliesAndFutureCriteria(t *testing.T) {
+func TestAccWebhookSubscriptionFamiliesAndFutureCriteria(t *testing.T) {
 	storetest.RunSubscriptionFamilies(t, func(*testing.T) port.Store { return inmem.New(memtx.New()) })
 }
 
-func TestUnitWebhookSubscriptionAdministration(t *testing.T) {
+func TestAccWebhookSubscriptionAdministration(t *testing.T) {
 	storetest.RunSubscriptionAdministration(t, func(*testing.T) port.Store { return inmem.New(memtx.New()) })
 }
 
