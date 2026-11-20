@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/storekit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -88,7 +89,12 @@ func (i items) put(ctx context.Context, it model.Item, create bool) (model.Item,
 	if err != nil {
 		return it, err
 	}
-	err = i.s.Do(ctx, func() error {
+	err = i.s.storageWrite(ctx, func(ctx context.Context) error {
+		change, err := storekit.PrepareStorageContent(ctx, i.s.storage, it.RepoKey)
+		if err != nil {
+			return err //nolint:wrapcheck // storekit names the accounting boundary
+		}
+		var before int64
 		// Only the property methods write PropertiesModified, as the SQL
 		// stores leave its column out of Put.
 		it.PropertiesModified = time.Time{}
@@ -99,12 +105,25 @@ func (i items) put(ctx context.Context, it model.Item, create bool) (model.Item,
 			it.ID = id
 			cur, _ := i.t().Get(id)
 			it.PropertiesModified = cur.PropertiesModified
+			if i.s.storage != nil {
+				before, err = storekit.LogicalItemBytes(cur)
+				if err != nil {
+					return err //nolint:wrapcheck // storekit names the accounting boundary
+				}
+			}
 		} else {
 			it.ID = i.s.NextID("items")
 			i.byPath().Put(keyOf(it), it.ID)
 		}
 		i.t().Put(it.ID, it)
 		it, _ = i.t().Get(it.ID)
+		if i.s.storage != nil {
+			after, err := storekit.LogicalItemBytes(it)
+			if err != nil {
+				return err //nolint:wrapcheck // storekit names the accounting boundary
+			}
+			return storekit.RecordStorageChange(ctx, change, after-before)
+		}
 		return nil
 	})
 	return it, err
@@ -204,7 +223,11 @@ func (i items) Delete(
 	ctx context.Context, repoKey string, cached bool, fullPath string,
 ) (port.DeleteResult, error) {
 	res := port.DeleteResult{BlobRefs: map[string]int64{}}
-	err := i.s.Do(ctx, func() error {
+	err := i.s.storageWrite(ctx, func(ctx context.Context) error {
+		change, err := storekit.PrepareStorageContent(ctx, i.s.storage, repoKey)
+		if err != nil {
+			return err //nolint:wrapcheck // storekit names the accounting boundary
+		}
 		match := func(it model.Item) bool {
 			return it.RepoKey == repoKey && it.Cached == cached && !it.IsRoot()
 		}
@@ -232,7 +255,10 @@ func (i items) Delete(
 			}
 			i.remove(it)
 		}
-		return nil
+		if i.s.storage != nil && res.Bytes < 0 {
+			return fmt.Errorf("invalid logical deletion bytes: %w", kernel.ErrStore)
+		}
+		return storekit.RecordStorageChange(ctx, change, -res.Bytes)
 	})
 	if err != nil {
 		return port.DeleteResult{}, err

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/storekit"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx/memtx"
@@ -16,12 +17,28 @@ import (
 // memtx.Store, under the names of the SQL tables, so every call joins the
 // transaction that the caller's context carries, whichever module's store
 // began it.
-type Store struct{ *memtx.Store }
+type Store struct {
+	*memtx.Store
+	storage api.StorageWatch
+}
 
 var _ port.Store = (*Store)(nil)
 
 // New returns the artifacts module's stores over db.
 func New(db *memtx.Store) *Store { return &Store{Store: db} }
+
+// NewWithStorageWatch installs the application's transaction-local accounting
+// watch. Standalone module stores use New because they own no project stream.
+func NewWithStorageWatch(db *memtx.Store, watch api.StorageWatch) *Store {
+	return &Store{Store: db, storage: watch}
+}
+
+func (s *Store) storageWrite(ctx context.Context, fn func(context.Context) error) error {
+	if s.storage == nil {
+		return s.Do(ctx, func() error { return fn(ctx) })
+	}
+	return s.Tx(ctx, fn)
+}
 
 // LayoutWatch returns the config watch that fences remote publication when
 // a layout document is created, changed or deleted: every remote repository
