@@ -132,9 +132,8 @@ These are choices made where no source documents Artifactory's behaviour:
   scope, `applied-permissions/admin` is an administrator whatever its subject. Otherwise the
   subject acts as an administrator only when the scope keeps applied permissions:
   `applied-permissions/user` for its own flag, or a groups scope naming an admin group.
-- **Token scopes** only remove, apart from the groups a groups scope names and
-  `applied-permissions/admin`; the evaluator never adds what the subject does not hold
-  otherwise:
+- **Token scopes** select the native user/group grants or explicitly delegated
+  project roles. Resource scopes intersect those grants and never expand them:
   - `applied-permissions/user` and `applied-permissions/admin` keep the user's own and
     group grants.
   - `applied-permissions/groups:…` acts through every group it names, whether or not the
@@ -144,7 +143,11 @@ These are choices made where no source documents Artifactory's behaviour:
     token acts through "Explicitly mapped groups only"
     ([access tokens](https://docs.jfrog.com/administration/docs/access-tokens), "Transient
     Users and Auto Join Groups").
-  - `applied-permissions/roles:…` grants nothing until projects arrive (P11). An OIDC
+  - `applied-permissions/roles:…` resolves current project/global role definitions
+    in P11 PRJ-02. Minting validates the current delegation and definitions; use
+    intersects the selected actions with canonical project ownership, environments
+    and resource ceilings. Deleting/recreating a project cannot revive tokens
+    bound to its previous lifetime. An OIDC
     identity mapping's scope names roles in one project at most, so the roles in a token it
     issues all belong to the mapping's project: "Only one project key is allowed per mapping",
     and a mapping naming two is refused with 400

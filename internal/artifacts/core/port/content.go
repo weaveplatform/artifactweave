@@ -99,6 +99,9 @@ type RepoStore interface {
 	// ProjectRepositories projects current ownership/environment facts without
 	// secrets or row locks, ordered by key using the project ownership index.
 	ProjectRepositories(ctx context.Context, projectKey string, page kernel.Page) ([]artapi.ProjectRepository, string, error)
+	// ProjectRepository reads the canonical class, owner and environments for
+	// one key before administration opens any sealed repository configuration.
+	ProjectRepository(ctx context.Context, repoKey string) (artapi.ProjectRepository, error)
 	// Create stores c; kernel.ErrConflict when the key exists.
 	Create(ctx context.Context, c repo.Config) error
 	// Get returns the configuration, including passwords and sensitive headers.

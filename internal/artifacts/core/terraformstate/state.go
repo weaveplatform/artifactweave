@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -42,6 +43,10 @@ func (st State) Created() time.Time { return tfbe.Created(st.Ms) }
 
 // StateWrite is a state to store as a workspace's current state.
 type StateWrite struct {
+	// CheckCurrent revalidates a signed upload capability after streaming and
+	// before workspace locks; nil uses the ordinary request's current policy.
+	CheckCurrent func(context.Context) error
+
 	// WorkspaceRecordID binds a deferred upload to the workspace that issued
 	// it. Zero leaves this precondition unused for ordinary inline writes.
 	WorkspaceRecordID int64
@@ -161,6 +166,9 @@ func (s *Service) ReadState(
 func (s *Service) NewState(ctx context.Context, c repo.Config, name, by string) (int64, error) {
 	var ms int64
 	err := s.store().Tx(ctx, func(ctx context.Context) error {
+		if err := s.checkCurrent(ctx, c, tfbe.LatestPath(name), false, accessapi.ActionWrite); err != nil {
+			return err
+		}
 		files, err := s.writable(ctx, c, name, by)
 		if err != nil {
 			return err
@@ -229,6 +237,13 @@ func (s *Service) WriteState(
 	}
 	ms := w.Ms
 	err = s.store().Tx(ctx, func(ctx context.Context) error {
+		if w.CheckCurrent != nil {
+			if err := w.CheckCurrent(ctx); err != nil {
+				return err
+			}
+		} else if err := s.checkCurrent(ctx, c, tfbe.LatestPath(name), false, accessapi.ActionWrite); err != nil {
+			return err
+		}
 		files, err := s.writable(ctx, c, name, w.By)
 		if err != nil {
 			return err

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -76,6 +77,10 @@ func (e *InvalidStateError) Error() string { return e.Message }
 
 // Service keeps the Terraform backend's workspaces and states.
 type Service struct {
+	// CheckCurrent fences the client's native operation before workspace/item
+	// locks. Server-derived state history retains this owning operation's policy.
+	CheckCurrent func(context.Context, repo.Config, string, bool, accessapi.Actions) error
+
 	// Items writes and deletes the items. Its formats must give the
 	// Terraform backend's the same Keys, so the hooks read what this
 	// seals.
@@ -85,6 +90,15 @@ type Service struct {
 	Keys *crypt.Keyring
 	// Now is the clock; nil means time.Now.
 	Now func() time.Time
+}
+
+func (s *Service) checkCurrent(ctx context.Context, c repo.Config, path string, folder bool, want accessapi.Actions) error {
+	if s.CheckCurrent != nil {
+		if err := s.CheckCurrent(ctx, c, path, folder, want); err != nil {
+			return fmt.Errorf("terraformstate: current authority: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *Service) now() time.Time {

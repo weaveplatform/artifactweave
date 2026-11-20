@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
 	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
@@ -141,6 +142,9 @@ func (s *Service) DeleteMultiArch(ctx context.Context, o Owner, tag string) ([]s
 	ctx = artifactevents.WithActor(ctx, o.By)
 	var removed []string
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := o.checkCurrent(ctx, o.Name+"/", accessapi.ActionDelete); err != nil {
+			return err
+		}
 		dir := o.Name + "/" + tag
 		f, err := s.Store.Items().Get(ctx, o.Repo.Key, false, dir)
 		if err == nil && !f.Folder {

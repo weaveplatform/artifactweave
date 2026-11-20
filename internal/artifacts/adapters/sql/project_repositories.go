@@ -11,6 +11,38 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 )
 
+func (r repos) projectEnvironmentsSQL() string {
+	if r.s.Dialect().Name == "postgres" {
+		return "COALESCE(doc::jsonb -> 'environments', '[]'::jsonb)::text"
+	}
+	return "COALESCE(json_extract(doc, '$.environments'), '[]')"
+}
+
+func (r repos) ProjectRepository(ctx context.Context, key string) (api.ProjectRepository, error) {
+	var out api.ProjectRepository
+	found := false
+	err := r.s.Rows(ctx, "repository project context",
+		"SELECT key, rclass, project_key, "+r.projectEnvironmentsSQL()+" FROM repositories WHERE key = ?", []any{key},
+		func(rows *sql.Rows) error {
+			var encoded string
+			if err := rows.Scan(&out.Key, &out.Class, &out.ProjectKey, &encoded); err != nil {
+				return fmt.Errorf("scan repository project context: %w", err)
+			}
+			if err := json.Unmarshal([]byte(encoded), &out.Environments); err != nil {
+				return fmt.Errorf("decode repository environments: %w", err)
+			}
+			found = true
+			return nil
+		})
+	if err != nil {
+		return api.ProjectRepository{}, fmt.Errorf("repository project context: %w", err)
+	}
+	if !found {
+		return api.ProjectRepository{}, kernel.ErrNotFound
+	}
+	return out, nil
+}
+
 func (r repos) ProjectRepositories(ctx context.Context, key string, page kernel.Page) ([]api.ProjectRepository, string, error) {
 	if key == "" {
 		return nil, "", fmt.Errorf("project repository query requires a project: %w", kernel.ErrInvalid)
@@ -23,10 +55,7 @@ func (r repos) ProjectRepositories(ctx context.Context, key string, page kernel.
 	if err != nil {
 		return nil, "", fmt.Errorf("project repositories cursor: %w", err)
 	}
-	environments := "COALESCE(json_extract(doc, '$.environments'), '[]')"
-	if r.s.Dialect().Name == "postgres" {
-		environments = "COALESCE(doc::jsonb -> 'environments', '[]'::jsonb)::text"
-	}
+	environments := r.projectEnvironmentsSQL()
 	var result []api.ProjectRepository
 	err = r.s.Rows(
 		ctx,

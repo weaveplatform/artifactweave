@@ -65,7 +65,7 @@ func (g *Registry) getReferrers(w http.ResponseWriter, r *http.Request, q Reques
 	if q.Repo.Class == repo.Virtual {
 		found, err = g.virtualReferrers(r, q, artifactType)
 	} else {
-		found, err = g.uploads.Referrers(r.Context(), owner(r, q), q.Reference, artifactType)
+		found, err = g.uploads.Referrers(r.Context(), g.owner(r, q), q.Reference, artifactType)
 	}
 	if err != nil {
 		g.writeErr(w, r, err)

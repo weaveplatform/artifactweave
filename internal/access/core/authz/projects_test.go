@@ -253,3 +253,49 @@ func TestUnitProjectContextFailureReturnsNoPartialDecider(t *testing.T) {
 		t.Fatalf("partial authorization escaped: %+v, %v", d, err)
 	}
 }
+
+func TestUnitCurrentProjectAdministrationUsesSelectedRolesAndCeilings(t *testing.T) {
+	db, src := projectWorld(t)
+	projectMember(t, db, model.PrincipalUser, "alice", "Project Admin")
+	p, err := db.Projects().Get(t.Context(), "alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.AdminPrivileges.ManageMembers = true
+	if err := db.Projects().Update(t.Context(), p); err != nil {
+		t.Fatal(err)
+	}
+	authority, err := db.Projects().Authority(t.Context(), "alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, raw string
+		want      bool
+	}{
+		{name: "password", want: true},
+		{name: "user", raw: "applied-permissions/user", want: true},
+		{name: "named administrator", raw: `applied-permissions/roles:alpha:"Project Admin"`, want: true},
+		{name: "resource ceiling", raw: "applied-permissions/user artifact:*:r"},
+		{name: "definitions", raw: "project:alpha/roles:r"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			subject := accessapi.Subject{Name: "alice"}
+			if tc.raw != "" {
+				subject.Scope = scope(t, tc.raw)
+			}
+			if tc.name == "named administrator" || tc.name == "definitions" {
+				subject.ProjectIncarnations = map[string]string{"alpha": string(authority.Incarnation)}
+			}
+			d := projectDecider(t, src, subject)
+			for _, op := range []accessapi.ProjectOperation{accessapi.ProjectManage, accessapi.ProjectManageMembers} {
+				if d.ManagesProject("alpha", op) != tc.want || d.ManagesProject("beta", op) || d.ManagesProject("", op) {
+					t.Fatal("selected role or management ceiling was not retained")
+				}
+			}
+			if d.ManagesProject("alpha", 0) {
+				t.Fatal("unknown operation permitted")
+			}
+		})
+	}
+}

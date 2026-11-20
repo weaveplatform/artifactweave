@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
@@ -64,6 +65,10 @@ func (e *SizeMismatchError) Error() string {
 
 // Push is a manifest to store in an image.
 type Push struct {
+	// CheckCurrent repeats conditional native tag overwrite checks after taking
+	// the owner's authority fence and before writing tags or derived platforms.
+	CheckCurrent func(context.Context) error
+
 	Owner
 	Manifest layout.Manifest
 	// Body is the manifest exactly as the client sent it, which jf reads
@@ -147,6 +152,14 @@ func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	}
 	items := s.items()
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := p.checkCurrent(ctx, p.Name+"/", accessapi.ActionWrite); err != nil {
+			return err
+		}
+		if p.CheckCurrent != nil {
+			if err := p.CheckCurrent(ctx); err != nil {
+				return err
+			}
+		}
 		changed := false
 		for _, folder := range p.Folders {
 			_, same, err := s.folderState(ctx, p.Owner, folder, m.Digest)

@@ -1,12 +1,14 @@
 package terraformbackendhttp
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -42,8 +44,10 @@ type claims struct {
 	Expires int64  `json:"exp"`
 	// Keep a token's original ceiling: looking up only its user's current
 	// permissions would silently turn a scoped capability into a full grant.
-	Scope    *string              `json:"scope,omitempty"`
-	Identity kernel.TokenIdentity `json:"identity,omitempty"`
+	Scope               *string              `json:"scope,omitempty"`
+	Identity            kernel.TokenIdentity `json:"identity,omitempty"`
+	ProjectKey          string               `json:"project,omitempty"`
+	ProjectIncarnations map[string]string    `json:"project_incarnations,omitempty"`
 }
 
 func (h handler) uploadURL(
@@ -63,16 +67,17 @@ func (h handler) uploadURL(
 		expiry = p.TokenExpires
 	}
 	c := claims{
-		ID:       st.ID(),
-		Subject:  p.Name,
-		MD5:      md5,
-		Serial:   st.Meta.Serial,
-		Record:   ws.RecordID,
-		Created:  ws.Created.UnixMilli(),
-		Issued:   now.Unix(),
-		Expires:  expiry.Unix(),
-		Scope:    scopeText(p),
-		Identity: identity,
+		ID:         st.ID(),
+		Subject:    p.Name,
+		MD5:        md5,
+		Serial:     st.Meta.Serial,
+		Record:     ws.RecordID,
+		Created:    ws.Created.UnixMilli(),
+		Issued:     now.Unix(),
+		Expires:    expiry.Unix(),
+		Scope:      scopeText(p),
+		Identity:   identity,
+		ProjectKey: p.TokenProject, ProjectIncarnations: maps.Clone(p.ProjectIncarnations),
 	}
 	raw, _ := json.Marshal(c)
 	body := encoding.EncodeToString(raw)
@@ -133,6 +138,9 @@ func (h handler) upload(_ http.ResponseWriter, r *http.Request) (result, error) 
 		return result{}, err //nolint:wrapcheck // storage errors retain their typed API status
 	}
 	_, err = h.states.WriteState(r.Context(), c, ws.Name, terraformstate.StateWrite{
+		CheckCurrent: func(ctx context.Context) error {
+			return h.authorizeUpload(r.WithContext(ctx), c, ws.Name, cl)
+		},
 		WorkspaceRecordID: cl.Record,
 		Ms:                ms, Body: r.Body, MD5: cl.MD5, Serial: cl.Serial, By: cl.Subject,
 	})
@@ -143,6 +151,11 @@ func (h handler) upload(_ http.ResponseWriter, r *http.Request) (result, error) 
 
 func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl claims) error {
 	ctx := r.Context()
+	if h.o.Projects != nil {
+		if err := h.o.Projects.Guard(ctx); err != nil {
+			return fmt.Errorf("terraformbackend: guard upload authority: %w", err)
+		}
+	}
 	u, err := h.uploadUser(r, cl)
 	if err != nil {
 		return err
@@ -159,7 +172,10 @@ func (h handler) authorizeUpload(r *http.Request, c repo.Config, name string, cl
 		}
 		scope = &parsed
 	}
-	subject := accessapi.Subject{Name: u.Name, Admin: u.Admin, Groups: u.Groups, Scope: scope}
+	subject := accessapi.Subject{
+		Name: u.Name, Admin: u.Admin, Groups: u.Groups, Scope: scope,
+		ProjectKey: cl.ProjectKey, ProjectIncarnations: maps.Clone(cl.ProjectIncarnations),
+	}
 	// Named-group tokens act through their named groups even when the user
 	// is not a member, as accessapi.SubjectOf does for bearer requests.
 	if scope != nil {

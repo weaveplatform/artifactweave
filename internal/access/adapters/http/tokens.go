@@ -255,11 +255,7 @@ func (t tokenAPI) projectRoleMint(ctx context.Context, p kernel.Principal, decid
 		if err != nil {
 			return false, fmt.Errorf("token mint project: %w", err)
 		}
-		allowed, err := caller.projectAllowed(ctx, svc, current, projectAdministrator)
-		if err != nil {
-			return false, fmt.Errorf("token mint project administration: %w", err)
-		}
-		if !allowed {
+		if !caller.projectAllowed(current.Key, projectAdministrator) {
 			return false, nil
 		}
 	}

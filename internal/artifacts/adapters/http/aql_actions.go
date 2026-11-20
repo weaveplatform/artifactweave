@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 )
 
 // aqlAction carries out items.delete or properties.update on the rows the
@@ -51,13 +52,16 @@ func (s ArtifactoryAPI) aqlAction(
 	items := s.Items(st)
 	switch {
 	case q.Action == aql.UpdateProperties:
-		return kept, updateProperties(ctx, st, items, configs, q, kept)
+		return kept, s.updateProperties(ctx, items, configs, q, kept)
 	case q.DryRun:
 		return kept, nil
 	}
 	for _, h := range kept {
 		t := item.Target{
 			Repo: configs[h.Item.RepoKey], Cached: h.Item.Cached, Path: h.Item.FullPath(),
+			CheckCurrent: func(ctx context.Context, path string, folder bool, want accessapi.Actions) error {
+				return s.PublicationCheck(configs[h.Item.RepoKey])(ctx, path, folder, want|accessapi.ActionRead)
+			},
 		}
 		// A folder earlier in the rows takes the items below it with it, so
 		// an item already gone when its turn comes was deleted by this run.
@@ -89,9 +93,8 @@ func actsOn(c repo.Config, it model.Item, a aql.Action) bool {
 // unless q is a dry run. Keys a hit lacks are not added. Each hit's
 // properties become the keys it changes, with their new values, which is
 // what its row shows either way.
-func updateProperties(
+func (s ArtifactoryAPI) updateProperties(
 	ctx context.Context,
-	st Store,
 	items *item.Service,
 	configs map[string]repo.Config,
 	q *aql.Query,
@@ -109,7 +112,15 @@ func updateProperties(
 	if q.DryRun {
 		return nil
 	}
-	err := st.Tx(ctx, func(ctx context.Context) error {
+	err := s.Tx(ctx, func(ctx context.Context) error {
+		p, _ := kernel.FromContext(ctx)
+		d, _ := accessapi.DeciderFrom(ctx)
+		acc := itemkit.Access{Decider: d}
+		for _, h := range hits {
+			if !acc.File(configs[h.Item.RepoKey], h.Item.FullPath(), accessapi.ActionRead|accessapi.ActionAnnotate) {
+				return httpkit.Denied(p)
+			}
+		}
 		for _, h := range hits {
 			if err := items.Annotate(
 				ctx,

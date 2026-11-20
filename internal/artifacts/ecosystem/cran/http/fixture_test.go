@@ -29,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/middleware"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // Config is the part of the router's configuration that the tests here
@@ -113,6 +114,7 @@ type itemWorld struct {
 func newItemWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 	t.Helper()
 	k := kittest.New(t, inmem.New())
+	support.Seed(t, k.Store)
 	c := Config{Store: k.Store, Blobs: k.Blobs}
 	for _, f := range tune {
 		f(&c)
@@ -145,7 +147,15 @@ func newItemWorld(t *testing.T, tune ...func(*Config)) *itemWorld {
 // a user whom none allows.
 func (w *itemWorld) do(method, path, as, body string) *httptest.ResponseRecorder {
 	w.t.Helper()
-	p, d := kittest.Admin, kittest.AdminAccess().Decider
+	access := accesstest.Over(w.t, w.db).API()
+	p, err := access.Authenticator.Basic(w.t.Context(), "admin", "pw")
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	d, err := access.Authorizer.For(w.t.Context(), p)
+	if err != nil {
+		w.t.Fatal(err)
+	}
 	if as != kittest.Admin.Name {
 		p, d = kernel.Principal{Name: as}, &accessapitest.Decider{}
 	}

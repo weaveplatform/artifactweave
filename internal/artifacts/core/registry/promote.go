@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
 	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
@@ -101,6 +102,16 @@ func (s *Service) Promote(ctx context.Context, p Promotion) error {
 	}
 	items := s.items()
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		want := accessapi.ActionRead
+		if !p.Copy {
+			want |= accessapi.ActionDelete
+		}
+		if err := p.From.checkCurrent(ctx, p.From.Name+"/", want); err != nil {
+			return err
+		}
+		if err := p.To.checkCurrent(ctx, p.To.Name+"/", accessapi.ActionWrite); err != nil {
+			return err
+		}
 		var landed, platforms []string
 		for _, r := range p.Tags {
 			manifest, err := s.TagManifest(ctx, p.From, r.From)
@@ -284,8 +295,10 @@ func (s *Service) landFolder(
 	move bool,
 ) error {
 	res, err := items.Transfer(ctx, item.Transfer{
-		From:     item.Target{Repo: src.Repo, Path: from},
-		To:       item.Target{Repo: dst.Repo, Path: to},
+		From: item.Target{Repo: src.Repo, Path: from},
+		To: item.Target{Repo: dst.Repo, Path: to, CheckCurrent: func(ctx context.Context, path string, _ bool, want accessapi.Actions) error {
+			return dst.checkCurrent(ctx, path, want)
+		}},
 		Move:     move,
 		FailFast: true, CanOverwrite: true, By: dst.By,
 	})

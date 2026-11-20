@@ -45,6 +45,11 @@ const prefix = "/artifactory/api/docker/"
 
 // Options configures a Registry.
 type Options struct {
+	// CurrentAccess refreshes verified credentials and policy inside the owning
+	// publication transaction, before source or item locks. Nil is a standalone
+	// registry whose embedding caller owns current policy.
+	CurrentAccess func(context.Context) (kernel.Principal, accessapi.Decider, error)
+
 	Sources *source.Service
 	// Store resolves repositories. Nil serves no repository, for tests of
 	// the router alone.
@@ -98,6 +103,7 @@ type Endpoint func(w http.ResponseWriter, r *http.Request, q Request)
 
 // Registry routes registry requests to the endpoints features register.
 type Registry struct {
+	currentAccess func(context.Context) (kernel.Principal, accessapi.Decider, error)
 	sources       *source.Service
 	store         registry.Store
 	authenticated bool
@@ -128,7 +134,7 @@ type endpointKey struct {
 // New returns the registry with every implemented endpoint registered.
 func New(o Options) *Registry {
 	g := &Registry{
-		sources: o.Sources, authenticated: o.Authenticated,
+		sources: o.Sources, authenticated: o.Authenticated, currentAccess: o.CurrentAccess,
 		store: o.Store, fault: o.Fault, tokens: o.Tokens, identity: o.Identity,
 		endpoints: map[endpointKey]Endpoint{}, tagLists: newTagCache(remoteTagsBudget), locations: layout.NewMemberLocations(),
 	}

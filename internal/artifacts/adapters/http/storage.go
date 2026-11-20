@@ -1598,7 +1598,15 @@ func (s ArtifactoryAPI) editProperties(
 	}
 	cached := v.isCached || v.repo.Class == repo.Remote
 	items := s.Items(v.st)
-	err = v.st.Tx(ctx, func(ctx context.Context) error {
+	err = s.Tx(ctx, func(ctx context.Context) error {
+		p, acc, err := s.ItemCaller(ctx, v.st)
+		if err != nil {
+			return err
+		}
+		if !acc.File(v.repo, v.path, api.ActionAnnotate) {
+			return httpkit.Denied(p)
+		}
+		v.acc = acc
 		apply := func(it model.Item) error {
 			return items.Annotate(ctx, v.repo, it, edit.set, edit.remove)
 		}

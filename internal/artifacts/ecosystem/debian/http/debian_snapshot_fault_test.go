@@ -235,7 +235,9 @@ func TestUnitDebianSnapshotThroughTheQueue(t *testing.T) {
 				Store: w.db, Blobs: w.blobs, Work: q,
 				Access: withAccess(t, Config{Store: w.db}).Access,
 			})
-			if err := RegisterDebianSnapshotWork(q, k); err != nil {
+			worker := *k
+			worker.Access.Authenticator = nil
+			if err := RegisterDebianSnapshotWork(q, &worker); err != nil {
 				t.Fatal(err)
 			}
 			body := snapshotBody()
@@ -491,6 +493,11 @@ func TestUnitDebianSnapshotCreationFailsClosed(t *testing.T) {
 				acc = *tc.acc
 			}
 			svc := DebianAPI{newKit(withAccess(t, Config{Store: st, Blobs: w.blobs}))}
+			if tc.acc != nil {
+				svc.Access.Authorizer = &accessapitest.Authorizer{DecideFunc: func(context.Context, accessapi.Subject, bool) (accessapi.Decider, error) {
+					return acc.Decider, nil
+				}}
+			}
 			err := svc.createDebianSnapshot(t.Context(), st, snapshotJob, kittest.Admin, acc)
 			if err == nil || tc.want != nil && !errors.Is(err, tc.want) ||
 				!strings.Contains(err.Error(), tc.step) {

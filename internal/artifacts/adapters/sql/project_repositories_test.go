@@ -35,5 +35,9 @@ func TestAccProjectRepositoryContextsDoNotOpenSealedCredentials(t *testing.T) {
 		if err != nil || next != "" || len(all) != 1 || all[0].Key != c.Key || all[0].ProjectKey != "alpha" || !slices.Equal(all[0].Environments, []string{"DEV"}) {
 			t.Fatalf("secret-free project context=%+v next=%q err=%v", all, next, err)
 		}
+		one, err := reader.Repos().ProjectRepository(t.Context(), c.Key)
+		if err != nil || one.Key != c.Key || one.ProjectKey != "alpha" || one.Class != repo.Remote || !slices.Equal(one.Environments, []string{"DEV"}) {
+			t.Fatalf("secret-free single context=%+v err=%v", one, err)
+		}
 	}, sqltest.WithPostgres())
 }

@@ -155,7 +155,7 @@ func (s *Service) Discards(ctx context.Context, d Discard, a Access) ([]model.Bu
 // d asks. It returns the deleted runs.
 func (s *Service) Discard(ctx context.Context, d Discard, a Access) ([]model.BuildRun, error) {
 	var gone []model.BuildRun
-	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+	err := s.tx(ctx, a, func(ctx context.Context, a Access) error {
 		runs, err := s.Discards(ctx, d, a)
 		if err != nil || len(runs) == 0 {
 			return err

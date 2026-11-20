@@ -272,7 +272,7 @@ func (s *Kit) ReindexAs(
 	if _, indexed := s.Format(t).(format.Reindexer); !ok || !indexed {
 		return "", apierror.ErrNotImplemented
 	}
-	st, c, by, err := s.OperationRepo(ctx, t, op, key)
+	st, c, _, err := s.OperationRepo(ctx, t, op, key)
 	if err != nil {
 		return "", err
 	}
@@ -300,14 +300,27 @@ func (s *Kit) ReindexAs(
 		// gate without scheduling work in any concrete member [I, #216].
 		return op.Text(key), nil
 	case c.Class == repo.Remote && op.RemoteExpires != nil:
-		if err = s.expireRemote(ctx, st, c, op.RemoteExpires); err != nil {
+		err = s.Tx(ctx, func(ctx context.Context) error {
+			_, latest, _, err := s.OperationRepo(ctx, t, op, key)
+			if err != nil {
+				return err
+			}
+			return s.expireRemote(ctx, st, latest, op.RemoteExpires)
+		})
+		if err != nil {
 			return "", err
 		}
 		return op.Text(key), nil
 	case t == repo.NuGet && c.Class == repo.Remote:
 		err = s.queueRemoteReindex(ctx, st, c, key)
 	default:
-		err = s.Enqueue(ctx, st, kind, workKey, by)
+		err = s.Tx(ctx, func(ctx context.Context) error {
+			_, _, by, err := s.OperationRepo(ctx, t, op, key)
+			if err != nil {
+				return err
+			}
+			return s.Enqueue(ctx, st, kind, workKey, by)
+		})
 	}
 	if err != nil {
 		return "", err

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -181,6 +182,9 @@ func (s *Service) CreateWorkspace(
 		return Workspace{}, fmt.Errorf("terraformstate: store the record of %s: %w", name, err)
 	}
 	err = s.store().Tx(ctx, func(ctx context.Context) error {
+		if err := s.checkCurrent(ctx, c, tfbe.RecordPath(name), false, accessapi.ActionWrite); err != nil {
+			return err
+		}
 		ctx = tfbe.Writing(ctx, nil)
 		if _, err := items.MakeFolder(ctx, target(c, tfbe.Folder(name)), nil, by); err != nil {
 			return fmt.Errorf("terraformstate: workspace folder %s: %w", name, err)
@@ -213,6 +217,9 @@ func (s *Service) CreateWorkspace(
 // workspace it deletes.
 func (s *Service) DeleteWorkspace(ctx context.Context, c repo.Config, name, by string) error {
 	err := s.store().Tx(ctx, func(ctx context.Context) error {
+		if err := s.checkCurrent(ctx, c, tfbe.Folder(name), true, accessapi.ActionDelete); err != nil {
+			return err
+		}
 		folder, err := s.holdWorkspace(ctx, c, name)
 		if err != nil {
 			return err
@@ -238,7 +245,7 @@ func (s *Service) DeleteWorkspace(ctx context.Context, c repo.Config, name, by s
 // Lock locks workspace name of c for by. Any lock refuses it with a
 // *LockedError, the caller's own included, as Terraform takes a lock once.
 func (s *Service) Lock(ctx context.Context, c repo.Config, name, by string) (Workspace, error) {
-	return s.changeLock(ctx, c, name, func(lock *Lock) (model.Properties, []string, error) {
+	return s.changeLock(ctx, c, name, accessapi.ActionRead, func(lock *Lock) (model.Properties, []string, error) {
 		if lock != nil {
 			return nil, nil, &LockedError{Workspace: name, Holder: lock.By}
 		}
@@ -252,7 +259,7 @@ func (s *Service) Lock(ctx context.Context, c repo.Config, name, by string) (Wor
 // Unlock releases by's lock on workspace name of c: a *NotLockedError when
 // there is none, and a *LockedError when another user holds it.
 func (s *Service) Unlock(ctx context.Context, c repo.Config, name, by string) (Workspace, error) {
-	return s.changeLock(ctx, c, name, func(lock *Lock) (model.Properties, []string, error) {
+	return s.changeLock(ctx, c, name, accessapi.ActionRead, func(lock *Lock) (model.Properties, []string, error) {
 		switch {
 		case lock == nil:
 			return nil, nil, &NotLockedError{Workspace: name}
@@ -266,7 +273,7 @@ func (s *Service) Unlock(ctx context.Context, c repo.Config, name, by string) (W
 // ForceUnlock releases anyone's lock on workspace name of c: a
 // *NotLockedError when there is none.
 func (s *Service) ForceUnlock(ctx context.Context, c repo.Config, name string) (Workspace, error) {
-	return s.changeLock(ctx, c, name, func(lock *Lock) (model.Properties, []string, error) {
+	return s.changeLock(ctx, c, name, accessapi.ActionDelete, func(lock *Lock) (model.Properties, []string, error) {
 		if lock == nil {
 			return nil, nil, &NotLockedError{Workspace: name}
 		}
@@ -283,9 +290,13 @@ func (s *Service) changeLock(
 	ctx context.Context,
 	c repo.Config,
 	name string,
+	want accessapi.Actions,
 	change func(*Lock) (set model.Properties, remove []string, err error),
 ) (Workspace, error) {
 	err := s.store().Tx(ctx, func(ctx context.Context) error {
+		if err := s.checkCurrent(ctx, c, tfbe.Folder(name), true, want); err != nil {
+			return err
+		}
 		folder, err := s.holdWorkspace(ctx, c, name)
 		if err != nil {
 			return err

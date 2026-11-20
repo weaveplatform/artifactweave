@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
@@ -317,7 +316,7 @@ func (s ArtifactoryAPI) currentBuildAccess(
 		if s.cfg.Access.Authenticator == nil {
 			return nil, build.ErrForbidden
 		}
-		current, err := s.cfg.Access.Authenticator.Current(ctx, p)
+		_, a, err := s.CurrentAccess(kernel.WithPrincipal(ctx, p))
 		if err != nil {
 			if errors.Is(err, kernel.ErrBadCredentials) ||
 				errors.Is(err, kernel.ErrPasswordExpired) ||
@@ -327,7 +326,6 @@ func (s ArtifactoryAPI) currentBuildAccess(
 			}
 			return nil, fmt.Errorf("recheck build credential: %w", err)
 		}
-		a, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, current, nil)
-		return buildAccess{a}, err
+		return buildAccess{a}, nil
 	}
 }

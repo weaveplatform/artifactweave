@@ -17,6 +17,7 @@ import (
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 )
 
 func virtualWrite(kind Kind, method string) bool {
@@ -139,23 +140,32 @@ func (g *Registry) copyVirtualBlob(r *http.Request, q Request, read virtualRead,
 	if read.result.Stream != nil {
 		defer read.result.Stream.Body.Close()
 	}
+	var info blob.Info
+	if from == nil {
+		var err error
+		info, err = g.uploads.StageBlob(r.Context(), read.result.Stream.Body, hexSum)
+		if err != nil {
+			return false, fmt.Errorf("stage virtual registry blob: %w", err)
+		}
+	}
 	var copied bool
-	err := g.store.Tx(r.Context(), func(ctx context.Context) error {
-		if read.result.Revalidate != nil {
-			if err := read.result.Revalidate(ctx); err != nil {
-				return err //nolint:wrapcheck // the source owns its refusal
-			}
+	err := g.tx(r.Context(), func(ctx context.Context) error {
+		if err := g.checkImportRead(ctx, r, read); err != nil {
+			return err
 		}
 		var err error
 		if from != nil {
-			_, copied, err = g.uploads.CopyBlob(ctx, owner(r, q), *from)
+			_, copied, err = g.uploads.CopyBlob(ctx, g.owner(r, q), *from)
 		} else {
-			_, err = g.uploads.Upload(ctx, owner(r, q), read.result.Stream.Body, hexSum)
+			_, err = g.uploads.StoreBlob(ctx, g.owner(r, q), hexSum, info)
 			copied = err == nil
 		}
-		return err //nolint:wrapcheck // the registry service names its failure
+		if err != nil {
+			return fmt.Errorf("publish virtual registry blob: %w", err)
+		}
+		return nil
 	})
-	return copied, err //nolint:wrapcheck // the source/registry service names its failure
+	return copied, err
 }
 
 func (g *Registry) importManifest(r *http.Request, q Request, read virtualRead, hexSum string, seen map[string]bool, depth int) error {
@@ -190,13 +200,11 @@ func (g *Registry) importManifest(r *http.Request, q Request, read virtualRead, 
 	if err = g.syncVirtual(r, q, m, seen, depth); err != nil {
 		return err
 	}
-	err = g.store.Tx(r.Context(), func(ctx context.Context) error {
-		if read.result.Revalidate != nil {
-			if err := read.result.Revalidate(ctx); err != nil {
-				return err //nolint:wrapcheck // the source owns its refusal
-			}
+	err = g.tx(r.Context(), func(ctx context.Context) error {
+		if err := g.checkImportRead(ctx, r, read); err != nil {
+			return err
 		}
-		return g.uploads.PutManifest(ctx, registry.Push{Owner: owner(r, q), Manifest: m, Body: bytes, Folders: []string{layout.DigestFolder(hexSum)}})
+		return g.uploads.PutManifest(ctx, registry.Push{Owner: g.owner(r, q), Manifest: m, Body: bytes, Folders: []string{layout.DigestFolder(hexSum)}})
 	})
 	return err //nolint:wrapcheck // the source/registry service names its failure
 }

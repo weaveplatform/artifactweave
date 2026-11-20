@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/project"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 func projectAccessWorld(t *testing.T) (AccessService, *inmem.Store) {
@@ -31,7 +32,10 @@ func projectAccessWorld(t *testing.T) (AccessService, *inmem.Store) {
 	api := accessapi.API{
 		Authenticator: &accessapitest.Authenticator{},
 		Authorizer: &accessapitest.Authorizer{DecideFunc: func(ctx context.Context, subject accessapi.Subject, _ bool) (accessapi.Decider, error) {
-			return authz.New(ctx, authz.Sources{Permissions: db.Permissions(), Groups: db.Groups()}, subject)
+			return authz.New(ctx, authz.Sources{
+				Permissions: db.Permissions(), Groups: db.Groups(), Projects: db.Projects(),
+				Roles: project.Service{Store: db}, Repositories: support.ProjectRepositories(db),
+			}, subject)
 		}},
 	}
 	return AccessService{accessState{deps: Deps{Store: db, API: api}}}, db
@@ -68,6 +72,8 @@ func TestUnitProjectManagementUsesCurrentRoleAndDelegatedPrivilege(t *testing.T)
 		{name: "resource ceiling", role: "Project Admin", group: true, scope: "artifact:*:r", need: projectAdministrator, wantStatus: 403},
 		{name: "applied user", role: "Project Admin", scope: "applied-permissions/user", need: projectAdministrator},
 		{name: "applied group", role: "Project Admin", group: true, scope: "applied-permissions/groups:project-admins", need: projectAdministrator},
+		{name: "named administrator", scope: `applied-permissions/roles:alpha:"Project Admin"`, need: projectAdministrator},
+		{name: "mixed applied resource ceiling", role: "Project Admin", scope: "applied-permissions/user artifact:*:r", need: projectAdministrator, wantStatus: 403},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s, db := projectAccessWorld(t)
@@ -82,6 +88,14 @@ func TestUnitProjectManagementUsesCurrentRoleAndDelegatedPrivilege(t *testing.T)
 					t.Fatal(err)
 				}
 				p.IsTokenAuthenticated = true
+				p.ProjectIncarnations = map[string]string{}
+				for _, key := range (model.Token{Scope: p.Scope}).ProjectKeys() {
+					authority, err := db.Projects().Authority(t.Context(), key)
+					if err != nil {
+						t.Fatal(err)
+					}
+					p.ProjectIncarnations[key] = string(authority.Incarnation)
+				}
 			}
 			if tc.role != "" {
 				member := model.ProjectMember{ProjectKey: "alpha", Type: model.PrincipalUser, Name: "alice", Roles: []string{tc.role}}

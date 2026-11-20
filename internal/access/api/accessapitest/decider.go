@@ -63,8 +63,17 @@ type Decider struct {
 	// ManagesRepositoryFunc answers configuration administration separately
 	// from content actions; nil answers Admin.
 	ManagesRepositoryFunc func(projectKey, class string, operation accessapi.RepositoryOperation) bool
+	ManagesProjectFunc    func(projectKey string, operation accessapi.ProjectOperation) bool
 	ManagesWebhookFunc    func(projectKey, domain, serviceURL string, want kernel.ScopeActions) bool
 	HasWebhookAccessFunc  func(serviceURL string, want kernel.ScopeActions) bool
+}
+
+// ManagesProject answers its configured administration question, or Admin.
+func (d *Decider) ManagesProject(key string, operation accessapi.ProjectOperation) bool {
+	if d.ManagesProjectFunc != nil {
+		return d.ManagesProjectFunc(key, operation)
+	}
+	return d.Admin
 }
 
 // ManagesWebhook answers its configured administration question, or Admin.

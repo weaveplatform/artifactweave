@@ -297,6 +297,10 @@ func newRegistry(cfg RouterConfig, kit *itemkit.Kit) *dockerhttp.Registry {
 		},
 		Tokens:   cfg.Access.Tokens,
 		Identity: cfg.Access.Identity,
+		CurrentAccess: func(ctx context.Context) (kernel.Principal, accessapi.Decider, error) {
+			p, a, err := kit.CurrentAccess(ctx)
+			return p, a.Decider, err
+		},
 	}
 	return dockerhttp.New(o)
 }
@@ -607,6 +611,11 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			Authorizer:   cfg.Access.Authorizer,
 			Identity:     cfg.Access.Identity,
 			Restrictions: cfg.Access.Restrictions,
+			Projects:     cfg.Access.Projects,
+			CurrentAccess: func(ctx context.Context) (kernel.Principal, accessapi.Decider, error) {
+				p, a, err := kit.CurrentAccess(ctx)
+				return p, a.Decider, err
+			},
 		},
 	)
 	for _, p := range mounted {

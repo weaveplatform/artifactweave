@@ -299,11 +299,11 @@ func (s Service) Granting(
 // Create stores a new permission; ErrConflict when the name is taken. Its
 // user grants are stored under folded names (model.Permission.FoldGrants).
 func (s Service) Create(ctx context.Context, p model.Permission) error {
-	if err := s.Validate(ctx, p); err != nil {
-		return err
-	}
-	p = p.FoldGrants()
 	return s.tx(ctx, func(ctx context.Context) error {
+		if err := s.Validate(ctx, p); err != nil {
+			return err
+		}
+		p = p.FoldGrants()
 		if _, err := s.Store.Permissions().Get(ctx, p.Name); err == nil {
 			return fmt.Errorf("%w: Permission '%s' already exists", ErrConflict, p.Name)
 		} else if !errors.Is(err, kernel.ErrNotFound) {

@@ -216,3 +216,19 @@ func (d *Decider) ManagesRepository(projectKey, class string, op accessapi.Repos
 	}
 	return false
 }
+
+// ManagesProject uses the same resolved role selection as content and repository
+// administration, including explicit named-role tokens. A content or definition
+// ceiling cannot borrow the subject's unrestricted membership privileges.
+func (d *Decider) ManagesProject(key string, op accessapi.ProjectOperation) bool {
+	if d.anonymous || d.managementCeiling() || (op != accessapi.ProjectManage && op != accessapi.ProjectManageMembers) {
+		return false
+	}
+	if d.isAdmin {
+		return true
+	}
+	if key == "" || !d.withinTokenProject(key) || !d.projectAdmins[key] {
+		return false
+	}
+	return op == accessapi.ProjectManage || d.repoAdmins[key].ManageMembers
+}

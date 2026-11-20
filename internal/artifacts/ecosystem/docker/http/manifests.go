@@ -1,10 +1,12 @@
 package dockerhttp
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -250,7 +252,7 @@ func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request
 		}
 		folders = append([]string{layout.DigestFolder(hexSum)}, tags...)
 	}
-	o := owner(r, q)
+	o := g.owner(r, q)
 	for _, f := range overwritten(m, folders, hexSum) {
 		replaces, err := g.uploads.Replaces(r.Context(), o, f.Tag, f.Hex)
 		if err == nil && replaces {
@@ -270,6 +272,20 @@ func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request
 	}
 	err = g.uploads.PutManifest(r.Context(), registry.Push{
 		Owner: o, Manifest: m, Body: body, Folders: folders,
+		CheckCurrent: func(ctx context.Context) error {
+			for _, f := range overwritten(m, folders, hexSum) {
+				replaces, err := g.uploads.Replaces(ctx, o, f.Tag, f.Hex)
+				if err != nil {
+					return fmt.Errorf("read current tag replacement: %w", err)
+				}
+				if replaces && o.CheckCurrent != nil {
+					if err := o.CheckCurrent(ctx, q.Name+"/"+f.Tag+"/", api.ActionDelete); err != nil {
+						return fmt.Errorf("current tag overwrite authority: %w", err)
+					}
+				}
+			}
+			return nil
+		},
 	})
 	if err != nil {
 		g.manifestErr(w, r, q, err)

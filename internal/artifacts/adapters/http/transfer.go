@@ -170,7 +170,7 @@ func (s ArtifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bo
 		httpkit.WriteErr(w, r, httpkit.Denied(p))
 		return
 	}
-	svc, src := s.Items(st), item.Target{Repo: from, Cached: cached, Path: srcPath}
+	svc, src := s.Items(st), item.Target{Repo: from, Cached: cached, Path: srcPath, CheckCurrent: s.PublicationCheck(from)}
 	canOverwrite, err := s.overwriteRight(ctx, st, acc, p, landing{
 		src: src, target: target, dest: dest, shouldMove: move,
 	})
@@ -180,7 +180,7 @@ func (s ArtifactoryAPI) transfer(w http.ResponseWriter, r *http.Request, move bo
 	}
 	res, err := svc.Transfer(ctx, item.Transfer{
 		From:       src,
-		To:         item.Target{Repo: target, Path: toPath},
+		To:         item.Target{Repo: target, Path: toPath, CheckCurrent: s.PublicationCheck(target)},
 		IntoFolder: into, Move: move, Dry: dry, FailFast: failFast,
 		TranslateLayouts: !suppress, CanOverwrite: canOverwrite,
 		By: p.Name,

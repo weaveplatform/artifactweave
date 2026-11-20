@@ -43,6 +43,26 @@ func RunProjectRepositories(t *testing.T, store port.RepoStore) {
 	if !reflect.DeepEqual(actual, want) {
 		t.Fatalf("project contexts=%+v, want=%+v", actual, want)
 	}
+	for _, expected := range want {
+		one, err := store.ProjectRepository(ctx, expected.Key)
+		storekit.Must(t, err)
+		if !reflect.DeepEqual(one, expected) {
+			t.Fatalf("single repository context=%+v want=%+v", one, expected)
+		}
+		one.Environments[0] = "caller mutation"
+		again, err := store.ProjectRepository(ctx, expected.Key)
+		storekit.Must(t, err)
+		if !reflect.DeepEqual(again, expected) {
+			t.Fatal("single context aliased stored environments")
+		}
+	}
+	unassigned, err := store.ProjectRepository(ctx, "unassigned")
+	storekit.Must(t, err)
+	if unassigned.Key != "unassigned" || unassigned.ProjectKey != "" || unassigned.Class != repo.Local {
+		t.Fatal("unowned repository context was lost")
+	}
+	_, err = store.ProjectRepository(ctx, "missing")
+	storekit.WantErr(t, err, kernel.ErrNotFound)
 	actual[0].Environments[0] = "caller mutation"
 	fresh, _, err := store.ProjectRepositories(ctx, "alpha", kernel.Page{Limit: 1})
 	storekit.Must(t, err)
@@ -60,6 +80,11 @@ func RunProjectRepositories(t *testing.T, store port.RepoStore) {
 	storekit.Must(t, err)
 	if len(moved) != 1 || moved[0].Key != first.Key || moved[0].ProjectKey != "beta" || !reflect.DeepEqual(moved[0].Environments, []string{"PROD"}) {
 		t.Fatalf("mixed ownership/environment tuple: %+v", moved)
+	}
+	one, err := store.ProjectRepository(ctx, first.Key)
+	storekit.Must(t, err)
+	if !reflect.DeepEqual(one, moved[0]) {
+		t.Fatal("single context retained old ownership or environment")
 	}
 	for _, cursor := range []string{"!invalid", kernel.Cursor("one", "two")} {
 		_, _, err := store.ProjectRepositories(ctx, "alpha", kernel.Page{After: cursor})

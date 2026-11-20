@@ -38,7 +38,7 @@ func webhookActions(want kernel.ScopeActions) bool {
 	return want != 0 && (kernel.ScopeRead | kernel.ScopeWrite | kernel.ScopeDelete | kernel.ScopeExecute).Covers(want)
 }
 
-func (d *Decider) webhookProject(key string) bool {
+func (d *Decider) withinTokenProject(key string) bool {
 	return d.tokenProject == "" || d.tokenProject == key
 }
 
@@ -66,7 +66,7 @@ func (d *Decider) webhookScopes(serviceURL string, want kernel.ScopeActions, all
 			continue
 		}
 		key, platformURL, ok := strings.Cut(e.Qualifier, "/")
-		if !ok || key == "" || serviceURL == "" || platformURL != serviceURL || !d.webhookProject(key) {
+		if !ok || key == "" || serviceURL == "" || platformURL != serviceURL || !d.withinTokenProject(key) {
 			continue
 		}
 		if allows(key) {
@@ -80,7 +80,7 @@ func (d *Decider) webhookScopes(serviceURL string, want kernel.ScopeActions, all
 // current own-project administrator for four domains, or an explicit action
 // scope. Artifact permissions and repository management never substitute for it.
 func (d *Decider) ManagesWebhook(projectKey, domain, serviceURL string, want kernel.ScopeActions) bool {
-	if d.anonymous || !webhookActions(want) || !d.webhookProject(projectKey) {
+	if d.anonymous || !webhookActions(want) || !d.withinTokenProject(projectKey) {
 		return false
 	}
 	if d.webhookScopes(serviceURL, want, func(key string) bool { return key == "" || key == projectKey }) {
@@ -110,7 +110,7 @@ func (d *Decider) HasWebhookAccess(serviceURL string, want kernel.ScopeActions) 
 		return true
 	}
 	for key := range d.projectAdmins {
-		if d.webhookProject(key) {
+		if d.withinTokenProject(key) {
 			return true
 		}
 	}

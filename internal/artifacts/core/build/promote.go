@@ -102,7 +102,11 @@ func (s *Service) promoteThen(
 	if p.DryRun {
 		err = pr.promote(ctx)
 	} else {
-		err = s.Store.Tx(ctx, func(ctx context.Context) error {
+		err = s.tx(ctx, a, func(ctx context.Context, a Access) error {
+			pr.a = a
+			if !a.Build(repoKey, path, false, api.ActionWrite) {
+				return ErrForbidden
+			}
 			if err := pr.promote(ctx); err != nil {
 				return err
 			}

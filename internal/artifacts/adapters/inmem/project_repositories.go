@@ -11,6 +11,22 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
+func (r repos) ProjectRepository(ctx context.Context, key string) (api.ProjectRepository, error) {
+	var out api.ProjectRepository
+	err := r.s.Do(ctx, func() error {
+		entry, ok := r.t().Get(key)
+		if !ok {
+			return kernel.ErrNotFound
+		}
+		out = api.ProjectRepository{Key: entry.Key, Class: entry.Class, ProjectKey: entry.ProjectKey, Environments: slices.Clone(entry.Environments)}
+		return nil
+	})
+	if err != nil {
+		return api.ProjectRepository{}, fmt.Errorf("repository project context: %w", err)
+	}
+	return out, nil
+}
+
 func (r repos) ProjectRepositories(ctx context.Context, key string, page kernel.Page) ([]api.ProjectRepository, string, error) {
 	if key == "" {
 		return nil, "", fmt.Errorf("project repository query requires a project: %w", kernel.ErrInvalid)

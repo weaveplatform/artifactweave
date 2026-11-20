@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
@@ -21,19 +22,28 @@ import (
 // principal, and the raw update body requestDetails saves.
 func TestAccHandlersCalledDirectly(t *testing.T) {
 	db := inmem.New()
+	cheapSeed(t, db)
 	ctx := context.Background()
 	if err := db.Repos().
 		Create(ctx, *repo.Defaults(&repo.Config{Key: "a", Class: repo.Local})); err != nil {
 		t.Fatal(err)
 	}
-	svc := newArtifactoryAPI(Config{Store: db})
+	access := accesstest.Over(t, db)
+	svc := newArtifactoryAPI(Config{Store: db, Access: access.API()})
 	if _, err := svc.GetRepositoriesByTypeAndProject(
 		ctx,
 		artgen.GetRepositoriesByTypeAndProjectRequestObject{},
 	); !errors.Is(err, kernel.ErrUnauthenticated) {
 		t.Fatalf("no principal: %v", err)
 	}
-	admin := kernel.WithPrincipal(ctx, kernel.Principal{Name: "admin", Admin: true})
+	p, err := access.API().Authenticator.Basic(ctx, "admin", "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	admin, err := access.Authorize(ctx, p, false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Without the saved body the decoded one is used, which cannot express
 	// a null reset but still merges.
 	if _, err := svc.UpdateRepositoryConfiguration(
@@ -60,7 +70,7 @@ func TestAccHandlersCalledDirectly(t *testing.T) {
 		artgen.CreateMultipleRepositoriesRequestObject{}); err == nil {
 		t.Fatal("a batch without a body was accepted")
 	}
-	repositoriesCalledDirectly(t, db, admin)
+	repositoriesCalledDirectly(t, db, kernel.WithPrincipal(ctx, p))
 }
 
 // repositoriesCalledDirectly: without the router's saved query, Get
@@ -136,6 +146,7 @@ func (r racedRepos) List(ctx context.Context, f port.RepoFilter) ([]repo.Config,
 // singly and 409 in a batch, and stores nothing.
 func TestUnitP2PlannedRemoteKeyTaken(t *testing.T) {
 	db := inmem.New()
+	cheapSeed(t, db)
 	ctx := context.Background()
 	for _, c := range []repo.Config{
 		{Key: "race.example", Class: repo.Local, PackageType: repo.Generic},
@@ -145,8 +156,16 @@ func TestUnitP2PlannedRemoteKeyTaken(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	svc := newArtifactoryAPI(Config{Store: racedStore{Store: db, hide: "race.example"}})
-	admin := kernel.WithPrincipal(ctx, kernel.Principal{Name: "admin", Admin: true})
+	access := accesstest.Over(t, db)
+	svc := newArtifactoryAPI(Config{Store: racedStore{Store: db, hide: "race.example"}, Access: access.API()})
+	p, err := access.API().Authenticator.Basic(ctx, "admin", "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	admin, err := access.Authorize(ctx, p, false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	body := repo.Config{
 		Key: "p2-virtual", Class: repo.Virtual, PackageType: repo.P2,
 		P2URLs: []string{"https://race.example/site"},
@@ -158,7 +177,7 @@ func TestUnitP2PlannedRemoteKeyTaken(t *testing.T) {
 			t.Errorf("%s: %v, want %d %q", name, err, status, msgKeyExists)
 		}
 	}
-	_, err := svc.UpdateRepositoryConfiguration(admin,
+	_, err = svc.UpdateRepositoryConfiguration(admin,
 		artgen.UpdateRepositoryConfigurationRequestObject{RepoKey: "p2-virtual", JSONBody: &body})
 	refused("update", err, http.StatusBadRequest)
 	_, err = svc.UpdateMultipleRepositories(admin,

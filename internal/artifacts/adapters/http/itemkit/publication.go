@@ -13,6 +13,23 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
+// Tx refreshes the original caller before taking business metadata locks. The
+// supplied context carries the matching current policy through publication.
+// Callers stage client streams and remote reads before entering this method.
+func (s *Kit) Tx(ctx context.Context, fn func(context.Context) error) error {
+	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		p, a, err := s.CurrentAccess(ctx)
+		if err != nil {
+			return err
+		}
+		return fn(accessapi.WithCaller(ctx, p, a.Decider))
+	})
+	if err != nil {
+		return fmt.Errorf("current publication transaction: %w", err)
+	}
+	return nil
+}
+
 // CurrentAccess takes the shared authority guard before refreshing credentials
 // and evaluating current policy. Publication callers retain the supplied shared
 // store transaction through their mutation and call this before any source,

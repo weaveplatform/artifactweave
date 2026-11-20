@@ -27,6 +27,7 @@ func (stub) AllowsAll(api.ResourceType, api.Repo, string, api.Actions) bool {
 	return false
 }
 func (stub) System(string, kernel.ScopeActions) bool                         { return false }
+func (stub) ManagesProject(string, api.ProjectOperation) bool                { return false }
 func (stub) ManagesRepository(string, string, api.RepositoryOperation) bool  { return false }
 func (stub) ManagesWebhook(string, string, string, kernel.ScopeActions) bool { return false }
 func (stub) HasWebhookAccess(string, kernel.ScopeActions) bool               { return false }

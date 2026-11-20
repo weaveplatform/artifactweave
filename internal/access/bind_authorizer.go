@@ -55,7 +55,7 @@ func (b authorizer) snapshot(ctx context.Context, fn func(context.Context) error
 // refresh deliberately does not recheck password expiry: middleware admits an
 // expired password only to its change-password route, which must remain usable.
 func (b authorizer) identity(ctx context.Context, p kernel.Principal) (kernel.Principal, error) {
-	if p.Anonymous || !p.Password && !p.IsTokenAuthenticated && p.Registry == nil {
+	if p.Anonymous || !p.Password && !p.IsTokenAuthenticated {
 		return p, nil
 	}
 	if p.Identity == kernel.IdentitySynthetic {
@@ -70,18 +70,12 @@ func (b authorizer) identity(ctx context.Context, p kernel.Principal) (kernel.Pr
 		if b.authenticator == nil {
 			return p, nil
 		}
-		if p.Registry != nil {
-			current, err := b.authenticator.CurrentRegistry(ctx, p, b.st.Tokens())
-			if err != nil {
-				return kernel.Principal{}, fmt.Errorf("current transient registry identity: %w", err)
-			}
-			return current, nil
-		}
-		current, err := b.authenticator.Current(ctx, p, b.st.Tokens())
+		groups, err := b.authenticator.TransientGroups(ctx)
 		if err != nil {
 			return kernel.Principal{}, fmt.Errorf("current transient identity: %w", err)
 		}
-		return current, nil
+		p.Admin, p.Groups = false, groups
+		return p, nil
 	}
 	if errors.Is(err, kernel.ErrNotFound) {
 		return kernel.Principal{}, kernel.ErrBadCredentials

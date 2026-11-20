@@ -211,6 +211,8 @@
       "permissions_fault_test.go",
       "permissions_test.go",
       "permissions_walk_test.go",
+      "project_publication_test.go",
+      "project_repositories_test.go",
       "project_tokens_test.go",
       "projects_status_test.go",
       "projects_test.go",
