@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/configuration"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/internal/platform/events"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
@@ -25,6 +26,7 @@ type modules struct {
 	access        *access.Module
 	artifacts     *artifacts.Module
 	configuration *configuration.Module
+	events        *events.Bus
 }
 
 // moduleStore is the metadata store the modules are built over: the store
@@ -50,6 +52,9 @@ type moduleDeps struct {
 	// blobs is the hot tier's blob store.
 	blobs blob.Store
 	work  *work.Queue
+	// events is the shared local bus. Consumers register during module
+	// assembly; OpenRuntime registers durable cursors before starting Work.
+	events *events.Bus
 	// gc is the garbage collector over app's multipart and registry upload
 	// services, whose loop the artifacts module runs.
 	gc  *gc.Collector
@@ -93,7 +98,7 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	if err != nil {
 		return modules{}, fmt.Errorf("configuration: %w", err)
 	}
-	return modules{access: acc, artifacts: art, configuration: conf}, nil
+	return modules{access: acc, artifacts: art, configuration: conf, events: d.events}, nil
 }
 
 // tokenKeyBits is the access-token RSA key size OpenRuntime uses when its

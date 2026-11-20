@@ -232,6 +232,23 @@ func (w workQueue) Extend(
 		"UPDATE work_items SET lease_until = ?, updated_at = ?", until.UnixMicro(), now.UnixMicro())
 }
 
+func (w workQueue) GuardLease(ctx context.Context, kind, key string, gen int64) (time.Time, error) {
+	if !w.s.InTx(ctx) {
+		return time.Time{}, fmt.Errorf("work lease guard requires its transaction: %w", kernel.ErrInvalid)
+	}
+	var until sql.NullInt64
+	err := w.s.Q(ctx).QueryRowContext(ctx, w.s.Dialect().Rebind(
+		"SELECT lease_until FROM work_items WHERE kind = ? AND key = ? AND state = 'leased' AND generation = ?"+
+			w.s.LockClause(ctx)), kind, key, gen).Scan(&until)
+	if errors.Is(err, sql.ErrNoRows) || err == nil && !until.Valid {
+		return time.Time{}, fmt.Errorf("work item %s/%s run %d: %w", kind, key, gen, kernel.ErrConflict)
+	}
+	if err != nil {
+		return time.Time{}, w.s.Wrap("guard work lease "+kind, err)
+	}
+	return dialect.FromMicros(until), nil
+}
+
 // unlease sets a run's item pending again; any work asked for during the
 // run folds into the pending item.
 const unlease = "state = 'pending', not_before = ?, leased_by = '', lease_until = NULL, " +

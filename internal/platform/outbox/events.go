@@ -41,8 +41,9 @@ type Position struct {
 // EventStore persists general module events in the existing ordered outbox.
 // Every call joins the caller's metadata transaction. Consumer effects and Ack
 // must share that transaction, propagating any conflict to roll both back.
-// Perform domain effects before Ack, which is the transaction's last lock
-// acquisition: producers also take domain locks before the outbox stream guard.
+// Perform domain effects before Ack: producers also take domain locks before
+// the outbox stream guard. Only event dispatch's dedicated work lease guard
+// may follow Ack; no later domain or delivery-work lock may follow it.
 // Next does not reserve/acknowledge events or acquire that write guard.
 type EventStore interface {
 	// AppendEvent validates e, allocates its sequence and commits with the
