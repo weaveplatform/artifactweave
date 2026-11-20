@@ -50,6 +50,11 @@ var (
 	ErrNotFound = kernel.ErrNotFound
 	// ErrExists is a deploy with IfAbsent to a path that holds an item.
 	ErrExists = errors.New("item: the path already holds an item")
+	// ErrPermissionDenied marks a current action refusal, separately from an
+	// ended credential or unavailable policy. A publication adapter wraps it
+	// alongside its HTTP refusal; only a denied Delete may use the identical
+	// content overwrite exception.
+	ErrPermissionDenied = errors.New("item: current action is not permitted")
 )
 
 // Store is what the item service reads and writes: what its formats see
@@ -122,6 +127,8 @@ type Target struct {
 	// adapter supplies it for client writes; server-derived metadata keeps its
 	// owner's separate authority check. It must acquire the shared authority
 	// guard before reading identity/policy and retain it through this transaction.
+	// Action refusals wrap ErrPermissionDenied; credential and policy failures
+	// must not, so they cannot use the identical-content overwrite exception.
 	CheckCurrent func(ctx context.Context, path string, folder bool, want accessapi.Actions) error `json:"-"`
 }
 
@@ -418,6 +425,18 @@ func (s *Service) storeFile(
 	}
 	var stored model.Item
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
+		if d.CheckCurrent != nil && d.Reusable != nil {
+			// A checksum lookup before publication cannot retain source Read
+			// after a role/group changes. Repeat its local-only gate in this
+			// transaction; the adapter takes the authority guard first.
+			allowed, err := d.Reusable(ctx, blob.Blob{Checksums: actual, Size: size})
+			if err != nil {
+				return fmt.Errorf("item: current reusable content: %w", err)
+			}
+			if !allowed {
+				return ErrNoBlob
+			}
+		}
 		var err error
 		stored, err = s.putFile(ctx, env, d, actual, size, declared, s.now())
 		return err
@@ -682,7 +701,7 @@ func (d *Deploy) mayReplace(ctx context.Context, full string, old model.Item, de
 		if err == nil {
 			return true, nil
 		}
-		if !errors.Is(err, kernel.ErrForbidden) {
+		if !errors.Is(err, ErrPermissionDenied) {
 			// Invalid credentials or storage faults cannot borrow the identical
 			// content exception, which removes only a Delete requirement.
 			return false, err

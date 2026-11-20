@@ -23,6 +23,9 @@ import (
 type Sources struct {
 	Permissions port.PermissionStore
 	Groups      port.GroupStore
+	// Users supplies current platform management flags. Nil is an evaluator
+	// embedded without those administrative capabilities.
+	Users port.UserStore
 	// AnonymousEnabled is the security.anonymous_access setting; the
 	// anonymous user's grants apply only while it is on.
 	AnonymousEnabled bool
@@ -76,8 +79,12 @@ type Decider struct {
 	member []string
 	// projectLimit is nil for an unbound credential; a non-nil empty map is
 	// a project token that reaches no current repository.
-	projectLimit map[string]bool
-	repoAdmins   map[string]model.AdminPrivileges
+	projectLimit   map[string]bool
+	repoAdmins     map[string]model.AdminPrivileges
+	projectAdmins  map[string]bool
+	webhookManager bool
+	tokenProject   string
+	anonymous      bool
 }
 
 // New reads the permissions that apply to s and returns its Decider. An
@@ -108,6 +115,8 @@ func New(ctx context.Context, src Sources, s accessapi.Subject) (*Decider, error
 		rules:                 map[accessapi.ResourceType][]rule{},
 		self:                  model.FoldUsername(s.Name),
 		member:                slices.Clone(s.Groups),
+		tokenProject:          s.ProjectKey,
+		anonymous:             s.Anonymous,
 	}
 	if sc.hasArtifactFilter {
 		d.filter = sc.artifact
@@ -153,6 +162,9 @@ func New(ctx context.Context, src Sources, s accessapi.Subject) (*Decider, error
 		}
 	}
 	if err := d.projectRoles(ctx, src, s, sc); err != nil {
+		return nil, err
+	}
+	if err := d.managementFlags(ctx, src); err != nil {
 		return nil, err
 	}
 	return d, nil

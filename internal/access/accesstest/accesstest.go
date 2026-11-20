@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	platinmem "github.com/weaveplatform/artifactweave/internal/platform/store/inmem"
@@ -78,6 +79,13 @@ type options struct {
 	tokens   bool
 	verifier authn.TokenVerifier
 	settings accessapi.Settings
+	projects artifactsapi.ProjectRepositoryReader
+}
+
+// WithProjectRepositories activates project grants against a canonical,
+// secret-free repository projection, as the application composition does.
+func WithProjectRepositories(reader artifactsapi.ProjectRepositoryReader) Option {
+	return func(o *options) { o.projects = reader }
 }
 
 // WithNow makes now the clock of the authenticator and the token service, in
@@ -183,6 +191,7 @@ func Over(tb testing.TB, st Store, opts ...Option) *Kit {
 	})
 	m, err := access.New(access.Deps{
 		Store: st, Authenticator: authn, Tokens: k.tokens, Settings: o.settings, Now: o.now,
+		ProjectRepositories: o.projects,
 	})
 	fatalIf(tb, errors.Join(authErr, err))
 	k.api = m.API()

@@ -89,7 +89,7 @@ type annotation struct {
 // it is made, so a caller checks them all first to change nothing when
 // one would be refused.
 func (h handler) annotate(r *http.Request, changes []annotation) error {
-	err := h.k.DB().Tx(r.Context(), func(ctx context.Context) error {
+	err := h.k.Tx(r.Context(), func(ctx context.Context) error {
 		r := r.WithContext(ctx)
 		for _, c := range changes {
 			set, remove := model.Properties{c.key: c.values}, []string(nil)
@@ -238,7 +238,7 @@ func (h handler) remove(w http.ResponseWriter, r *http.Request, paths []string) 
 			return
 		}
 	}
-	err := h.k.DB().Tx(r.Context(), func(ctx context.Context) error {
+	err := h.k.Tx(r.Context(), func(ctx context.Context) error {
 		r := r.WithContext(ctx)
 		for _, p := range paths {
 			if err := h.k.Delete(r, p); err != nil {

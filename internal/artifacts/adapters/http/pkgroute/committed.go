@@ -61,10 +61,7 @@ func (k *Kit) fileDeploy(
 	c := RequestFrom(r).Repo
 	by, _ := kernel.FromContext(r.Context())
 	return item.Deploy{
-		Target: item.Target{
-			Repo: c,
-			Path: path,
-		},
+		Target:             k.writeTarget(c, path),
 		Properties:         props,
 		Declared:           declared,
 		By:                 by.Name,

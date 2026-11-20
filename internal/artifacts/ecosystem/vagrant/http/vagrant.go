@@ -100,7 +100,7 @@ func (h handler) read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var out catalog
-	err = h.k.DB().Tx(r.Context(), func(ctx context.Context) error {
+	err = h.k.Tx(r.Context(), func(ctx context.Context) error {
 		var e error
 		out, e = h.catalog(
 			r.WithContext(ctx),

@@ -102,6 +102,12 @@ func (d *Decider) project(ctx context.Context, src Sources, key string, names []
 		return fmt.Errorf("authz: selected project roles: %w", err)
 	}
 	roles := slices.Concat(assigned, named)
+	if applied && slices.ContainsFunc(roles, func(role model.Role) bool { return role.Type == model.RoleAdmin }) {
+		if d.projectAdmins == nil {
+			d.projectAdmins = map[string]bool{}
+		}
+		d.projectAdmins[key] = true
+	}
 	if applied && slices.ContainsFunc(roles, managesResources) {
 		if d.repoAdmins == nil {
 			d.repoAdmins = map[string]model.AdminPrivileges{}

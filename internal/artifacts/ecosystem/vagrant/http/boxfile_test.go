@@ -16,7 +16,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // boxPath is the escaped path of the box these tests publish, and boxURL
@@ -41,10 +40,7 @@ const (
 // that carries headers.
 func (f *fixture) send(r *http.Request, user string) *httptest.ResponseRecorder {
 	f.t.Helper()
-	p := kernel.Principal{Name: user, Admin: user == "admin"}
-	if user == "" {
-		p = kernel.Anonymous
-	}
+	p := f.principal(r.Context(), user)
 	ctx, err := f.kit.Authorize(r.Context(), p, true)
 	if err != nil {
 		f.t.Fatal(err)

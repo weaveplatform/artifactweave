@@ -119,7 +119,7 @@ func (h handler) commit(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
-	err = h.k.DB().Tx(r.Context(), func(ctx context.Context) error {
+	err = h.k.Tx(r.Context(), func(ctx context.Context) error {
 		return h.publish(r.WithContext(ml.Publication(ctx)), id, tx, m, props, info)
 	})
 	if err != nil {

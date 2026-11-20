@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app/config"
 	"github.com/weaveplatform/artifactweave/internal/artifacts"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/gc"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 	nimmodelhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/nimmodel/http"
 	"github.com/weaveplatform/artifactweave/internal/configuration"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -69,8 +70,9 @@ type moduleDeps struct {
 func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	acc, err := access.New(access.Deps{
 		Store: d.store, Authenticator: d.auth, Tokens: d.tokens,
-		Settings: cfg.Access(),
-		Log:      d.log,
+		ProjectRepositories: repos.NewProjectRepositoryReader(d.store),
+		Settings:            cfg.Access(),
+		Log:                 d.log,
 	})
 	if err != nil {
 		return modules{}, fmt.Errorf("access: %w", err)

@@ -312,6 +312,7 @@ func withAccess(cfg RouterConfig) RouterConfig {
 	// there is no error for New's callers to see.
 	if m, err := accessmodule.New(accessmodule.Deps{
 		Store: cfg.Store, Authenticator: cfg.Auth, Tokens: cfg.Tokens,
+		ProjectRepositories: repos.NewProjectRepositoryReader(cfg.Store),
 		Settings: accessapi.Settings{
 			AllowBasicAuthTokens:   cfg.AllowBasicAuthTokens,
 			GlobalEnvironmentLimit: cfg.GlobalEnvironmentLimit,
@@ -533,7 +534,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			// challenged whether anonymous access is on or off.
 			kit.ForceAuthentication,
 			accesshttp.Authenticate(
-				newAuthnOptions(cfg.Auth, cfg.Store, func(req *http.Request) bool {
+				newAuthnOptions(cfg.Auth, cfg.Store, cfg.Access.Authorizer, func(req *http.Request) bool {
 					if terraformbackendhttp.IsPath(req.URL.Path) {
 						return terraformbackendhttp.SkipsAuthentication(req)
 					}
@@ -772,6 +773,7 @@ func redactLoggedPath(path string) string {
 func newAuthnOptions(
 	a *authn.Authenticator,
 	st accesshttp.Store,
+	authorizer accessapi.Authorizer,
 	skip ...func(*http.Request) bool,
 ) accesshttp.AuthnOptions {
 	public := accesshttp.PublicRoutes()
@@ -779,6 +781,7 @@ func newAuthnOptions(
 	return accesshttp.AuthnOptions{
 		Auth:               a,
 		Store:              st,
+		Authorizer:         authorizer,
 		SelfAuthenticated:  artifactshttp.SelfAuthenticated(),
 		Skip:               append([]func(*http.Request) bool{npmhttp.NPMUserRequest}, skip...),
 		RegistryPath:       dockerhttp.IsRegistryPath,

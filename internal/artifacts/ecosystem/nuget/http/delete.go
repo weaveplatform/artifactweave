@@ -74,7 +74,7 @@ func (h handler) remove(w http.ResponseWriter, r *http.Request) {
 		}
 		paths = append(paths, it.FullPath())
 	}
-	err = st.Tx(ctx, func(ctx context.Context) error {
+	err = h.k.Tx(ctx, func(ctx context.Context) error {
 		for _, p := range paths {
 			if err := h.k.Delete(r.WithContext(ctx), p); err != nil {
 				return err //nolint:wrapcheck // the kit's answer, given as it is

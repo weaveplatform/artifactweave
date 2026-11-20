@@ -86,6 +86,14 @@ type Decider interface {
 	// requires platform administration. Granular class privileges are already
 	// normalized by project administration, so a false value stays a denial.
 	ManagesRepository(projectKey, class string, operation RepositoryOperation) bool
+	// ManagesWebhook checks subscription administration independently of content
+	// permissions. serviceURL is the configured JFrog platform URL, never the
+	// webhook receiver or a request-supplied Host. Project administrators are
+	// limited to their own artifact, artifact_property, docker and build domains.
+	ManagesWebhook(projectKey, domain, serviceURL string, want kernel.ScopeActions) bool
+	// HasWebhookAccess authorizes the collection before it is read or filtered.
+	// ManagesWebhook still checks every subscription in a permitted collection.
+	HasWebhookAccess(serviceURL string, want kernel.ScopeActions) bool
 }
 
 // Authorizer evaluates a principal's permissions (decision 0006), once for a

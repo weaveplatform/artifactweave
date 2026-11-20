@@ -64,9 +64,18 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 	if err := db.Repos().Create(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
+	kit := accesstest.Over(t, db)
+	for _, name := range []string{"admin", "reader", "nonreader", "outsider"} {
+		if err := db.Users().Create(t.Context(), accesstest.User{
+			Name: name, Admin: name == "admin", PasswordHash: accesstest.HashPassword(t, "pw"),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	router := harness.Router(
 		harness.Config{
 			Store:   faults,
+			Access:  kit.API(),
 			Blobs:   blobs,
 			BaseURL: "https://public.example",
 			Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -75,7 +84,7 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 	return &fixture{
 		t:      t,
 		db:     db,
-		kit:    accesstest.Over(t, db),
+		kit:    kit,
 		faults: faults,
 		c:      c,
 		items:  &item.Service{Store: db, Blobs: blobs, Formats: ecosystem.For},
@@ -86,10 +95,7 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 func (f *fixture) do(method, path, user string, body []byte) *httptest.ResponseRecorder {
 	f.t.Helper()
 	r := httptest.NewRequest(method, path, bytes.NewReader(body))
-	p := kernel.Principal{Name: user, Admin: user == "admin"}
-	if user == "" {
-		p = kernel.Anonymous
-	}
+	p := f.principal(r.Context(), user)
 	ctx, err := f.kit.Authorize(r.Context(), p, true)
 	if err != nil {
 		f.t.Fatal(err)
@@ -506,4 +512,16 @@ func TestAccDuplicateProviderUsesNewestReadableItem(t *testing.T) {
 	if !strings.HasSuffix(c.Versions[0].Providers[0].URL, "/a.box") {
 		t.Fatalf("tie %+v", c)
 	}
+}
+
+func (f *fixture) principal(ctx context.Context, user string) kernel.Principal {
+	f.t.Helper()
+	if user == "" {
+		return kernel.Anonymous
+	}
+	p, err := f.kit.API().Authenticator.Basic(ctx, user, "pw")
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return p
 }

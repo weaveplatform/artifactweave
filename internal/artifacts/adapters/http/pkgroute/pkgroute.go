@@ -58,6 +58,11 @@ type Options struct {
 	// Items returns the item service a deploy goes through, with the
 	// server's formats and work queue.
 	Items func() *item.Service
+	// CurrentAccess refreshes the caller under the shared project guard. It
+	// joins the caller's metadata transaction; runtime composition supplies
+	// it before any protocol-owned source/item/work locks. Standalone kits
+	// without an access module leave it nil.
+	CurrentAccess func(context.Context) (kernel.Principal, accessapi.Decider, error)
 	// ServeItem answers GET or HEAD of a file in c with the item routes'
 	// download, which applies the download redirect policy (decision 0029),
 	// sets the checksum headers and counts the download.
@@ -809,14 +814,17 @@ func (k *Kit) Annotate(
 	set model.Properties,
 	remove []string,
 ) error {
-	c := RequestFrom(r).Repo
-	if !can(r, c, it.FullPath(), accessapi.ActionAnnotate) {
-		return refusal(r)
-	}
-	if err := k.o.Items().Annotate(r.Context(), c, it, set, remove); err != nil {
-		return k.o.ItemError(r.Context(), "annotate", err)
-	}
-	return nil
+	return k.Tx(r.Context(), func(ctx context.Context) error {
+		r := r.WithContext(ctx)
+		c := RequestFrom(r).Repo
+		if !can(r, c, it.FullPath(), accessapi.ActionAnnotate) {
+			return refusal(r)
+		}
+		if err := k.o.Items().Annotate(ctx, c, it, set, remove); err != nil {
+			return k.o.ItemError(ctx, "annotate", err)
+		}
+		return nil
+	})
 }
 
 // Delete removes the file at path in the request's repository through the
@@ -838,7 +846,7 @@ func (k *Kit) Delete(r *http.Request, path string) error {
 		return fmt.Errorf("get item %s/%s: %w", c.Key, path, err)
 	}
 	p, _ := kernel.FromContext(ctx)
-	if _, err := k.o.Items().Delete(ctx, item.Target{Repo: c, Path: path}, p.Name); err != nil {
+	if _, err := k.o.Items().Delete(ctx, k.writeTarget(c, path), p.Name); err != nil {
 		return k.o.ItemError(ctx, "delete", err)
 	}
 	return nil
@@ -847,6 +855,12 @@ func (k *Kit) Delete(r *http.Request, path string) error {
 // DeleteTree removes a protocol revision only after checking Delete on every
 // descendant. The item service performs the actual removal in one transaction.
 func (k *Kit) DeleteTree(r *http.Request, path string) error {
+	return k.Tx(r.Context(), func(ctx context.Context) error {
+		return k.deleteTree(r.WithContext(ctx), path)
+	})
+}
+
+func (k *Kit) deleteTree(r *http.Request, path string) error {
 	ctx := r.Context()
 	c := RequestFrom(r).Repo
 	if c.Class != repo.Local && c.Class != repo.Federated {
@@ -871,6 +885,9 @@ func (k *Kit) DeleteTree(r *http.Request, path string) error {
 		page.After = next
 	}
 	p, _ := kernel.FromContext(ctx)
+	// This operation permits a root reached through allowed descendants;
+	// it checked every descendant above under the current authority guard.
+	// Do not replace that contract with an exact-file grant on the root.
 	if _, err := k.o.Items().Delete(ctx, item.Target{Repo: c, Path: path}, p.Name); err != nil {
 		return k.o.ItemError(ctx, "delete", err)
 	}
@@ -1085,7 +1102,7 @@ func (k *Kit) Store(
 		return model.Item{}, fmt.Errorf("get item %s/%s: %w", c.Key, path, err)
 	}
 	it, err := k.o.Items().Deploy(ctx, item.Deploy{
-		Target: item.Target{Repo: c, Path: path}, Body: body, Declared: declared,
+		Target: k.writeTarget(c, path), Body: body, Declared: declared,
 		Properties: props, By: p.Name,
 	})
 	if err != nil {
@@ -1123,7 +1140,7 @@ func (k *Kit) StoreOnce(
 	}
 	p, _ := kernel.FromContext(ctx)
 	d := item.Deploy{
-		Target: item.Target{Repo: c, Path: path}, Body: body, Declared: declared,
+		Target: k.writeTarget(c, path), Body: body, Declared: declared,
 		Properties: props, By: p.Name,
 	}
 	svc := k.o.Items()
@@ -1131,6 +1148,24 @@ func (k *Kit) StoreOnce(
 	if err != nil {
 		return model.Item{}, k.o.ItemError(ctx, "deploy", err)
 	}
+	var published model.Item
+	err = k.Tx(ctx, func(ctx context.Context) error {
+		r := r.WithContext(ctx)
+		if !can(r, c, path, accessapi.ActionWrite) {
+			return refusal(r)
+		}
+		var err error
+		published, err = k.storeOnce(r, svc, d, info, differs)
+		return err
+	})
+	if err != nil {
+		return model.Item{}, err
+	}
+	return published, nil
+}
+
+func (k *Kit) storeOnce(r *http.Request, svc *item.Service, d item.Deploy, info blob.Info, differs func(model.Item) error) (model.Item, error) {
+	ctx, c, path := r.Context(), d.Repo, d.Path
 	stored, err := k.o.Store.Items().Get(ctx, c.Key, false, path)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound) || err == nil && stored.Folder:
@@ -1145,8 +1180,8 @@ func (k *Kit) StoreOnce(
 	case stored.Actual.SHA256 != info.Digests.SHA256:
 		return model.Item{}, k.o.ItemError(ctx, "deploy", differs(stored))
 	}
-	if len(props) > 0 {
-		if err := svc.Annotate(ctx, c, stored, props, nil); err != nil {
+	if len(d.Properties) > 0 {
+		if err := svc.Annotate(ctx, c, stored, d.Properties, nil); err != nil {
 			return model.Item{}, k.o.ItemError(ctx, "deploy", err)
 		}
 	}
@@ -1218,7 +1253,7 @@ func (k *Kit) StoreNew(
 	}
 	p, _ := kernel.FromContext(ctx)
 	it, err := k.o.Items().DeployCommitted(ctx, item.Deploy{
-		Target: item.Target{Repo: c, Path: path}, Properties: props, By: p.Name,
+		Target: k.writeTarget(c, path), Properties: props, By: p.Name,
 		Declared: declared, IfAbsent: true,
 	}, info)
 	switch {

@@ -93,6 +93,11 @@ func (t Token) ProjectKeys() []string {
 		if e.Kind == kernel.ScopeRoles || e.Kind == kernel.ScopeProject {
 			out = append(out, e.Project)
 		}
+		if e.Kind == kernel.ScopeSystem && e.Target == "webhooks" && e.Qualifier != "" {
+			if key, _, ok := strings.Cut(e.Qualifier, "/"); ok && key != "" {
+				out = append(out, key)
+			}
+		}
 	}
 	slices.Sort(out)
 	return slices.Compact(out)

@@ -26,8 +26,10 @@ func (stub) AllowsFolder(api.ResourceType, api.Repo, string, api.Actions) bool {
 func (stub) AllowsAll(api.ResourceType, api.Repo, string, api.Actions) bool {
 	return false
 }
-func (stub) System(string, kernel.ScopeActions) bool                        { return false }
-func (stub) ManagesRepository(string, string, api.RepositoryOperation) bool { return false }
+func (stub) System(string, kernel.ScopeActions) bool                         { return false }
+func (stub) ManagesRepository(string, string, api.RepositoryOperation) bool  { return false }
+func (stub) ManagesWebhook(string, string, string, kernel.ScopeActions) bool { return false }
+func (stub) HasWebhookAccess(string, kernel.ScopeActions) bool               { return false }
 
 // A request's decider answers only for the WithPrincipal call it was bound
 // to. Were it matched to the principal's value instead, a decider would

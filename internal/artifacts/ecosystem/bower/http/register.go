@@ -106,7 +106,7 @@ func (h handler) register(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	err = h.k.DB().Tx(r.Context(), func(ctx context.Context) error {
+	err = h.k.Tx(r.Context(), func(ctx context.Context) error {
 		current, err := h.k.DB().RemoteCache().Source(ctx, selected.Key)
 		if err != nil {
 			return fmt.Errorf("bower registration source: %w", err)

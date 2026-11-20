@@ -16,6 +16,7 @@ func TestUnitProjectTokenLifetimeIncludesRefreshReferenceAndRegistry(t *testing.
 		"applied-permissions/user",
 		"applied-permissions/roles:alpha:Viewer",
 		"project:alpha/roles:r",
+		"system:webhooks@alpha/https://platform.example:r,w,d",
 	} {
 		t.Run(scope, func(t *testing.T) {
 			s, db, _ := world(t)

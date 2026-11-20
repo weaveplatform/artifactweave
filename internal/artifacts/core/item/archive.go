@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -181,6 +182,9 @@ func (s *Service) Explode(ctx context.Context, d Explode) (model.Item, error) {
 	}
 	if d.Atomic {
 		err = s.Store.Tx(ctx, func(ctx context.Context) error {
+			if err := d.checkCurrent(ctx, d.Path, false, accessapi.ActionWrite); err != nil {
+				return err
+			}
 			for _, p := range folders {
 				if err := s.ensureFolders(ctx, d.Target, p, d.By, now); err != nil {
 					return err
@@ -194,8 +198,18 @@ func (s *Service) Explode(ctx context.Context, d Explode) (model.Item, error) {
 			return nil
 		})
 	} else {
+		if d.CheckCurrent != nil {
+			err = s.Store.Tx(ctx, func(ctx context.Context) error {
+				return d.checkCurrent(ctx, d.Path, false, accessapi.ActionWrite)
+			})
+		}
 		for _, p := range folders {
-			if _, err = s.MakeFolder(ctx, Target{Repo: d.Repo, Path: p}, nil, d.By); err != nil {
+			if err != nil {
+				break
+			}
+			target := d.Target
+			target.Path = p
+			if _, err = s.MakeFolder(ctx, target, nil, d.By); err != nil {
 				break
 			}
 		}

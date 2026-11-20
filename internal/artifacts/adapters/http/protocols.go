@@ -1,11 +1,14 @@
 package artifactshttp
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"path"
 	"slices"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
@@ -61,6 +64,13 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 			return remote.NoOriginUpstream(r.Context(), v)
 		},
 		Items: func() *item.Service { return s.Items(s.cfg.Store) },
+		CurrentAccess: func(ctx context.Context) (kernel.Principal, accessapi.Decider, error) {
+			p, access, err := s.CurrentAccess(ctx)
+			if err != nil {
+				return kernel.Principal{}, nil, fmt.Errorf("current package publication authority: %w", err)
+			}
+			return p, access.Decider, nil
+		},
 		ServeItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, it model.Item) {
 			p, _ := kernel.FromContext(r.Context())
 			f := itemkit.Found{Repo: c, Item: it}
