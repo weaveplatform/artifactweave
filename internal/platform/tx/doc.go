@@ -23,12 +23,19 @@
 //   - AfterCommit: a context and a function to run once the transaction
 //     that context is inside commits.
 //   - BeforeCommit: an active transaction context and a fallible callback.
+//   - Middleware surrounds ordinary work in a new root after backend binding
+//     and rollback setup. It is configured once by the application composition.
+//   - SetPublicationCheck binds repeatable ordinary-work settlement to the
+//     owning transaction, before acknowledgement and final lease/stream locks.
 //
 // # Outputs
 //
 //   - Runner, with Tx and AfterCommit.
 //   - BeforeCommit and Finalizers: ordered required work after business
 //     mutations finish, inside the same transaction and before commit.
+//   - CheckPublication: settle current local changes while commit facts can
+//     still be registered. A nested join restores its owner's check; an inner
+//     independent transaction cannot replace it. No configured check is a no-op.
 //
 // # Invariants
 //

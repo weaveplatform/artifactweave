@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/internal/platform/store/inmem"
 	platsql "github.com/weaveplatform/artifactweave/internal/platform/store/sql"
+	"github.com/weaveplatform/artifactweave/internal/platform/tx"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx/memtx"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
@@ -107,15 +108,108 @@ func TestAccDispatch(t *testing.T) {
 func runDispatch(t *testing.T, newStore func(*testing.T) dispatchStore) {
 	t.Helper()
 	for name, test := range map[string]func(*testing.T, world){
-		"independent ordered consumers and parking":             independentConsumers,
-		"restart after committed event before queue completion": restartAfterCommit,
-		"expired lease rolls back effects and ack":              expiredLease,
-		"maximum payload survives durable handoff and pruning":  largeHandoff,
-		"shutdown returns unfinished work without an attempt":   shutdown,
-		"takeover before effect rejects stale acknowledgement":  func(t *testing.T, w world) { takeover(t, w, true) },
-		"takeover of empty poll cannot dirty replacement":       func(t *testing.T, w world) { takeover(t, w, false) },
+		"publication settlement before acknowledgement and fresh lease": settlementBeforeAck,
+		"independent ordered consumers and parking":                     independentConsumers,
+		"restart after committed event before queue completion":         restartAfterCommit,
+		"expired lease rolls back effects and ack":                      expiredLease,
+		"maximum payload survives durable handoff and pruning":          largeHandoff,
+		"shutdown returns unfinished work without an attempt":           shutdown,
+		"takeover before effect rejects stale acknowledgement":          func(t *testing.T, w world) { takeover(t, w, true) },
+		"takeover of empty poll cannot dirty replacement":               func(t *testing.T, w world) { takeover(t, w, false) },
 	} {
 		t.Run(name, func(t *testing.T) { test(t, newWorld(t, newStore(t), nil, 2)) })
+	}
+}
+
+type publicationStore struct {
+	dispatchStore
+	check func(context.Context) error
+}
+
+func (s publicationStore) Tx(ctx context.Context, fn func(context.Context) error) error {
+	return s.dispatchStore.Tx(ctx, func(ctx context.Context) error {
+		if err := tx.SetPublicationCheck(ctx, s.check); err != nil {
+			return err
+		}
+		return fn(ctx)
+	})
+}
+
+func settlementBeforeAck(t *testing.T, original world) {
+	for _, mode := range []string{"success", "refused", "lease expires during settlement"} {
+		t.Run(mode, func(t *testing.T) {
+			consumer := "settlement-" + strings.ReplaceAll(mode, " ", "-")
+			origin := consumer
+			dirty, calls := false, 0
+			marker := errors.New("quota publication refused")
+			var w world
+			checked := publicationStore{dispatchStore: original.store, check: func(ctx context.Context) error {
+				if !dirty {
+					return nil
+				}
+				dirty = false
+				calls++
+				_, position, err := original.store.Events().Next(ctx, origin, consumer, 1)
+				if err != nil {
+					return err
+				}
+				if position.Seq != 0 {
+					t.Fatal("domain settlement ran after acknowledgement", position.Seq)
+				}
+				if err := w.queue.Enqueue(ctx, "quota.warning", consumer, []byte(`{"warning":"durable handoff"}`)); err != nil {
+					return err
+				}
+				switch mode {
+				case "refused":
+					return marker
+				case "lease expires during settlement":
+					original.clock.advance(2 * time.Minute)
+				}
+				return nil
+			}}
+			w = newWorld(t, checked, original.clock, 100)
+			// Separate streams keep pruning in one outcome from seeding a
+			// later consumer's acknowledgement floor.
+			w.bus.o.Origin = origin
+			must(t, w.bus.Subscribe("artifact.deployed", consumer, func(ctx context.Context, delivery Delivery) error {
+				if err := w.effect(consumer)(ctx, delivery); err != nil {
+					return err
+				}
+				dirty = true
+				return nil
+			}))
+			must(t, w.bus.RegisterWork(t.Context()))
+			event, err := w.store.Events().AppendEvent(t.Context(), outbox.Event{Origin: origin, Topic: "artifact.deployed", Key: "item", At: w.clock.now()})
+			must(t, err)
+			leased, err := w.store.WorkQueue().Lease(t.Context(), work.WorkLease{
+				Kinds: []string{WorkKind(consumer)}, Holder: "publication-fixture", Limit: 1,
+				Now: w.clock.now(), Until: w.clock.now().Add(time.Minute),
+			})
+			must(t, err)
+			if len(leased) != 1 {
+				t.Fatal("publication fixture did not lease its dispatcher")
+			}
+			dispatchErr := w.bus.dispatch(t.Context(), consumer, leased[0])
+			if mode == "success" && dispatchErr != nil || mode == "refused" && !errors.Is(dispatchErr, marker) ||
+				mode == "lease expires during settlement" && !errors.Is(dispatchErr, kernel.ErrConflict) {
+				t.Fatal("unexpected publication outcome", dispatchErr)
+			}
+			_, position, err := w.store.Events().Next(t.Context(), origin, consumer, 100)
+			must(t, err)
+			var effects []string
+			effectErr := w.store.Settings().Get(t.Context(), "effect/"+consumer, &effects)
+			_, warningErr := w.store.WorkQueue().Get(t.Context(), "quota.warning", consumer)
+			if calls != 1 {
+				t.Fatal("dirty publication was not settled exactly once", calls)
+			}
+			if mode == "success" {
+				if position.Seq != event.Seq || effectErr != nil || len(effects) != 1 || warningErr != nil {
+					t.Fatal("effect, warning and acknowledgement did not commit together", position.Seq, effectErr, warningErr)
+				}
+			} else if position.Seq != 0 || !errors.Is(effectErr, kernel.ErrNotFound) || !errors.Is(warningErr, kernel.ErrNotFound) {
+				t.Fatal("refusal/expired lease left partial consumer publication", position.Seq, effectErr, warningErr)
+			}
+		})
 	}
 }
 

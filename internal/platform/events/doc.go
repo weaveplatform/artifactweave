@@ -25,11 +25,14 @@
 // generation fencing survives retries and process restarts.
 //
 // A Handler commits database effects or a self-contained consumer-owned handoff
-// in the event transaction. The bus then performs Ack, locks the current dispatch
-// generation with WorkQueue.GuardLease, and checks a fresh clock after any lock
+// in the event transaction. The bus settles the composition's pending local
+// publication work before Ack, then locks the current dispatch generation with
+// WorkQueue.GuardLease and checks a fresh clock after any lock
 // wait. A stale/expired lease, acknowledgement conflict or handler failure rolls
 // back effects and acknowledgement together. Callbacks must not perform network
 // I/O or acquire any dispatch polling row; all domain/delivery locks precede Ack.
+// Publication checks also precede poll rescheduling's lease fence, so settlement
+// cannot commit effects after an expiry checked against an earlier clock.
 // This does not promise exactly-once remote effects. A bare outbox reference is
 // insufficient for a handoff: pruning can remove it after acknowledgement.
 //
