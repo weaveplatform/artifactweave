@@ -69,6 +69,11 @@ func (s *Store) Tx(ctx context.Context, fn func(context.Context) error) error {
 		return runTx(ctx, s.db, s.d, fn)
 	}
 	joined := s.InTx(ctx)
+	if !joined {
+		// runTx keeps this root context for finalizers. Bind the marker here,
+		// so a callback joining this configured store retains its admission.
+		ctx = context.WithValue(ctx, middlewareKey{s}, true)
+	}
 	return runTx(ctx, s.db, s.d, func(ctx context.Context) error {
 		if joined {
 			if ctx.Value(middlewareKey{s}) != true {
@@ -76,7 +81,7 @@ func (s *Store) Tx(ctx context.Context, fn func(context.Context) error) error {
 			}
 			return fn(ctx)
 		}
-		return s.middleware(context.WithValue(ctx, middlewareKey{s}, true), fn)
+		return s.middleware(ctx, fn)
 	})
 }
 

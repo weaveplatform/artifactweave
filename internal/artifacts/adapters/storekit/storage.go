@@ -49,6 +49,20 @@ func RecordStorageChange(ctx context.Context, change api.StorageChange, bytes in
 	return nil
 }
 
+// RecordRepositoryStorage records the remaining actual total at an ownership
+// boundary. Deletion calls it after cache invalidation, so raw cache negatives
+// already recorded by their own hooks are not subtracted twice.
+func RecordRepositoryStorage(ctx context.Context, change api.StorageChange, usage api.StorageUsage, repository string) error {
+	if change == nil {
+		return nil
+	}
+	bytes, err := usage.RepositoryStorageBytes(ctx, repository)
+	if err != nil {
+		return storageRefusal(ctx, fmt.Errorf("read transferred repository bytes: %w", err))
+	}
+	return RecordStorageChange(ctx, change, bytes)
+}
+
 // A joined memory Tx deliberately permits the outer caller to handle its
 // errors. Accounting refusal cannot use that escape: rows may already have
 // changed. Bind the refusal to the owning finalizer queue, without acquiring
@@ -81,4 +95,39 @@ func RawStorageBytes(entry model.RemoteCacheEntry) (int64, error) {
 		return 0, fmt.Errorf("negative logical cache bytes: %w", kernel.ErrStore)
 	}
 	return entry.Blob.Size, nil
+}
+
+// WriteRawStorage observes the actual retained cache representation, including
+// a positive body hidden by a later negative response. The adapters call this
+// within their metadata transaction; standalone stores skip the extra read.
+func WriteRawStorage(
+	ctx context.Context,
+	watch api.StorageWatch,
+	entry model.RemoteCacheEntry,
+	read func(context.Context, model.RemoteCacheKey) (model.RemoteCacheEntry, error),
+	write func() error,
+) error {
+	if watch == nil {
+		return write()
+	}
+	change, err := PrepareStorageContent(ctx, watch, entry.Token.Key.RepoKey)
+	if err != nil {
+		return err
+	}
+	old, err := read(ctx, entry.Token.Key)
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
+		return fmt.Errorf("read previous logical cache body: %w", err)
+	}
+	previous, err := RawStorageBytes(old)
+	if err != nil {
+		return err
+	}
+	next, err := RawStorageBytes(entry)
+	if err != nil {
+		return err
+	}
+	if err := write(); err != nil {
+		return err
+	}
+	return RecordStorageChange(ctx, change, next-previous)
 }

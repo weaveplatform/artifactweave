@@ -29,6 +29,12 @@
 // Every compound operation takes the project snapshot guard before its records,
 // and no transaction spans network I/O or streaming.
 //
+// StorageAccounting surrounds the application composition's root transactions.
+// Actual item, retained raw-cache, transformed-copy and ownership deltas settle
+// together before event acknowledgment and lease fences. Lazy initialization
+// uses canonical scalar totals before mutation. The durable warning handoff
+// shares that transaction; mail delivery is a separate worker concern.
+//
 // # References
 //
 //   - Target layout:

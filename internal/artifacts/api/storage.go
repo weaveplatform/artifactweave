@@ -5,7 +5,8 @@ import "context"
 // StorageUsage supplies metadata-only logical byte totals for guarded quota
 // initialization and ownership changes. Item-backed cache is counted through
 // items; raw positive cache bodies contribute separately, even when a later
-// negative response retains them. Shares do not transfer canonical ownership.
+// negative response retains them. Virtual-owned transformed copies contribute
+// their own retained lengths. Shares do not transfer canonical ownership.
 // These descriptions reserve no capacity and grant no publication authority.
 type StorageUsage interface {
 	// The empty project key describes unassigned repositories, not all projects.

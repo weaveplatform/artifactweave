@@ -1,13 +1,21 @@
 package inmem
 
 import (
+	"context"
+	"fmt"
+	"time"
+
 	accinmem "github.com/weaveplatform/artifactweave/internal/access/adapters/inmem"
+	accmodel "github.com/weaveplatform/artifactweave/internal/access/core/model"
 	accport "github.com/weaveplatform/artifactweave/internal/access/core/port"
+	"github.com/weaveplatform/artifactweave/internal/access/core/project"
 	artinmem "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/inmem"
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	artport "github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	fedinmem "github.com/weaveplatform/artifactweave/internal/federation/adapters/inmem"
 	fedport "github.com/weaveplatform/artifactweave/internal/federation/core/port"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	ntfinmem "github.com/weaveplatform/artifactweave/internal/notifications/adapters/inmem"
 	ntfport "github.com/weaveplatform/artifactweave/internal/notifications/core/port"
 	"github.com/weaveplatform/artifactweave/internal/platform/apilimit"
@@ -49,9 +57,30 @@ type Store struct {
 // watch with the platform's config store: a layout document that is
 // created, changed or deleted fences the remote repositories that use it,
 // in the same transaction (decision 0007).
+// It also binds project storage accounting around every root transaction,
+// settling actual artifacts deltas and warning work before publication fences.
 func New() *Store {
-	s := &Store{Store: memtx.New()}
-	s.artifacts = artinmem.New(s.Store)
+	s := &Store{}
+	accounting := &project.StorageAccounting{
+		Service: project.Service{
+			Store: s,
+			StorageBytes: func(ctx context.Context, key string) (int64, error) {
+				usage, ok := s.artifacts.Repos().(artapi.StorageUsage)
+				if !ok {
+					return 0, fmt.Errorf("project storage totals unavailable: %w", kernel.ErrStore)
+				}
+				return usage.ProjectStorageBytes(ctx, key) //nolint:wrapcheck // the scalar reader names its operation
+			},
+			StorageWarning: func(ctx context.Context, warning accmodel.ProjectStorageWarning) error {
+				return project.EnqueueStorageWarning(ctx, s.WorkQueue(), warning, time.Now()) //nolint:wrapcheck // the handoff names its operation
+			},
+		},
+		Repository: func(ctx context.Context, key string) (artapi.ProjectRepository, error) {
+			return s.Repos().ProjectRepository(ctx, key) //nolint:wrapcheck // the repository projection names its operation
+		},
+	}
+	s.Store = memtx.NewWithMiddleware(accounting.Middleware)
+	s.artifacts = artinmem.NewWithStorageWatch(s.Store, accounting)
 	s.platform = platinmem.New(s.Store, s.artifacts.LayoutWatch())
 	s.access = accinmem.New(s.Store)
 	s.notifications = ntfinmem.New(s.Store)

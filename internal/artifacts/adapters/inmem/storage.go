@@ -46,6 +46,13 @@ func (r repos) storageBytes(ctx context.Context, owns func(string) bool) (int64,
 				}
 			}
 		}
+		for _, copy := range copyRecords(r).rows().Rows {
+			if owns(copy.Virtual) {
+				if err := add(copy.Item.Size); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	})
 	if err != nil {

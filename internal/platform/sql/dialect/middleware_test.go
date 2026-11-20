@@ -40,7 +40,12 @@ func TestAccMiddlewareWrapsRootAndRollsBack(t *testing.T) {
 					return err
 				}
 				s.AfterCommit(ctx, func() { order = append(order, "committed") })
-				return platformtx.BeforeCommit(ctx, func(context.Context) error { order = append(order, "event"); return nil })
+				return platformtx.BeforeCommit(ctx, func(ctx context.Context) error {
+					return s.Tx(ctx, func(context.Context) error {
+						order = append(order, "event")
+						return nil
+					})
+				})
 			})
 			want := []string{"guard", "business", "joined", "settle"}
 			if failure {

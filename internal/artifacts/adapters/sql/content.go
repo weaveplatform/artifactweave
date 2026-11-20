@@ -9,6 +9,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/storekit"
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -34,6 +36,10 @@ func (r repos) Create(ctx context.Context, c repo.Config) error {
 		return fmt.Errorf("create repository: key is required: %w", kernel.ErrInvalid)
 	}
 	return r.s.Tx(ctx, func(ctx context.Context) error {
+		change, err := storekit.PrepareStorageOwnership(ctx, r.s.storage, artapi.StorageOwnership{Repository: c.Key, Project: c.ProjectKey})
+		if err != nil {
+			return err //nolint:wrapcheck // storekit names the accounting boundary
+		}
 		doc, err := repoDoc(c)
 		if err != nil {
 			return err
@@ -69,9 +75,12 @@ func (r repos) Create(ctx context.Context, c repo.Config) error {
 		if err := r.writeChildren(ctx, c); err != nil {
 			return err
 		}
-		return remoteRecords(
+		if err := remoteRecords(
 			r,
-		).PutSource(ctx, c.Key, model.RemoteSourceState{Source: port.NewRemoteSource(c.Key)})
+		).PutSource(ctx, c.Key, model.RemoteSourceState{Source: port.NewRemoteSource(c.Key)}); err != nil {
+			return err
+		}
+		return storekit.RecordRepositoryStorage(ctx, change, r, c.Key)
 	})
 }
 
@@ -184,6 +193,21 @@ func decodeRepo(doc string) (repo.Config, error) {
 
 func (r repos) Update(ctx context.Context, c repo.Config) error {
 	return r.s.Tx(ctx, func(ctx context.Context) error {
+		var change artapi.StorageChange
+		if r.s.storage != nil {
+			previous, err := r.ProjectRepository(ctx, c.Key)
+			if err != nil {
+				return err
+			}
+			change, err = storekit.PrepareStorageOwnership(
+				ctx,
+				r.s.storage,
+				artapi.StorageOwnership{Repository: c.Key, PreviousProject: previous.ProjectKey, Project: c.ProjectKey},
+			)
+			if err != nil {
+				return err //nolint:wrapcheck // storekit names the accounting boundary
+			}
+		}
 		state, err := remoteRecords(r).Source(ctx, c.Key)
 		if err != nil {
 			return err
@@ -223,26 +247,42 @@ func (r repos) Update(ctx context.Context, c repo.Config) error {
 			}
 			state.PolicyRevision++
 			state.Revision++
-			return remoteRecords(r).PutSource(ctx, c.Key, state)
+			if err := remoteRecords(r).PutSource(ctx, c.Key, state); err != nil {
+				return err
+			}
 		}
-		return nil
+		return storekit.RecordRepositoryStorage(ctx, change, r, c.Key)
 	})
 }
 
 func (r repos) Delete(ctx context.Context, key string) error {
 	return r.s.Tx(ctx, func(ctx context.Context) error {
+		var change artapi.StorageChange
+		if r.s.storage != nil {
+			previous, err := r.ProjectRepository(ctx, key)
+			if err != nil {
+				return err
+			}
+			change, err = storekit.PrepareStorageOwnership(ctx, r.s.storage, artapi.StorageOwnership{Repository: key, PreviousProject: previous.ProjectKey})
+			if err != nil {
+				return err //nolint:wrapcheck // storekit names the accounting boundary
+			}
+		}
 		if err := r.s.VirtualCopies().DeleteRepo(ctx, key); err != nil {
 			return fmt.Errorf("remove virtual copies: %w", err)
 		}
 		if _, err := r.s.RemoteCache().Invalidate(ctx, key, "", false); err != nil {
 			return fmt.Errorf("remove remote cache: %w", err)
 		}
-		return r.s.ExecOne(
+		if err := r.s.ExecOne(
 			ctx,
 			"delete repository "+key,
 			"DELETE FROM repositories WHERE key = ?",
 			key,
-		)
+		); err != nil {
+			return err
+		}
+		return storekit.RecordRepositoryStorage(ctx, change, r, key)
 	})
 }
 

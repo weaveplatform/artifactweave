@@ -25,6 +25,9 @@
 //
 // VirtualCopies adds the shared atomic blob-reference transaction for
 // durable virtual-owned files, over each backend's CopyRecords.
+// Storage helpers prepare optional application accounting before row mutations
+// and record actual logical deltas. Refusals bind to the owning transaction so
+// a dropped nested error cannot commit a partially accounted memory write.
 //
 // # Outputs
 //

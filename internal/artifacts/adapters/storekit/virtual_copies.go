@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -24,10 +25,19 @@ type CopyRecords interface {
 type virtualCopies struct {
 	store   Stores
 	records CopyRecords
+	storage api.StorageWatch
 }
 
 // NewVirtualCopies gives both adapters the same atomic blob-reference rules.
-func NewVirtualCopies(s Stores, r CopyRecords) virtual.CopyStore { return virtualCopies{s, r} }
+func NewVirtualCopies(s Stores, r CopyRecords) virtual.CopyStore {
+	return NewVirtualCopiesWithStorageWatch(s, r, nil)
+}
+
+// NewVirtualCopiesWithStorageWatch also accounts for these separately retained
+// bytes against the virtual repository's canonical project, before row locks.
+func NewVirtualCopiesWithStorageWatch(s Stores, r CopyRecords, watch api.StorageWatch) virtual.CopyStore {
+	return virtualCopies{store: s, records: r, storage: watch}
+}
 
 func (s virtualCopies) Get(ctx context.Context, key, path string) (virtual.Copy, error) {
 	c, err := s.records.Read(ctx, key, path)
@@ -42,6 +52,10 @@ func (s virtualCopies) Put(ctx context.Context, c virtual.Copy) error {
 		return fmt.Errorf("put virtual copy: %w", kernel.ErrInvalid)
 	}
 	return s.store.Tx(ctx, func(ctx context.Context) error { //nolint:wrapcheck // the transaction retains the contextual operation errors below
+		change, err := PrepareStorageContent(ctx, s.storage, c.Virtual)
+		if err != nil {
+			return err
+		}
 		if err := s.records.Lock(ctx, c.Virtual); err != nil {
 			return fmt.Errorf("lock virtual copy: %w", err)
 		}
@@ -56,6 +70,9 @@ func (s virtualCopies) Put(ctx context.Context, c virtual.Copy) error {
 		if err != nil && !errors.Is(err, kernel.ErrNotFound) {
 			return fmt.Errorf("old virtual copy: %w", err)
 		}
+		if old.Item.Size < 0 {
+			return fmt.Errorf("negative previous virtual copy bytes: %w", kernel.ErrStore)
+		}
 		if old.Item.Actual.SHA256 != c.Item.Actual.SHA256 {
 			if _, err = s.store.Blobs().Ref(ctx, blob.Blob{Checksums: c.Item.Actual, Size: c.Item.Size, Created: c.Item.Created}, 1); err != nil {
 				return fmt.Errorf("reference virtual copy: %w", err)
@@ -69,12 +86,16 @@ func (s virtualCopies) Put(ctx context.Context, c virtual.Copy) error {
 		if err = s.records.Write(ctx, c); err != nil {
 			return fmt.Errorf("write virtual copy: %w", err)
 		}
-		return nil
+		return RecordStorageChange(ctx, change, c.Item.Size-old.Item.Size)
 	})
 }
 
 func (s virtualCopies) DeleteRepo(ctx context.Context, key string) error {
 	return s.store.Tx(ctx, func(ctx context.Context) error { //nolint:wrapcheck // the transaction retains the contextual operation errors below
+		change, err := PrepareStorageContent(ctx, s.storage, key)
+		if err != nil {
+			return err
+		}
 		if err := s.records.Lock(ctx, key); err != nil {
 			return fmt.Errorf("lock virtual copies: %w", err)
 		}
@@ -83,8 +104,14 @@ func (s virtualCopies) DeleteRepo(ctx context.Context, key string) error {
 			return fmt.Errorf("list virtual copies: %w", err)
 		}
 		for _, c := range copies {
+			if c.Item.Size < 0 {
+				return fmt.Errorf("negative removed virtual copy bytes: %w", kernel.ErrStore)
+			}
 			if _, err = s.store.Blobs().Unref(ctx, c.Item.Actual.SHA256, 1); err != nil {
 				return fmt.Errorf("release virtual copies: %w", err)
+			}
+			if err := RecordStorageChange(ctx, change, -c.Item.Size); err != nil {
+				return err
 			}
 		}
 		if err = s.records.Delete(ctx, key); err != nil {

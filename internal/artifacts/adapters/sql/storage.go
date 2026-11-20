@@ -22,20 +22,29 @@ func (r repos) storageBytes(ctx context.Context, join, owner, key string) (int64
 	rawSize := "COALESCE(json_extract(i.doc, '$.blob.Size'), 0)"
 	rawItem := "COALESCE(json_extract(i.doc, '$.item_id'), 0)"
 	rawDigest := "COALESCE(json_extract(i.doc, '$.blob.Checksums.sha256'), '')"
+	copySize := "COALESCE(json_extract(i.document, '$.item.size'), 0)"
 	if r.s.Dialect().Name == "postgres" {
 		rawSize = "COALESCE((i.doc::jsonb #>> '{blob,Size}')::bigint, 0)"
 		rawItem = "COALESCE((i.doc::jsonb ->> 'item_id')::bigint, 0)"
 		rawDigest = "COALESCE(i.doc::jsonb #>> '{blob,Checksums,sha256}', '')"
+		copySize = "COALESCE((i.document::jsonb #>> '{item,size}')::bigint, 0)"
 	}
-	// Separate aggregates avoid an item/cache cross product. Canonical owner
+	copyOwner := "i.virtual_key"
+	copyJoin := ""
+	if join != "" {
+		copyJoin = " JOIN repositories r ON r.key = i.virtual_key"
+		copyOwner = "r.project_key"
+	}
+	// Separate aggregates avoid an item/cache/copy cross product. Canonical owner
 	// and natural-key indexes bound the scans to this project or repository;
 	// one scalar result never hydrates configurations, items or cache bodies.
 	query := "SELECT CAST(COALESCE(SUM(bytes), 0) AS BIGINT), COALESCE(MIN(bytes), 0) FROM (" +
 		"SELECT i.size AS bytes FROM items i" + join + " WHERE " + owner + " = ? AND i.type = 'file' AND i.depth > 0" +
 		" UNION ALL SELECT " + rawSize + " AS bytes FROM remote_cache i" + join + " WHERE " + owner + " = ? AND " + rawItem + " = 0 AND " + rawDigest + " <> ''" +
+		" UNION ALL SELECT " + copySize + " AS bytes FROM virtual_copies i" + copyJoin + " WHERE " + copyOwner + " = ?" +
 		") logical_storage"
 	var total, minimum int64
-	err := r.s.Q(ctx).QueryRowContext(ctx, r.s.Dialect().Rebind(query), key, key).Scan(&total, &minimum)
+	err := r.s.Q(ctx).QueryRowContext(ctx, r.s.Dialect().Rebind(query), key, key, key).Scan(&total, &minimum)
 	if err != nil {
 		return 0, r.s.Wrap("read logical storage bytes", err)
 	}

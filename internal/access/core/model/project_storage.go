@@ -16,8 +16,9 @@ type ProjectStorage struct {
 // verifies Incarnation and WarningKey against current state before sending;
 // retry must keep this occurrence's identity rather than create a new message.
 type ProjectStorageWarning struct {
-	ProjectKey   string
-	Incarnation  ProjectIncarnation
-	WarningKey   string
-	Bytes, Limit int64
+	ProjectKey  string             `json:"project_key"`
+	Incarnation ProjectIncarnation `json:"incarnation"`
+	WarningKey  string             `json:"warning_key"`
+	Bytes       int64              `json:"bytes"`
+	Limit       int64              `json:"limit"`
 }
