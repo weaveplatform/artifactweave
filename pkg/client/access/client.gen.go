@@ -2326,7 +2326,7 @@ type AttachRepositoryToProjectParams struct {
 
 // ShareRepositoryWithAllProjectsParams defines parameters for ShareRepositoryWithAllProjects.
 type ShareRepositoryWithAllProjectsParams struct {
-	// ReadOnly Optional query parameter supported by the JFrog Project provider. When true, the repository-wide sharing permission ceiling permits reads only. Defaults to false.
+	// ReadOnly Optional query parameter. When true, the repository-wide sharing permission ceiling permits reads only. Defaults to false.
 	ReadOnly *bool `form:"readOnly,omitempty" json:"readOnly,omitempty"`
 }
 

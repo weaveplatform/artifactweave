@@ -773,8 +773,8 @@ paths:
           schema:
             type: string
         - description: >-
-            Optional query parameter supported by the JFrog Project provider. When true,
-            the repository-wide sharing permission ceiling permits reads only. Defaults to false.
+            Optional query parameter. When true, the repository-wide sharing permission ceiling
+            permits reads only. Defaults to false.
           in: query
           name: readOnly
           schema:
