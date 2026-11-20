@@ -112,7 +112,7 @@ func (r indexReader) Packages(ctx context.Context, ref api.IndexRepository, page
 		}
 		var err error
 		out, next, err = packages.IndexPackages(ctx, ref, page)
-		return err
+		return err //nolint:wrapcheck // the enclosing transaction names the projection failure
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("index packages: %w", err)
@@ -136,7 +136,7 @@ func (r indexReader) Versions(ctx context.Context, ref api.IndexPackage, keep in
 		}
 		var err error
 		out, next, err = packages.IndexVersions(ctx, ref, keep, page)
-		return err
+		return err //nolint:wrapcheck // the enclosing transaction names the projection failure
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("index versions: %w", err)
@@ -159,7 +159,7 @@ func (r indexReader) Version(ctx context.Context, ref api.IndexVersion, keep int
 		}
 		var err error
 		out, err = packages.IndexVersion(ctx, ref, keep)
-		return err
+		return err //nolint:wrapcheck // the enclosing transaction names the projection failure
 	})
 	if err != nil {
 		return api.IndexVersion{}, fmt.Errorf("current indexed version: %w", err)
@@ -218,7 +218,7 @@ func (r indexReader) Files(ctx context.Context, ref api.IndexVersion, properties
 				out[i].Lead = &lead
 			}
 		}
-		return err
+		return err //nolint:wrapcheck // the enclosing transaction names the projection failure
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("index files: %w", err)

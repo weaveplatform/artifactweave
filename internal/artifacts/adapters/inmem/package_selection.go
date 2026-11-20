@@ -97,7 +97,9 @@ func (r repos) IndexRepositories(ctx context.Context, query api.IndexRepositoryQ
 				len(after) > 0 && value.Key <= after[0] || !indexMatches(include, value.Key) || indexMatches(exclude, value.Key) {
 				continue
 			}
-			if query.Environments != nil && !slices.ContainsFunc(value.Environments, func(environment string) bool { return slices.Contains(query.Environments, environment) }) {
+			if query.Environments != nil && !slices.ContainsFunc(value.Environments, func(environment string) bool {
+				return slices.ContainsFunc(query.Environments, func(requested string) bool { return strings.EqualFold(requested, environment) })
+			}) {
 				continue
 			}
 			entry := api.IndexRepository{
@@ -116,7 +118,7 @@ func (r repos) IndexRepositories(ctx context.Context, query api.IndexRepositoryQ
 }
 
 func (p packages) indexRepositoryCurrent(ref api.IndexRepository) bool {
-	value, ok := (repos{p.s}).t().Get(ref.Key)
+	value, ok := repos(p).t().Get(ref.Key)
 	return ok && value.Class == ref.Class && value.ProjectKey == ref.Project && value.PackageType == ref.PackageType
 }
 
@@ -251,7 +253,7 @@ func (p packages) IndexFiles(ctx context.Context, ref api.IndexVersion, properti
 		if !ok || version.PackageID != ref.Package.ID || version.Version != ref.Version {
 			return nil
 		}
-		i := items{p.s}
+		i := items(p)
 		for link := range p.files().Rows {
 			if link.VersionID != ref.ID || link.ItemID <= after {
 				continue

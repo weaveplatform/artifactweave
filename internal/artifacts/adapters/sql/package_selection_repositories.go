@@ -92,9 +92,9 @@ func (r repos) IndexRepositories(ctx context.Context, query api.IndexRepositoryQ
 			array = "jsonb_array_elements_text(COALESCE(NULLIF(doc::jsonb -> 'environments', 'null'::jsonb), '[]'::jsonb))"
 			alias += "(value)"
 		}
-		condition += " AND EXISTS (SELECT 1 FROM " + array + alias + " WHERE environment.value IN (" + dialect.Placeholders(len(query.Environments)) + "))"
+		condition += " AND EXISTS (SELECT 1 FROM " + array + alias + " WHERE LOWER(environment.value) IN (" + dialect.Placeholders(len(query.Environments)) + "))"
 		for _, environment := range query.Environments {
-			args = append(args, environment)
+			args = append(args, strings.ToLower(environment))
 		}
 	}
 	var out []api.IndexRepository

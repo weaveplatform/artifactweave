@@ -47,10 +47,11 @@
 //
 // # Invariants
 //
-//   - No method wraps the error behind it, so callers keep their own
+//   - Repositories methods preserve the error behind them, so callers keep their own
 //     wrapping and errors.Is finds the store's sentinels and ErrChanged.
 //     Every text (ErrChanged, MsgKeyExists, the validation and layout
 //     messages) stays byte-identical, because clients and logs show it.
+//     PackageIndex names projection failures while preserving errors.Is.
 //   - Every Repositories method that takes a context takes part in the store
 //     transaction the context carries, so the configuration descriptor's
 //     deletes, writes and reindex requests commit or roll back together

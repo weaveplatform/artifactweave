@@ -17,6 +17,7 @@ import (
 // report fields; report serialization remains with CLN-05.
 type Reason string
 
+// Selection reasons explain retained versions without exposing foreign scope.
 const (
 	ReasonSelected            Reason = "selected"
 	ReasonProtected           Reason = "protected_version"
@@ -66,7 +67,7 @@ func versionIdentity(v artifactsapi.IndexVersion) versionFacts {
 func (s *Selection) Candidates(ctx context.Context, ref artifactsapi.IndexVersion, page kernel.Page) (CandidatePage, error) {
 	page, err := page.Normalize()
 	if err != nil {
-		return CandidatePage{}, err
+		return CandidatePage{}, fmt.Errorf("cleanup candidate page: %w", err)
 	}
 	current, err := s.currentVersion(ctx, ref)
 	if err != nil {

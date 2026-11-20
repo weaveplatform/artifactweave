@@ -138,7 +138,7 @@ func selectionInput(kind repo.PackageType) model.CleanupPolicy {
 	stages := false
 	return model.CleanupPolicy{Key: "selection-policy", ProjectKey: "alpha", Criteria: model.CleanupCriteria{
 		PackageTypes: []string{string(kind)}, Repos: []string{"**"}, ExcludedRepos: []string{"*-safe"}, IncludedPackages: []string{"**"}, ExcludedPackages: []string{"keep"},
-		IncludeAllStages: &stages, IncludedStages: []string{"DEV"}, KeepLastNVersions: 1, CreatedBeforeInDays: 1, LastDownloadedBeforeInDays: 1,
+		IncludeAllStages: &stages, IncludedStages: []string{"dEv"}, KeepLastNVersions: 1, CreatedBeforeInDays: 1, LastDownloadedBeforeInDays: 1,
 		IncludedProperties: map[string][]string{"release": {"clean"}, "team": {"platform"}}, ExcludedProperties: map[string][]string{"hold": {"true"}},
 	}}
 }

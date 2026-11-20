@@ -11,7 +11,8 @@ import (
 // IndexRepositoryQuery narrows descriptive index reads before package paging.
 // An empty Projects list admits none unless AllProjects is explicitly set;
 // the empty project key denotes unassigned repositories. Environments nil
-// admits every environment. This query is not an authorization capability.
+// admits every environment; names compare without regard to case, retaining
+// stored spelling in results. This query is not an authorization capability.
 type IndexRepositoryQuery struct {
 	Projects, Repositories, ExcludedRepositories []string
 	// Class optionally narrows stored local/remote indexes. Cleanup supplies

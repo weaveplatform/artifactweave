@@ -7012,7 +7012,7 @@ type GetAllPackageCleanupPoliciesParams struct {
 
 // GetPackageCleanupPolicyParams defines parameters for GetPackageCleanupPolicy.
 type GetPackageCleanupPolicyParams struct {
-	// CheckRepoAvailability Optional query parameter. When true the server also resolves the repository keys named explicitly in searchCriteria.repos and excludedRepos against the repositories that exist now, and leaves keys that no longer resolve out of the returned searchCriteria (patterns are returned as stored). The stored policy never changes. Defaults to false, which returns the policy exactly as stored.
+	// CheckRepoAvailability Optional query parameter. When true the server also resolves the repository keys named explicitly in searchCriteria.repos and excludedRepos against local repositories currently eligible in the policy's project scope, and omits unavailable or unsupported keys from the returned searchCriteria (patterns are returned as stored). The stored policy never changes. Defaults to false, which returns the policy exactly as stored.
 	CheckRepoAvailability *bool `form:"checkRepoAvailability,omitempty" json:"checkRepoAvailability,omitempty"`
 }
 

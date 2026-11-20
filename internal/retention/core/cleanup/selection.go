@@ -107,7 +107,7 @@ func (s *Selection) Repositories(ctx context.Context, page kernel.Page) ([]artif
 	err := s.run(ctx, func(ctx context.Context) error {
 		var err error
 		out, next, err = s.service.PackageIndex.Repositories(ctx, s.repositoryQuery(), page)
-		return err
+		return err //nolint:wrapcheck // run names the failed cleanup transaction
 	})
 	if err != nil {
 		return nil, "", err
@@ -151,7 +151,7 @@ func (s *Selection) Packages(ctx context.Context, ref artifactsapi.IndexReposito
 		}
 		var err error
 		out, next, err = s.service.PackageIndex.Packages(ctx, ref, page)
-		return err
+		return err //nolint:wrapcheck // run names the failed cleanup transaction
 	})
 	if err != nil {
 		return nil, "", err
@@ -174,7 +174,7 @@ func (s *Selection) Versions(ctx context.Context, ref artifactsapi.IndexPackage,
 		}
 		var err error
 		out, next, err = s.service.PackageIndex.Versions(ctx, ref, s.snapshot.Policy.Criteria.KeepLastNVersions, page)
-		return err
+		return err //nolint:wrapcheck // run names the failed cleanup transaction
 	})
 	if err != nil {
 		return nil, "", err
@@ -193,7 +193,7 @@ func (s *Selection) currentVersion(ctx context.Context, ref artifactsapi.IndexVe
 		}
 		var err error
 		out, err = s.service.PackageIndex.Version(ctx, ref, s.snapshot.Policy.Criteria.KeepLastNVersions)
-		return err
+		return err //nolint:wrapcheck // run names the failed cleanup transaction
 	})
 	return out, err
 }
@@ -210,7 +210,7 @@ func (s *Selection) files(ctx context.Context, ref artifactsapi.IndexVersion, pa
 		}
 		var err error
 		out, next, err = s.service.PackageIndex.Files(ctx, ref, s.properties, page)
-		return err
+		return err //nolint:wrapcheck // run names the failed cleanup transaction
 	})
 	if err != nil {
 		return nil, "", err
