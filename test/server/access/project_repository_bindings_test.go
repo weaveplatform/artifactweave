@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
@@ -132,6 +133,8 @@ func projectRepositoryBatchRollback(t *testing.T, db harness.Store, h http.Handl
 	const batch = "/artifactory/api/v2/repositories/batch"
 	const first = "alpha-batch-first"
 	const second = "alpha-batch-second"
+	bindings := map[string]model.RepositoryAssignment{}
+	authorities := map[string]model.SharingAuthority{}
 	body := `[{"key":"` + first + `","rclass":"local","packageType":"generic","projectKey":"alpha"},{"key":"` + second + `","rclass":"local","packageType":"generic","projectKey":"alpha"}]`
 	wantStatus(t, do(t, failing, "PUT", batch, jsonAs(basic("admin", "pw")), body), 500)
 	for _, key := range []string{first, second} {
@@ -141,6 +144,16 @@ func projectRepositoryBatchRollback(t *testing.T, db harness.Store, h http.Handl
 			t.Fatalf("failed batch create left an assignment for %s: %v", key, err)
 		}
 		wantStatus(t, do(t, h, "PUT", "/artifactory/api/repositories/"+key, jsonAs(basic("admin", "pw")), `{"rclass":"local","packageType":"generic","projectKey":"alpha"}`), 200)
+		binding, err := db.Projects().Assignment(t.Context(), key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bindings[key] = binding
+		authority, err := db.Projects().SharingAuthority(t.Context(), key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		authorities[key] = authority
 	}
 	update := `[{"key":"` + first + `","projectKey":"beta"},{"key":"` + second + `","projectKey":"beta"}]`
 	wantStatus(t, do(t, failing, "POST", batch, jsonAs(basic("admin", "pw")), update), 500)
@@ -149,6 +162,20 @@ func projectRepositoryBatchRollback(t *testing.T, db harness.Store, h http.Handl
 		assignment := decodeObject(t, projectRequest(t, h, "GET", "/_/repositories/"+key, "admin", "", 200).Body.String())
 		if configuration["projectKey"] != "alpha" || assignment["assigned_to"] != "alpha" {
 			t.Fatalf("failed batch update split canonical ownership: configuration=%+v assignment=%+v", configuration, assignment)
+		}
+		stored, err := db.Projects().Assignment(t.Context(), key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(stored, bindings[key]) {
+			t.Fatalf("failed batch update changed the stored Access binding for %s: before=%+v after=%+v", key, bindings[key], stored)
+		}
+		authority, err := db.Projects().SharingAuthority(t.Context(), key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if authority != authorities[key] {
+			t.Fatalf("failed batch update changed the sharing revision for %s", key)
 		}
 	}
 }
