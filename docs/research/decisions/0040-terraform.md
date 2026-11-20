@@ -518,6 +518,41 @@ stay in scope under [P28 #668](https://github.com/weaveplatform/artifactweave/is
 No generic go-getter capability is presumed to be Artifactory parity solely because the
 native client recognizes its syntax.
 
+### Additional module getter implementation (#668)
+
+Status remains **Proposed**. The
+[version-pinned source audit](../terraform-additional-getters-contract-audit.md)
+distinguishes documented/source behavior, bounded local choices and outstanding
+live-vendor captures. The implementation admits bounded HTTP(S) header/HTML vanity
+chains, absolute HTTP(S) checksum-file URLs and GitHub shorthand subdirectories.
+Separate closed source operations retain validated caller-independent control data;
+every acquisition and signed delivery retains the existing current-authority fences.
+See the [operations contract](../../operations/terraform-remote-modules.md) for exact
+grammar, status, size, hop, checksum and cache rules. #1291's document Read checks
+remain unchanged pending its assigned P19 comparison.
+
+Controlled native probes found that both pinned clients refuse plain TAR and single
+gzip/bzip2/XZ files as directory installations. These same-kind corrections preserve
+the original cached bytes while deriving a separately signed tar.gz delivery package.
+A single compressed file is one decoded regular file, not an inferred TAR stream.
+Native acceptance covers Terraform 1.17.1 and OpenTofu 1.13.9 via standalone SQL-backed
+direct/virtual registry coordinates, selected versions and fresh-client offline reuse.
+macOS's explicit loopback service override is separate from the required Linux HTTPS
+discovery gate. Full #668 qualification, snapshot/ref limitations and vendor captures
+must remain visible until their corresponding evidence exists; this does not qualify
+OpenTofu providers, mirrors or state backend behavior.
+
+The snapshot matrix explicitly preserves positive-depth HTTP snapshot semantics,
+including full commits, and compares them with the pinned clients' file-only Git
+clone controls. Snapshot archives do not initialize submodules or hydrate LFS data;
+pointers and already-materialized bytes remain ordinary content. Literal ref-name
+validation excludes revision/reflog expressions. The complete normalized source
+descriptor is bound into remote module signatures with a keyed digest, so an old
+capability cannot follow query, selector, checksum-file or depth edits that retain
+the same archive bytes. These are explicit local choices with controlled native
+proof; GitHub collision precedence and Artifactory runtime behavior remain separate
+vendor captures under #216/P19.
+
 ## Constraints
 
 - **Namespace length.** A module namespace holds the key, `__` and the namespace within 64

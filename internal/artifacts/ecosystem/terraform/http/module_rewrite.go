@@ -3,6 +3,7 @@ package terraformhttp
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/bzip2"
 	"compress/gzip"
 	"context"
@@ -340,28 +341,60 @@ func rewriteModuleArchive(ctx context.Context, ra io.ReaderAt, size int64, locat
 		if err != nil {
 			return "", false, remoteModuleError()
 		}
-		return "tar.gz", changed, nil
+		return "tar.gz", changed || location.Archive == "tar", nil
 	}
 	u, _ := url.Parse(location.Target)
 	name := strings.TrimSuffix(path.Base(u.Path), "."+location.Archive)
-	if !isModuleConfig(name) {
-		_ = gz.Close()
-		return location.Archive, false, nil
+	// A module installer asks go-getter for a directory. Its single-file
+	// decompressors refuse that mode, even when the URL carries archive=gz,
+	// bz2 or xz. Wrap the one decoded file in a portable package; the source
+	// cache and its checksum continue to describe the original compressed file.
+	var body io.Reader
+	var expanded int64
+	if isModuleConfig(name) {
+		content, _, err := rewriteConfig(stream, name, target)
+		if err != nil {
+			_ = gz.Close()
+			return "", false, err
+		}
+		body, expanded = bytes.NewReader(content), int64(len(content))
+	} else {
+		// TAR needs the size before its entry. Count through the existing
+		// expansion/cancellation budget, then reopen without retaining the file
+		// in memory or changing the allowed non-config file size.
+		expanded, err = io.Copy(io.Discard, stream)
+		if err != nil {
+			_ = gz.Close()
+			return "", false, remoteModuleError()
+		}
+		closeReader()
+		var closeAgain func()
+		body, closeAgain, err = moduleArchiveReader(ctx, ra, size, location.Archive)
+		if err != nil {
+			_ = gz.Close()
+			return "", false, err
+		}
+		defer closeAgain()
 	}
-	body, changed, err := rewriteConfig(stream, name, target)
-	if err != nil {
+	tw := tar.NewWriter(gz)
+	if err = tw.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0o600, Size: expanded}); err != nil {
+		_ = tw.Close()
 		_ = gz.Close()
-		return "", false, err
+		return "", false, remoteModuleError()
 	}
-	gz.Name = name
-	if _, err = gz.Write(body); err != nil {
+	if _, err = io.Copy(tw, body); err != nil { //nolint:gosec // validated, context-aware bounded source
+		_ = tw.Close()
+		_ = gz.Close()
+		return "", false, remoteModuleError()
+	}
+	if err = tw.Close(); err != nil {
 		_ = gz.Close()
 		return "", false, remoteModuleError()
 	}
 	if err = gz.Close(); err != nil {
 		return "", false, remoteModuleError()
 	}
-	return "gz", changed, nil
+	return "tar.gz", true, nil
 }
 
 func rewriteModuleZip(ctx context.Context, ra io.ReaderAt, size int64, target rewriteTarget, w io.Writer) (bool, error) {
@@ -463,11 +496,17 @@ func rewriteModuleTar(r io.Reader, target rewriteTarget, w io.Writer) (bool, err
 	return changed, nil
 }
 
-// Discover edits without creating a derived archive. Common packages with only
-// relative/Git sources retain both their original representation and disk needs.
+// Discover representation changes without creating a derived archive. Supported
+// packages with only relative/Git sources retain their original representation.
 func moduleArchiveNeedsRewrite(ctx context.Context, ra io.ReaderAt, size int64, location moduleSource, target rewriteTarget) (bool, error) {
 	if err := location.validateArchive(ctx, io.NewSectionReader(ra, 0, size), size); err != nil {
 		return false, err
+	}
+	// Plain TAR is parsed as vanity XML, while single-file gzip/bzip2/XZ
+	// decompression refuses the installer's directory mode. These formats need
+	// guarded tar.gz delivery even without edits; the cache keeps original bytes.
+	if location.Archive == "tar" || location.Archive == "gz" || location.Archive == "bz2" || location.Archive == "xz" {
+		return true, nil
 	}
 	if location.Archive == "zip" {
 		zr, err := zip.NewReader(ra, size)
@@ -514,13 +553,7 @@ func moduleArchiveNeedsRewrite(ctx context.Context, ra io.ReaderAt, size int64, 
 			}
 		}
 	}
-	u, _ := url.Parse(location.Target)
-	name := strings.TrimSuffix(path.Base(u.Path), "."+location.Archive)
-	if !isModuleConfig(name) {
-		return false, nil
-	}
-	_, changed, err := rewriteConfig(stream, name, target)
-	return changed, err
+	return false, nil
 }
 
 func moduleArchiveReader(ctx context.Context, ra io.ReaderAt, size int64, kind string) (io.Reader, func(), error) {

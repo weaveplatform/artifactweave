@@ -487,6 +487,10 @@
     "terraform-linux-amd64-sha256": {
       "path": "deploy/check.sh",
       "pattern": "terraform_linux_amd64\\) echo ([a-f0-9]{64}) ;;"
+    },
+    "opentofu": {
+      "path": ".github/actions/registry-clients/action.yml",
+      "pattern": "^\\s+TOFU_VERSION: '([0-9.]+)'$"
     }
   },
   "recipes": {
@@ -534,7 +538,7 @@
     "sbt": "sbt {{sbt}}; Eclipse Temurin {{jdk-sbt}}",
     "skills": "JFrog CLI {{jfrog}}",
     "swift": "Swift/SwiftPM {{swift.version}} pinned Linux client",
-    "terraform": "Terraform {{terraform}}; JFrog CLI {{jfrog}}",
+    "terraform": "Terraform {{terraform}}; OpenTofu {{opentofu}} (module getters); JFrog CLI {{jfrog}}",
     "terraformbackend": "Terraform {{terraform}}",
     "vagrant": "Vagrant {{vagrant}} (Linux amd64)",
     "vcs": "curl from the immutable Maven/Temurin image (runtime version recorded by native CI)"
@@ -912,6 +916,28 @@
       "path": ".github/actions/ai-editor-assets/action.yml",
       "pattern": "(/extension/hexeditor/)[0-9]+(?:\\.[0-9]+)*(/assetbyname)",
       "replacement": "\\g<1>{{hexeditor}}\\g<2>"
+    },
+    {
+      "path": "test/acceptance/terraform_getters_steps_test.go",
+      "pattern": "(\"ARTIFACTWEAVE_TERRAFORM_BIN\", \")[0-9.]+(\")",
+      "replacement": "\\g<1>{{terraform}}\\g<2>"
+    },
+    {
+      "path": "test/acceptance/terraform_getters_steps_test.go",
+      "pattern": "(\"ARTIFACTWEAVE_TOFU_BIN\", \")[0-9.]+(\")",
+      "replacement": "\\g<1>{{opentofu}}\\g<2>"
+    },
+    {
+      "path": "test/acceptance/terraform_snapshot_test.go",
+      "pattern": "(\"ARTIFACTWEAVE_TERRAFORM_BIN\", \")[0-9.]+(\")",
+      "replacement": "\\g<1>{{terraform}}\\g<2>",
+      "count": 2
+    },
+    {
+      "path": "test/acceptance/terraform_snapshot_test.go",
+      "pattern": "(\"ARTIFACTWEAVE_TOFU_BIN\", \")[0-9.]+(\")",
+      "replacement": "\\g<1>{{opentofu}}\\g<2>",
+      "count": 2
     }
   ],
   "images": [

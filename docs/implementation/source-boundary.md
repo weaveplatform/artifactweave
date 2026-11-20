@@ -175,6 +175,43 @@ checksums and validators do not describe the projected JSON and are discarded.
 Cache-Control and Vary still apply, as do current source/credential checks,
 metadata-zap epochs, cancellation and final delivery authorization.
 
+### Terraform vanity and checksum-file control metadata (#668)
+
+`ModuleVanityDocument` and `ModuleChecksumDocument` are separate closed metadata-GET
+operations with their own cache identities, variants, URL guards and validators.
+They cannot be combined with the 204-location operation or another adapter opt-in.
+Both require a complete 200 response within 16 MiB, preserve only the private control
+representation and use full refreshes without HTTP validators. Projected bytes do
+not inherit an upstream body checksum, ETag or arbitrary response header; existing
+cache-control/Vary, source, epoch, credential, cancellation and delivery rules remain.
+
+Vanity control stores one valid header source (8 KiB maximum) or the complete
+UTF-8/ASCII HTML bytes in private JSON, with bytes encoded as base64. The adapter
+validates header/HTML source grammar and destinations against the sanitized actual
+response base before admission. An opaque canonical logical-URL identity supports
+request/effective cycle checks without disclosing URL query values. The shared
+operation does not parse HTML or authorize another request on its own.
+
+Checksum control stores complete UTF-8/ASCII text/plain or application/octet-stream
+bytes as base64 in private JSON. The adapter validates complete records and the
+selected archive filename before admission. `Result.RejectMetadata` is an opaque,
+current-authority-checked callback available only for a stored online checksum result.
+If its archive acquisition fails with the existing 502 surface, the adapter rejects
+that exact checksum generation through the existing eviction CAS. The transaction
+rechecks current source/credential authority; a policy-only revision can be refreshed
+without losing the source/revision/epoch comparison against a newer replacement.
+Offline, cache-only and transient results cannot perform this mutation. Storage and
+authorization errors keep their own existing status/error identities. This narrow
+callback does not expose a generic cache deletion or change shared error sanitization.
+
+The Terraform adapter binds the complete normalized terminal source descriptor
+into its signed remote-module capability with a purpose-derived keyed digest. Query,
+selector, checksum-file identity and snapshot-depth changes therefore refuse an older
+capability even when the immutable archive bytes match. No private descriptor URL or
+query enters the public claim, and its keyed digest prevents offline parameter
+guesses. This is separate from the common source-incarnation/credential/digest fences;
+local/provider capabilities do not acquire the remote-module descriptor contract.
+
 
 ## Transient Smart AQL
 

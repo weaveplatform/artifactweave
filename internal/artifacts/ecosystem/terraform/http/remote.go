@@ -168,7 +168,7 @@ func (h handler) upstreamModuleLocation(
 		"module-metadata/"+m.Package()+"/"+m.Version+"/download",
 		endpoint,
 		m.Package(),
-		"terraform-module-location-v1",
+		"terraform-module-location-v4",
 		true,
 		func(body io.Reader, actual string) error { _, e := parseModuleLocation(body, actual, c); return e },
 	)
@@ -182,7 +182,14 @@ func (h handler) upstreamModuleLocation(
 		return moduleSource{}, result, remoteModuleError()
 	}
 	location, err := parseModuleLocation(result.Stream.Body, result.Metadata.BaseURL, c)
-	return location, result, err
+	if err != nil {
+		return moduleSource{}, result, err
+	}
+	location, result, err = h.resolveModuleVanity(r, m, location, result)
+	if err != nil {
+		return moduleSource{}, result, err
+	}
+	return h.resolveModuleChecksum(r, m, location, result)
 }
 
 func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operation) {
@@ -232,7 +239,7 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 	completeModuleResource(&resource) // signing/rewrite needs complete original bytes, including HEAD
 	artifact, err := h.k.Read(r, resource)
 	if err != nil {
-		h.k.Error(w, r, err)
+		h.k.Error(w, r, rejectModuleChecksumOnArchiveFailure(r.Context(), metadata, err))
 		return
 	}
 	defer closeModuleResult(artifact)
@@ -255,11 +262,10 @@ func (h handler) remoteModule(w http.ResponseWriter, r *http.Request, q operatio
 	public, err := h.remoteDownloadURL(
 		r,
 		q.module,
-		path,
+		location,
 		digest,
 		artifact.Identity,
 		selected,
-		location.Archive,
 		representation,
 	)
 	if err != nil {
@@ -481,8 +487,8 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 	// The archive's cache path follows its location, so the URL names the
 	// module it was issued for, and the location read now must name the
 	// same path.
-	m, ok := tf.ParseModule(c.Module + ".zip")
-	if !ok || c.Source == nil {
+	m, ok := remoteModuleClaim(c)
+	if !ok {
 		h.k.Error(w, r, forbidden)
 		return
 	}
@@ -495,7 +501,7 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 		h.k.Error(w, r, signedMemberError(c, err))
 		return
 	}
-	if location.Path != c.Path || metadata.Identity != *c.Source {
+	if location.Path != c.Path || metadata.Identity != *c.Source || c.ModuleSource != h.moduleSourceDigest(location) {
 		h.k.Error(w, r, forbidden)
 		return
 	}
@@ -508,6 +514,7 @@ func (h handler) remoteSignedModule(w http.ResponseWriter, r *http.Request, c cl
 	resource.Checksums.SHA256 = c.SHA256
 	result, err := h.k.Read(r, resource)
 	if err != nil {
+		err = rejectModuleChecksumOnArchiveFailure(r.Context(), metadata, err)
 		h.k.Error(w, r, signedMemberError(c, err))
 		return
 	}

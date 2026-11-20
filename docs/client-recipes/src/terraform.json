@@ -2,10 +2,11 @@
   "schema": 1,
   "type": "terraform",
   "name": "Terraform module and provider registries",
-  "client": "Terraform 1.17.1; JFrog CLI 2.131.0",
+  "client": "Terraform 1.17.1; OpenTofu 1.13.9 (module getters); JFrog CLI 2.131.0",
   "version_sources": [
     "deploy/check.sh",
-    ".github/actions/jfrog-cli/action.yml"
+    ".github/actions/jfrog-cli/action.yml",
+    ".github/actions/registry-clients/action.yml"
   ],
   "endpoint": "${AW_URL}/.well-known/terraform.json",
   "auth": "Terraform sends an Access token from its host credentials configuration. READ is required for the module/provider repository; DEPLOY is required for publication. Provider signatures and signed module-download capabilities retain their separate integrity semantics.",
@@ -75,7 +76,8 @@
     "Provider source coordinates use <authority>/<repository>-rt-ns-<namespace>/<provider>, not the module __ separator.",
     "Module publication through a virtual requires defaultDeploymentRepo. The provider upload example targets a concrete PROVIDER repository; generic item uploads retain the virtual default-deployment target’s admission, while native provider API writes remain unsupported. Virtual provider/mirror reads preserve the selected member’s signature and bytes; registry exact-platform selection and mirror whole-version ownership are distinct. Remote repositories resolve only.",
     "The HTTP host override in tests is a loopback fixture workaround; production clients should use HTTPS discovery.",
-    "The provider registry requires a valid publisher signature and configured verification key. The HTTPS network mirror is a separate installation mode that checks archive hashes and the lockfile; it does not claim publisher-signature verification."
+    "The provider registry requires a valid publisher signature and configured verification key. The HTTPS network mirror is a separate installation mode that checks archive hashes and the lockfile; it does not claim publisher-signature verification.",
+    "Remote module sources support bounded HTTP(S) vanity headers/HTML, absolute HTTP(S) checksum-file URLs and portable archive delivery. OpenTofu qualification in this recipe covers module getters; provider and backend acceptance retain their separate Terraform evidence. GitHub sources are HTTP snapshots rather than recursive Git clones; generic Git/Hg/SSH/cloud getters remain disabled."
   ],
   "evidence": [
     {
@@ -149,6 +151,45 @@
         "combinedTerraformRequests",
         "combinedProviderBinary",
         "combinedTerraformState"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/terraform_getters.feature",
+      "contains": [
+        "@terraform_getters",
+        "| Terraform | remote",
+        "| OpenTofu  | remote",
+        "| Terraform | virtual",
+        "| OpenTofu  | virtual"
+      ]
+    },
+    {
+      "path": "test/acceptance/terraform_getters_steps_test.go",
+      "contains": [
+        "offline-fresh-client",
+        "TF_CLI_CONFIG_FILE=",
+        "TOFU_CLI_CONFIG_FILE=",
+        "/.well-known/terraform.json",
+        "terraformGetterIdentity"
+      ]
+    },
+    {
+      "path": "test/acceptance/terraform_snapshot_test.go",
+      "contains": [
+        "TestAccTerraformGitHubSnapshots",
+        "TestAccTerraformGitCloneDepthControl",
+        "warm-moved-ref",
+        "lfs-pointer",
+        "absent-submodule",
+        "GIT_ALLOW_PROTOCOL=file"
+      ]
+    },
+    {
+      "path": ".github/workflows/quality-gate.yml",
+      "contains": [
+        "Terraform and OpenTofu GitHub snapshot native acceptance",
+        "^TestAccTerraformGit(HubSnapshots|CloneDepthControl)$",
+        "-test.gocoverdir="
       ]
     }
   ]

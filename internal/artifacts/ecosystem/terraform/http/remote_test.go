@@ -306,6 +306,8 @@ func TestAccRemoteSignedModuleRejectsChangedClaimsBeforeFetch(t *testing.T) {
 	}{
 		{"missing credential", func(c *claims) { c.Credential = nil }},
 		{"missing source", func(c *claims) { c.Source = nil }},
+		{"missing source descriptor", func(c *claims) { c.ModuleSource = "" }},
+		{"malformed source descriptor", func(c *claims) { c.ModuleSource = "invalid" }},
 		// The cache path is the archive URL's, so a URL that names the
 		// module's old identity path, or any other, is refused.
 		{"identity path", func(c *claims) { c.Path = "ns/name/aws/1.0.0.zip" }},
@@ -544,11 +546,10 @@ func TestUnitRemoteModuleDeliveryRejectsUnreadableAndRevokedSources(t *testing.T
 	if target, err := h.remoteDownloadURL(
 		r,
 		tf.Module{Namespace: "ns", Name: "name", System: "aws", Version: "1.0.0"},
-		"ns/name/aws/1.0.0.zip",
+		moduleSource{Path: "ns/name/aws/1.0.0.zip", Archive: "zip"},
 		strings.Repeat("0", 64),
 		artmodel.SourceIdentity{},
 		"",
-		"zip",
 	); target != "" || !errors.Is(err, kernel.ErrBadCredentials) {
 		t.Fatalf("module signed URL issued without credential: %q, %v", target, err)
 	}

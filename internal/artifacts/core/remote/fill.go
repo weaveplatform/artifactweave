@@ -144,7 +144,7 @@ func (p *Policy) info(
 	// A GET's body, and the body a format's own exchange may send a HEAD,
 	// as the registry's does, are closed unread.
 	defer func() { _ = res.Body.Close() }()
-	if err = projectModuleLocation(head, res); err != nil {
+	if err = projectModuleResponse(head, res); err != nil {
 		return out, err
 	}
 	if p.ProjectResponse != nil {

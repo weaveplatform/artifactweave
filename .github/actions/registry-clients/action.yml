@@ -1,9 +1,9 @@
 name: Registry clients (pinned)
 description: >-
-  Install the pinned crane, oras, cosign, helm and terraform binaries, each
+  Install the pinned crane, oras, cosign, helm, Terraform and OpenTofu binaries, each
   checked against the SHA-256 its release publishes, and export their paths
   as ARTIFACTWEAVE_CRANE_BIN, ARTIFACTWEAVE_ORAS_BIN, ARTIFACTWEAVE_COSIGN_BIN,
-  ARTIFACTWEAVE_HELM_BIN and ARTIFACTWEAVE_TERRAFORM_BIN.
+  ARTIFACTWEAVE_HELM_BIN, ARTIFACTWEAVE_TERRAFORM_BIN and ARTIFACTWEAVE_TOFU_BIN.
 
 # The registry's real clients for the acceptance features (decision 0015,
 # #229), and P8's helm and terraform (#534). Binaries rather than setup
@@ -22,7 +22,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Download crane, oras, cosign, helm and terraform
+    - name: Download crane, oras, cosign, helm, Terraform and OpenTofu
       shell: bash
       env:
         CLIENTS: ${{ inputs.clients }}
@@ -36,6 +36,8 @@ runs:
         NULL_PROVIDER_SHA256: 'd2855b922ea345dbd89ea287e4c6c4757e38bc0aaffeb2b79aa0b8004f9c53ff'
         HELM_VERSION: 'v4.3.1'
         HELM_SHA256: '0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b'
+        TOFU_VERSION: '1.13.9'
+        TOFU_SHA256: 'bc44eb6b06446ba83bd4072114891987f590f66cca712737a7f1147c50c539ce'
       run: |
         dir="$RUNNER_TEMP/registry-clients"
         mkdir -p "$dir"
@@ -85,10 +87,17 @@ runs:
         echo "${NULL_PROVIDER_SHA256}  $dir/terraform-provider-null.zip" | sha256sum -c -
         echo "ARTIFACTWEAVE_TERRAFORM_BIN=$dir/terraform" >> "$GITHUB_ENV"
         echo "ARTIFACTWEAVE_NULL_PROVIDER_ZIP=$dir/terraform-provider-null.zip" >> "$GITHUB_ENV"
+        # Both clients qualify module getters; selecting Terraform installs
+        # the independently pinned OpenTofu client as well.
+        curl -fsSL -o "$dir/tofu.zip" \
+          "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_amd64.zip"
+        echo "${TOFU_SHA256}  $dir/tofu.zip" | sha256sum -c -
+        unzip -q -o "$dir/tofu.zip" tofu -d "$dir"
+        echo "ARTIFACTWEAVE_TOFU_BIN=$dir/tofu" >> "$GITHUB_ENV"
         fi
-        for binary in crane oras cosign helm terraform; do
+        for binary in crane oras cosign helm terraform tofu; do
           if [ -f "$dir/$binary" ]; then chmod +x "$dir/$binary"; fi
         done
-        for binary in crane oras cosign helm terraform; do
+        for binary in crane oras cosign helm terraform tofu; do
           if [ -f "$dir/$binary" ]; then "$dir/$binary" version; fi
         done

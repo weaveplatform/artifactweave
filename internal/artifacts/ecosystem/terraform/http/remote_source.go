@@ -26,10 +26,14 @@ const (
 )
 
 type moduleSource struct {
-	Target    string           `json:"target"`
-	Subdir    string           `json:"subdir"`
-	Archive   string           `json:"archive"`
-	Checksums kernel.Checksums `json:"checksums"`
+	Target       string           `json:"target"`
+	Subdir       string           `json:"subdir"`
+	Archive      string           `json:"archive"`
+	Checksums    kernel.Checksums `json:"checksums"`
+	Vanity       bool             `json:"vanity,omitempty"`
+	ChecksumURL  string           `json:"checksum_url,omitempty"`
+	ChecksumName string           `json:"checksum_name,omitempty"`
+	GitHubDepth  string           `json:"github_depth,omitempty"`
 	// Path is the archive's cache path, where its read checks Read
 	// permission and the remote's download policy and the cache keeps it.
 	Path string `json:"path"`
@@ -130,7 +134,85 @@ func parseModuleLocation(r io.Reader, base string, c repo.Config) (moduleSource,
 // admits HTTP archives and GitHub HTTPS sources as documented for Artifactory;
 // it never launches a process or follows ambient git, SSH or cloud credentials.
 func parseModuleSource(raw, base string, c repo.Config) (moduleSource, error) {
-	var out moduleSource
+	address, err := moduleSourceAddress(raw, base)
+	out := moduleSource{Subdir: address.subdir}
+	if err != nil {
+		return out, err
+	}
+	u := address.url
+	query, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return out, remoteModuleError()
+	}
+	for _, key := range []string{"archive", "checksum", "ref", "depth", "terraform-get"} {
+		if len(query[key]) > 1 {
+			return out, remoteModuleError()
+		}
+	}
+	if values, ok := query["terraform-get"]; ok && (len(values) != 1 || values[0] != "1") {
+		return out, remoteModuleError()
+	}
+	if address.force == "git" {
+		return githubModuleSource(u, out.Subdir, query, c)
+	}
+	kind := query.Get("archive")
+	if _, explicit := query["archive"]; explicit && kind == "" {
+		return out, remoteModuleError()
+	}
+	if kind == "" {
+		kind = moduleArchiveType(u.Path)
+	}
+	kind = canonicalModuleArchive(kind)
+	if kind == "" {
+		if _, explicit := query["archive"]; explicit {
+			return out, remoteModuleError()
+		}
+		// Registry coordinates and local-looking bare paths are not vanity URLs.
+		// Relative web references must use the registry protocol's explicit forms.
+		if !address.webReference {
+			return out, remoteModuleError()
+		}
+		out.Vanity = true
+		query.Del("terraform-get")
+	}
+	out.Archive = kind
+	if value, file := strings.CutPrefix(query.Get("checksum"), "file:"); file {
+		if out.ChecksumURL, err = moduleChecksumURL(value, u.String(), c); err != nil {
+			return out, err
+		}
+	} else {
+		if out.Checksums, err = moduleChecksum(query.Get("checksum")); err != nil {
+			return out, err
+		}
+	}
+	query.Del("archive")
+	query.Del("checksum")
+	u.RawQuery = query.Encode()
+	out.Target = u.String()
+	if err = allowModuleURL(c, out.Target); err != nil {
+		return out, err
+	}
+	if out.Vanity {
+		return out, nil
+	}
+	// [I] No 7.x source shows where a remote caches an HTTP archive; it is
+	// taken to follow the rule a provider's files do, below the remote's
+	// URL (remoteFilePath).
+	var ok bool
+	if out.Path, ok = remoteFilePath(c.URL, out.Target); !ok {
+		return out, remoteModuleError()
+	}
+	return out, nil
+}
+
+type moduleAddress struct {
+	url           *url.URL
+	force, subdir string
+	webReference  bool
+}
+
+func moduleSourceAddress(raw, base string) (moduleAddress, error) {
+	var out moduleAddress
 	if raw == "" || len(raw) > 8192 || strings.ContainsFunc(raw, unicode.IsControl) ||
 		strings.Contains(raw, "\\") {
 		return out, remoteModuleError()
@@ -142,7 +224,11 @@ func parseModuleSource(raw, base string, c repo.Config) (moduleSource, error) {
 	if force != "" && force != "git" && force != "http" && force != "https" {
 		return out, apierror.New(502, "upstream Terraform module source transport is not qualified")
 	}
-	if strings.HasPrefix(raw, "github.com/") {
+	shorthand := strings.HasPrefix(raw, "github.com/")
+	if shorthand {
+		if force != "" && force != "git" {
+			return out, remoteModuleError()
+		}
 		raw = "https://" + raw
 		force = "git"
 	}
@@ -157,59 +243,55 @@ func parseModuleSource(raw, base string, c repo.Config) (moduleSource, error) {
 	}
 	if i := strings.Index(raw[offset:end], "//"); i >= 0 {
 		i += offset
-		out.Subdir = raw[i+2 : end]
+		out.subdir = raw[i+2 : end]
 		raw = raw[:i] + raw[end:]
-		if !validModuleSubdir(out.Subdir) {
+		if !validModuleSubdir(out.subdir) {
 			return out, remoteModuleError()
+		}
+	}
+	if shorthand {
+		var err error
+		raw, out.subdir, err = expandGitHubModuleShorthand(raw, out.subdir)
+		if err != nil {
+			return out, err
 		}
 	}
 	target, err := moduleURL(base, raw)
 	if err != nil {
 		return out, err
 	}
-	u, _ := url.Parse(target)
-	query, err := url.ParseQuery(u.RawQuery)
-	if err != nil {
-		return out, remoteModuleError()
-	}
-	for _, key := range []string{"archive", "checksum", "ref", "depth"} {
-		if len(query[key]) > 1 {
-			return out, remoteModuleError()
-		}
-	}
-	if force == "git" {
-		return githubModuleSource(u, out.Subdir, query, c)
-	}
-	kind := query.Get("archive")
-	if kind == "" {
-		kind = moduleArchiveType(u.Path)
-	}
-	kind = canonicalModuleArchive(kind)
-	if kind == "" {
-		return out, apierror.New(
-			502,
-			"upstream Terraform module location does not select a qualified archive",
-		)
-	}
-	out.Archive = kind
-	if out.Checksums, err = moduleChecksum(query.Get("checksum")); err != nil {
-		return out, err
-	}
-	query.Del("archive")
-	query.Del("checksum")
-	u.RawQuery = query.Encode()
-	out.Target = u.String()
-	if err = allowModuleURL(c, out.Target); err != nil {
-		return out, err
-	}
-	// [I] No 7.x source shows where a remote caches an HTTP archive; it is
-	// taken to follow the rule a provider's files do, below the remote's
-	// URL (remoteFilePath).
-	var ok bool
-	if out.Path, ok = remoteFilePath(c.URL, out.Target); !ok {
-		return out, remoteModuleError()
-	}
+	out.url, _ = url.Parse(target)
+	out.force = force
+	out.webReference = strings.Contains(raw, "://") || strings.HasPrefix(raw, "/") ||
+		strings.HasPrefix(raw, "./") || strings.HasPrefix(raw, "../") || strings.HasPrefix(raw, "?")
 	return out, nil
+}
+
+// Terraform treats path segments after a shorthand's owner/repository as a
+// subdirectory, followed by any explicit // selector. Validate before resolving
+// the URL so path cleaning cannot hide a traversal or an encoded separator.
+func expandGitHubModuleShorthand(raw, subdir string) (string, string, error) {
+	u, err := url.Parse(raw)
+	if err != nil || strings.Contains(u.EscapedPath(), "%") {
+		return "", "", remoteModuleError()
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" ||
+		parts[0] == "." || parts[0] == ".." || parts[1] == "." || parts[1] == ".." {
+		return "", "", remoteModuleError()
+	}
+	if len(parts) > 2 {
+		implied := strings.Join(parts[2:], "/")
+		if !validModuleSubdir(implied) {
+			return "", "", remoteModuleError()
+		}
+		if subdir != "" {
+			implied += "/" + subdir
+		}
+		subdir = implied
+	}
+	u.Path = "/" + parts[0] + "/" + parts[1]
+	return u.String(), subdir, nil
 }
 
 func githubModuleSource(
@@ -218,7 +300,7 @@ func githubModuleSource(
 	q url.Values,
 	c repo.Config,
 ) (moduleSource, error) {
-	out := moduleSource{Subdir: subdir, Archive: "tar.gz"}
+	out := moduleSource{Subdir: subdir, Archive: "tar.gz", GitHubDepth: q.Get("depth")}
 	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if u.Scheme != "https" || !strings.EqualFold(u.Host, "github.com") || len(parts) != 2 ||
 		parts[0] == "" ||
@@ -243,11 +325,17 @@ func githubModuleSource(
 	if ref == "" {
 		ref = "HEAD"
 	}
-	if strings.ContainsAny(ref, "\\\x00\r\n") || strings.HasPrefix(ref, "-") {
+	if strings.ContainsAny(ref, "\\ ~^:?*[") || strings.HasPrefix(ref, "-") ||
+		strings.HasSuffix(ref, ".") || strings.Contains(ref, "..") || strings.Contains(ref, "@{") || ref == "@" {
 		return out, remoteModuleError()
 	}
+	for _, c := range ref {
+		if c < 0x20 || c == 0x7f {
+			return out, remoteModuleError()
+		}
+	}
 	for _, part := range strings.Split(ref, "/") {
-		if part == ".." || part == "." || part == "" {
+		if part == "" || strings.HasPrefix(part, ".") || strings.HasSuffix(part, ".lock") {
 			return out, remoteModuleError()
 		}
 	}
@@ -325,6 +413,7 @@ func moduleChecksum(raw string) (kernel.Checksums, error) {
 		return out, nil
 	}
 	algorithm, digest, ok := strings.Cut(raw, ":")
+	algorithm = strings.ToLower(algorithm)
 	if !ok {
 		switch len(raw) {
 		case 32:

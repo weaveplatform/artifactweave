@@ -126,6 +126,14 @@ type Resource struct {
 	// private JSON control representation; the adapter must validate its source
 	// against the actual response base before admission and rewrite it on delivery.
 	ModuleDownloadLocation bool
+	// ModuleVanityDocument projects a complete, bounded Terraform HTTP vanity
+	// response into ModuleVanityResponse. It is exclusive with registry 204
+	// projection and requires validated JSON metadata before cache admission.
+	ModuleVanityDocument bool
+	// ModuleChecksumDocument projects a complete, bounded Terraform checksum
+	// file into ModuleChecksumResponse. Its caller must validate the complete
+	// checksum grammar and selected archive record before metadata admission.
+	ModuleChecksumDocument bool
 	// NuGetEmptyFeed projects a bodyless NuGet v2 204 into a fixed empty Atom
 	// feed. Only trusted feed/query metadata adapters may opt in; complete
 	// metadata validation, an Atom MIME expectation and a versioned schema remain required.
@@ -334,9 +342,14 @@ type Result struct {
 	CheckPermission func(context.Context, string) error
 	// Revalidate fences backend-specific credentials immediately before delivery.
 	Revalidate func(context.Context) error
-	Item       *model.Item
-	Stream     *Stream
-	Identity   model.SourceIdentity
+	// RejectMetadata forgets only the exact stored module-checksum generation
+	// whose related archive failed integrity/format validation. It is fenced
+	// by current authority and cannot remove a newer replacement. Nil for
+	// transient, offline and cache-only results.
+	RejectMetadata func(context.Context) error
+	Item           *model.Item
+	Stream         *Stream
+	Identity       model.SourceIdentity
 	// Used records successful content delivery using the backend's opaque cache
 	// token. The delivery adapter calls it after a successful GET/range or signed
 	// URL issuance, never on lookup, HEAD, 304 or a failed body. Nil for no-store.
@@ -581,6 +594,18 @@ func (s *Service) fenceDelivery(
 		}
 		return nil
 	}
+	if reject := result.RejectMetadata; reject != nil {
+		if !q.Resource.ModuleChecksumDocument || q.CacheOnly || !p.UpstreamNetworkAllowed || q.Repo.Offline != nil && *q.Repo.Offline {
+			result.RejectMetadata = nil
+		} else {
+			result.RejectMetadata = func(current context.Context) error {
+				if err := result.Revalidate(current); err != nil {
+					return err
+				}
+				return safeError(reject(current))
+			}
+		}
+	}
 	check := func(current context.Context, path string, folder, policy bool) error {
 		scope := q.Resource.Path
 		if q.Resource.PermissionRoot {
@@ -794,7 +819,7 @@ func gitLFSObjectPath(oid string) string {
 }
 
 func galleryPOSTHasUnsupportedOptions(r Resource) bool {
-	return r.RequireSmart || r.SmartAQL != "" || r.ModuleDownloadLocation ||
+	return r.RequireSmart || r.SmartAQL != "" || r.ModuleDownloadLocation || r.ModuleVanityDocument || r.ModuleChecksumDocument ||
 		r.NuGetEmptyFeed || r.ChecksumOnly || r.Mutable || r.GoneIsMissing
 }
 
@@ -1133,8 +1158,15 @@ func invalidGitLFSObjectResource(r Resource) bool {
 }
 
 func validateModuleLocationContract(r Resource) error {
-	if !r.ModuleDownloadLocation {
+	if !r.ModuleDownloadLocation && !r.ModuleVanityDocument && !r.ModuleChecksumDocument {
 		return nil
+	}
+	if r.ModuleVanityDocument && r.ModuleChecksumDocument {
+		return ErrInvalidRequest
+	}
+	if (r.ModuleVanityDocument || r.ModuleChecksumDocument) && (r.ModuleDownloadLocation || r.NuGetEmptyFeed || r.RequireSmart || r.SmartAQL != "" ||
+		r.ExternalURL == "" || r.CheckURL == nil) {
+		return ErrInvalidRequest
 	}
 	if r.Kind != ResourceKindMetadata || r.Method != http.MethodGet ||
 		r.ValidateMetadata == nil || r.Variant == "" || r.Checksums != (kernel.Checksums{}) ||
@@ -1171,7 +1203,7 @@ func validateSmartAQLContract(r Resource) error {
 	if !r.RequireSmart || r.Method != http.MethodGet || r.ValidateMetadata == nil ||
 		r.ExpectedContentType != "application/json" ||
 		len(r.ExpectedContentTypes) > 0 ||
-		r.ModuleDownloadLocation ||
+		r.ModuleDownloadLocation || r.ModuleVanityDocument || r.ModuleChecksumDocument ||
 		!r.PermissionFolder ||
 		r.PermissionPath != "" ||
 		r.Checksums != (kernel.Checksums{}) {

@@ -50,5 +50,6 @@ var (
 	ResponseBase          = responseBase
 	MetadataResponse      = metadataResponse
 	ProjectModuleLocation = projectModuleLocation
+	ProjectModuleResponse = projectModuleResponse
 	Unchanged             = unchanged
 )
