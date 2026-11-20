@@ -46,6 +46,12 @@ type Service struct {
 	// artifacts binding built with this store's access Projects contract.
 	// Role-only services need no repository binding.
 	Repositories artifactsapi.Repositories
+	// StorageBytes reads current owned logical bytes for lazy initialization,
+	// under the project guard and before the publication's artifact writes.
+	StorageBytes func(context.Context, string) (int64, error)
+	// StorageWarning durably enqueues the complete notification in the same
+	// transaction. A newly required warning without a handoff fails publication.
+	StorageWarning func(context.Context, model.ProjectStorageWarning) error
 }
 
 func (s Service) tx(ctx context.Context, fn func(context.Context) error) error {

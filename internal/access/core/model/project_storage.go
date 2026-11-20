@@ -11,3 +11,13 @@ type ProjectStorage struct {
 	// project incarnation, so deletion/recreation cannot revive queued mail.
 	WarningKey string
 }
+
+// ProjectStorageWarning is a self-contained durable handoff. A mail worker
+// verifies Incarnation and WarningKey against current state before sending;
+// retry must keep this occurrence's identity rather than create a new message.
+type ProjectStorageWarning struct {
+	ProjectKey   string
+	Incarnation  ProjectIncarnation
+	WarningKey   string
+	Bytes, Limit int64
+}
