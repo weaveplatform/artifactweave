@@ -7,6 +7,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx"
@@ -20,13 +21,18 @@ type IndexStore interface {
 	Packages() port.PackageStore
 }
 
-type indexReader struct{ store IndexStore }
+type indexReader struct {
+	store   IndexStore
+	formats format.Registry
+}
 
 // NewReader publishes index metadata without exposing artifacts' core models.
 // It performs no I/O. The caller supplies current authority; each member read
 // also checks its descriptive parent context so a stale/mixed reference cannot
 // cross a repository's ownership or package identity.
-func NewReader(store IndexStore) api.PackageIndex { return indexReader{store: store} }
+func NewReader(store IndexStore, formats format.Registry) api.PackageIndex {
+	return indexReader{store: store, formats: formats}
+}
 
 func (r indexReader) sources() (port.RepositoryIndexPages, port.PackageIndexPages, error) {
 	if r.store == nil {
@@ -147,7 +153,22 @@ func (r indexReader) Files(ctx context.Context, ref api.IndexVersion, properties
 		if current.ID != ref.ID {
 			return kernel.ErrNotFound
 		}
+		var selectLead format.CleanupLeadSelector
+		if r.formats != nil {
+			if resolver, ok := r.formats(ref.Package.Repository.PackageType).(format.CleanupLeadResolver); ok {
+				selectLead, err = resolver.CleanupLead(current)
+				if err != nil {
+					return fmt.Errorf("classify indexed version lead: %w", err)
+				}
+			}
+		}
 		out, next, err = packages.IndexFiles(ctx, ref, properties, page)
+		if err == nil && selectLead != nil {
+			for i := range out {
+				lead := selectLead(out[i])
+				out[i].Lead = &lead
+			}
+		}
 		return err
 	})
 	if err != nil {

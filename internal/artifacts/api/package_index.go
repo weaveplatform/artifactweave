@@ -62,6 +62,18 @@ type IndexFile struct {
 	Created, Modified, Updated         time.Time
 	PropertiesModified, LastDownloaded time.Time
 	Properties                         map[string][]string
+	// Lead is nil when this format has no lead contract. A nonnil value comes
+	// from the format's metadata-only classifier, never a guessed blob path.
+	Lead *IndexLead
+}
+
+// IndexLead identifies a format's cleanup lead among linked version files.
+// Single selects the greatest Rank, then TieBreak, across all file pages;
+// otherwise every Found file is a lead. The rank is not a continuation key.
+type IndexLead struct {
+	Found, Single bool
+	Rank          int64
+	TieBreak      string
 }
 
 // PackageIndex supplies bounded, deterministic index projections. The owning

@@ -170,7 +170,7 @@ func New(d Deps) (*Module, error) {
 		api: artifactsapi.API{
 			Repositories: repos.NewRepositories(d.Store, d.Access.Keys, d.Access.Projects, d.RepositoryLifecycle),
 			Layouts:      layout.Checker{},
-			PackageIndex: pkgindex.NewReader(d.Store),
+			PackageIndex: pkgindex.NewReader(d.Store, formats.For),
 		},
 		formats:      formats,
 		virtualCache: cache,

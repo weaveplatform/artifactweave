@@ -34,7 +34,7 @@ func RunPackageIndexSelection(t *testing.T, newStore Factory) {
 				t.Fatal(err)
 			}
 		}
-		reader := pkgindex.NewReader(st)
+		reader := pkgindex.NewReader(st, nil)
 		query := api.IndexRepositoryQuery{
 			Projects: []string{"alpha"}, Repositories: []string{"**"},
 			ExcludedRepositories: []string{"*-secret"}, PackageTypes: []repo.PackageType{repo.Maven}, Environments: []string{"DEV"},
@@ -97,7 +97,7 @@ func RunPackageIndexSelection(t *testing.T, newStore Factory) {
 					t.Fatal(err)
 				}
 			}
-			reader := pkgindex.NewReader(st)
+			reader := pkgindex.NewReader(st, nil)
 			ref := api.IndexRepository{Key: cfg.Key, Project: "alpha", Class: cfg.Class, PackageType: tc.kind, Environments: []string{"DEV"}}
 			packages, _, err := reader.Packages(ctx, ref, kernel.Page{Limit: 1})
 			if err != nil || len(packages) != 1 {

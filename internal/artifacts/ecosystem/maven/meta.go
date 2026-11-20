@@ -65,16 +65,23 @@ func versionPOM(its []model.Item) (model.Item, bool) {
 	bestBuild, found := 0, false
 	for _, it := range its {
 		p := it.FullPath()
-		if !IsPom(p) {
+		build, ok := pomPriority(p)
+		if !ok {
 			continue
-		}
-		build := -1
-		if b, ok := ParseUniqueBuild(path.Base(p)); ok {
-			build = b.Number
 		}
 		if !found || build > bestBuild || build == bestBuild && p > best.FullPath() {
 			best, bestBuild, found = it, build, true
 		}
 	}
 	return best, found
+}
+
+func pomPriority(p string) (int, bool) {
+	if !IsPom(p) {
+		return 0, false
+	}
+	if build, ok := ParseUniqueBuild(path.Base(p)); ok {
+		return build.Number, true
+	}
+	return -1, true
 }
