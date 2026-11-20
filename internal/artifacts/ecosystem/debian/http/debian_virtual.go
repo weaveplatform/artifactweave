@@ -140,7 +140,7 @@ func (s DebianAPI) virtualDebianFiles(
 	release, document := "dists/"+distribution+"/Release", "dists/"+distribution+"/"
 	e, err := k.Merged(k.Bind(r, open), release, document,
 		func(r *http.Request) (virtual.Entry, error) {
-			files, err := s.buildVirtualDebian(r, k, st, c, distribution, p, acc)
+			files, err := s.buildVirtualDebian(r, k, st, c, distribution, p, acc, nil)
 			if err != nil {
 				return virtual.Entry{}, err
 			}
@@ -171,12 +171,12 @@ func (s DebianAPI) virtualDebianFiles(
 // merged (R3); a failure is logged (Kit.WarnPassedOver) [I].
 func (s DebianAPI) buildVirtualDebian(
 	r *http.Request, k *pkgroute.Kit, st itemkit.Store, c repo.Config, distribution string,
-	p kernel.Principal, acc itemkit.Access,
+	p kernel.Principal, acc itemkit.Access, checks *snapshotAuthority,
 ) (map[string][]byte, error) {
 	release := "dists/" + distribution + "/Release"
 	parts, err := pkgroute.Collect(k, r, release,
 		func(mr *http.Request) ([]debian.MemberIndex, error) {
-			indexes, err := s.debianMemberIndexes(mr, st, c, distribution, p, acc)
+			indexes, err := s.debianMemberIndexes(mr, st, c, distribution, p, acc, checks)
 			k.WarnPassedOver(mr, err)
 			return indexes, err
 		})
@@ -252,7 +252,7 @@ func indexedArchitectures(c repo.Config) []string {
 //     the walk passes over when it is a fault (pkgroute.PassedOver).
 func (s DebianAPI) debianMemberIndexes(
 	mr *http.Request, st itemkit.Store, c repo.Config, distribution string,
-	p kernel.Principal, acc itemkit.Access,
+	p kernel.Principal, acc itemkit.Access, checks *snapshotAuthority,
 ) ([]debian.MemberIndex, error) {
 	ctx := mr.Context()
 	member := pkgroute.RequestFrom(mr).Repo
@@ -263,7 +263,7 @@ func (s DebianAPI) debianMemberIndexes(
 	if member.Class == repo.Remote && s.RemoteSources == nil {
 		return nil, errDebianNoSources
 	}
-	release, _, err := s.debianMemberBytes(ctx, st, member, "dists/"+distribution+"/Release", p, acc)
+	release, releaseCheck, err := s.debianMemberBytes(ctx, st, member, "dists/"+distribution+"/Release", p, acc)
 	if err != nil {
 		return nil, fmt.Errorf("debian member %s Release: %w", member.Key, err)
 	}
@@ -306,6 +306,7 @@ func (s DebianAPI) debianMemberIndexes(
 		if err != nil {
 			return nil, fmt.Errorf("debian member %s Packages: %w", member.Key, err)
 		}
+		checks.add(member, ref.Path, checkPermission)
 		index := debian.MemberIndex{Path: ref.BasePath()}
 		for _, row := range rows {
 			if !acc.File(member, row.Filename, accessapi.ActionRead) {
@@ -318,9 +319,13 @@ func (s DebianAPI) debianMemberIndexes(
 					return nil, fmt.Errorf("debian member %s package authority: %w", member.Key, err)
 				}
 			}
+			checks.add(member, row.Filename, checkPermission)
 			index.Rows = append(index.Rows, row)
 		}
 		out = append(out, index)
+	}
+	if len(out) != 0 {
+		checks.add(member, "dists/"+distribution+"/Release", releaseCheck)
 	}
 	return out, nil
 }

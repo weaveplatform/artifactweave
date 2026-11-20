@@ -10502,7 +10502,7 @@ paths:
       x-cost: ordinary
   /api/repositories/{repoKey}:
     delete:
-      description: 'Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.'
+      description: 'Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Requires platform administration or the current delete privilege for the repository class from its owning project. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.'
       operationId: deleteRepository
       parameters:
         - $ref: '#/components/parameters/repoKey'
@@ -10641,7 +10641,7 @@ paths:
       x-idempotency: safe
       x-cost: ordinary
     post:
-      description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.'
+      description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. An rclass or packageType that differs from the stored value only in letter case is the stored value, which keeps its spelling; a key that differs from the stored key only in letter case is a different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Requires platform administration or the current configuration-management privilege for the repository class from its owning project. Only platform administrators may change projectKey through this endpoint. Answers 200 with a plain-text confirmation.'
       operationId: updateRepositoryConfiguration
       parameters:
         - $ref: '#/components/parameters/repoKey'
@@ -10715,7 +10715,7 @@ paths:
         - path:repoKey
       x-cost: expensive
     put:
-      description: 'Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.'
+      description: 'Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type. Requires platform administration or the current create privilege for the requested repository class in the owning project; an unowned repository requires platform administration.'
       operationId: createRepository
       parameters:
         - $ref: '#/components/parameters/repoKey'
@@ -18017,7 +18017,7 @@ paths:
       x-cost: ordinary
   /api/v2/repositories/batch:
     delete:
-      description: 'Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Admin only.'
+      description: 'Deletes each listed repository independently and reports per key. The HTTP status summarises the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500 when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`. Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or `artifactory-build-info` (403). Every key must pass current platform or owning project class-specific delete authorization before the first deletion. Each independent deletion rechecks that authority.'
       operationId: deleteRepositories
       requestBody:
         content:
@@ -18157,7 +18157,7 @@ paths:
       x-pagination: complete
       x-pagination-next: none
     post:
-      description: 'Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Admin only.'
+      description: 'Applies one update per configuration in the body, with the same merge rules as the single update. Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers 404. Each configuration requires platform administration or the current class-specific management privilege from its owning project. Only platform administrators may change projectKey through this endpoint.'
       operationId: updateMultipleRepositories
       requestBody:
         content:
@@ -18229,7 +18229,7 @@ paths:
         - 'body:'
       x-cost: expensive
     put:
-      description: 'Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Admin only.'
+      description: 'Creates every configuration in the body in one request, mixed classes and package types allowed. Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created. Answers 201 with one plain-text line per repository. Each configuration requires platform administration or the current create privilege for its class in the owning project. Unowned repositories require platform administration.'
       operationId: createMultipleRepositories
       requestBody:
         content:

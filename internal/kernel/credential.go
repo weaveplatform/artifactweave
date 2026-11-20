@@ -1,6 +1,9 @@
 package kernel
 
-import "time"
+import (
+	"maps"
+	"time"
+)
 
 // CredentialReference records which already-authenticated identity scheduled
 // bounded background work. It carries no credential or group membership. A
@@ -23,13 +26,15 @@ type CredentialReference struct {
 // CurrentRegistry rechecks them against current state, which can only remove
 // access.
 type RegistryReference struct {
-	Verified bool           `json:"verified"`
-	Access   RegistryAccess `json:"access"`
-	Scope    string         `json:"scope"`
-	Subject  string         `json:"subject"`
-	Expires  time.Time      `json:"expires"`
-	Parent   string         `json:"parent"`
-	Identity TokenIdentity  `json:"identity"`
+	Verified            bool              `json:"verified"`
+	Access              RegistryAccess    `json:"access"`
+	Scope               string            `json:"scope"`
+	Subject             string            `json:"subject"`
+	Expires             time.Time         `json:"expires"`
+	Parent              string            `json:"parent"`
+	Identity            TokenIdentity     `json:"identity"`
+	ProjectKey          string            `json:"project_key,omitempty"`
+	ProjectIncarnations map[string]string `json:"project_incarnations,omitempty"`
 }
 
 // CredentialReference returns the reference that background work keeps in
@@ -47,13 +52,15 @@ func (p Principal) CredentialReference() CredentialReference {
 	}
 	if p.Registry != nil {
 		r.Registry = &RegistryReference{
-			Verified: p.IsTokenAuthenticated,
-			Access:   Clone(*p.Registry),
-			Scope:    p.Scope.String(),
-			Subject:  p.TokenSubject,
-			Expires:  p.TokenExpires,
-			Parent:   p.TokenParent,
-			Identity: p.Identity,
+			Verified:            p.IsTokenAuthenticated,
+			Access:              Clone(*p.Registry),
+			Scope:               p.Scope.String(),
+			Subject:             p.TokenSubject,
+			Expires:             p.TokenExpires,
+			Parent:              p.TokenParent,
+			Identity:            p.Identity,
+			ProjectKey:          p.TokenProject,
+			ProjectIncarnations: maps.Clone(p.ProjectIncarnations),
 		}
 	}
 	return r
@@ -76,6 +83,7 @@ func (r CredentialReference) Principal() Principal {
 		scope, err := ParseScope(v.Scope)
 		p.Registry, p.Scope, p.IsTokenAuthenticated = &access, scope, v.Verified && err == nil
 		p.TokenSubject, p.TokenExpires, p.TokenParent, p.Identity = v.Subject, v.Expires, v.Parent, v.Identity
+		p.TokenProject, p.ProjectIncarnations = v.ProjectKey, maps.Clone(v.ProjectIncarnations)
 	}
 	return p
 }

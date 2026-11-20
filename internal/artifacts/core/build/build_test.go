@@ -110,6 +110,39 @@ func (w *world) publish(d string) Published {
 	return p
 }
 
+func TestUnitBuildPublicationRefreshesPolicyBeforeEffects(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		access    Access
+		err, want error
+	}{
+		{name: "current", access: everyone},
+		{name: "revoked", access: only(api.ActionRead), want: ErrForbidden},
+		{name: "unavailable", err: kernel.ErrStore, want: kernel.ErrStore},
+		{name: "missing", want: ErrForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newWorld(t)
+			called := false
+			w.svc.CurrentAccess = func(ctx context.Context) (Access, error) {
+				if !w.db.InTx(ctx) {
+					t.Fatal("current policy read is outside publication transaction")
+				}
+				called = true
+				return tc.access, tc.err
+			}
+			_, err := w.svc.Publish(t.Context(), "", []byte(doc("app", "1", started0)), "ci", everyone)
+			if !called || !errors.Is(err, tc.want) {
+				t.Fatalf("publication=%v, want %v; current policy read=%t", err, tc.want, called)
+			}
+			_, stored := w.db.Builds().Get(t.Context(), "", "app", "1", time.Time{})
+			if tc.want != nil && !errors.Is(stored, kernel.ErrNotFound) || tc.want == nil && stored != nil {
+				t.Fatalf("publication effect escaped current policy: %v", stored)
+			}
+		})
+	}
+}
+
 // deploy puts content at path in libs-local with properties.
 func (w *world) deploy(path, content string, props model.Properties) {
 	w.t.Helper()

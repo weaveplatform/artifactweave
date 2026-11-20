@@ -63,4 +63,7 @@ const (
 	UserDisabled     = model.UserDisabled
 	UserLocked       = model.UserLocked
 	RoleCustomGlobal = model.RoleCustomGlobal
+	RoleCustom       = model.RoleCustom
+	PrincipalUser    = model.PrincipalUser
+	PrincipalGroup   = model.PrincipalGroup
 )

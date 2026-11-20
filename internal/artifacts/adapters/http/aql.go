@@ -144,7 +144,7 @@ func (s ArtifactoryAPI) searchAQL(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case q.Action != aql.Find:
 		if hits, err = s.aqlAction(ctx, st, p, q, configs, hits); err != nil {
-			httpkit.WriteErr(w, r, s.InternalError(ctx, q.Action.String(), err))
+			httpkit.WriteErr(w, r, s.ItemError(ctx, q.Action.String(), err))
 			return
 		}
 	case !p.Admin:

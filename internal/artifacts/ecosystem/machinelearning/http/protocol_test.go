@@ -50,17 +50,32 @@ func newFixture(t *testing.T, class repo.Class, configure ...func(*harness.Confi
 		c:     c,
 		items: &item.Service{Store: db, Blobs: b, Formats: ecosystem.For},
 	}
-	config := harness.Config{Store: db, Blobs: b}
+	kit := accesstest.Over(t, db)
+	for _, name := range []string{"admin", "writer", "other", "reader", "outsider", "manager", "manifest-only", "no-code"} {
+		if err := db.Users().Create(t.Context(), accesstest.User{
+			Name: name, Admin: name == "admin", PasswordHash: accesstest.HashPassword(t, "pw"),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	config := harness.Config{Store: db, Blobs: b, Access: kit.API()}
 	for _, apply := range configure {
 		apply(&config)
 	}
 	h := harness.Router(config)
-	authorize := accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
+	authorize := kit.Middleware(t, true, func(r *http.Request) kernel.Principal {
 		name := r.Header.Get("X-User")
 		if name == "" {
 			name = "admin"
 		}
-		return kernel.Principal{Name: name, Admin: name == "admin", Anonymous: name == "anonymous"}
+		if name == "anonymous" {
+			return kernel.Anonymous
+		}
+		p, err := kit.API().Authenticator.Basic(r.Context(), name, "pw")
+		if err != nil {
+			t.Errorf("authenticate test actor %q: %v", name, err)
+		}
+		return p
 	})
 	f.server = httptest.NewServer(authorize(h))
 	t.Cleanup(f.server.Close)

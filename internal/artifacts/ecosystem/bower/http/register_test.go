@@ -2,15 +2,56 @@ package bowerhttp
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
+
+func TestAccBowerRegistrationRechecksOriginalAndSelectedWriteAuthority(t *testing.T) {
+	for _, denied := range []string{"", "bower-virtual", "bower-remote"} {
+		t.Run("denied="+denied, func(t *testing.T) {
+			f := newRemoteFixture(t, true)
+			f.configure(func(c *repo.Config) {
+				c.URL, c.VCSGitProvider = f.up.URL+"/stash", repo.Stash
+			})
+			f.repo("bower-virtual", repo.Virtual, "bower-remote")
+			current := false
+			f.currentAccess = func(ctx context.Context) (kernel.Principal, api.Decider, error) {
+				if !f.db.InTx(ctx) {
+					t.Fatal("current Bower authority is outside publication")
+				}
+				current = true
+				return kernel.Principal{Name: "admin"}, &accessapitest.Decider{AllowsFolderFunc: func(_ api.ResourceType, r api.Repo, _ string, want api.Actions) bool {
+					return r.Key != denied && want == api.ActionWrite
+				}}, nil
+			}
+			f.mount(f.sources)
+			u, _ := url.Parse(f.up.URL)
+			r := f.registerPackage("bower-virtual", "hello", "ssh://git@"+u.Hostname()+":7999/team/hello.git", "admin")
+			want := http.StatusCreated
+			if denied != "" {
+				want = http.StatusForbidden
+			}
+			if !current || r.Code != want {
+				t.Fatalf("current=%t registration=%d body=%s, want %d", current, r.Code, r.Body.String(), want)
+			}
+			_, err := f.db.BowerRegistrations().Get(t.Context(), "bower-remote", "hello")
+			if denied == "" && err != nil || denied != "" && !errors.Is(err, kernel.ErrNotFound) {
+				t.Fatal("registration effect escaped selected current authority", err)
+			}
+		})
+	}
+}
 
 func (f *fixture) registerPackage(key, name, raw, user string) *httptest.ResponseRecorder {
 	f.t.Helper()

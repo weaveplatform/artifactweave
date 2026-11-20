@@ -22,7 +22,7 @@ func (g *Registry) deleteManifest(w http.ResponseWriter, r *http.Request, q Requ
 		return
 	}
 	err := kernel.ErrNotFound
-	o := owner(r, q)
+	o := g.owner(r, q)
 	switch {
 	case strings.Contains(q.Reference, ":"):
 		if hex, ok := layout.SHA256Hex(q.Reference); ok {

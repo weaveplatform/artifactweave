@@ -25,8 +25,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
 )
 
-// The repositories API (research 02, decision 0003). Every write is for
-// administrators; reads show a caller the repositories the permission
+// The repositories API (research 02, decisions 0003 and 0013). Writes require
+// current platform or owning-project administrative privileges; reads show a caller the repositories the permission
 // evaluator lets them see (access.visible): those they may read anywhere in,
 // or those a token's repo or system:info scope names (decision 0006).
 
@@ -737,13 +737,16 @@ func requestConfigs(bodies ...*[]repo.Config) []repo.Config {
 // stored; a key already taken answers 400. A P2 virtual repository also
 // gets the members its p2Urls need, and the P2 remote repositories it
 // needs are created with it (repos.PlanP2Virtual).
-func (s ArtifactoryAPI) CreateRepository(
+func (s ArtifactoryAPI) CreateRepository(ctx context.Context, req artgen.CreateRepositoryRequestObject) (artgen.CreateRepositoryResponseObject, error) {
+	return repositoryMutation(ctx, s, func(ctx context.Context) (artgen.CreateRepositoryResponseObject, error) {
+		return s.createRepository(ctx, req)
+	})
+}
+
+func (s ArtifactoryAPI) createRepository(
 	ctx context.Context,
 	req artgen.CreateRepositoryRequestObject,
 ) (artgen.CreateRepositoryResponseObject, error) {
-	if err := httpkit.AdminOnly(ctx); err != nil {
-		return nil, err
-	}
 	st, err := s.content()
 	if err != nil {
 		return nil, err
@@ -761,6 +764,10 @@ func (s ArtifactoryAPI) CreateRepository(
 	c := *body
 	// The key in the path wins over the body (research 03).
 	c.Key = string(req.RepoKey)
+	repo.Defaults(&c)
+	if err := repositoryPermission(ctx, c, accessapi.RepositoryCreate); err != nil {
+		return nil, err
+	}
 	existing, err := st.Repos().List(ctx, port.RepoFilter{})
 	if err != nil {
 		return nil, s.InternalError(ctx, "list repositories", err)
@@ -771,8 +778,8 @@ func (s ArtifactoryAPI) CreateRepository(
 	if err := repos.CheckMembers(&c, nil, existing); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	var created []repo.Config
-	if c, created, err = repos.PlanP2Virtual(c, existing); err != nil {
+	c, created, err := repos.PlanP2Virtual(c, existing)
+	if err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
 	if err := repos.CheckKeypairs(ctx, s.cfg.Access.Keys, c); err != nil {
@@ -781,7 +788,11 @@ func (s ArtifactoryAPI) CreateRepository(
 	if err := repos.CheckEnvironments(ctx, s.cfg.Access.Projects, &c); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	switch err := createAll(ctx, st, append(created, c)); {
+	created = append(created, c)
+	if err := createdRepositoryPermissions(ctx, created); err != nil {
+		return nil, err
+	}
+	switch err := createAll(ctx, st, created); {
 	case errors.Is(err, kernel.ErrConflict):
 		return nil, httpkit.BadRequestf(msgKeyExists)
 	case err != nil:
@@ -802,9 +813,15 @@ func (s ArtifactoryAPI) CreateMultipleRepositories(
 	ctx context.Context,
 	req artgen.CreateMultipleRepositoriesRequestObject,
 ) (artgen.CreateMultipleRepositoriesResponseObject, error) {
-	if err := httpkit.AdminOnly(ctx); err != nil {
-		return nil, err
-	}
+	return repositoryMutation(ctx, s, func(ctx context.Context) (artgen.CreateMultipleRepositoriesResponseObject, error) {
+		return s.createMultipleRepositories(ctx, req)
+	})
+}
+
+func (s ArtifactoryAPI) createMultipleRepositories(
+	ctx context.Context,
+	req artgen.CreateMultipleRepositoriesRequestObject,
+) (artgen.CreateMultipleRepositoriesResponseObject, error) {
 	st, err := s.content()
 	if err != nil {
 		return nil, err
@@ -818,6 +835,12 @@ func (s ArtifactoryAPI) CreateMultipleRepositories(
 	)
 	if err := batchSize(len(batch)); err != nil {
 		return nil, err
+	}
+	for i := range batch {
+		repo.Defaults(&batch[i])
+		if err := repositoryPermission(ctx, batch[i], accessapi.RepositoryCreate); err != nil {
+			return nil, err
+		}
 	}
 	known, err := st.Repos().List(ctx, port.RepoFilter{})
 	if err != nil {
@@ -864,6 +887,9 @@ func (s ArtifactoryAPI) CreateMultipleRepositories(
 		if err := repos.CheckEnvironments(ctx, s.cfg.Access.Projects, &prepared[i]); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
+	}
+	if err := createdRepositoryPermissions(ctx, append(created, prepared...)); err != nil {
+		return nil, err
 	}
 	switch err := createAll(ctx, st, append(created, prepared...)); {
 	case errors.Is(err, kernel.ErrConflict):
@@ -933,14 +959,23 @@ func (s ArtifactoryAPI) UpdateRepositoryConfiguration(
 	ctx context.Context,
 	req artgen.UpdateRepositoryConfigurationRequestObject,
 ) (artgen.UpdateRepositoryConfigurationResponseObject, error) {
-	if err := httpkit.AdminOnly(ctx); err != nil {
-		return nil, err
-	}
+	return repositoryMutation(ctx, s, func(ctx context.Context) (artgen.UpdateRepositoryConfigurationResponseObject, error) {
+		return s.updateRepositoryConfiguration(ctx, req)
+	})
+}
+
+func (s ArtifactoryAPI) updateRepositoryConfiguration(
+	ctx context.Context,
+	req artgen.UpdateRepositoryConfigurationRequestObject,
+) (artgen.UpdateRepositoryConfigurationResponseObject, error) {
 	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
 	key := string(req.RepoKey)
+	if err := s.existingRepositoryPermission(ctx, st, key, accessapi.RepositoryUpdate); err != nil {
+		return nil, err
+	}
 	stored, err := st.Repos().Get(ctx, key)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound):
@@ -966,8 +1001,15 @@ func (s ArtifactoryAPI) UpdateRepositoryConfiguration(
 	if err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
+	current, _ := accessapi.DeciderFrom(ctx)
+	if updated.ProjectKey != stored.ProjectKey && !current.IsAdmin() {
+		return nil, kernel.ErrForbidden
+	}
 	created, err := s.checkReferences(ctx, st, &updated, &stored, sendsP2URLs(patch), nil)
 	if err != nil {
+		return nil, err
+	}
+	if err := createdRepositoryPermissions(ctx, created); err != nil {
 		return nil, err
 	}
 	switch err := s.writeUpdates(
@@ -1083,9 +1125,15 @@ func (s ArtifactoryAPI) UpdateMultipleRepositories(
 	ctx context.Context,
 	req artgen.UpdateMultipleRepositoriesRequestObject,
 ) (artgen.UpdateMultipleRepositoriesResponseObject, error) {
-	if err := httpkit.AdminOnly(ctx); err != nil {
-		return nil, err
-	}
+	return repositoryMutation(ctx, s, func(ctx context.Context) (artgen.UpdateMultipleRepositoriesResponseObject, error) {
+		return s.updateMultipleRepositories(ctx, req)
+	})
+}
+
+func (s ArtifactoryAPI) updateMultipleRepositories(
+	ctx context.Context,
+	req artgen.UpdateMultipleRepositoriesRequestObject,
+) (artgen.UpdateMultipleRepositoriesResponseObject, error) {
 	st, err := s.content()
 	if err != nil {
 		return nil, err
@@ -1118,6 +1166,9 @@ func (s ArtifactoryAPI) UpdateMultipleRepositories(
 		if key == "" {
 			return nil, httpkit.BadRequestf("Repository %d of the batch has no key", i+1)
 		}
+		if err := s.existingRepositoryPermission(ctx, st, key, accessapi.RepositoryUpdate); err != nil {
+			return nil, err
+		}
 		stored, err := st.Repos().Get(ctx, key)
 		switch {
 		case errors.Is(err, kernel.ErrNotFound):
@@ -1129,6 +1180,10 @@ func (s ArtifactoryAPI) UpdateMultipleRepositories(
 		if err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
+		current, _ := accessapi.DeciderFrom(ctx)
+		if c.ProjectKey != stored.ProjectKey && !current.IsAdmin() {
+			return nil, kernel.ErrForbidden
+		}
 		made, err := s.checkReferences(ctx, st, &c, &stored, sendsP2URLs(patch), created)
 		if err != nil {
 			return nil, err
@@ -1136,6 +1191,9 @@ func (s ArtifactoryAPI) UpdateMultipleRepositories(
 		created = append(created, made...)
 		before = append(before, stored)
 		updated = append(updated, c)
+	}
+	if err := createdRepositoryPermissions(ctx, created); err != nil {
+		return nil, err
 	}
 	switch err := s.writeUpdates(ctx, st, created, before, updated); {
 	case errors.Is(err, errCreatedKeyTaken):
@@ -1196,7 +1254,7 @@ func failFast403(msg string) artgen.DeleteRepositories403JSONResponse {
 }
 
 // DeleteRepository deletes a repository and everything in it, for
-// administrators only, and answers with JFrog's removal report even when it
+// current repository administrators, and answers with JFrog's removal report even when it
 // refuses: 403 for a signed-in user without the right and for the
 // build-info repository, 400 for a protected key and 404 for a missing one.
 // Only an anonymous caller gets the ordinary 401.
@@ -1205,19 +1263,25 @@ func (s ArtifactoryAPI) DeleteRepository(
 	req artgen.DeleteRepositoryRequestObject,
 ) (artgen.DeleteRepositoryResponseObject, error) {
 	key := string(req.RepoKey)
-	admin, err := kernel.RequireAdmin(ctx)
-	if err != nil {
-		// A user without the right gets the documented failure report;
-		// without credentials the ordinary 401.
-		if p, ok := kernel.FromContext(ctx); ok && !p.Anonymous {
-			return artgen.DeleteRepository403JSONResponse(
-				failed(key, fmt.Sprintf(msgNoRight, key, p.Name, key)),
-			), nil
-		}
-		return nil, fmt.Errorf("repositories: %w", err)
+	out, err := repositoryMutation(ctx, s, func(ctx context.Context) (artgen.DeleteRepositoryResponseObject, error) {
+		return s.deleteRepository(ctx, req)
+	})
+	if errors.Is(err, kernel.ErrForbidden) {
+		p, _ := kernel.FromContext(ctx)
+		return artgen.DeleteRepository403JSONResponse(failed(key, fmt.Sprintf(msgNoRight, key, p.Name, key))), nil
 	}
+	return out, err
+}
+
+func (s ArtifactoryAPI) deleteRepository(
+	ctx context.Context, req artgen.DeleteRepositoryRequestObject,
+) (artgen.DeleteRepositoryResponseObject, error) {
+	key := string(req.RepoKey)
 	st, err := s.content()
 	if err != nil {
+		return nil, err
+	}
+	if err := s.existingRepositoryPermission(ctx, st, key, accessapi.RepositoryDelete); err != nil {
 		return nil, err
 	}
 	if msg, forbidden, ok := refuseDelete(key); ok {
@@ -1226,7 +1290,8 @@ func (s ArtifactoryAPI) DeleteRepository(
 		}
 		return artgen.DeleteRepository400JSONResponse(failed(key, msg)), nil
 	}
-	files, found, err := repos.Remove(ctx, st, key, admin.Name)
+	p, _ := kernel.FromContext(ctx)
+	files, found, err := repos.Remove(ctx, st, key, p.Name)
 	switch {
 	case err != nil:
 		_ = s.InternalError(ctx, "delete repository", err)
@@ -1242,29 +1307,43 @@ func (s ArtifactoryAPI) DeleteRepository(
 	return artgen.DeleteRepository200JSONResponse(removed(key, files)), nil
 }
 
-// DeleteRepositories deletes a list of repositories, for administrators
-// only, and answers with a report per key: 200 when every key was removed
+// DeleteRepositories deletes a list of repositories with current administrative
+// privileges, and answers with a report per key: 200 when every key was removed
 // (a missing key counts as removed), 207 when some failed and 500 when all
 // did. A refused key refuses the whole list before anything is deleted.
 func (s ArtifactoryAPI) DeleteRepositories(
 	ctx context.Context,
 	req artgen.DeleteRepositoriesRequestObject,
 ) (artgen.DeleteRepositoriesResponseObject, error) {
-	admin, err := kernel.RequireAdmin(ctx)
+	var keys []string
+	if req.Body != nil {
+		keys = *req.Body
+	}
+	// Preflight the complete selection before any effect, then recheck each
+	// independent deletion. Keeping separate commits retains the native partial
+	// success report when a later delete fails or authority changes meanwhile.
+	_, err := repositoryMutation(ctx, s, func(ctx context.Context) (struct{}, error) {
+		st, err := s.content()
+		if err != nil {
+			return struct{}{}, err
+		}
+		if len(keys) == 0 {
+			return struct{}{}, repositoryPermission(ctx, repo.Config{}, accessapi.RepositoryDelete)
+		}
+		for _, key := range keys {
+			if err := s.existingRepositoryPermission(ctx, st, key, accessapi.RepositoryDelete); err != nil {
+				return struct{}{}, err
+			}
+		}
+		return struct{}{}, nil
+	})
 	if err != nil {
-		if p, ok := kernel.FromContext(ctx); ok && !p.Anonymous {
+		if errors.Is(err, kernel.ErrForbidden) {
+			p, _ := kernel.FromContext(ctx)
 			return failFast403(fmt.Sprintf(
 				"User: ('%s') has insufficient permission to delete repositories", p.Name)), nil
 		}
 		return nil, fmt.Errorf("repositories: %w", err)
-	}
-	st, err := s.content()
-	if err != nil {
-		return nil, err
-	}
-	var keys []string
-	if req.Body != nil {
-		keys = *req.Body
 	}
 	if len(keys) == 0 {
 		return artgen.DeleteRepositories400JSONResponse{StatusMessage: msgNoKeys}, nil
@@ -1284,18 +1363,32 @@ func (s ArtifactoryAPI) DeleteRepositories(
 	failures := 0
 	for _, key := range keys {
 		var item artgen.RepoBulkRemovalReport_Reports_Item
-		files, found, err := repos.Remove(ctx, st, key, admin.Name)
+		result, err := repositoryMutation(ctx, s, func(ctx context.Context) (repositoryRemoval, error) {
+			st, err := s.content()
+			if err != nil {
+				return repositoryRemoval{}, err
+			}
+			if err := s.existingRepositoryPermission(ctx, st, key, accessapi.RepositoryDelete); err != nil {
+				return repositoryRemoval{}, err
+			}
+			p, _ := kernel.FromContext(ctx)
+			files, found, err := repos.Remove(ctx, st, key, p.Name)
+			if err != nil {
+				return repositoryRemoval{}, fmt.Errorf("remove repository %s: %w", key, err)
+			}
+			return repositoryRemoval{files: files, found: found}, nil
+		})
 		switch {
 		case err != nil:
 			_ = s.InternalError(ctx, "delete repository", err)
 			failures++
 			_ = item.FromRemoveRepositoryFailureReport(failed(key,
 				fmt.Sprintf("Cannot delete repository: '%s'. See the server log.", key)))
-		case !found:
+		case !result.found:
 			// A missing key counts as removed (JFrog's documented example).
 			_ = item.FromRemoveRepositorySuccessReport(noConfig(key))
 		default:
-			_ = item.FromRemoveRepositorySuccessReport(removed(key, files))
+			_ = item.FromRemoveRepositorySuccessReport(removed(key, result.files))
 		}
 		if err == nil && s.cfg.RemoteHTTP != nil {
 			s.cfg.RemoteHTTP.Remove(key)

@@ -120,6 +120,15 @@ func (s ArtifactoryAPI) deployEscapedItem(
 	t := item.Target{Repo: c, Path: req.Path}
 	explode := strings.EqualFold(r.Header.Get("X-Explode-Archive"), "true") ||
 		strings.EqualFold(r.Header.Get("X-Explode-Archive-Atomic"), "true")
+	t.CheckCurrent = s.PublicationCheck(c)
+	if explode {
+		check := t.CheckCurrent
+		// Archive authorization is on the submitted archive operation, as
+		// its overwrite flag has always been; entries are server-expanded.
+		t.CheckCurrent = func(ctx context.Context, _ string, _ bool, want api.Actions) error {
+			return check(ctx, req.Path, false, want)
+		}
+	}
 	byChecksum := strings.EqualFold(r.Header.Get("X-Checksum-Deploy"), "true")
 	// Overwriting replaces content, which needs the right to delete it,
 	// except with the same content (item.Deploy.OverwriteIdentical). Only
@@ -151,13 +160,15 @@ func (s ArtifactoryAPI) deployEscapedItem(
 		})
 	case byChecksum:
 		d := s.fileDeploy(r, t, req, p, acc)
-		d.Reusable = s.reusable(st, p, acc, r.Header.Get("X-Checksum-Deploy-Token"))
+		d.Reusable = s.reusable(st, r.Header.Get("X-Checksum-Deploy-Token"))
 		d.OverwriteIdentical = s.MayBeIdentical(true)
 		it, err = svc.DeployByChecksum(ctx, d)
 	default:
 		if artifact, alg, ok := item.Sidecar(req.Path); ok &&
 			(svc.OwnsSidecars(c) || s.isFile(ctx, st, c, artifact)) {
-			s.recordChecksum(w, r, svc, item.Target{Repo: c, Path: artifact}, alg)
+			checksumTarget := t
+			checksumTarget.Path = artifact
+			s.recordChecksum(w, r, svc, checksumTarget, alg)
 			return
 		}
 		d := s.fileDeploy(r, t, req, p, acc)
@@ -236,18 +247,20 @@ func (s ArtifactoryAPI) fileDeploy(
 // multipart upload of the content, which no item holds until this deploy.
 func (s ArtifactoryAPI) reusable(
 	st Store,
-	p kernel.Principal,
-	acc itemkit.Access,
 	token string,
 ) func(context.Context, blob.Blob) (bool, error) {
 	return func(ctx context.Context, b blob.Blob) (bool, error) {
+		current, access, err := s.CurrentAccess(ctx)
+		if err != nil {
+			return false, fmt.Errorf("current checksum deploy authority: %w", err)
+		}
 		if token != "" && s.cfg.Multipart != nil {
-			ok, err := s.cfg.Multipart.Finished(ctx, token, p.Name, b.Checksums.SHA256)
+			ok, err := s.cfg.Multipart.Finished(ctx, token, current.Name, b.Checksums.SHA256)
 			if err != nil || ok {
 				return ok, err //nolint:wrapcheck // DeployByChecksum wraps it
 			}
 		}
-		return readsContent(ctx, st, acc, b.Checksums.SHA256, s.Private)
+		return readsContent(ctx, st, access, b.Checksums.SHA256, s.Private)
 	}
 }
 
@@ -382,7 +395,7 @@ func (s ArtifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
 		}
 		ctx = debian.WithSnapshotDelete(ctx)
 	}
-	t := item.Target{Repo: c, Cached: cached || c.Class == repo.Remote, Path: req.Path}
+	t := item.Target{Repo: c, Cached: cached || c.Class == repo.Remote, Path: req.Path, CheckCurrent: s.PublicationCheck(c)}
 	svc := s.Items(st)
 	// A file's sidecars go with it, such as a Helm chart's .prov, so the
 	// caller needs Delete on each as on the file (decision 0039).

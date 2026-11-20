@@ -7,6 +7,7 @@ import (
 	"path"
 	"slices"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
@@ -43,6 +44,9 @@ func (s *Service) RemoveTag(ctx context.Context, o Owner, tag string, r Removal)
 	ctx = artifactevents.WithActor(ctx, o.By)
 	items := s.items()
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := o.checkCurrent(ctx, o.Name+"/", accessapi.ActionDelete); err != nil {
+			return err
+		}
 		dir := o.Name + "/" + tag
 		_, ok, err := layout.FolderManifest(ctx, s.Store.Items(), o.Repo.Key, false, dir)
 		switch {

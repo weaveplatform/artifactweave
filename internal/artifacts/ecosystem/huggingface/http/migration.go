@@ -119,7 +119,11 @@ func (h handler) migrateLegacy(w http.ResponseWriter, r *http.Request) {
 		h.k.Error(w, r, err)
 		return
 	}
-	err := h.k.DB().Tx(r.Context(), func(ctx context.Context) error {
+	err := h.k.Tx(r.Context(), func(ctx context.Context) error {
+		p, _ := kernel.FromContext(ctx)
+		if !p.Admin {
+			return apierror.New(http.StatusForbidden, "legacy migration requires an administrator")
+		}
 		r := r.WithContext(format.DeferReindex(ctx))
 		files, err := h.legacyFiles(r, request, &status)
 		if err != nil {

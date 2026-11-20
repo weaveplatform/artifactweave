@@ -82,8 +82,19 @@ func (s ArtifactoryAPI) EmptyTrashCan(
 	if !p.Admin {
 		return nil, trashRefusalf(p, "Only an administrator can empty the trash can")
 	}
-	if _, err := s.trashService(st).Empty(ctx); err != nil {
-		return nil, s.InternalError(ctx, "empty trash", err)
+	svc := s.trashService(st)
+	svc.AuthorizeBatch = func(ctx context.Context, _ []model.TrashEntry) error {
+		p, _, err := s.CurrentAccess(ctx)
+		if err != nil {
+			return fmt.Errorf("current trash administrator: %w", err)
+		}
+		if !p.Admin {
+			return trashRefusalf(p, "Only an administrator can empty the trash can")
+		}
+		return nil
+	}
+	if _, err := svc.Empty(ctx); err != nil {
+		return nil, s.ItemError(ctx, "empty trash", err)
 	}
 	return artgen.EmptyTrashCan202Response{}, nil
 }
@@ -136,8 +147,29 @@ func (s ArtifactoryAPI) cleanTrash(ctx context.Context, repoPath string) error {
 			return trashRefusalf(p, "Delete or manage permission on '%s' is required", key)
 		}
 	}
-	if _, err := s.trashService(st).Clean(ctx, key, rest); err != nil {
-		return s.InternalError(ctx, "clean trash", err)
+	svc := s.trashService(st)
+	svc.AuthorizeBatch = func(ctx context.Context, _ []model.TrashEntry) error {
+		p, acc, err := s.CurrentAccess(ctx)
+		if err != nil {
+			return fmt.Errorf("current trash cleaner: %w", err)
+		}
+		if p.Admin {
+			return nil
+		}
+		c, err := st.Repos().Get(ctx, key)
+		if errors.Is(err, kernel.ErrNotFound) {
+			return trashRefusalf(p, "Only an administrator can clean trash of a deleted repository")
+		}
+		if err != nil {
+			return fmt.Errorf("current trash repository: %w", err)
+		}
+		if !removes(acc, c, rest) {
+			return trashRefusalf(p, "Delete or manage permission on '%s' is required", key)
+		}
+		return nil
+	}
+	if _, err := svc.Clean(ctx, key, rest); err != nil {
+		return s.ItemError(ctx, "clean trash", err)
 	}
 	return nil
 }
@@ -222,47 +254,34 @@ func (s ArtifactoryAPI) restoreTrash(
 	case dst.Class != repo.Local && dst.Class != repo.Federated:
 		return httpkit.BadRequestf("Items can be restored only into a local repository; '%s' is %s",
 			toKey, dst.Class)
-	case !acc.File(dst, toPath, api.ActionManage):
-		return trashRefusalf(p, "Manage permission on '%s' is required", toKey)
+
 	}
-	var permit func(model.Item) bool
-	var nativeMetadataRelocation, modelRelocation bool
-	if !p.Admin {
-		origin, err := st.Repos().Get(ctx, fromKey)
-		switch {
-		case errors.Is(err, kernel.ErrNotFound):
-			return trashRefusalf(
-				p,
-				"Only an administrator can restore trash of a deleted repository",
-			)
-		case err != nil:
-			return s.InternalError(ctx, "get repository", err)
-		case !removes(acc, origin, fromPath):
-			return trashRefusalf(p, "Delete or manage permission on '%s' is required",
-				strings.Trim(from, "/"))
-		}
-		// An exclude pattern, or an include that admits from but not what
-		// lies below it, can still refuse an item the check above allowed.
-		relocated := toKey != fromKey || toPath != "" && toPath != fromPath
-		permit = func(it model.Item) bool {
-			if !removes(acc, origin, it.FullPath()) {
-				return false
-			}
-			// Restored native metadata bytes must remain behind the native filtering route.
-			// Restore preflights the entire selection before its first batch.
-			if (protocolPrivateItem(origin, it.FullPath()) || chefMetadataItem(origin, it.FullPath())) &&
-				relocated {
-				nativeMetadataRelocation = true
-				return false
-			}
-			if machineLearningPrivate(origin, it.FullPath()) && relocated {
-				modelRelocation = true
-				return false
-			}
-			return true
-		}
+	authority := trashRestoreAuthority{store: st, from: from, to: to, destination: dst}
+	authorize := authority.permit
+	permit, err := authorize(ctx, p, acc)
+	if err != nil {
+		return s.ItemError(ctx, "trash restore authority", err)
 	}
+
 	svc := s.trashService(st)
+	svc.AuthorizeBatch = func(ctx context.Context, entries []model.TrashEntry) error {
+		current, acc, err := s.CurrentAccess(ctx)
+		if err != nil {
+			return fmt.Errorf("current trash restorer: %w", err)
+		}
+		permit, err := authorize(ctx, current, acc)
+		if err != nil {
+			return err
+		}
+		if permit != nil {
+			for _, entry := range entries {
+				if !permit(entry.Record.Item) {
+					return trash.ErrNotPermitted
+				}
+			}
+		}
+		return nil
+	}
 	if size != nil {
 		svc.Batch = *size
 	}
@@ -270,13 +289,13 @@ func (s ArtifactoryAPI) restoreTrash(
 		trash.Destination{Repo: dst, Path: toPath}, p.Name, permit)
 	switch {
 	case errors.Is(err, trash.ErrNotPermitted):
-		if modelRelocation {
+		if authority.modelRelocation {
 			return trashRefusalf(
 				p,
 				"Private model metadata must be restored to its original repository and paths",
 			)
 		}
-		if nativeMetadataRelocation {
+		if authority.nativeMetadataRelocation {
 			return trashRefusalf(
 				p,
 				"Native metadata must be restored to its original repository and paths",
@@ -290,7 +309,7 @@ func (s ArtifactoryAPI) restoreTrash(
 	case errors.Is(err, item.ErrConflict), errors.Is(err, kernel.ErrInvalidItemPath):
 		return apierror.New(http.StatusConflict, err.Error())
 	case err != nil:
-		return s.InternalError(ctx, "restore trash", err)
+		return s.ItemError(ctx, "restore trash", err)
 	}
 	return nil
 }

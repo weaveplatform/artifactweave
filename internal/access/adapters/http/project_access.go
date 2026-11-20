@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
@@ -74,12 +73,11 @@ func (s AccessService) projectAccess(
 			return fmt.Errorf("current project permissions: %w", err)
 		}
 		caller := projectCaller{principal: currentPrincipal, decider: decider}
-		if !decider.IsAdmin() && need != projectList {
-			allowed, err := caller.projectAllowed(ctx, svc, current, need)
-			if err != nil {
-				return err
-			}
-			if !allowed {
+		if decider == nil {
+			return kernel.ErrForbidden
+		}
+		if need != projectList {
+			if !caller.projectAllowed(current.Key, need) {
 				return kernel.ErrForbidden
 			}
 		}
@@ -91,47 +89,18 @@ func (s AccessService) projectAccess(
 	return nil
 }
 
-func (p projectCaller) projectAllowed(ctx context.Context, svc project.Service, current model.Project, need projectPrivilege) (bool, error) {
+func (p projectCaller) projectAllowed(key string, need projectPrivilege) bool {
 	if need == projectPlatform {
-		return false, nil
+		return p.decider.ManagesProject("", accessapi.ProjectManage)
 	}
-	if p.projectReadScope(current.Key, need) {
-		return true, nil
+	if p.projectReadScope(key, need) {
+		return true
 	}
-	user, groups := p.membershipIdentity()
-	roles, err := svc.AssignedRoles(ctx, current.Key, user, groups)
-	if err != nil {
-		return false, fmt.Errorf("current project administrator: %w", err)
-	}
-	admin := slices.ContainsFunc(roles, func(r model.Role) bool { return r.Type == model.RoleAdmin })
+	op := accessapi.ProjectManage
 	if need == projectManageMembers || need == projectListUsers || need == projectListGroups {
-		admin = admin && current.AdminPrivileges.ManageMembers
+		op = accessapi.ProjectManageMembers
 	}
-	return admin, nil
-}
-
-// Membership-based management uses the same applied user/group selection as
-// the native evaluator. Resource-only tokens cannot borrow project memberships.
-// Named-role token activation remains PRJ-02, together with mint/lifetime checks.
-func (p projectCaller) membershipIdentity() (string, []string) {
-	subject := accessapi.SubjectOf(p.principal)
-	if subject.Scope == nil {
-		return subject.Name, p.decider.Groups()
-	}
-	var user string
-	var useGroups bool
-	for _, e := range subject.Scope.Entries {
-		switch e.Kind {
-		case kernel.ScopeUser, kernel.ScopeAdmin:
-			user, useGroups = subject.Name, true
-		case kernel.ScopeGroups:
-			useGroups = true
-		}
-	}
-	if useGroups {
-		return user, p.decider.Groups()
-	}
-	return user, nil
+	return p.decider.ManagesProject(key, op)
 }
 
 func (p projectCaller) projectReadScope(key string, need projectPrivilege) bool {
@@ -147,7 +116,7 @@ func (p projectCaller) projectReadScope(key string, need projectPrivilege) bool 
 		return false
 	}
 	subject := accessapi.SubjectOf(p.principal)
-	if subject.Scope == nil {
+	if subject.Scope == nil || subject.ProjectKey != "" && subject.ProjectKey != key {
 		return false
 	}
 	for _, entry := range subject.Scope.Entries {
@@ -169,6 +138,9 @@ func (s AccessService) projectError(ctx context.Context, operation string, err e
 	case err == nil:
 		return nil
 	case errors.As(err, &response):
+		return err
+	case errors.Is(err, kernel.ErrBadCredentials), errors.Is(err, kernel.ErrForbidden),
+		errors.Is(err, kernel.ErrPasswordExpired), errors.Is(err, kernel.ErrAPIRestricted):
 		return err
 	case errors.Is(err, project.ErrNotFound):
 		return apierror.New(http.StatusNotFound, err.Error())

@@ -251,6 +251,30 @@ Role action vocabularies (from the provider validators):
 - `type` is `PREDEFINED | CUSTOM | CUSTOM_GLOBAL`; global roles are created with
   `CUSTOM_GLOBAL` and the create response is `{code,message}`.
 
+### Current project authorization in artifactweave
+
+[PRJ-02](https://github.com/weaveplatform/artifactweave/issues/1745) resolves current
+direct-user, selected-group and explicitly delegated named roles through `access/api`.
+Artifact/build actions are limited to canonical repository ownership and matching
+environments, then intersected with native resource scopes and any token project.
+An empty repository environment uses DEV; an empty role environment grants nothing.
+The latter is a local fail-closed choice, not a claimed vendor observation.
+
+Repository administration uses the normalized granular local/remote/virtual
+create/delete flags. Explicit false values override the legacy aggregate flag.
+Project/member management and webhook capabilities remain separate from content
+Read; a `project:…/roles:r` scope reads definitions without granting content access.
+Role-token minting validates live delegation and definitions. Private stored project
+lifetime bindings prevent deletion/recreation of a key from reviving old tokens;
+the access-token wire format is unchanged.
+
+Publication owners take the shared authority guard before identity, source, work
+or item locks, refresh credentials and policy, then retain that guard through the
+metadata commit. Client and upstream streams are staged first. Batched trash and
+repository deletion retain their native partial-progress boundaries and recheck
+authority for each independent commit. These checks do not deliver the separate
+attachment/sharing, quota, cleanup or replication tickets.
+
 Primary URLs: https://docs.jfrog.com/integrations/reference/jfrog-platform-webhooks-api/llms.txt,
 https://docs.jfrog.com/integrations/docs/webhook-event-types,
 https://docs.jfrog.com/administration/reference/storage-and-archive/llms.txt,

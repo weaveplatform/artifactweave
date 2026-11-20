@@ -210,7 +210,7 @@ func (h handler) publishCommit(
 	// MemberRequest derives the deployment member from target; keep it in the
 	// transaction context when publishing through a virtual repository.
 	//nolint:contextcheck // target.Context inherits the selected member.
-	err := h.k.DB().Tx(target.Context(), func(ctx context.Context) error {
+	err := h.k.Tx(target.Context(), func(ctx context.Context) error {
 		target := target.WithContext(format.DeferReindex(ctx))
 		parent, err := h.commitParent(target, refPath)
 		if err != nil {

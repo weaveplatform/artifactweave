@@ -184,7 +184,7 @@ func TestAccLegacyMigrationWrapsPermissionScanFailures(t *testing.T) {
 	}}
 	expectRefusal(t, w.migrate(t, grants, false), http.StatusInternalServerError, "internal error")
 	if len(w.faults) != 1 || !errors.Is(w.faults[0], injected) ||
-		w.faults[0].Error() != "huggingface: migration permissions: "+injected.Error() {
-		t.Fatalf("faults %v, want the scan failure wrapped once", w.faults)
+		w.faults[0].Error() != "package publication transaction: huggingface: migration permissions: "+injected.Error() {
+		t.Fatalf("faults %v, want the scan failure with its operation and transaction context", w.faults)
 	}
 }

@@ -40,7 +40,10 @@ func (s CranAPI) MoveCranArchives(
 		return nil, err
 	}
 	moved := 0
-	err = st.Tx(ctx, func(ctx context.Context) error {
+	err = s.Tx(ctx, func(ctx context.Context) error {
+		if err := httpkit.AdminOnly(ctx); err != nil {
+			return err
+		}
 		var err error
 		moved, err = s.moveCranArchives(ctx, st, c, by)
 		return err

@@ -13,7 +13,7 @@ var _ accessapi.AnonymousAccess = anonymousAccess{}
 // JSON boolean. Errors are the store's, unwrapped: a setting never written
 // matches kernel.ErrNotFound, which each caller reads as off in its own way.
 type anonymousAccess struct {
-	st interface{ Settings() settings.SettingsStore }
+	st Store
 }
 
 func (b anonymousAccess) Enabled(ctx context.Context) (bool, error) {
@@ -26,5 +26,10 @@ func (b anonymousAccess) Enabled(ctx context.Context) (bool, error) {
 
 func (b anonymousAccess) SetEnabled(ctx context.Context, on bool) error {
 	//nolint:wrapcheck // the store's errors are the contract's
-	return b.st.Settings().Put(ctx, settings.SettingAnonymousAccess, on)
+	return b.st.Tx(ctx, func(ctx context.Context) error {
+		if err := b.st.Projects().Guard(ctx); err != nil {
+			return err //nolint:wrapcheck // preserve the shared guard failure
+		}
+		return b.st.Settings().Put(ctx, settings.SettingAnonymousAccess, on)
+	})
 }

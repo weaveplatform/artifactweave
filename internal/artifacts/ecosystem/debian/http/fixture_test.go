@@ -57,13 +57,13 @@ func newKit(c Config) *itemkit.Kit {
 }
 
 // withAccess returns c with the access module over its store, as the router
-// binds it for a configuration that sets none, and, as there, without an
-// authenticator, since the configuration names none: nothing can recheck a
-// caller's credential.
+// binds it for a configuration that sets none. These fault fixtures supply
+// already-authenticated principals and control current credentials explicitly;
+// real credential/publication races run through the application route suites.
 func withAccess(t *testing.T, c Config) Config {
 	t.Helper()
 	c.Access = accesstest.Over(t, c.Store).API()
-	c.Access.Authenticator = nil
+	c.Access.Authenticator = &accessapitest.Authenticator{}
 	return c
 }
 

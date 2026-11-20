@@ -3,6 +3,7 @@ package dockerhttp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -158,7 +159,7 @@ func (g *Registry) startUpload(w http.ResponseWriter, r *http.Request, q Request
 			"unsupported digest algorithm %q: only sha256 is supported", a))
 		return
 	}
-	o := owner(r, q)
+	o := g.owner(r, q)
 	if query.Has("digest") {
 		hex, err := uploadDigest(query.Get("digest"))
 		if err != nil {
@@ -238,7 +239,18 @@ func (g *Registry) mount(w http.ResponseWriter, r *http.Request, q Request, o re
 		if !lent {
 			continue
 		}
-		_, ok, err := g.uploads.Mount(r.Context(), o, src.Repo, src.Name, hex)
+		var ok bool
+		err = g.tx(r.Context(), func(ctx context.Context) error {
+			if err := src.Require(r.WithContext(ctx), src.Name+"/", api.ActionRead); err != nil {
+				return nil // retain the native fallback to a new upload session
+			}
+			var err error
+			_, ok, err = g.uploads.Mount(ctx, o, src.Repo, src.Name, hex)
+			if err != nil {
+				return fmt.Errorf("mount registry blob: %w", err)
+			}
+			return nil
+		})
 		if err != nil {
 			g.uploadErr(w, r, q, err)
 			return true
@@ -329,7 +341,7 @@ func (g *Registry) uploadStatus(w http.ResponseWriter, r *http.Request, q Reques
 		Write(w, err)
 		return
 	}
-	size, err := g.uploads.Status(r.Context(), owner(r, q), q.Reference)
+	size, err := g.uploads.Status(r.Context(), g.owner(r, q), q.Reference)
 	if err != nil {
 		g.uploadErr(w, r, q, err)
 		return
@@ -349,7 +361,7 @@ func (g *Registry) appendUpload(w http.ResponseWriter, r *http.Request, q Reques
 		Write(w, err)
 		return
 	}
-	size, err := g.uploads.Append(r.Context(), owner(r, q), q.Reference, offset, body)
+	size, err := g.uploads.Append(r.Context(), g.owner(r, q), q.Reference, offset, body)
 	if err != nil {
 		g.chunkErr(w, r, q, offset, size, err)
 		return
@@ -380,7 +392,7 @@ func (g *Registry) finishUpload(w http.ResponseWriter, r *http.Request, q Reques
 		Write(w, err)
 		return
 	}
-	o := owner(r, q)
+	o := g.owner(r, q)
 	if _, err := g.uploads.Finish(r.Context(), o, q.Reference, offset, body, hex); err != nil {
 		var size int64
 		if errors.Is(err, registry.ErrOffset) {
@@ -399,7 +411,7 @@ func (g *Registry) cancelUpload(w http.ResponseWriter, r *http.Request, q Reques
 		Write(w, err)
 		return
 	}
-	if err := g.uploads.Cancel(r.Context(), owner(r, q), q.Reference); err != nil {
+	if err := g.uploads.Cancel(r.Context(), g.owner(r, q), q.Reference); err != nil {
 		g.uploadErr(w, r, q, err)
 		return
 	}
@@ -497,9 +509,22 @@ func location(r *http.Request, q Request, segments ...string) string {
 
 // owner is the session owner of a request: its repository, its image and
 // the caller.
-func owner(r *http.Request, q Request) registry.Owner {
+func (g *Registry) owner(r *http.Request, q Request) registry.Owner {
 	p, _ := kernel.FromContext(r.Context())
-	return registry.Owner{Repo: q.Repo, Name: q.Name, By: p.Name}
+	o := registry.Owner{Repo: q.Repo, Name: q.Name, By: p.Name}
+	if g.currentAccess != nil {
+		o.CheckCurrent = func(ctx context.Context, path string, want api.Actions) error {
+			p, d, err := g.currentAccess(ctx)
+			if err != nil {
+				return err
+			}
+			if d == nil {
+				return q.refuse(r.Method, p)
+			}
+			return q.Require(r.WithContext(api.WithCaller(ctx, p, d)), path, want)
+		}
+	}
+	return o
 }
 
 // digestRE is the specification's digest grammar: an algorithm and its

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
@@ -61,6 +62,7 @@ func (a *Authenticator) Token(ctx context.Context, raw, user string) (kernel.Pri
 	p := tokenPrincipal(u, t.Scope)
 	p.TokenID, p.TokenExpires, p.Identity = t.ID, t.ExpiresAt, t.Identity
 	p.TokenSubject = t.Subject
+	p.TokenProject, p.ProjectIncarnations = t.ProjectKey, maps.Clone(t.ProjectIncarnations)
 	if t.Registry != nil {
 		p.Registry, p.TokenParent = t.Registry, t.Parent
 		p.PasswordRevision = sha256.Sum256(u.PasswordHash)
@@ -175,15 +177,27 @@ func (a *Authenticator) lookupTokenUser(
 // groups and grants to the name, a groups scope only the groups it names.
 func (a *Authenticator) transientUser(ctx context.Context, name string) (model.User, error) {
 	u := model.User{Name: name}
-	if a.groups == nil {
-		return u, nil
-	}
-	groups, err := a.groups.AutoJoin(ctx)
+	groups, err := a.TransientGroups(ctx)
 	if err != nil {
-		return model.User{}, fmt.Errorf("auth: auto-join groups: %w", err)
+		return model.User{}, err
 	}
 	u.Groups = groups
 	return u, nil
+}
+
+// TransientGroups reads the configured auto-join source for a verified identity
+// without repeating token verification or requiring a local token record. The
+// authorizer uses it when refreshing a missing transient user's group selection;
+// credential lifetime/revocation remains the authenticator owner's check.
+func (a *Authenticator) TransientGroups(ctx context.Context) ([]string, error) {
+	if a.groups == nil {
+		return nil, nil
+	}
+	groups, err := a.groups.AutoJoin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("auth: auto-join groups: %w", err)
+	}
+	return groups, nil
 }
 
 // passwordUsable applies to an encrypted password what Basic applies to the

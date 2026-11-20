@@ -17,6 +17,11 @@ var BuiltinEnvironments = []string{EnvironmentDev, EnvironmentProd}
 // environments. Each call uses ctx for the store it reads, so a call inside
 // a store transaction takes part in it.
 type Projects interface {
+	// Guard serializes a current authority snapshot with project, membership,
+	// role and credential changes until the caller's transaction commits. Call
+	// it before repository, source, work or item locks. It joins the shared
+	// store transaction; outside a transaction it provides no publication fence.
+	Guard(ctx context.Context) error
 	// Environments returns the names of a project's environments, or of the
 	// global environments for project "", ordered by name and spelled as
 	// stored; a project that does not exist has none. The built-in DEV and

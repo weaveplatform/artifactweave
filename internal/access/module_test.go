@@ -509,6 +509,8 @@ func TestUnitStoreBindings(t *testing.T) {
 	canceled := canceledContext(ctx)
 	_, unreadable := st.Projects().Environments(canceled, "ml")
 	for name, projects := range map[string]accessapi.Projects{"API": w.api.Projects, "ProjectsOf": access.ProjectsOf(st)} {
+		must(t, st.Tx(ctx, projects.Guard))
+		sameError(t, name+" Guard with a canceled context", projects.Guard(canceled), st.Projects().Guard(canceled))
 		for project, want := range map[string][]string{"ml": {"ML-LAB", "ML-STAGE"}, "": {"QA"}, "missing": {}} {
 			if envs, err := projects.Environments(
 				ctx,

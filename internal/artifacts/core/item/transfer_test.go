@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -62,6 +63,44 @@ func (w *world) transfer(t Transfer) TransferResult {
 		w.t.Fatal(err)
 	}
 	return res
+}
+
+func TestUnitTransferCurrentAuthorityRefusalLeavesBothRepositoriesIntact(t *testing.T) {
+	for _, refuse := range []string{"source", "destination", "replacement"} {
+		t.Run(refuse, func(t *testing.T) {
+			w := newWorld(t)
+			other := w.addRepo(repo.Config{Key: "other", Class: repo.Local})
+			w.must("source.bin", "original")
+			previous, err := w.svc.Deploy(t.Context(), Deploy{Target: Target{Repo: other, Path: "target.bin"}, Body: strings.NewReader("previous")})
+			if err != nil {
+				t.Fatal(err)
+			}
+			check := func(side string) func(context.Context, string, bool, accessapi.Actions) error {
+				return func(ctx context.Context, _ string, _ bool, want accessapi.Actions) error {
+					if !w.db.InTx(ctx) {
+						t.Fatal("current transfer authority is outside publication")
+					}
+					if side == refuse || refuse == "replacement" && side == "destination" && want.Has(accessapi.ActionDelete) {
+						return kernel.ErrForbidden
+					}
+					return nil
+				}
+			}
+			_, err = w.svc.Transfer(t.Context(), Transfer{
+				From: Target{Repo: w.loc, Path: "source.bin", CheckCurrent: check("source")},
+				To:   Target{Repo: other, Path: "target.bin", CheckCurrent: check("destination")}, Move: true, CanOverwrite: true,
+			})
+			if !errors.Is(err, kernel.ErrForbidden) {
+				t.Fatal("revoked transfer published", err)
+			}
+			if _, ok := w.get(w.loc, "source.bin"); !ok {
+				t.Fatal("refused transfer removed the source")
+			}
+			if target, ok := w.get(other, "target.bin"); !ok || target.Actual.SHA256 != previous.Actual.SHA256 {
+				t.Fatal("refused transfer replaced the destination")
+			}
+		})
+	}
 }
 
 func TestUnitCopyFile(t *testing.T) {

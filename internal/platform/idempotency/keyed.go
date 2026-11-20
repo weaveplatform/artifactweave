@@ -23,6 +23,9 @@ const Header = "Idempotency-Key"
 // which the replay runs as the effect. The request each function receives is
 // the generated strict server's request object for the operation.
 type Binding struct {
+	// Guard is the operation's transactional admission fence, before replay
+	// and domain row locks. It runs on new effects and on committed replays.
+	Guard func(ctx context.Context) error
 	// Name names the operation's effect in the answer to a request that
 	// runs out of budget, "Protected <Name> exceeded its wait budget";
 	// empty means "request".
@@ -195,6 +198,7 @@ func (p Replay) serve(
 		effectErr, reloadErr error
 	)
 	_, err = p.Do(ctx, r, Effect{
+		Guard: b.Guard,
 		Run: func(ctx context.Context) (int64, error) {
 			var id int64
 			out, err := handler(context.WithValue(ctx, reportKey{}, &id))

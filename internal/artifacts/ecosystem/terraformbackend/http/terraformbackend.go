@@ -1,6 +1,7 @@
 package terraformbackendhttp
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,6 +49,10 @@ type Options struct {
 	// Restrictions checks the API restriction of the user a state upload
 	// capability names, at upload time.
 	Restrictions accessapi.Restrictions
+	// CurrentAccess refreshes ordinary request credentials inside publication.
+	// Projects fences signed upload capability checks before workspace locks.
+	CurrentAccess func(context.Context) (kernel.Principal, accessapi.Decider, error)
+	Projects      accessapi.Projects
 }
 
 type (
@@ -88,6 +93,19 @@ func Register(r chi.Router, o Options) {
 		o.Now = time.Now
 	}
 	h := handler{o: o, states: &terraformstate.Service{Items: o.Items, Keys: o.Keys, Now: o.Now}}
+	if o.CurrentAccess != nil {
+		h.states.CheckCurrent = func(ctx context.Context, c repo.Config, path string, folder bool, want accessapi.Actions) error {
+			p, d, err := o.CurrentAccess(ctx)
+			if err != nil {
+				return err
+			}
+			if d == nil {
+				return kernel.ErrForbidden
+			}
+			r := (&http.Request{Method: http.MethodPost}).WithContext(accessapi.WithCaller(ctx, p, d))
+			return require(r, c, path, want, folder)
+		}
+	}
 	r.Route(Prefix, func(r chi.Router) {
 		missing := func(w http.ResponseWriter, r *http.Request) {
 			h.error(w, r, apierror.New(404, "Terraform backend operation not found"))

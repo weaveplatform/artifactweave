@@ -21,14 +21,8 @@ func (s AccessService) GetProjectsList(ctx context.Context, _ accessgen.GetProje
 			return fmt.Errorf("get projects list: %w", err)
 		}
 		for _, p := range all {
-			if !caller.decider.IsAdmin() {
-				allowed, err := caller.projectAllowed(ctx, svc, p, projectAdministrator)
-				if err != nil {
-					return fmt.Errorf("get projects list: %w", err)
-				}
-				if !allowed {
-					continue
-				}
+			if !caller.projectAllowed(p.Key, projectAdministrator) {
+				continue
 			}
 			out = append(out, projectWire(p))
 		}

@@ -94,6 +94,64 @@ func (w *world) exists(c repo.Config, p string) bool {
 	return err == nil
 }
 
+func TestUnitTrashRevocationPreservesEarlierBatchesAndRemainingEntries(t *testing.T) {
+	for _, operation := range []string{"restore", "clean", "empty"} {
+		for _, allowFirst := range []bool{false, true} {
+			t.Run(operation+"/allow-first="+strconv.FormatBool(allowFirst), func(t *testing.T) {
+				w := newWorld(t)
+				w.trash.Batch = 1
+				for _, path := range []string{"a.bin", "b.bin"} {
+					w.deploy(t, w.libs, path, path, nil)
+					w.remove(t, w.libs, path)
+				}
+				calls := 0
+				w.trash.AuthorizeBatch = func(ctx context.Context, entries []model.TrashEntry) error {
+					if !w.db.InTx(ctx) || len(entries) != 1 {
+						t.Fatal("trash authority is outside its bounded batch transaction")
+					}
+					calls++
+					if !allowFirst || calls > 1 {
+						return kernel.ErrForbidden
+					}
+					return nil
+				}
+				var count int
+				var err error
+				switch operation {
+				case "restore":
+					count, err = w.trash.Restore(t.Context(), w.libs.Key, "", trash.Destination{Repo: w.other}, "alice", nil)
+				case "clean":
+					count, err = w.trash.Clean(t.Context(), w.libs.Key, "")
+				case "empty":
+					count, err = w.trash.Empty(t.Context())
+				}
+				want := 0
+				if allowFirst {
+					want = 1
+				}
+				if count != want || !errors.Is(err, kernel.ErrForbidden) {
+					t.Fatalf("trash operation=%d/%v, want %d/forbidden", count, err, want)
+				}
+				remaining, err := w.trash.Entries(t.Context(), w.libs.Key, "")
+				if err != nil || len(remaining) != 2-want {
+					t.Fatal("revoked batch lost unprocessed trash", err)
+				}
+				if operation == "restore" {
+					restored := 0
+					for _, path := range []string{"a.bin", "b.bin"} {
+						if w.exists(w.other, path) {
+							restored++
+						}
+					}
+					if restored != want {
+						t.Fatal("restoration effect escaped the authorized batches")
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestUnitSettings(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()

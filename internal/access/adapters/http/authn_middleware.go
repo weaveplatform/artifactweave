@@ -46,6 +46,9 @@ type AuthnOptions struct {
 	Auth *authn.Authenticator
 	// Store holds the permissions each principal is authorised with.
 	Store Store
+	// Authorizer supplies the application's current project-aware snapshot.
+	// Nil retains native evaluation for a standalone middleware embedding.
+	Authorizer accessapi.Authorizer
 	// SelfAuthenticated holds "METHOD path" of the routes that verify their
 	// own credential, which pass untouched.
 	SelfAuthenticated map[string]bool
@@ -124,9 +127,9 @@ func Authenticate(o AuthnOptions) func(http.Handler) http.Handler {
 					// (decision 0005).
 					err = kernel.ErrBadCredentials
 				}
-				var d *authz.Decider
+				var d accessapi.Decider
 				if err == nil {
-					p, d, err = authorize(ctx, o.Store, p, p.Anonymous)
+					p, d, err = authorize(ctx, o, p, p.Anonymous)
 				} else if who, ok := expiredRefresh(ctx, o.Auth, r, err); ok {
 					next.ServeHTTP(w, r.WithContext(authn.WithExpiredToken(ctx, who)))
 					return
@@ -140,7 +143,7 @@ func Authenticate(o AuthnOptions) func(http.Handler) http.Handler {
 				for _, keep := range o.CredentialKeepers {
 					kept = keep(kept, r, p)
 				}
-				next.ServeHTTP(w, r.WithContext(authn.WithAuthorized(kept, p, d)))
+				next.ServeHTTP(w, r.WithContext(accessapi.WithCaller(kept, p, d)))
 				return
 			}
 			if o.ChallengeAnonymous(r.URL.Path) {
@@ -158,13 +161,13 @@ func Authenticate(o AuthnOptions) func(http.Handler) http.Handler {
 			}
 			switch {
 			case anonymous:
-				p, d, err := authorize(ctx, o.Store, kernel.Anonymous, true)
+				p, d, err := authorize(ctx, o, kernel.Anonymous, true)
 				if err != nil {
 					httpkit.WriteErr(w, r, err)
 					return
 				}
 				httpkit.NoteUser(ctx, p.Name)
-				next.ServeHTTP(w, r.WithContext(authn.WithAuthorized(ctx, p, d)))
+				next.ServeHTTP(w, r.WithContext(accessapi.WithCaller(ctx, p, d)))
 			case o.PublicRoutes[r.Method+" "+r.URL.Path]:
 				next.ServeHTTP(w, r)
 			default:
@@ -493,14 +496,18 @@ func expiredRefresh(
 // without a decider.
 func authorize(
 	ctx context.Context,
-	st Store,
+	o AuthnOptions,
 	p kernel.Principal,
 	anonymous bool,
-) (kernel.Principal, *authz.Decider, error) {
-	if st == nil {
+) (kernel.Principal, accessapi.Decider, error) {
+	if o.Authorizer != nil {
+		return o.Authorizer.Authorize(ctx, p, anonymous) //nolint:wrapcheck // authorizer supplies the binding's error envelope
+	}
+	if o.Store == nil {
 		return p, nil, nil
 	}
-	return authn.Authorize(ctx, authz.Sources{ //nolint:wrapcheck // auth wraps its own errors
-		Permissions: st.Permissions(), Groups: st.Groups(), AnonymousEnabled: anonymous,
+	p, d, err := authn.Authorize(ctx, authz.Sources{
+		Permissions: o.Store.Permissions(), Groups: o.Store.Groups(), AnonymousEnabled: anonymous,
 	}, p)
+	return p, authz.AsAPI(d), err //nolint:wrapcheck // auth wraps its own errors
 }

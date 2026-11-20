@@ -265,10 +265,9 @@ func TestUnitDebianSnapshotWorkWithoutAuthenticator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := RegisterDebianSnapshotWork(
-		q,
-		newKit(withAccess(t, Config{Store: st})),
-	); err != nil {
+	c := withAccess(t, Config{Store: st})
+	c.Access.Authenticator = nil
+	if err := RegisterDebianSnapshotWork(q, newKit(c)); err != nil {
 		t.Fatal(err)
 	}
 	payload, err := json.Marshal(debianSnapshotRequest{

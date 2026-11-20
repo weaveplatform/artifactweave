@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
@@ -23,12 +23,19 @@ var errRequestType = errors.New("artifacts: replay binding got another operation
 // operation ID. The router gives them to the shared replay
 // (idempotency.Strict), which runs the handler as the effect.
 func (s ArtifactoryAPI) KeyedBindings() map[string]idempotency.Binding {
-	return map[string]idempotency.Binding{
+	bindings := map[string]idempotency.Binding{
 		"appendBuild":          s.appendBinding(),
 		"deleteBuilds":         s.deleteBinding(),
 		"deleteBuildsMultiple": s.deleteMultipleBinding(),
 		"promoteBuild":         s.promoteBinding(),
 	}
+	if s.cfg.Access.Projects != nil {
+		for name, binding := range bindings {
+			binding.Guard = s.cfg.Access.Projects.Guard
+			bindings[name] = binding
+		}
+	}
+	return bindings
 }
 
 // reportRetention is how long a keyed delete's or promotion's report is
@@ -310,7 +317,7 @@ func (s ArtifactoryAPI) currentBuildAccess(
 		if s.cfg.Access.Authenticator == nil {
 			return nil, build.ErrForbidden
 		}
-		current, err := s.cfg.Access.Authenticator.Current(ctx, p)
+		_, a, err := s.CurrentAccess(accessapi.WithCaller(ctx, p, nil))
 		if err != nil {
 			if errors.Is(err, kernel.ErrBadCredentials) ||
 				errors.Is(err, kernel.ErrPasswordExpired) ||
@@ -320,7 +327,6 @@ func (s ArtifactoryAPI) currentBuildAccess(
 			}
 			return nil, fmt.Errorf("recheck build credential: %w", err)
 		}
-		a, err := itemkit.AccessFor(ctx, s.cfg.Access.Authorizer, current, nil)
-		return buildAccess{a}, err
+		return buildAccess{a}, nil
 	}
 }

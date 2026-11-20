@@ -10,6 +10,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	artrepo "github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/kernel/antpath"
@@ -22,9 +23,19 @@ import (
 type Sources struct {
 	Permissions port.PermissionStore
 	Groups      port.GroupStore
+	// Users supplies current platform management flags. Nil is an evaluator
+	// embedded without those administrative capabilities.
+	Users port.UserStore
 	// AnonymousEnabled is the security.anonymous_access setting; the
 	// anonymous user's grants apply only while it is on.
 	AnonymousEnabled bool
+	// Projects and Roles resolve current memberships and role definitions.
+	// Repositories supplies the canonical, secret-free ownership/environment
+	// projection. Publication callers take the project guard before identity
+	// or artifact locks and retain their transaction through the mutation.
+	Projects     port.ProjectStore
+	Roles        RoleResolver
+	Repositories artifactsapi.ProjectRepositoryReader
 }
 
 type rule struct {
@@ -66,6 +77,14 @@ type Decider struct {
 	// a groups scope acts through.
 	self   string
 	member []string
+	// projectLimit is nil for an unbound credential; a non-nil empty map is
+	// a project token that reaches no current repository.
+	projectLimit   map[string]bool
+	repoAdmins     map[string]model.AdminPrivileges
+	projectAdmins  map[string]bool
+	webhookManager bool
+	tokenProject   string
+	anonymous      bool
 }
 
 // New reads the permissions that apply to s and returns its Decider. An
@@ -77,6 +96,18 @@ func New(ctx context.Context, src Sources, s accessapi.Subject) (*Decider, error
 	if s.Anonymous && !src.AnonymousEnabled {
 		return &Decider{}, nil
 	}
+	current, err := currentProjectToken(ctx, src.Projects, s)
+	if err != nil {
+		return nil, err
+	}
+	if !current {
+		if src.Projects != nil {
+			// Management read-scope helpers also inspect the verified subject;
+			// an empty content decider alone cannot revoke an ended token.
+			return nil, fmt.Errorf("authz: project token lifetime ended: %w", kernel.ErrBadCredentials)
+		}
+		return &Decider{}, nil
+	}
 	sc := analyse(s.Scope)
 	d := &Decider{
 		hasAppliedPermissions: sc.hasAppliedPermissions,
@@ -84,6 +115,8 @@ func New(ctx context.Context, src Sources, s accessapi.Subject) (*Decider, error
 		rules:                 map[accessapi.ResourceType][]rule{},
 		self:                  model.FoldUsername(s.Name),
 		member:                slices.Clone(s.Groups),
+		tokenProject:          s.ProjectKey,
+		anonymous:             s.Anonymous,
 	}
 	if sc.hasArtifactFilter {
 		d.filter = sc.artifact
@@ -128,6 +161,12 @@ func New(ctx context.Context, src Sources, s accessapi.Subject) (*Decider, error
 			}
 		}
 	}
+	if err := d.projectRoles(ctx, src, s, sc); err != nil {
+		return nil, err
+	}
+	if err := d.managementFlags(ctx, src); err != nil {
+		return nil, err
+	}
 	return d, nil
 }
 
@@ -144,6 +183,9 @@ func (d *Decider) Groups() []string { return slices.Clone(d.groups) }
 // Otherwise the subject sees a repository it may read anywhere in, and every
 // repository through the system:info:r scope.
 func (d *Decider) IsRepoVisible(repo accessapi.Repo) bool {
+	if !d.inProject(repo.Key) {
+		return false
+	}
 	if d.isAdmin {
 		return true
 	}
@@ -167,6 +209,18 @@ func (d *Decider) IsRepoVisible(repo accessapi.Repo) bool {
 // include and exclude patterns name paths, not repositories, so each one
 // contributes its whole target.
 func (d *Decider) VisibleRepos() accessapi.RepoVisibility {
+	out := d.visibleRepos()
+	if d.projectLimit != nil {
+		var boundary accessapi.RepoSet
+		for key := range d.projectLimit {
+			boundary.Keys = append(boundary.Keys, key)
+		}
+		out = append(out, compact(boundary))
+	}
+	return out
+}
+
+func (d *Decider) visibleRepos() accessapi.RepoVisibility {
 	if d.isAdmin {
 		return nil
 	}
@@ -297,6 +351,9 @@ func (d *Decider) Actions(
 	path string,
 	folder bool,
 ) accessapi.Actions {
+	if !d.inProject(repo.Key) {
+		return 0
+	}
 	var have accessapi.Actions
 	if d.hasEveryAction {
 		have = allActions
@@ -352,7 +409,7 @@ func (d *Decider) AllowsAll(
 	folder string,
 	want accessapi.Actions,
 ) bool {
-	if want == 0 {
+	if want == 0 || !d.inProject(repo.Key) {
 		return false
 	}
 	var have accessapi.Actions
@@ -383,6 +440,9 @@ func (d *Decider) AllowsAll(
 // accessapi.Decider leaves it out because other modules ask
 // IsRepoVisible, which applies it with the permissions.
 func (d *Decider) RepoConfig(key string) bool {
+	if !d.inProject(key) {
+		return false
+	}
 	if d.isAdmin || d.scope == nil {
 		return true
 	}
@@ -403,6 +463,9 @@ func (d *Decider) RepoConfig(key string) bool {
 // such as "info", "metrics" or "identities"): administrators may; anyone
 // else only through a token's system scope covering the area and actions.
 func (d *Decider) System(area string, want kernel.ScopeActions) bool {
+	if d.projectLimit != nil {
+		return false
+	}
 	if d.isAdmin {
 		return true
 	}
@@ -602,7 +665,8 @@ func analyse(s *kernel.Scope) scopeShape {
 			sh.named = append(sh.named, e.Names...)
 			applied = true
 		case kernel.ScopeRoles:
-			// Project roles are P11; a roles scope grants nothing yet.
+			// Named project definitions are resolved independently of native
+			// user/group grants, then narrowed by resource entries as usual.
 			applied = true
 		case kernel.ScopeArtifact:
 			sh.artifact = append(sh.artifact, e)

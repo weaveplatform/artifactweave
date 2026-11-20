@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
@@ -33,6 +34,10 @@ type Deps struct {
 	// settings and API restrictions that the bindings read and write. It is
 	// required.
 	Store Store
+	// ProjectRepositories supplies canonical ownership and environments without
+	// opening repository secrets. App binds it before constructing either module.
+	// Nil leaves project content grants inactive for an access-only embedding.
+	ProjectRepositories artifactsapi.ProjectRepositoryReader
 	// Authenticator verifies credentials; nil leaves API().Authenticator nil,
 	// as a server without authentication has none.
 	Authenticator *authn.Authenticator
@@ -70,7 +75,7 @@ func New(d Deps) (*Module, error) {
 	}
 	m := &Module{
 		api: accessapi.API{
-			Authorizer:      authorizer{st: d.Store},
+			Authorizer:      authorizer{st: d.Store, repositories: d.ProjectRepositories, authenticator: d.Authenticator},
 			Tokens:          TokensOf(d.Store, d.Tokens),
 			Keys:            KeysOf(d.Store),
 			Identity:        identity{st: d.Store},
@@ -125,8 +130,6 @@ func TokensOf(st Store, svc *token.Service) accessapi.Tokens {
 // AnonymousAccessOf returns the AnonymousAccess binding over st alone, for
 // code that holds a store before any module exists, such as applying the
 // bootstrap descriptor. The errors are the store's, unwrapped.
-func AnonymousAccessOf(
-	st interface{ Settings() settings.SettingsStore },
-) accessapi.AnonymousAccess {
+func AnonymousAccessOf(st Store) accessapi.AnonymousAccess {
 	return anonymousAccess{st: st}
 }

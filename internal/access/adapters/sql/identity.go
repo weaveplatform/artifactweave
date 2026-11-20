@@ -153,7 +153,7 @@ func scanUser(row interface{ Scan(...any) error }) (model.User, error) {
 
 func (us users) Create(ctx context.Context, u model.User) error {
 	args := userArgs(u)
-	return us.s.Tx(ctx, func(ctx context.Context) error {
+	return projectStore(us).tx(ctx, func(ctx context.Context) error {
 		groups := sortedUnique(u.Groups)
 		if err := us.s.requireRows(ctx, "user_groups", "name", "group", groups); err != nil {
 			return err
@@ -187,7 +187,7 @@ func (us users) Get(ctx context.Context, name string) (model.User, error) {
 
 func (us users) Update(ctx context.Context, u model.User) error {
 	args := userArgs(u)
-	return us.s.Tx(ctx, func(ctx context.Context) error {
+	return projectStore(us).tx(ctx, func(ctx context.Context) error {
 		groups := sortedUnique(u.Groups)
 		if err := us.s.requireRows(ctx, "user_groups", "name", "group", groups); err != nil {
 			return err
@@ -219,7 +219,7 @@ func (us users) Update(ctx context.Context, u model.User) error {
 }
 
 func (us users) Delete(ctx context.Context, name string) error {
-	return us.s.Tx(ctx, func(ctx context.Context) error {
+	return projectStore(us).tx(ctx, func(ctx context.Context) error {
 		if _, err := us.s.Exec(
 			ctx,
 			"delete memberships",
@@ -274,13 +274,15 @@ func (us users) List(ctx context.Context, p kernel.Page) ([]model.User, string, 
 }
 
 func (us users) RecordLogin(ctx context.Context, name string, at time.Time) error {
-	return us.s.ExecOne(
-		ctx,
-		fmt.Sprintf("record login %q", name),
-		"UPDATE users SET last_logged_in_at = ?, failed_logins = 0 WHERE name = ?",
-		dialect.Micros(at),
-		name,
-	)
+	return projectStore(us).tx(ctx, func(ctx context.Context) error {
+		return us.s.ExecOne(
+			ctx,
+			fmt.Sprintf("record login %q", name),
+			"UPDATE users SET last_logged_in_at = ?, failed_logins = 0 WHERE name = ?",
+			dialect.Micros(at),
+			name,
+		)
+	})
 }
 
 // RecordFailedLogin counts and locks in one statement, so concurrent wrong
@@ -292,7 +294,7 @@ func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) 
 
 func (us users) RecordFailedLoginResult(ctx context.Context, name string, lockAt int) (port.FailedLoginResult, error) {
 	var result port.FailedLoginResult
-	err := us.s.Tx(ctx, func(ctx context.Context) error {
+	err := projectStore(us).tx(ctx, func(ctx context.Context) error {
 		var before string
 		if err := us.s.Q(ctx).QueryRowContext(ctx,
 			us.s.Dialect().Rebind("SELECT status FROM users WHERE name = ?"+us.s.LockClause(ctx)), name).Scan(&before); err != nil {
@@ -320,6 +322,12 @@ func (us users) RecordFailedLoginResult(ctx context.Context, name string, lockAt
 }
 
 func (us users) Unlock(ctx context.Context, names ...string) error {
+	return projectStore(us).tx(ctx, func(ctx context.Context) error {
+		return us.unlock(ctx, names...)
+	})
+}
+
+func (us users) unlock(ctx context.Context, names ...string) error {
 	unlock := "UPDATE users SET failed_logins = 0, status = CASE WHEN status = ? THEN ? ELSE status END"
 	args := []any{string(model.UserLocked), string(model.UserEnabled)}
 	if len(names) == 0 {
@@ -415,7 +423,7 @@ func scanGroup(row interface{ Scan(...any) error }) (model.Group, error) {
 
 func (gs groups) Create(ctx context.Context, g model.Group) error {
 	args := groupArgs(g)
-	return gs.s.Tx(ctx, func(ctx context.Context) error {
+	return projectStore(gs).tx(ctx, func(ctx context.Context) error {
 		members := sortedUnique(g.Members)
 		if err := gs.s.requireRows(ctx, "users", "name", "user", members); err != nil {
 			return err
@@ -444,7 +452,7 @@ func (gs groups) Get(ctx context.Context, name string) (model.Group, error) {
 
 func (gs groups) Update(ctx context.Context, g model.Group) error {
 	args := groupArgs(g)
-	return gs.s.Tx(ctx, func(ctx context.Context) error {
+	return projectStore(gs).tx(ctx, func(ctx context.Context) error {
 		members := sortedUnique(g.Members)
 		if err := gs.s.requireRows(ctx, "users", "name", "user", members); err != nil {
 			return err
@@ -471,7 +479,7 @@ func (gs groups) Update(ctx context.Context, g model.Group) error {
 }
 
 func (gs groups) Delete(ctx context.Context, name string) error {
-	return gs.s.Tx(ctx, func(ctx context.Context) error {
+	return projectStore(gs).tx(ctx, func(ctx context.Context) error {
 		if _, err := gs.s.Exec(
 			ctx,
 			"delete members",
@@ -531,7 +539,7 @@ func (gs groups) List(ctx context.Context, p kernel.Page) ([]model.Group, string
 }
 
 func (gs groups) AddMembers(ctx context.Context, group string, users ...string) error {
-	return gs.s.Tx(ctx, func(ctx context.Context) error {
+	return projectStore(gs).tx(ctx, func(ctx context.Context) error {
 		if err := gs.s.requireRows(
 			ctx,
 			"user_groups",
@@ -550,7 +558,7 @@ func (gs groups) AddMembers(ctx context.Context, group string, users ...string) 
 }
 
 func (gs groups) RemoveMembers(ctx context.Context, group string, users ...string) error {
-	return gs.s.Tx(ctx, func(ctx context.Context) error {
+	return projectStore(gs).tx(ctx, func(ctx context.Context) error {
 		if err := gs.s.requireRows(
 			ctx,
 			"user_groups",
@@ -666,7 +674,7 @@ func (ps permissions) mirror(ctx context.Context, p model.Permission) error {
 }
 
 func (ps permissions) Create(ctx context.Context, p model.Permission) error {
-	return ps.s.Tx(ctx, func(ctx context.Context) error {
+	return projectStore(ps).tx(ctx, func(ctx context.Context) error {
 		if _, err := ps.s.Exec(
 			ctx,
 			"create permission "+p.Name,
@@ -690,7 +698,7 @@ func (ps permissions) Get(ctx context.Context, name string) (model.Permission, e
 }
 
 func (ps permissions) Update(ctx context.Context, p model.Permission) error {
-	return ps.s.Tx(ctx, func(ctx context.Context) error {
+	return projectStore(ps).tx(ctx, func(ctx context.Context) error {
 		if err := ps.s.ExecOne(
 			ctx,
 			fmt.Sprintf("update permission %q", p.Name),
@@ -708,7 +716,7 @@ func (ps permissions) Update(ctx context.Context, p model.Permission) error {
 }
 
 func (ps permissions) Delete(ctx context.Context, name string) error {
-	return ps.s.Tx(ctx, func(ctx context.Context) error {
+	return projectStore(ps).tx(ctx, func(ctx context.Context) error {
 		for _, table := range []string{"permission_grants", "permission_targets"} {
 			if _, err := ps.s.Exec(ctx, "clear "+table,
 				"DELETE FROM "+table+" WHERE permission_name = ?", name); err != nil {

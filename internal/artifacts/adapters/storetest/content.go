@@ -22,6 +22,7 @@ import (
 // runContent covers repositories, items with their properties and
 // statistics, the trash can and the package index.
 func runContent(t *testing.T, newStore Factory) {
+	t.Run("ProjectRepositoryContexts", func(t *testing.T) { RunProjectRepositories(t, newStore(t).Repos()) })
 	t.Run("Repos", func(t *testing.T) { testRepos(t, newStore(t).Repos()) })
 	t.Run("Items", func(t *testing.T) { testItems(t, newStore(t).Items()) })
 	t.Run("ItemsByFullPath", func(t *testing.T) { testItemsByFullPath(t, newStore(t).Items()) })

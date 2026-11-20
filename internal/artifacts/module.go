@@ -180,6 +180,7 @@ func New(d Deps) (*Module, error) {
 			nuget.KindSnapshots: d.Settings.NuGetSnapshotCleanupInterval,
 		},
 	}
+	m.items.GuardAuthority = m.guardAuthority
 	// Assigned only when present: a nil queue in the interface would be a
 	// typed nil, which the item service would call instead of skipping.
 	if d.Work != nil {
@@ -191,6 +192,16 @@ func New(d Deps) (*Module, error) {
 // API returns the module's published surface: Repositories and Layouts,
 // bound by New.
 func (m *Module) API() artifactsapi.API { return m.api }
+
+func (m *Module) guardAuthority(ctx context.Context) error {
+	if m.access.Projects == nil {
+		return nil
+	}
+	if err := m.access.Projects.Guard(ctx); err != nil {
+		return fmt.Errorf("artifact current authority: %w", err)
+	}
+	return nil
+}
 
 // VirtualCache is shared by protocol reads and member-write invalidation.
 func (m *Module) VirtualCache() *virtual.Cache { return m.virtualCache }
@@ -346,6 +357,9 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 		return identity(ctx, c, false)
 	}
 	revalidatePrincipal := func(ctx context.Context, q source.Request, permit source.Permit, registry, fence bool) error {
+		if err := m.guardAuthority(ctx); err != nil {
+			return err
+		}
 		id, err := identity(ctx, q.Repo, fence)
 		if err != nil {
 			return err
@@ -442,6 +456,8 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 		Options: resolver.Options, CheckCurrent: checkCurrent(true), Key: key,
 		GitFetch: cocoapods.FetchCocoaPodsGit, ProjectResponse: nuget.ProjectEmptyFeed,
 	}
+	policy.GuardAuthority = m.guardAuthority
+	registryPolicy.GuardAuthority = m.guardAuthority
 	content := &docker.RegistryContent{
 		Policy: registryPolicy,
 		Registries: &upstream.RegistryClients{

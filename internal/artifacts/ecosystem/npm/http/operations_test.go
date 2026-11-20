@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/npm"
@@ -70,6 +71,15 @@ func TestAccReindexFaults(t *testing.T) {
 	ctx := context.Background()
 	f := &reindexRecorder{}
 	db := inmem.New()
+	if err := db.Users().Create(ctx, accesstest.User{
+		Name: "admin", Admin: true, PasswordHash: accesstest.HashPassword(t, "pw"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	authenticated, err := accesstest.Over(t, db).API().Authenticator.Basic(ctx, "admin", "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, c := range []repo.Config{
 		{Key: "nuget-local", Class: repo.Local, PackageType: repo.NuGet},
 		{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},
@@ -82,8 +92,9 @@ func TestAccReindexFaults(t *testing.T) {
 		cfg := Config{Formats: recording(f)}
 		if st != nil {
 			cfg.Store = st
+			cfg.Access = accesstest.Over(t, st).API()
 		}
-		return NPMAPI{newKit(withAccess(t, cfg))}
+		return NPMAPI{newKit(cfg)}
 	}
 	status := func(err error) int {
 		var e *apierror.Error
@@ -100,7 +111,7 @@ func TestAccReindexFaults(t *testing.T) {
 		http.StatusUnauthorized {
 		t.Errorf("no caller: %v", err)
 	}
-	admin := kernel.WithPrincipal(ctx, kernel.Principal{Name: "admin", Admin: true})
+	admin := kernel.WithPrincipal(ctx, authenticated)
 	for _, c := range []struct {
 		fail string
 		call func(NPMAPI) error

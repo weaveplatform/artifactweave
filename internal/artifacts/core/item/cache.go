@@ -155,13 +155,15 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 	// of its hooks' opens or reads of stored content failed, as checkCopy
 	// marks a check's refusal.
 	publish := func(ctx context.Context) error {
-		if err := s.Store.RemoteCache().Check(ctx, u.Token); err != nil {
-			return storeFault(ctx, fmt.Errorf("cache fence: %w", err))
-		}
 		if u.CheckCurrent != nil {
 			if err := u.CheckCurrent(ctx, s.Store); err != nil {
 				return fmt.Errorf("cache current policy: %w", err)
 			}
+		}
+		// Current authority must precede the source lifetime lock: a project
+		// environment mutation takes these locks in that order too.
+		if err := s.Store.RemoteCache().Check(ctx, u.Token); err != nil {
+			return storeFault(ctx, fmt.Errorf("cache fence: %w", err))
 		}
 		now := s.now()
 		e := model.RemoteCacheEntry{

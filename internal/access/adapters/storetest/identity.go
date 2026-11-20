@@ -472,16 +472,17 @@ func token(t *testing.T, id, subject string, issued time.Time) model.Token {
 			t,
 			`applied-permissions/groups:readers,"Project Admin" repo:libs-local:r,w`,
 		),
-		Audience:        "jfrt@*",
-		Description:     "token " + id,
-		ProjectKey:      "proj",
-		IssuedAt:        issued,
-		ExpiresAt:       issued.Add(time.Hour),
-		Refreshable:     true,
-		Revocable:       true,
-		AccessDigest:    []byte("access-" + id),
-		RefreshDigest:   []byte("refresh-" + id),
-		ReferenceDigest: []byte("reference-" + id),
+		Audience:            "jfrt@*",
+		Description:         "token " + id,
+		ProjectKey:          "proj",
+		ProjectIncarnations: map[string]string{"proj": "issued-project-lifetime"},
+		IssuedAt:            issued,
+		ExpiresAt:           issued.Add(time.Hour),
+		Refreshable:         true,
+		Revocable:           true,
+		AccessDigest:        []byte("access-" + id),
+		RefreshDigest:       []byte("refresh-" + id),
+		ReferenceDigest:     []byte("reference-" + id),
 	}
 }
 
@@ -498,6 +499,7 @@ func testTokens(t *testing.T, s port.Store) {
 	got := storekit.Get[model.Token](t)(ts.Get(ctx, "t1"))
 	storekit.Same(t, "Get", t1, got)
 	got.AccessDigest[0] = 'X'
+	got.ProjectIncarnations["proj"] = "changed-by-caller"
 	storekit.Same(
 		t,
 		"Get after mutating a result",

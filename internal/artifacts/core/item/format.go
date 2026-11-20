@@ -351,6 +351,11 @@ func (s *Service) reindex(ctx context.Context, c repo.Config, request *format.Wo
 	if request != nil && request.Source != nil {
 		env.ReindexSource = request.Source
 		env.CheckReindex = func(ctx context.Context) error {
+			if s.GuardAuthority != nil {
+				if err := s.GuardAuthority(ctx); err != nil {
+					return fmt.Errorf("guard reindex authority: %w", err)
+				}
+			}
 			if s.ReindexAuthorize == nil {
 				return fmt.Errorf("%w: remote reindex authorizer unavailable", work.ErrPermanent)
 			}

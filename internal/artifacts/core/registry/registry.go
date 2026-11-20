@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
@@ -67,11 +68,24 @@ type Service struct {
 
 // Owner is who a session belongs to.
 type Owner struct {
+	// CheckCurrent rechecks the native client operation in publication, before
+	// metadata locks. Derived tag/platform/history writes use this owner check.
+	CheckCurrent func(context.Context, string, accessapi.Actions) error
+
 	Repo repo.Config
 	// Name is the image inside Repo.
 	Name string
 	// By is the user that opened it.
 	By string
+}
+
+func (o Owner) checkCurrent(ctx context.Context, path string, want accessapi.Actions) error {
+	if o.CheckCurrent != nil {
+		if err := o.CheckCurrent(ctx, path, want); err != nil {
+			return fmt.Errorf("registry: current publication authority: %w", err)
+		}
+	}
+	return nil
 }
 
 // state is a session's uploads row State; the row's RepoKey holds the
@@ -265,7 +279,7 @@ func (s *Service) Finish(
 	// The upload is committed and cannot be resumed, so the session ends
 	// whether or not the item is stored; content left unreferenced is
 	// garbage collection's.
-	stored, err := s.store(ctx, o, hex, info)
+	stored, err := s.StoreBlob(ctx, o, hex, info)
 	return stored, errors.Join(err, s.forget(ctx, id))
 }
 
@@ -290,15 +304,22 @@ func (s *Service) Upload(
 	body io.Reader,
 	hex string,
 ) (model.Item, error) {
-	up, err := s.Blobs.BeginUpload(ctx, blob.WithExpectedSHA256(hex))
-	if err != nil {
-		return model.Item{}, fmt.Errorf("registry: begin upload: %w", err)
-	}
-	info, err := commit(ctx, up, body, hex)
+	info, err := s.StageBlob(ctx, body, hex)
 	if err != nil {
 		return model.Item{}, err
 	}
-	return s.store(ctx, o, hex, info)
+	return s.StoreBlob(ctx, o, hex, info)
+}
+
+// StageBlob commits and verifies bytes without opening a metadata transaction.
+// A virtual import stages its upstream stream before checking source and target
+// authority together in the StoreBlob publication transaction.
+func (s *Service) StageBlob(ctx context.Context, body io.Reader, hex string) (blob.Info, error) {
+	up, err := s.Blobs.BeginUpload(ctx, blob.WithExpectedSHA256(hex))
+	if err != nil {
+		return blob.Info{}, fmt.Errorf("registry: begin upload: %w", err)
+	}
+	return commit(ctx, up, body, hex)
 }
 
 // commit appends body to up and commits it against hex, aborting up on any
@@ -319,8 +340,10 @@ func commit(ctx context.Context, up blob.Upload, body io.Reader, hex string) (bl
 	return info, nil
 }
 
-// store records committed content as o's finished upload of hex.
-func (s *Service) store(
+// StoreBlob publishes content previously committed and verified by StageBlob
+// as o's finished upload. It joins the caller's transaction and current owner
+// fence; bytes left unreferenced by a refusal remain garbage collection's.
+func (s *Service) StoreBlob(
 	ctx context.Context,
 	o Owner,
 	hex string,
@@ -336,10 +359,19 @@ func (s *Service) store(
 // uploadDeploy is the write of a finished upload. The registry writes the
 // item, not the client, so its computed checksums are the originals.
 func uploadDeploy(o Owner, hex string) item.Deploy {
-	return item.Deploy{
+	d := item.Deploy{
 		Target:   item.Target{Repo: o.Repo, Path: layout.UploadPath(o.Name, hex)},
 		Declared: kernel.Checksums{SHA256: hex}, By: o.By, Trusted: true,
 	}
+	if o.CheckCurrent != nil {
+		d.CheckCurrent = func(ctx context.Context, _ string, _ bool, _ accessapi.Actions) error {
+			// A verified digest names the same bytes on every upload or mount.
+			// Repeating it needs Write; mutable tag replacement checks Delete
+			// separately when publishing its manifest.
+			return o.checkCurrent(ctx, o.Name+"/", accessapi.ActionWrite)
+		}
+	}
+	return d
 }
 
 // Mount links the blob hex from the image srcName in src into o's image as

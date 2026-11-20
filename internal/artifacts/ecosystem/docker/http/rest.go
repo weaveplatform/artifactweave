@@ -26,6 +26,16 @@ type DockerAPI struct {
 	Registry *Registry
 }
 
+func (s DockerAPI) owner(c repo.Config, name, by string) registry.Owner {
+	check := s.PublicationCheck(c)
+	return registry.Owner{
+		Repo: c, Name: name, By: by,
+		CheckCurrent: func(ctx context.Context, path string, want api.Actions) error {
+			return check(ctx, path, false, want)
+		},
+	}
+}
+
 // DeleteDockerTag is the multi-architecture tag delete, the JFrog REST
 // operation under a repository's Docker API path (decision 0031): the tag
 // folder goes, with a list's platform manifests nothing else in the image
@@ -73,12 +83,12 @@ func (s DockerAPI) DeleteDockerTag(
 		return nil, missing
 	}
 	_, err = s.registry(st).DeleteMultiArch(ctx,
-		registry.Owner{Repo: c, Name: name, By: p.Name}, tag)
+		s.owner(c, name, p.Name), tag)
 	switch {
 	case errors.Is(err, kernel.ErrNotFound):
 		return nil, missing
 	case err != nil:
-		return nil, s.InternalError(ctx, "delete docker tag", err)
+		return nil, s.ItemError(ctx, "delete docker tag", err)
 	}
 	return artgen.DeleteDockerTag200TextResponse(
 		fmt.Sprintf("Deleted tag '%s' of image '%s' in '%s'.", tag, name, c.Key)), nil
@@ -131,8 +141,8 @@ func (s DockerAPI) PromoteDockerImage(
 	}
 	svc := s.registry(st)
 	promotion := registry.Promotion{
-		From: registry.Owner{Repo: from, Name: args.name, By: p.Name},
-		To:   registry.Owner{Repo: to, Name: args.toName, By: p.Name},
+		From: s.owner(from, args.name, p.Name),
+		To:   s.owner(to, args.toName, p.Name),
 		Copy: args.shouldCopy,
 	}
 	if promotion.Tags, err = s.promotionTags(ctx, svc, promotion, args, acc, p); err != nil {
@@ -143,7 +153,7 @@ func (s DockerAPI) PromoteDockerImage(
 	case errors.Is(err, registry.ErrSamePlace):
 		return nil, httpkit.BadRequestf("the image would be promoted onto itself")
 	case err != nil:
-		return nil, s.InternalError(ctx, "docker promotion", err)
+		return nil, s.ItemError(ctx, "docker promotion", err)
 	}
 	return artgen.PromoteDockerImage200TextResponse(fmt.Sprintf(
 		"Promoted %d tag(s) of '%s' from '%s' to '%s/%s'.",

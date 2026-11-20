@@ -70,6 +70,7 @@ func New(d Deps) (*Module, error) {
 			Layouts:         d.Layouts,
 			Configs:         configs{st: d.Store},
 			AnonymousAccess: d.Access.AnonymousAccess,
+			Projects:        d.Access.Projects,
 		}),
 		settings: d.Settings,
 	}, nil

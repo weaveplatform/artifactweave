@@ -916,6 +916,7 @@ column tokens.last_used_at bigint
 column tokens.purpose text NOT NULL DEFAULT ''::text
 column tokens.secret bytea
 column tokens.identity text NOT NULL DEFAULT ''::text
+column tokens.project_incarnations text NOT NULL DEFAULT '{}'::text
 constraint tokens.tokens_access_digest_key UNIQUE (access_digest)
 constraint tokens.tokens_pkey PRIMARY KEY (id)
 constraint tokens.tokens_reference_digest_key UNIQUE (reference_digest)

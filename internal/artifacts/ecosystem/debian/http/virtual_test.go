@@ -264,7 +264,7 @@ func TestAccDebianVirtualMetadataIsKeptForThePeriod(t *testing.T) {
 		t.Errorf("a period of -1 kept the metadata: %v", got)
 	}
 	files, err := DebianAPI{w.kit}.debianSnapshotFiles(t.Context(), w.db, w.debRepo("deb-virtual"),
-		"stable", kittest.Admin, kittest.AdminAccess())
+		"stable", kittest.Admin, kittest.AdminAccess(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func TestUnitDebianVirtualReadsNeedTheRouterKitsStore(t *testing.T) {
 		wantError(t, w.get("deb-virtual", path, "admin"), http.StatusInternalServerError, "internal error")
 	}
 	if _, err := (DebianAPI{w.kit}).debianSnapshotFiles(t.Context(), w.db, w.debRepo("deb-virtual"),
-		"stable", kittest.Admin, kittest.AdminAccess()); err == nil {
+		"stable", kittest.Admin, kittest.AdminAccess(), nil); err == nil {
 		t.Error("a snapshot walked the virtual repository without the router kit's store")
 	}
 }

@@ -57,3 +57,37 @@ func TestUnitCachePolicyRequiresBoundAuthority(t *testing.T) {
 		})
 	}
 }
+
+func TestUnitCacheCurrentAuthorityPrecedesSourceFence(t *testing.T) {
+	for _, revoked := range []bool{true, false} {
+		t.Run(map[bool]string{true: "revoked", false: "current"}[revoked], func(t *testing.T) {
+			w, upload := remoteWorld(t)
+			w.svc.Store = storeFaults{Store: w.db, fence: errDown}
+			checked := false
+			upload.CheckCurrent = func(ctx context.Context, _ Store) error {
+				if !w.db.InTx(ctx) {
+					t.Fatal("authority check ran outside publication transaction")
+				}
+				checked = true
+				if revoked {
+					return kernel.ErrForbidden
+				}
+				return nil
+			}
+			_, err := w.svc.Cache(t.Context(), upload)
+			want := errDown
+			if revoked {
+				want = kernel.ErrForbidden
+			}
+			if !checked || !errors.Is(err, want) {
+				t.Fatalf("authority checked=%v, publication=%v, want %v", checked, err, want)
+			}
+			if _, err := w.db.RemoteCache().Read(t.Context(), upload.Token.Key); !errors.Is(err, kernel.ErrNotFound) {
+				t.Fatalf("refused publication retained cache state: %v", err)
+			}
+			if _, err := w.db.Items().Get(t.Context(), upload.Repo.Key, true, upload.Token.Key.Path); !errors.Is(err, kernel.ErrNotFound) {
+				t.Fatalf("refused publication retained item: %v", err)
+			}
+		})
+	}
+}

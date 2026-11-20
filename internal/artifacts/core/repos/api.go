@@ -69,17 +69,38 @@ func (r repositories) UsingKeypair(ctx context.Context, name string) ([]string, 
 }
 
 func (r repositories) Create(ctx context.Context, c repo.Config) error {
-	//nolint:wrapcheck // preserves upstream error identity
-	return r.st.Repos().Create(ctx, c)
+	return r.tx(ctx, func(ctx context.Context) error {
+		return r.st.Repos().Create(ctx, c) //nolint:wrapcheck // preserves upstream error identity
+	})
 }
 
 func (r repositories) Update(ctx context.Context, c repo.Config) error {
-	//nolint:wrapcheck // preserves upstream error identity
-	return r.st.Repos().Update(ctx, c)
+	return r.tx(ctx, func(ctx context.Context) error {
+		return r.st.Repos().Update(ctx, c) //nolint:wrapcheck // preserves upstream error identity
+	})
 }
 
 func (r repositories) Remove(ctx context.Context, key, by string) (int64, bool, error) {
-	return Remove(ctx, r.st, key, by)
+	var removed int64
+	var trashed bool
+	err := r.tx(ctx, func(ctx context.Context) error {
+		var err error
+		removed, trashed, err = Remove(ctx, r.st, key, by)
+		return err
+	})
+	return removed, trashed, err
+}
+
+func (r repositories) tx(ctx context.Context, fn func(context.Context) error) error {
+	//nolint:wrapcheck // preserves upstream error identity
+	return r.st.Tx(ctx, func(ctx context.Context) error {
+		if r.projects != nil {
+			if err := r.projects.Guard(ctx); err != nil {
+				return err //nolint:wrapcheck // preserves authority-store error identity
+			}
+		}
+		return fn(ctx)
+	})
 }
 
 func (r repositories) RequestReindex(ctx context.Context, key, by string, at time.Time) error {

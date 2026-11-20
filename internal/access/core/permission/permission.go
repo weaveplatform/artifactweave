@@ -109,7 +109,12 @@ func notFound(name string) error {
 
 // tx runs fn in one transaction; the wrap keeps fn's error for errors.Is.
 func (s Service) tx(ctx context.Context, fn func(ctx context.Context) error) error {
-	if err := s.Store.Tx(ctx, fn); err != nil {
+	if err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := s.Store.Projects().Guard(ctx); err != nil {
+			return fmt.Errorf("guard current permission authority: %w", err)
+		}
+		return fn(ctx)
+	}); err != nil {
 		return fmt.Errorf("permission: %w", err)
 	}
 	return nil
@@ -294,11 +299,11 @@ func (s Service) Granting(
 // Create stores a new permission; ErrConflict when the name is taken. Its
 // user grants are stored under folded names (model.Permission.FoldGrants).
 func (s Service) Create(ctx context.Context, p model.Permission) error {
-	if err := s.Validate(ctx, p); err != nil {
-		return err
-	}
-	p = p.FoldGrants()
 	return s.tx(ctx, func(ctx context.Context) error {
+		if err := s.Validate(ctx, p); err != nil {
+			return err
+		}
+		p = p.FoldGrants()
 		if _, err := s.Store.Permissions().Get(ctx, p.Name); err == nil {
 			return fmt.Errorf("%w: Permission '%s' already exists", ErrConflict, p.Name)
 		} else if !errors.Is(err, kernel.ErrNotFound) {

@@ -56,6 +56,12 @@ func Repositories(db SeedStore) artifactsapi.Repositories {
 	return repos.NewRepositories(db, access.KeysOf(db), access.ProjectsOf(db))
 }
 
+// ProjectRepositories supplies the same canonical, secret-free ownership and
+// environment reader that app binds before constructing the access module.
+func ProjectRepositories(db SeedStore) artifactsapi.ProjectRepositoryReader {
+	return repos.NewProjectRepositoryReader(db)
+}
+
 // The artifacts record and store port that the tests of other modules name
 // when they seed a SeedStore or wrap its repositories to fail. The artifacts
 // module declares them in core/model and core/port, which another module may

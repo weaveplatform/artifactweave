@@ -107,11 +107,18 @@ func (s Service) Role(ctx context.Context, key, name string) (model.Role, error)
 }
 
 func (s Service) role(ctx context.Context, key, name string) (model.Role, error) {
-	local, localErr := s.Store.Projects().Role(ctx, key, name)
+	return ResolveRole(ctx, s.Store.Projects(), key, name)
+}
+
+// ResolveRole shares project/global ambiguity and built-in override semantics
+// with credential issuance. The caller holds a guarded project snapshot and
+// validates project existence before accepting the definition.
+func ResolveRole(ctx context.Context, projects port.ProjectStore, key, name string) (model.Role, error) {
+	local, localErr := projects.Role(ctx, key, name)
 	if localErr != nil && !errors.Is(localErr, kernel.ErrNotFound) {
 		return model.Role{}, fmt.Errorf("project: read role %q in %q: %w", name, key, localErr)
 	}
-	global, globalErr := (roles.Service{Store: s.Store}).Role(ctx, name)
+	global, globalErr := roles.Lookup(ctx, projects, name)
 	if globalErr != nil && !errors.Is(globalErr, roles.ErrNotFound) {
 		return model.Role{}, fmt.Errorf("project: read global role %q: %w", name, globalErr)
 	}

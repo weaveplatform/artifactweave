@@ -72,6 +72,11 @@ type Store interface {
 
 // Service works on the trash can of one store.
 type Service struct {
+	// AuthorizeBatch refreshes the client's authority before each batch takes
+	// item/blob locks. A refusal keeps earlier committed batches, matching the
+	// service's partial-progress contract. Maintenance services leave it nil.
+	AuthorizeBatch func(context.Context, []model.TrashEntry) error
+
 	Store Store
 	// Items recreates restored items; only Restore needs it.
 	Items *item.Service
@@ -233,6 +238,15 @@ func (s *Service) Restore(
 	restored := 0
 	for chunk := range slices.Chunk(selected, s.batch()) {
 		err := s.Store.Tx(ctx, func(ctx context.Context) error {
+			if s.AuthorizeBatch != nil {
+				entries := make([]model.TrashEntry, 0, len(chunk))
+				for _, r := range chunk {
+					entries = append(entries, r.entry)
+				}
+				if err := s.AuthorizeBatch(ctx, entries); err != nil {
+					return fmt.Errorf("trash: current restoration authority: %w", err)
+				}
+			}
 			for _, r := range chunk {
 				t := item.Target{Repo: dst.Repo, Path: r.path}
 				if _, err := s.Items.Restore(ctx, t, r.entry.Record, by); err != nil {
@@ -382,6 +396,11 @@ func (s *Service) purge(ctx context.Context, entries []model.TrashEntry) (int, e
 	for chunk := range slices.Chunk(entries, s.batch()) {
 		n := 0
 		err := s.Store.Tx(ctx, func(ctx context.Context) error {
+			if s.AuthorizeBatch != nil {
+				if err := s.AuthorizeBatch(ctx, chunk); err != nil {
+					return fmt.Errorf("trash: current purge authority: %w", err)
+				}
+			}
 			n = 0
 			for _, e := range chunk {
 				err := s.Store.Trash().Delete(ctx, e.ID)

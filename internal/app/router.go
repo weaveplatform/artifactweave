@@ -297,6 +297,13 @@ func newRegistry(cfg RouterConfig, kit *itemkit.Kit) *dockerhttp.Registry {
 		},
 		Tokens:   cfg.Access.Tokens,
 		Identity: cfg.Access.Identity,
+		CurrentAccess: func(ctx context.Context) (kernel.Principal, accessapi.Decider, error) {
+			p, a, err := kit.CurrentAccess(ctx)
+			if err != nil {
+				return p, nil, fmt.Errorf("refresh registry publication authority: %w", err)
+			}
+			return p, a.Decider, nil
+		},
 	}
 	return dockerhttp.New(o)
 }
@@ -312,6 +319,7 @@ func withAccess(cfg RouterConfig) RouterConfig {
 	// there is no error for New's callers to see.
 	if m, err := accessmodule.New(accessmodule.Deps{
 		Store: cfg.Store, Authenticator: cfg.Auth, Tokens: cfg.Tokens,
+		ProjectRepositories: repos.NewProjectRepositoryReader(cfg.Store),
 		Settings: accessapi.Settings{
 			AllowBasicAuthTokens:   cfg.AllowBasicAuthTokens,
 			GlobalEnvironmentLimit: cfg.GlobalEnvironmentLimit,
@@ -351,6 +359,7 @@ func withConfiguration(cfg RouterConfig) RouterConfig {
 		Layouts:         layout.Checker{},
 		Configs:         cfg.Store.Configs(),
 		AnonymousAccess: cfg.Access.AnonymousAccess,
+		Projects:        cfg.Access.Projects,
 	})
 	return cfg
 }
@@ -532,7 +541,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			// challenged whether anonymous access is on or off.
 			kit.ForceAuthentication,
 			accesshttp.Authenticate(
-				newAuthnOptions(cfg.Auth, cfg.Store, func(req *http.Request) bool {
+				newAuthnOptions(cfg.Auth, cfg.Store, cfg.Access.Authorizer, func(req *http.Request) bool {
 					if terraformbackendhttp.IsPath(req.URL.Path) {
 						return terraformbackendhttp.SkipsAuthentication(req)
 					}
@@ -605,6 +614,14 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			Authorizer:   cfg.Access.Authorizer,
 			Identity:     cfg.Access.Identity,
 			Restrictions: cfg.Access.Restrictions,
+			Projects:     cfg.Access.Projects,
+			CurrentAccess: func(ctx context.Context) (kernel.Principal, accessapi.Decider, error) {
+				p, a, err := kit.CurrentAccess(ctx)
+				if err != nil {
+					return p, nil, fmt.Errorf("refresh Terraform publication authority: %w", err)
+				}
+				return p, a.Decider, nil
+			},
 		},
 	)
 	for _, p := range mounted {
@@ -771,6 +788,7 @@ func redactLoggedPath(path string) string {
 func newAuthnOptions(
 	a *authn.Authenticator,
 	st accesshttp.Store,
+	authorizer accessapi.Authorizer,
 	skip ...func(*http.Request) bool,
 ) accesshttp.AuthnOptions {
 	public := accesshttp.PublicRoutes()
@@ -778,6 +796,7 @@ func newAuthnOptions(
 	return accesshttp.AuthnOptions{
 		Auth:               a,
 		Store:              st,
+		Authorizer:         authorizer,
 		SelfAuthenticated:  artifactshttp.SelfAuthenticated(),
 		Skip:               append([]func(*http.Request) bool{npmhttp.NPMUserRequest}, skip...),
 		RegistryPath:       dockerhttp.IsRegistryPath,

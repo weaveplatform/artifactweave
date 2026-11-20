@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
@@ -40,6 +41,9 @@ func (s *Service) DeleteManifest(ctx context.Context, o Owner, hex string) error
 func (s *Service) deleteFolders(ctx context.Context, o Owner, folders []string, digest string) error {
 	items := s.items()
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := o.checkCurrent(ctx, o.Name+"/", accessapi.ActionDelete); err != nil {
+			return err
+		}
 		for _, f := range folders {
 			dir := o.Name + "/" + f
 			if _, err := items.Delete(ctx, item.Target{Repo: o.Repo, Path: dir}, o.By); err != nil {

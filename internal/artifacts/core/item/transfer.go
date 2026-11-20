@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
@@ -109,6 +110,25 @@ func (s *Service) Transfer(ctx context.Context, t Transfer) (TransferResult, err
 	}
 	if !t.Dry && len(steps) > 0 {
 		if err := s.Store.Tx(ctx, func(ctx context.Context) error {
+			want := accessapi.ActionRead
+			if t.Move {
+				want |= accessapi.ActionDelete
+			}
+			if err := t.From.checkCurrent(ctx, t.From.Path, false, want); err != nil {
+				return err
+			}
+			for _, st := range steps {
+				if err := t.From.checkCurrent(ctx, st.src.FullPath(), st.src.Folder, want); err != nil {
+					return err
+				}
+				want := accessapi.ActionWrite
+				if st.replace.ID != 0 && !st.replace.Folder {
+					want |= accessapi.ActionDelete
+				}
+				if err := t.To.checkCurrent(ctx, st.dst, st.src.Folder, want); err != nil {
+					return err
+				}
+			}
 			return s.withTransferWork(ctx, func(ctx context.Context) error {
 				return s.apply(ctx, t, steps, &res)
 			})

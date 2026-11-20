@@ -48,8 +48,9 @@
 //
 // # Status
 //
-// P11 PRJ-01 supplies administration over the delivered role and identity
-// foundations. PRJ-02 owns effective content grants and role-token mint/use
-// policy; repository attachment/sharing and quotas have separate P11 tickets.
+// P11 PRJ-01 supplies administration over the role and identity foundations.
+// PRJ-02 activates current role-derived content and management grants, with
+// guarded role-token mint/use and project lifetime boundaries. Repository
+// attachment/sharing and quotas have separate P11 tickets.
 // The contract audit's unresolved vendor validation/scope edges remain qualified.
 package project

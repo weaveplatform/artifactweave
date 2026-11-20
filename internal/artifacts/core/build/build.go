@@ -57,8 +57,12 @@ type Store interface {
 
 // Service works on the builds of one store.
 type Service struct {
-	Store Store
-	Blobs blob.Store
+	// CurrentAccess refreshes the client's credential and policy at transaction
+	// entry, before any build/item/source locks. Nil uses the owning caller's
+	// supplied policy, for services without runtime access integration.
+	CurrentAccess func(context.Context) (Access, error)
+	Store         Store
+	Blobs         blob.Store
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
 	// Page bounds the store pages a listing reads; zero means
@@ -81,6 +85,22 @@ func (s *Service) checkDuplicates(modules []model.BuildModule) error {
 		return nil
 	}
 	return duplicateEntry(modules)
+}
+
+func (s *Service) tx(ctx context.Context, a Access, fn func(context.Context, Access) error) error {
+	return s.Store.Tx(ctx, func(ctx context.Context) error { //nolint:wrapcheck // retain the transaction's error
+		if s.CurrentAccess != nil {
+			var err error
+			a, err = s.CurrentAccess(ctx)
+			if err != nil {
+				return fmt.Errorf("build: current publication authority: %w", err)
+			}
+			if a == nil {
+				return ErrForbidden
+			}
+		}
+		return fn(ctx, a)
+	})
 }
 
 func (s *Service) now() time.Time {
@@ -157,7 +177,10 @@ func (s *Service) Publish(
 	now := s.now()
 	b.Created, b.CreatedBy, b.Modified, b.ModifiedBy = now, by, now, by
 	var out Published
-	err = s.Store.Tx(ctx, func(ctx context.Context) error {
+	err = s.tx(ctx, a, func(ctx context.Context, a Access) error {
+		if !a.Build(c.Key, path, false, api.ActionWrite) {
+			return ErrForbidden
+		}
 		old, err := s.Store.Builds().Get(ctx, projectKey, b.Name, b.Number, b.Started)
 		switch {
 		case err == nil:
@@ -278,7 +301,7 @@ func (s *Service) Append(ctx context.Context, ap Append, a Access) error {
 	if err != nil {
 		return err
 	}
-	return s.Store.Tx(ctx, func(ctx context.Context) error { //nolint:wrapcheck // ours
+	return s.tx(ctx, a, func(ctx context.Context, a Access) error { //nolint:wrapcheck // ours
 		b, err := s.Store.Builds().GetForUpdate(ctx, projectKey, ap.Name, ap.Number, ap.Started)
 		if err != nil {
 			return fmt.Errorf("build: get run: %w", err)
@@ -334,7 +357,7 @@ func (s *Service) Rename(ctx context.Context, projectKey, from, to, by string, a
 	if err != nil {
 		return fmt.Errorf("build: name: %w", err)
 	}
-	return s.Store.Tx(ctx, func(ctx context.Context) error { //nolint:wrapcheck // ours
+	return s.tx(ctx, a, func(ctx context.Context, a Access) error { //nolint:wrapcheck // ours
 		runs, err := s.runs(ctx, projectKey, from)
 		if err != nil {
 			return err
@@ -428,7 +451,7 @@ func (s *Service) deleteThen(
 		return nil, err
 	}
 	var gone []model.BuildRun
-	err = s.Store.Tx(ctx, func(ctx context.Context) error {
+	err = s.tx(ctx, a, func(ctx context.Context, a Access) error {
 		// The store returns the deleted runs without their modules, so the
 		// artifacts are read first.
 		loaded := map[int64]model.Build{}

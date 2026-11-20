@@ -32,6 +32,50 @@ func newReplay() (idempotency.Replay, *inmem.Store) {
 
 func noReload(context.Context, idempotency.ReplayReceipt) error { return nil }
 
+func TestUnitReplayGuardRefusesNewAndCommittedEffects(t *testing.T) {
+	p, st := newReplay()
+	r := request(time.Now())
+	allowed, runs, reloads := false, 0, 0
+	effect := idempotency.Effect{
+		Guard: func(ctx context.Context) error {
+			if !st.InTx(ctx) {
+				t.Fatal("authority fence is outside the effect transaction")
+			}
+			if err := st.Settings().Put(ctx, "authority-attempt", true); err != nil {
+				return err //nolint:wrapcheck // injected test state
+			}
+			if !allowed {
+				return kernel.ErrForbidden
+			}
+			return nil
+		},
+		Run: func(context.Context) (int64, error) { runs++; return 17, nil },
+		Reload: func(context.Context, idempotency.ReplayReceipt) error {
+			reloads++
+			return nil
+		},
+	}
+	if _, err := p.Do(t.Context(), r, effect); !errors.Is(err, kernel.ErrForbidden) || runs != 0 || reloads != 0 {
+		t.Fatalf("refused new effect ran: runs=%d reloads=%d err=%v", runs, reloads, err)
+	}
+	var attempt bool
+	if err := st.Settings().Get(t.Context(), "authority-attempt", &attempt); !errors.Is(err, kernel.ErrNotFound) {
+		t.Fatalf("failed authority transaction committed: %v", err)
+	}
+	allowed = true
+	if receipt, err := p.Do(t.Context(), r, effect); err != nil || receipt.Replayed || receipt.ResourceID != 17 {
+		t.Fatalf("allowed original: %+v, %v", receipt, err)
+	}
+	allowed = false
+	if _, err := p.Do(t.Context(), r, effect); !errors.Is(err, kernel.ErrForbidden) || runs != 1 || reloads != 1 {
+		t.Fatalf("revoked replay disclosed its resource: runs=%d reloads=%d err=%v", runs, reloads, err)
+	}
+	allowed = true
+	if receipt, err := p.Do(t.Context(), r, effect); err != nil || !receipt.Replayed || runs != 1 || reloads != 2 {
+		t.Fatalf("refused replay damaged receipt: %+v runs=%d reloads=%d err=%v", receipt, runs, reloads, err)
+	}
+}
+
 func TestUnitReplayDoRefusesBadRequests(t *testing.T) {
 	p, _ := newReplay()
 	run := func(context.Context) (int64, error) { return 1, nil }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"maps"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
@@ -50,6 +51,7 @@ func (a *Authenticator) Current(
 		}
 		fresh := tokenPrincipal(u, t.Scope)
 		fresh.TokenID, fresh.TokenExpires, fresh.Identity = t.ID, t.ExpiresAt, t.Identity
+		fresh.TokenProject, fresh.ProjectIncarnations = t.ProjectKey, maps.Clone(t.ProjectIncarnations)
 		return fresh, nil
 	}
 	if !p.Password {

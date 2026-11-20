@@ -43,6 +43,10 @@ type Replay struct {
 
 // Effect is the work of one keyed request.
 type Effect struct {
+	// Guard runs at transaction entry, before the replay row or domain locks.
+	// An owning module uses it when its current authority must remain valid
+	// through both new effects and replays. Nil needs no admission fence.
+	Guard func(ctx context.Context) error
 	// Run makes the effect through the context it is given and returns the
 	// positive, stable ID of the resource it created or changed. It runs
 	// only for a key that has no unexpired receipt.
@@ -107,6 +111,11 @@ func (p Replay) do(ctx context.Context, r ReplayRequest, e Effect, receipt *Repl
 		return fmt.Errorf("idempotency: prune receipts: %w", err)
 	}
 	err := p.Tx.Tx(ctx, func(ctx context.Context) error {
+		if e.Guard != nil {
+			if err := e.Guard(ctx); err != nil {
+				return err //nolint:wrapcheck // the operation owns its authority refusal
+			}
+		}
 		var err error
 		*receipt, err = p.Store.Do(ctx, r, e.Run)
 		if err != nil {

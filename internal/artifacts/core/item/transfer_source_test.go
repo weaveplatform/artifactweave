@@ -6,14 +6,56 @@ import (
 	"net/http"
 	"testing"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 type transferSourceGuard struct {
 	bare
 	check func(repo.Config, model.Item) error
+}
+
+func TestUnitTransferRechecksEveryCurrentSourceIncludingSidecars(t *testing.T) {
+	for _, move := range []bool{false, true} {
+		for _, folder := range []bool{false, true} {
+			t.Run(map[bool]string{false: "copy", true: "move"}[move]+map[bool]string{false: "/sidecar", true: "/descendant"}[folder], func(t *testing.T) {
+				w := keeping(t)
+				w.must("src/x.bin", "content")
+				w.must("src/x.bin.sig", "signed content")
+				dst := w.addRepo(repo.Config{Key: "target", Class: repo.Local})
+				path := "src/x.bin"
+				destination := "out/x.bin"
+				if folder {
+					path = "src"
+					destination = "out"
+				}
+				checkedAdditional := false
+				_, err := w.svc.Transfer(t.Context(), Transfer{
+					From: Target{Repo: w.loc, Path: path, CheckCurrent: func(ctx context.Context, current string, _ bool, want accessapi.Actions) error {
+						if !w.db.InTx(ctx) || !want.Has(accessapi.ActionRead) || move && !want.Has(accessapi.ActionDelete) {
+							t.Fatal("source action did not join the current publication check")
+						}
+						if current != path {
+							checkedAdditional = true
+							return kernel.ErrForbidden
+						}
+						return nil
+					}},
+					To: Target{Repo: dst, Path: destination}, Move: move,
+				})
+				if !checkedAdditional || !errors.Is(err, kernel.ErrForbidden) {
+					t.Fatal("revoked child source was published", err)
+				}
+				w.has(w.loc, true, "src/x.bin", "src/x.bin.sig")
+				if _, exists := w.get(dst, "out"); exists {
+					t.Fatal("refused source created a destination or its parents")
+				}
+			})
+		}
+	}
 }
 
 func (g transferSourceGuard) GuardTransferSource(

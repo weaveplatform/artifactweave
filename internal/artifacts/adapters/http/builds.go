@@ -56,7 +56,9 @@ func (s ArtifactoryAPI) buildCaller(
 		return nil, kernel.Principal{}, buildAccess{}, err
 	}
 	p, a, err := s.ItemCaller(ctx, st)
-	return s.builds(st), p, buildAccess{a}, err
+	svc := s.builds(st)
+	svc.CurrentAccess = s.currentBuildAccess(p)
+	return svc, p, buildAccess{a}, err
 }
 
 // buildError maps the build service's errors onto statuses; missing is the

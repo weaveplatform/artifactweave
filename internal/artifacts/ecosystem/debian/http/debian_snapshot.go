@@ -26,6 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -76,30 +77,39 @@ func (s DebianAPI) CreateDebianSnapshot(
 	if _, _, err := snapshotRepos(ctx, st, job, p, acc); err != nil {
 		return nil, err
 	}
-	if err := claimDebianSnapshot(ctx, st, job, p); err != nil {
-		return nil, s.ItemError(ctx, "Debian snapshot claim", err)
+	payload, err := json.Marshal(job)
+	if err != nil {
+		return nil, s.InternalError(ctx, "Debian snapshot request", err)
+	}
+	key := job.Target + "/" + job.Tag
+	if len(key) > work.MaxWorkKey {
+		return nil, httpkit.BadRequestf("Debian snapshot key is too long")
+	}
+	if err := s.Tx(ctx, func(ctx context.Context) error {
+		p, acc, err := s.ItemCaller(ctx, st)
+		if err != nil {
+			return err
+		}
+		if _, _, err := snapshotRepos(ctx, st, job, p, acc); err != nil {
+			return err
+		}
+		if err := claimDebianSnapshot(ctx, st, job, p); err != nil {
+			return err
+		}
+		if s.Work != nil {
+			return s.Work.Enqueue(ctx, debianSnapshotKind, key, payload)
+		}
+		return nil
+	}); err != nil {
+		return nil, s.ItemError(ctx, "Debian snapshot claim and queue", err)
 	}
 	if s.Work == nil {
 		if err := s.createDebianSnapshot(ctx, st, job, p, acc); err != nil {
 			return nil, s.ItemError(ctx, "Debian snapshot", err)
 		}
-	} else {
-		payload, err := json.Marshal(job)
-		if err != nil {
-			return nil, s.InternalError(ctx, "Debian snapshot request", err)
-		}
-		key := job.Target + "/" + job.Tag
-		if len(key) > work.MaxWorkKey {
-			return nil, httpkit.BadRequestf("Debian snapshot key is too long")
-		}
-		if err := s.Work.Enqueue(ctx, debianSnapshotKind, key, payload); err != nil {
-			return nil, s.InternalError(ctx, "Debian snapshot queue", err)
-		}
-		if req.Params.Async == nil ||
-			*req.Params.Async == artgen.CreateDebianSnapshotParamsAsyncN0 {
-			if err := s.Work.EnsureFresh(ctx, debianSnapshotKind, key); err != nil {
-				return nil, s.ItemError(ctx, "Debian snapshot", err)
-			}
+	} else if req.Params.Async == nil || *req.Params.Async == artgen.CreateDebianSnapshotParamsAsyncN0 {
+		if err := s.Work.EnsureFresh(ctx, debianSnapshotKind, key); err != nil {
+			return nil, s.ItemError(ctx, "Debian snapshot", err)
 		}
 	}
 	verb := "created"
@@ -266,7 +276,8 @@ func (s DebianAPI) createDebianSnapshot(
 	} else if !errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("snapshot marker lookup: %w", err)
 	}
-	files, err := s.debianSnapshotFiles(ctx, st, sourceRepo, job.Distribution, p, acc)
+	var checks snapshotAuthority
+	files, err := s.debianSnapshotFiles(ctx, st, sourceRepo, job.Distribution, p, acc, &checks)
 	if err != nil {
 		return err
 	}
@@ -275,47 +286,70 @@ func (s DebianAPI) createDebianSnapshot(
 		paths = append(paths, name)
 	}
 	slices.Sort(paths)
+	staged := make(map[string]blob.Info, len(files))
 	for _, name := range paths {
-		if !acc.File(targetRepo, root+"/"+name, accessapi.ActionWrite) {
-			return httpkit.Denied(p)
-		}
-		_, err := s.Items(st).Deploy(debian.WithSnapshotWrite(ctx), item.Deploy{
-			Target: item.Target{Repo: targetRepo, Path: root + "/" + name},
-			Body:   bytes.NewReader(files[name]), By: p.Name,
+		info, err := s.Items(st).Upload(ctx, item.Deploy{
+			Target: item.Target{Repo: targetRepo, Path: root + "/" + name}, Body: bytes.NewReader(files[name]),
 		})
 		if err != nil {
-			return fmt.Errorf("snapshot metadata %s: %w", name, err)
+			return fmt.Errorf("stage snapshot metadata %s: %w", name, err)
 		}
+		staged[name] = info
 	}
-	marker, err := st.Items().Put(ctx, model.Item{
-		RepoKey: targetRepo.Key, Name: root, Folder: true,
-		Created: time.Now().UTC(), CreatedBy: p.Name,
+	err = s.Tx(accessapi.WithCaller(ctx, p, acc.Decider), func(ctx context.Context) error {
+		p, acc, err := s.ItemCaller(ctx, st)
+		if err != nil {
+			return err
+		}
+		if _, _, err := snapshotRepos(ctx, st, job, p, acc); err != nil {
+			return err
+		}
+		if err := checks.validate(ctx, p, acc); err != nil {
+			return err
+		}
+		for _, name := range paths {
+			if !acc.File(targetRepo, root+"/"+name, accessapi.ActionWrite) {
+				return httpkit.Denied(p)
+			}
+			if _, err := s.Items(st).DeployCommitted(debian.WithSnapshotWrite(ctx), item.Deploy{
+				Target: item.Target{Repo: targetRepo, Path: root + "/" + name}, By: p.Name,
+			}, staged[name]); err != nil {
+				return fmt.Errorf("snapshot metadata %s: %w", name, err)
+			}
+		}
+		marker, err := st.Items().Put(ctx, model.Item{
+			RepoKey: targetRepo.Key, Name: root, Folder: true,
+			Created: time.Now().UTC(), CreatedBy: p.Name,
+		})
+		if err != nil {
+			return fmt.Errorf("snapshot marker: %w", err)
+		}
+		if err := st.Items().SetProperties(ctx, marker.ID, model.Properties{
+			"deb.snapshot.source": {sourceRepo.Key}, "deb.snapshot.distribution": {job.Distribution},
+		}, time.Now().UTC()); err != nil {
+			return fmt.Errorf("snapshot source property: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("snapshot marker: %w", err)
-	}
-	if err := st.Items().SetProperties(ctx, marker.ID,
-		model.Properties{
-			"deb.snapshot.source":       {sourceRepo.Key},
-			"deb.snapshot.distribution": {job.Distribution},
-		}, time.Now().UTC()); err != nil {
-		return fmt.Errorf("snapshot source property: %w", err)
+		return fmt.Errorf("publish snapshot metadata: %w", err)
 	}
 	return nil
 }
 
 func (s DebianAPI) debianSnapshotFiles(
 	ctx context.Context, st itemkit.Store, c repo.Config, distribution string,
-	p kernel.Principal, acc itemkit.Access,
+	p kernel.Principal, acc itemkit.Access, checks *snapshotAuthority,
 ) (map[string][]byte, error) {
 	if c.Class == repo.Virtual {
-		return s.snapshotVirtualDebian(ctx, st, c, distribution, p, acc)
+		return s.snapshotVirtualDebian(ctx, st, c, distribution, p, acc, checks)
 	}
 	base := "dists/" + distribution + "/"
-	release, _, err := s.debianMemberBytes(ctx, st, c, base+"Release", p, acc)
+	release, releaseCheck, err := s.debianMemberBytes(ctx, st, c, base+"Release", p, acc)
 	if err != nil {
 		return nil, fmt.Errorf("snapshot Release: %w", snapshotReadError(err, p))
 	}
+	checks.add(c, base+"Release", releaseCheck)
 	refs, err := debian.ReleaseIndexRefs(distribution, release)
 	if err != nil {
 		return nil, fmt.Errorf("snapshot Release declarations: %w", err)
@@ -357,6 +391,7 @@ func (s DebianAPI) debianSnapshotFiles(
 				if !acc.File(c, artifact, accessapi.ActionRead) {
 					return nil, httpkit.Denied(p)
 				}
+				checks.add(c, artifact, checkPermission)
 				if checkPermission != nil {
 					if err := checkPermission(ctx, artifact); err != nil {
 						return nil, fmt.Errorf("snapshot artifact authority: %w",
@@ -365,6 +400,7 @@ func (s DebianAPI) debianSnapshotFiles(
 				}
 			}
 		}
+		checks.add(c, ref.Path, checkPermission)
 		files[ref.Path] = body
 		total += int64(len(body))
 		if debian.PackagesIndexPath(ref.Path) || debian.SourcesIndexPath(ref.Path) {
@@ -373,13 +409,14 @@ func (s DebianAPI) debianSnapshotFiles(
 		}
 	}
 	for _, suffix := range []string{"InRelease", "Release.gpg"} {
-		body, _, err := s.debianMemberBytes(ctx, st, c, base+suffix, p, acc)
+		body, permission, err := s.debianMemberBytes(ctx, st, c, base+suffix, p, acc)
 		if errors.Is(err, kernel.ErrNotFound) {
 			continue
 		}
 		if err != nil {
 			return nil, fmt.Errorf("snapshot %s: %w", suffix, snapshotReadError(err, p))
 		}
+		checks.add(c, base+suffix, permission)
 		files[base+suffix] = body
 	}
 	return files, nil
@@ -394,7 +431,7 @@ func (s DebianAPI) debianSnapshotFiles(
 // carries the caller and its decider.
 func (s DebianAPI) snapshotVirtualDebian(
 	ctx context.Context, st itemkit.Store, c repo.Config, distribution string,
-	p kernel.Principal, acc itemkit.Access,
+	p kernel.Principal, acc itemkit.Access, checks *snapshotAuthority,
 ) (map[string][]byte, error) {
 	k, err := s.Packages(debianProtocol(s.Kit), false)
 	if err != nil {
@@ -409,7 +446,7 @@ func (s DebianAPI) snapshotVirtualDebian(
 	// say, so the walk does not check them.
 	open := c
 	open.IncludesPattern, open.ExcludesPattern = nil, nil
-	return s.buildVirtualDebian(k.Bind(r, open), k, st, c, distribution, p, acc)
+	return s.buildVirtualDebian(k.Bind(r, open), k, st, c, distribution, p, acc, checks)
 }
 
 // snapshotReadError answers a read of the source that the caller may not

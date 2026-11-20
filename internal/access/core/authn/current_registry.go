@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"maps"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
@@ -30,7 +31,8 @@ func (a *Authenticator) CurrentRegistry(
 		// Stored parent scopes are immutable. Refuse replacement of that record,
 		// rather than allowing an old grant to inherit a changed scope/identity.
 		if parent.Expired(a.now()) || parent.Subject != p.TokenSubject ||
-			parent.Identity != p.Identity || parent.Scope.String() != p.Scope.String() {
+			parent.Identity != p.Identity || parent.Scope.String() != p.Scope.String() ||
+			parent.ProjectKey != p.TokenProject || !maps.Equal(parent.ProjectIncarnations, p.ProjectIncarnations) {
 			return kernel.Principal{}, kernel.ErrBadCredentials
 		}
 	}
@@ -53,5 +55,6 @@ func (a *Authenticator) CurrentRegistry(
 	fresh.TokenID, fresh.TokenExpires, fresh.Identity = p.TokenID, p.TokenExpires, p.Identity
 	fresh.Registry, fresh.TokenParent, fresh.Anonymous = p.Registry, p.TokenParent, p.Anonymous
 	fresh.TokenSubject, fresh.PasswordRevision = p.TokenSubject, p.PasswordRevision
+	fresh.TokenProject, fresh.ProjectIncarnations = p.TokenProject, maps.Clone(p.ProjectIncarnations)
 	return fresh, nil
 }

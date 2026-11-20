@@ -50,6 +50,11 @@ var (
 	ErrNotFound = kernel.ErrNotFound
 	// ErrExists is a deploy with IfAbsent to a path that holds an item.
 	ErrExists = errors.New("item: the path already holds an item")
+	// ErrPermissionDenied marks a current action refusal, separately from an
+	// ended credential or unavailable policy. A publication adapter wraps it
+	// alongside its HTTP refusal; only a denied Delete may use the identical
+	// content overwrite exception.
+	ErrPermissionDenied = errors.New("item: current action is not permitted")
 )
 
 // Store is what the item service reads and writes: what its formats see
@@ -98,7 +103,10 @@ type Service struct {
 	// ReindexAuthorize checks the original caller of queued remote maintenance.
 	// A remote job fails closed when this runtime hook is absent.
 	ReindexAuthorize func(context.Context, repo.Config, format.WorkRequest) error
-	readLayouts      map[string]readLayout
+	// GuardAuthority takes the current project/credential fence at transaction
+	// entry, before source or item locks. Nil is a service without access policy.
+	GuardAuthority func(context.Context) error
+	readLayouts    map[string]readLayout
 }
 
 func (s *Service) now() time.Time {
@@ -114,6 +122,23 @@ type Target struct {
 	Repo   repo.Config
 	Cached bool
 	Path   string
+	// CheckCurrent rechecks the original client's operation inside publication,
+	// using its transaction context and the actual admitted path. The owning
+	// adapter supplies it for client writes; server-derived metadata keeps its
+	// owner's separate authority check. It must acquire the shared authority
+	// guard before reading identity/policy and retain it through this transaction.
+	// Action refusals wrap ErrPermissionDenied; credential and policy failures
+	// must not, so they cannot use the identical-content overwrite exception.
+	CheckCurrent func(ctx context.Context, path string, folder bool, want accessapi.Actions) error `json:"-"`
+}
+
+func (t Target) checkCurrent(ctx context.Context, path string, folder bool, want accessapi.Actions) error {
+	if t.CheckCurrent != nil {
+		if err := t.CheckCurrent(ctx, path, folder, want); err != nil {
+			return fmt.Errorf("item: current publication authority: %w", err)
+		}
+	}
+	return nil
 }
 
 // Deploy is a file write.
@@ -400,6 +425,18 @@ func (s *Service) storeFile(
 	}
 	var stored model.Item
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
+		if d.CheckCurrent != nil && d.Reusable != nil {
+			// A checksum lookup before publication cannot retain source Read
+			// after a role/group changes. Repeat its local-only gate in this
+			// transaction; the adapter takes the authority guard first.
+			allowed, err := d.Reusable(ctx, blob.Blob{Checksums: actual, Size: size})
+			if err != nil {
+				return fmt.Errorf("item: current reusable content: %w", err)
+			}
+			if !allowed {
+				return ErrNoBlob
+			}
+		}
 		var err error
 		stored, err = s.putFile(ctx, env, d, actual, size, declared, s.now())
 		return err
@@ -422,6 +459,9 @@ func (s *Service) putFile(
 	declared kernel.Checksums,
 	now time.Time,
 ) (model.Item, error) {
+	if err := d.checkCurrent(ctx, d.Path, false, accessapi.ActionWrite); err != nil {
+		return model.Item{}, err
+	}
 	h := s.format(d.Repo.PackageType)
 	// Only properties the client sent replace the file's: those a format
 	// adds in Admit, such as Maven's plugin mark, join the file's, as
@@ -438,6 +478,11 @@ func (s *Service) putFile(
 	w, err := admit(ctx, h, env, d.Repo, w)
 	if err != nil {
 		return model.Item{}, hookFault(ctx, d, err)
+	}
+	if w.Path != d.Path {
+		if err := d.checkCurrent(ctx, w.Path, false, accessapi.ActionWrite); err != nil {
+			return model.Item{}, err
+		}
 	}
 	d.Path, d.Properties = w.Path, w.Properties
 	written, err := s.writeFile(ctx, d, fileWrite{
@@ -527,9 +572,14 @@ func (s *Service) writeFile(
 		return writtenFile{}, fmt.Errorf("%w: %s", ErrExists, full)
 	case err == nil && old.Folder:
 		return writtenFile{}, fmt.Errorf("%w: %s is a folder", ErrConflict, full)
-	case err == nil && !d.mayReplace(full, old, declared, actual):
-		return writtenFile{}, &OverwriteDeniedError{Repo: d.Repo.Key, Path: full, User: d.By}
 	case err == nil:
+		allowed, err := d.mayReplace(ctx, full, old, declared, actual)
+		if err != nil {
+			return writtenFile{}, err
+		}
+		if !allowed {
+			return writtenFile{}, &OverwriteDeniedError{Repo: d.Repo.Key, Path: full, User: d.By}
+		}
 		it.Created, it.CreatedBy = old.Created, old.CreatedBy
 	case !errors.Is(err, kernel.ErrNotFound):
 		return writtenFile{}, fmt.Errorf("item: get %s: %w", full, err)
@@ -645,12 +695,22 @@ func nonUniqueSnapshot(p string) bool {
 // content whose digests are actual: CanOverwritePath allows it, or
 // OverwriteIdentical does and the deploy declares and stores old's own
 // content.
-func (d *Deploy) mayReplace(full string, old model.Item, declared, actual kernel.Checksums) bool {
-	if d.CanOverwritePath == nil || d.CanOverwritePath(full) {
-		return true
+func (d *Deploy) mayReplace(ctx context.Context, full string, old model.Item, declared, actual kernel.Checksums) (bool, error) {
+	if d.CheckCurrent != nil {
+		err := d.checkCurrent(ctx, full, false, accessapi.ActionDelete)
+		if err == nil {
+			return true, nil
+		}
+		if !errors.Is(err, ErrPermissionDenied) {
+			// Invalid credentials or storage faults cannot borrow the identical
+			// content exception, which removes only a Delete requirement.
+			return false, err
+		}
+	} else if d.CanOverwritePath == nil || d.CanOverwritePath(full) {
+		return true, nil
 	}
 	return d.OverwriteIdentical && DeclaresContentOf(declared, old) &&
-		actual.SHA256 == old.Actual.SHA256
+		actual.SHA256 == old.Actual.SHA256, nil
 }
 
 // MakeFolder creates the folder at t.Path and its parents, once the format
@@ -667,6 +727,9 @@ func (s *Service) MakeFolder(
 	full := strings.Trim(t.Path, "/")
 	var folder model.Item
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := t.checkCurrent(ctx, full, true, accessapi.ActionWrite); err != nil {
+			return err
+		}
 		if a, ok := s.format(t.Repo.PackageType).(format.FolderAdmitter); ok {
 			if err := a.AdmitFolder(ctx, s.env(), t.Repo, full); err != nil {
 				return err //nolint:wrapcheck // the format's own error
@@ -865,6 +928,9 @@ func (s *Service) RecordSidecar(
 	received := value
 	var stored model.Item
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := t.checkCurrent(ctx, t.Path, false, accessapi.ActionWrite); err != nil {
+			return err
+		}
 		// The format answers first, as Artifactory refuses an oversized
 		// sidecar and drops metadata checksums before reading the value.
 		w, err := admit(ctx, s.format(t.Repo.PackageType), s.env(), t.Repo, format.Write{
@@ -872,6 +938,11 @@ func (s *Service) RecordSidecar(
 		})
 		if err != nil {
 			return err
+		}
+		if w.Path != t.Path {
+			if err := t.checkCurrent(ctx, w.Path, false, accessapi.ActionWrite); err != nil {
+				return err
+			}
 		}
 		var declared kernel.Checksums
 		a.set(&declared, value)
@@ -963,6 +1034,9 @@ func (s *Service) remove(
 	var res port.DeleteResult
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		ctx = artifactevents.WithActor(ctx, by)
+		if err := t.checkCurrent(ctx, full, false, accessapi.ActionDelete); err != nil {
+			return err
+		}
 		invalidated, err := s.invalidateCache(ctx, t, by)
 		if err != nil {
 			return err
@@ -982,6 +1056,9 @@ func (s *Service) remove(
 			return err
 		}
 		for _, sc := range sidecars {
+			if err := t.checkCurrent(ctx, sc.FullPath(), false, accessapi.ActionDelete); err != nil {
+				return err
+			}
 			if _, err := s.invalidateCache(
 				ctx,
 				Target{Repo: t.Repo, Cached: t.Cached, Path: sc.FullPath()},

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"maps"
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -18,6 +19,10 @@ type Subject struct {
 	// Scope is the scope of the token the request carries; nil for password
 	// authentication, which acts with everything the subject holds.
 	Scope *kernel.Scope
+	// ProjectKey and ProjectIncarnations are verified server-side token
+	// boundaries, empty for a subject without a project-bound token.
+	ProjectKey          string
+	ProjectIncarnations map[string]string
 }
 
 // Repo identifies a permission target: a repository's key and class (local,
@@ -32,9 +37,9 @@ type Repo struct {
 // Decider answers the permission questions other modules ask about one
 // request's subject, from the snapshot of the permissions taken when it was
 // built (decision 0006). The access module's evaluator implements it, and an
-// implementation answers exactly as that evaluator does: a token scope only
-// removes actions, except that applied-permissions/admin acts as an
-// administrator. The methods only read that snapshot, so a Decider may be
+// implementation answers exactly as that evaluator does: native applied scopes
+// select user, group or explicitly delegated project roles; resource scopes
+// always bound their actions. The methods only read that snapshot, so a Decider may be
 // used from several goroutines. It holds only what other modules ask; the
 // questions about permission documents and the subject's own grants stay on
 // the evaluator, because only access's permission handlers ask them.
@@ -76,6 +81,22 @@ type Decider interface {
 	// administrator may, anyone else only through a token's system scope
 	// that covers the area and the actions.
 	System(area string, want kernel.ScopeActions) bool
+	// ManagesRepository checks current project administration independently of
+	// content actions. class is local, remote or virtual; an unowned repository
+	// requires platform administration. Granular class privileges are already
+	// normalized by project administration, so a false value stays a denial.
+	ManagesRepository(projectKey, class string, operation RepositoryOperation) bool
+	// ManagesProject checks the current administrator role and token management
+	// ceiling. An empty project key asks for platform-wide administration.
+	ManagesProject(projectKey string, operation ProjectOperation) bool
+	// ManagesWebhook checks subscription administration independently of content
+	// permissions. serviceURL is the configured JFrog platform URL, never the
+	// webhook receiver or a request-supplied Host. Project administrators are
+	// limited to their own artifact, artifact_property, docker and build domains.
+	ManagesWebhook(projectKey, domain, serviceURL string, want kernel.ScopeActions) bool
+	// HasWebhookAccess authorizes the collection before it is read or filtered.
+	// ManagesWebhook still checks every subscription in a permitted collection.
+	HasWebhookAccess(serviceURL string, want kernel.ScopeActions) bool
 }
 
 // Authorizer evaluates a principal's permissions (decision 0006), once for a
@@ -121,6 +142,7 @@ func SubjectOf(p kernel.Principal) Subject {
 		Name: p.Name, Groups: slices.Clone(p.Groups), Admin: p.Admin, Anonymous: p.Anonymous,
 	}
 	if p.IsTokenAuthenticated {
+		s.ProjectKey, s.ProjectIncarnations = p.TokenProject, maps.Clone(p.ProjectIncarnations)
 		sc := p.Scope
 		s.Scope = &sc
 		// A groups scope acts through the groups it names whether or not

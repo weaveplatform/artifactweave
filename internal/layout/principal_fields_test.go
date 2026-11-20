@@ -22,7 +22,7 @@ import (
 // queued work. The kernel declares Principal, so they are exported, but a
 // value set outside access could pass that recheck for a credential nobody
 // verified.
-var principalInternals = []string{"IsTokenAuthenticated", "PasswordRevision", "TokenSubject"}
+var principalInternals = []string{"IsTokenAuthenticated", "PasswordRevision", "TokenSubject", "TokenProject", "ProjectIncarnations"}
 
 // sharedInternal is the one of them that CredentialReference and
 // DownloadCredential declare too, for the revision they persist. Setting it in
