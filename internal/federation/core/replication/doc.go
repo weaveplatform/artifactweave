@@ -1,5 +1,5 @@
-// Package replication will run repository replication: single push and pull
-// first, then multi-push and event replication.
+// Package replication manages single push/pull configuration under current
+// repository authority and fences worker bookkeeping with private revisions.
 //
 // # Role
 //
@@ -7,14 +7,15 @@
 //
 // # Inputs
 //
-// None yet. Planned: replication configurations and their execute requests
-// (plan P11, task 4).
+// Presence-aware Input, a shared metadata unit of work, current repository
+// authority, secret-free ownership and canonical remote/proxy configuration.
 //
 // # Outputs
 //
-// None yet. Planned (target layout, line 338): single push and pull between
-// two instances in P11, then multi-push, event-triggered and checksum
-// replication with per-target status and retry in P37.
+// Secret-safe View, stable public target identity, private change revisions,
+// atomic bulk enablement and global pause controls. An omitted credential is
+// merged before the store's whole-row replacement. WithTarget guards bounded
+// metadata bookkeeping; it never holds a transaction over network I/O.
 //
 // # References
 //
@@ -33,5 +34,6 @@
 //
 // # Status
 //
-// Placeholder: implemented by P11, P37.
+// Configuration is implemented by REP-01. Transfer and execution are separate
+// P11 owners; multi-push, event-triggered and checksum behavior remain P37.
 package replication

@@ -20,6 +20,7 @@ func replication(key, repoKey string) model.Replication {
 	return model.Replication{
 		RepoKey:              repoKey,
 		Key:                  key,
+		Revision:             "private-revision-" + key,
 		URL:                  "https://edge.example/artifactory/" + repoKey,
 		Username:             "replicator",
 		Password:             "pw-" + key,

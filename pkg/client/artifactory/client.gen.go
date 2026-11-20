@@ -5846,7 +5846,7 @@ type RemoveRepositorySuccessReportSuccess bool
 
 // ReplicationConfigRequest Configuration of one replication for a repository. On a local repository it is a push to another instance's local repository; on a remote repository it is a pull from the upstream into the cache. The same shape is returned by the read operation, where replicationKey and repoKey are filled in by the server.
 type ReplicationConfigRequest struct {
-	// CheckBinaryExistenceInFilestore Optional within this object. Skip transferring content the target already holds, as allowed by the target's checksum replication settings. Accepted and ignored.
+	// CheckBinaryExistenceInFilestore Optional within this object. Skip transferring content the target already holds, as allowed by the target's checksum replication settings. True is rejected until checksum replication is supported.
 	CheckBinaryExistenceInFilestore *bool `json:"checkBinaryExistenceInFilestore,omitempty"`
 
 	// CronExp Optional within this object. Schedule in Quartz cron syntax, for example 0 0 2 * * ?. Omitted on create leaves the replication unscheduled and only runnable on demand. When an array of configurations is set, the first element's value applies to all.
@@ -5855,7 +5855,7 @@ type ReplicationConfigRequest struct {
 	// DisableProxy Optional within this object. True ignores the instance-wide default proxy for this replication. Defaults to false.
 	DisableProxy *bool `json:"disableProxy,omitempty"`
 
-	// EnableEventReplication Optional within this object. True replicates each write as it happens in addition to the schedule. Defaults to false. Event-based replication is accepted and stored but not acted on.
+	// EnableEventReplication Optional within this object. True replicates each write as it happens in addition to the schedule. Defaults to false. True is rejected until event-based replication is supported.
 	EnableEventReplication *bool `json:"enableEventReplication,omitempty"`
 
 	// Enabled Optional within this object. False keeps the configuration but stops the schedule. Defaults to true.
@@ -5873,7 +5873,10 @@ type ReplicationConfigRequest struct {
 	// Proxy Optional within this object. Key of a configured proxy to route the replication through.
 	Proxy *string `json:"proxy,omitempty"`
 
-	// ReplicationKey Optional within this object. Server-owned identifier of this configuration; ignored on input. It is not guaranteed to stay the same across updates, so clients should not depend on it.
+	// ProxyRef Optional within this object. Response-only alias of proxy. Ignored on input.
+	ProxyRef *string `json:"proxyRef,omitempty"`
+
+	// ReplicationKey Optional within this object. Server-owned identifier of this configuration; ignored on input. This server preserves it across updates and allocates a new identifier after deletion and recreation.
 	ReplicationKey *string `json:"replicationKey,omitempty"`
 
 	// RepoKey Optional within this object. Server-owned; the repository the configuration belongs to, taken from the path. Ignored on input.
@@ -6161,6 +6164,14 @@ type SecurityStatusMessage struct {
 	Status *string `json:"status,omitempty"`
 }
 
+// SetSingleReplicationConfigurationRequest One single-target configuration, supplied as an object or a one-element array.
+type SetSingleReplicationConfigurationRequest struct {
+	union json.RawMessage
+}
+
+// SetSingleReplicationConfigurationRequest1 Array form; only a single element is accepted.
+type SetSingleReplicationConfigurationRequest1 = []ReplicationConfigRequest
+
 // Sha256ChecksumRequest Names the item whose `sha256` property should be computed. SHA-256 is recorded on every deploy, so the call only re-attaches the property.
 type Sha256ChecksumRequest struct {
 	// Path Required within this object. Item path without a leading `/`. A folder path applies the operation to every file below it.
@@ -6433,6 +6444,11 @@ type UpdatePropertiesRequestProps1 = []string
 
 // UpdatePropertiesRequest_Props_AdditionalProperties A single string sets one value, an array of strings sets several, and null removes the key.
 type UpdatePropertiesRequest_Props_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// UpdateSingleReplicationConfigurationRequest A partial target update, or URL patterns for the reserved bulk enable/disable operations.
+type UpdateSingleReplicationConfigurationRequest struct {
 	union json.RawMessage
 }
 
@@ -7448,19 +7464,6 @@ type GetRepositoryReplicationConfiguration200JSONResponseBody struct {
 	union json.RawMessage
 }
 
-// UpdateRepositoryReplicationConfigurationJSONBody defines parameters for UpdateRepositoryReplicationConfiguration.
-type UpdateRepositoryReplicationConfigurationJSONBody struct {
-	union json.RawMessage
-}
-
-// SetRepositoryReplicationConfigurationJSONBody defines parameters for SetRepositoryReplicationConfiguration.
-type SetRepositoryReplicationConfigurationJSONBody struct {
-	union json.RawMessage
-}
-
-// SetRepositoryReplicationConfigurationJSONBody1 defines parameters for SetRepositoryReplicationConfiguration.
-type SetRepositoryReplicationConfigurationJSONBody1 = []ReplicationConfigRequest
-
 // GetRepositoriesByTypeAndProjectParams defines parameters for GetRepositoriesByTypeAndProject.
 type GetRepositoriesByTypeAndProjectParams struct {
 	// Type Optional query parameter. Repository class to list. distribution is accepted and always yields an empty list.
@@ -7891,19 +7894,19 @@ type StopSha256MigrationParams struct {
 
 // BlockSystemReplicationParams defines parameters for BlockSystemReplication.
 type BlockSystemReplicationParams struct {
-	// Push Optional query parameter. true (default) blocks push replications; false leaves them running.
+	// Push Optional query parameter. true (default) blocks push replications; false leaves the current push setting unchanged.
 	Push *string `form:"push,omitempty" json:"push,omitempty"`
 
-	// Pull Optional query parameter. true (default) blocks pull replications; false leaves them running.
+	// Pull Optional query parameter. true (default) blocks pull replications; false leaves the current pull setting unchanged.
 	Pull *string `form:"pull,omitempty" json:"pull,omitempty"`
 }
 
 // UnblockSystemReplicationParams defines parameters for UnblockSystemReplication.
 type UnblockSystemReplicationParams struct {
-	// Push Optional query parameter. true (default) unblocks push replications; false leaves them blocked.
+	// Push Optional query parameter. true (default) unblocks push replications; false leaves the current push setting unchanged.
 	Push *string `form:"push,omitempty" json:"push,omitempty"`
 
-	// Pull Optional query parameter. true (default) unblocks pull replications; false leaves them blocked.
+	// Pull Optional query parameter. true (default) unblocks pull replications; false leaves the current pull setting unchanged.
 	Pull *string `form:"pull,omitempty" json:"pull,omitempty"`
 }
 
@@ -8344,10 +8347,10 @@ type UpdateMultiPushReplicationJSONRequestBody = MultipleReplicationConfigReques
 type CreateOrReplaceMultiPushReplicationJSONRequestBody = MultipleReplicationConfigRequest
 
 // UpdateRepositoryReplicationConfigurationJSONRequestBody defines body for UpdateRepositoryReplicationConfiguration for application/json ContentType.
-type UpdateRepositoryReplicationConfigurationJSONRequestBody UpdateRepositoryReplicationConfigurationJSONBody
+type UpdateRepositoryReplicationConfigurationJSONRequestBody = UpdateSingleReplicationConfigurationRequest
 
 // SetRepositoryReplicationConfigurationJSONRequestBody defines body for SetRepositoryReplicationConfiguration for application/json ContentType.
-type SetRepositoryReplicationConfigurationJSONRequestBody SetRepositoryReplicationConfigurationJSONBody
+type SetRepositoryReplicationConfigurationJSONRequestBody = SetSingleReplicationConfigurationRequest
 
 // UpdateRepositoryConfigurationJSONRequestBody defines body for UpdateRepositoryConfiguration for application/json ContentType.
 type UpdateRepositoryConfigurationJSONRequestBody = RepositoryConfiguration
@@ -9043,6 +9046,68 @@ func (t *RepoBulkRemovalReport_Reports_Item) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsReplicationConfigRequest returns the union data inside the SetSingleReplicationConfigurationRequest as a ReplicationConfigRequest
+func (t SetSingleReplicationConfigurationRequest) AsReplicationConfigRequest() (ReplicationConfigRequest, error) {
+	var body ReplicationConfigRequest
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromReplicationConfigRequest overwrites any union data inside the SetSingleReplicationConfigurationRequest as the provided ReplicationConfigRequest
+func (t *SetSingleReplicationConfigurationRequest) FromReplicationConfigRequest(v ReplicationConfigRequest) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeReplicationConfigRequest performs a merge with any union data inside the SetSingleReplicationConfigurationRequest, using the provided ReplicationConfigRequest
+func (t *SetSingleReplicationConfigurationRequest) MergeReplicationConfigRequest(v ReplicationConfigRequest) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSetSingleReplicationConfigurationRequest1 returns the union data inside the SetSingleReplicationConfigurationRequest as a SetSingleReplicationConfigurationRequest1
+func (t SetSingleReplicationConfigurationRequest) AsSetSingleReplicationConfigurationRequest1() (SetSingleReplicationConfigurationRequest1, error) {
+	var body SetSingleReplicationConfigurationRequest1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSetSingleReplicationConfigurationRequest1 overwrites any union data inside the SetSingleReplicationConfigurationRequest as the provided SetSingleReplicationConfigurationRequest1
+func (t *SetSingleReplicationConfigurationRequest) FromSetSingleReplicationConfigurationRequest1(v SetSingleReplicationConfigurationRequest1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSetSingleReplicationConfigurationRequest1 performs a merge with any union data inside the SetSingleReplicationConfigurationRequest, using the provided SetSingleReplicationConfigurationRequest1
+func (t *SetSingleReplicationConfigurationRequest) MergeSetSingleReplicationConfigurationRequest1(v SetSingleReplicationConfigurationRequest1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SetSingleReplicationConfigurationRequest) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SetSingleReplicationConfigurationRequest) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsUpdatePropertiesRequestProps0 returns the union data inside the UpdatePropertiesRequest_Props_AdditionalProperties as a UpdatePropertiesRequestProps0
 func (t UpdatePropertiesRequest_Props_AdditionalProperties) AsUpdatePropertiesRequestProps0() (UpdatePropertiesRequestProps0, error) {
 	var body UpdatePropertiesRequestProps0
@@ -9101,6 +9166,68 @@ func (t UpdatePropertiesRequest_Props_AdditionalProperties) MarshalJSON() ([]byt
 }
 
 func (t *UpdatePropertiesRequest_Props_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsReplicationConfigRequest returns the union data inside the UpdateSingleReplicationConfigurationRequest as a ReplicationConfigRequest
+func (t UpdateSingleReplicationConfigurationRequest) AsReplicationConfigRequest() (ReplicationConfigRequest, error) {
+	var body ReplicationConfigRequest
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromReplicationConfigRequest overwrites any union data inside the UpdateSingleReplicationConfigurationRequest as the provided ReplicationConfigRequest
+func (t *UpdateSingleReplicationConfigurationRequest) FromReplicationConfigRequest(v ReplicationConfigRequest) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeReplicationConfigRequest performs a merge with any union data inside the UpdateSingleReplicationConfigurationRequest, using the provided ReplicationConfigRequest
+func (t *UpdateSingleReplicationConfigurationRequest) MergeReplicationConfigRequest(v ReplicationConfigRequest) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsReplicationEnableDisableRequest returns the union data inside the UpdateSingleReplicationConfigurationRequest as a ReplicationEnableDisableRequest
+func (t UpdateSingleReplicationConfigurationRequest) AsReplicationEnableDisableRequest() (ReplicationEnableDisableRequest, error) {
+	var body ReplicationEnableDisableRequest
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromReplicationEnableDisableRequest overwrites any union data inside the UpdateSingleReplicationConfigurationRequest as the provided ReplicationEnableDisableRequest
+func (t *UpdateSingleReplicationConfigurationRequest) FromReplicationEnableDisableRequest(v ReplicationEnableDisableRequest) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeReplicationEnableDisableRequest performs a merge with any union data inside the UpdateSingleReplicationConfigurationRequest, using the provided ReplicationEnableDisableRequest
+func (t *UpdateSingleReplicationConfigurationRequest) MergeReplicationEnableDisableRequest(v ReplicationEnableDisableRequest) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t UpdateSingleReplicationConfigurationRequest) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *UpdateSingleReplicationConfigurationRequest) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -9225,130 +9352,6 @@ func (t GetRepositoryReplicationConfiguration200JSONResponseBody) MarshalJSON() 
 }
 
 func (t *GetRepositoryReplicationConfiguration200JSONResponseBody) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsReplicationConfigRequest returns the union data inside the UpdateRepositoryReplicationConfigurationJSONBody as a ReplicationConfigRequest
-func (t UpdateRepositoryReplicationConfigurationJSONBody) AsReplicationConfigRequest() (ReplicationConfigRequest, error) {
-	var body ReplicationConfigRequest
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromReplicationConfigRequest overwrites any union data inside the UpdateRepositoryReplicationConfigurationJSONBody as the provided ReplicationConfigRequest
-func (t *UpdateRepositoryReplicationConfigurationJSONBody) FromReplicationConfigRequest(v ReplicationConfigRequest) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeReplicationConfigRequest performs a merge with any union data inside the UpdateRepositoryReplicationConfigurationJSONBody, using the provided ReplicationConfigRequest
-func (t *UpdateRepositoryReplicationConfigurationJSONBody) MergeReplicationConfigRequest(v ReplicationConfigRequest) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsReplicationEnableDisableRequest returns the union data inside the UpdateRepositoryReplicationConfigurationJSONBody as a ReplicationEnableDisableRequest
-func (t UpdateRepositoryReplicationConfigurationJSONBody) AsReplicationEnableDisableRequest() (ReplicationEnableDisableRequest, error) {
-	var body ReplicationEnableDisableRequest
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromReplicationEnableDisableRequest overwrites any union data inside the UpdateRepositoryReplicationConfigurationJSONBody as the provided ReplicationEnableDisableRequest
-func (t *UpdateRepositoryReplicationConfigurationJSONBody) FromReplicationEnableDisableRequest(v ReplicationEnableDisableRequest) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeReplicationEnableDisableRequest performs a merge with any union data inside the UpdateRepositoryReplicationConfigurationJSONBody, using the provided ReplicationEnableDisableRequest
-func (t *UpdateRepositoryReplicationConfigurationJSONBody) MergeReplicationEnableDisableRequest(v ReplicationEnableDisableRequest) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t UpdateRepositoryReplicationConfigurationJSONBody) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *UpdateRepositoryReplicationConfigurationJSONBody) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsReplicationConfigRequest returns the union data inside the SetRepositoryReplicationConfigurationJSONBody as a ReplicationConfigRequest
-func (t SetRepositoryReplicationConfigurationJSONBody) AsReplicationConfigRequest() (ReplicationConfigRequest, error) {
-	var body ReplicationConfigRequest
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromReplicationConfigRequest overwrites any union data inside the SetRepositoryReplicationConfigurationJSONBody as the provided ReplicationConfigRequest
-func (t *SetRepositoryReplicationConfigurationJSONBody) FromReplicationConfigRequest(v ReplicationConfigRequest) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeReplicationConfigRequest performs a merge with any union data inside the SetRepositoryReplicationConfigurationJSONBody, using the provided ReplicationConfigRequest
-func (t *SetRepositoryReplicationConfigurationJSONBody) MergeReplicationConfigRequest(v ReplicationConfigRequest) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsSetRepositoryReplicationConfigurationJSONBody1 returns the union data inside the SetRepositoryReplicationConfigurationJSONBody as a SetRepositoryReplicationConfigurationJSONBody1
-func (t SetRepositoryReplicationConfigurationJSONBody) AsSetRepositoryReplicationConfigurationJSONBody1() (SetRepositoryReplicationConfigurationJSONBody1, error) {
-	var body SetRepositoryReplicationConfigurationJSONBody1
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromSetRepositoryReplicationConfigurationJSONBody1 overwrites any union data inside the SetRepositoryReplicationConfigurationJSONBody as the provided SetRepositoryReplicationConfigurationJSONBody1
-func (t *SetRepositoryReplicationConfigurationJSONBody) FromSetRepositoryReplicationConfigurationJSONBody1(v SetRepositoryReplicationConfigurationJSONBody1) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeSetRepositoryReplicationConfigurationJSONBody1 performs a merge with any union data inside the SetRepositoryReplicationConfigurationJSONBody, using the provided SetRepositoryReplicationConfigurationJSONBody1
-func (t *SetRepositoryReplicationConfigurationJSONBody) MergeSetRepositoryReplicationConfigurationJSONBody1(v SetRepositoryReplicationConfigurationJSONBody1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t SetRepositoryReplicationConfigurationJSONBody) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *SetRepositoryReplicationConfigurationJSONBody) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -10890,36 +10893,36 @@ type ClientInterface interface {
 
 	// DeleteRepositoryReplicationConfiguration performs a DELETE /api/replications/{repoKey} (the `DeleteRepositoryReplicationConfiguration` operationId) request.
 	//
-	// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it every configuration of the repository is removed. Administrators only.
+	// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it the single configuration of the repository is removed. Requires platform or current project repository management.
 	DeleteRepositoryReplicationConfiguration(ctx context.Context, repoKey string, params *DeleteRepositoryReplicationConfigurationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRepositoryReplicationConfiguration performs a GET /api/replications/{repoKey} (the `GetRepositoryReplicationConfiguration` operationId) request.
 	//
-	// Returns the replication configuration of a local or remote repository. A local repository with several push targets returns an array; otherwise a single object. password is returned masked. The caller needs manage permission on the repository.
+	// Returns the replication configuration of a local or remote repository. A local repository with several push targets belongs to the advanced-replication owner and answers 501; a single target returns one object. password is returned masked. The caller needs current platform or project repository management.
 	GetRepositoryReplicationConfiguration(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateRepositoryReplicationConfigurationWithBody performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Single-target updates require platform or current project repository management; bulk operations require platform administration.
 	UpdateRepositoryReplicationConfigurationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateRepositoryReplicationConfiguration performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Single-target updates require platform or current project repository management; bulk operations require platform administration.
 	UpdateRepositoryReplicationConfiguration(ctx context.Context, repoKey string, body UpdateRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetRepositoryReplicationConfigurationWithBody performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 	SetRepositoryReplicationConfigurationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetRepositoryReplicationConfiguration performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 	SetRepositoryReplicationConfiguration(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRepositoriesByTypeAndProject List repositories
@@ -12166,12 +12169,12 @@ type ClientInterface interface {
 
 	// BlockSystemReplication performs a POST /api/system/replications/block (the `BlockSystemReplication` operationId) request.
 	//
-	// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction running. Scheduled and on-demand runs are refused while blocked. Administrators only.
+	// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. The pause flags fence worker admission; configuration does not execute a run. Administrators only.
 	BlockSystemReplication(ctx context.Context, params *BlockSystemReplicationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UnblockSystemReplication performs a POST /api/system/replications/unblock (the `UnblockSystemReplication` operationId) request.
 	//
-	// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction blocked. Administrators only.
+	// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. Administrators only.
 	UnblockSystemReplication(ctx context.Context, params *UnblockSystemReplicationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetCertificates List client certificates
@@ -16125,7 +16128,7 @@ func (c *Client) CreateOrReplaceMultiPushReplication(ctx context.Context, repoKe
 
 // DeleteRepositoryReplicationConfiguration performs a DELETE /api/replications/{repoKey} (the `DeleteRepositoryReplicationConfiguration` operationId) request.
 //
-// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it every configuration of the repository is removed. Administrators only.
+// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it the single configuration of the repository is removed. Requires platform or current project repository management.
 func (c *Client) DeleteRepositoryReplicationConfiguration(ctx context.Context, repoKey string, params *DeleteRepositoryReplicationConfigurationParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteRepositoryReplicationConfigurationRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -16140,7 +16143,7 @@ func (c *Client) DeleteRepositoryReplicationConfiguration(ctx context.Context, r
 
 // GetRepositoryReplicationConfiguration performs a GET /api/replications/{repoKey} (the `GetRepositoryReplicationConfiguration` operationId) request.
 //
-// Returns the replication configuration of a local or remote repository. A local repository with several push targets returns an array; otherwise a single object. password is returned masked. The caller needs manage permission on the repository.
+// Returns the replication configuration of a local or remote repository. A local repository with several push targets belongs to the advanced-replication owner and answers 501; a single target returns one object. password is returned masked. The caller needs current platform or project repository management.
 func (c *Client) GetRepositoryReplicationConfiguration(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetRepositoryReplicationConfigurationRequest(c.Server, repoKey)
 	if err != nil {
@@ -16156,7 +16159,7 @@ func (c *Client) GetRepositoryReplicationConfiguration(ctx context.Context, repo
 // UpdateRepositoryReplicationConfigurationWithBody performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request,
 // with any type of body and a specified content type.
 //
-// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Single-target updates require platform or current project repository management; bulk operations require platform administration.
 func (c *Client) UpdateRepositoryReplicationConfigurationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateRepositoryReplicationConfigurationRequestWithBody(c.Server, repoKey, contentType, body)
 	if err != nil {
@@ -16172,7 +16175,7 @@ func (c *Client) UpdateRepositoryReplicationConfigurationWithBody(ctx context.Co
 // UpdateRepositoryReplicationConfiguration performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Single-target updates require platform or current project repository management; bulk operations require platform administration.
 func (c *Client) UpdateRepositoryReplicationConfiguration(ctx context.Context, repoKey string, body UpdateRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateRepositoryReplicationConfigurationRequest(c.Server, repoKey, body)
 	if err != nil {
@@ -16188,7 +16191,7 @@ func (c *Client) UpdateRepositoryReplicationConfiguration(ctx context.Context, r
 // SetRepositoryReplicationConfigurationWithBody performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 // with any type of body and a specified content type.
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 func (c *Client) SetRepositoryReplicationConfigurationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetRepositoryReplicationConfigurationRequestWithBody(c.Server, repoKey, contentType, body)
 	if err != nil {
@@ -16204,7 +16207,7 @@ func (c *Client) SetRepositoryReplicationConfigurationWithBody(ctx context.Conte
 // SetRepositoryReplicationConfiguration performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 func (c *Client) SetRepositoryReplicationConfiguration(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetRepositoryReplicationConfigurationRequest(c.Server, repoKey, body)
 	if err != nil {
@@ -18930,7 +18933,7 @@ func (c *Client) GetGlobalSystemReplicationConfiguration(ctx context.Context, re
 
 // BlockSystemReplication performs a POST /api/system/replications/block (the `BlockSystemReplication` operationId) request.
 //
-// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction running. Scheduled and on-demand runs are refused while blocked. Administrators only.
+// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. The pause flags fence worker admission; configuration does not execute a run. Administrators only.
 func (c *Client) BlockSystemReplication(ctx context.Context, params *BlockSystemReplicationParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBlockSystemReplicationRequest(c.Server, params)
 	if err != nil {
@@ -18945,7 +18948,7 @@ func (c *Client) BlockSystemReplication(ctx context.Context, params *BlockSystem
 
 // UnblockSystemReplication performs a POST /api/system/replications/unblock (the `UnblockSystemReplication` operationId) request.
 //
-// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction blocked. Administrators only.
+// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. Administrators only.
 func (c *Client) UnblockSystemReplication(ctx context.Context, params *UnblockSystemReplicationParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUnblockSystemReplicationRequest(c.Server, params)
 	if err != nil {
@@ -38469,14 +38472,14 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteRepositoryReplicationConfigurationWithResponse performs a DELETE /api/replications/{repoKey} (the `DeleteRepositoryReplicationConfiguration` operationId) request.
 	//
-	// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it every configuration of the repository is removed. Administrators only.
+	// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it the single configuration of the repository is removed. Requires platform or current project repository management.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DeleteRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, params *DeleteRepositoryReplicationConfigurationParams, reqEditors ...RequestEditorFn) (*DeleteRepositoryReplicationConfigurationResponse, error)
 
 	// GetRepositoryReplicationConfigurationWithResponse performs a GET /api/replications/{repoKey} (the `GetRepositoryReplicationConfiguration` operationId) request.
 	//
-	// Returns the replication configuration of a local or remote repository. A local repository with several push targets returns an array; otherwise a single object. password is returned masked. The caller needs manage permission on the repository.
+	// Returns the replication configuration of a local or remote repository. A local repository with several push targets belongs to the advanced-replication owner and answers 501; a single target returns one object. password is returned masked. The caller needs current platform or project repository management.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetRepositoryReplicationConfigurationResponse, error)
@@ -38484,7 +38487,7 @@ type ClientWithResponsesInterface interface {
 	// UpdateRepositoryReplicationConfigurationWithBodyWithResponse performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Single-target updates require platform or current project repository management; bulk operations require platform administration.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	UpdateRepositoryReplicationConfigurationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateRepositoryReplicationConfigurationResponse, error)
@@ -38492,13 +38495,13 @@ type ClientWithResponsesInterface interface {
 	// UpdateRepositoryReplicationConfigurationWithResponse performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Single-target updates require platform or current project repository management; bulk operations require platform administration.
 	UpdateRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, body UpdateRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateRepositoryReplicationConfigurationResponse, error)
 
 	// SetRepositoryReplicationConfigurationWithBodyWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SetRepositoryReplicationConfigurationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error)
@@ -38506,7 +38509,7 @@ type ClientWithResponsesInterface interface {
 	// SetRepositoryReplicationConfigurationWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 	SetRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error)
 
 	// GetRepositoriesByTypeAndProjectWithResponse List repositories
@@ -39913,14 +39916,14 @@ type ClientWithResponsesInterface interface {
 
 	// BlockSystemReplicationWithResponse performs a POST /api/system/replications/block (the `BlockSystemReplication` operationId) request.
 	//
-	// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction running. Scheduled and on-demand runs are refused while blocked. Administrators only.
+	// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. The pause flags fence worker admission; configuration does not execute a run. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	BlockSystemReplicationWithResponse(ctx context.Context, params *BlockSystemReplicationParams, reqEditors ...RequestEditorFn) (*BlockSystemReplicationResponse, error)
 
 	// UnblockSystemReplicationWithResponse performs a POST /api/system/replications/unblock (the `UnblockSystemReplication` operationId) request.
 	//
-	// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction blocked. Administrators only.
+	// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	UnblockSystemReplicationWithResponse(ctx context.Context, params *UnblockSystemReplicationParams, reqEditors ...RequestEditorFn) (*UnblockSystemReplicationResponse, error)
@@ -76572,7 +76575,7 @@ func (c *ClientWithResponses) CreateOrReplaceMultiPushReplicationWithResponse(ct
 
 // DeleteRepositoryReplicationConfigurationWithResponse performs a DELETE /api/replications/{repoKey} (the `DeleteRepositoryReplicationConfiguration` operationId) request.
 //
-// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it every configuration of the repository is removed. Administrators only.
+// Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it the single configuration of the repository is removed. Requires platform or current project repository management.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DeleteRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, params *DeleteRepositoryReplicationConfigurationParams, reqEditors ...RequestEditorFn) (*DeleteRepositoryReplicationConfigurationResponse, error) {
@@ -76585,7 +76588,7 @@ func (c *ClientWithResponses) DeleteRepositoryReplicationConfigurationWithRespon
 
 // GetRepositoryReplicationConfigurationWithResponse performs a GET /api/replications/{repoKey} (the `GetRepositoryReplicationConfiguration` operationId) request.
 //
-// Returns the replication configuration of a local or remote repository. A local repository with several push targets returns an array; otherwise a single object. password is returned masked. The caller needs manage permission on the repository.
+// Returns the replication configuration of a local or remote repository. A local repository with several push targets belongs to the advanced-replication owner and answers 501; a single target returns one object. password is returned masked. The caller needs current platform or project repository management.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetRepositoryReplicationConfigurationResponse, error) {
@@ -76599,7 +76602,7 @@ func (c *ClientWithResponses) GetRepositoryReplicationConfigurationWithResponse(
 // UpdateRepositoryReplicationConfigurationWithBodyWithResponse performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request,
 // with any type of body and a specified content type.
 //
-// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Single-target updates require platform or current project repository management; bulk operations require platform administration.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) UpdateRepositoryReplicationConfigurationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateRepositoryReplicationConfigurationResponse, error) {
@@ -76613,7 +76616,7 @@ func (c *ClientWithResponses) UpdateRepositoryReplicationConfigurationWithBodyWi
 // UpdateRepositoryReplicationConfigurationWithResponse performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Single-target updates require platform or current project repository management; bulk operations require platform administration.
 func (c *ClientWithResponses) UpdateRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, body UpdateRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateRepositoryReplicationConfigurationResponse, error) {
 	rsp, err := c.UpdateRepositoryReplicationConfiguration(ctx, repoKey, body, reqEditors...)
 	if err != nil {
@@ -76625,7 +76628,7 @@ func (c *ClientWithResponses) UpdateRepositoryReplicationConfigurationWithRespon
 // SetRepositoryReplicationConfigurationWithBodyWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 // with any type of body and a specified content type.
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) SetRepositoryReplicationConfigurationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error) {
@@ -76639,7 +76642,7 @@ func (c *ClientWithResponses) SetRepositoryReplicationConfigurationWithBodyWithR
 // SetRepositoryReplicationConfigurationWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.
 func (c *ClientWithResponses) SetRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error) {
 	rsp, err := c.SetRepositoryReplicationConfiguration(ctx, repoKey, body, reqEditors...)
 	if err != nil {
@@ -78946,7 +78949,7 @@ func (c *ClientWithResponses) GetGlobalSystemReplicationConfigurationWithRespons
 
 // BlockSystemReplicationWithResponse performs a POST /api/system/replications/block (the `BlockSystemReplication` operationId) request.
 //
-// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction running. Scheduled and on-demand runs are refused while blocked. Administrators only.
+// Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. The pause flags fence worker admission; configuration does not execute a run. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) BlockSystemReplicationWithResponse(ctx context.Context, params *BlockSystemReplicationParams, reqEditors ...RequestEditorFn) (*BlockSystemReplicationResponse, error) {
@@ -78959,7 +78962,7 @@ func (c *ClientWithResponses) BlockSystemReplicationWithResponse(ctx context.Con
 
 // UnblockSystemReplicationWithResponse performs a POST /api/system/replications/unblock (the `UnblockSystemReplication` operationId) request.
 //
-// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction blocked. Administrators only.
+// Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) UnblockSystemReplicationWithResponse(ctx context.Context, params *UnblockSystemReplicationParams, reqEditors ...RequestEditorFn) (*UnblockSystemReplicationResponse, error) {
@@ -97217,6 +97220,9 @@ func ParseSetRepositoryReplicationConfigurationResponse(rsp *http.Response) (*Se
 
 	switch {
 	case rsp.StatusCode == 200:
+		break // No content-type
+
+	case rsp.StatusCode == 201:
 		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:

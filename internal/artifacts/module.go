@@ -71,6 +71,9 @@ type Deps struct {
 	// access core, so the authenticator reaches the module as the API's
 	// Authenticator binding.
 	Access accessapi.API
+	// RepositoryLifecycle resets consumer configuration on a new/deleted key
+	// in the repository's metadata transaction. It performs no remote I/O.
+	RepositoryLifecycle artifactsapi.RepositoryLifecycle
 	// Work is the work queue that the item service queues derived work on
 	// and RegisterWork registers its kinds with.
 	Work *work.Queue
@@ -164,7 +167,7 @@ func New(d Deps) (*Module, error) {
 		allowedPrivateOrigins: d.Settings.AllowedPrivateOrigins,
 		gcInterval:            d.Settings.GCInterval,
 		api: artifactsapi.API{
-			Repositories: repos.NewRepositories(d.Store, d.Access.Keys, d.Access.Projects),
+			Repositories: repos.NewRepositories(d.Store, d.Access.Keys, d.Access.Projects, d.RepositoryLifecycle),
 			Layouts:      layout.Checker{},
 		},
 		formats:      formats,

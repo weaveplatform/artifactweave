@@ -108,6 +108,7 @@ func serve(
 			Notifications: rt.modules.notifications,
 			Configuration: rt.modules.configuration.API(),
 			Retention:     rt.modules.retention,
+			Federation:    rt.modules.federation,
 			Redirect: itemkit.Redirect{
 				MinSize: artifactsSettings.RedirectMinSize, TTL: artifactsSettings.RedirectTTL,
 				CDNMaxSize: cdnMaxSize(cfg.Blob),

@@ -1560,17 +1560,27 @@
     "route": "DELETE /artifactory/api/replications/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "deleteRepositoryReplicationConfiguration",
-    "state": "stub: 501",
-    "contract": "Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it every configuration of the repository is removed. Administrators only.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "state": "implemented",
+    "contract": "Removes the replication configuration of a repository. With url only the push target with that URL is removed; without it the single configuration of the repository is removed. Requires platform or current project repository management.",
+    "handler": "internal/federation/adapters/http/replication.go: ReplicationAPI.DeleteRepositoryReplicationConfiguration",
+    "direct_calls": [
+      "httpkit.Deref",
+      "s.service",
+      "svc.Delete"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoKey, query:url",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:repoKey, query:url: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -7438,17 +7448,27 @@
     "route": "GET /artifactory/api/replications/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getRepositoryReplicationConfiguration",
-    "state": "stub: 501",
-    "contract": "Returns the replication configuration of a local or remote repository. A local repository with several push targets returns an array; otherwise a single object. password is returned masked. The caller needs manage permission on the repository.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "state": "partial: handler enforces the contract's limitations",
+    "contract": "Returns the replication configuration of a local or remote repository. A local repository with several push targets belongs to the advanced-replication owner and answers 501; a single target returns one object. password is returned masked. The caller needs current platform or project repository management.",
+    "handler": "internal/federation/adapters/http/replication.go: ReplicationAPI.GetRepositoryReplicationConfiguration",
+    "direct_calls": [
+      "out.FromReplicationConfigRequest",
+      "s.service",
+      "svc.Get"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: one repository's single configured target is authorized and redacted under its metadata guard before publication; legacy multi-target configurations are rejected, never published as a list; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -9400,17 +9420,26 @@
     "route": "GET /artifactory/api/system/replications",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getGlobalSystemReplicationConfiguration",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Reports whether push and pull replication are blocked for the whole instance. Administrators only.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/federation/adapters/http/replication_controls.go: ReplicationAPI.GetGlobalSystemReplicationConfiguration",
+    "direct_calls": [
+      "s.service",
+      "svc.Global"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -17804,17 +17833,34 @@
     "route": "POST /artifactory/api/replications/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "updateRepositoryReplicationConfiguration",
-    "state": "stub: 501",
-    "contract": "Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "state": "implemented",
+    "contract": "Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Single-target updates require platform or current project repository management; bulk operations require platform administration.",
+    "handler": "internal/federation/adapters/http/replication.go: ReplicationAPI.UpdateRepositoryReplicationConfiguration",
+    "direct_calls": [
+      "bytes.NewReader",
+      "decoder.Decode",
+      "decoder.DisallowUnknownFields",
+      "httpkit.BadRequestf",
+      "httpkit.Deref",
+      "json.NewDecoder",
+      "req.Body.MarshalJSON",
+      "s.service",
+      "svc.SetEnabled",
+      "svc.Update"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoKey, body:/include, body:/exclude",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on path:repoKey, body:/include, body:/exclude: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -18824,34 +18870,52 @@
     "route": "POST /artifactory/api/system/replications/block",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "blockSystemReplication",
-    "state": "stub: 501",
-    "contract": "Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction running. Scheduled and on-demand runs are refused while blocked. Administrators only.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "state": "implemented",
+    "contract": "Pauses replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. The pause flags fence worker admission; configuration does not execute a run. Administrators only.",
+    "handler": "internal/federation/adapters/http/replication_controls.go: ReplicationAPI.BlockSystemReplication",
+    "direct_calls": [
+      "artgen.BlockSystemReplication200TextResponse",
+      "s.block"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on route",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on route: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /artifactory/api/system/replications/unblock",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "unblockSystemReplication",
-    "state": "stub: 501",
-    "contract": "Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction blocked. Administrators only.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "state": "implemented",
+    "contract": "Resumes replication for the whole instance. push and pull default to true; passing false for one leaves that direction unchanged. Administrators only.",
+    "handler": "internal/federation/adapters/http/replication_controls.go: ReplicationAPI.UnblockSystemReplication",
+    "direct_calls": [
+      "artgen.UnblockSystemReplication200TextResponse",
+      "s.block"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on route",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on route: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -22197,17 +22261,28 @@
     "route": "PUT /artifactory/api/replications/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "setRepositoryReplicationConfiguration",
-    "state": "stub: 501",
-    "contract": "Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "state": "implemented",
+    "contract": "Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected with 400. Event-driven and checksum replication options are rejected rather than accepted without execution. Requires platform or current project repository management. Answers 201 when the configuration is stored.",
+    "handler": "internal/federation/adapters/http/replication.go: ReplicationAPI.SetRepositoryReplicationConfiguration",
+    "direct_calls": [
+      "httpkit.BadRequestf",
+      "req.Body.MarshalJSON",
+      "s.service",
+      "svc.Replace"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoKey",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:repoKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

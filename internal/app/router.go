@@ -26,6 +26,7 @@ import (
 	artifactshttp "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/format"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/gc"
@@ -61,6 +62,8 @@ import (
 	configurationhttp "github.com/weaveplatform/artifactweave/internal/configuration/adapters/http"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/configuration/core/descriptor"
+	"github.com/weaveplatform/artifactweave/internal/federation"
+	federationhttp "github.com/weaveplatform/artifactweave/internal/federation/adapters/http"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/notifications"
 	notificationshttp "github.com/weaveplatform/artifactweave/internal/notifications/adapters/http"
@@ -95,6 +98,7 @@ import (
 // the tests build routers over.
 type RouterStore interface {
 	retention.Store
+	federation.Store
 	// The artifacts handlers, with their item kit, package routes and
 	// replays.
 	artifactshttp.Store
@@ -199,6 +203,9 @@ type RouterConfig struct {
 	// Retention owns package policy administration; a router with only Store
 	// binds the same module after Access, as runtime module assembly does.
 	Retention *retention.Module
+	// Federation owns single-replication configuration. Direct router assembly
+	// binds it over Store and Access when nil, matching runtime assembly.
+	Federation *federation.Module
 	// AllowBasicAuthTokens lets a password sent with Basic create tokens
 	// through POST /access/api/v1/tokens (token.allow_basic_auth); the zero
 	// value refuses it, as Artifactory 7.x does by default.
@@ -369,13 +376,36 @@ func withConfiguration(cfg RouterConfig) RouterConfig {
 	}
 	cfg.Configuration = descriptor.NewAPI(descriptor.Deps{
 		Tx:              cfg.Store,
-		Repositories:    repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
+		Repositories:    repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects, repositoryLifecycle(cfg)),
 		Layouts:         layout.Checker{},
 		Configs:         cfg.Store.Configs(),
 		AnonymousAccess: cfg.Access.AnonymousAccess,
 		Projects:        cfg.Access.Projects,
 	})
 	return cfg
+}
+
+// withFederation runs after Access and before Configuration: descriptor
+// repository deletion must share the same replication lifetime cleanup.
+func withFederation(cfg RouterConfig) RouterConfig {
+	if cfg.Store == nil || cfg.Federation != nil {
+		return cfg
+	}
+	if m, err := federation.New(federation.Deps{
+		Store: cfg.Store, Access: cfg.Access, Ownership: repos.NewProjectRepositoryLookup(cfg.Store),
+		Repositories: repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
+	}); err == nil {
+		// New refuses only a nil store, excluded above, and performs no I/O.
+		cfg.Federation = m
+	}
+	return cfg
+}
+
+func repositoryLifecycle(cfg RouterConfig) artifactsapi.RepositoryLifecycle {
+	if cfg.Federation != nil {
+		return cfg.Federation.RepositoryLifecycle()
+	}
+	return nil
 }
 
 // overlays are the format routes an item GET tries before the generic
@@ -431,6 +461,7 @@ func artifactsDeps(cfg RouterConfig) artifactshttp.Deps {
 	return artifactshttp.Deps{
 		Deps:                        kitDeps(cfg),
 		Store:                       cfg.Store,
+		RepositoryLifecycle:         repositoryLifecycle(cfg),
 		RemoteHTTP:                  cfg.RemoteHTTP,
 		RemoteStatus:                cfg.RemoteStatus,
 		GC:                          cfg.GC,
@@ -464,7 +495,7 @@ func newArtifactoryAPI(cfg RouterConfig) artifactshttp.ArtifactoryAPI {
 // Access or Configuration contract, NewRouter binds them over it first, as
 // RouterConfig.Access and RouterConfig.Configuration describe.
 func NewRouter(cfg RouterConfig) http.Handler {
-	cfg = withConfiguration(withAccess(cfg))
+	cfg = withConfiguration(withFederation(withAccess(cfg)))
 	if cfg.Notifications == nil && cfg.Store != nil {
 		// New refuses only a nil store and performs no I/O.
 		cfg.Notifications, _ = notifications.New(notifications.Deps{
@@ -487,6 +518,11 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	if cfg.Retention != nil {
 		policies := cfg.Retention.Policies()
 		cleanupOps.Policies = &policies
+	}
+	replicationOps := federationhttp.ReplicationAPI{}
+	if cfg.Federation != nil {
+		configurations := cfg.Federation.Configurations()
+		replicationOps.Configurations = &configurations
 	}
 	logger := cfg.Logger
 	if logger == nil {
@@ -702,6 +738,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				CranAPI:            &cranOps,
 				RPMAPI:             &rpmOps,
 				PackagePoliciesAPI: &cleanupOps,
+				ReplicationAPI:     &replicationOps,
 			}, append(keyed.artifactory(), vcshttp.KeepRequest), strictOpts),
 			artgen.ChiServerOptions{
 				BaseURL:          "/artifactory",
@@ -1251,6 +1288,7 @@ type artifactoryServer struct {
 	*cranhttp.CranAPI
 	*rpmhttp.RPMAPI
 	*retentionhttp.PackagePoliciesAPI
+	*federationhttp.ReplicationAPI
 	artifactoryStubs
 }
 

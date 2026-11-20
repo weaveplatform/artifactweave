@@ -23,7 +23,7 @@ const purposeReplicationPassword = "replications.password" // #nosec G101 -- a c
 
 const replicationCols = "replication_key, repo_key, url, username, password, enabled, cron_exp, " +
 	"event_replication, sync_deletes, sync_properties, sync_statistics, include_prefix, exclude_prefix, " +
-	"proxy, disable_proxy, check_binary_existence, socket_timeout_ms"
+	"proxy, disable_proxy, check_binary_existence, socket_timeout_ms, private_revision"
 
 func (rs replicationStore) scan(row interface{ Scan(...any) error }) (model.Replication, error) {
 	var (
@@ -49,6 +49,7 @@ func (rs replicationStore) scan(row interface{ Scan(...any) error }) (model.Repl
 		&r.DisableProxy,
 		&r.CheckBinaryExistence,
 		&timeout,
+		&r.Revision,
 	); err != nil {
 		return r, err //nolint:wrapcheck // wrapped by the caller
 	}
@@ -91,6 +92,7 @@ func (rs replicationStore) Put(ctx context.Context, r model.Replication) error {
 		r.DisableProxy,
 		r.CheckBinaryExistence,
 		dialect.Millis(r.SocketTimeout),
+		r.Revision,
 	)
 	return err
 }

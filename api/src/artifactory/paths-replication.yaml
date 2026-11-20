@@ -70,7 +70,7 @@ components:
       properties:
         checkBinaryExistenceInFilestore:
           description: Optional within this object. Skip transferring content the target already holds, as allowed
-            by the target's checksum replication settings. Accepted and ignored.
+            by the target's checksum replication settings. True is rejected until checksum replication is supported.
           type: boolean
         cronExp:
           description: Optional within this object. Schedule in Quartz cron syntax, for example 0 0 2 * * ?. Omitted
@@ -83,7 +83,7 @@ components:
           type: boolean
         enableEventReplication:
           description: Optional within this object. True replicates each write as it happens in addition to the
-            schedule. Defaults to false. Event-based replication is accepted and stored but not acted on.
+            schedule. Defaults to false. True is rejected until event-based replication is supported.
           type: boolean
         enabled:
           description: Optional within this object. False keeps the configuration but stops the schedule. Defaults
@@ -104,9 +104,13 @@ components:
         proxy:
           description: Optional within this object. Key of a configured proxy to route the replication through.
           type: string
+        proxyRef:
+          description: Optional within this object. Response-only alias of proxy. Ignored on input.
+          readOnly: true
+          type: string
         replicationKey:
           description: Optional within this object. Server-owned identifier of this configuration; ignored on input.
-            It is not guaranteed to stay the same across updates, so clients should not depend on it.
+            This server preserves it across updates and allocates a new identifier after deletion and recreation.
           readOnly: true
           type: string
         repoKey:
@@ -156,6 +160,21 @@ components:
             type: string
           type: array
       type: object
+    SetSingleReplicationConfigurationRequest:
+      description: One single-target configuration, supplied as an object or a one-element array.
+      oneOf:
+      - $ref: '#/components/schemas/ReplicationConfigRequest'
+      - description: Array form; only a single element is accepted.
+        minItems: 1
+        maxItems: 1
+        items:
+          $ref: '#/components/schemas/ReplicationConfigRequest'
+        type: array
+    UpdateSingleReplicationConfigurationRequest:
+      description: A partial target update, or URL patterns for the reserved bulk enable/disable operations.
+      anyOf:
+      - $ref: '#/components/schemas/ReplicationConfigRequest'
+      - $ref: '#/components/schemas/ReplicationEnableDisableRequest'
     ReplicationRepositoryStatus:
       description: Status of replication for one repository, as seen from a path that belongs to it.
       properties:
@@ -650,7 +669,8 @@ paths:
   /api/replications/{repoKey}:
     delete:
       description: Removes the replication configuration of a repository. With url only the push target with that
-        URL is removed; without it every configuration of the repository is removed. Administrators only.
+        URL is removed; without it the single configuration of the repository is removed. Requires platform or current
+        project repository management.
       operationId: deleteRepositoryReplicationConfiguration
       parameters:
       - description: Required path parameter. Key of the local or remote repository.
@@ -682,7 +702,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is not an administrator.
+          description: The caller lacks current repository management authority.
         '404':
           content:
             application/json:
@@ -699,8 +719,8 @@ paths:
       x-cost: expensive
     get:
       description: Returns the replication configuration of a local or remote repository. A local repository with
-        several push targets returns an array; otherwise a single object. password is returned masked. The caller
-        needs manage permission on the repository.
+        several push targets belongs to the advanced-replication owner and answers 501; a single target returns one
+        object. password is returned masked. The caller needs current platform or project repository management.
       operationId: getRepositoryReplicationConfiguration
       parameters:
       - description: Required path parameter. Key of the local or remote repository.
@@ -759,7 +779,8 @@ paths:
         reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable
         request and the call switches many replications on or off at once, selected by wildcard patterns over their
         target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through
-        this path. Administrators only.'
+        this path. Single-target updates require platform or current project repository management; bulk operations
+        require platform administration.'
       operationId: updateRepositoryReplicationConfiguration
       parameters:
       - description: Required path parameter. Key of the local or remote repository, or the reserved value `enable`
@@ -775,11 +796,7 @@ paths:
         content:
           application/json:
             schema:
-              description: A replication configuration update, or an enable/disable request when repoKey is `enable`
-                or `disable`.
-              oneOf:
-              - $ref: '#/components/schemas/ReplicationConfigRequest'
-              - $ref: '#/components/schemas/ReplicationEnableDisableRequest'
+              $ref: '#/components/schemas/UpdateSingleReplicationConfigurationRequest'
         description: The fields to change, or for the reserved keys the target URL patterns to include and exclude.
         required: true
       responses:
@@ -802,7 +819,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is not an administrator.
+          description: The caller lacks current repository management authority.
         '404':
           content:
             application/json:
@@ -821,9 +838,9 @@ paths:
       x-cost: expensive
     put:
       description: Creates or replaces the replication configuration of a local or remote repository. The body is
-        one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from
-        the first element for all. Several targets in the array amount to multi-push, which is rejected with 400.
-        Administrators only. Answers 201 when the configuration is stored.
+        one configuration or a one-element array. Several targets in the array amount to multi-push, which is rejected
+        with 400. Event-driven and checksum replication options are rejected rather than accepted without execution.
+        Requires platform or current project repository management. Answers 201 when the configuration is stored.
       operationId: setRepositoryReplicationConfiguration
       parameters:
       - description: Required path parameter. Key of the local or remote repository.
@@ -838,17 +855,14 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-              - $ref: '#/components/schemas/ReplicationConfigRequest'
-              - description: Array form; only a single element is accepted.
-                items:
-                  $ref: '#/components/schemas/ReplicationConfigRequest'
-                type: array
+              $ref: '#/components/schemas/SetSingleReplicationConfigurationRequest'
         description: The configuration to store.
         required: true
       responses:
         '200':
           description: Not returned; a stored configuration answers 201.
+        '201':
+          description: The single-replication configuration was stored.
         '400':
           content:
             application/json:
@@ -866,7 +880,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is not an administrator.
+          description: The caller lacks current repository management authority.
       tags:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setrepositoryreplicationconfiguration.md
@@ -906,10 +920,10 @@ paths:
   /api/system/replications/block:
     post:
       description: Pauses replication for the whole instance. push and pull default to true; passing false for one
-        leaves that direction running. Scheduled and on-demand runs are refused while blocked. Administrators only.
+        leaves that direction unchanged. The pause flags fence worker admission; configuration does not execute a run. Administrators only.
       operationId: blockSystemReplication
       parameters:
-      - description: Optional query parameter. true (default) blocks push replications; false leaves them running.
+      - description: Optional query parameter. true (default) blocks push replications; false leaves the current push setting unchanged.
         in: query
         name: push
         required: false
@@ -917,7 +931,7 @@ paths:
           default: 'true'
           description: true or false as a string.
           type: string
-      - description: Optional query parameter. true (default) blocks pull replications; false leaves them running.
+      - description: Optional query parameter. true (default) blocks pull replications; false leaves the current pull setting unchanged.
         in: query
         name: pull
         required: false
@@ -955,10 +969,10 @@ paths:
   /api/system/replications/unblock:
     post:
       description: Resumes replication for the whole instance. push and pull default to true; passing false for
-        one leaves that direction blocked. Administrators only.
+        one leaves that direction unchanged. Administrators only.
       operationId: unblockSystemReplication
       parameters:
-      - description: Optional query parameter. true (default) unblocks push replications; false leaves them blocked.
+      - description: Optional query parameter. true (default) unblocks push replications; false leaves the current push setting unchanged.
         in: query
         name: push
         required: false
@@ -966,7 +980,7 @@ paths:
           default: 'true'
           description: true or false as a string.
           type: string
-      - description: Optional query parameter. true (default) unblocks pull replications; false leaves them blocked.
+      - description: Optional query parameter. true (default) unblocks pull replications; false leaves the current pull setting unchanged.
         in: query
         name: pull
         required: false

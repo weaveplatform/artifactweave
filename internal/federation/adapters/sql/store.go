@@ -1,6 +1,8 @@
 package sql
 
 import (
+	"context"
+
 	"github.com/weaveplatform/artifactweave/internal/federation/adapters/sql/migrations"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 )
@@ -23,6 +25,9 @@ func New(db *dialect.Store) *Store { return &Store{Store: db} }
 var Module = dialect.Module{
 	Name:       "federation",
 	Migrations: migrations.FS,
+	AfterMigrate: func(ctx context.Context, db *dialect.Store) error {
+		return New(db).backfillReplicationRevisions(ctx)
+	},
 	Sealed: []dialect.SealedColumn{
 		{
 			Table: "replications", Column: "password", Purpose: purposeReplicationPassword,

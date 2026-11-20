@@ -1,5 +1,5 @@
-// Package federationhttp will serve the federation module's REST endpoints:
-// pfed, grid, federation and replication.
+// Package federationhttp serves single-target replication configuration and
+// enablement/global controls through the generated Artifactory strict API.
 //
 // # Role
 //
@@ -8,15 +8,15 @@
 //
 // # Inputs
 //
-// None yet. Planned: requests through the generated strict servers: the
-// federation and replication operations of the Artifactory specification,
-// paths-federation of the Access specification, and the grid and pfed
-// specifications (target layout, lines 810, 811 and 814).
+// Generated replication request DTOs and the guarded configuration service.
+// Wire conversion remains here; core configuration has no generated API types.
 //
 // # Outputs
 //
-// None yet. Planned: the module's parts of those APIs, composed into the app
-// router as partial strict servers (decision 0044, composition and HTTP).
+// Seven strict operations composed into the app router: single-target CRUD,
+// global pause reads and block/unblock. PUT stores one target with 201, POST
+// patches it or applies reserved bulk enable/disable filters, and reads mask
+// passwords while keeping private worker revisions out of responses.
 //
 // # References
 //
@@ -41,5 +41,6 @@
 //
 // # Status
 //
-// Placeholder: implemented by P11, P13, P14, P37.
+// REP-01 configuration is implemented. Execute/status and advanced, event-driven
+// and checksum replication retain their separate generated/deferred owners.
 package federationhttp

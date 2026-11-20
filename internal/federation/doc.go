@@ -1,27 +1,24 @@
-// Package federation will be the federation module: peer trust, outbox
-// delivery, federated repositories, replication, Access federation and
-// topology.
+// Package federation owns guarded single-target replication configuration.
+// Peer trust, outbox delivery, federation and topology retain their later owners.
 //
 // # Role
 //
 // federation module, module root. Only app imports a module root; other
 // modules reach federation through federation/api (decision 0044, dependency
-// rules). Its storage skeleton (the module's ports, models and store
-// adapters) sits in subpackages ahead of its phase; skeleton modules get no
-// constructor until then (decision 0044, composition and HTTP).
+// rules). New constructs configuration and repository-lifetime services without
+// reading dependencies, starting workers or making remote requests.
 //
 // # Inputs
 //
-// None yet. Planned: the Deps that app passes to New, among them the outbox
-// that the sync sender reads as one consumer per peer (target layout, lines
-// 736-739).
+// Deps supplies the shared transaction store, current Access authority,
+// secret-free repository ownership and canonical remote/proxy configuration.
 //
 // # Outputs
 //
-// None yet. Planned: module.go with New(Deps). The module's layers are its
-// subpackages: api, core/peer, core/pairing, core/sync, core/federated,
-// core/replication, core/accessfed, core/topology, adapters/peer and
-// adapters/http.
+// Configurations manages single push/pull targets, URL-filtered enablement and
+// global pause controls. RepositoryLifecycle removes stale targets and runs
+// inside Artifacts' guarded create/delete transaction. Configuration does not
+// transfer content or publish a run result.
 //
 // # References
 //
@@ -49,5 +46,6 @@
 //
 // # Status
 //
-// Placeholder: implemented by P11, P13, P14, P37.
+// REP-01 configuration is implemented. Transfer, execution and scheduling are
+// separate P11 tickets; peer and advanced federation remain P13, P14 and P37.
 package federation

@@ -30,6 +30,13 @@ var implemented = routeUnion(append(
 // generatedRoutes are the generated operations with real handlers outside
 // the formats' parts.
 var generatedRoutes = map[string]bool{
+	"GET /artifactory/api/replications/{repoKey}":                                       true,
+	"PUT /artifactory/api/replications/{repoKey}":                                       true,
+	"POST /artifactory/api/replications/{repoKey}":                                      true,
+	"DELETE /artifactory/api/replications/{repoKey}":                                    true,
+	"GET /artifactory/api/system/replications":                                          true,
+	"POST /artifactory/api/system/replications/block":                                   true,
+	"POST /artifactory/api/system/replications/unblock":                                 true,
 	"GET /artifactory/api/cleanup/packages/policies":                                    true,
 	"POST /artifactory/api/cleanup/packages/policies/{policyKey}":                       true,
 	"GET /artifactory/api/cleanup/packages/policies/{policyKey}":                        true,

@@ -364,6 +364,27 @@ apply_webhooks() {
 	python3 -I "$here/check-webhooks.py" --controls
 }
 
+# Configuration only. Both URLs point at unused paths on this fixture server;
+# no transfer or execution is part of this scenario's qualification.
+apply_single_replication() {
+	export TF_VAR_repository_prefix=tf-single-replication TF_VAR_revision=1 \
+		TF_VAR_target_url="$url/artifactory/controlled-replication-target" \
+		TF_VAR_upstream_url="$url/artifactory/controlled-replication-source" \
+		TF_VAR_target_password=Terraform-replication-target-1 \
+		TF_VAR_upstream_password=Terraform-replication-upstream-1 \
+		TF_VAR_proxy_key=tf-single-replication-proxy
+	python3 -I "$here/check-replications.py" --proxy "$port"
+	tf apply -auto-approve
+	tf plan -detailed-exitcode
+	tf output -json repository_keys >"$work/replication-repositories.json"
+	python3 -I "$here/check-replications.py" --check "$work/replication-repositories.json" "$work/replication-identity.json" "$work/data" "$work/server.log"
+	export TF_VAR_revision=2 TF_VAR_target_password=Terraform-replication-target-2 \
+		TF_VAR_upstream_password=Terraform-replication-upstream-2
+	tf apply -auto-approve
+	tf plan -detailed-exitcode
+	python3 -I "$here/check-replications.py" --check "$work/replication-repositories.json" "$work/replication-identity.json" "$work/data" "$work/server.log"
+}
+
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
 	case $scenario in
@@ -374,6 +395,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/remote-repositories) apply_remote_repositories ;;
 	deploy/artifactweave/terraform/virtual-repositories) apply_virtual_repositories ;;
 	deploy/artifactweave/terraform/webhooks) apply_webhooks ;;
+	deploy/artifactweave/terraform/single-replication) apply_single_replication ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1
@@ -388,5 +410,9 @@ for scenario in "${scenarios[@]}"; do
 	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/webhooks ]; then
 		python3 -I "$here/check-webhooks.py" --deleted "$work/webhook-keys.json"
+	fi
+	if [ "$scenario" = deploy/artifactweave/terraform/single-replication ]; then
+		python3 -I "$here/check-replications.py" --deleted "$work/replication-repositories.json"
+		python3 -I "$here/check-replications.py" --remove-proxy
 	fi
 done

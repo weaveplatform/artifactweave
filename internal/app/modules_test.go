@@ -26,8 +26,8 @@ func TestUnitBuildModulesDoesNoIO(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mods.access == nil || mods.artifacts == nil || mods.configuration == nil || mods.notifications == nil || mods.retention == nil {
-		t.Fatalf("modules = %+v, want all five", mods)
+	if mods.access == nil || mods.artifacts == nil || mods.configuration == nil || mods.notifications == nil || mods.retention == nil || mods.federation == nil {
+		t.Fatalf("modules = %+v, want all six", mods)
 	}
 	if _, err := buildModules(config.Default(), moduleDeps{}); err == nil ||
 		!strings.HasPrefix(err.Error(), "access: ") {
