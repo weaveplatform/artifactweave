@@ -16221,6 +16221,7 @@
     "handler": "internal/artifacts/ecosystem/debian/http/debian_snapshot.go: DebianAPI.createDebianSnapshot",
     "direct_calls": [
       "acc.File",
+      "accessapi.WithCaller",
       "apierror.New",
       "bytes.NewReader",
       "checks.validate",
@@ -16228,7 +16229,6 @@
       "errors.Is",
       "fmt.Errorf",
       "httpkit.Denied",
-      "kernel.WithPrincipal",
       "s.ItemCaller",
       "s.Items",
       "s.Items().DeployCommitted",

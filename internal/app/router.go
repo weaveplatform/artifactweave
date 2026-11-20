@@ -299,7 +299,10 @@ func newRegistry(cfg RouterConfig, kit *itemkit.Kit) *dockerhttp.Registry {
 		Identity: cfg.Access.Identity,
 		CurrentAccess: func(ctx context.Context) (kernel.Principal, accessapi.Decider, error) {
 			p, a, err := kit.CurrentAccess(ctx)
-			return p, a.Decider, err
+			if err != nil {
+				return p, nil, fmt.Errorf("refresh registry publication authority: %w", err)
+			}
+			return p, a.Decider, nil
 		},
 	}
 	return dockerhttp.New(o)
@@ -614,7 +617,10 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			Projects:     cfg.Access.Projects,
 			CurrentAccess: func(ctx context.Context) (kernel.Principal, accessapi.Decider, error) {
 				p, a, err := kit.CurrentAccess(ctx)
-				return p, a.Decider, err
+				if err != nil {
+					return p, nil, fmt.Errorf("refresh Terraform publication authority: %w", err)
+				}
+				return p, a.Decider, nil
 			},
 		},
 	)
