@@ -32,7 +32,8 @@ var (
 	ErrAmbiguousRole = errors.New("role name is ambiguous across project and global scopes")
 )
 
-// Service manages project roles and memberships over the access unit of work.
+// Service manages projects, roles, memberships and repository bindings over
+// the access unit of work.
 // Its caller checks the relevant administration privilege before invoking a
 // mutation. It never grants platform or artifact permissions on its own.
 // Every compound read and mutation uses one transaction, taking the project
@@ -40,8 +41,10 @@ var (
 type Service struct {
 	// Store provides the access records and their shared transaction runner.
 	Store port.Store
-	// Repositories joins the access transaction when project lifecycle changes
-	// its server-owned build-info repository. Role-only services need no binding.
+	// Repositories joins the access transaction and synchronizes access-owned
+	// bindings on configuration writes. Lifecycle/attachment callers supply the
+	// artifacts binding built with this store's access Projects contract.
+	// Role-only services need no repository binding.
 	Repositories artifactsapi.Repositories
 }
 

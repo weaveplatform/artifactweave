@@ -127,10 +127,72 @@ func (d *Decider) project(ctx context.Context, src Sources, key string, names []
 			d.addProjectRules(repo, roles)
 		}
 		if next == "" {
-			return nil
+			break
 		}
 		page.After = next
 	}
+	return d.sharedProject(ctx, src, key, roles)
+}
+
+func (d *Decider) sharedProject(ctx context.Context, src Sources, projectKey string, roles []model.Role) error {
+	assignments, err := src.Projects.Assignments(ctx, projectKey)
+	if err != nil {
+		return fmt.Errorf("authz: project sharing: %w", err)
+	}
+	for _, a := range assignments {
+		// Ownership remains canonical in artifacts. Stored shares grant only to
+		// the consuming project's current roles; no producer credential or
+		// upstream-discovery mode participates in this calculation.
+		if !a.SharedWithAll && !slices.Contains(a.SharedWith, projectKey) {
+			continue
+		}
+		lookup, ok := src.Repositories.(artifactsapi.ProjectRepositoryLookup)
+		if !ok {
+			return fmt.Errorf("authz: project sharing requires canonical repository lookup: %w", kernel.ErrStore)
+		}
+		r, err := lookup.ProjectRepository(ctx, a.RepoKey)
+		if errors.Is(err, kernel.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("authz: shared repository: %w", err)
+		}
+		if r.ProjectKey == projectKey || r.Class != artrepo.Local && r.Class != artrepo.Remote {
+			continue
+		}
+		if d.projectLimit != nil {
+			d.projectLimit[r.Key] = true
+			if a.SharedReadOnly {
+				if d.sharedReadOnly == nil {
+					d.sharedReadOnly = map[string]bool{}
+				}
+				d.sharedReadOnly[r.Key] = true
+			}
+		}
+		for _, role := range roles {
+			if !roleEnvironment(role.Environments, r.Environments) {
+				continue
+			}
+			actions := model.RoleActions(role.Actions, accessapi.ResourceArtifact)
+			if a.SharedReadOnly {
+				actions &= accessapi.ActionRead
+			}
+			if actions != 0 {
+				d.rules[accessapi.ResourceArtifact] = append(d.rules[accessapi.ResourceArtifact], rule{target: r.Key, include: compileAll(nil, "**"), actions: actions})
+			}
+		}
+	}
+	return nil
+}
+
+func (d *Decider) sharingCeiling(key string) accessapi.Actions {
+	key, _ = artrepo.ResolveKey(key)
+	if d.sharedReadOnly[key] {
+		// A project-bound platform credential retains its own content grants,
+		// but consuming a shared repository cannot widen that share's ceiling.
+		return accessapi.ActionRead
+	}
+	return allActions
 }
 
 func managesResources(role model.Role) bool {

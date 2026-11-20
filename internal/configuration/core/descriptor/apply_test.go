@@ -508,6 +508,27 @@ func TestUnitApplyDryRun(t *testing.T) {
 	}
 }
 
+func TestUnitApplyProjectCreationPrefixAgreesWithDryRun(t *testing.T) {
+	for _, dryRun := range []bool{true, false} {
+		t.Run(fmt.Sprintf("dryRun=%t", dryRun), func(t *testing.T) {
+			db := inmem.New()
+			if err := db.Projects().Create(t.Context(), accesstest.Project{Key: "alpha", DisplayName: "Alpha"}); err != nil {
+				t.Fatal(err)
+			}
+			patch, err := Parse([]byte("localRepositories:\n  wrong:\n    type: generic\n    projectKey: alpha\n"), noEnv)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := Apply(t.Context(), depsOf(t, db), patch, now, dryRun); err == nil || !strings.Contains(err.Error(), "alpha-") {
+				t.Fatalf("planning/publication disagreed about required project prefix: %v", err)
+			}
+			if _, err := db.Repos().Get(t.Context(), "wrong"); !errors.Is(err, kernel.ErrNotFound) {
+				t.Fatalf("invalid descriptor published a repository: %v", err)
+			}
+		})
+	}
+}
+
 // faulty fails the named store operations.
 type faulty struct {
 	*inmem.Store
@@ -893,13 +914,16 @@ func TestUnitStoredDocumentThatIsNotJSON(t *testing.T) {
 func TestUnitApplyEnvironments(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
+	if err := db.Projects().Create(ctx, accesstest.Project{Key: "proj", DisplayName: "Project"}); err != nil {
+		t.Fatal(err)
+	}
 	const doc = `
 localRepositories:
-  env-local:
+  proj-env-local:
     type: generic
     projectKey: proj
     environments: [prod]
-  default-local:
+  proj-default-local:
     type: generic
     projectKey: proj
   loose-local:
@@ -910,7 +934,7 @@ localRepositories:
 		t.Fatalf("first apply %+v", res)
 	}
 	for key, want := range map[string]string{
-		"env-local": "PROD", "default-local": "DEV", "loose-local": "",
+		"proj-env-local": "PROD", "proj-default-local": "DEV", "loose-local": "",
 	} {
 		c, err := db.Repos().Get(ctx, key)
 		if err != nil || strings.Join(c.Environments, ",") != want {
@@ -924,7 +948,7 @@ localRepositories:
 localRepositories:
   other-local:
     type: generic
-  env-local:
+  proj-env-local:
     environments: [DEV, nope]
 `)
 	if !errors.Is(err, ErrInvalid) ||
@@ -934,7 +958,7 @@ localRepositories:
 	if _, err := db.Repos().Get(ctx, "other-local"); err == nil {
 		t.Fatal("a refused descriptor created a repository")
 	}
-	if c, _ := db.Repos().Get(ctx, "env-local"); strings.Join(c.Environments, ",") != "PROD" {
+	if c, _ := db.Repos().Get(ctx, "proj-env-local"); strings.Join(c.Environments, ",") != "PROD" {
 		t.Fatalf("a refused descriptor changed a repository: %v", c.Environments)
 	}
 }

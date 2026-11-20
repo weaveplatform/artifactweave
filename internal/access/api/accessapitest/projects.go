@@ -28,7 +28,9 @@ type Project struct {
 // goroutines while no one changes its fields.
 type Projects struct {
 	// GuardFunc can observe or refuse transactional authority admission.
-	GuardFunc func(context.Context) error
+	GuardFunc            func(context.Context) error
+	BindRepositoryFunc   func(context.Context, string, string, []string, bool) error
+	RemoveRepositoryFunc func(context.Context, string) error
 	// Projects maps a project key to the project.
 	Projects map[string]Project
 	// Global is the global environments' names, in any order, which
@@ -36,6 +38,22 @@ type Projects struct {
 	Global []string
 	// Err, when set, is every call's error.
 	Err error
+}
+
+// BindRepository observes binding publication when configured, or returns Err.
+func (p *Projects) BindRepository(ctx context.Context, key, project string, environments []string, fresh bool) error {
+	if p.BindRepositoryFunc != nil {
+		return p.BindRepositoryFunc(ctx, key, project, environments, fresh)
+	}
+	return p.Err
+}
+
+// RemoveRepository observes binding removal when configured, or returns Err.
+func (p *Projects) RemoveRepository(ctx context.Context, key string) error {
+	if p.RemoveRepositoryFunc != nil {
+		return p.RemoveRepositoryFunc(ctx, key)
+	}
+	return p.Err
 }
 
 // Guard runs GuardFunc, when supplied, or returns Err.

@@ -90,7 +90,8 @@ func TestAccGlobalRolesAndEnvironmentsBodies(t *testing.T) {
 	}
 
 	// A project's repository in STAGE keeps it from being deleted.
-	rec = do(t, h, http.MethodPut, "/artifactory/api/repositories/staged", jsonAdmin,
+	projectRequest(t, h, http.MethodPost, "", "admin", `{"project_key":"proj","display_name":"Project"}`, http.StatusCreated)
+	rec = do(t, h, http.MethodPut, "/artifactory/api/repositories/proj-staged", jsonAdmin,
 		`{"rclass":"local","packageType":"generic","projectKey":"proj","environments":["STAGE"]}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create repository: %d %s", rec.Code, rec.Body)

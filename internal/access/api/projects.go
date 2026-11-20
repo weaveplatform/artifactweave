@@ -22,6 +22,13 @@ type Projects interface {
 	// it before repository, source, work or item locks. It joins the shared
 	// store transaction; outside a transaction it provides no publication fence.
 	Guard(ctx context.Context) error
+	// BindRepository synchronizes canonical ownership/environments in the
+	// caller's transaction. fresh discards shares from an earlier repository
+	// lifetime; updates retain current shares. Call after taking Guard.
+	BindRepository(ctx context.Context, key, project string, environments []string, fresh bool) error
+	// RemoveRepository removes binding and shares, tolerating an absent binding.
+	// It joins the guarded transaction that deletes the repository configuration.
+	RemoveRepository(ctx context.Context, key string) error
 	// Environments returns the names of a project's environments, or of the
 	// global environments for project "", ordered by name and spelled as
 	// stored; a project that does not exist has none. The built-in DEV and

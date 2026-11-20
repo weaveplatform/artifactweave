@@ -32,13 +32,12 @@ type Store interface {
 
 // NewRepositories returns the artifacts module's Repositories over st, which
 // reads key pairs through keys and environments through projects for
-// CheckKeypairs and CheckEnvironments. Each method calls st's repository
-// store or work queue, or this package's function of the same name, once,
-// and returns its results as they are, so a caller sees exactly what a
-// direct call returns. Every call uses the context it is given, so it takes
-// part in a transaction of st that the context carries; keys and projects
-// must take part in that transaction too, as the access module's bindings
-// over st do. Nothing is read or checked until a method is called.
+// CheckKeypairs and CheckEnvironments. Create, Update and Remove coordinate
+// canonical configuration with access-owned bindings and shares when projects
+// is supplied; their writes and failures commit or roll back together. Reads
+// and validation preserve the underlying operation's error identity. Every
+// call joins the transaction ctx carries; keys and projects must use that same
+// unit of work. Nothing is read or checked until a method is called.
 func NewRepositories(
 	st Store,
 	keys accessapi.Keys,
@@ -51,6 +50,10 @@ type repositories struct {
 	st       Store
 	keys     accessapi.Keys
 	projects accessapi.Projects
+}
+
+func (r repositories) ProjectRepository(ctx context.Context, key string) (artifactsapi.ProjectRepository, error) {
+	return r.st.Repos().ProjectRepository(ctx, key) //nolint:wrapcheck // preserves upstream error identity
 }
 
 func (r repositories) Get(ctx context.Context, key string) (repo.Config, error) {
@@ -70,13 +73,28 @@ func (r repositories) UsingKeypair(ctx context.Context, name string) ([]string, 
 
 func (r repositories) Create(ctx context.Context, c repo.Config) error {
 	return r.tx(ctx, func(ctx context.Context) error {
-		return r.st.Repos().Create(ctx, c) //nolint:wrapcheck // preserves upstream error identity
+		if err := checkProjectPrefix(c); err != nil {
+			return err
+		}
+		if err := r.st.Repos().Create(ctx, c); err != nil {
+			return err //nolint:wrapcheck // preserves upstream error identity
+		}
+		if r.projects != nil {
+			return r.projects.BindRepository(ctx, c.Key, c.ProjectKey, c.Environments, true) //nolint:wrapcheck // access owns binding context
+		}
+		return nil
 	})
 }
 
 func (r repositories) Update(ctx context.Context, c repo.Config) error {
 	return r.tx(ctx, func(ctx context.Context) error {
-		return r.st.Repos().Update(ctx, c) //nolint:wrapcheck // preserves upstream error identity
+		if err := r.st.Repos().Update(ctx, c); err != nil {
+			return err //nolint:wrapcheck // preserves upstream error identity
+		}
+		if r.projects != nil {
+			return r.projects.BindRepository(ctx, c.Key, c.ProjectKey, c.Environments, false) //nolint:wrapcheck // access owns binding context
+		}
+		return nil
 	})
 }
 
@@ -86,7 +104,10 @@ func (r repositories) Remove(ctx context.Context, key, by string) (int64, bool, 
 	err := r.tx(ctx, func(ctx context.Context) error {
 		var err error
 		removed, trashed, err = Remove(ctx, r.st, key, by)
-		return err
+		if err == nil && r.projects != nil {
+			err = r.projects.RemoveRepository(ctx, key)
+		}
+		return err //nolint:wrapcheck // preserves removal/binding error identity for the caller
 	})
 	return removed, trashed, err
 }

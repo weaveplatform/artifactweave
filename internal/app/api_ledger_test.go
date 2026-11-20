@@ -391,6 +391,17 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		"disableAllCleanupPolicies":
 		cleanupPolicy = e.State == "implemented"
 	}
+	projectRepository := false
+	switch e.OperationID {
+	case "getProjectRepositoryStatus",
+		"attachRepositoryToProject",
+		"unassignProjectFromRepository",
+		"shareRepositoryWithAllProjects",
+		"unshareRepositoryWithAllProjects",
+		"shareRepositoryWithTargetProject",
+		"unshareRepositoryWithTargetProject":
+		projectRepository = e.State == "implemented"
+	}
 	r := &http.Request{Method: method, URL: &url.URL{Path: path}}
 	e.Admission = "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue"
 	if expensiveRequest(r) {
@@ -407,6 +418,9 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	}
 	if cleanupPolicy {
 		e.Admission += "; current platform/project administration refreshed under the project guard before disclosure/publication; project administrators require own-project collection filter"
+	}
+	if projectRepository {
+		e.Admission += "; current platform administration refreshed under the project guard before repository lookup and retained through publication"
 	}
 	e.Effects = "resource mutation/action; see served contract and handler calls"
 	e.Retry = "no key support; reconcile ambiguous completion before retrying"
@@ -426,6 +440,20 @@ func apiReviewPolicy(e *apiReviewOperation) {
 			e.Retry = "no Idempotency-Key; reconcile policy state after ambiguous completion; identical configuration/enablement preserves generation and queued position, while edits and disablement fence old queued work"
 		}
 		e.Evidence = append(e.Evidence, "internal/retention/core/cleanup/policies.go", "test/server/retention/policies_test.go", "internal/app/storetest/cleanup_policies.go")
+	}
+	if projectRepository {
+		if method == "GET" {
+			e.Effects = "canonical owner/environment and standard-share snapshot; no upstream credential hydration or source activation"
+		} else {
+			e.Effects = "atomic repository configuration/binding or standard-share publication; detach retains shares and content; readOnly is a permission ceiling, never a producer source mode"
+			e.Retry = "no Idempotency-Key; reconcile current status/configuration; moving an existing owner requires explicit force; existing keys never change spelling"
+		}
+		e.Evidence = append(
+			e.Evidence,
+			"internal/access/core/project/repositories.go",
+			"internal/artifacts/core/repos/api.go",
+			"test/server/access/project_repository_bindings_test.go",
+		)
 	}
 	if strings.Contains(path, "/move-archives") {
 		e.Effects, e.Retry = "CRAN archive move even on GET", "reconcile source/destination; no request deduplication"

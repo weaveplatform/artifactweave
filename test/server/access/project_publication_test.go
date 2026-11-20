@@ -77,7 +77,9 @@ func TestAccProjectRolesRecheckedAtNativePublicationAfterStreaming(t *testing.T)
 						packageType = "generic"
 					}
 					wantStatus(t, do(t, h, http.MethodPut, "/artifactory/api/repositories/publish", jsonAs(basic("admin", "pw")),
-						`{"rclass":"local","packageType":"`+packageType+`","projectKey":"alpha"}`), http.StatusOK)
+						`{"rclass":"local","packageType":"`+packageType+`"}`), http.StatusOK)
+					// Existing repository keys retain their spelling when attached.
+					projectRequest(t, h, http.MethodPut, "/_/attach/repositories/publish/alpha", "admin", "", http.StatusNoContent)
 				}
 				method, target, payload, storedPath, want := http.MethodPost, "", "", "", http.StatusCreated
 				switch kind {

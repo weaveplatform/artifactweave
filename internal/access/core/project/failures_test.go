@@ -29,6 +29,20 @@ type failingProjects struct {
 	fail string
 }
 
+func (s failingProjects) Guard(ctx context.Context) error {
+	if s.fail == "binding guard" {
+		return errStoreFailure
+	}
+	return s.ProjectStore.Guard(ctx)
+}
+
+func (s failingProjects) Assignment(ctx context.Context, key string) (model.RepositoryAssignment, error) {
+	if s.fail == "binding assignment" {
+		return model.RepositoryAssignment{}, errStoreFailure
+	}
+	return s.ProjectStore.Assignment(ctx, key)
+}
+
 func (s failingProjects) RoleProjects(ctx context.Context, q port.ProjectRoleQuery) ([]model.Project, bool, error) {
 	if s.fail == "role project page" {
 		return nil, false, errStoreFailure

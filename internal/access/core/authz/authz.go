@@ -80,6 +80,7 @@ type Decider struct {
 	// projectLimit is nil for an unbound credential; a non-nil empty map is
 	// a project token that reaches no current repository.
 	projectLimit   map[string]bool
+	sharedReadOnly map[string]bool
 	repoAdmins     map[string]model.AdminPrivileges
 	projectAdmins  map[string]bool
 	webhookManager bool
@@ -372,7 +373,7 @@ func (d *Decider) Actions(
 	case rt != accessapi.ResourceArtifact && !d.hasAppliedPermissions:
 		have = 0
 	}
-	return have
+	return have & d.sharingCeiling(repo.Key)
 }
 
 // Allows reports whether the subject holds every action in want on a file
@@ -430,7 +431,7 @@ func (d *Decider) AllowsAll(
 	case rt != accessapi.ResourceArtifact && !d.hasAppliedPermissions:
 		have = 0
 	}
-	return have.Has(want)
+	return (have & d.sharingCeiling(repo.Key)).Has(want)
 }
 
 // RepoConfig reports whether a token scope lets the subject read a

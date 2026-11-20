@@ -44,16 +44,16 @@ func TestAccRepositoryEnvironments(t *testing.T) {
 		}
 	}
 
-	refused("create", "PUT", "/artifactory/api/repositories/fresh",
+	refused("create", "PUT", "/artifactory/api/repositories/proj-fresh",
 		`{"rclass":"local","projectKey":"proj","environments":["nope"]}`)
 	refused("update", "POST", "/artifactory/api/repositories/kept",
 		`{"environments":["PROD","nope"]}`)
 	refused("batch create", "PUT", "/artifactory/api/v2/repositories/batch",
-		`[{"key":"b1","rclass":"local"},`+
-			`{"key":"b2","rclass":"local","projectKey":"proj","environments":["nope"]}]`)
+		`[{"key":"proj-b1","rclass":"local"},`+
+			`{"key":"proj-b2","rclass":"local","projectKey":"proj","environments":["nope"]}]`)
 	refused("batch update", "POST", "/artifactory/api/v2/repositories/batch",
 		`[{"key":"kept","description":"x"},{"key":"kept","environments":["nope"]}]`)
-	for key, want := range map[string]string{"fresh": "missing", "b1": "missing", "kept": "DEV"} {
+	for key, want := range map[string]string{"proj-fresh": "missing", "proj-b1": "missing", "kept": "DEV"} {
 		if got := envs(key); got != want {
 			t.Fatalf("%s: environments %s after refused writes, want %s", key, got, want)
 		}
@@ -69,7 +69,7 @@ func TestAccRepositoryEnvironments(t *testing.T) {
 			`{"rclass":"local","environments":["nope"]}`,
 		},
 		// In a project an empty list becomes DEV.
-		{"PUT", "/artifactory/api/repositories/fresh", `{"rclass":"local","projectKey":"proj"}`},
+		{"PUT", "/artifactory/api/repositories/proj-fresh", `{"rclass":"local","projectKey":"proj"}`},
 		// Built-in, global and the project's own, in any case.
 		{
 			"POST", "/artifactory/api/repositories/kept",
@@ -77,11 +77,11 @@ func TestAccRepositoryEnvironments(t *testing.T) {
 		},
 		{
 			"PUT", "/artifactory/api/v2/repositories/batch",
-			`[{"key":"b1","rclass":"local","projectKey":"proj","environments":["Qa"]}]`,
+			`[{"key":"proj-b1","rclass":"local","projectKey":"proj","environments":["Qa"]}]`,
 		},
 		{
 			"POST", "/artifactory/api/v2/repositories/batch",
-			`[{"key":"b1","environments":["DEV","dev"]}]`,
+			`[{"key":"proj-b1","environments":["DEV","dev"]}]`,
 		},
 	} {
 		if rec := w.do(step.method, step.path, "admin", step.body); rec.Code/100 != 2 {
@@ -89,7 +89,7 @@ func TestAccRepositoryEnvironments(t *testing.T) {
 		}
 	}
 	for key, want := range map[string]string{
-		"loose": "", "fresh": "DEV", "kept": "PROD,QA,proj-stage", "b1": "DEV",
+		"loose": "", "proj-fresh": "DEV", "kept": "PROD,QA,proj-stage", "proj-b1": "DEV",
 	} {
 		if got := envs(key); got != want {
 			t.Fatalf("%s: environments %q, want %q", key, got, want)

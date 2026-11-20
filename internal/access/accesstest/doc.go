@@ -37,6 +37,8 @@
 //   - HashPassword and ErrLoginSuspended: cheap password hashes for the
 //     users a test stores, and the suspended-login sentinel, which the
 //     kernel does not declare.
+//   - ProjectAdministration: real project lifecycle operations over a composite
+//     store and canonical repository API for SQL rollback/concurrency proofs.
 //   - The access records a test stores (User, Group, Permission, Token,
 //     Project, Role and the rest), the store ports a fake wraps (UserStore,
 //     PermissionStore with PermissionQuery, TokenStore with TokenFilter,

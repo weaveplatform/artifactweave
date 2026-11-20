@@ -51,6 +51,8 @@
 // P11 PRJ-01 supplies administration over the role and identity foundations.
 // PRJ-02 activates current role-derived content and management grants, with
 // guarded role-token mint/use and project lifetime boundaries. Repository
-// attachment/sharing and quotas have separate P11 tickets.
+// attachment and standard sharing publish canonical configuration and Access
+// assignments in one guarded transaction (PRJ-03). Quotas retain their separate
+// P11 owner.
 // The contract audit's unresolved vendor validation/scope edges remain qualified.
 package project
