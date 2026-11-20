@@ -1,5 +1,6 @@
 // Package pkgindex maintains the package index of decision 0018 for the
-// format handlers: which package and version each file belongs to.
+// format handlers: which package and version each file belongs to. It also
+// publishes metadata-only bounded projections for authorized retention reads.
 //
 // # Role
 //
@@ -28,10 +29,16 @@
 //     and times; a repository's configuration (Stored, Reconcile); and a
 //     format's reading of a repository's whole tree (Indexed and
 //     IndexedVersion).
+//   - NewReader takes IndexStore and the format registry. The caller holds the
+//     current authority guard; the reader checks current repository context,
+//     package/version identity and the adapter's bounded query capabilities.
 //
 // # Outputs
 //
 //   - Store, the one-accessor store the functions take.
+//   - IndexStore and NewReader expose bounded existing index rows through
+//     artifacts/api.PackageIndex. The owning format classifies linked lead
+//     files; no reader opens blobs or invents versions from file paths.
 //   - Index rows written through the store. Link creates the package and
 //     version when they are new; Prune deletes the versions left with no
 //     files, and a package left with no versions; Sync makes one version

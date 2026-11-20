@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
@@ -141,6 +142,48 @@ func policyRoutes(t *testing.T, db harness.Store) {
 		w.request("PUT", policies+"/global-policy", user, global, want)
 		w.request("DELETE", policies+"/global-policy", user, "", want)
 		w.request("POST", policies+"/global-policy/enablement", user, `{"enabled":true}`, want)
+	}
+	policyRepositoryClasses(w)
+}
+
+func policyRepositoryClasses(w policyWorld) {
+	w.t.Helper()
+	federated := repo.Config{Key: "alpha-scope-federated", Class: repo.Federated, PackageType: repo.NPM, ProjectKey: "alpha"}
+	if err := w.store.Repos().Create(w.t.Context(), *repo.Defaults(&federated)); err != nil {
+		w.t.Fatal(err)
+	}
+	body := policyBody("federated-policy", "alpha", federated.Key)
+	w.request("POST", policies+"/federated-policy", "admin", body, 201)
+	w.request("PUT", policies+"/federated-policy", "admin", body, 200)
+	if projected := w.request("GET", policies+"/federated-policy?checkRepoAvailability=true", "admin", "", 200); !strings.Contains(projected.Body.String(), federated.Key) {
+		w.t.Fatal("remote/virtual exclusion removed a supported federated policy reference", projected.Body.String())
+	}
+	for _, class := range []repo.Class{repo.Remote, repo.Virtual} {
+		c := repo.Config{Key: "alpha-scope-" + string(class), Class: class, PackageType: repo.NPM, ProjectKey: "alpha"}
+		if err := w.store.Repos().Create(w.t.Context(), *repo.Defaults(&c)); err != nil {
+			w.t.Fatal(err)
+		}
+		key := "refused-" + string(class)
+		w.request("POST", policies+"/"+key, "admin", policyBody(key, "alpha", c.Key), 400)
+		w.request("GET", policies+"/"+key, "admin", "", 404)
+		// Older versions could persist these literal references. Availability
+		// projects their current eligibility without rewriting the saved rule.
+		key = "legacy-" + string(class)
+		legacy := model.CleanupPolicy{Key: key, ProjectKey: "alpha", ItemType: model.CleanupPackage, Criteria: model.CleanupCriteria{
+			PackageTypes: []string{"npm"}, Repos: []string{c.Key}, ExcludedRepos: []string{c.Key}, IncludedPackages: []string{"**"},
+		}}
+		if err := w.store.Cleanup().CreatePolicy(w.t.Context(), legacy); err != nil {
+			w.t.Fatal(err)
+		}
+		before := w.request("GET", policies+"/"+key, "admin", "", 200).Body.String()
+		projected := w.request("GET", policies+"/"+key+"?checkRepoAvailability=true", "admin", "", 200)
+		if !strings.Contains(before, c.Key) || strings.Contains(projected.Body.String(), c.Key) {
+			w.t.Fatal("availability retained an unsupported literal or changed raw storage", before, projected.Body.String())
+		}
+		w.request("PUT", policies+"/"+key, "admin", policyBody(key, "alpha", c.Key), 400)
+		if after := w.request("GET", policies+"/"+key, "admin", "", 200).Body.String(); after != before {
+			w.t.Fatal("availability or refused update changed stored criteria", before, after)
+		}
 	}
 }
 

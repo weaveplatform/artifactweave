@@ -123,7 +123,7 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	if err != nil {
 		return modules{}, fmt.Errorf("notifications: %w", err)
 	}
-	ret, err := retention.New(retention.Deps{Store: d.store, Access: accessAPI, Repositories: repos.NewProjectRepositoryLookup(d.store)})
+	ret, err := retention.New(retention.Deps{Store: d.store, Access: accessAPI, Repositories: repos.NewProjectRepositoryLookup(d.store), PackageIndex: artifactsAPI.PackageIndex})
 	if err != nil {
 		return modules{}, fmt.Errorf("retention: %w", err)
 	}

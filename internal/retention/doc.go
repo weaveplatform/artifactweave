@@ -1,4 +1,4 @@
-// Package retention owns cleanup policy administration and its execution fence.
+// Package retention owns cleanup policies, candidate selection and admission.
 //
 // # Role
 //
@@ -9,13 +9,15 @@
 // # Inputs
 //
 // Deps supplies retention/schedule persistence, current access APIs, secret-free
-// repository ownership and the server schedule timezone (UTC by default).
+// repository ownership, bounded package-index reads and the server schedule
+// timezone (UTC by default).
 //
 // # Outputs
 //
 // Policy administration and durable generation checks for subsequent cleanup
-// execution. Identity and authority refresh under the project guard before
-// administrative disclosure or publication. Construction starts no scheduler,
+// execution, plus read-only candidate snapshots with a frozen rule and clock.
+// Identity and authority refresh under the project guard before every selection
+// page, administrative disclosure or publication. Construction starts no scheduler,
 // executor or network activity.
 //
 // # References
@@ -28,6 +30,6 @@
 //
 // # Status
 //
-// Implemented P11 policy administration (CLN-02). Evaluation, execution and
-// reports retain CLN-03/04; cold archive/restore remain P16.
+// P11 policy administration and metadata selection are supplied (CLN-02/03).
+// Execution/stop and reports retain CLN-04/05; cold archive/restore remain P16.
 package retention

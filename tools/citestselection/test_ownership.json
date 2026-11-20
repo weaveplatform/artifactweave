@@ -364,6 +364,11 @@
     ],
     "test/server/notifications": [
       "subscriptions_test.go"
+    ],
+    "test/server/retention": [
+      "policies_test.go",
+      "selection_changes_test.go",
+      "selection_test.go"
     ]
   },
   "format_dependencies": {

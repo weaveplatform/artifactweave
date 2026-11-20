@@ -37,11 +37,12 @@ type RepositoryReader interface {
 // and authority inside Store's transaction, before policy/schedule locks.
 // Guard acquires that same guard for a worker's revision admission. Neither
 // callback performs network I/O; run admission through WithPolicy also remains
-// inside the transaction. Candidate selection/execution belongs to CLN-04.
+// inside the transaction. Selection is metadata-only; CLN-04 owns execution.
 type Service struct {
 	Store         port.Store
 	Schedules     schedule.Store
 	Repositories  RepositoryReader
+	PackageIndex  artifactsapi.PackageIndex
 	ProjectExists func(context.Context, string) error
 	Authorize     func(context.Context) (Policy, error)
 	Guard         func(context.Context) error

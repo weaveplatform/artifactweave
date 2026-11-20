@@ -1,14 +1,15 @@
 // Package api is the artifacts module's published surface for other modules:
 // the repository operations they call (Repositories, with RepoFilter and the
-// shared names ErrChanged, MsgKeyExists and IsNull) and the layout check
-// (Layouts, with LayoutDefinition), which API holds as the module binds
-// them. The repository configuration model is its subpackage repo.
+// shared names ErrChanged, MsgKeyExists and IsNull), layout checks and bounded
+// package-index snapshots, which API holds as the module binds them. It also
+// supplies immutable event facts and secret-free project repository projections.
+// The repository configuration model is its subpackage repo.
 //
 // # Role
 //
 // artifacts module, api layer: what other modules may call. Other modules
 // reach artifacts only through this package and its subpackages, and it
-// imports only the standard library and its own repo subpackage (decision
+// imports only the standard library, kernel and its own repo subpackage (decision
 // 0044, dependency rules 5 and 6), so it declares its own types rather than
 // naming the module's core or store types: LayoutDefinition mirrors the
 // layout engine's Definition and RepoFilter the store's repository filter.
@@ -17,12 +18,12 @@
 //
 // # Inputs
 //
-// None: the package holds interfaces, a struct of them, two values and a
-// pure function. The artifacts module implements the interfaces:
+// The package declares contracts and immutable facts; their implementations
+// consume current authority, index identities and bounded page requests.
+// The artifacts module implements the interfaces:
 // internal/artifacts/core/repos's NewRepositories binds Repositories over
 // the store and access's Keys and Projects, and artifacts/core/layout's
-// Checker implements Layouts; the module's API method returns both as an
-// API.
+// Checker implements Layouts; pkgindex.NewReader supplies PackageIndex.
 //
 // # Outputs
 //
@@ -38,15 +39,19 @@
 //     which callers of Repositories use with its results.
 //   - Layouts, with LayoutDefinition: the check that configuration runs on a
 //     layout definition before it stores it.
-//   - API, the two contracts as the module binds them, which app hands to
-//     the configuration module.
+//   - PackageIndex: bounded repository/package/version/file snapshots and
+//     comparator retention cutoffs. Callers hold current authority; snapshots
+//     disclose no credentials and never authorize deletion.
+//   - API: the contracts as the module binds them, consumed by configuration,
+//     retention and the application composition.
 //
 // # Invariants
 //
-//   - No method wraps the error behind it, so callers keep their own
+//   - Repositories methods preserve the error behind them, so callers keep their own
 //     wrapping and errors.Is finds the store's sentinels and ErrChanged.
 //     Every text (ErrChanged, MsgKeyExists, the validation and layout
 //     messages) stays byte-identical, because clients and logs show it.
+//     PackageIndex names projection failures while preserving errors.Is.
 //   - Every Repositories method that takes a context takes part in the store
 //     transaction the context carries, so the configuration descriptor's
 //     deletes, writes and reindex requests commit or roll back together

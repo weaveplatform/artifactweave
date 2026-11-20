@@ -185,6 +185,18 @@ optional year); see [ADR 0010](decisions/0010-retention-trash-and-gc.md).
 over the package index ([ADR 0018](decisions/0018-package-index.md)) with the per-type
 version comparator.
 
+P11 selection now supplies bounded metadata snapshots with fresh project and
+environment admission, a fixed policy/clock, lead-based age/properties and
+current comparator protection. Remote and virtual repositories are excluded
+from cleanup. Federated policy configuration remains accepted, and the
+empty-members subset uses the same indexed selection as local content.
+Selection requiring configured-member download evidence is owned by P13
+([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)). Index reads
+remain generic. See [ADR 0010's candidate selection
+contract](decisions/0010-retention-trash-and-gc.md) for snapshot revalidation,
+format classifier semantics and existing index limits. Internal selection reasons do not
+define the later vendor report fields or authorize deletion.
+
 Cold-storage archive policies (`/artifactory/api/retention/archive/*`, Enterprise+) and
 smart archiving (`/artifactory/api/archive/v2/*`, Cloud only, 7.111+) answer 501. Release
 bundle v1 retention (`/artifactory/api/v1/bundle/retention/*`, Distribution) is ignored.

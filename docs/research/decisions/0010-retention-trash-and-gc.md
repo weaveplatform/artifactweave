@@ -32,6 +32,72 @@ run reports and the run status enumeration. Version-based criteria (`keepLastNVe
 `includedPackageVersions`) are evaluated over the package index
 ([0018](0018-package-index.md)) with the package type's comparator, never by path globbing.
 
+**Candidate selection (P11 CLN-03).** Retention freezes a detached policy and
+clock, then reads bounded package-index projections. Repository type, canonical
+project, environment and exclusions narrow the query before paging. Package
+cleanup excludes remote caches and virtual repositories, as the
+[current cleanup guide](https://docs.jfrog.com/administration/docs/cleanup-policies)
+requires. That guide supports federated repositories too and requires checking
+downloads across their members. Federated policy configuration and availability
+remain accepted. P11 selection evaluates local repositories and federated
+repositories with an empty membership list: decision 0022 permits omitting the
+self entry, so this subset needs no external-member download evidence. A bounded
+membership-presence projection filters before paging and refreshes parent
+identity; adding a member between pages refuses further local-only evaluation.
+Federated repositories with configured members need peer-aware selection in P13
+([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)), whose peer
+identity/evidence contracts are required before local statistics can safely
+represent a federation. This is an explicit implementation gap for configured
+members, not a vendor limitation. The generic index reader can describe remote
+and federated indexes for other owners; retention requests the admitted hosted
+classes with no federation members and refuses stale/foreign parents.
+
+Keep-last-N protects the comparator-newest versions before inclusion filters;
+zero still protects the newest. Version strings break comparator ties and supply
+stable traversal keys. Age uses the supplied evaluation clock, complete 24-hour
+days and 30-day legacy months. A never-downloaded lead uses its creation time;
+missing creation time cannot become an invented old date. The last-download
+predicate also preserves the existing version-level aggregate when a linked
+archive was downloaded more recently than its descriptor; a change to that
+statistic during evaluation invalidates the candidate page. This project choice
+keeps active package content when a client's descriptor is already cached.
+Matching excluded
+properties wins over inclusion; all included property keys must match, with any
+listed value sufficient for one key.
+
+The owning format identifies lead files from existing index identity/metadata.
+Selection reads no blob; file traversal retains one bounded page and lead
+evidence rather than collecting the version's items. A classifier may read the
+one existing opaque version-metadata document. Maven
+unique snapshots use the current POM build order rather than checksum identity;
+npm uses its canonical scoped tarball; Debian preserves admitted architectures;
+Docker/OCI uses the canonical manifest preference; Go uses its module descriptor;
+Helm and NuGet use the archive named by existing version metadata. The remaining
+indexed formats reuse their canonical archive/descriptor validators, excluding
+generated metadata, signatures and staged transactions. Ivy/SBT and custom Maven
+descriptors follow the current compiled repository layout, including overrides;
+an arbitrary XML file is never substituted. Hugging Face recognizes its documented
+model/dataset metadata names; a snapshot without that lead is retained for
+age/property evaluation rather than using an arbitrary model file.
+
+A missing documented lead yields `missing_lead`; an embedding without a format
+classifier explicitly yields `lead_contract_unavailable`. Neither invents old
+timestamps or a substitute file. Existing formats without a populated package
+index (including Generic, Cargo and Composer) retain the P28 ownership in
+[0018](0018-package-index.md); cleanup builds no second index and performs no
+item-tree/blob scan to fabricate package identities. For several leads in one version,
+all must satisfy the rule; this conservative project choice preserves the whole
+version rather than selecting an arbitrary architecture.
+
+Each file snapshot carries actual ID/path/checksums/size, content and property
+timestamps, download time and requested properties. Selection confirms lead
+evidence and current comparator protection after its bounded candidate read;
+changed lead evidence produces no candidates. These facts and internal reasons
+are descriptive, not vendor report fields or deletion permissions. CLN-04 must
+recheck current authority, item facts, keep protection and run/lease admission
+before effects; CLN-05 owns report serialization. Selection itself changes no
+items, bytes, usage, work or schedules.
+
 **Scheduler (P11 CLN-01).** `internal/platform/schedule` supplies the shared Quartz
 evaluator and durable logical positions for cleanup and single replication. It accepts
 the documented six/seven-field grammar, named ranges and day modifiers, with the
