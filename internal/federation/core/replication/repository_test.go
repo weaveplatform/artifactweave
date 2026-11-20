@@ -96,3 +96,22 @@ func TestUnitReplicationRepositoryRefreshKeepsOtherOwners(t *testing.T) {
 		t.Fatal("unwired repository refresh did not fail explicitly", err)
 	}
 }
+
+func TestUnitReplicationWorkerRefusesLegacyMultipleTargets(t *testing.T) {
+	w, ctx := newWorld(), t.Context()
+	must(t, w.service.Replace(ctx, "remote", replication.Input{}))
+	first := stored(t, w, "remote")
+	second := first
+	second.Key = "legacy-second-target"
+	must(t, w.db.Replications().Put(ctx, second))
+	for _, target := range []model.Replication{first, second} {
+		called := false
+		err := w.service.WithTarget(ctx, target.Key, target.Revision, func(context.Context, model.Replication) error {
+			called = true
+			return nil
+		})
+		if !errors.Is(err, kernel.ErrConflict) || called {
+			t.Fatal("legacy multiple configuration entered single-target worker admission", err)
+		}
+	}
+}

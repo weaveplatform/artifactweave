@@ -245,6 +245,16 @@ func (s Service) WithTarget(ctx context.Context, key, revision string, fn func(c
 		if revision == "" || r.Revision != revision || !r.Enabled {
 			return kernel.ErrConflict
 		}
+		current, err := s.target(ctx, r.RepoKey)
+		if errors.Is(err, ErrMultipleTargets) {
+			return kernel.ErrConflict
+		}
+		if err != nil {
+			return err
+		}
+		if current.Key != r.Key || current.Revision != r.Revision {
+			return kernel.ErrConflict
+		}
 		repository, err := s.Ownership.ProjectRepository(ctx, r.RepoKey)
 		if err != nil {
 			return fmt.Errorf("read replication worker repository: %w", err)
