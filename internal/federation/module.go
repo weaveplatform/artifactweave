@@ -50,7 +50,10 @@ func New(d Deps) (*Module, error) {
 // Configurations supplies administration and the private configuration revision
 // admission contract. It does not implement a transfer or dispatch a run.
 func (m *Module) Configurations() replication.Service {
-	d := m.deps
+	return m.deps.configurations()
+}
+
+func (d Deps) configurations() replication.Service {
 	s := replication.Service{
 		Store: d.Store, Settings: d.Store.Settings(), Ownership: d.Ownership,
 		Repositories: d.Repositories, Authorize: d.currentPolicy, Zone: d.Zone,
@@ -68,14 +71,18 @@ func (m *Module) Configurations() replication.Service {
 	return s
 }
 
-// RepositoryLifecycle invalidates replication targets and their runs when the
-// canonical repository starts or ends a lifetime. Artifacts invokes this before
+// RepositoryLifecycle resets targets/runs at repository lifetime boundaries and
+// refreshes a pull source after a canonical update. Artifacts invokes it before
 // content-event stream locks, under its shared transaction and project guard.
 func (m *Module) RepositoryLifecycle() artifactsapi.RepositoryLifecycle {
 	return repositoryLifecycle{deps: m.deps}
 }
 
 type repositoryLifecycle struct{ deps Deps }
+
+func (l repositoryLifecycle) RefreshRepository(ctx context.Context, key string) error {
+	return l.deps.configurations().RefreshRepository(ctx, key) //nolint:wrapcheck // the service supplies repository refresh context
+}
 
 func (l repositoryLifecycle) ResetRepository(ctx context.Context, key string) error {
 	if l.deps.Access.Projects == nil {

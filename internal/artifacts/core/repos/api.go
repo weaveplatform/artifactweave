@@ -101,7 +101,16 @@ func (r repositories) Update(ctx context.Context, c repo.Config) error {
 			return err //nolint:wrapcheck // preserves upstream error identity
 		}
 		if r.projects != nil {
-			return r.projects.BindRepository(ctx, c.Key, c.ProjectKey, c.Environments, false) //nolint:wrapcheck // access owns binding context
+			if err := r.projects.BindRepository(ctx, c.Key, c.ProjectKey, c.Environments, false); err != nil {
+				return err //nolint:wrapcheck // access owns binding context
+			}
+		}
+		for _, lifecycle := range r.lifecycles {
+			if lifecycle != nil {
+				if err := lifecycle.RefreshRepository(ctx, c.Key); err != nil {
+					return fmt.Errorf("refresh repository consumers: %w", err)
+				}
+			}
 		}
 		return nil
 	})

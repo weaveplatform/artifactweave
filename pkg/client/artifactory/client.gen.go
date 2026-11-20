@@ -5873,7 +5873,7 @@ type ReplicationConfigRequest struct {
 	// Proxy Optional within this object. Key of a configured proxy to route the replication through.
 	Proxy *string `json:"proxy,omitempty"`
 
-	// ProxyRef Optional within this object. Read-only alias of proxy returned for provider refresh. Ignored on input.
+	// ProxyRef Optional within this object. Response-only alias of proxy. Ignored on input.
 	ProxyRef *string `json:"proxyRef,omitempty"`
 
 	// ReplicationKey Optional within this object. Server-owned identifier of this configuration; ignored on input. This server preserves it across updates and allocates a new identifier after deletion and recreation.

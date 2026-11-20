@@ -105,7 +105,7 @@ components:
           description: Optional within this object. Key of a configured proxy to route the replication through.
           type: string
         proxyRef:
-          description: Optional within this object. Read-only alias of proxy returned for provider refresh. Ignored on input.
+          description: Optional within this object. Response-only alias of proxy. Ignored on input.
           readOnly: true
           type: string
         replicationKey:

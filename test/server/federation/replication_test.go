@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
@@ -211,6 +212,7 @@ func TestAccSingleReplicationSQLConfigurationAndRepositoryLifetime(t *testing.T)
 			replicationConfigurationLifecycle(t, w)
 			replicationRepositoryLifetime(t, w)
 			replicationLifetimeFailure(t, newStore(t))
+			replicationRemoteSourceUpdate(t, newStore(t))
 			replicationCurrentPrincipals(t, newStore(t))
 		}, sqltest.WithPostgres(), sqltest.WithKeyring(keys))
 }
@@ -219,7 +221,7 @@ var errLifetimeFailure = errors.New("injected replication lifetime failure")
 
 type lifetimeFailureStore struct {
 	app.RouterStore
-	fail bool
+	fail, failPut bool
 }
 
 func (s *lifetimeFailureStore) Replications() port.ReplicationStore {
@@ -229,6 +231,70 @@ func (s *lifetimeFailureStore) Replications() port.ReplicationStore {
 type lifetimeFailureReplications struct {
 	port.ReplicationStore
 	owner *lifetimeFailureStore
+}
+
+func (s lifetimeFailureReplications) Put(ctx context.Context, target model.Replication) error {
+	if err := s.ReplicationStore.Put(ctx, target); err != nil {
+		return err //nolint:wrapcheck // preserve the actual store failure for the HTTP assertion
+	}
+	if s.owner.failPut {
+		return errLifetimeFailure
+	}
+	return nil
+}
+
+func TestAccSingleReplicationRemoteSourceUpdateIsAtomic(t *testing.T) {
+	replicationRemoteSourceUpdate(t, inmem.New())
+}
+
+func replicationRemoteSourceUpdate(t *testing.T, db app.RouterStore) {
+	t.Helper()
+	st := &lifetimeFailureStore{RouterStore: db}
+	w := newReplicationWorldWithStore(t, st)
+	w.request("PUT", replicationPath+"remote", `{"password":"pull-private-password"}`, 201)
+	before, err := db.Replications().ForRepo(t.Context(), "remote")
+	if err != nil || len(before) != 1 {
+		t.Fatal("missing remote source fixture", err)
+	}
+	const nextURL = "https://replacement.example/artifactory/source"
+	w.request("POST", "/artifactory/api/repositories/remote", `{"url":"`+nextURL+`"}`, 200)
+	if w.configuration("remote")["url"] != nextURL {
+		t.Fatal("pull configuration retained the former canonical upstream")
+	}
+	after, err := db.Replications().ForRepo(t.Context(), "remote")
+	if err != nil || len(after) != 1 || after[0].Key != before[0].Key || after[0].Revision == before[0].Revision || after[0].Password != before[0].Password {
+		t.Fatal("source update lost stable identity/secret or retained old worker revision", err)
+	}
+	worker := replication.Service{Store: st, Settings: st.Settings(), Ownership: st.Repos(), Guard: func(context.Context) error { return nil }}
+	called := false
+	admit := func(_ context.Context, target model.Replication) error {
+		called = true
+		if target.URL != nextURL {
+			t.Fatal("worker received an obsolete pull source")
+		}
+		return nil
+	}
+	if err := worker.WithTarget(t.Context(), before[0].Key, before[0].Revision, admit); !errors.Is(err, kernel.ErrConflict) || called {
+		t.Fatal("old pull revision retained worker admission", err)
+	}
+	if err := worker.WithTarget(t.Context(), after[0].Key, after[0].Revision, admit); err != nil || !called {
+		t.Fatal("current pull revision was not admitted", err)
+	}
+	w.request("POST", "/artifactory/api/repositories/remote", `{"url":"`+nextURL+`"}`, 200)
+	unchanged, err := db.Replications().ForRepo(t.Context(), "remote")
+	if err != nil || !reflect.DeepEqual(unchanged, after) {
+		t.Fatal("identical source retry invalidated current replication", err)
+	}
+	st.failPut = true
+	w.request("POST", "/artifactory/api/repositories/remote", `{"url":"https://failed.example/source"}`, 500)
+	unchanged, err = db.Replications().ForRepo(t.Context(), "remote")
+	if err != nil || !reflect.DeepEqual(unchanged, after) {
+		t.Fatal("failed source refresh changed target configuration or secret", err)
+	}
+	source, err := db.Repos().Get(t.Context(), "remote")
+	if err != nil || source.URL != nextURL {
+		t.Fatal("failed target refresh published the canonical source update", err)
+	}
 }
 
 func (s lifetimeFailureReplications) DeleteForRepo(ctx context.Context, key string) error {

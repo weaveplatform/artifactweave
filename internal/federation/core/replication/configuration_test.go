@@ -34,10 +34,14 @@ func (p authority) Allows(project string, _ repo.Class) bool {
 type repositories struct {
 	values                     map[string]repo.Config
 	metadataReads, secretReads int
+	metadataError, secretError error
 }
 
 func (r *repositories) ProjectRepository(_ context.Context, key string) (artifactsapi.ProjectRepository, error) {
 	r.metadataReads++
+	if r.metadataError != nil {
+		return artifactsapi.ProjectRepository{}, r.metadataError
+	}
 	c, ok := r.values[key]
 	if !ok {
 		return artifactsapi.ProjectRepository{}, kernel.ErrNotFound
@@ -47,6 +51,9 @@ func (r *repositories) ProjectRepository(_ context.Context, key string) (artifac
 
 func (r *repositories) Get(_ context.Context, key string) (repo.Config, error) {
 	r.secretReads++
+	if r.secretError != nil {
+		return repo.Config{}, r.secretError
+	}
 	c, ok := r.values[key]
 	if !ok {
 		return repo.Config{}, kernel.ErrNotFound
