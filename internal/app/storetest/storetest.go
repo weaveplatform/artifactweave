@@ -51,7 +51,6 @@ type Factory func(t *testing.T) Store
 func Run(t *testing.T, newStore Factory) {
 	t.Helper()
 	runCore(t, newStore)
-	t.Run("ProjectRepositoryBindingLifetime", func(t *testing.T) { testProjectRepositoryBindingLifetime(t, newStore(t)) })
 	artstoretest.Run(t, func(t *testing.T) artport.Store { return newStore(t) })
 	// A layout document lives in the platform's config store and fences the
 	// artifacts module's remote sources, so this test needs a whole composite and

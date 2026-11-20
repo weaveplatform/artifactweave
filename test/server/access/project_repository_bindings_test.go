@@ -1,7 +1,6 @@
 package access_test
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -14,11 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
-	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
-	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
-	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
-	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
@@ -181,12 +176,7 @@ func projectRepositoryBatchRollback(t *testing.T, db harness.Store, h http.Handl
 }
 
 func TestAccProjectRepositoryBindingSQLRoutes(t *testing.T) {
-	keys, err := crypt.New(bytes.Repeat([]byte{7}, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	sqltest.RunModule(t, appsql.Modules(), func(s *dialect.Store) *appsql.Store { return appsql.New(s.DB(), s.Dialect(), keys) },
-		func(t *testing.T, newStore func(*testing.T) *appsql.Store) { projectRepositoryBindings(t, newStore(t)) }, sqltest.WithPostgres(), sqltest.WithKeyring(keys))
+	projectRepositorySQL(t, projectRepositoryBindings)
 }
 
 func TestAccProjectRepositorySharesUseCurrentConsumerRole(t *testing.T) {

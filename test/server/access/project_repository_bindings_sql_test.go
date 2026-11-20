@@ -1,6 +1,7 @@
-package storetest
+package access_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,15 +10,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/access"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/access/core/project"
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
+	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
+	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/storekit"
+	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 type bindingSnapshotRepositories struct {
@@ -55,7 +60,7 @@ func (r bindingDeleteRepositories) List(ctx context.Context, filter artifactsapi
 }
 
 type bindingDeleteStore struct {
-	Store
+	harness.Store
 	entered *atomic.Bool
 	reads   *atomic.Int32
 }
@@ -89,7 +94,7 @@ func (p bindingDeleteProjects) Get(ctx context.Context, key string) (model.Proje
 	return value, nil
 }
 
-func testProjectRepositoryBindingLifetime(t *testing.T, db Store) {
+func projectRepositoryLifetime(t *testing.T, db harness.Store) {
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	for _, key := range []string{"alpha", "beta"} {
@@ -97,7 +102,7 @@ func testProjectRepositoryBindingLifetime(t *testing.T, db Store) {
 	}
 	const key = "existing-arbitrary-key"
 	storekit.Must(t, db.Repos().Create(ctx, *repo.Defaults(&repo.Config{Key: key, Class: repo.Local, PackageType: repo.Generic})))
-	repositories := repos.NewRepositories(db, nil, access.ProjectsOf(db))
+	repositories := support.Repositories(db)
 	s := project.Service{Store: db, Repositories: repositories}
 	storekit.Must(t, s.AttachRepository(ctx, key, "alpha", false))
 	storekit.Must(t, s.ShareRepository(ctx, key, "beta", false, true))
@@ -160,4 +165,22 @@ func testProjectRepositoryBindingLifetime(t *testing.T, db Store) {
 	if status.ProjectKey != "" || len(status.Environments) != 0 || len(status.SharedWith) != 0 {
 		t.Fatalf("Access status retained an obsolete owner or target share: %+v", status)
 	}
+}
+
+func TestAccProjectRepositoryBindingLifetime(t *testing.T) {
+	projectRepositoryLifetime(t, inmem.New())
+}
+
+func TestAccProjectRepositoryBindingSQLLifetime(t *testing.T) {
+	projectRepositorySQL(t, projectRepositoryLifetime)
+}
+
+func projectRepositorySQL(t *testing.T, check func(*testing.T, harness.Store)) {
+	t.Helper()
+	keys, err := crypt.New(bytes.Repeat([]byte{7}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqltest.RunModule(t, appsql.Modules(), func(s *dialect.Store) *appsql.Store { return appsql.New(s.DB(), s.Dialect(), keys) },
+		func(t *testing.T, newStore func(*testing.T) *appsql.Store) { check(t, newStore(t)) }, sqltest.WithPostgres(), sqltest.WithKeyring(keys))
 }
