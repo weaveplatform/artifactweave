@@ -55,7 +55,8 @@
 //
 // REP-01 configuration and REP-02/03 bounded direction drivers are implemented.
 // REP-04 binds durable manual/Quartz admission and generation-fenced workers to
-// actual transfer checkpoints and path evidence. Public execute/status adapters
-// and remaining runtime qualification are still integration work. Advanced
+// actual transfer checkpoints and path evidence. Public stored-config execute
+// answers 202 after durable admission; status uses current read authority and
+// scoped evidence. One-shot overrides and remaining qualification are open. Advanced
 // federation remains P13/P14/P37. Both drivers open before the queue starts.
 package federation
