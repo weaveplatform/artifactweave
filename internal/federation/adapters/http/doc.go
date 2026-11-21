@@ -41,6 +41,7 @@
 //
 // # Status
 //
-// REP-01 configuration and durable single-target status are implemented. Execute and advanced, event-driven
+// REP-01 configuration and durable single-target status and stored-config execute are implemented. One-shot
+// overrides and advanced, event-driven
 // and checksum replication retain their separate generated/deferred owners.
 package federationhttp

@@ -17892,33 +17892,41 @@
   },
   {
     "route": "POST /artifactory/api/replication/execute/*",
-    "state": "stub: 501",
-    "handler": "internal/app/router.go: handwrittenStub",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes",
-    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/app/router.go: internal/federation/adapters/http.ReplicationAPI.execute-fm",
+    "review_family": "single-replication-execution",
+    "effects": "atomic stored-config direction progress, immutable execution linkage and reference-only queue admission; no peer I/O during enqueue; unsupported one-shot options are refused",
+    "retry": "no Idempotency-Key; each accepted request creates a distinct logical execution; inspect durable status before retrying ambiguous admission",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; current repository management and original caller transfer authority before transactionally admitting work",
+    "pagination_execution": "one current stored configuration and canonical path; transfer progress, execution and queue reference commit together; bounded direction steps and dual-generation ownership run outside HTTP admission",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/federation/adapters/http/execute.go",
+      "internal/federation/core/replication/coordinator.go",
+      "internal/federation/core/replication/worker.go",
+      "test/server/federation/execution_runtime_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /artifactory/api/replication/execute/{repoPath}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "executePullPushReplication",
-    "state": "stub: 501",
-    "contract": "Not implemented; answers 501. It would start a replication now, independently of any schedule. The direction would follow the repository class: a local repository pushes to the targets in the body or, when the body is omitted, to its stored configuration; a remote repository pulls from its upstream into the cache, and its body may name at most one target. The path may name a folder below the repository to limit the run. The run would be scheduled and the call would answer 200 with an empty body as soon as it is accepted; progress and per-file messages would go to the server log, and the status operation would report the outcome. A body with more than one target would be rejected with 400. Callers other than administrators would be limited to the user query result limit when choosing files. The caller would need manage permission on the repository.",
-    "handler": "internal/app/router.go: handwrittenStub",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoPath, body:",
+    "state": "partial: native dispatch; supported modes follow the contract",
+    "contract": "Starts one durable execution using the repository's stored single-target configuration. A local repository pushes; a remote repository pulls into its owning cache. The optional folder path limits selection. Returns 202 with an empty body after transfer progress, execution linkage and queue admission commit atomically. Current repository management and transfer permissions apply. Repeated requests create distinct logical runs. The body may be omitted or contain an empty array or one empty object. One-shot option/connection overrides remain unsupported and answer 501; supplied options are never silently discarded. Multiple targets answer 400.",
+    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "review_family": "single-replication-execution",
+    "effects": "atomic stored-config direction progress, immutable execution linkage and reference-only queue admission; no peer I/O during enqueue; unsupported one-shot options are refused",
+    "retry": "none: no retry protection; reconcile before retrying",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/federation/adapters/http/execute.go",
+      "internal/federation/core/replication/coordinator.go",
+      "internal/federation/core/replication/worker.go",
+      "test/server/federation/execution_runtime_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

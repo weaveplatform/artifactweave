@@ -17,11 +17,12 @@ import (
 )
 
 // ReplicationAPI serves single-target configuration and its enablement/global
-// controls and durable status. Execute, multi-push and advanced replication
+// controls, stored-config execution and durable status. One-shot, multi-push and advanced replication
 // retain their separate owners and generated responses.
 type ReplicationAPI struct {
 	Configurations *replication.Service
 	Status         *replication.StatusReader
+	Executions     *replication.Coordinator
 }
 
 func (s ReplicationAPI) service() (replication.Service, error) {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -80,6 +81,35 @@ func qualifyReplicationWorkerProcesses(t *testing.T, backend string) {
 			if string(actual) != body {
 				t.Fatal("actual queued worker did not populate verified destination bytes")
 			}
+			// Public admission must enqueue the real driver, not merely publish
+			// an accepted timestamp over the earlier completed execution.
+			updated := body + " after public execute"
+			writeOrigin, writeRepository := w.source, repository
+			if direction == model.ReplicationPull {
+				writeOrigin, writeRepository = w.target, "target"
+			}
+			w.request(writeOrigin, http.MethodPut, itemRoute(writeRepository, path), updated, http.StatusCreated)
+			publicExecute(t, w, repository+"/selected", "admin", "[]", http.StatusAccepted)
+			publicStatus(t, w, repository, "admin", http.StatusOK, model.ReplicationIncomplete)
+			if _, err := w.runtime.Work.RunDue(t.Context(), replication.ExecutionWorkKind); err != nil {
+				t.Fatal(err)
+			}
+			second, stop := context.WithTimeout(t.Context(), 20*time.Second)
+			defer stop()
+			for publicStatus(t, w, repository, "admin", http.StatusOK, "") != model.ReplicationOK {
+				select {
+				case <-ticker.C:
+				case <-second.Done():
+					t.Fatal("public execute did not settle actual effects")
+				}
+			}
+			actual, _ = w.request(origin, http.MethodGet, itemRoute(destination, path), "", http.StatusOK)
+			if string(actual) != updated {
+				t.Fatal("accepted public execution did not transfer changed bytes")
+			}
+			for _, malformed := range []string{"{}", "null", "[null]", "[{},{}]", "[]{}"} {
+				publicExecute(t, w, repository, "admin", malformed, http.StatusBadRequest)
+			}
 			status, err := w.runtime.Store.Executions().PathStatus(t.Context(), run.Binding.TargetKey, run.Binding.Repository.Incarnation, "selected")
 			if err != nil || status.Latest.Status != model.ReplicationOK || status.LastCompleted.IsZero() {
 				t.Fatal("actual transfer did not publish matching scoped status", err)
@@ -101,6 +131,15 @@ func qualifyReplicationWorkerProcesses(t *testing.T, backend string) {
 			publicStatus(t, w, repository+"/selected", "status-reader", http.StatusOK, model.ReplicationOK)
 			publicStatus(t, w, repository, "status-reader", http.StatusForbidden, "")
 			publicStatus(t, w, repository+"/private", "status-reader", http.StatusForbidden, "")
+			publicExecute(t, w, repository+"/selected", "status-reader", "", http.StatusForbidden)
+			publicExecute(t, w, repository+"/selected", "", "", http.StatusUnauthorized)
+			w.request(w.source, http.MethodPost, replicationPath+repository, `{"enabled":false}`, http.StatusOK)
+			publicExecute(t, w, repository, "admin", "", http.StatusConflict)
+			w.request(w.source, http.MethodPost, replicationPath+repository, `{"enabled":true}`, http.StatusOK)
+			w.request(w.source, http.MethodPost, "/artifactory/api/system/replications/block", "", http.StatusOK)
+			publicExecute(t, w, repository, "admin", "", http.StatusConflict)
+			w.request(w.source, http.MethodPost, "/artifactory/api/system/replications/unblock", "", http.StatusOK)
+
 			publicStatus(t, w, repository+"/selected", "", http.StatusUnauthorized, "")
 			unrelated, err := w.runtime.Store.Executions().PathStatus(t.Context(), run.Binding.TargetKey, run.Binding.Repository.Incarnation, "private")
 			if err != nil || !unrelated.Latest.Started.IsZero() {
@@ -110,7 +149,7 @@ func qualifyReplicationWorkerProcesses(t *testing.T, backend string) {
 	}
 }
 
-func publicStatus(t *testing.T, w *pushWorld, path, user string, want int, state model.ReplicationStatus) {
+func publicStatus(t *testing.T, w *pushWorld, path, user string, want int, state model.ReplicationStatus) model.ReplicationStatus {
 	t.Helper()
 	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, w.source+"/artifactory/api/replication/"+path, nil)
 	if err != nil {
@@ -129,7 +168,7 @@ func publicStatus(t *testing.T, w *pushWorld, path, user string, want int, state
 		t.Fatalf("public replication status: got%d want%d: %s err=%v", response.StatusCode, want, body, err)
 	}
 	if want != http.StatusOK {
-		return
+		return ""
 	}
 	var view struct {
 		Status  model.ReplicationStatus `json:"status"`
@@ -145,7 +184,29 @@ func publicStatus(t *testing.T, w *pushWorld, path, user string, want int, state
 	if len(view.Targets) > 0 {
 		actual = view.Targets[0].Status
 	}
-	if actual != state {
+	if state != "" && actual != state {
 		t.Fatalf("public replication status got%s want%s: %s", actual, state, body)
+	}
+	return actual
+}
+
+func publicExecute(t *testing.T, w *pushWorld, path, user, body string, want int) {
+	t.Helper()
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodPost, w.source+"/artifactory/api/replication/execute/"+path, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user != "" {
+		request.SetBasicAuth(user, "pw")
+	}
+	request.Header.Set("Content-Type", "application/json")
+	response, err := w.client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	data, err := io.ReadAll(response.Body)
+	if err != nil || response.StatusCode != want || want == http.StatusAccepted && len(data) != 0 {
+		t.Fatalf("public execute got%d want%d: %s err=%v", response.StatusCode, want, data, err)
 	}
 }

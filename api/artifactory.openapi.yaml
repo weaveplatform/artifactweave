@@ -9507,7 +9507,7 @@ paths:
       x-cost: ordinary
   /api/replication/execute/{repoPath}:
     post:
-      description: 'Not implemented; answers 501. It would start a replication now, independently of any schedule. The direction would follow the repository class: a local repository pushes to the targets in the body or, when the body is omitted, to its stored configuration; a remote repository pulls from its upstream into the cache, and its body may name at most one target. The path may name a folder below the repository to limit the run. The run would be scheduled and the call would answer 200 with an empty body as soon as it is accepted; progress and per-file messages would go to the server log, and the status operation would report the outcome. A body with more than one target would be rejected with 400. Callers other than administrators would be limited to the user query result limit when choosing files. The caller would need manage permission on the repository.'
+      description: Starts one durable execution using the repository's stored single-target configuration. A local repository pushes; a remote repository pulls into its owning cache. The optional folder path limits selection. Returns 202 with an empty body after transfer progress, execution linkage and queue admission commit atomically. Current repository management and transfer permissions apply. Repeated requests create distinct logical runs. The body may be omitted or contain an empty array or one empty object. One-shot option/connection overrides remain unsupported and answer 501; supplied options are never silently discarded. Multiple targets answer 400.
       operationId: executePullPushReplication
       parameters:
         - description: Required path parameter. Repository key, optionally followed by a folder path, for example libs-release-local or libs-release-local/org/acme. May span several segments.
@@ -9534,11 +9534,11 @@ paths:
               items:
                 $ref: '#/components/schemas/ReplicationRequest'
               type: array
-        description: Optional per-target options. Omitted uses the stored configuration.
+        description: Optional single-target options. Omitted or empty uses stored configuration; one-shot overrides answer 501.
         required: false
       responses:
-        '200':
-          description: The replication was accepted and scheduled; there is no body.
+        '202':
+          description: The replication was durably accepted and queued; there is no body.
         '400':
           content:
             application/json:
@@ -9557,8 +9557,26 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks manage permission on the repository, or replication is globally blocked.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or single-target configuration does not exist.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The configuration changed, is disabled, or the applicable replication direction is blocked.
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: One-shot execution overrides or advanced replication are unsupported.
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       tags:
@@ -9566,11 +9584,8 @@ paths:
         - replication
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/executepullpushreplication.md
-      x-tier: stub
-      x-idempotency: natural
-      x-idempotency-natural:
-        - path:repoPath
-        - 'body:'
+      x-tier: native
+      x-idempotency: none
       x-cost: expensive
   /api/replication/{repoPath}:
     get:

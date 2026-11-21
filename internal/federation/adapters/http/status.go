@@ -14,11 +14,15 @@ import (
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/middleware"
 )
 
 // RegisterExecutionRoutes claims the authored greedy path routes before the
 // router installs its handwritten-operation fallbacks.
 func (s ReplicationAPI) RegisterExecutionRoutes(r chi.Router) {
+	for _, pattern := range httpkit.ChiPatterns("/artifactory/api/replication/execute/{repoPath}") {
+		r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).Post(pattern, s.execute)
+	}
 	for _, pattern := range httpkit.ChiPatterns("/artifactory/api/replication/{repoPath}") {
 		r.Get(pattern, s.getStatus)
 	}

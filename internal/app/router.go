@@ -536,6 +536,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		if status, err := cfg.Federation.Status(); err == nil {
 			replicationOps.Status = &status
 		}
+		if coordinator, err := cfg.Federation.Coordinator(); err == nil {
+			replicationOps.Executions = &coordinator
+		}
 	}
 	logger := cfg.Logger
 	if logger == nil {

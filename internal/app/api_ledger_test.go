@@ -440,6 +440,11 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		e.Effects = "read-only current target/repository lifetime and selected-effect history; no sealed credentials, artifact/cache mutation, upstream request or queue admission"
 		e.Admission += "; current credential and Read covering the requested subtree refreshed under the shared project guard"
 	}
+	if method == http.MethodPost && (path == "/artifactory/api/replication/execute/{repoPath}" || path == "/artifactory/api/replication/execute/*") {
+		e.Effects = "atomic stored-config direction progress, immutable execution linkage and reference-only queue admission; no peer I/O during enqueue; unsupported one-shot options are refused"
+		e.Retry = "no Idempotency-Key; each accepted request creates a distinct logical execution; inspect durable status before retrying ambiguous admission"
+		e.Admission += "; current repository management and original caller transfer authority before transactionally admitting work"
+	}
 	if cleanupPolicy {
 		if method == "GET" {
 			e.Effects = "authorized policy configuration read; optional repository availability projection never rewrites stored criteria"
@@ -867,6 +872,14 @@ func (c *apiReviewClasses) pagingText() string {
 }
 
 func apiReviewPersistence(path string) (string, string, []string) {
+	if path == "/artifactory/api/replication/execute/{repoPath}" || path == "/artifactory/api/replication/execute/*" {
+		return "single-replication-execution", "one current stored configuration and canonical path; transfer progress, execution and queue reference commit together; bounded direction steps and dual-generation ownership run outside HTTP admission", []string{
+			"internal/federation/adapters/http/execute.go",
+			"internal/federation/core/replication/coordinator.go",
+			"internal/federation/core/replication/worker.go",
+			"test/server/federation/execution_runtime_test.go",
+		}
+	}
 	if path == "/artifactory/api/replication/{repoPath}" || path == "/artifactory/api/replication/*" {
 		return "single-replication-status", "one current single-target configuration; secret-free target keyset pages of 100; indexed current target/repository incarnation and exact-or-descendant selected effects; latest scoped outcome plus retained last completion", []string{
 			"internal/federation/adapters/http/status.go",

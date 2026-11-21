@@ -2,14 +2,17 @@ package federationhttp
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
 func TestUnitReplicationStatusPathDecodesOnceAndKeepsLiteralCharacters(t *testing.T) {
@@ -58,5 +61,25 @@ func TestUnitReplicationStatusWirePreservesDirectionAndLastCompletion(t *testing
 	ReplicationAPI{}.getStatus(response, httptest.NewRequest(http.MethodGet, "/artifactory/api/replication/libs", nil))
 	if response.Code != http.StatusNotImplemented {
 		t.Fatal("unbound status route claimed implementation")
+	}
+}
+
+func TestUnitReplicationExecuteRejectsAmbiguousBodiesAndUndeliveredOptions(t *testing.T) {
+	for _, raw := range []string{"", "[]", "[{}]"} {
+		if err := executionBody(strings.NewReader(raw)); err != nil {
+			t.Fatal("stored execution body refused", err)
+		}
+	}
+	for _, raw := range []string{"null", "{}", "[{},{}]", "[null,null]", "[null]", `[{"unknown":true}]`, "[]{}", "[{broken]", "[{\"unknown\":true}]"} {
+		var answer *apierror.Error
+		if err := executionBody(strings.NewReader(raw)); !errors.As(err, &answer) || answer.Status != http.StatusBadRequest {
+			t.Fatal("ambiguous execution body accepted", raw, err)
+		}
+	}
+	if err := executionBody(strings.NewReader(`[{"password":null}]`)); !errors.Is(err, apierror.ErrNotImplemented) {
+		t.Fatal("explicit null override was silently discarded", err)
+	}
+	if err := executionBody(strings.NewReader(`[{"password":"private-must-not-be-ignored"}]`)); !errors.Is(err, apierror.ErrNotImplemented) {
+		t.Fatal("one-shot options silently discarded", err)
 	}
 }
