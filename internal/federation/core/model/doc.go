@@ -29,7 +29,8 @@
 // # Outputs
 //
 //   - Replication, ReplicationRun, ReplicationDirection with DirectionFor,
-//     and ReplicationStatus.
+//     and ReplicationStatus. ReplicationTargetState is a credential-free
+//     repository history projection; it supplies no folder-level effect proof.
 //   - PushRun/PushBinding and PushItem preserve private logical execution,
 //     source/target intent and monotonic verification independently of the
 //     queue and public replication status. Their validation grants no current

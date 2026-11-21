@@ -14,6 +14,7 @@ import (
 // runReplications covers replication configurations and their last runs.
 func runReplications(t *testing.T, newStore Factory) {
 	t.Run("Replications", func(t *testing.T) { testReplications(t, newStore(t)) })
+	t.Run("ReplicationStatusTargets", func(t *testing.T) { testReplicationStatusTargets(t, newStore(t)) })
 }
 
 func replication(key, repoKey string) model.Replication {

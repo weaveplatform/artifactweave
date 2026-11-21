@@ -76,3 +76,13 @@ type ReplicationRun struct {
 	Completed      time.Time
 	Status         ReplicationStatus
 }
+
+// ReplicationTargetState is a secret-free projection of a current target's
+// repository-wide history. Latest may be incomplete while LastCompleted retains
+// a prior completion. Path-specific status requires selected-effect evidence;
+// this projection alone cannot claim that a run touched an arbitrary folder.
+type ReplicationTargetState struct {
+	Key, URL      string
+	Latest        ReplicationRun
+	LastCompleted time.Time
+}

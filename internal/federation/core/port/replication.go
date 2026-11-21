@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // ReplicationStore persists replication targets and their run history. The
@@ -16,6 +17,9 @@ type ReplicationStore interface {
 	Get(ctx context.Context, key string) (model.Replication, error)
 	// ForRepo returns a repository's replications ordered by key.
 	ForRepo(ctx context.Context, repoKey string) ([]model.Replication, error)
+	// StatusTargets projects current targets and repository-wide history ordered
+	// by key, without reading or unsealing credentials. A zero Latest is never-run.
+	StatusTargets(ctx context.Context, repoKey string, page kernel.Page) ([]model.ReplicationTargetState, string, error)
 	// List returns every replication ordered by (repository, key).
 	List(ctx context.Context) ([]model.Replication, error)
 	// Delete removes a replication and its runs.
