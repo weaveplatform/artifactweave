@@ -1,6 +1,6 @@
 terraform {
   # import blocks with expressions in id need 1.6; mocked tests need 1.7.
-  required_version = ">= 1.7"
+  required_version = ">= 1.17"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
