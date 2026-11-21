@@ -166,9 +166,10 @@ func cleanupReportsContract(t *testing.T, db harness.Store) {
 	f.preserved(t)
 	actual := cleanupReportRun(t, f, false)
 	check(actual)
+	const query = "policyKey=execution-policy&itemTypes=package&status=COMPLETED&pageSize=1&sortBy=runId&sortOrder=desc&keep=%2B&keep=two+words"
 	response := w.request(
 		http.MethodGet,
-		cleanupReports+"view?policyKey=execution-policy&itemTypes=package&status=COMPLETED&pageSize=1&sortBy=runId&sortOrder=desc",
+		cleanupReports+"view?"+query,
 		"admin",
 		"",
 		http.StatusOK,
@@ -178,6 +179,17 @@ func cleanupReportsContract(t *testing.T, db harness.Store) {
 	if page.RunViews == nil || len(*page.RunViews) != 1 || httpkit.Deref((*page.RunViews)[0].RunId) != int(actual.ID) || page.Pagination == nil ||
 		httpkit.Deref(page.Pagination.Total) != 2 {
 		t.Fatal("run view did not apply stable paging/counts")
+	}
+	if response.Header().Get("Link") != "<"+cleanupReports+"view?"+query+`&page=2>; rel="next"` {
+		t.Fatal("run view lost its preserved-query continuation", response.Header().Get("Link"))
+	}
+	next := strings.TrimSuffix(strings.TrimPrefix(response.Header().Get("Link"), "<"), `>; rel="next"`)
+	following := w.request(http.MethodGet, next, "admin", "", http.StatusOK)
+	var last artgen.CleanupPolicyRunView
+	storekit.Must(t, json.Unmarshal(following.Body.Bytes(), &last))
+	if following.Header().Get("Link") != "" || last.RunViews == nil || len(*last.RunViews) != 1 ||
+		httpkit.Deref((*last.RunViews)[0].RunId) != int(dry.ID) || last.Pagination == nil || httpkit.Deref(last.Pagination.CurrentPage) != 2 {
+		t.Fatal("continuation did not reach the final matching run or emitted another link")
 	}
 	for _, filters := range []string{"itemTypes=package&status=FAILED", "itemTypes=build&status=COMPLETED"} {
 		response = w.request(http.MethodGet, cleanupReports+"view?policyKey=execution-policy&"+filters, "admin", "", http.StatusOK)

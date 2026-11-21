@@ -1,16 +1,91 @@
 package retentionhttp
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/retention/api"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/cleanup"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/model"
 )
+
+func TestUnitCleanupRunViewWithoutRouterKeepsDecodedFiltersInLink(t *testing.T) {
+	db := inmem.New()
+	ctx := t.Context()
+	s := PackagePoliciesAPI{Policies: &cleanup.Service{
+		Store: db, Guard: db.Projects().Guard,
+		Authorize: func(ctx context.Context) (cleanup.Policy, error) { return fullPolicy{}, db.Projects().Guard(ctx) },
+	}}
+	p := model.CleanupPolicy{Key: "query-policy", Revision: "snapshot-revision", ProjectKey: "alpha", ItemType: model.CleanupPackage}
+	at := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	ids := []int64{}
+	for i := range 2 {
+		r, err := db.Cleanup().CreateRun(ctx, model.CleanupRun{
+			PolicyKey: p.Key, ItemType: p.ItemType, Status: api.RunCompleted, TotalItems: 1, Started: at.Add(time.Duration(i) * time.Hour),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.TriggerID = r.ID
+		if err := db.Cleanup().UpdateRun(ctx, r); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Cleanup().CreateExecution(ctx, model.CleanupExecution{
+			RunID: r.ID, Policy: p, At: at, ProjectIncarnation: "original-alpha", Credential: kernel.CredentialReference{Name: "admin", TokenID: "verified"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, r.ID)
+	}
+	params := artgen.GetCleanupPolicyRunsViewParams{
+		PolicyKey: &p.Key, ProjectKey: &p.ProjectKey, Page: httpkit.PtrTo(1), PageSize: httpkit.PtrTo(1),
+		From: httpkit.PtrTo(at.Add(-time.Minute).UnixMilli()), To: httpkit.PtrTo(at.Add(3 * time.Hour).UnixMilli()),
+		ItemTypes: httpkit.PtrTo([]string{"package", "build"}), Status: httpkit.PtrTo([]string{"COMPLETED", "FAILED"}),
+		ProjectKeyList: httpkit.PtrTo([]string{"alpha", "beta"}), ExcludeBlankExecutions: httpkit.PtrTo("true"),
+		SortBy: httpkit.PtrTo(artgen.GetCleanupPolicyRunsViewParamsSortBy("runId")), SortOrder: httpkit.PtrTo(artgen.GetCleanupPolicyRunsViewParamsSortOrderAsc),
+	}
+	response, err := s.GetCleanupPolicyRunsView(ctx, artgen.GetCleanupPolicyRunsViewRequestObject{Params: params})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := response.(artgen.GetCleanupPolicyRunsView200JSONResponse)
+	if first.Body.RunViews == nil || len(*first.Body.RunViews) != 1 || httpkit.Deref((*first.Body.RunViews)[0].RunId) != int(ids[0]) || first.Headers.Link == nil {
+		t.Fatal("decoded first-page request lost its row or continuation")
+	}
+	target, err := url.Parse(strings.TrimSuffix(strings.TrimPrefix(*first.Headers.Link, "<"), `>; rel="next"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := target.Query()
+	if target.Path != cleanupRunViewPath || query.Get("page") != "2" || query.Get("pageSize") != "1" || query.Get("policyKey") != p.Key || query.Get("projectKey") != "alpha" ||
+		strings.Join(query["status"], ",") != "COMPLETED,FAILED" || strings.Join(query["itemTypes"], ",") != "package,build" ||
+		strings.Join(query["projectKeyList"], ",") != "alpha,beta" || query.Get("from") == "" || query.Get("to") == "" || query.Get("excludeBlankExecutions") != "true" ||
+		query.Get("sortBy") != "runId" || query.Get("sortOrder") != "asc" {
+		t.Fatal("decoded continuation dropped a selection or order constraint", target)
+	}
+	params.Page = httpkit.PtrTo(2)
+	response, err = s.GetCleanupPolicyRunsView(ctx, artgen.GetCleanupPolicyRunsViewRequestObject{Params: params})
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := response.(artgen.GetCleanupPolicyRunsView200JSONResponse)
+	if last.Headers.Link != nil || last.Body.RunViews == nil || len(*last.Body.RunViews) != 1 || httpkit.Deref((*last.Body.RunViews)[0].RunId) != int(ids[1]) {
+		t.Fatal("decoded continuation failed to terminate on its second row")
+	}
+	if !KeepsSearchQuery(&http.Request{Method: http.MethodGet, URL: target}) || KeepsSearchQuery(&http.Request{Method: http.MethodPost, URL: target}) ||
+		KeepsSearchQuery(&http.Request{Method: http.MethodGet, URL: &url.URL{Path: "/different"}}) {
+		t.Fatal("query retention widened beyond the run-view GET")
+	}
+}
 
 func TestUnitCleanupReportWireUsesFrozenRuleAndTruthfulSizes(t *testing.T) {
 	at := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)

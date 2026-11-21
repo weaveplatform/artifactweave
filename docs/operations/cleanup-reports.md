@@ -30,6 +30,11 @@ An empty result has `lastPage: 0`. The [API source](../../api/src/artifactory/pa
 lists the supported sort fields and status enums. Archive and warming statuses do
 not become completed package executions.
 
+When more runs remain, `Link: <target>; rel="next"` names the next page. It keeps
+the original query, including repeated and unrecognized parameters, and changes
+only `page`. The final page has no next link. This is the shared ArtifactWeave
+paging extension described by [decision 0043](../research/decisions/0043-api-reliability.md).
+
 A dry run reports selected eligible items and sizes without claiming deletion.
 An actual run reports acknowledged deletions and retains failed, skipped and pending
 item outcomes. The summary's `processedItems` and size fields describe selected items

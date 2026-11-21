@@ -3648,6 +3648,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/CleanupPolicyRunView'
           description: One page of runs.
+          headers:
+            Link:
+              $ref: '#/components/headers/LinkNext'
         '400':
           content:
             application/json:

@@ -5244,10 +5244,14 @@
     "handler": "internal/retention/adapters/http/reports.go: PackagePoliciesAPI.GetCleanupPolicyRunsView",
     "direct_calls": [
       "httpkit.Deref",
+      "httpkit.NextLink",
+      "httpkit.PtrTo",
+      "httpkit.RawSearchQuery",
       "model.CleanupItemType",
       "port.RunOrder",
       "retapi.RunStatus",
       "s.service",
+      "strconv.FormatInt",
       "svc.Runs"
     ],
     "review_family": "cleanup-reports",

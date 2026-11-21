@@ -3,7 +3,10 @@ package retentionhttp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -15,6 +18,14 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/retention/core/model"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/port"
 )
+
+const cleanupRunViewPath = "/artifactory/api/cleanup/policies/runs/view"
+
+// KeepsSearchQuery preserves filters and unrecognized query parameters in the
+// next-page link, before the generated binding reduces them to known fields.
+func KeepsSearchQuery(r *http.Request) bool {
+	return r.Method == http.MethodGet && r.URL.Path == cleanupRunViewPath
+}
 
 func reportError(ctx context.Context, err error) error {
 	if errors.Is(err, kernel.ErrNotFound) {
@@ -107,10 +118,44 @@ func (s PackagePoliciesAPI) GetCleanupPolicyRunsView(ctx context.Context, req ar
 		}
 		rows = append(rows, row)
 	}
-	return artgen.GetCleanupPolicyRunsView200JSONResponse{
+	body := artgen.CleanupPolicyRunView{
 		RunViews:   &rows,
 		Pagination: &artgen.CleanupPagination{CurrentPage: &page.CurrentPage, LastPage: &page.LastPage, PageSize: &page.PageSize, Total: &page.Total},
-	}, nil
+	}
+	out := artgen.GetCleanupPolicyRunsView200JSONResponse{Body: body}
+	if page.CurrentPage < page.LastPage {
+		query := httpkit.RawSearchQuery(ctx)
+		if query == "" {
+			query = runViewQuery(p)
+		}
+		out.Headers.Link = httpkit.PtrTo(httpkit.NextLink(cleanupRunViewPath, query, "page", strconv.FormatInt(page.CurrentPage+1, 10)))
+	}
+	return out, nil
+}
+
+// Calls without the router have decoded parameters but no original query.
+func runViewQuery(p artgen.GetCleanupPolicyRunsViewParams) string {
+	return url.Values{
+		"itemTypes":              httpkit.Deref(p.ItemTypes),
+		"status":                 httpkit.Deref(p.Status),
+		"projectKeyList":         httpkit.Deref(p.ProjectKeyList),
+		"from":                   reportQueryValue(p.From),
+		"to":                     reportQueryValue(p.To),
+		"policyKey":              reportQueryValue(p.PolicyKey),
+		"projectKey":             reportQueryValue(p.ProjectKey),
+		"page":                   reportQueryValue(p.Page),
+		"pageSize":               reportQueryValue(p.PageSize),
+		"sortBy":                 reportQueryValue(p.SortBy),
+		"sortOrder":              reportQueryValue(p.SortOrder),
+		"excludeBlankExecutions": reportQueryValue(p.ExcludeBlankExecutions),
+	}.Encode()
+}
+
+func reportQueryValue[T ~string | ~int | ~int64](value *T) []string {
+	if value == nil {
+		return nil
+	}
+	return []string{fmt.Sprint(*value)}
 }
 
 // GetCleanupPoliciesView exposes configuration and genuine scoped last runs.
