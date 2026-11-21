@@ -1,5 +1,5 @@
 // Package cleanup administers package cleanup policies, selects candidates and
-// durably admits manual and scheduled runs.
+// executes durable manual and scheduled runs.
 //
 // # Role
 //
@@ -35,6 +35,15 @@
 // Stop/StopAll and emergency DisableAll request STOPPING; only the executor
 // may mark a run terminal after fencing further destructive publication.
 //
+// Executor reconstructs the frozen selection and restores the original current
+// principal with its permission decider inside each metadata transaction.
+// Bounded traversal cursors and immutable file intents survive restart. Normal
+// ItemRemoval effects, actual item/byte acknowledgements and continuation CAS
+// commit together, after current project/content checks and a final lease fence.
+// Non-leads precede ranked leads; only acknowledged removals leave the expected
+// version fingerprint. Stop, expiry and cancellation cannot publish a partial
+// mutation as completed. Dry runs record selection without artifact effects.
+//
 // # References
 //
 //   - docs/implementation/plan.md#p11-projects-webhooks-retention-replication.
@@ -44,7 +53,8 @@
 // # Status
 //
 // Implemented P11 policy administration and candidate evaluation (CLN-02/03).
-// CLN-04 run admission, private snapshots and durable stop requests are present.
-// Candidate execution/progress/terminal settlement remain in progress; report
-// wire formatting retains CLN-05. These helpers do not activate public routes.
+// CLN-04 run admission, durable execution/progress and stop settlement are
+// present. Runtime worker/scheduler and public run/stop bindings remain in
+// progress; report wire formatting retains CLN-05. These helpers alone do not
+// activate public routes or start workers.
 package cleanup

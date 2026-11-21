@@ -31,6 +31,9 @@ func (q cleanupEnqueueFault) Enqueue(ctx context.Context, kind, key string, payl
 
 func cleanupRunService(db Store, now func() time.Time) cleanup.Service {
 	return cleanup.Service{
+		Restore: func(ctx context.Context, _ kernel.CredentialReference) (context.Context, error) {
+			return ctx, db.Projects().Guard(ctx)
+		},
 		Store: db, Work: db.WorkQueue(), Schedules: db.Schedules(), Guard: db.Projects().Guard,
 		ProjectExists: func(ctx context.Context, key string) error {
 			if _, err := db.Projects().Get(ctx, key); err != nil {

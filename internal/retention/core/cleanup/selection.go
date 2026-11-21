@@ -41,24 +41,28 @@ func (s Service) Select(ctx context.Context, key string) (*Selection, error) {
 		if err != nil {
 			return err
 		}
-		if s.PackageIndex == nil {
-			return fmt.Errorf("cleanup package index unavailable: %w", kernel.ErrStore)
-		}
-		if err := validateCriteria(p.ProjectKey, p.Criteria); err != nil {
-			return err
-		}
-		at := s.now()
-		out = &Selection{service: s, snapshot: SelectionSnapshot{Policy: kernel.Clone(p), At: at}, criteria: newVersionCriteria(p.Criteria, at)}
-		out.properties = make(map[string][]string)
-		for _, conditions := range []map[string][]string{p.Criteria.IncludedProperties, p.Criteria.ExcludedProperties} {
-			for name, values := range conditions {
-				out.properties[name] = append(out.properties[name], values...)
-			}
-		}
-		return nil
+		out, err = s.selection(SelectionSnapshot{Policy: p, At: s.now()})
+		return err
 	})
 	if err != nil {
 		return nil, err
+	}
+	return out, nil
+}
+
+func (s Service) selection(snapshot SelectionSnapshot) (*Selection, error) {
+	if s.PackageIndex == nil {
+		return nil, fmt.Errorf("cleanup package index unavailable: %w", kernel.ErrStore)
+	}
+	if err := validateCriteria(snapshot.Policy.ProjectKey, snapshot.Policy.Criteria); err != nil {
+		return nil, err
+	}
+	snapshot = kernel.Clone(snapshot)
+	out := &Selection{service: s, snapshot: snapshot, criteria: newVersionCriteria(snapshot.Policy.Criteria, snapshot.At), properties: make(map[string][]string)}
+	for _, conditions := range []map[string][]string{snapshot.Policy.Criteria.IncludedProperties, snapshot.Policy.Criteria.ExcludedProperties} {
+		for name, values := range conditions {
+			out.properties[name] = append(out.properties[name], values...)
+		}
 	}
 	return out, nil
 }

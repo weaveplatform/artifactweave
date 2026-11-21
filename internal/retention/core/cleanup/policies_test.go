@@ -36,6 +36,9 @@ func world(t *testing.T, authority string) (cleanup.Service, *inmem.Store) {
 		must(t, db.Repos().Create(t.Context(), *repo.Defaults(&repo.Config{Key: key + "-npm", Class: repo.Local, PackageType: repo.NPM, ProjectKey: key})))
 	}
 	s := cleanup.Service{
+		Restore: func(ctx context.Context, reference kernel.CredentialReference) (context.Context, error) {
+			return kernel.WithPrincipal(ctx, reference.Principal()), db.Projects().Guard(ctx)
+		},
 		Store: db, Schedules: db.Schedules(), Repositories: db.Repos(), Guard: db.Projects().Guard,
 		Now:           func() time.Time { return time.Date(2026, 11, 20, 1, 0, 0, 0, time.UTC) },
 		ProjectExists: func(ctx context.Context, key string) error { _, err := db.Projects().Get(ctx, key); return err },

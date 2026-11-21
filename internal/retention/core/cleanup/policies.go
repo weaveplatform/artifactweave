@@ -48,9 +48,12 @@ type Service struct {
 	ProjectExists      func(context.Context, string) error
 	ProjectIncarnation func(context.Context, string) (string, error)
 	Authorize          func(context.Context) (Policy, error)
-	Guard              func(context.Context) error
-	Work               work.WorkQueue
-	Now                func() time.Time
+	// Restore binds the original current principal and permission decider to
+	// the supplied transaction context. A persisted name alone grants nothing.
+	Restore func(context.Context, kernel.CredentialReference) (context.Context, error)
+	Guard   func(context.Context) error
+	Work    work.WorkQueue
+	Now     func() time.Time
 	// Zone is the server's configured IANA timezone; empty uses deterministic UTC.
 	Zone string
 }

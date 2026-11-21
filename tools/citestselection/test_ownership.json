@@ -379,6 +379,9 @@
       "subscriptions_test.go"
     ],
     "test/server/retention": [
+      "executor_lifecycle_test.go",
+      "executor_native_test.go",
+      "executor_test.go",
       "policies_test.go",
       "removal_test.go",
       "selection_changes_test.go",

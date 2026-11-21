@@ -58,7 +58,7 @@ func (s Service) ManualRun(ctx context.Context, key string, dryRun bool) (model.
 // policy/project guard. A legacy name-only editor is never impersonated: such
 // policies need enablement by a verified credential before scheduled execution.
 func (s Service) ScheduledRun(ctx context.Context, trigger schedule.Trigger) (model.CleanupRun, error) {
-	if s.Store == nil || s.Guard == nil || s.Authorize == nil {
+	if s.Store == nil || s.Guard == nil || s.Authorize == nil || s.Restore == nil {
 		return model.CleanupRun{}, fmt.Errorf("cleanup scheduling is unavailable: %w", kernel.ErrStore)
 	}
 	if trigger.Reference.Kind != ScheduleKind || trigger.ID == "" || trigger.Revision == "" || trigger.Fire.IsZero() || trigger.Fence == nil {
@@ -82,7 +82,13 @@ func (s Service) ScheduledRun(ctx context.Context, trigger schedule.Trigger) (mo
 		if err := model.ValidateCleanupCredential(p.ExecutionCredential); err != nil {
 			return err //nolint:wrapcheck // a legacy actor name is not a verified grant
 		}
-		ctx = kernel.WithPrincipal(ctx, p.ExecutionCredential.Principal())
+		ctx, err = s.Restore(ctx, p.ExecutionCredential)
+		if err != nil {
+			return fmt.Errorf("restore scheduled cleanup caller: %w", err)
+		}
+		if ctx == nil {
+			return fmt.Errorf("cleanup restoration returned no context: %w", kernel.ErrStore)
+		}
 		authority, err := s.Authorize(ctx)
 		if err != nil {
 			return fmt.Errorf("current scheduled cleanup caller: %w", err)
@@ -149,6 +155,9 @@ func (s Service) admitRun(ctx context.Context, p model.CleanupPolicy, authority 
 	execution := model.CleanupExecution{RunID: r.ID, Occurrence: occurrence, Policy: kernel.Clone(p), Credential: credential, ProjectIncarnation: incarnation, At: s.now()}
 	if err := s.Store.Cleanup().CreateExecution(ctx, execution); err != nil {
 		return model.CleanupRun{}, fmt.Errorf("record cleanup execution snapshot: %w", err)
+	}
+	if err := s.Store.Cleanup().CreateProgress(ctx, model.CleanupProgress{RunID: r.ID, Revision: 1, Phase: model.CleanupRepositories}); err != nil {
+		return model.CleanupRun{}, fmt.Errorf("initialize cleanup traversal: %w", err)
 	}
 	if err := s.Work.Enqueue(ctx, WorkKind, strconv.FormatInt(r.ID, 10), nil, s.now()); err != nil {
 		return model.CleanupRun{}, fmt.Errorf("enqueue cleanup run: %w", err)
