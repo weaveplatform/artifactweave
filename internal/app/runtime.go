@@ -26,6 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	debianhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian/http"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/internal/federation"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/session"
@@ -60,6 +61,8 @@ type Runtime struct {
 	// Artifacts is the artifacts module, whose remote sources, remote
 	// HTTP pool and registry sources serve hands the server.
 	Artifacts *artifacts.Module
+	// Federation owns configuration and the initialized bounded single-push driver.
+	Federation *federation.Module
 	// modules are the access, artifacts and configuration modules over
 	// Store, Auth and Tokens; the server is given their APIs and the
 	// artifacts module's remote sources beside them.
@@ -229,6 +232,7 @@ func OpenRuntime(
 		Auth:       authenticator,
 		Tokens:     tokens,
 		Artifacts:  mods.artifacts,
+		Federation: mods.federation,
 		modules:    mods,
 		closeStore: st.Close,
 		Blobs:      hot.store,
@@ -242,6 +246,11 @@ func OpenRuntime(
 		stop()
 		return nil, errors.Join(err, st.Close())
 	}
+	if err := mods.federation.OpenPush(ctx, art.API().TransferSource, federation.PushOptions{AllowedPrivateOrigins: cfg.Remote.AllowedPrivateOrigins}); err != nil {
+		stop()
+		art.Close()
+		return nil, errors.Join(err, st.Close())
+	}
 	// A snapshot of a virtual repository walks its members as the package
 	// handlers do (itemkit.Kit.Packages), so the work's kit needs the
 	// store that walk reads; it keeps no merge, as a snapshot builds its
@@ -252,6 +261,8 @@ func OpenRuntime(
 		PackageOptions: pkgroute.Options{Store: st},
 	})); err != nil {
 		stop()
+		mods.federation.Close()
+		art.Close()
 		return nil, errors.Join(err, st.Close())
 	}
 	for _, t := range []struct {
@@ -296,6 +307,7 @@ func (rt *Runtime) Close(ctx context.Context) error {
 	rt.modules.artifacts.Close()
 	rt.stopLoops()
 	rt.loops.Wait()
+	rt.modules.federation.Close()
 	errs := make([]error, 0, len(rt.mirrors)+1)
 	for _, m := range rt.mirrors {
 		errs = append(errs, m.WaitIdle(ctx))

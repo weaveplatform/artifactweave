@@ -365,6 +365,8 @@
       "system_health_test.go"
     ],
     "test/server/federation": [
+      "push_process_test.go",
+      "push_test.go",
       "replication_test.go"
     ],
     "test/server/notifications": [

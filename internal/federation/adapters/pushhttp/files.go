@@ -88,7 +88,7 @@ func (c *connection) Files(ctx context.Context, root string, page kernel.Page) (
 	}
 	keys, complete, err := c.aql(ctx, root, last, page.Limit+1)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("query target file page: %w", err)
 	}
 	if !complete {
 		// Native AQL filters permissions after its scan limit. Underfilled,
@@ -96,7 +96,7 @@ func (c *connection) Files(ctx context.Context, root string, page kernel.Page) (
 		// storage listing, streaming it into a bounded next-page selection.
 		keys, err = c.fileList(ctx, root, last, page.Limit+1)
 		if err != nil {
-			return nil, "", err
+			return nil, "", fmt.Errorf("verify target file listing: %w", err)
 		}
 	}
 	next := ""
@@ -112,7 +112,7 @@ func (c *connection) Files(ctx context.Context, root string, page kernel.Page) (
 	for _, key := range keys {
 		item, err := c.info(ctx, key.path())
 		if err != nil {
-			return nil, "", err
+			return nil, "", fmt.Errorf("inspect listed target file: %w", err)
 		}
 		if item.Snapshot.Folder {
 			return nil, "", port.PushTargetInvalid
@@ -128,7 +128,7 @@ func (c *connection) aql(ctx context.Context, root string, last fileKey, limit i
 	if root != "" {
 		exact := keyFor(root)
 		clauses = append(clauses, map[string]any{"$or": []any{
-			map[string]any{"path": exact.Path, "name": exact.Name},
+			map[string]any{"$and": []any{map[string]any{"path": exact.Path}, map[string]any{"name": exact.Name}}},
 			map[string]any{"path": root},
 			map[string]any{"$and": []any{
 				map[string]any{"path": map[string]string{"$gte": root + "/"}},
@@ -137,9 +137,11 @@ func (c *connection) aql(ctx context.Context, root string, last fileKey, limit i
 		}})
 	}
 	if last.Name != "" {
+		// AQL's $or joins every member of its objects. Compound alternatives
+		// need an explicit $and, or path equality would re-admit earlier names.
 		clauses = append(clauses, map[string]any{"$or": []any{
 			map[string]any{"path": map[string]string{"$gt": last.Path}},
-			map[string]any{"path": last.Path, "name": map[string]string{"$gt": last.Name}},
+			map[string]any{"$and": []any{map[string]any{"path": last.Path}, map[string]any{"name": map[string]string{"$gt": last.Name}}}},
 		}})
 	}
 	if len(clauses) > 0 {
@@ -179,7 +181,7 @@ func (c *connection) aql(ctx context.Context, root string, last fileKey, limit i
 		} `json:"range"`
 	}
 	if err := decodeDocument(response.Body, &document); err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("decode target search: %w", err)
 	}
 	if document.Results == nil || len(*document.Results) > limit {
 		return nil, false, port.PushTargetInvalid
@@ -190,7 +192,7 @@ func (c *connection) aql(ctx context.Context, root string, last fileKey, limit i
 		key := fileKey{Path: row.Path, Name: row.Name}
 		if row.Repository != c.endpoint.Repository() || row.Type != "file" || keyFor(key.path()) != key || !inRoot(root, key.path()) ||
 			compareKey(previous, key) >= 0 {
-			return nil, false, port.PushTargetInvalid
+			return nil, false, fmt.Errorf("validate target search record: %w", port.PushTargetInvalid)
 		}
 		if _, err := c.endpoint.ItemURL(key.path()); err != nil {
 			return nil, false, port.PushTargetInvalid

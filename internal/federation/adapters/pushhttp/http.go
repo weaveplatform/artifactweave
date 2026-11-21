@@ -120,27 +120,27 @@ func (c *connection) info(ctx context.Context, path string) (port.PushTargetItem
 	}
 	var document map[string]json.RawMessage
 	if err := decodeDocument(response.Body, &document); err != nil {
-		return port.PushTargetItem{}, err
+		return port.PushTargetItem{}, fmt.Errorf("decode target item metadata: %w", err)
 	}
 	encoded, err := json.Marshal(document)
 	if err != nil {
-		return port.PushTargetItem{}, port.PushTargetInvalid
+		return port.PushTargetItem{}, fmt.Errorf("encode target metadata document: %w", port.PushTargetInvalid)
 	}
 	var info artifactory.FileInfo
 	if json.Unmarshal(encoded, &info) != nil || info.Repo == nil || *info.Repo != c.endpoint.Repository() ||
 		info.Path == nil || *info.Path != "/"+path || info.LastModified == nil || info.LastUpdated == nil {
-		return port.PushTargetItem{}, port.PushTargetInvalid
+		return port.PushTargetItem{}, fmt.Errorf("validate target item namespace and timestamps: %w", port.PushTargetInvalid)
 	}
 	snapshot := model.PushTargetSnapshot{Modified: *info.LastModified, Updated: *info.LastUpdated}
 	if children, folder := document["children"]; folder {
 		var entries []artifactory.FolderChild
 		if json.Unmarshal(children, &entries) != nil || entries == nil || info.Size != nil || info.Checksums != nil {
-			return port.PushTargetItem{}, port.PushTargetInvalid
+			return port.PushTargetItem{}, fmt.Errorf("validate target folder metadata: %w", port.PushTargetInvalid)
 		}
 		snapshot.Folder = true
 	} else {
 		if info.Size == nil || info.Checksums == nil || info.Checksums.Sha256 == nil {
-			return port.PushTargetItem{}, port.PushTargetInvalid
+			return port.PushTargetItem{}, fmt.Errorf("target omitted computed file size or checksum: %w", port.PushTargetInvalid)
 		}
 		snapshot.Size, err = strconv.ParseInt(*info.Size, 10, 64)
 		if err != nil || snapshot.Size < 0 || !digest(*info.Checksums.Sha256, 32) {

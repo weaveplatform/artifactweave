@@ -1,4 +1,5 @@
-// Package federation owns guarded single-target replication configuration.
+// Package federation owns guarded single-target replication configuration and
+// the bounded single-push transfer driver.
 // Peer trust, outbox delivery, federation and topology retain their later owners.
 //
 // # Role
@@ -12,6 +13,8 @@
 //
 // Deps supplies the shared transaction store, current Access authority,
 // secret-free repository ownership and canonical remote/proxy configuration.
+// OpenPush receives Artifacts' public source API after module assembly and
+// exact trusted outbound/TLS policy. It initializes its private policy key.
 //
 // # Outputs
 //
@@ -19,6 +22,10 @@
 // global pause controls. RepositoryLifecycle removes stale targets and runs
 // inside Artifacts' guarded create/delete transaction. Configuration does not
 // transfer content or publish a run result.
+// Pusher supplies resumable transfer after OpenPush; dispatch and scheduling
+// retain admission/lease ownership. Close releases the owned target HTTP pool.
+// Caller restoration refreshes the original verified credential and current
+// permissions under the project guard, and never returns a transaction context.
 //
 // # References
 //
@@ -46,6 +53,7 @@
 //
 // # Status
 //
-// REP-01 configuration is implemented. Transfer, execution and scheduling are
-// separate P11 tickets; peer and advanced federation remain P13, P14 and P37.
+// REP-01 configuration and REP-02 bounded push are implemented. Execution and
+// scheduling are separate P11 tickets; peer and advanced federation remain P13,
+// P14 and P37. The application opens push before running its work queue.
 package federation
