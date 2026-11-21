@@ -824,6 +824,41 @@ column remote_sources.doc text NOT NULL
 constraint remote_sources.remote_sources_pkey PRIMARY KEY (repo_key)
 constraint remote_sources.remote_sources_repo_key_fkey FOREIGN KEY (repo_key) REFERENCES repositories(key) ON DELETE CASCADE
 index remote_sources.remote_sources_pkey CREATE UNIQUE INDEX remote_sources_pkey ON remote_sources USING btree (repo_key)
+table replication_pull_items
+column replication_pull_items.run_id text NOT NULL
+column replication_pull_items.run_incarnation text NOT NULL
+column replication_pull_items.operation_key text NOT NULL
+column replication_pull_items.intent_fingerprint text NOT NULL
+column replication_pull_items.action text NOT NULL
+column replication_pull_items.path text NOT NULL
+column replication_pull_items.version bigint NOT NULL
+column replication_pull_items.phase text NOT NULL
+column replication_pull_items.document text NOT NULL
+constraint replication_pull_items.replication_pull_items_pkey PRIMARY KEY (run_id, operation_key)
+constraint replication_pull_items.replication_pull_items_run_id_run_incarnation_fkey FOREIGN KEY (run_id, run_incarnation) REFERENCES replication_pull_runs(run_id, incarnation) ON DELETE CASCADE
+constraint replication_pull_items.replication_pull_items_version_check CHECK ((version > 0))
+index replication_pull_items.replication_pull_items_pending CREATE INDEX replication_pull_items_pending ON replication_pull_items USING btree (run_id, phase, operation_key)
+index replication_pull_items.replication_pull_items_pkey CREATE UNIQUE INDEX replication_pull_items_pkey ON replication_pull_items USING btree (run_id, operation_key)
+table replication_pull_runs
+column replication_pull_runs.run_id text NOT NULL
+column replication_pull_runs.incarnation text NOT NULL
+column replication_pull_runs.target_key text NOT NULL
+column replication_pull_runs.binding_json text NOT NULL
+column replication_pull_runs.version bigint NOT NULL
+column replication_pull_runs.phase text NOT NULL
+column replication_pull_runs.source_cursor text NOT NULL DEFAULT ''::text
+column replication_pull_runs.target_cursor text NOT NULL DEFAULT ''::text
+column replication_pull_runs.source_done boolean NOT NULL DEFAULT false
+column replication_pull_runs.target_done boolean NOT NULL DEFAULT false
+column replication_pull_runs.started_at bigint NOT NULL
+column replication_pull_runs.updated_at bigint NOT NULL
+column replication_pull_runs.completed_at bigint
+constraint replication_pull_runs.replication_pull_runs_pkey PRIMARY KEY (run_id)
+constraint replication_pull_runs.replication_pull_runs_run_id_incarnation_key UNIQUE (run_id, incarnation)
+constraint replication_pull_runs.replication_pull_runs_version_check CHECK ((version > 0))
+index replication_pull_runs.replication_pull_runs_pkey CREATE UNIQUE INDEX replication_pull_runs_pkey ON replication_pull_runs USING btree (run_id)
+index replication_pull_runs.replication_pull_runs_run_id_incarnation_key CREATE UNIQUE INDEX replication_pull_runs_run_id_incarnation_key ON replication_pull_runs USING btree (run_id, incarnation)
+index replication_pull_runs.replication_pull_runs_target CREATE INDEX replication_pull_runs_target ON replication_pull_runs USING btree (target_key, phase, run_id)
 table replication_push_items
 column replication_push_items.run_id text NOT NULL
 column replication_push_items.run_incarnation text NOT NULL
