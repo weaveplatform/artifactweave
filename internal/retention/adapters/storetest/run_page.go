@@ -1,10 +1,14 @@
 package storetest
 
 import (
+	"context"
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/internal/retention/api"
@@ -30,6 +34,23 @@ func testCleanupRunPages(t *testing.T, store port.Store) {
 			t,
 			cs.CreateExecution(ctx, model.CleanupExecution{RunID: r.ID, Policy: p, Credential: p.ExecutionCredential, ProjectIncarnation: incarnation, At: storekit.At(5)}),
 		)
+		if r.CleanedItems > 0 {
+			storekit.Must(t, store.Tx(ctx, func(ctx context.Context) error {
+				if err := cs.CreateProgress(ctx, model.CleanupProgress{RunID: r.ID, Revision: 1, Phase: model.CleanupRepositories}); err != nil {
+					return fmt.Errorf("seed report run progress: %w", err)
+				}
+				for id := int64(1); id <= r.CleanedItems; id++ {
+					_, err := cs.CreateEntry(ctx, model.CleanupEntry{
+						RunID: r.ID, EntityID: id, VersionID: 1, Revision: 1, Kind: model.CleanupItemEntry, State: model.CleanupDeleted,
+						Removed: &artifactsapi.RemovedItem{ID: id, Size: r.CleanedSize / r.CleanedItems, SHA256: strings.Repeat("a", 64)},
+					})
+					if err != nil {
+						return fmt.Errorf("seed acknowledged run content: %w", err)
+					}
+				}
+				return nil
+			}))
+		}
 		storekit.Must(t, cs.DeletePolicy(ctx, key))
 		return r
 	}
@@ -41,7 +62,7 @@ func testCleanupRunPages(t *testing.T, store port.Store) {
 			Started:      storekit.At(1),
 			TotalItems:   10,
 			CleanedItems: 1,
-			CleanedSize:  100,
+			CleanedSize:  200,
 			Status:       api.RunCompleted,
 			TriggeredBy:  "Z",
 			Report:       []byte("private legacy report"),
@@ -130,7 +151,7 @@ func testCleanupRunPages(t *testing.T, store port.Store) {
 		{by: port.RunOrderStarted, ascending: []int64{d.ID, e.ID, g.ID, c.ID, a.ID}},
 		{by: port.RunOrderEnded, ascending: []int64{d.ID, e.ID, g.ID, c.ID, a.ID}},
 		{by: port.RunOrderTotal, ascending: []int64{d.ID, g.ID, e.ID, a.ID, c.ID}},
-		{by: port.RunOrderCleanedSize, ascending: []int64{c.ID, d.ID, e.ID, g.ID, a.ID}},
+		{by: port.RunOrderCleanedSize, ascending: []int64{c.ID, d.ID, e.ID, a.ID, g.ID}},
 		{by: port.RunOrderCleanedItems, ascending: []int64{c.ID, d.ID, e.ID, g.ID, a.ID}},
 		{by: port.RunOrderStatus, ascending: []int64{g.ID, c.ID, a.ID, d.ID, e.ID}},
 		{by: port.RunOrderActor, ascending: []int64{e.ID, g.ID, a.ID, c.ID, d.ID}},
@@ -167,6 +188,9 @@ func testCleanupRunPages(t *testing.T, store port.Store) {
 		})
 	}
 	page := storekit.Get[port.RunPage](t)(cs.RunPage(ctx, base))
+	if page.Runs[0].Run.ID != a.ID || page.Runs[0].CleanedContentBytes != 100 || page.Runs[0].Run.CleanedSize != 300 {
+		t.Fatal("view confused virtual bytes with distinct acknowledged content")
+	}
 	page.Runs[0].Policy.Criteria.Repos[0] = "changed-outside-the-store"
 	again := storekit.Get[port.RunPage](t)(cs.RunPage(ctx, base))
 	if again.Runs[0].Policy.Criteria.Repos[0] != "npm-local" {

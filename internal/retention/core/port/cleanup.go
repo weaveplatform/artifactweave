@@ -51,6 +51,9 @@ type CleanupStore interface {
 	// OutcomeTotals aggregates item states and actual content effects without
 	// collecting report rows. Version decisions do not become extra items.
 	OutcomeTotals(context.Context, int64) (model.CleanupOutcomeTotals, error)
+	// MarkReportDownloaded joins the caller's metadata transaction and marks
+	// an ended run only. It never changes outcome counters or report entries.
+	MarkReportDownloaded(context.Context, int64) error
 
 	// CreateExecution persists the private snapshot of an existing run. A
 	// nonempty occurrence is unique across scheduler retries, including after

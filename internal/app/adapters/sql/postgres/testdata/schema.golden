@@ -372,6 +372,7 @@ column cleanup_runs.total_items bigint NOT NULL DEFAULT 0
 column cleanup_runs.cleaned_items bigint NOT NULL DEFAULT 0
 column cleanup_runs.cleaned_size bigint NOT NULL DEFAULT 0
 column cleanup_runs.report text
+column cleanup_runs.report_downloaded boolean NOT NULL DEFAULT false
 constraint cleanup_runs.cleanup_runs_pkey PRIMARY KEY (id)
 index cleanup_runs.cleanup_runs_pkey CREATE UNIQUE INDEX cleanup_runs_pkey ON cleanup_runs USING btree (id)
 index cleanup_runs.cleanup_runs_policy CREATE INDEX cleanup_runs_policy ON cleanup_runs USING btree (policy_key, id)

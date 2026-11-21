@@ -146,7 +146,7 @@ func (c cleanupStore) Policies(
 }
 
 const runCols = "policy_key, trigger_id, item_type, status, dry_run, manual, triggered_by, started_at, ended_at, " +
-	"total_items, cleaned_items, cleaned_size, report"
+	"total_items, cleaned_items, cleaned_size, report, report_downloaded"
 
 func runArgs(r model.CleanupRun) []any {
 	return []any{
@@ -165,6 +165,7 @@ func runArgs(r model.CleanupRun) []any {
 		r.CleanedItems,
 		r.CleanedSize,
 		dialect.RawJSON(r.Report),
+		r.ReportDownloaded,
 	}
 }
 
@@ -174,7 +175,7 @@ func scanRun(row interface{ Scan(...any) error }, extra ...any) (model.CleanupRu
 		started, ended sql.NullInt64
 		report         sql.NullString
 	)
-	columns := make([]any, 0, 14+len(extra))
+	columns := make([]any, 0, 1+len(dialect.OpsCols(runCols))+len(extra))
 	columns = append(columns,
 		&r.ID,
 		&r.PolicyKey,
@@ -190,6 +191,7 @@ func scanRun(row interface{ Scan(...any) error }, extra ...any) (model.CleanupRu
 		&r.CleanedItems,
 		&r.CleanedSize,
 		&report,
+		&r.ReportDownloaded,
 	)
 	if err := row.Scan(append(columns, extra...)...); err != nil {
 		return r, err //nolint:wrapcheck // wrapped by the caller
@@ -219,7 +221,7 @@ func (c cleanupStore) Run(ctx context.Context, id int64) (model.CleanupRun, erro
 }
 
 func (c cleanupStore) UpdateRun(ctx context.Context, r model.CleanupRun) error {
-	sets := make([]string, 0, 13)
+	sets := make([]string, 0, len(dialect.OpsCols(runCols)))
 	for _, col := range dialect.OpsCols(runCols) {
 		sets = append(sets, col+" = ?")
 	}

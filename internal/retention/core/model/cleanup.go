@@ -70,20 +70,21 @@ type CleanupPolicy struct {
 
 // CleanupRun is one execution of a cleanup policy.
 type CleanupRun struct {
-	ID           int64
-	PolicyKey    string
-	TriggerID    int64
-	ItemType     CleanupItemType
-	Status       api.RunStatus
-	DryRun       bool
-	Manual       bool
-	TriggeredBy  string
-	Started      time.Time
-	Ended        time.Time
-	TotalItems   int64
-	CleanedItems int64
-	CleanedSize  int64
-	Report       []byte
+	ID               int64
+	PolicyKey        string
+	TriggerID        int64
+	ItemType         CleanupItemType
+	Status           api.RunStatus
+	DryRun           bool
+	Manual           bool
+	TriggeredBy      string
+	Started          time.Time
+	Ended            time.Time
+	TotalItems       int64
+	CleanedItems     int64
+	CleanedSize      int64
+	Report           []byte
+	ReportDownloaded bool
 }
 
 // CleanupRunSnapshot pairs public run facts with the policy it actually used.
@@ -92,6 +93,9 @@ type CleanupRun struct {
 type CleanupRunSnapshot struct {
 	Run    CleanupRun
 	Policy CleanupPolicy
+	// CleanedContentBytes deduplicates actual acknowledged content. Run's
+	// private CleanedSize retains the per-item total used by the executor.
+	CleanedContentBytes int64
 }
 
 // CleanupSnapshot removes private execution bindings from a history projection.

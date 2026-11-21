@@ -26,6 +26,9 @@ func (c cleanupStore) RunPage(ctx context.Context, q port.RunListing) (port.RunP
 			}
 			rows = append(rows, model.CleanupSnapshot(run, e.Policy))
 		}
+		if err := c.runContent(rows); err != nil {
+			return err
+		}
 		slices.SortFunc(rows, func(a, b model.CleanupRunSnapshot) int {
 			order := compareCleanupRun(a, b, q.Order)
 			if order == 0 {
@@ -102,7 +105,7 @@ func compareCleanupRun(a, b model.CleanupRunSnapshot, by port.RunOrder) int {
 	case port.RunOrderTotal:
 		return cmp.Compare(x.TotalItems, y.TotalItems)
 	case port.RunOrderCleanedSize:
-		return cmp.Compare(x.CleanedSize, y.CleanedSize)
+		return cmp.Compare(a.CleanedContentBytes, b.CleanedContentBytes)
 	case port.RunOrderCleanedItems:
 		return cmp.Compare(x.CleanedItems, y.CleanedItems)
 	case port.RunOrderStatus:

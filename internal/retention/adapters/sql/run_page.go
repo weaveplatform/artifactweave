@@ -38,10 +38,16 @@ func (c cleanupStore) RunPage(ctx context.Context, q port.RunListing) (port.RunP
 		columns = append(columns, "r."+column)
 	}
 	policy := c.runSnapshotField("Policy")
-	query := "SELECT " + strings.Join(columns, ", ") + ", " + policy + from + " ORDER BY " + c.runOrdering(q) + " LIMIT ? OFFSET ?"
+	query := "SELECT " + strings.Join(
+		columns,
+		", ",
+	) + ", " + policy + ", " + c.runContentExpression() + " AS cleaned_content_bytes" + from + " ORDER BY " + c.runOrdering(
+		q,
+	) + " LIMIT ? OFFSET ?"
 	err = c.s.Rows(ctx, "page cleanup report runs", query, append(slices.Clip(args), q.Limit, q.Offset), func(row *sql.Rows) error {
 		var raw sql.NullString
-		run, err := scanRun(row, &raw)
+		var content int64
+		run, err := scanRun(row, &raw, &content)
 		if err != nil {
 			return err
 		}
@@ -49,7 +55,9 @@ func (c cleanupStore) RunPage(ctx context.Context, q port.RunListing) (port.RunP
 		if err := dialect.FromJSON(raw, &policy); err != nil {
 			return err
 		}
-		out.Runs = append(out.Runs, model.CleanupSnapshot(run, policy))
+		snapshot := model.CleanupSnapshot(run, policy)
+		snapshot.CleanedContentBytes = content
+		out.Runs = append(out.Runs, snapshot)
 		return nil
 	})
 	if err != nil {
@@ -143,7 +151,7 @@ func (c cleanupStore) runOrdering(q port.RunListing) string {
 		port.RunOrderStarted:      {column: "r.started_at", nullable: true},
 		port.RunOrderEnded:        {column: "r.ended_at", nullable: true},
 		port.RunOrderTotal:        {column: "r.total_items"},
-		port.RunOrderCleanedSize:  {column: "r.cleaned_size"},
+		port.RunOrderCleanedSize:  {column: "cleaned_content_bytes"},
 		port.RunOrderCleanedItems: {column: "r.cleaned_items"},
 		port.RunOrderStatus:       {column: "r.status", text: true},
 		port.RunOrderActor:        {column: "r.triggered_by", text: true},
