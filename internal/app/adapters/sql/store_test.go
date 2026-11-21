@@ -19,14 +19,16 @@ import (
 // promoted one without a compile error: callers of Store reach the outer
 // method, while code that holds the *dialect.Store reaches the inner one. So
 // the dialect store exports no method named like an accessor of the
-// composite contract's store (appstoretest.Store) except Tx, AfterCommit
-// and Close, which Store takes from it on purpose. Reflection cannot tell a
+// composite contract's store (appstoretest.Store) except Tx, InTx, AfterCommit
+// and Close, which Store takes from it on purpose. InTx must observe the same
+// unit of work as Tx when a push opens content outside metadata transactions.
+// Reflection cannot tell a
 // method Store declares from one promoted onto it, so the methods Store
 // declares, including those outside the contract such as Reseal, are read
 // from this package's source.
 func TestUnitDialectStoreShadowsNoAccessor(t *testing.T) {
 	inner := reflect.TypeFor[*dialect.Store]()
-	fromDialect := []string{"Tx", "AfterCommit", "Close"}
+	fromDialect := []string{"Tx", "InTx", "AfterCommit", "Close"}
 	for _, name := range fromDialect {
 		if _, ok := inner.MethodByName(name); !ok {
 			t.Errorf("*dialect.Store has no %s method for Store to take", name)

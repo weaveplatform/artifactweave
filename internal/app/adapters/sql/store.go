@@ -251,6 +251,9 @@ func (s *Store) Archive() retport.ArchiveStore { return s.retention.Archive() }
 // Replications is the federation module's replication store.
 func (s *Store) Replications() fedport.ReplicationStore { return s.federation.Replications() }
 
+// PushProgress is the federation module's private durable execution evidence.
+func (s *Store) PushProgress() fedport.PushProgressStore { return s.federation.PushProgress() }
+
 // Peers is the federation module's peer store.
 func (s *Store) Peers() fedport.PeerStore { return s.federation.Peers() }
 

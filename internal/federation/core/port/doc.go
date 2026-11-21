@@ -28,6 +28,9 @@
 //
 //   - ReplicationStore: Put, Get, ForRepo, List, Delete and DeleteForRepo;
 //     PutRun and LastRun.
+//   - PushProgressStore: immutable logical run/intent creation, exact-lifetime
+//     reads, monotonic version CAS and bounded pending-item recovery. Private
+//     execution evidence survives target deletion and queue completion.
 //   - PeerStore: Put, Get, List and Delete; AddNonce, RedeemNonce and
 //     PruneNonces.
 //   - FederationStore: SetMembers, Members and MembersWithPeer;
@@ -36,7 +39,8 @@
 //     DeleteAccessTarget; PutFederation, Federation, Federations and
 //     DeleteFederation; PutTopology, Topology, Topologies and DeleteTopology.
 //   - PeerFilter.
-//   - Store: tx.Runner, Replications, Peers, Federation and Platform.
+//   - Store: shared transactions, Replications, PushProgress, Peers, Federation
+//     and Platform. ConfigurationStore remains independent of execution.
 //
 // # Invariants
 //
