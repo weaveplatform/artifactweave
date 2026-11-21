@@ -111,7 +111,7 @@ func compareCleanupRun(a, b model.CleanupRunSnapshot, by port.RunOrder) int {
 	case port.RunOrderStatus:
 		return cmp.Compare(x.Status, y.Status)
 	case port.RunOrderActor:
-		return cmp.Compare(x.TriggeredBy, y.TriggeredBy)
+		return cmp.Compare(x.DisplayActor(), y.DisplayActor())
 	case port.RunOrderManual:
 		return compareRunBool(x.Manual, y.Manual)
 	case port.RunOrderDry:

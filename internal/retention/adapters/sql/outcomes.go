@@ -11,7 +11,7 @@ import (
 )
 
 func (c cleanupStore) OutcomeTotals(ctx context.Context, run int64) (model.CleanupOutcomeTotals, error) {
-	if _, err := c.Run(ctx, run); err != nil {
+	if _, err := c.RunMetadata(ctx, run); err != nil {
 		return model.CleanupOutcomeTotals{}, err
 	}
 	return c.outcomeTotals(ctx, run)

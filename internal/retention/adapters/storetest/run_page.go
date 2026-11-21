@@ -165,7 +165,9 @@ func testCleanupRunPages(t *testing.T, store port.Store) {
 		{by: port.RunOrderCleanedSize, ascending: []int64{c.ID, d.ID, e.ID, a.ID, g.ID}},
 		{by: port.RunOrderCleanedItems, ascending: []int64{c.ID, d.ID, e.ID, g.ID, a.ID}},
 		{by: port.RunOrderStatus, ascending: []int64{g.ID, c.ID, a.ID, d.ID, e.ID}},
-		{by: port.RunOrderActor, ascending: []int64{e.ID, g.ID, a.ID, c.ID, d.ID}},
+		// Scheduled runs display "system", regardless of their saved enabling
+		// caller. Sort that public actor before applying numeric run-ID ties.
+		{by: port.RunOrderActor, ascending: []int64{e.ID, a.ID, g.ID, c.ID, d.ID}},
 		{by: port.RunOrderManual, ascending: []int64{g.ID, c.ID, a.ID, d.ID, e.ID}},
 		{by: port.RunOrderDry, ascending: []int64{g.ID, a.ID, d.ID, c.ID, e.ID}},
 	} {

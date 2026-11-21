@@ -198,4 +198,57 @@ func cleanupReportsContract(t *testing.T, db harness.Store) {
 			world.request(http.MethodGet, tc.path, tc.user, "", tc.status)
 		})
 	}
+	checkReportActorOrdering(t, f, dry.ID)
+}
+
+func checkReportActorOrdering(t *testing.T, f *cleanupExecutorFixture, original int64) {
+	t.Helper()
+	cs := f.db.Cleanup()
+	execution := storekit.Get[model.CleanupExecution](t)(cs.Execution(f.ctx, original))
+	p := execution.Policy
+	p.Key = "report-actor-order"
+	storekit.Must(t, cs.CreatePolicy(f.ctx, p))
+	ids := []int64{}
+	for _, actor := range []struct {
+		name   string
+		manual bool
+	}{{name: "alice"}, {name: "bob", manual: true}, {name: "zulu"}} {
+		run := storekit.Get[model.CleanupRun](t)(cs.CreateRun(f.ctx, model.CleanupRun{
+			PolicyKey: p.Key, ItemType: model.CleanupPackage, Status: retapi.RunCompleted, TriggeredBy: actor.name, Manual: actor.manual,
+		}))
+		run.TriggerID = run.ID
+		storekit.Must(t, cs.UpdateRun(f.ctx, run))
+		e := execution
+		e.RunID, e.Occurrence, e.Policy = run.ID, "", p
+		storekit.Must(t, cs.CreateExecution(f.ctx, e))
+		ids = append(ids, run.ID)
+	}
+	for _, order := range []struct {
+		name   string
+		ids    []int64
+		actors []string
+	}{
+		{name: "asc", ids: []int64{ids[1], ids[0], ids[2]}, actors: []string{"bob", "system", "system"}},
+		{name: "desc", ids: []int64{ids[2], ids[0], ids[1]}, actors: []string{"system", "system", "bob"}},
+	} {
+		for index, wantID := range order.ids {
+			w := policyWorld{t: t, store: f.db, h: f.handler}
+			response := w.request(
+				http.MethodGet,
+				cleanupReports+"view?policyKey="+p.Key+"&pageSize=1&sortBy=triggeredBy&sortOrder="+order.name+"&page="+strconv.Itoa(index+1),
+				"admin",
+				"",
+				http.StatusOK,
+			)
+			var page artgen.CleanupPolicyRunView
+			storekit.Must(t, json.Unmarshal(response.Body.Bytes(), &page))
+			if page.Pagination == nil || httpkit.Deref(page.Pagination.Total) != 3 || page.RunViews == nil || len(*page.RunViews) != 1 {
+				t.Fatal("actor sorting lost its bounded window or total")
+			}
+			row := (*page.RunViews)[0]
+			if httpkit.Deref(row.RunId) != int(wantID) || httpkit.Deref(row.TriggeredBy) != order.actors[index] {
+				t.Fatal("actor page sorted private enabling callers instead of the public actor", order.name, index)
+			}
+		}
+	}
 }

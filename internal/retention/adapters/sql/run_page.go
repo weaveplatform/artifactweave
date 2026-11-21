@@ -149,7 +149,7 @@ func (c cleanupStore) runOrdering(q port.RunListing) string {
 		port.RunOrderCleanedSize:  {column: "cleaned_content_bytes"},
 		port.RunOrderCleanedItems: {column: "r.cleaned_items"},
 		port.RunOrderStatus:       {column: "r.status", text: true},
-		port.RunOrderActor:        {column: "r.triggered_by", text: true},
+		port.RunOrderActor:        {column: "CASE WHEN r.manual THEN r.triggered_by ELSE 'system' END", text: true},
 		port.RunOrderManual:       {column: "r.manual"},
 		port.RunOrderDry:          {column: "r.dry_run"},
 	}

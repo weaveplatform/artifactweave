@@ -87,6 +87,15 @@ type CleanupRun struct {
 	ReportDownloaded bool
 }
 
+// DisplayActor describes who triggered the run. Scheduled execution retains
+// its enabling caller privately but presents the scheduler as "system".
+func (r CleanupRun) DisplayActor() string {
+	if !r.Manual {
+		return "system"
+	}
+	return r.TriggeredBy
+}
+
 // CleanupRunSnapshot pairs public run facts with the policy it actually used.
 // It contains no execution credential or project-lifetime capability. Later
 // policy edits, deletion or reuse of its key cannot change this history.

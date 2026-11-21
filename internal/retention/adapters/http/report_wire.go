@@ -12,13 +12,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/retention/core/model"
 )
 
-func runActor(r model.CleanupRun) string {
-	if !r.Manual {
-		return "system"
-	}
-	return r.TriggeredBy
-}
-
 func coveredProjects(p model.CleanupPolicy) []string {
 	if p.ProjectKey != "" {
 		return []string{p.ProjectKey}
@@ -35,7 +28,7 @@ func runWire(s model.CleanupRunSnapshot, content int64) (artgen.CleanupPolicyRun
 	out := artgen.CleanupPolicyRunViewEntry{
 		RunId: &id, PolicyKey: &r.PolicyKey, ItemType: httpkit.PtrTo(artgen.CleanupPolicyRunViewEntryItemType(r.ItemType)),
 		Status: httpkit.PtrTo(artgen.CleanupPolicyRunViewEntryStatus(r.Status)), DryRun: &r.DryRun, Manual: &r.Manual,
-		TriggeredBy: httpkit.PtrTo(runActor(r)), TotalItems: &r.TotalItems, CleanedItems: &r.CleanedItems, CleanedSize: &content,
+		TriggeredBy: httpkit.PtrTo(r.DisplayActor()), TotalItems: &r.TotalItems, CleanedItems: &r.CleanedItems, CleanedSize: &content,
 		DisplayProject: optionalString(s.DisplayProject), IncludedProjects: optionalList(coveredProjects(p)),
 	}
 	if !r.Started.IsZero() {
@@ -90,7 +83,7 @@ func summaryWire(report cleanup.RunReport) (artgen.CleanupRunSummary, error) {
 			RunId:       &id,
 			DryRun:      &r.DryRun,
 			Status:      httpkit.PtrTo(string(r.Status)),
-			TriggeredBy: httpkit.PtrTo(runActor(r)),
+			TriggeredBy: httpkit.PtrTo(r.DisplayActor()),
 		},
 		ExecutionSummary: &execution,
 		ProcessedItemsSummary: &artgen.CleanupProcessedItemsSummary{
