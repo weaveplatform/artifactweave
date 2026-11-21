@@ -118,8 +118,9 @@ jobs:
       # The Put Block From URL ranges up to 4,000 MiB are copied server-side
       # from a 101 MiB upload: they cost about a minute, not traffic.
       ARTIFACTWEAVE_TEST_AZURE_LARGE_RANGES: '1'
-      # Not the AZURE_* names: DefaultAzureCredential reads those and would
-      # try other credential types before the Azure CLI login.
+      # Runner IMDS can return 401, stopping the default chain before the
+      # deployer's CLI login. Select that login explicitly for the SDK.
+      AZURE_TOKEN_CREDENTIALS: AzureCLICredential
       CONFORMANCE_AZURE_CLIENT_ID: ${{ vars.CONFORMANCE_AZURE_CLIENT_ID }}
       CONFORMANCE_AZURE_TENANT_ID: ${{ vars.CONFORMANCE_AZURE_TENANT_ID }}
       CONFORMANCE_AZURE_SUBSCRIPTION_ID: ${{ vars.CONFORMANCE_AZURE_SUBSCRIPTION_ID }}

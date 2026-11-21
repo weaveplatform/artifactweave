@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"maps"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,11 +14,108 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"gopkg.in/yaml.v3"
 )
 
 // unitJobs are the quality gate's Go unit test jobs, one per runner OS.
 var unitJobs = []string{"unit-linux", "unit-macos", "unit-windows"}
+
+func TestUnitAzureWorkflowUsesDeployerLoginAfterMetadataUnauthorized(t *testing.T) {
+	// A hosted runner can answer IMDS with 401. The default chain then stops
+	// before azure/login's CLI session, rather than treating IMDS as absent.
+	for _, name := range []string{
+		"AZURE_CLIENT_ID", "AZURE_TENANT_ID", "AZURE_FEDERATED_TOKEN_FILE",
+		"IDENTITY_ENDPOINT", "IDENTITY_HEADER", "IDENTITY_SERVER_THUMBPRINT",
+		"MSI_ENDPOINT", "MSI_SECRET", "IMDS_ENDPOINT", "AZURE_POD_IDENTITY_AUTHORITY_HOST",
+	} {
+		t.Setenv(name, "")
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bin := t.TempDir()
+	cliName, cli := "az", "#!/bin/sh\nprintf '%s\\n' '{\"accessToken\":\"fixture-deployer\",\"expires_on\":4102444800}'\n"
+	if runtime.GOOS == "windows" {
+		cliName, cli = "az.cmd", "@echo off\r\necho {\"accessToken\":\"fixture-deployer\",\"expires_on\":4102444800}\r\n"
+	}
+	if err := os.WriteFile(filepath.Join(bin, cliName), []byte(cli), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	for _, tc := range []struct {
+		name     string
+		workflow string
+		job      string
+	}{
+		{"default chain reproduces IMDS 401", "", ""},
+		{"platform scenario", "platform-scenarios.yml", "run"},
+		{"cloud conformance", "cloud-conformance.yml", "azure"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("AZURE_TOKEN_CREDENTIALS", "")
+			if err := os.Unsetenv("AZURE_TOKEN_CREDENTIALS"); err != nil {
+				t.Fatal(err)
+			}
+			if tc.workflow != "" {
+				data, err := os.ReadFile(filepath.Join("../../.github/workflows", tc.workflow))
+				if err != nil {
+					t.Fatal(err)
+				}
+				var workflow struct {
+					Jobs map[string]struct {
+						Env map[string]string `yaml:"env"`
+					} `yaml:"jobs"`
+				}
+				if err := yaml.Unmarshal(data, &workflow); err != nil {
+					t.Fatal(err)
+				}
+				if selection, ok := workflow.Jobs[tc.job].Env["AZURE_TOKEN_CREDENTIALS"]; ok {
+					t.Setenv("AZURE_TOKEN_CREDENTIALS", selection)
+				}
+			}
+			metadata := &unauthorizedAzureMetadata{}
+			credential, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{
+				ClientOptions: azcore.ClientOptions{Transport: metadata},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			token, err := credential.GetToken(t.Context(), policy.TokenRequestOptions{
+				Scopes: []string{"https://storage.azure.com/.default"},
+			})
+			if tc.workflow == "" {
+				if err == nil || !strings.Contains(err.Error(), "ManagedIdentityCredential authentication failed") ||
+					metadata.requests == 0 {
+					t.Fatalf("default chain did not reproduce the hosted runner failure: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("workflow did not authenticate through the deployer CLI login: %v", err)
+			}
+			if token.Token != "fixture-deployer" || metadata.requests != 0 {
+				t.Error("workflow must use the deployer CLI login without probing runner metadata")
+			}
+		})
+	}
+}
+
+type unauthorizedAzureMetadata struct {
+	requests int
+}
+
+func (m *unauthorizedAzureMetadata) Do(req *http.Request) (*http.Response, error) {
+	m.requests++
+	return &http.Response{
+		StatusCode: http.StatusUnauthorized,
+		Header:     make(http.Header),
+		Body:       http.NoBody,
+		Request:    req,
+	}, nil
+}
 
 func TestUnitNativeImageFailureSurvivesUnwritableRunnerStatus(t *testing.T) {
 	if runtime.GOOS != "linux" {
