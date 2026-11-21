@@ -3,6 +3,7 @@ package remote_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +25,8 @@ func TestAccSelectedPublicationFinalFenceRollsBackTheCacheItemAndRawState(t *tes
 	w.up.Set("/selected.bin", fakeupstream.Resource{Body: []byte("verified")})
 	q := w.request("selected.bin", source.ResourceKindArtifact)
 	q.Resource.SelectedContent, q.Publication = selectedContent("verified"), executionPublication()
+	properties := model.Properties{"quality": {"verified"}}
+	q.SelectedProperties = &properties
 	fences := 0
 	q.Publication.Fence = func(ctx context.Context) error {
 		fences++
@@ -37,6 +40,10 @@ func TestAccSelectedPublicationFinalFenceRollsBackTheCacheItemAndRawState(t *tes
 		entry, err := w.db.RemoteCache().Read(ctx, w.p.CacheKey(q, "credential-1"))
 		if err != nil || entry.ItemID != item.ID {
 			t.Errorf("worker fence preceded raw-cache publication: %v", err)
+		}
+		props, err := w.db.Items().Properties(ctx, item.ID)
+		if err != nil || strings.Join(props["quality"], ",") != "verified" {
+			t.Errorf("worker fence preceded selected property publication: %v", err)
 		}
 		return source.ErrSuperseded
 	}
@@ -53,6 +60,7 @@ func TestAccSelectedPublicationFinalFenceRollsBackTheCacheItemAndRawState(t *tes
 	}
 	// Ordinary demand fetch still works, with the original cache identity.
 	q.Publication, q.Resource.SelectedContent = nil, nil
+	q.SelectedProperties = nil
 	w.mustRead(q, "verified")
 }
 

@@ -12,8 +12,20 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pull"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
+
+func (m *Module) readPullContent(ctx context.Context, request source.Request) (source.Result, error) {
+	service := m.remoteSources
+	if docker.Serves(request.Repo.PackageType) {
+		service = m.registrySources
+	}
+	if service == nil {
+		return source.Result{}, source.ErrUnavailable
+	}
+	return service.Read(remote.WithSmart(ctx, false), request) //nolint:wrapcheck // retain the ordinary P9 refusal
+}
 
 func openPullPeer(ctx context.Context, service *source.Service, request source.Request, root string, scope remote.DiscoveryScope) (pull.Peer, error) {
 	reader, err := peerstorage.New(ctx, service, request, root, scope)

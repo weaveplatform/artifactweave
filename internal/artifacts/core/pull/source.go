@@ -29,6 +29,7 @@ type Source struct {
 	InTx    func(context.Context) bool
 	Open    func(context.Context, string, string) (*source.Service, source.Request, error)
 	Peer    func(context.Context, *source.Service, source.Request, string, remote.DiscoveryScope) (Peer, error)
+	Read    func(context.Context, source.Request) (source.Result, error)
 }
 
 var _ api.PullSource = Source{}

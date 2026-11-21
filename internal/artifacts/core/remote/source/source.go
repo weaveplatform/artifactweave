@@ -264,6 +264,12 @@ type Request struct {
 	// Publication is trusted execution authority for a selected file. It is
 	// never supplied by an HTTP adapter or retained in cache identity/state.
 	Publication *Publication
+	// SelectedProperties accompanies a verified selected file, never an HTTP
+	// caller's metadata. The owner checks current Annotate authority through
+	// Publication.Check. Initial properties join the ordinary cache transaction;
+	// a warm-cache owner refresh preserves locally owned annotations.
+	SelectedProperties        *model.Properties
+	SelectedPropertiesStarted time.Time
 }
 
 // Permit is request-scoped authority. A future project backend may narrow
@@ -338,6 +344,10 @@ type Stream struct {
 // Identity allows consumers and publication code to retain the source revision.
 type Result struct {
 	Metadata MetadataResponse `json:"-"`
+	// CacheEntry identifies a persisted P9 representation. Transient/no-store
+	// streams leave it nil. It is provenance, not a reusable permission grant;
+	// a local consumer must refresh current authority and check its token.
+	CacheEntry *model.RemoteCacheEntry `json:"-"`
 
 	// CheckRead checks a disclosed descendant against current authority. It is
 	// bounded by the originally authorized metadata folder and never fetches.

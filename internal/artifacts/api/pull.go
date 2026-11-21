@@ -40,6 +40,23 @@ type PullItem struct {
 	Version      string              `json:"version"`
 }
 
+// PullPublication narrows a trusted worker's cache effects to its current
+// configuration and queue attempt. Check runs before source/cache work; Fence
+// is last in a publication transaction, after all domain and event effects.
+type PullPublication struct {
+	Check func(context.Context) error
+	Fence func(context.Context) error
+}
+
+// PullCached identifies an actual P9 representation, including raw protocol
+// metadata. The hashes describe a committed cache version, never permission to
+// reuse it. No credentials, transport options or private cache token escape.
+type PullCached struct {
+	Item           PullItem `json:"item"`
+	Representation string   `json:"representation"`
+	Version        string   `json:"version"`
+}
+
 // PullSource publishes bounded selection from an owning remote through P9.
 // Every call reloads current source/configuration and caller authority. An empty
 // page may still have a continuation; only an empty continuation ends a walk.
@@ -47,4 +64,12 @@ type PullItem struct {
 type PullSource interface {
 	Repository(context.Context, string, PullSelection) (PullRepository, error)
 	Items(context.Context, PullRepository, PullSelection, kernel.Page) ([]PullItem, string, error)
+	// Fetch admits complete selected bytes through the ordinary format/cache
+	// service outside transactions. A transient/no-store response is not a
+	// successful cache population. Selected properties preserve local edits.
+	Fetch(context.Context, PullItem, PullPublication) (PullCached, error)
+	// WithCurrent joins a short local transaction, refreshes caller/config and
+	// the exact committed representation, then runs checkpoint work. The
+	// callback must perform no network I/O and end with its ownership fence.
+	WithCurrent(context.Context, PullCached, func(context.Context) error) error
 }

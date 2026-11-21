@@ -6,7 +6,9 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
@@ -30,6 +32,11 @@ func TestUnitExecutionPublicationNeedsSelectedContentAndCompleteFences(t *testin
 		{"unselected", func(q *source.Request) { q.Resource.SelectedContent = nil }},
 		{"missing-current-check", func(q *source.Request) { q.Publication.Check = nil }},
 		{"missing-lease-fence", func(q *source.Request) { q.Publication.Fence = nil }},
+		{"properties-without-execution", func(q *source.Request) {
+			properties := model.Properties{"quality": {"verified"}}
+			q.SelectedProperties, q.Publication = &properties, nil
+		}},
+		{"property-clock-without-properties", func(q *source.Request) { q.SelectedPropertiesStarted = time.Now() }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			q := selectedPublication(t)

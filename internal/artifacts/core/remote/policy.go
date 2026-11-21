@@ -591,7 +591,7 @@ func (p *Policy) result(ctx context.Context, e model.RemoteCacheEntry) (source.R
 		if it.Actual.SHA256 != e.Blob.Checksums.SHA256 {
 			return source.Result{}, kernel.ErrNotFound
 		}
-		return source.Result{Item: &it, Used: p.used(e.Token)}, nil
+		return source.Result{Item: &it, CacheEntry: kernel.Clone(&e), Used: p.used(e.Token)}, nil
 	}
 	if e.Blob.Checksums.SHA256 == "" {
 		return source.Result{}, kernel.ErrNotFound
@@ -602,7 +602,8 @@ func (p *Policy) result(ctx context.Context, e model.RemoteCacheEntry) (source.R
 	}
 	modified, _ := http.ParseTime(e.LastModified)
 	return source.Result{
-		Metadata: source.MetadataResponse{BaseURL: e.MetadataBaseURL},
+		CacheEntry: kernel.Clone(&e),
+		Metadata:   source.MetadataResponse{BaseURL: e.MetadataBaseURL},
 		Stream: &source.Stream{Body: body, Status: 200, Representation: source.Representation{
 			Size:              info.Size,
 			MediaType:         e.ContentType,

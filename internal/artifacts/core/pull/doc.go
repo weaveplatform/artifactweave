@@ -15,7 +15,9 @@
 // Entry contains computed size/checksums and upstream item timestamps. Peer
 // returns complete bounded file windows and optional property snapshots.
 // Source implements api.PullSource: current runtime/source/layout bindings,
-// mapped canonical selection and immutable per-entry versioned snapshots.
+// mapped canonical selection, immutable per-entry snapshots, ordinary verified
+// cache receipts and current-authority checkpoint transactions. Selected user
+// properties share cache ownership rules and preserve local annotations.
 //
 // # Invariants
 //
@@ -31,7 +33,8 @@
 //
 // # Status
 //
-// The peer contract, ordinary storage adapter and current owning-source catalog
-// are implemented. Content admission, durable pull progress and execution
-// remain integration work.
+// The peer adapter/catalog and Generic/Maven cache admission are implemented,
+// including virtual upstream discovery. Durable federation pull progress,
+// deletion reconciliation and native protocol qualification remain integration
+// work; a selected or cached snapshot alone does not complete a logical run.
 package pull

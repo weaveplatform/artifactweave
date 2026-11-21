@@ -79,7 +79,7 @@ func (p *Policy) selectedFlightKey(q source.Request, key model.RemoteCacheKey, i
 	selected.Checksums.SHA512 = strings.ToLower(selected.Checksums.SHA512)
 	selected.Checksums.SHA1 = strings.ToLower(selected.Checksums.SHA1)
 	selected.Checksums.MD5 = strings.ToLower(selected.Checksums.MD5)
-	raw, _ := json.Marshal(selected)
+	raw, _ := json.Marshal([]any{selected, q.SelectedProperties})
 	sum := sha256.Sum256(append(append([]byte(base), '\x00'), raw...))
 	return hex.EncodeToString(sum[:])
 }
