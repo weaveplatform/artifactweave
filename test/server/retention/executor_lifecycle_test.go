@@ -3,6 +3,7 @@ package retention_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"testing"
@@ -57,6 +58,50 @@ type cleanupBeforeAcknowledgement struct {
 type cleanupDeniedItem struct {
 	artifactsapi.ItemRemoval
 	id int64
+}
+
+var errPersistentCleanupRemoval = errors.New("injected persistent item store fault")
+
+type cleanupPersistentItemFault struct {
+	artifactsapi.ItemRemoval
+	id            int64
+	beforeFailure func()
+}
+
+func (r cleanupPersistentItemFault) Remove(
+	ctx context.Context,
+	request artifactsapi.RemovalRequest,
+	validate func(context.Context) error,
+	record func(context.Context, artifactsapi.RemovalResult) error,
+) (artifactsapi.RemovalResult, error) {
+	if request.Item.ID == r.id {
+		if r.beforeFailure != nil {
+			r.beforeFailure()
+		}
+		return artifactsapi.RemovalResult{}, errPersistentCleanupRemoval
+	}
+	return r.ItemRemoval.Remove(ctx, request, validate, record)
+}
+
+type cleanupFinalOutcomeFault struct {
+	retport.CleanupStore
+	armed *bool
+}
+
+func (s cleanupFinalOutcomeFault) AdvanceProgress(ctx context.Context, revision int64, p model.CleanupProgress) error {
+	if *s.armed && p.Phase == model.CleanupFailing {
+		return errPersistentCleanupRemoval
+	}
+	return s.CleanupStore.AdvanceProgress(ctx, revision, p)
+}
+
+type cleanupFinalOutcomeStore struct {
+	retport.CleanupExecutionStore
+	armed *bool
+}
+
+func (s cleanupFinalOutcomeStore) Cleanup() retport.CleanupStore {
+	return cleanupFinalOutcomeFault{s.CleanupExecutionStore.Cleanup(), s.armed}
 }
 
 func (r cleanupDeniedItem) Remove(
@@ -309,6 +354,100 @@ func cleanupExecutorLifecycle(t *testing.T, newStore func(*testing.T) harness.St
 			if tc.cleaned == 0 {
 				f.preserved(t)
 			}
+		})
+	}
+	for _, tc := range []struct {
+		name                    string
+		refuseOutcome, duration bool
+	}{
+		{"record partial failure", false, false},
+		{"retry unavailable outcome", true, false},
+		{"duration expires during final failed attempt", false, true},
+	} {
+		t.Run("exhausted retries "+tc.name, func(t *testing.T) {
+			f := newCleanupExecutorFixture(t, newStore(t))
+			response := support.Do(t, f.handler, http.MethodPut, "/artifactory/execution/package/1/three.bin", support.Basic("admin", "pw"), "real-three.bin")
+			if response.Code != http.StatusCreated {
+				t.Fatal("third-file fixture failed", response.Code)
+			}
+			third := storekit.Get[artifactmodel.Item](t)(f.db.Items().Get(f.ctx, "execution", false, "package/1/three.bin"))
+			f.ids = append(f.ids, third.ID)
+			storekit.Must(t, pkgindex.Link(f.ctx, f.db, pkgindex.Version{RepoKey: "execution", PackageType: repo.Generic, Package: "package", Version: "1"}, third.ID, f.now))
+			r, w := f.selected(t)
+			_, err := f.executor.Step(f.ctx, r.ID, func(ctx context.Context) error {
+				_, err := f.db.WorkQueue().GuardLease(ctx, w.Kind, w.Key, w.Generation)
+				return err
+			})
+			storekit.Must(t, err)
+			storekit.Must(t, f.db.WorkQueue().Release(f.ctx, w.Kind, w.Key, w.Generation, f.now))
+			executor := f.executor
+			failed := 0
+			executor.Removal = cleanupPersistentItemFault{ItemRemoval: executor.Removal, id: f.ids[1], beforeFailure: func() {
+				failed++
+				if tc.duration && failed == 2 {
+					f.now = f.now.Add(time.Minute)
+				}
+			}}
+			armed := tc.refuseOutcome
+			executor.Store = cleanupFinalOutcomeStore{f.store, &armed}
+			queue := storekit.Get[*work.Queue](
+				t,
+			)(
+				work.New(f.db, work.Options{MaxAttempts: 2, Lease: time.Hour, Now: func() time.Time { return f.now }, Backoff: func(int) time.Duration { return 0 }}),
+			)
+			storekit.Must(t, queue.Handle(cleanup.WorkKind, executor.Execute))
+			process := func() {
+				t.Helper()
+				n, err := queue.RunDue(f.ctx, cleanup.WorkKind)
+				storekit.Must(t, err)
+				if n != 1 {
+					t.Fatal("real queue did not execute its pending cleanup", n)
+				}
+			}
+			process()
+			pending := storekit.Get[work.WorkItem](t)(f.db.WorkQueue().Get(f.ctx, w.Kind, w.Key))
+			if pending.State != work.WorkPending || pending.Attempts != 1 {
+				t.Fatal("ordinary failed attempt lost retry semantics")
+			}
+			process()
+			if tc.refuseOutcome {
+				pending = storekit.Get[work.WorkItem](t)(f.db.WorkQueue().Get(f.ctx, w.Kind, w.Key))
+				unchanged := storekit.Get[model.CleanupRun](t)(f.db.Cleanup().Run(f.ctx, r.ID))
+				if pending.State != work.WorkPending || pending.Attempts != 2 || unchanged.Status.Terminal() || unchanged.CleanedItems != 1 {
+					t.Fatal("unrecorded final outcome was parked, lost or falsely completed")
+				}
+				armed = false
+				process()
+			}
+			finished := storekit.Get[model.CleanupRun](t)(f.db.Cleanup().Run(f.ctx, r.ID))
+			if tc.duration {
+				if finished.Status != retapi.RunStopped || finished.CleanedItems != 1 {
+					t.Fatal("final failed attempt overrode the elapsed duration", finished.Status, finished.CleanedItems)
+				}
+				p := storekit.Get[model.CleanupProgress](t)(f.db.Cleanup().Progress(f.ctx, r.ID))
+				if p.Reason != "duration_limit" {
+					t.Fatal("elapsed duration lost its terminal reason", p.Reason)
+				}
+				return
+			}
+			if finished.Status != retapi.RunFailed || finished.TotalItems != 3 || finished.CleanedItems != 1 {
+				t.Fatal("retry exhaustion lost accurate partial failure", finished.Status, finished.TotalItems, finished.CleanedItems)
+			}
+			_, err = f.db.WorkQueue().Get(f.ctx, w.Kind, w.Key)
+			storekit.WantErr(t, err, kernel.ErrNotFound)
+			rows, next, err := f.db.Cleanup().Entries(f.ctx, retport.CleanupEntryQuery{RunID: r.ID, Kind: model.CleanupItemEntry}, kernel.Page{Limit: 100})
+			storekit.Must(t, err)
+			if len(rows) != 3 || next != "" || rows[0].State != model.CleanupDeleted || rows[1].State != model.CleanupEntryFailed || rows[2].State != model.CleanupSkipped ||
+				rows[1].Reason != "work_retries_exhausted" ||
+				rows[2].Reason != "run_failed" {
+				t.Fatal("partial run did not retain reasoned item outcomes")
+			}
+			for _, id := range f.ids[1:] {
+				_, err := f.db.Items().GetByID(f.ctx, id)
+				storekit.Must(t, err)
+			}
+			_, err = f.policies.ManualRun(f.caller, "execution-policy", false)
+			storekit.Must(t, err)
 		})
 	}
 }

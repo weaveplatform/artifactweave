@@ -21,6 +21,7 @@ const (
 	CleanupCandidates   CleanupPhase = "candidates"
 	CleanupRemoving     CleanupPhase = "removing"
 	CleanupSkipping     CleanupPhase = "skipping"
+	CleanupFailing      CleanupPhase = "failing"
 	CleanupFinished     CleanupPhase = "finished"
 )
 
@@ -63,7 +64,7 @@ func (p CleanupProgress) Validate() error {
 		}
 	}
 	switch p.Phase {
-	case CleanupRepositories, CleanupFinished:
+	case CleanupRepositories, CleanupFailing, CleanupFinished:
 	case CleanupPackages:
 		if p.Repository.Key == "" {
 			return fmt.Errorf("cleanup progress has no repository: %w", kernel.ErrInvalid)

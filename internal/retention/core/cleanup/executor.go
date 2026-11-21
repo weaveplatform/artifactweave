@@ -59,7 +59,13 @@ func (x Executor) Execute(ctx context.Context, item work.WorkItem) error {
 	for {
 		done, err := x.Step(ctx, id, fence)
 		if err != nil {
-			return err
+			if !item.FinalAttempt || ctx.Err() != nil {
+				return err
+			}
+			if failure := x.beginFailure(ctx, id, fence); failure != nil {
+				return fmt.Errorf("cleanup outcome not recorded: %w", errors.Join(work.ErrUnsettled, err, failure))
+			}
+			continue
 		}
 		if done {
 			return nil
@@ -97,6 +103,9 @@ func (x Executor) Step(ctx context.Context, id int64, fence func(context.Context
 	}
 	if r.Status.Terminal() {
 		return true, nil
+	}
+	if p.Phase == model.CleanupFailing {
+		return x.settleFailure(ctx, e, p, fence)
 	}
 	e.Policy.ProjectIncarnation = e.ProjectIncarnation
 	selection, err := x.Policies.selection(SelectionSnapshot{Policy: e.Policy, At: e.At})

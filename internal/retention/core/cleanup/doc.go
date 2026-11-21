@@ -44,6 +44,11 @@
 // Non-leads precede ranked leads; only acknowledged removals leave the expected
 // version fingerprint. Stop, expiry and cancellation cannot publish a partial
 // mutation as completed. Dry runs record selection without artifact effects.
+// Exhausted work retries record the failing intent and retire other pending
+// intents in bounded pages before FAILED. A refused outcome checkpoint retains
+// queue retryability; it cannot strand an active run behind parked work. These
+// private outcome writes never use the original caller as an enduring deletion
+// capability and retain only the actually acknowledged item/byte counts.
 //
 // # References
 //
