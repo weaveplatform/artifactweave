@@ -45,6 +45,7 @@ func TestAccCleanupUnmigrated(t *testing.T) {
 		"update run":       cs.UpdateRun(ctx, model.CleanupRun{ID: 1}),
 		"last run":         sqltest.Err(cs.LastRun(ctx, "k")),
 		"run page":         sqltest.Err(cs.RunPage(ctx, port.RunListing{Limit: 25})),
+		"report totals":    sqltest.Err(cs.OutcomeTotals(ctx, 1)),
 		"create execution": cs.CreateExecution(ctx, execution),
 		"execution":        sqltest.Err(cs.Execution(ctx, 1)),
 		"occurrence":       sqltest.Err(cs.ExecutionForOccurrence(ctx, "fire")),

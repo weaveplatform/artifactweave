@@ -48,6 +48,9 @@ type CleanupStore interface {
 	// RunPage applies immutable ownership before filters, count and a bounded
 	// offset window. Unbound legacy rows do not acquire guessed global scope.
 	RunPage(context.Context, RunListing) (RunPage, error)
+	// OutcomeTotals aggregates item states and actual content effects without
+	// collecting report rows. Version decisions do not become extra items.
+	OutcomeTotals(context.Context, int64) (model.CleanupOutcomeTotals, error)
 
 	// CreateExecution persists the private snapshot of an existing run. A
 	// nonempty occurrence is unique across scheduler retries, including after
