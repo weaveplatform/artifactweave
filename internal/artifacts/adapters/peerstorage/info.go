@@ -43,7 +43,8 @@ func decodeInfo(ctx context.Context, body io.Reader, repository, path string) (p
 		return pull.Entry{}, invalid()
 	}
 	var info artifactory.FileInfo
-	if json.Unmarshal(encoded, &info) != nil || info.Repo == nil || *info.Repo != repository ||
+	if json.Unmarshal(encoded, &info) != nil || info.Repo == nil ||
+		(*info.Repo != repository && *info.Repo != repository+model.CacheSuffix) ||
 		info.Path == nil || *info.Path != "/"+path {
 		return pull.Entry{}, invalid()
 	}

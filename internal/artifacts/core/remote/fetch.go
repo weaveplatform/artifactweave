@@ -424,8 +424,10 @@ func (p *Policy) negative(
 		if currentErr := p.Check(tx, q, permit, revision); currentErr != nil {
 			return currentErr
 		}
-		return p.Store.RemoteCache().
-			Negative(tx, token, p.now().Add(time.Duration(seconds)*time.Second))
+		if err := p.Store.RemoteCache().Negative(tx, token, p.now().Add(time.Duration(seconds)*time.Second)); err != nil {
+			return fmt.Errorf("publish remote miss: %w", err)
+		}
+		return q.FencePublication(tx)
 	})
 	if err != nil {
 		return PolicyError(err)
@@ -504,6 +506,7 @@ func (p *Policy) upload(
 		NoStore:      noStore,
 		MaxBytes:     limit,
 		CheckCurrent: func(ctx context.Context, _ item.Store) error { return p.Check(ctx, q, permit, revision) },
+		FinalFence:   q.FencePublication,
 		ClientAccept: clientAccept(q),
 		RequestURL:   requestURL(res),
 	}
@@ -623,7 +626,7 @@ func (p *Policy) unexpireEntry(
 		if putErr != nil {
 			return fmt.Errorf("unexpire remote cache: %w", putErr)
 		}
-		return nil
+		return q.FencePublication(tx)
 	})
 	if err != nil {
 		return model.RemoteCacheEntry{}, fmt.Errorf("unexpire remote cache transaction: %w", err)
@@ -683,14 +686,20 @@ func (p *Policy) Check(
 		return source.ErrSuperseded
 	}
 	if p.CheckCurrent != nil {
-		return p.CheckCurrent(ctx, p.Store, q, permit, revision)
+		if err := p.CheckCurrent(ctx, p.Store, q, permit, revision); err != nil {
+			return err
+		}
+	} else {
+		current, err := p.Store.RemoteCache().Source(ctx, q.Repo.Key)
+		if err != nil {
+			return fmt.Errorf("read current remote source: %w", err)
+		}
+		if current != permit.Identity {
+			return source.ErrSuperseded
+		}
 	}
-	current, err := p.Store.RemoteCache().Source(ctx, q.Repo.Key)
-	if err != nil {
-		return fmt.Errorf("read current remote source: %w", err)
-	}
-	if current != permit.Identity {
-		return source.ErrSuperseded
+	if err := q.CheckPublication(ctx); err != nil {
+		return fmt.Errorf("current execution authority: %w", err)
 	}
 	return nil
 }
@@ -813,7 +822,7 @@ func (p *Policy) revalidate(
 		if putErr != nil {
 			return fmt.Errorf("revalidate remote cache: %w", putErr)
 		}
-		return nil
+		return q.FencePublication(tx)
 	})
 	if err != nil {
 		return model.RemoteCacheEntry{}, clockError(ctx, err)

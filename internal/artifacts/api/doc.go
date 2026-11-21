@@ -45,6 +45,9 @@
 //   - PackageIndex: bounded repository/package/version/file snapshots and
 //     comparator retention cutoffs. Callers hold current authority; snapshots
 //     disclose no credentials and never authorize deletion.
+//   - PullSource, PullRepository, PullSelection and PullItem: source-bound,
+//     bounded remote discovery in canonical paths. Bindings and snapshots grant
+//     no enduring caller authority or cache-publication acknowledgement.
 //   - StorageUsage supplies canonical logical byte totals. StorageWatch
 //     prepares content/ownership accounting before mutation and records actual
 //     row deltas for whole-operation quota settlement, without credentials.

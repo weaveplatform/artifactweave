@@ -22,6 +22,10 @@ type Entry struct {
 // Peer exposes only ordinary, read-only storage operations on one configured
 // repository and selection root. It grants no arbitrary URL or upstream write.
 type Peer interface {
+	// Binding is a hash of the selected source/configuration/scope authority,
+	// not a credential or a grant that may be reused without Revalidate.
+	Binding() string
+	CheckRead(context.Context, string) error
 	Inspect(context.Context, string) (Entry, error)
 	Files(context.Context, kernel.Page) ([]Entry, string, error)
 	Properties(context.Context, string) (model.Properties, error)

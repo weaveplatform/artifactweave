@@ -26,6 +26,9 @@ func (e ContentExpectation) Matches(size int64, actual kernel.Checksums) bool {
 }
 
 func validateRetrievalContract(q Request) error {
+	if q.Publication != nil && (q.Resource.SelectedContent == nil || q.Publication.Check == nil || q.Publication.Fence == nil) {
+		return ErrInvalidRequest
+	}
 	if err := validateSelectedContent(q); err != nil {
 		return err
 	}

@@ -14,6 +14,8 @@
 //
 // Entry contains computed size/checksums and upstream item timestamps. Peer
 // returns complete bounded file windows and optional property snapshots.
+// Source implements api.PullSource: current runtime/source/layout bindings,
+// mapped canonical selection and immutable per-entry versioned snapshots.
 //
 // # Invariants
 //
@@ -24,11 +26,12 @@
 //
 // # References
 //
-// Decisions 0007 (remote repositories), 0032 (source authority), 0044 (module
+// Decisions 0007 (remote repositories), 0032 (package format handlers), 0044 (module
 // ownership), and P11 REP-03 / GitHub issue 1762.
 //
 // # Status
 //
-// The peer contract and ordinary storage adapter are implemented. Durable
-// pull progress and execution remain separate integration work.
+// The peer contract, ordinary storage adapter and current owning-source catalog
+// are implemented. Content admission, durable pull progress and execution
+// remain integration work.
 package pull

@@ -261,6 +261,9 @@ type Request struct {
 	CacheOnly    bool
 	Project      string
 	Visited      []model.RepositoryIncarnation
+	// Publication is trusted execution authority for a selected file. It is
+	// never supplied by an HTTP adapter or retained in cache identity/state.
+	Publication *Publication
 }
 
 // Permit is request-scoped authority. A future project backend may narrow
@@ -945,9 +948,11 @@ func ChecksumSubject(path string) (string, bool) {
 
 func (s *Service) revalidate(ctx context.Context, q Request, p Permit) error {
 	if s.Revalidate != nil {
-		return safeError(s.Revalidate(ctx, q, p))
+		if err := s.Revalidate(ctx, q, p); err != nil {
+			return safeError(err)
+		}
 	}
-	return nil
+	return safeError(q.CheckPublication(ctx))
 }
 
 func validateResult(q Request, r Result) error {

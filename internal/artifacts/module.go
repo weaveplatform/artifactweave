@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pkgindex"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pull"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/reindexauth"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/smart"
@@ -193,6 +194,9 @@ func New(d Deps) (*Module, error) {
 		Store: d.Store, Blobs: d.Blobs, Guard: m.guardAuthority, Current: m.currentTransferCaller,
 	}
 	m.api.ItemRemoval = removal.New(d.Store, m.items, m.currentRemovalCaller)
+	m.api.PullSource = pull.Source{
+		Content: m.items, InTx: m.store.InTx, Open: m.currentPullSource, Peer: openPullPeer,
+	}
 	// Assigned only when present: a nil queue in the interface would be a
 	// typed nil, which the item service would call instead of skipping.
 	if d.Work != nil {
@@ -237,28 +241,33 @@ func (m *Module) guardAuthority(ctx context.Context) error {
 }
 
 func (m *Module) currentTransferCaller(ctx context.Context) (accessapi.Decider, error) {
+	_, decider, err := m.currentContentCaller(ctx)
+	return decider, err
+}
+
+func (m *Module) currentContentCaller(ctx context.Context) (kernel.Principal, accessapi.Decider, error) {
 	p, err := kernel.RequireAuthenticated(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("content source caller: %w", err)
+		return kernel.Principal{}, nil, fmt.Errorf("content source caller: %w", err)
 	}
 	if m.access.Projects == nil || m.access.Authenticator == nil || m.access.Authorizer == nil {
-		return nil, fmt.Errorf("content source access contracts unavailable: %w", kernel.ErrStore)
+		return kernel.Principal{}, nil, fmt.Errorf("content source access contracts unavailable: %w", kernel.ErrStore)
 	}
 	if p.Registry != nil {
-		return nil, kernel.ErrForbidden
+		return kernel.Principal{}, nil, kernel.ErrForbidden
 	}
 	p, err = m.access.Authenticator.Current(ctx, p)
 	if errors.Is(err, kernel.ErrNotFound) {
-		return nil, kernel.ErrBadCredentials
+		return kernel.Principal{}, nil, kernel.ErrBadCredentials
 	}
 	if err != nil {
-		return nil, fmt.Errorf("current content source credential: %w", err)
+		return kernel.Principal{}, nil, fmt.Errorf("current content source credential: %w", err)
 	}
 	decider, err := m.access.Authorizer.For(ctx, p)
 	if err != nil {
-		return nil, fmt.Errorf("current content source permissions: %w", err)
+		return kernel.Principal{}, nil, fmt.Errorf("current content source permissions: %w", err)
 	}
-	return decider, nil
+	return p, decider, nil
 }
 
 // VirtualCache is shared by protocol reads and member-write invalidation.

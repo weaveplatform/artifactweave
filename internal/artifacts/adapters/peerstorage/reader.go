@@ -31,6 +31,10 @@ type Reader struct {
 	binding   string
 }
 
+// Binding returns the private source/options/scope fingerprint, never raw
+// credential material. Operations still require current authority checks.
+func (r *Reader) Binding() string { return r.binding }
+
 // New binds the configured upstream root to the owner's canonical scope. The
 // caller derives scope from its layout; an unrepresentable folder needs actual
 // root Read. No-store and cache aliases cannot initiate a cache-populating pull.
@@ -52,7 +56,7 @@ func New(ctx context.Context, service *source.Service, request source.Request,
 	request.Resource = source.Resource{
 		Kind: source.ResourceKindMetadata, Method: http.MethodGet,
 		Path: ".replication-storage", Variant: "replication-storage-v1",
-		PermissionFolder: true, PermissionPath: scope.Path, PermissionRoot: scope.Root,
+		PermissionFolder: !scope.Root, PermissionPath: scope.Path, PermissionRoot: scope.Root,
 		BlackoutOnly: true, NoCacheFile: true, Transient: true, PullStorage: true,
 	}
 	request, err = metadataRequest(request, peer, root, nil, func(ctx context.Context, body io.Reader) error {
@@ -84,6 +88,15 @@ func New(ctx context.Context, service *source.Service, request source.Request,
 func (r *Reader) Revalidate(ctx context.Context) error {
 	if err := r.authority.Revalidate(remote.WithSmart(ctx, false)); err != nil {
 		return fmt.Errorf("revalidate pull discovery: %w", err)
+	}
+	return nil
+}
+
+// CheckRead authorizes one canonical descendant against the bound scope and
+// current caller/source policy. Upstream traversal names grant no file access.
+func (r *Reader) CheckRead(ctx context.Context, path string) error {
+	if err := r.authority.CheckRead(remote.WithSmart(ctx, false), path); err != nil {
+		return fmt.Errorf("authorize canonical pull file: %w", err)
 	}
 	return nil
 }

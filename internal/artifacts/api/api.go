@@ -7,5 +7,6 @@ type API struct {
 	Layouts        Layouts
 	PackageIndex   PackageIndex
 	TransferSource TransferSource
+	PullSource     PullSource
 	ItemRemoval    ItemRemoval
 }

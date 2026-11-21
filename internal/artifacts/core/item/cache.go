@@ -75,6 +75,10 @@ type CacheUpload struct {
 	// default 64MiB for metadata and no additional artifact size limit.
 	MaxBytes     int64
 	CheckCurrent func(context.Context, Store) error
+	// FinalFence checks optional execution ownership after every item, index,
+	// property, raw-cache and event effect. It is local-only and last in the
+	// publication transaction; refusal rolls all metadata effects back.
+	FinalFence func(context.Context) error
 	// ClientAccept is the client's Accept values for a file with no format
 	// hint, which 7.x's MIME check takes the requested types from
 	// (HttpRepo.getAcceptableHeaders); nil, as for a format route, takes
@@ -201,10 +205,7 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 		if err = s.PropagateRemotePropertyState(ctx, out.Entry); err != nil {
 			return storeFault(ctx, err)
 		}
-		if e.ItemID == 0 {
-			return s.emitRawCached(ctx, out.Entry, d.By, now)
-		}
-		return nil
+		return s.finishCachePublication(ctx, u, out.Entry, d.By, now)
 	}
 	var published error
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
@@ -221,6 +222,20 @@ func (s *Service) Cache(ctx context.Context, u CacheUpload) (CacheResult, error)
 	}
 	out.Info = info
 	return out, nil
+}
+
+func (s *Service) finishCachePublication(ctx context.Context, u CacheUpload, entry model.RemoteCacheEntry, by string, at time.Time) error {
+	if entry.ItemID == 0 {
+		if err := s.emitRawCached(ctx, entry, by, at); err != nil {
+			return err
+		}
+	}
+	if u.FinalFence != nil {
+		if err := u.FinalFence(ctx); err != nil {
+			return fmt.Errorf("cache execution fence: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *Service) cacheItem(

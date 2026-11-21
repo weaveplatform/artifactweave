@@ -246,6 +246,27 @@ func TestAccFilesSingleFileAndMissingRootRequireCurrentNamespace(t *testing.T) {
 	}
 }
 
+func TestAccPullDiscoveryAcceptsTheConfiguredUpstreamsCacheAliasMetadata(t *testing.T) {
+	w := fixture(t)
+	// Storage info names a cached remote by <configured-key>-cache while
+	// the list and subsequent download stay under its configured key.
+	w.set("", `{"repo":"source-cache","path":"/","children":[]}`)
+	w.set(listQuery, `{"files":[{"uri":"/a.bin","folder":false}]}`)
+	w.set("/a.bin", strings.Replace(fileInfo("a.bin"), `"repo":"source"`, `"repo":"source-cache"`, 1))
+	files, next, err := w.reader("").Files(t.Context(), kernel.Page{})
+	if err != nil || len(files) != 1 || next != "" || files[0].Path != "a.bin" {
+		t.Fatalf("configured remote source alias %+v %q %v", files, next, err)
+	}
+	// The accepted alias changes no URL authority or selected repository.
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for _, requested := range w.requests {
+		if strings.Contains(requested, "-cache") {
+			t.Fatal("reported alias rewrote the configured metadata destination")
+		}
+	}
+}
+
 func TestAccPullMetadataRejectsMalformedOrEscapingListings(t *testing.T) {
 	for _, test := range []struct{ name, body string }{
 		{"missing-files", `{}`},
@@ -503,5 +524,39 @@ func TestAccPullDiscoveryBlockedAnswerHonorsCurrentAuthority(t *testing.T) {
 				t.Fatalf("stale answer was accepted: %v want %v", err, want)
 			}
 		})
+	}
+}
+
+func TestAccPullDiscoveryLayoutRootScanRequiresActualRootRead(t *testing.T) {
+	w := fixture(t)
+	if _, err := peerstorage.New(t.Context(), w.service, w.request, "", remote.DiscoveryScope{Root: true}); err != nil || w.count() != 0 {
+		t.Fatalf("authorized root binding: %v requests=%d", err, w.count())
+	}
+	if err := w.db.Permissions().Create(t.Context(), accesstest.Permission{Name: "narrow", Resources: map[accessapi.ResourceType]accesstest.Resource{
+		accessapi.ResourceArtifact: {
+			Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"limited": accessapi.ActionRead}},
+			Targets: map[string]accesstest.Target{"remote": {Include: []string{"allowed/**"}}},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	w.request.Subject = accessapi.Subject{Name: "limited"}
+	decider, err := accesstest.Over(t, w.db).Decide(t.Context(), w.request.Subject, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.request.Access = decider
+	if _, err = peerstorage.New(t.Context(), w.service, w.request, "", remote.DiscoveryScope{Root: true}); !errors.Is(err, source.ErrDenied) || w.count() != 0 {
+		t.Fatalf("descendant grant authorized root scan: %v requests=%d", err, w.count())
+	}
+	r, err := peerstorage.New(t.Context(), w.service, w.request, "allowed", remote.DiscoveryScope{Path: "allowed"})
+	if err != nil {
+		t.Fatal("narrow canonical selection was refused", err)
+	}
+	if err = r.CheckRead(t.Context(), "allowed/file"); err != nil {
+		t.Fatal(err)
+	}
+	if err = r.CheckRead(t.Context(), "other/file"); !errors.Is(err, source.ErrDenied) {
+		t.Fatal("selection escaped canonical scope", err)
 	}
 }

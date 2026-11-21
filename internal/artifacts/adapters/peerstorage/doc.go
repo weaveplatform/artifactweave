@@ -29,7 +29,7 @@
 //
 // # References
 //
-// Decisions 0007 (remote repositories), 0032 (source authority), 0044 (module
+// Decisions 0007 (remote repositories), 0032 (package format handlers), 0044 (module
 // ownership), and P11 REP-03 / GitHub issue 1762.
 //
 // # Status
