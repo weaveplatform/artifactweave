@@ -483,6 +483,12 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		}
 	}
 	e.Family, e.Pagination, e.Evidence = apiReviewPersistence(path)
+	if e.Family == "cleanup-reports" {
+		e.Effects = "current-authorized policy/run metadata and saved outcome reads; original project lifetime retained; no artifact deletion, upstream request or restoration of saved execution credentials"
+		if e.OperationID == "downloadCleanupPolicyRunReport" {
+			e.Effects += "; completed local CSV response marks only reportDownloaded after a final authority refresh"
+		}
+	}
 	if cleanupPolicy {
 		e.Evidence = append(e.Evidence, "internal/retention/core/cleanup/policies.go", "test/server/retention/policies_test.go", "internal/app/storetest/cleanup_policies.go")
 	}
@@ -691,6 +697,7 @@ func apiReviewCompleteText(e *apiReviewOperation) string {
 // content is known only once every element is read, so writing it as it
 // is read would change the bytes.
 var apiReviewCollected = map[string]string{
+	"GET /artifactory/api/cleanup/policies/view":                                       "administrator-defined configuration in the authorized global/project scope, with current labels and last-run/schedule metadata under one authority transaction; commit or visibility failure must not publish a partial overview",
 	"GET /artifactory/api/replications/{repoKey}":                                      "one repository's single configured target is authorized and redacted under its metadata guard before publication; legacy multi-target configurations are rejected, never published as a list",
 	"GET /event/api/v1/subscriptions":                                                  "complete configuration snapshot is authorized, secret-redacted and committed before response bytes; visibility or commit failure must not expose a partial list; no keyset or constant-memory claim",
 	"GET /artifactory/api/cleanup/packages/policies":                                   "administrator-defined policy configuration, read whole within the explicitly authorized global or project scope",
@@ -856,6 +863,9 @@ func (c *apiReviewClasses) pagingText() string {
 }
 
 func apiReviewPersistence(path string) (string, string, []string) {
+	if family, execution, evidence := apiReviewCleanupReports(path); family != "" {
+		return family, execution, evidence
+	}
 	if path == "/event/api/v1/subscriptions" || path == "/event/api/v1/subscriptions/{key}" {
 		return "webhook-administration", "complete authorized configuration list under one current project/identity/policy transaction; singular CRUD retains immutable project and sealed secret replacement; no receiver requests or delivery claim", []string{
 			"internal/notifications/module.go",
@@ -969,6 +979,32 @@ func apiReviewPersistence(path string) (string, string, []string) {
 		"internal/artifacts/adapters/http/storage.go",
 		"internal/artifacts/adapters/sql/content_items.go",
 		"internal/access/adapters/sql/projects.go",
+	}
+}
+
+func apiReviewCleanupReports(path string) (string, string, []string) {
+	var execution string
+	switch path {
+	case "/artifactory/api/cleanup/policies/runs/view":
+		execution = "default25/max500, page-number offset; immutable execution project/lifetime and filters in SQL before COUNT and LIMIT/OFFSET; bytewise public-field order with numeric run-ID ties; total/current/last page metadata; legacy report payload is not read"
+	case "/artifactory/api/cleanup/policies/view":
+		execution = "complete current policy configuration snapshot under current administration authority; last-run queries use one SQL row within immutable execution scope and next-run metadata requires the enabled matching schedule revision"
+	case "/artifactory/api/cleanup/policies/runs/downloadReport":
+		execution = "CSV from durable item outcomes, at most100 per store page; current authority refreshed between pages; no metadata transaction spans client writes; download marker follows successful local completion; legacy report payload is not read"
+	case "/artifactory/api/cleanup/policies/runs/{policyKey}/{triggerId}", "/artifactory/api/cleanup/policies/runs/summaryReports":
+		execution = "singular exact integer run identity under current authority and original project lifetime; frozen policy metadata and SQL outcome aggregates; selected dry-run versus acknowledged deletion facts remain distinct; legacy report payload is not read"
+	default:
+		return "", "", nil
+	}
+	return "cleanup-reports", execution, []string{
+		"internal/retention/adapters/http/reports.go",
+		"internal/retention/adapters/http/item_report.go",
+		"internal/retention/core/cleanup/reports.go",
+		"internal/retention/core/cleanup/item_report.go",
+		"internal/retention/core/cleanup/run_view.go",
+		"internal/retention/adapters/sql/run_page.go",
+		"internal/retention/adapters/sql/outcomes.go",
+		"test/server/retention/reports_test.go",
 	}
 }
 

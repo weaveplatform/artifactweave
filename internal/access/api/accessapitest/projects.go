@@ -13,6 +13,7 @@ var _ accessapi.Projects = (*Projects)(nil)
 
 // Project is one project as Projects holds it.
 type Project struct {
+	DisplayName string
 	// Incarnation is the explicit lifetime used by durable-work tests.
 	Incarnation string
 	// Environments are the project's environment names, in any order;
@@ -106,6 +107,17 @@ func (p *Projects) Exists(_ context.Context, project string) error {
 		return nil
 	}
 	return fmt.Errorf("accessapitest: project %q: %w", project, kernel.ErrNotFound)
+}
+
+// DisplayName returns only the stored descriptive label, or the read failure.
+func (p *Projects) DisplayName(_ context.Context, project string) (string, error) {
+	if p.Err != nil {
+		return "", p.Err
+	}
+	if value, ok := p.Projects[project]; ok {
+		return value.DisplayName, nil
+	}
+	return "", fmt.Errorf("accessapitest: project %q: %w", project, kernel.ErrNotFound)
 }
 
 // Incarnation returns the configured lifetime or a store failure for an

@@ -3919,7 +3919,7 @@ type CleanupPolicyRunViewEntry struct {
 	// CleanedItems Optional within this object. Number of items deleted (0 for a dry run).
 	CleanedItems *int64 `json:"cleanedItems,omitempty"`
 
-	// CleanedSize Optional within this object. Bytes freed by the deletions, counting each blob once.
+	// CleanedSize Optional within this object. Content bytes acknowledged as deleted, counting shared content once (0 for a dry run). Physical blob reclamation occurs independently.
 	CleanedSize *int64 `json:"cleanedSize,omitempty"`
 
 	// DisplayProject Optional within this object. Display name of the owning project; absent for a global policy.
@@ -4003,10 +4003,10 @@ type CleanupProcessedItemsSummary struct {
 	// ProcessedItems Optional within this object. Items deleted (or that would be deleted, for a dry run).
 	ProcessedItems *int64 `json:"processedItems,omitempty"`
 
-	// ProcessedPhysicalSizeBytes Optional within this object. Bytes actually released from the blob store, counting shared content once.
+	// ProcessedPhysicalSizeBytes Optional within this object. Content bytes acknowledged as deleted (or selected for a dry run), counting shared content once. Physical blob reclamation occurs independently.
 	ProcessedPhysicalSizeBytes *int64 `json:"processedPhysicalSizeBytes,omitempty"`
 
-	// ProcessedVirtualSizeBytes Optional within this object. Sum of the deleted items' sizes, counting shared content once per item.
+	// ProcessedVirtualSizeBytes Optional within this object. Sum of the deleted items' sizes (or selected items for a dry run), counting shared content once per item.
 	ProcessedVirtualSizeBytes *int64 `json:"processedVirtualSizeBytes,omitempty"`
 
 	// TotalItems Optional within this object. Items the selection matched.
@@ -46725,6 +46725,11 @@ func (r ViewCleanupPolicyRunSummaryReportResponse) ContentType() string {
 	return ""
 }
 
+// GetCleanupPolicyRunsViewResponse200Headers the declared response headers of an HTTP 200 response for GetCleanupPolicyRunsView
+type GetCleanupPolicyRunsViewResponse200Headers struct {
+	Link *string
+}
+
 // GetCleanupPolicyRunsViewResponse429Headers the declared response headers of an HTTP 429 response for GetCleanupPolicyRunsView
 type GetCleanupPolicyRunsViewResponse429Headers struct {
 	RateLimit       *string
@@ -46756,6 +46761,8 @@ type GetCleanupPolicyRunsViewResponse struct {
 	JSON500 *ErrorResponse
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *ServiceUnavailable
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetCleanupPolicyRunsViewResponse200Headers
 	// Headers429 the parsed response headers for an HTTP 429 response
 	Headers429 *GetCleanupPolicyRunsViewResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
@@ -87644,6 +87651,16 @@ func ParseGetCleanupPolicyRunsViewResponse(rsp *http.Response) (*GetCleanupPolic
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers GetCleanupPolicyRunsViewResponse200Headers
+		if values := rsp.Header.Values("Link"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Link", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.Link = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 429:
 		var headers GetCleanupPolicyRunsViewResponse429Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {

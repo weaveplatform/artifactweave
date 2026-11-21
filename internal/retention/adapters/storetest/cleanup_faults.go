@@ -66,6 +66,12 @@ func (s CleanupFaults) Run(ctx context.Context, id int64) (model.CleanupRun, err
 	return r, s.result(ctx, "Run", err)
 }
 
+// RunMetadata applies the configured fault after the underlying operation succeeds.
+func (s CleanupFaults) RunMetadata(ctx context.Context, id int64) (model.CleanupRun, error) {
+	r, err := s.CleanupStore.RunMetadata(ctx, id)
+	return r, s.result(ctx, "RunMetadata", err)
+}
+
 // UpdateRun applies the configured fault after the underlying operation succeeds.
 func (s CleanupFaults) UpdateRun(ctx context.Context, r model.CleanupRun) error {
 	return s.result(ctx, "UpdateRun", s.CleanupStore.UpdateRun(ctx, r))

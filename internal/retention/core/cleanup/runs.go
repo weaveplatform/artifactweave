@@ -175,6 +175,10 @@ func (s Service) admitRun(ctx context.Context, p model.CleanupPolicy, authority 
 	if len(active) != 0 {
 		return model.CleanupRun{}, fmt.Errorf("cleanup policy already has an active run: %w", kernel.ErrInvalid)
 	}
+	display, err := s.projectDisplayName(ctx, p.ProjectKey)
+	if err != nil {
+		return model.CleanupRun{}, err
+	}
 	r, err := s.Store.Cleanup().CreateRun(ctx, model.CleanupRun{
 		PolicyKey: p.Key, ItemType: model.CleanupPackage, Status: api.RunInProgress,
 		DryRun: dryRun, Manual: manual, TriggeredBy: authority.Name(),
@@ -191,7 +195,15 @@ func (s Service) admitRun(ctx context.Context, p model.CleanupPolicy, authority 
 	}
 	incarnation := p.ProjectIncarnation
 	p.ExecutionCredential, p.ProjectIncarnation = kernel.CredentialReference{}, ""
-	execution := model.CleanupExecution{RunID: r.ID, Occurrence: occurrence, Policy: kernel.Clone(p), Credential: credential, ProjectIncarnation: incarnation, At: s.now()}
+	execution := model.CleanupExecution{
+		RunID:              r.ID,
+		Occurrence:         occurrence,
+		Policy:             kernel.Clone(p),
+		Credential:         credential,
+		ProjectIncarnation: incarnation,
+		DisplayProject:     display,
+		At:                 s.now(),
+	}
 	if err := s.Store.Cleanup().CreateExecution(ctx, execution); err != nil {
 		return model.CleanupRun{}, fmt.Errorf("record cleanup execution snapshot: %w", err)
 	}

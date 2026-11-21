@@ -593,6 +593,27 @@ func TestUnitProjects(t *testing.T) {
 	}
 }
 
+func TestUnitProjectDisplayNames(t *testing.T) {
+	for _, tc := range []struct {
+		name, key, display string
+		failure            error
+		wantErr            error
+	}{
+		{"named", "alpha", "Alpha team", nil, nil},
+		{"empty", "empty", "", nil, nil},
+		{"missing", "missing", "", nil, kernel.ErrNotFound},
+		{"store failure", "alpha", "", errBoom, errBoom},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &accessapitest.Projects{Projects: map[string]accessapitest.Project{"alpha": {DisplayName: "Alpha team"}, "empty": {}}, Err: tc.failure}
+			name, err := p.DisplayName(t.Context(), tc.key)
+			if name != tc.display || !errors.Is(err, tc.wantErr) {
+				t.Fatal("display projection changed metadata or swallowed a read failure", name, err)
+			}
+		})
+	}
+}
+
 func TestUnitAnonymousAccess(t *testing.T) {
 	ctx := t.Context()
 	if on, err := (&accessapitest.AnonymousAccess{}).Enabled(ctx); on || err != nil {

@@ -70,20 +70,52 @@ type CleanupPolicy struct {
 
 // CleanupRun is one execution of a cleanup policy.
 type CleanupRun struct {
-	ID           int64
-	PolicyKey    string
-	TriggerID    int64
-	ItemType     CleanupItemType
-	Status       api.RunStatus
-	DryRun       bool
-	Manual       bool
-	TriggeredBy  string
-	Started      time.Time
-	Ended        time.Time
-	TotalItems   int64
-	CleanedItems int64
-	CleanedSize  int64
-	Report       []byte
+	ID               int64
+	PolicyKey        string
+	TriggerID        int64
+	ItemType         CleanupItemType
+	Status           api.RunStatus
+	DryRun           bool
+	Manual           bool
+	TriggeredBy      string
+	Started          time.Time
+	Ended            time.Time
+	TotalItems       int64
+	CleanedItems     int64
+	CleanedSize      int64
+	Report           []byte
+	ReportDownloaded bool
+}
+
+// DisplayActor describes who triggered the run. Scheduled execution retains
+// its enabling caller privately but presents the scheduler as "system".
+func (r CleanupRun) DisplayActor() string {
+	if !r.Manual {
+		return "system"
+	}
+	return r.TriggeredBy
+}
+
+// CleanupRunSnapshot pairs public run facts with the policy it actually used.
+// It contains no execution credential or project-lifetime capability. Later
+// policy edits, deletion or reuse of its key cannot change this history.
+type CleanupRunSnapshot struct {
+	Run            CleanupRun
+	Policy         CleanupPolicy
+	DisplayProject string
+	// CleanedContentBytes deduplicates actual acknowledged content. Run's
+	// private CleanedSize retains the per-item total used by the executor.
+	CleanedContentBytes int64
+}
+
+// CleanupSnapshot removes private execution bindings from a history projection.
+func CleanupSnapshot(run CleanupRun, policy CleanupPolicy, display string) CleanupRunSnapshot {
+	run.Report = nil // legacy report blobs are not part of bounded run metadata
+	policy.ExecutionCredential, policy.ProjectIncarnation = kernel.CredentialReference{}, ""
+	if display == "" {
+		display = policy.ProjectKey
+	}
+	return CleanupRunSnapshot{Run: run, Policy: policy, DisplayProject: display}
 }
 
 // CleanupExecution is private durable run state, separate from report bytes.
@@ -96,5 +128,8 @@ type CleanupExecution struct {
 	Policy             CleanupPolicy
 	Credential         kernel.CredentialReference
 	ProjectIncarnation string
-	At                 time.Time
+	// DisplayProject is descriptive admission-time metadata, never ownership.
+	// Older snapshots omit it and retain their original project-key label.
+	DisplayProject string `json:"display_project,omitempty"`
+	At             time.Time
 }

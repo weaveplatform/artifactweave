@@ -75,6 +75,7 @@ func cleanupExecutorNative(t *testing.T, db harness.Store) {
 	if strings.Contains(after, "<version>1.0</version>") || !strings.Contains(after, "<version>2.0</version>") {
 		t.Fatal("cleanup did not rebuild native version metadata")
 	}
+	checkNativeCleanupReport(t, f, finished)
 	request(http.MethodPost, "/artifactory/api/trash/restore/execution-maven/com/acme/app/1.0?to=execution-maven", "", http.StatusAccepted)
 	if request(http.MethodGet, base+"1.0/app-1.0.jar", "", http.StatusOK) != "native-1.0" {
 		t.Fatal("normal trash restore lost native bytes")
@@ -83,4 +84,5 @@ func cleanupExecutorNative(t *testing.T, db harness.Store) {
 	if !strings.Contains(restored, "<version>1.0</version>") || !strings.Contains(restored, "<version>2.0</version>") {
 		t.Fatal("normal restore did not rebuild native version metadata")
 	}
+	checkNativeCleanupReport(t, f, finished)
 }

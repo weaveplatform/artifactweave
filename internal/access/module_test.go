@@ -534,6 +534,14 @@ func TestUnitStoreBindings(t *testing.T) {
 			t.Errorf("%s Exists(ml) = %v, want nil", name, err)
 		}
 		sameError(t, name+" Exists(missing)", projects.Exists(ctx, "missing"), noProject)
+		if label, err := projects.DisplayName(ctx, "ml"); err != nil || label != "ML" {
+			t.Error("project API lost its descriptive label", label, err)
+		}
+		_, missingLabel := projects.DisplayName(ctx, "missing")
+		sameError(t, name+" DisplayName(missing)", missingLabel, noProject)
+		_, canceledLabel := projects.DisplayName(canceled, "ml")
+		_, canceledProject := st.Projects().Get(canceled, "ml")
+		sameError(t, name+" DisplayName with a canceled context", canceledLabel, canceledProject)
 		lifetime, err := projects.Incarnation(ctx, "ml")
 		must(t, err)
 		authority, err := st.Projects().Authority(ctx, "ml")

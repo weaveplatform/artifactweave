@@ -57,6 +57,7 @@ func (m *Module) Policies() cleanup.Service {
 	if d.Access.Projects != nil {
 		s.Guard, s.ProjectExists = d.Access.Projects.Guard, d.Access.Projects.Exists
 		s.ProjectIncarnation = d.Access.Projects.Incarnation
+		s.ProjectDisplayName = d.Access.Projects.DisplayName
 	}
 	return s
 }

@@ -962,7 +962,7 @@ func requestDetails(o detailOptions) func(http.Handler) http.Handler {
 func newDetailOptions() detailOptions {
 	access := accesshttp.DetailRules()
 	return detailOptions{
-		SearchQuery: []func(*http.Request) bool{artifactshttp.KeepsSearchQuery},
+		SearchQuery: []func(*http.Request) bool{artifactshttp.KeepsSearchQuery, retentionhttp.KeepsSearchQuery},
 		Rewrite:     access.Rewrite,
 		RawBody: append(
 			[]func(*http.Request) bool{

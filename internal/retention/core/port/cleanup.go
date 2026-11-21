@@ -39,12 +39,24 @@ type CleanupStore interface {
 	CreateRun(ctx context.Context, r model.CleanupRun) (model.CleanupRun, error)
 	// Run returns the run with id.
 	Run(ctx context.Context, id int64) (model.CleanupRun, error)
+	// RunMetadata returns the run without reading its legacy report blob.
+	// Report readers traverse bounded durable outcome pages independently.
+	RunMetadata(ctx context.Context, id int64) (model.CleanupRun, error)
 	// UpdateRun replaces a run.
 	UpdateRun(ctx context.Context, r model.CleanupRun) error
 	// Runs returns matching runs newest first.
 	Runs(ctx context.Context, f RunFilter, p kernel.Page) ([]model.CleanupRun, string, error)
 	// LastRun returns a policy's most recent run.
 	LastRun(ctx context.Context, policyKey string) (model.CleanupRun, error)
+	// RunPage applies immutable ownership before filters, count and a bounded
+	// offset window. Unbound legacy rows do not acquire guessed global scope.
+	RunPage(context.Context, RunListing) (RunPage, error)
+	// OutcomeTotals aggregates item states and actual content effects without
+	// collecting report rows. Version decisions do not become extra items.
+	OutcomeTotals(context.Context, int64) (model.CleanupOutcomeTotals, error)
+	// MarkReportDownloaded joins the caller's metadata transaction and marks
+	// an ended run only. It never changes outcome counters or report entries.
+	MarkReportDownloaded(context.Context, int64) error
 
 	// CreateExecution persists the private snapshot of an existing run. A
 	// nonempty occurrence is unique across scheduler retries, including after

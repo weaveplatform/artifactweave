@@ -146,7 +146,7 @@ func (c cleanupStore) Policies(
 }
 
 const runCols = "policy_key, trigger_id, item_type, status, dry_run, manual, triggered_by, started_at, ended_at, " +
-	"total_items, cleaned_items, cleaned_size, report"
+	"total_items, cleaned_items, cleaned_size, report, report_downloaded"
 
 func runArgs(r model.CleanupRun) []any {
 	return []any{
@@ -165,16 +165,18 @@ func runArgs(r model.CleanupRun) []any {
 		r.CleanedItems,
 		r.CleanedSize,
 		dialect.RawJSON(r.Report),
+		r.ReportDownloaded,
 	}
 }
 
-func scanRun(row interface{ Scan(...any) error }) (model.CleanupRun, error) {
+func scanRun(row interface{ Scan(...any) error }, extra ...any) (model.CleanupRun, error) {
 	var (
 		r              model.CleanupRun
 		started, ended sql.NullInt64
 		report         sql.NullString
 	)
-	if err := row.Scan(
+	columns := make([]any, 0, 1+len(dialect.OpsCols(runCols))+len(extra))
+	columns = append(columns,
 		&r.ID,
 		&r.PolicyKey,
 		&r.TriggerID,
@@ -189,7 +191,9 @@ func scanRun(row interface{ Scan(...any) error }) (model.CleanupRun, error) {
 		&r.CleanedItems,
 		&r.CleanedSize,
 		&report,
-	); err != nil {
+		&r.ReportDownloaded,
+	)
+	if err := row.Scan(append(columns, extra...)...); err != nil {
 		return r, err //nolint:wrapcheck // wrapped by the caller
 	}
 	r.Started, r.Ended, r.Report = dialect.FromMicros(started), dialect.FromMicros(ended),
@@ -216,8 +220,28 @@ func (c cleanupStore) Run(ctx context.Context, id int64) (model.CleanupRun, erro
 	return r, c.s.Wrap(fmt.Sprintf("get cleanup run %d", id), err)
 }
 
+func (c cleanupStore) RunMetadata(ctx context.Context, id int64) (model.CleanupRun, error) {
+	r, err := scanRun(c.s.Q(ctx).QueryRowContext(ctx,
+		c.s.Dialect().Rebind("SELECT "+runMetadataColumns("")+" FROM cleanup_runs WHERE id = ?"), id))
+	return r, c.s.Wrap(fmt.Sprintf("get cleanup run metadata %d", id), err)
+}
+
+// Aliases are fixed adapter identifiers. Replacing the report column with NULL
+// retains one scanner while preventing legacy blobs from being read at all.
+func runMetadataColumns(alias string) string {
+	columns := []string{alias + "id"}
+	for _, column := range strings.Split(runCols, ", ") {
+		if column == "report" {
+			columns = append(columns, "NULL")
+			continue
+		}
+		columns = append(columns, alias+column)
+	}
+	return strings.Join(columns, ", ")
+}
+
 func (c cleanupStore) UpdateRun(ctx context.Context, r model.CleanupRun) error {
-	sets := make([]string, 0, 13)
+	sets := make([]string, 0, len(dialect.OpsCols(runCols)))
 	for _, col := range dialect.OpsCols(runCols) {
 		sets = append(sets, col+" = ?")
 	}

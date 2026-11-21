@@ -40,6 +40,10 @@ type Projects interface {
 	// Exists returns nil when project exists; an error matching
 	// kernel.ErrNotFound when it does not.
 	Exists(ctx context.Context, project string) error
+	// DisplayName reads descriptive metadata, not authority. Callers must
+	// authorize the project first and hold Guard when freezing a run snapshot.
+	// Missing projects and store failures retain their usual classification.
+	DisplayName(ctx context.Context, project string) (string, error)
 	// Incarnation returns a project's opaque lifetime identity, not authority
 	// to act. A recreated key has a different identity. Hold Guard in the
 	// caller's transaction when binding or checking durable background work.

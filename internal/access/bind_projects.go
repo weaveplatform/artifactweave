@@ -90,6 +90,14 @@ func (b projects) Exists(ctx context.Context, project string) error {
 	return err //nolint:wrapcheck // the store's errors are the contract's
 }
 
+func (b projects) DisplayName(ctx context.Context, project string) (string, error) {
+	p, err := b.st.Projects().Get(ctx, project)
+	if err != nil {
+		return "", err //nolint:wrapcheck // descriptive reads preserve the store's failure classification
+	}
+	return p.DisplayName, nil
+}
+
 func (b projects) Incarnation(ctx context.Context, project string) (string, error) {
 	authority, err := b.st.Projects().Authority(ctx, project)
 	if err != nil {

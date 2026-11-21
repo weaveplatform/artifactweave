@@ -242,7 +242,8 @@
     ],
     "internal/retention/adapters/http": [
       "idempotency_test.go",
-      "policies_test.go"
+      "policies_test.go",
+      "report_wire_test.go"
     ],
     "test/server/access": [
       "access_identity_test.go",
@@ -389,6 +390,10 @@
       "executor_test.go",
       "policies_test.go",
       "removal_test.go",
+      "reports_outcomes_test.go",
+      "reports_scope_test.go",
+      "reports_stream_test.go",
+      "reports_test.go",
       "runs_test.go",
       "selection_changes_test.go",
       "selection_test.go"
