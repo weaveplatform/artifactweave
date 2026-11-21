@@ -59,13 +59,17 @@ func (r bindingDeleteRepositories) List(ctx context.Context, filter artifactsapi
 
 type bindingDeleteStore struct {
 	harness.Store
-	entered *atomic.Bool
-	reads   *atomic.Int32
+	entered         *atomic.Bool
+	callbackEntered *atomic.Bool
+	reads           *atomic.Int32
 }
 
 func (s bindingDeleteStore) Tx(ctx context.Context, fn func(context.Context) error) error {
 	s.entered.Store(true)
-	if err := s.Store.Tx(ctx, fn); err != nil {
+	if err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		s.callbackEntered.Store(true)
+		return fn(ctx)
+	}); err != nil {
 		return fmt.Errorf("probe lifecycle transaction: %w", err)
 	}
 	return nil
@@ -118,17 +122,18 @@ func projectRepositoryLifetime(t *testing.T, db harness.Store) {
 	case <-ctx.Done():
 		t.Fatal("force attach never read the guarded repository snapshot")
 	}
-	var entered atomic.Bool
+	var entered, callbackEntered atomic.Bool
 	var reads, listed atomic.Int32
-	deletingStore := bindingDeleteStore{Store: db, entered: &entered, reads: &reads}
+	deletingStore := bindingDeleteStore{Store: db, entered: &entered, callbackEntered: &callbackEntered, reads: &reads}
 	deleter := accesstest.ProjectAdministration(deletingStore, bindingDeleteRepositories{
 		Repositories: repositories, listed: &listed,
 	})
 	// Call deletion synchronously while attachment holds the snapshot. Its
 	// deadline must expire before it can read canonical ownership. Recording
 	// the actual transaction/read entry avoids a delayed second goroutine
-	// turning this into a sequential test. Memory/SQLite wait at Tx entry;
-	// PostgreSQL enters Tx, then waits in the guarded project read.
+	// turning this into a sequential test. Accounting takes the global project
+	// guard before every root callback, so all backends must wait before the
+	// deletion's lifecycle callback or its project/ownership reads can begin.
 	blocked, stop := context.WithTimeout(ctx, time.Second)
 	err := deleter.DeleteProject(blocked, "beta")
 	ended := blocked.Err()
@@ -136,8 +141,8 @@ func projectRepositoryLifetime(t *testing.T, db harness.Store) {
 	if err == nil || !errors.Is(ended, context.DeadlineExceeded) || !entered.Load() {
 		t.Fatalf("concurrent deletion did not wait inside its transaction: entered=%t context=%v error=%v", entered.Load(), ended, err)
 	}
-	if sql, ok := db.(*appsql.Store); ok && sql.Dialect().ForUpdate != "" && reads.Load() != 1 {
-		t.Fatalf("row-locking deletion never reached its actual project read: %d", reads.Load())
+	if callbackEntered.Load() || reads.Load() != 0 {
+		t.Fatalf("deletion passed the held project guard: callback=%t project_reads=%d", callbackEntered.Load(), reads.Load())
 	}
 	if listed.Load() != 0 {
 		t.Fatal("deletion read canonical ownership before acquiring the current project guard")
