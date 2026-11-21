@@ -46,6 +46,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
 python3 -I "$here/check-webhooks.py" --inventory "$root"
 python3 -I "$here/check-projects.py" --inventory "$root"
+python3 -I "$here/check-cleanup.py" --inventory "$root"
 scenarios=("$@")
 [ ${#scenarios[@]} -gt 0 ] || scenarios=(deploy/artifactweave/terraform/repositories)
 work=${TERRAFORM_WORK:-}
@@ -421,6 +422,18 @@ apply_projects() {
 	python3 -I "$here/check-projects.py" --check "$root" "$work/project-fixture.json" "$dir/terraform.tfstate" "$project_evidence"
 }
 
+apply_package_cleanup() {
+	export TF_VAR_repository_prefix=tf-p11-cleanup TF_VAR_revision=1
+	tf apply -auto-approve
+	tf output -json fixture >"$work/cleanup-fixture.json"
+	python3 -I "$here/check-cleanup.py" --prepare "$work/cleanup-fixture.json" "$work/cleanup-runs.json" "$work/server.log"
+	tf plan -detailed-exitcode
+	export TF_VAR_revision=2
+	tf apply -auto-approve
+	tf output -json fixture >"$work/cleanup-fixture.json"
+	python3 -I "$here/check-cleanup.py" --check "$work/cleanup-fixture.json" "$work/cleanup-runs.json" "$work/server.log"
+}
+
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
 	case $scenario in
@@ -433,6 +446,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/webhooks) apply_webhooks ;;
 	deploy/artifactweave/terraform/single-replication) apply_single_replication ;;
 	deploy/artifactweave/terraform/projects) apply_projects ;;
+	deploy/artifactweave/terraform/package-cleanup) apply_package_cleanup ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1
@@ -454,5 +468,8 @@ for scenario in "${scenarios[@]}"; do
 	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/projects ]; then
 		python3 -I "$here/check-projects.py" --deleted "$work/project-fixture.json" "$project_evidence"
+	fi
+	if [ "$scenario" = deploy/artifactweave/terraform/package-cleanup ]; then
+		python3 -I "$here/check-cleanup.py" --deleted "$work/cleanup-fixture.json" "$work/cleanup-runs.json" "$work/server.log"
 	fi
 done
