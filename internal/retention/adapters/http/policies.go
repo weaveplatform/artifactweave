@@ -13,7 +13,8 @@ import (
 )
 
 // PackagePoliciesAPI implements package configuration, execution admission and
-// cooperative stop controls. Reports, build, bundle and archive retain owners.
+// cooperative stops and report views. Build, bundle and archive execution
+// retain their phase owners.
 type PackagePoliciesAPI struct{ Policies *cleanup.Service }
 
 func (s PackagePoliciesAPI) service() (cleanup.Service, error) {

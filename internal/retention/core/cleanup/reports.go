@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/model"
@@ -64,8 +65,9 @@ func (s Service) readRun(ctx context.Context, policyKey string, trigger int64, a
 // item outcomes under one metadata transaction. Original run credentials and
 // current artifact/blob contents are not needed to describe retained effects.
 type RunReport struct {
-	Snapshot model.CleanupRunSnapshot
-	Totals   model.CleanupOutcomeTotals
+	Snapshot               model.CleanupRunSnapshot
+	Totals                 model.CleanupOutcomeTotals
+	SelectedAt, ObservedAt time.Time
 }
 
 // Report supplies summary and CSV readers from the same retained facts.
@@ -79,6 +81,10 @@ func (s Service) Report(ctx context.Context, policyKey string, trigger int64) (R
 		if err != nil {
 			return err
 		}
+		execution, err := s.Store.Cleanup().Execution(ctx, trigger)
+		if err != nil {
+			return fmt.Errorf("read cleanup report selection clock: %w", err)
+		}
 		totals, err := s.Store.Cleanup().OutcomeTotals(ctx, trigger)
 		if err != nil {
 			return fmt.Errorf("read cleanup report outcomes: %w", err)
@@ -86,7 +92,7 @@ func (s Service) Report(ctx context.Context, policyKey string, trigger int64) (R
 		if history.Run.CleanedItems != totals.Deleted || history.Run.CleanedSize != totals.DeletedVirtualBytes {
 			return fmt.Errorf("cleanup report counters disagree with acknowledged effects: %w", kernel.ErrStore)
 		}
-		out = RunReport{Snapshot: history, Totals: totals}
+		out = RunReport{Snapshot: history, Totals: totals, SelectedAt: execution.At, ObservedAt: s.now()}
 		return nil
 	})
 	if err != nil {
