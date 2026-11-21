@@ -35,6 +35,12 @@
 // advancing cursors, and records verified cache/removal results in the artifact
 // owner's transaction. Current source/options/configuration and the final work
 // fence guard publication; no-store/offline admission retains its refusal.
+// ScheduleKind publishes private target-revision-bound Quartz positions in the
+// same configuration transaction. Each enabled schedule retains its verified
+// author reference; an identical retry preserves its logical fire. Credential,
+// source, enablement and lifetime changes fence queued generations. Legacy
+// configurations with no retained author stay unscheduled until an authenticated
+// configuration/enablement write establishes that authority.
 //
 // # References
 //
@@ -55,8 +61,10 @@
 //
 // Configuration is implemented by REP-01. REP-02 supplies source/progress
 // contracts, the bounded driver, guarded target HTTP and application bindings.
-// REP-03 supplies durable owning-cache pull and application bindings; native
-// protocol qualification remains open. Dispatch/reporting belong to REP-04. Multi-push,
+// REP-03 supplies durable verified owning-cache pull, including native registry
+// admission. REP-04 supplies guarded Quartz lifecycle positions and private
+// author persistence. Dispatch and path-aware reporting remain integration work.
+// Multi-push,
 // event-triggered and binary-existence optimization remain P37.
 //
 // # Testing

@@ -29,6 +29,12 @@
 //
 // # Outputs
 //
+// Replication configuration keeps an optional private schedule-author reference
+// in JSON, as push execution already does. The reference contains no credential
+// value or cached administrator decision and is excluded from public models.
+// Upgrading an existing target preserves its sealed password and leaves this
+// author absent; migration cannot reconstruct verified scheduling authority.
+//
 //   - Store, from New, with Replications, PushProgress, Peers, Federation and Platform,
 //     and the dialect store's Tx, AfterCommit and Close.
 //   - Module: the name federation, the stream migrations.FS and the sealed

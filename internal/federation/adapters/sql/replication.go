@@ -23,13 +23,14 @@ const purposeReplicationPassword = "replications.password" // #nosec G101 -- a c
 
 const replicationCols = "replication_key, repo_key, url, username, password, enabled, cron_exp, " +
 	"event_replication, sync_deletes, sync_properties, sync_statistics, include_prefix, exclude_prefix, " +
-	"proxy, disable_proxy, check_binary_existence, socket_timeout_ms, private_revision"
+	"proxy, disable_proxy, check_binary_existence, socket_timeout_ms, private_revision, schedule_author_json"
 
 func (rs replicationStore) scan(row interface{ Scan(...any) error }) (model.Replication, error) {
 	var (
 		r        model.Replication
 		password []byte
 		timeout  int64
+		author   sql.NullString
 	)
 	if err := row.Scan(
 		&r.Key,
@@ -50,10 +51,14 @@ func (rs replicationStore) scan(row interface{ Scan(...any) error }) (model.Repl
 		&r.CheckBinaryExistence,
 		&timeout,
 		&r.Revision,
+		&author,
 	); err != nil {
 		return r, err //nolint:wrapcheck // wrapped by the caller
 	}
 	r.SocketTimeout = dialect.FromMillis(timeout)
+	if err := dialect.FromJSON(author, &r.ScheduleAuthor); err != nil {
+		return model.Replication{}, fmt.Errorf("decode private replication schedule author: %w", kernel.ErrStore)
+	}
 	var err error
 	r.Password, err = rs.s.Unseal(purposeReplicationPassword, r.Key, password)
 	return r, err
@@ -66,6 +71,14 @@ func (rs replicationStore) Put(ctx context.Context, r model.Replication) error {
 	password, err := rs.s.Seal(purposeReplicationPassword, r.Key, r.Password)
 	if err != nil {
 		return err
+	}
+	var author any
+	if r.ScheduleAuthor != (kernel.CredentialReference{}) {
+		document, err := dialect.ToJSON(r.ScheduleAuthor)
+		if err != nil {
+			return fmt.Errorf("encode private replication schedule author: %w", err)
+		}
+		author = document
 	}
 	_, err = rs.s.Exec(
 		ctx,
@@ -93,6 +106,7 @@ func (rs replicationStore) Put(ctx context.Context, r model.Replication) error {
 		r.CheckBinaryExistence,
 		dialect.Millis(r.SocketTimeout),
 		r.Revision,
+		author,
 	)
 	return err
 }
