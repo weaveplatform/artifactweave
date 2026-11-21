@@ -14,16 +14,16 @@ import (
 
 func TestUnitCleanupPolicyBoundaryFailuresPreservePublishedState(t *testing.T) {
 	for _, tc := range []struct {
-		name, operation string
+		name, operation, action string
 	}{
-		{name: "update policy read", operation: "Policy"},
-		{name: "update active run read", operation: "Runs"},
-		{name: "update policy write", operation: "UpdatePolicy"},
-		{name: "delete active run read", operation: "Runs"},
-		{name: "delete policy write", operation: "DeletePolicy"},
-		{name: "force disable collection read", operation: "Policies"},
-		{name: "force disable policy write", operation: "UpdatePolicy"},
-		{name: "force disable stop listing", operation: "Runs"},
+		{name: "update policy read", operation: "Policy", action: "update"},
+		{name: "update active run read", operation: "Runs", action: "update"},
+		{name: "update policy write", operation: "UpdatePolicy", action: "update"},
+		{name: "delete active run read", operation: "Runs", action: "delete"},
+		{name: "delete policy write", operation: "DeletePolicy", action: "delete"},
+		{name: "force disable collection read", operation: "Policies", action: "disable"},
+		{name: "force disable policy write", operation: "UpdatePolicy", action: "disable"},
+		{name: "force disable stop listing", operation: "Runs", action: "disable"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s, db := world(t, "*")
@@ -43,15 +43,17 @@ func TestUnitCleanupPolicyBoundaryFailuresPreservePublishedState(t *testing.T) {
 				}
 				return nil
 			}}}
-			switch tc.name[:6] {
+			switch tc.action {
 			case "update":
 				in := input(p.Key, p.ProjectKey)
 				in.Description = "changed configuration"
 				_, err = s.Update(ctx, p.Key, in)
 			case "delete":
 				err = s.Delete(ctx, p.Key)
-			default:
+			case "disable":
 				err = s.DisableAll(ctx, p.ProjectKey)
+			default:
+				t.Fatalf("unknown policy action %q", tc.action)
 			}
 			if !hit || !errors.Is(err, errCleanupBoundary) {
 				t.Fatal("policy operation ignored its store failure", err)
