@@ -47,7 +47,7 @@ func (p *Policy) fill(
 	if !state.OfflineUntil.IsZero() {
 		// Recovery is source-wide. Different paths share one probe; after a
 		// successful probe each path still resolves its own representation.
-		probeKey := p.probeKey(key, permit, state)
+		probeKey := p.probeKey(q, key, permit, state)
 		filled, probeErr := p.probes.Do(
 			ctx,
 			probeKey,
@@ -229,7 +229,7 @@ func (p *Policy) direct(
 	if !state.OfflineUntil.IsZero() {
 		probe, probeErr := p.probes.Do(
 			ctx,
-			p.probeKey(key, permit, state),
+			p.probeKey(q, key, permit, state),
 			func(shared context.Context) (fillResult, error) {
 				// Transient bodies have exactly one owner. A recovery probe validates and
 				// discards its body; callers then fetch their own response after recovery.
@@ -435,11 +435,12 @@ func (p *Policy) negative(
 }
 
 func (p *Policy) probeKey(
+	q source.Request,
 	key model.RemoteCacheKey,
 	permit source.Permit,
 	state model.RemoteSourceState,
 ) string {
-	return p.FlightKey(
+	return p.selectedFlightKey(q,
 		model.RemoteCacheKey{
 			RepoKey:          key.RepoKey,
 			SettingsRevision: key.SettingsRevision,
@@ -469,9 +470,14 @@ func (p *Policy) upload(
 			return q.Resource.ValidateMetadata(ctx, r, size, metadata)
 		}
 	}
+	expected := q.Resource.Checksums
+	if selected := q.Resource.SelectedContent; selected != nil {
+		expected = mergeSelectedChecksums(expected, selected.Checksums)
+		validate = selectedValidator(*selected, validate)
+	}
 	return item.CacheUpload{
 		CachePolicy:          permit.CachePolicy(),
-		Expected:             q.Resource.Checksums,
+		Expected:             expected,
 		ExpectedContentType:  q.Resource.ExpectedContentType,
 		ExpectedContentTypes: q.Resource.ExpectedContentTypes,
 		Validate:             validate,

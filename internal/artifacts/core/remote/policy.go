@@ -182,6 +182,9 @@ func (p *Policy) Read(
 	q source.Request,
 	permit source.Permit,
 ) (out source.Result, retErr error) {
+	defer func() {
+		out, retErr = selectedAnswer(q, out, retErr)
+	}()
 	if p.Smart != nil && ctx.Value(smartKey{}) == nil {
 		//nolint:wrapcheck // preserves upstream error identity
 		return p.Smart.Read(ctx, q, permit)
@@ -248,7 +251,7 @@ func (p *Policy) Read(
 	// A returning hop into this exact fill must reach the next HTTP hop's
 	// recursion guard without joining itself or superseding its cache token.
 	// The original fill owns persistence; this nested read owns its response.
-	if returningOrigin(ctx) && p.flights.Active(p.FlightKey(key, permit.Identity)) {
+	if returningOrigin(ctx) && p.flights.Active(p.selectedFlightKey(q, key, permit.Identity)) {
 		return p.direct(ctx, q, permit, opts, key, true)
 	}
 	// 7.161.26's DownloadServiceImpl.respond answers a HEAD from the
@@ -261,7 +264,7 @@ func (p *Policy) Read(
 	if q.Resource.Method == http.MethodHead {
 		fillQ.Resource.Method = http.MethodGet
 	}
-	flightKey := p.FlightKey(key, permit.Identity)
+	flightKey := p.selectedFlightKey(q, key, permit.Identity)
 	filled, err := p.flights.Do(ctx, flightKey, func(shared context.Context) (fillResult, error) {
 		return p.fill(shared, fillQ, permit, opts, key)
 	})
@@ -507,6 +510,9 @@ func (p *Policy) ReadEntry(
 }
 
 func (p *Policy) fresh(q source.Request, e model.RemoteCacheEntry) bool {
+	if selected := q.Resource.SelectedContent; selected != nil && !selected.Matches(e.Blob.Size, e.Blob.Checksums) {
+		return false
+	}
 	if q.Resource.RefreshMetadata && q.Resource.Kind == source.ResourceKindMetadata && !q.CacheOnly {
 		return false
 	}
@@ -537,6 +543,9 @@ func Fresh(c repo.Config, e model.RemoteCacheEntry, now time.Time) bool {
 }
 
 func (p *Policy) negativeFresh(q source.Request, e model.RemoteCacheEntry) bool {
+	if q.Resource.SelectedContent != nil {
+		return false
+	}
 	if q.Resource.RefreshMetadata && q.Resource.Kind == source.ResourceKindMetadata && !q.CacheOnly {
 		return false
 	}
@@ -658,7 +667,8 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 	}
 	// The caller's validators describe downstream bytes. Only validators of
 	// this exact complete upstream representation may revalidate its cache.
-	if e.Blob.Checksums.SHA256 != "" && !q.Resource.ModuleDownloadLocation && !q.Resource.ModuleVanityDocument && !q.Resource.ModuleChecksumDocument &&
+	selectedMatches := q.Resource.SelectedContent == nil || q.Resource.SelectedContent.Matches(e.Blob.Size, e.Blob.Checksums)
+	if selectedMatches && e.Blob.Checksums.SHA256 != "" && !q.Resource.ModuleDownloadLocation && !q.Resource.ModuleVanityDocument && !q.Resource.ModuleChecksumDocument &&
 		q.Resource.Method != http.MethodPost {
 		if e.ETag != "" {
 			headers.Set("If-None-Match", e.ETag)

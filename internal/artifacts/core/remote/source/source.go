@@ -74,7 +74,11 @@ type Resource struct {
 	// Checksums pin the selected representation independently of the repository's
 	// policy for optional upstream checksum headers. Variant identifies the
 	// adapter validation schema; it must change if validation semantics change.
-	Checksums           kernel.Checksums
+	Checksums kernel.Checksums
+	// SelectedContent verifies one selected file transfer without changing
+	// its ordinary representation/cache identity. Replication discovery sets
+	// this from a complete peer file-info response, never from client headers.
+	SelectedContent     *ContentExpectation
 	ExpectedContentType string
 	// ExpectedContentTypes is an exact metadata MIME allowlist for negotiated APIs.
 	// It requires complete body validation and cannot accompany the singular hint.
@@ -688,7 +692,7 @@ func authorize(q Request) error {
 		(r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
 		return ErrInvalidRequest
 	}
-	if err := validateMetadataMethod(q); err != nil {
+	if err := validateRetrievalContract(q); err != nil {
 		return err
 	}
 	if err := validateAdapterContract(r); err != nil {
