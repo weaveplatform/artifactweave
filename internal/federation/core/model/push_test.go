@@ -233,6 +233,42 @@ func TestUnitPushItemRejectsFalseSuccessAndChangedIntent(t *testing.T) {
 	}
 }
 
+func TestUnitPushPersistenceRejectsMalformedOrPrematureEvidence(t *testing.T) {
+	run := pushFixture(t)
+	if _, err := NewPushRun("", run.Binding, run.Started); !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal("empty logical identity was admitted", err)
+	}
+	for _, tc := range []struct {
+		name string
+		edit func(*PushItem)
+	}{
+		{"missing lifetime", func(i *PushItem) { i.Run.Incarnation = "" }},
+		{"unknown action", func(i *PushItem) { i.Action = "invented" }},
+		{"unknown phase", func(i *PushItem) { i.Phase = "invented" }},
+		{"unknown outcome", func(i *PushItem) { i.Phase, i.Outcome = PushItemComplete, "invented" }},
+		{"invalid destination proof", func(i *PushItem) { i.Target = &PushTargetSnapshot{Size: -1} }},
+		{"invalid source proof", func(i *PushItem) { i.Source.Actual.SHA256 = "missing" }},
+		{"delete without snapshot", func(i *PushItem) { i.Action, i.Source = PushDelete, nil }},
+		{"noncanonical path", func(i *PushItem) { i.Path, i.Source.Path = "./item.pkg", "./item.pkg" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			intent := pushIntent(t, run)
+			tc.edit(&intent)
+			if err := ValidatePushItemCreation(run, intent); !errors.Is(err, kernel.ErrInvalid) {
+				t.Fatal("malformed durable evidence was admitted", err)
+			}
+		})
+	}
+	intent := pushIntent(t, run)
+	intent.Phase, intent.VerifiedTarget = PushContentVerified, &PushTargetSnapshot{Actual: intent.Source.Actual, Size: intent.Source.Size}
+	if err := ValidatePushItemCreation(run, intent); !errors.Is(err, kernel.ErrConflict) {
+		t.Fatal("new intent invented a completed remote effect", err)
+	}
+	if _, err := PushItemKey(PushUpload, "../item.pkg"); !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal("operation key accepted an escaped path", err)
+	}
+}
+
 func TestUnitPushDeleteNeedsAbsenceAndFailuresKeepSafeReasons(t *testing.T) {
 	run := pushFixture(t)
 	run.Phase, run.SourceDone = PushReconcile, true
