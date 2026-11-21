@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -39,10 +40,55 @@ const cdnRepo = "platform-cdn"
 
 func init() {
 	scenarioChecks["aws/cdn"] = cdnChecks(cloudFrontSigner)
+	scenarioReady["aws/cdn"] = waitForCloudFrontDNS
 	scenarioChecks["gcp/cdn"] = append([]check{
 		{"Cloud CDN passes both response overrides on a cache fill", overridesOnACacheFill},
 	}, cdnChecks(cloudCDNSigner)...)
 	scenarioReady["gcp/cdn"] = waitForCloudCDN
+}
+
+// A resolver can retain Route 53's negative answer for 900 seconds after a
+// record is created. Allow that cache to expire before the generic download
+// checks, with a fixed bound for a wrong/missing record.
+// https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/SOA-NSrecords.html
+const cloudFrontDNSWait = 20 * time.Minute
+
+func waitForCloudFrontDNS(t *testing.T, h *harness) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), cloudFrontDNSWait)
+	defer cancel()
+	for host := range h.storageHosts {
+		t.Logf("confirming runner DNS resolves %s", host)
+		if err := waitForHostDNS(ctx, host, h.dnsLookup, 5*time.Second); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func waitForHostDNS(
+	ctx context.Context,
+	host string,
+	lookup func(context.Context, string) ([]string, error),
+	interval time.Duration,
+) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	var last error
+	for {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("runner DNS for %s was not ready: %w", host, errors.Join(err, last))
+		}
+		addresses, err := lookup(ctx, host)
+		if err == nil && len(addresses) > 0 {
+			return nil
+		}
+		last = err
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("runner DNS for %s was not ready: %w", host, errors.Join(ctx.Err(), last))
+		case <-ticker.C:
+		}
+	}
 }
 
 // edgeSigner signs a URL for objectKey on the scenario's CDN as if at now,
