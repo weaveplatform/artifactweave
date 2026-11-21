@@ -7,14 +7,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	appstoretest "github.com/weaveplatform/artifactweave/internal/app/storetest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	pgdrv "github.com/weaveplatform/artifactweave/internal/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 )
@@ -51,6 +54,25 @@ func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 				t.Fatal(err)
 			}
 			pkg := nupkg("Acme.Race", "1.0.0", "")
+			// Authorize before the owner takes the root project guard. The
+			// cancelled waiter must exercise the upload transaction itself.
+			requestCtx, err := accesstest.Over(t, db).Authorize(ctx, kernel.Principal{Name: "admin", Admin: true}, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			source, err := db.Repos().Get(ctx, "libs-local")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode == "copy" || mode == "move" {
+				// Fixture writes need the same root guard as the paused owner.
+				if _, err := f.items.Deploy(ctx, item.Deploy{
+					Target: item.Target{Repo: source, Path: "Acme.Race.1.0.0.nupkg"},
+					Body:   bytes.NewReader(pkg),
+				}); err != nil {
+					t.Fatal(err)
+				}
+			}
 			ownerCtx, cancelOwner := context.WithCancel(ctx)
 			defer cancelOwner()
 			paused := pausedWrite{
@@ -61,10 +83,22 @@ func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 			if mode == "rollback" {
 				paused.fail = errBroken
 			}
+			var writers sync.WaitGroup
+			defer func() {
+				cancel()
+				select {
+				case <-paused.resume:
+				default:
+					close(paused.resume)
+				}
+				writers.Wait()
+			}()
 			owner := *f.items
 			owner.Store = paused
 			ownerDone := make(chan error, 1)
+			writers.Add(1)
 			go func() {
+				defer writers.Done()
 				_, err := owner.Deploy(ownerCtx, item.Deploy{
 					Target: item.Target{Repo: c, Path: "rest/Acme.Race.1.0.0.nupkg"},
 					Body:   bytes.NewReader(pkg), By: "admin",
@@ -78,33 +112,13 @@ func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 			case <-ctx.Done():
 				t.Fatal(ctx.Err())
 			}
-			// Always unblock our writer even if an assertion fails.
-			defer func() {
-				select {
-				case <-paused.resume:
-				default:
-					close(paused.resume)
-				}
-			}()
-			waitCtx, cancelWait := context.WithCancel(ctx)
+			waitCtx, cancelWait := context.WithCancel(requestCtx)
 			defer cancelWait()
 			waitDone := make(chan error, 1)
+			writers.Add(1)
 			if mode == "copy" || mode == "move" {
-				source, err := db.Repos().Get(ctx, "libs-local")
-				if err != nil {
-					t.Fatal(err)
-				}
-				_, err = f.items.Deploy(ctx, item.Deploy{
-					Target: item.Target{
-						Repo: source,
-						Path: "Acme.Race.1.0.0.nupkg",
-					},
-					Body: bytes.NewReader(pkg),
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
 				go func() {
+					defer writers.Done()
 					res, err := f.items.Transfer(waitCtx, item.Transfer{
 						From: item.Target{Repo: source, Path: "Acme.Race.1.0.0.nupkg"},
 						To: item.Target{
@@ -121,6 +135,7 @@ func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 				}()
 			} else {
 				go func() {
+					defer writers.Done()
 					body, ct := pushForm(nupkg("acme.race", "1.0.0.0", ""))
 					r := httptest.NewRequestWithContext(
 						waitCtx,
@@ -129,7 +144,6 @@ func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 						body,
 					)
 					r.Header.Set("Content-Type", ct)
-					r.Header.Set("X-Test-User", "admin")
 					rec := httptest.NewRecorder()
 					f.h.ServeHTTP(rec, r)
 					want := http.StatusConflict
@@ -207,8 +221,11 @@ func waitForBlocked(
 	for {
 		var blocked bool
 		if err := db.DB().QueryRowContext(ctx, `SELECT EXISTS (
-			SELECT 1 FROM pg_stat_activity WHERE datname = current_database()
-			AND cardinality(pg_blocking_pids(pid)) > 0)`).Scan(&blocked); err != nil {
+			SELECT 1 FROM pg_stat_activity a WHERE datname = current_database()
+			AND query LIKE 'SELECT id FROM project_authority_guard%'
+			AND cardinality(pg_blocking_pids(a.pid)) > 0
+			AND EXISTS (SELECT 1 FROM pg_locks l WHERE l.pid = a.pid
+			AND l.relation = 'project_authority_guard'::regclass))`).Scan(&blocked); err != nil {
 			t.Fatal(err)
 		}
 		if blocked {

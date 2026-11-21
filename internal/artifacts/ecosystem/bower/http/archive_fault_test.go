@@ -15,8 +15,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -207,6 +209,36 @@ type interruptedArchiveReader struct{ io.ReadSeekCloser }
 
 func (r interruptedArchiveReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
 
+type invalidArchiveSizeStore struct {
+	pkgroute.Store
+	digest string
+}
+
+func (s invalidArchiveSizeStore) Items() port.ItemStore {
+	return invalidArchiveSizeItems{ItemStore: s.Store.Items(), digest: s.digest}
+}
+
+type invalidArchiveSizeItems struct {
+	port.ItemStore
+	digest string
+}
+
+func (s invalidArchiveSizeItems) Descendants(
+	ctx context.Context,
+	repository string,
+	cached bool,
+	folder string,
+	page kernel.Page,
+) ([]model.Item, string, error) {
+	items, next, err := s.ItemStore.Descendants(ctx, repository, cached, folder, page)
+	for i := range items {
+		if items[i].Actual.SHA256 == s.digest {
+			items[i].Size = -1
+		}
+	}
+	return items, next, err //nolint:wrapcheck // preserve the underlying fixture error
+}
+
 func TestAccBowerLocalArchiveFailureDoesNotDeliverPartialBytes(t *testing.T) {
 	for _, fault := range []string{"missing blob", "interrupted", "invalid size", "cancelled"} {
 		t.Run(fault, func(t *testing.T) {
@@ -222,10 +254,11 @@ func TestAccBowerLocalArchiveFailureDoesNotDeliverPartialBytes(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			if fault == "invalid size" {
-				it.Size = -1
-				if _, err := f.db.Items().Put(t.Context(), it); err != nil {
-					t.Fatal(err)
-				}
+				// Writes reject negative sizes; inject legacy corruption only
+				// into the archive's read without weakening that invariant.
+				f.mount(nil, func(db pkgroute.Store) pkgroute.Store {
+					return invalidArchiveSizeStore{Store: db, digest: it.Actual.SHA256}
+				})
 			}
 			f.items.Blobs = localArchiveFaultBlobs{
 				Store:  f.items.Blobs,
