@@ -301,3 +301,83 @@ func qualifyPullRestart(t *testing.T, backend string) {
 		}
 	}
 }
+
+func TestAccSinglePullPolicyRecoverySQLite(t *testing.T) { qualifyPullPolicyRecovery(t, "sqlite") }
+
+func TestAccSinglePullPolicyRecoveryPostgres(t *testing.T) { qualifyPullPolicyRecovery(t, "postgres") }
+
+func qualifyPullPolicyRecovery(t *testing.T, backend string) {
+	t.Helper()
+	w, driver, initial := newPullDriverWorld(t, backend, false)
+	finish := func(run model.PullRun) model.PullRun {
+		t.Helper()
+		var err error
+		for step := 0; step < 20 && !run.Phase.Terminal(); step++ {
+			run, err = driver.Step(t.Context(), run.Reference, w.fence)
+			if err != nil {
+				t.Fatal("recover current pull", err)
+			}
+		}
+		if run.Phase != model.PullComplete {
+			t.Fatal("current pull did not finish", run.Phase)
+		}
+		return run
+	}
+	initial = finish(initial)
+	payloads := w.bridge.count(http.MethodGet, itemRoute("target", pullFaultPath))
+	w.request(w.source, http.MethodPost, "/artifactory/api/repositories/pull-remote", `{"retrievalCachePeriodSecs":12345}`, http.StatusOK)
+	principal, err := w.runtime.Auth.Basic(t.Context(), "replica-reader", "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := func(id string) model.PullRun {
+		t.Helper()
+		targets, err := w.runtime.Store.Replications().ForRepo(t.Context(), "pull-remote")
+		if err != nil || len(targets) != 1 {
+			t.Fatal("current replication target", err)
+		}
+		run, err := driver.Start(
+			accessapi.WithCaller(t.Context(), principal, nil),
+			replication.PullRequest{ID: id, TargetKey: targets[0].Key, TargetRevision: targets[0].Revision, Root: "selected"},
+			nil,
+		)
+		if err != nil {
+			t.Fatal("admit fresh pull", err)
+		}
+		return run
+	}
+	warm := finish(start("policy-warm-recovery"))
+	if warm.Binding.Source.Revision == initial.Binding.Source.Revision || warm.Binding.Source.Repository.Generation != initial.Binding.Source.Repository.Generation {
+		t.Fatal("policy edit lost distinct run fencing or changed byte identity")
+	}
+	item, err := w.runtime.Store.PullProgress().Item(t.Context(), warm.Reference, model.PullFetch, pullFaultPath)
+	if err != nil || item.Outcome != model.PullSucceeded || w.bridge.count(http.MethodGet, itemRoute("target", pullFaultPath)) != payloads {
+		t.Fatal("fresh policy pull did not checkpoint warm verified bytes", err)
+	}
+	source := w.runtime.Artifacts.API().PullSource
+	if _, _, err := source.Items(
+		accessapi.WithCaller(t.Context(), principal, nil),
+		initial.Binding.Source,
+		initial.Binding.Selection(),
+		kernel.Page{},
+	); !errors.Is(
+		err,
+		artifactsapi.ErrPullChanged,
+	) {
+		t.Fatal("old run retained policy authority", err)
+	}
+	// A new source credential generation can retire old bytes only after exact
+	// current-peer absence. Neither the old job nor a listing omission grants it.
+	w.request(w.target, http.MethodDelete, itemRoute("target", pullFaultPath), "", http.StatusNoContent)
+	w.request(w.source, http.MethodPost, "/artifactory/api/repositories/pull-remote", `{"username":"receiver-readonly"}`, http.StatusOK)
+	w.request(w.source, http.MethodPost, replicationPath+"pull-remote", `{"syncDeletes":true}`, http.StatusOK)
+	reconciled := finish(start("generation-reconciliation"))
+	removed, err := w.runtime.Store.PullProgress().Item(t.Context(), reconciled.Reference, model.PullDelete, pullFaultPath)
+	if err != nil || removed.Outcome != model.PullSucceeded || len(removed.Removed) == 0 {
+		t.Fatal("fresh source generation could not retire absent earlier cache", err)
+	}
+	assertNoPullCache(t, w)
+	if w.bridge.count(http.MethodDelete, itemRoute("target", pullFaultPath)) != 0 {
+		t.Fatal("cache reconciliation sent upstream DELETE")
+	}
+}

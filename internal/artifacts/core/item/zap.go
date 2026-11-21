@@ -65,7 +65,8 @@ func (s *Service) invalidateCache(ctx context.Context, t Target, by string) (int
 }
 
 func (s *Service) invalidateExactCache(ctx context.Context, t Target, by string) (int64, error) {
-	if _, err := s.Store.RemoteCache().Source(ctx, t.Repo.Key); err != nil {
+	identity, err := s.Store.RemoteCache().Source(ctx, t.Repo.Key)
+	if err != nil {
 		return 0, fmt.Errorf("item: guard exact cache deletion: %w", err)
 	}
 	page := kernel.Page{Limit: 64}
@@ -76,7 +77,17 @@ func (s *Service) invalidateExactCache(ctx context.Context, t Target, by string)
 			return 0, fmt.Errorf("item: read exact cache deletion: %w", err)
 		}
 		for _, entry := range entries {
-			if err := s.Store.RemoteCache().Evict(ctx, entry.Token); err != nil {
+			if entry.Token.Source.Repository != identity.Repository {
+				return 0, kernel.ErrConflict
+			}
+			token, err := s.Store.RemoteCache().Begin(ctx, entry.Token.Key)
+			if err != nil {
+				return 0, fmt.Errorf("item: refresh exact cache deletion token: %w", err)
+			}
+			if token.Epoch != entry.Token.Epoch || token.Revision != entry.Token.Revision {
+				return 0, kernel.ErrConflict
+			}
+			if err := s.Store.RemoteCache().Evict(ctx, token); err != nil {
 				return 0, fmt.Errorf("item: evict exact cache deletion: %w", err)
 			}
 			if entry.ItemID == 0 && entry.Blob.Checksums.SHA256 != "" {

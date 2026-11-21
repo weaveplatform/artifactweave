@@ -185,8 +185,23 @@ func (s Source) withCached(ctx context.Context, expected api.PullCached,
 		if err != nil || proof.Representation != expected.Representation || proof.Version != expected.Version {
 			continue
 		}
-		if err := s.Content.Store.RemoteCache().Check(ctx, entry.Token); err != nil {
+		token, err := s.Content.Store.RemoteCache().Begin(ctx, entry.Token.Key)
+		if err != nil {
+			return fmt.Errorf("current selected cache token: %w", err)
+		}
+		if token.Source != entry.Token.Source || token.Epoch != entry.Token.Epoch || token.Revision != entry.Token.Revision {
+			return source.ErrSuperseded
+		}
+		if err := s.Content.Store.RemoteCache().Check(ctx, token); err != nil {
 			return fmt.Errorf("guard selected cache representation: %w", err)
+		}
+		if token.PolicyRevision != entry.Token.PolicyRevision {
+			// Policy-only edits preserve verified bytes and normal cache identity.
+			// Commit current CAS authority so the receipt describes stored state.
+			entry, err = s.Content.Store.RemoteCache().Put(ctx, token, entry)
+			if err != nil {
+				return fmt.Errorf("refresh selected cache policy receipt: %w", err)
+			}
 		}
 		return effect(ctx, state, entry)
 	}

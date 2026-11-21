@@ -134,6 +134,30 @@ func TestUnitPullCacheCheckpointIsAtomicAndCannotReuseEvictedRepresentation(t *t
 	}
 }
 
+func TestUnitPullFreshPolicyWarmReceiptKeepsBytesAndRefreshesCASAuthority(t *testing.T) {
+	w := fixture(t)
+	old := selectedFile(t, w)
+	entry := retainedFile(t, w, old)
+	w.config.RetrievalCachePeriodSecs = new(12345)
+	if err := w.db.Repos().Update(t.Context(), w.config); err != nil {
+		t.Fatal(err)
+	}
+	selected := selectedFile(t, w)
+	w.source.Read = func(context.Context, source.Request) (source.Result, error) {
+		return source.Result{CacheEntry: &entry}, nil
+	}
+	proof, err := w.source.Fetch(t.Context(), selected, publication())
+	if err != nil {
+		t.Fatal("fresh pull rejected verified warm bytes after policy edit", err)
+	}
+	if err := w.source.WithCurrent(t.Context(), proof, func(context.Context) error { return nil }); err != nil {
+		t.Fatal("renewed warm receipt did not describe committed cache authority", err)
+	}
+	if _, err := w.source.Fetch(t.Context(), old, publication()); !errors.Is(err, source.ErrSuperseded) {
+		t.Fatal("old selected intent survived policy edit", err)
+	}
+}
+
 func TestUnitPullFetchRefusesTransactionsAndIncompleteExecutionAuthority(t *testing.T) {
 	w := fixture(t)
 	selected := selectedFile(t, w)

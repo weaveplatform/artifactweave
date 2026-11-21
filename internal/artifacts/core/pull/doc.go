@@ -22,7 +22,10 @@
 // exact source absence permits local removal/checkpoint work under the final
 // execution fence, without an upstream mutation.
 // Public supplies the published ErrPull recovery categories while preserving
-// errors.Is causes. Offline and no-store owners refuse admission before peer
+// errors.Is causes. Source policy revisions fence retained selections. Fresh
+// pulls can renew warm receipts after policy edits and retire older-generation
+// cache bytes only within the same repository lifetime after current absence.
+// Offline and no-store owners refuse admission before peer
 // discovery; a transient response cannot become a retained cache receipt.
 //
 // # Invariants

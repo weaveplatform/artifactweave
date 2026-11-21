@@ -70,6 +70,35 @@ func TestUnitPullCacheRemovalNeedsExactAbsenceAndCurrentRepresentation(t *testin
 	}
 }
 
+func TestUnitPullFreshReconciliationRetiresEarlierSourceAndPolicyEntries(t *testing.T) {
+	for _, change := range []string{"generation", "policy"} {
+		t.Run(change, func(t *testing.T) {
+			w, entry, old := removalFixture(t)
+			if change == "generation" {
+				w.config.URL = "https://replacement.example/artifactory/source"
+			} else {
+				w.config.RetrievalCachePeriodSecs = new(12345)
+			}
+			if err := w.db.Repos().Update(t.Context(), w.config); err != nil {
+				t.Fatal(err)
+			}
+			repository := binding(t, w, old.Selection)
+			candidates, _, err := w.source.CachedItems(t.Context(), repository, old.Selection, kernel.Page{})
+			if err != nil || len(candidates) != 1 {
+				t.Fatal("fresh reconciliation could not select retained earlier cache", err)
+			}
+			removed, err := w.source.Remove(t.Context(), candidates[0], publication(), nil)
+			if err != nil || len(removed) != 1 || removed[0] != "a" {
+				t.Fatal("fresh current absence could not retire earlier cache", removed, err)
+			}
+			current, err := w.db.RemoteCache().Read(t.Context(), entry.Token.Key)
+			if !errors.Is(err, kernel.ErrNotFound) || current.Blob.Checksums.SHA256 != "" {
+				t.Fatal("retired cache representation survived", err)
+			}
+		})
+	}
+}
+
 func TestUnitPullExactRemovalPreservesRawDescendantRepresentations(t *testing.T) {
 	w, _, candidate := removalFixture(t)
 	key := model.RemoteCacheKey{RepoKey: "remote", Path: "a/metadata", Variant: "raw-native", SettingsRevision: "current-options"}

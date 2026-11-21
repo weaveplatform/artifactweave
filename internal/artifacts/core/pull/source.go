@@ -126,10 +126,17 @@ func (s Source) prepare(ctx context.Context, key string, selection api.PullSelec
 	if err != nil {
 		return selectionState{}, fmt.Errorf("resolve selected pull source: %w", err)
 	}
+	policy, err := s.Content.Store.RemoteCache().State(ctx, key)
+	if err != nil {
+		return selectionState{}, fmt.Errorf("current selected pull policy: %w", err)
+	}
+	if policy.Source != identity {
+		return selectionState{}, source.ErrSuperseded
+	}
 	state.repository = api.PullRepository{Repository: api.TransferRepository{
 		Key: key, Incarnation: string(identity.Repository), Generation: string(identity.Generation), PackageType: q.Repo.PackageType,
 	}}
-	state.repository.Revision, err = fingerprint([]any{state.repository.Repository, state.peer.Binding(), layoutRevision, selection})
+	state.repository.Revision, err = fingerprint([]any{state.repository.Repository, policy.PolicyRevision, state.peer.Binding(), layoutRevision, selection})
 	if err != nil {
 		return selectionState{}, err
 	}

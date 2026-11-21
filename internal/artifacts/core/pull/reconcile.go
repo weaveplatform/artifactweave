@@ -96,7 +96,11 @@ func (s Source) removalSnapshot(ctx context.Context, state selectionState, path 
 				return removalSnapshot{}, err
 			}
 			versions = append(versions, version)
-			if selected == path && entry.Token.Source == identity && entry.Blob.Checksums.SHA256 != "" {
+			// A fresh run can retire bytes from an earlier source generation in
+			// this repository lifetime. Current upstream absence, Delete rights
+			// and the complete unchanged cache snapshot still decide removal.
+			if selected == path && entry.Token.Source.Repository == identity.Repository &&
+				entry.Token.Source.Kind == identity.Kind && entry.Token.Source.ID == identity.ID && entry.Blob.Checksums.SHA256 != "" {
 				positive = true
 				snapshot.rawRoot = snapshot.rawRoot || entry.ItemID == 0
 			}
