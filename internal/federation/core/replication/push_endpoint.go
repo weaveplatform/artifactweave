@@ -9,29 +9,30 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
-// pushEndpoint derives normal item and storage routes from the configured
+// PushEndpoint derives normal item and storage routes from the configured
 // target repository URL. File names are data, including matrix separators;
 // parsing them as URL references would permit origin or namespace changes.
-type pushEndpoint struct {
+type PushEndpoint struct {
 	base       url.URL
 	prefix     string
 	repository string
 }
 
-func newPushEndpoint(raw string) (pushEndpoint, error) {
+// NewPushEndpoint validates a configured repository URL without network I/O.
+func NewPushEndpoint(raw string) (PushEndpoint, error) {
 	if err := validateURL(raw); err != nil {
-		return pushEndpoint{}, err
+		return PushEndpoint{}, err
 	}
 	u, err := url.Parse(raw)
 	if err != nil || u.Opaque != "" || u.ForceQuery || !utf8.ValidString(u.Path) {
-		return pushEndpoint{}, fmt.Errorf("invalid replication target: %w", kernel.ErrInvalid)
+		return PushEndpoint{}, fmt.Errorf("invalid replication target: %w", kernel.ErrInvalid)
 	}
 	path := strings.TrimRight(u.Path, "/")
 	if path == "" || !strings.HasPrefix(path, "/") || !canonicalPushPath(strings.TrimPrefix(path, "/")) {
-		return pushEndpoint{}, fmt.Errorf("replication target must name a repository: %w", kernel.ErrInvalid)
+		return PushEndpoint{}, fmt.Errorf("replication target must name a repository: %w", kernel.ErrInvalid)
 	}
 	last := strings.LastIndexByte(path, '/')
-	return pushEndpoint{base: *u, prefix: path[:last], repository: path[last+1:]}, nil
+	return PushEndpoint{base: *u, prefix: path[:last], repository: path[last+1:]}, nil
 }
 
 func canonicalPushPath(path string) bool {
@@ -42,19 +43,22 @@ func canonicalPushPath(path string) bool {
 	return err == nil
 }
 
-func (e pushEndpoint) itemURL(path string) (*url.URL, error) {
+// ItemURL addresses normal item admission, never a physical blob.
+func (e PushEndpoint) ItemURL(path string) (*url.URL, error) {
 	return e.route(e.prefix+"/"+e.repository, path)
 }
 
-func (e pushEndpoint) storageURL(path string) (*url.URL, error) {
+// StorageURL addresses the exact item metadata resource.
+func (e PushEndpoint) StorageURL(path string) (*url.URL, error) {
 	return e.route(e.prefix+"/api/storage/"+e.repository, path)
 }
 
-func (e pushEndpoint) metadataURL(path string) (*url.URL, error) {
+// MetadataURL addresses the exact item property resource.
+func (e PushEndpoint) MetadataURL(path string) (*url.URL, error) {
 	return e.route(e.prefix+"/api/metadata/"+e.repository, path)
 }
 
-func (e pushEndpoint) route(base, path string) (*url.URL, error) {
+func (e PushEndpoint) route(base, path string) (*url.URL, error) {
 	if e.repository == "" || !canonicalPushPath(path) {
 		return nil, fmt.Errorf("invalid replication item path: %w", kernel.ErrInvalid)
 	}
@@ -67,4 +71,20 @@ func (e pushEndpoint) route(base, path string) (*url.URL, error) {
 	u.RawPath = strings.Join(parts, "/")
 	u.RawQuery, u.Fragment = "", ""
 	return &u, nil
+}
+
+// Repository is the configured destination repository key.
+func (e PushEndpoint) Repository() string { return e.repository }
+
+// AQLURL addresses the deployment's authenticated search API.
+func (e PushEndpoint) AQLURL() (*url.URL, error) {
+	return e.route(e.prefix+"/api/search", "aql")
+}
+
+// StorageRootURL permits the repository root for a nonmutating file listing.
+func (e PushEndpoint) StorageRootURL(root string) (*url.URL, error) {
+	if root != "" {
+		return e.StorageURL(root)
+	}
+	return e.route(e.prefix+"/api/storage", e.repository)
 }
