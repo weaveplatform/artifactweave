@@ -65,8 +65,10 @@
 // admission.
 // REP-04 supplies guarded Quartz configuration/lifecycle positions and private
 // author persistence, exclusive generation-fenced target ownership, and active
-// transfer renewal/cancellation. Run dispatch, current author restoration and path-aware
-// reporting remain integration work. Multi-push,
+// transfer renewal/cancellation. Coordinator/Worker now restore original authors,
+// admit distinct manual/stable Quartz lifetimes, and join actual push/pull
+// checkpoints with idempotent selected-path evidence. Public execute/status
+// adapters and remaining runtime qualification are still integration work. Multi-push,
 // event-triggered and binary-existence optimization remain P37.
 //
 // # Testing

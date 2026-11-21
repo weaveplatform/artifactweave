@@ -24,6 +24,7 @@ func TestAccReplicationScheduleAuthorUpgradePreservesLegacyConfiguration(t *test
 		"sqlite/0001_baseline.sql", "postgres/0001_baseline.sql",
 		"sqlite/0002_replication_revision.sql", "postgres/0002_replication_revision.sql",
 		"sqlite/0003_push_progress.sql", "postgres/0003_push_progress.sql",
+		"sqlite/0004_pull_progress.sql", "postgres/0004_pull_progress.sql",
 	} {
 		data, err := migrations.FS.ReadFile(name)
 		storekit.Must(t, err)

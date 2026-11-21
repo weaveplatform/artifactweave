@@ -824,6 +824,63 @@ column remote_sources.doc text NOT NULL
 constraint remote_sources.remote_sources_pkey PRIMARY KEY (repo_key)
 constraint remote_sources.remote_sources_repo_key_fkey FOREIGN KEY (repo_key) REFERENCES repositories(key) ON DELETE CASCADE
 index remote_sources.remote_sources_pkey CREATE UNIQUE INDEX remote_sources_pkey ON remote_sources USING btree (repo_key)
+table replication_execution_effect_paths
+column replication_execution_effect_paths.run_id text NOT NULL
+column replication_execution_effect_paths.run_incarnation text NOT NULL
+column replication_execution_effect_paths.operation_key text NOT NULL
+column replication_execution_effect_paths.path text COLLATE "C" NOT NULL
+constraint replication_execution_effect_paths.replication_execution_effect__run_id_run_incarnation_opera_fkey FOREIGN KEY (run_id, run_incarnation, operation_key) REFERENCES replication_execution_effects(run_id, run_incarnation, operation_key) ON DELETE CASCADE
+constraint replication_execution_effect_paths.replication_execution_effect_paths_pkey PRIMARY KEY (run_id, run_incarnation, operation_key, path)
+index replication_execution_effect_paths.replication_execution_effect_paths_pkey CREATE UNIQUE INDEX replication_execution_effect_paths_pkey ON replication_execution_effect_paths USING btree (run_id, run_incarnation, operation_key, path)
+index replication_execution_effect_paths.replication_execution_effect_paths_scope CREATE INDEX replication_execution_effect_paths_scope ON replication_execution_effect_paths USING btree (run_id, run_incarnation, path, operation_key)
+table replication_execution_effects
+column replication_execution_effects.run_id text NOT NULL
+column replication_execution_effects.run_incarnation text NOT NULL
+column replication_execution_effects.operation_key text NOT NULL
+column replication_execution_effects.transfer_id text NOT NULL
+column replication_execution_effects.transfer_incarnation text NOT NULL
+column replication_execution_effects.intent_fingerprint text NOT NULL
+column replication_execution_effects.transfer_version bigint NOT NULL
+column replication_execution_effects.path text COLLATE "C" NOT NULL
+column replication_execution_effects.outcome text NOT NULL
+column replication_execution_effects.reason text NOT NULL
+column replication_execution_effects.effect_paths_json text NOT NULL
+column replication_execution_effects.updated_at bigint NOT NULL
+constraint replication_execution_effects.replication_execution_effects_pkey PRIMARY KEY (run_id, run_incarnation, operation_key)
+constraint replication_execution_effects.replication_execution_effects_run_id_run_incarnation_fkey FOREIGN KEY (run_id, run_incarnation) REFERENCES replication_executions(run_id, incarnation) ON DELETE CASCADE
+constraint replication_execution_effects.replication_execution_effects_transfer_version_check CHECK ((transfer_version > 0))
+index replication_execution_effects.replication_execution_effects_pkey CREATE UNIQUE INDEX replication_execution_effects_pkey ON replication_execution_effects USING btree (run_id, run_incarnation, operation_key)
+table replication_executions
+column replication_executions.run_id text NOT NULL
+column replication_executions.incarnation text NOT NULL
+column replication_executions.target_key text NOT NULL
+column replication_executions.repo_key text NOT NULL
+column replication_executions.repo_incarnation text NOT NULL
+column replication_executions.direction text NOT NULL
+column replication_executions.occurrence text
+column replication_executions.binding_json text NOT NULL
+column replication_executions.version bigint NOT NULL
+column replication_executions.phase text NOT NULL
+column replication_executions.succeeded bigint NOT NULL DEFAULT 0
+column replication_executions.failed bigint NOT NULL DEFAULT 0
+column replication_executions.skipped bigint NOT NULL DEFAULT 0
+column replication_executions.pending bigint NOT NULL DEFAULT 0
+column replication_executions.started_at bigint NOT NULL
+column replication_executions.updated_at bigint NOT NULL
+column replication_executions.completed_at bigint
+constraint replication_executions.replication_executions_failed_check CHECK ((failed >= 0))
+constraint replication_executions.replication_executions_occurrence_key UNIQUE (occurrence)
+constraint replication_executions.replication_executions_pending_check CHECK ((pending >= 0))
+constraint replication_executions.replication_executions_pkey PRIMARY KEY (run_id)
+constraint replication_executions.replication_executions_run_id_incarnation_key UNIQUE (run_id, incarnation)
+constraint replication_executions.replication_executions_skipped_check CHECK ((skipped >= 0))
+constraint replication_executions.replication_executions_succeeded_check CHECK ((succeeded >= 0))
+constraint replication_executions.replication_executions_version_check CHECK ((version > 0))
+index replication_executions.replication_executions_occurrence_key CREATE UNIQUE INDEX replication_executions_occurrence_key ON replication_executions USING btree (occurrence)
+index replication_executions.replication_executions_pkey CREATE UNIQUE INDEX replication_executions_pkey ON replication_executions USING btree (run_id)
+index replication_executions.replication_executions_repository CREATE INDEX replication_executions_repository ON replication_executions USING btree (repo_key, repo_incarnation, started_at, run_id)
+index replication_executions.replication_executions_run_id_incarnation_key CREATE UNIQUE INDEX replication_executions_run_id_incarnation_key ON replication_executions USING btree (run_id, incarnation)
+index replication_executions.replication_executions_target CREATE INDEX replication_executions_target ON replication_executions USING btree (target_key, started_at, run_id)
 table replication_pull_items
 column replication_pull_items.run_id text NOT NULL
 column replication_pull_items.run_incarnation text NOT NULL
