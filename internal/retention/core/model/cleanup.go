@@ -94,6 +94,12 @@ type CleanupRunSnapshot struct {
 	Policy CleanupPolicy
 }
 
+// CleanupSnapshot removes private execution bindings from a history projection.
+func CleanupSnapshot(run CleanupRun, policy CleanupPolicy) CleanupRunSnapshot {
+	policy.ExecutionCredential, policy.ProjectIncarnation = kernel.CredentialReference{}, ""
+	return CleanupRunSnapshot{Run: run, Policy: policy}
+}
+
 // CleanupExecution is private durable run state, separate from report bytes.
 // The frozen policy and clock survive policy edits/deletion and process restart.
 // Occurrence identifies a scheduler fire; empty denotes a distinct manual run.

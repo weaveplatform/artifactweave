@@ -168,13 +168,14 @@ func runArgs(r model.CleanupRun) []any {
 	}
 }
 
-func scanRun(row interface{ Scan(...any) error }) (model.CleanupRun, error) {
+func scanRun(row interface{ Scan(...any) error }, extra ...any) (model.CleanupRun, error) {
 	var (
 		r              model.CleanupRun
 		started, ended sql.NullInt64
 		report         sql.NullString
 	)
-	if err := row.Scan(
+	columns := make([]any, 0, 14+len(extra))
+	columns = append(columns,
 		&r.ID,
 		&r.PolicyKey,
 		&r.TriggerID,
@@ -189,7 +190,8 @@ func scanRun(row interface{ Scan(...any) error }) (model.CleanupRun, error) {
 		&r.CleanedItems,
 		&r.CleanedSize,
 		&report,
-	); err != nil {
+	)
+	if err := row.Scan(append(columns, extra...)...); err != nil {
 		return r, err //nolint:wrapcheck // wrapped by the caller
 	}
 	r.Started, r.Ended, r.Report = dialect.FromMicros(started), dialect.FromMicros(ended),

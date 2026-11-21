@@ -18,6 +18,7 @@ func runCleanup(t *testing.T, newStore Factory) {
 	t.Run("CleanupRuns", func(t *testing.T) { testCleanupRuns(t, newStore(t)) })
 	t.Run("CleanupExecutions", func(t *testing.T) { testCleanupExecutions(t, newStore(t)) })
 	t.Run("CleanupProgress", func(t *testing.T) { testCleanupProgress(t, newStore(t)) })
+	t.Run("CleanupRunPages", func(t *testing.T) { testCleanupRunPages(t, newStore(t)) })
 }
 
 func cleanupPolicy(key string, item model.CleanupItemType, project string) model.CleanupPolicy {

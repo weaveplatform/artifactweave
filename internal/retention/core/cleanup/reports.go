@@ -45,8 +45,7 @@ func (s Service) Run(ctx context.Context, policyKey string, trigger int64) (mode
 		if !sameRun || !samePolicy || !packageRun {
 			return kernel.ErrNotFound
 		}
-		policy.ExecutionCredential, policy.ProjectIncarnation = kernel.CredentialReference{}, ""
-		out = model.CleanupRunSnapshot{Run: run, Policy: policy}
+		out = model.CleanupSnapshot(run, policy)
 		return nil
 	})
 	if err != nil {

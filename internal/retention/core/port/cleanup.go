@@ -45,6 +45,9 @@ type CleanupStore interface {
 	Runs(ctx context.Context, f RunFilter, p kernel.Page) ([]model.CleanupRun, string, error)
 	// LastRun returns a policy's most recent run.
 	LastRun(ctx context.Context, policyKey string) (model.CleanupRun, error)
+	// RunPage applies immutable ownership before filters, count and a bounded
+	// offset window. Unbound legacy rows do not acquire guessed global scope.
+	RunPage(context.Context, RunListing) (RunPage, error)
 
 	// CreateExecution persists the private snapshot of an existing run. A
 	// nonempty occurrence is unique across scheduler retries, including after
