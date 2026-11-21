@@ -15,7 +15,7 @@ import re
 import sys
 from urllib.error import HTTPError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 
 SCENARIO = "deploy/artifactweave/terraform/projects"
@@ -51,7 +51,8 @@ def inventory(root):
     assert SCENARIO + ") apply_projects ;;" in runner, "project scenario has no native apply steps"
     for mode in ["--check", "--deleted"]:
         assert 'python3 -I "$here/check-projects.py" ' + mode in runner, "project runner omits required effect or destruction checks"
-    assert "PROJECT_VERSION=" + version in runner, "project release pin missing from provider mirror"
+    release = re.search(r'^PROJECT_VERSION=([0-9.]+)$', runner, re.M)
+    assert release and release.group(1) == version, "project release pin missing from provider mirror"
     print("project provider inventory: nine planned resource types and required native lane PASS")
     return version
 
@@ -73,7 +74,7 @@ def request(path, method="GET", data=None, want=200, actor=None, fixture=None, h
     fields.update(headers or {})
     req = Request(base + path, data=data, method=method, headers=fields)
     try:
-        with build_opener(NoRedirects()).open(req, timeout=180) as response:
+        with build_opener(ProxyHandler({}), NoRedirects()).open(req, timeout=180) as response:
             status, payload = response.status, response.read(1 << 20)
     except HTTPError as error:
         status, payload = error.code, error.read(1 << 20)
