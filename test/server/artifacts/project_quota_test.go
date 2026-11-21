@@ -1,6 +1,8 @@
 package artifacts_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -135,6 +137,72 @@ func TestAccProjectQuotaRemoteReads(t *testing.T) {
 			w.Upstream.Set("/unlimited.bin", fakeupstream.Resource{Body: []byte("unlimited")})
 			read("unlimited.bin", "unlimited")
 			bytes(116)
+		})
+	}
+}
+
+func TestAccProjectQuotaTransformedPOMReads(t *testing.T) {
+	for _, backend := range []string{"sqlite", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			w := remoteFolderWorld(t, backend)
+			call := func(method, path, body string, want int) *httptest.ResponseRecorder {
+				t.Helper()
+				rec := w.Request(method, path, "admin", body, "Content-Type", "application/json")
+				if rec.Code != want {
+					t.Fatalf("%s %s = %d %s, want %d", method, path, rec.Code, rec.Body, want)
+				}
+				return rec
+			}
+			call(http.MethodPost, "/access/api/v1/projects", `{"project_key":"alpha","display_name":"Alpha","storage_quota_bytes":1}`, http.StatusCreated)
+			call(http.MethodPut, "/artifactory/api/repositories/source-maven", `{"rclass":"local","packageType":"maven"}`, http.StatusOK)
+			call(
+				http.MethodPut,
+				"/artifactory/api/repositories/alpha-virtual",
+				`{"rclass":"virtual","packageType":"maven","repositories":["source-maven"],"projectKey":"alpha"}`,
+				http.StatusOK,
+			)
+			const path = "org/acme/app/1.0/app-1.0.pom"
+			const body = `<project><modelVersion>4.0.0</modelVersion><groupId>org.acme</groupId><artifactId>app</artifactId><version>1.0</version><repositories/><name>kept</name></project>`
+			call(http.MethodPut, "/artifactory/source-maven/"+path, body, http.StatusCreated)
+			var cleaned string
+			var etag string
+			for range 2 {
+				rec := call(http.MethodGet, "/artifactory/alpha-virtual/"+path, "", http.StatusOK)
+				cleaned, etag = rec.Body.String(), rec.Header().Get("ETag")
+				if strings.Contains(rec.Body.String(), "<repositories") || !strings.Contains(rec.Body.String(), "<name>kept</name>") {
+					t.Fatal("quota pressure changed POM cleanup")
+				}
+				state, initialized, err := w.Runtime.Store.Projects().Storage(t.Context(), "alpha")
+				if err != nil || !initialized || state.Bytes != 0 {
+					t.Fatal("transient POM read consumed quota", state.Bytes, err)
+				}
+				if _, err := w.Runtime.Store.VirtualCopies().Get(t.Context(), "alpha-virtual", path); !errors.Is(err, kernel.ErrNotFound) {
+					t.Fatal("quota-constrained transformed copy was retained", err)
+				}
+			}
+			call(http.MethodHead, "/artifactory/alpha-virtual/"+path, "", http.StatusOK)
+			sum := sha256.Sum256([]byte(cleaned))
+			if rec := call(http.MethodGet, "/artifactory/alpha-virtual/"+path+".sha256", "", http.StatusOK); strings.TrimSpace(rec.Body.String()) != hex.EncodeToString(sum[:]) {
+				t.Fatal("transient POM sidecar describes different bytes")
+			}
+			partial := w.Request(http.MethodGet, "/artifactory/alpha-virtual/"+path, "admin", "", "Range", "bytes=0-9")
+			if partial.Code != http.StatusPartialContent || partial.Body.String() != cleaned[:10] {
+				t.Fatal("transient POM did not preserve range delivery", partial.Code)
+			}
+			conditional := w.Request(http.MethodGet, "/artifactory/alpha-virtual/"+path, "admin", "", "If-None-Match", etag)
+			if conditional.Code != http.StatusNotModified {
+				t.Fatal("transient POM did not preserve conditional delivery", conditional.Code)
+			}
+			call(http.MethodPut, "/access/api/v1/projects/alpha", `{"storage_quota_bytes":1000000}`, http.StatusOK)
+			call(http.MethodGet, "/artifactory/alpha-virtual/"+path, "", http.StatusOK)
+			copy, err := w.Runtime.Store.VirtualCopies().Get(t.Context(), "alpha-virtual", path)
+			if err != nil {
+				t.Fatal("available quota did not retain the ordinary transformed copy", err)
+			}
+			state, _, err := w.Runtime.Store.Projects().Storage(t.Context(), "alpha")
+			if err != nil || state.Bytes != copy.Item.Size || state.Bytes == 0 {
+				t.Fatal("retained transformed bytes differ from project accounting", state.Bytes, copy.Item.Size, err)
+			}
 		})
 	}
 }

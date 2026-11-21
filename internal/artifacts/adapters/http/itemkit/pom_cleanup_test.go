@@ -37,6 +37,7 @@ func TestUnitPOMRemoteDeliveryRetainsAuthorityAndUsage(t *testing.T) {
 	for _, tc := range []struct {
 		name, method             string
 		refuse, fail, usageError bool
+		quota, refuseLate        bool
 		body                     string
 		status                   int
 		used                     bool
@@ -48,6 +49,9 @@ func TestUnitPOMRemoteDeliveryRetainsAuthorityAndUsage(t *testing.T) {
 		{name: "revoked", method: "GET", refuse: true, status: 403},
 		{name: "broken-body", method: "GET", fail: true, status: 404},
 		{name: "usage-fault", method: "GET", usageError: true, status: 200, used: true},
+		{name: "quota-get", method: "GET", quota: true, status: 200, used: true},
+		{name: "quota-head", method: "HEAD", quota: true, status: 200},
+		{name: "quota-current-authority-revoked", method: "GET", quota: true, refuseLate: true, status: 403},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := inmem.New()
@@ -77,7 +81,7 @@ func TestUnitPOMRemoteDeliveryRetainsAuthorityAndUsage(t *testing.T) {
 				},
 				Revalidate: func(context.Context) error {
 					called++
-					if tc.refuse {
+					if tc.refuse || tc.refuseLate && called == 2 {
 						return source.ErrDenied
 					}
 					return nil
@@ -93,7 +97,11 @@ func TestUnitPOMRemoteDeliveryRetainsAuthorityAndUsage(t *testing.T) {
 			found := Found{Repo: repo.Config{Key: "member", Class: repo.Remote, PackageType: repo.Maven}, remote: &remoteRead{result: result}}
 			r := httptest.NewRequest(tc.method, "/artifactory/v/a.pom", nil)
 			rec := httptest.NewRecorder()
-			k.serveReturnedPOM(rec, r, db, v, ItemRequest{Key: "v", Path: "a.pom"}, found, kernel.Principal{Name: "reader"})
+			var store Store = db
+			if tc.quota {
+				store = pomQuotaStore{Store: db}
+			}
+			k.serveReturnedPOM(rec, r, store, v, ItemRequest{Key: "v", Path: "a.pom"}, found, kernel.Principal{Name: "reader"})
 			if rec.Code != tc.status || used != tc.used || !body.closed {
 				t.Fatalf("status %d, used %v, closed %v: %s", rec.Code, used, body.closed, rec.Body.String())
 			}
@@ -106,6 +114,16 @@ func TestUnitPOMRemoteDeliveryRetainsAuthorityAndUsage(t *testing.T) {
 		})
 	}
 }
+
+type pomQuotaStore struct{ Store }
+
+func (s pomQuotaStore) VirtualCopies() virtual.CopyStore {
+	return pomQuotaCopies{CopyStore: s.Store.VirtualCopies()}
+}
+
+type pomQuotaCopies struct{ virtual.CopyStore }
+
+func (pomQuotaCopies) Put(context.Context, virtual.Copy) error { return kernel.ErrStorageQuota }
 
 type pomCopyFaultStore struct {
 	Store

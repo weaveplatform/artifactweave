@@ -125,6 +125,11 @@ owned response, as with an initially unknown no-store response. This does not
 bypass cache-fill permissions, integrity checks or unrelated storage failures.
 Successful reads do not mark a healthy upstream as failed because local cache
 capacity was refused. Soft/unlimited projects retain ordinary cache behavior.
+Virtual Maven POM cleanup applies the same optional-retention rule: cleaned
+bytes can be served with their transformed checksums without a stored virtual
+copy when quota refuses it. Existing source delivery checks and successful-use
+callbacks still apply; unrelated transformation/storage failures keep their
+existing answers.
 
 Actual deltas settle for the complete metadata transaction before event/lease
 publication fences. This admits net-zero moves above a lowered quota and rolls
