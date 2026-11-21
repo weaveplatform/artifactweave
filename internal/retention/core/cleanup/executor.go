@@ -73,9 +73,10 @@ func (x Executor) Execute(ctx context.Context, item work.WorkItem) error {
 	}
 }
 
-// Step owns its root transaction and transfers no bytes. A caller supplies an
-// exclusive ownership fence; queue workers bind it to GuardLease. It executes
-// after event/accounting finalizers, so no later domain lock follows the lease.
+// Step transfers no bytes and owns its transaction boundaries, releasing each
+// discovery page before reading the next. A caller supplies an exclusive fence;
+// queue workers bind it to GuardLease. Publication runs that fence after domain
+// finalizers, so no later domain lock follows the lease.
 func (x Executor) Step(ctx context.Context, id int64, fence func(context.Context) error) (bool, error) {
 	if x.Store == nil || x.Policies.Guard == nil || x.Policies.Restore == nil || x.Removal == nil || fence == nil {
 		return false, fmt.Errorf("cleanup executor unavailable: %w", kernel.ErrStore)
@@ -113,10 +114,14 @@ func (x Executor) Step(ctx context.Context, id int64, fence func(context.Context
 		return false, err
 	}
 	authorized := false
-	err = x.withCaller(ctx, e.Credential, func(ctx context.Context, authority Policy) error {
-		authorized = true
-		return x.authorizedStep(ctx, e, p, selection, fence, authority)
-	})
+	if discoveryPhase(p.Phase) && !r.Started.IsZero() {
+		authorized, err = x.discover(ctx, e, p, selection, fence)
+	} else {
+		err = x.withCaller(ctx, e.Credential, func(ctx context.Context, authority Policy) error {
+			authorized = true
+			return x.authorizedStep(ctx, e, p, selection, fence, authority)
+		})
+	}
 	if err != nil {
 		return x.failedStep(ctx, e, p, fence, authorized, err)
 	}
@@ -157,31 +162,12 @@ func (x Executor) authorizedStep(
 	if !authority.Allows(e.Policy.ProjectKey) {
 		return &authorityRefusal{kernel.ErrForbidden}
 	}
-	if err := x.Policies.currentProject(ctx, e.Policy); err != nil {
-		return &authorityRefusal{err}
-	}
-	current, err := x.Policies.Store.Cleanup().Policy(ctx, e.Policy.Key)
-	if errors.Is(err, kernel.ErrNotFound) {
-		return &stopRequired{"policy_deleted"}
-	}
+	fresh, err := x.currentRun(ctx, e)
 	if err != nil {
-		return fmt.Errorf("read current cleanup policy: %w", err)
-	}
-	if current.ProjectKey != e.Policy.ProjectKey || current.ItemType != model.CleanupPackage {
-		return &authorityRefusal{kernel.ErrForbidden}
-	}
-	fresh, err := x.Store.Cleanup().Run(ctx, e.RunID)
-	if err != nil {
-		return fmt.Errorf("read current cleanup run: %w", err)
+		return err
 	}
 	if fresh.Status.Terminal() {
 		return nil
-	}
-	if fresh.Status == api.RunStopping {
-		return &stopRequired{"stop_requested"}
-	}
-	if x.expired(e, fresh) {
-		return &stopRequired{"duration_limit"}
 	}
 	if fresh.Started.IsZero() {
 		return x.publish(ctx, e, p, fence, true, func(_ context.Context, r *model.CleanupRun, _ *model.CleanupProgress) error {
@@ -195,7 +181,37 @@ func (x Executor) authorizedStep(
 	if p.Phase == model.CleanupSkipping {
 		return x.skipStep(ctx, e, p, fence)
 	}
-	return x.discoverStep(ctx, e, p, selection, fence)
+	return fmt.Errorf("cleanup discovery needs an external page context: %w", kernel.ErrStore)
+}
+
+func (x Executor) currentRun(ctx context.Context, e model.CleanupExecution) (model.CleanupRun, error) {
+	if err := x.Policies.currentProject(ctx, e.Policy); err != nil {
+		return model.CleanupRun{}, &authorityRefusal{err}
+	}
+	current, err := x.Policies.Store.Cleanup().Policy(ctx, e.Policy.Key)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.CleanupRun{}, &stopRequired{"policy_deleted"}
+	}
+	if err != nil {
+		return model.CleanupRun{}, fmt.Errorf("read current cleanup policy: %w", err)
+	}
+	if current.ProjectKey != e.Policy.ProjectKey || current.ItemType != model.CleanupPackage {
+		return model.CleanupRun{}, &authorityRefusal{kernel.ErrForbidden}
+	}
+	fresh, err := x.Store.Cleanup().Run(ctx, e.RunID)
+	if err != nil {
+		return model.CleanupRun{}, fmt.Errorf("read current cleanup run: %w", err)
+	}
+	if fresh.Status.Terminal() {
+		return fresh, nil
+	}
+	if fresh.Status == api.RunStopping {
+		return model.CleanupRun{}, &stopRequired{"stop_requested"}
+	}
+	if x.expired(e, fresh) {
+		return model.CleanupRun{}, &stopRequired{"duration_limit"}
+	}
+	return fresh, nil
 }
 
 func (x Executor) failedStep(ctx context.Context, e model.CleanupExecution, p model.CleanupProgress, fence func(context.Context) error, authorized bool, err error) (bool, error) {
@@ -216,6 +232,9 @@ func (x Executor) failedStep(ctx context.Context, e model.CleanupExecution, p mo
 		return false, x.refuseVersion(ctx, e, p, fence, err)
 	}
 	var unavailable *repositoryUnavailable
+	if discoveryPhase(p.Phase) && errors.Is(err, kernel.ErrForbidden) && !errors.As(err, &unavailable) {
+		return x.finish(ctx, e, p, fence, api.RunFailed, "authority_revoked")
+	}
 	if (p.Phase == model.CleanupPackages || p.Phase == model.CleanupVersions || p.Phase == model.CleanupCandidates) &&
 		(errors.Is(err, kernel.ErrNotFound) || errors.Is(err, kernel.ErrConflict) || errors.As(err, &unavailable)) {
 		return false, x.skipTraversal(ctx, e, p, fence)

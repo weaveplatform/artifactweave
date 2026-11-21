@@ -29,6 +29,7 @@ type Selection struct {
 	snapshot   SelectionSnapshot
 	criteria   versionCriteria
 	properties map[string][]string
+	boundary   func(context.Context) error
 }
 
 // repositoryUnavailable keeps preview's scope refusal while letting execution
@@ -86,6 +87,11 @@ func (s *Selection) run(ctx context.Context, fn func(context.Context) error) err
 		// bound snapshots cannot silently move to a recreated project key.
 		if s.snapshot.Policy.ProjectIncarnation != "" {
 			if err := s.service.currentProject(ctx, s.snapshot.Policy); err != nil {
+				return err
+			}
+		}
+		if s.boundary != nil {
+			if err := s.boundary(ctx); err != nil {
 				return err
 			}
 		}

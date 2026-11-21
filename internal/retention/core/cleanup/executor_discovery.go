@@ -13,6 +13,27 @@ import (
 
 const executionPageSize = 64
 
+func discoveryPhase(phase model.CleanupPhase) bool {
+	return phase == model.CleanupRepositories || phase == model.CleanupPackages || phase == model.CleanupVersions || phase == model.CleanupCandidates
+}
+
+// Discovery keeps no outer write transaction over a complete lead traversal.
+// Each owner read refreshes authority and the run boundary in its short Tx.
+func (x Executor) discover(ctx context.Context, e model.CleanupExecution, p model.CleanupProgress, s *Selection, fence func(context.Context) error) (bool, error) {
+	bound, err := x.Policies.Restore(ctx, e.Credential)
+	if err != nil {
+		return false, fmt.Errorf("restore cleanup discovery caller: %w", err)
+	}
+	if bound == nil || x.Store.InTx(bound) {
+		return true, fmt.Errorf("cleanup discovery retained a transaction: %w", kernel.ErrStore)
+	}
+	s.boundary = func(ctx context.Context) error {
+		_, err := x.currentRun(ctx, e)
+		return err
+	}
+	return true, x.discoverStep(bound, e, p, s, fence)
+}
+
 func afterRepository(p *model.CleanupProgress) {
 	p.PackageAfter, p.VersionAfter, p.FileAfter = "", "", ""
 	if p.RepositoryDone {
@@ -162,34 +183,42 @@ func (x Executor) publishDiscovery(
 	entries []model.CleanupEntry,
 	fence func(context.Context) error,
 ) error {
-	return x.publish(ctx, e, p, fence, true, func(ctx context.Context, r *model.CleanupRun, current *model.CleanupProgress) error {
-		if next.Phase == model.CleanupSkipping {
-			if err := x.versionOutcome(ctx, e, p, model.CleanupSkipped, next.Reason); err != nil {
-				return err
-			}
+	return x.withCaller(ctx, e.Credential, func(ctx context.Context, authority Policy) error {
+		if !authority.Allows(e.Policy.ProjectKey) {
+			return &authorityRefusal{kernel.ErrForbidden}
 		}
-		for _, entry := range entries {
-			if r.DryRun && entry.Kind == model.CleanupItemEntry {
-				entry.State = model.CleanupSelected
-			}
-			created, err := x.Store.Cleanup().CreateEntry(ctx, entry)
-			if err != nil {
-				return fmt.Errorf("record cleanup selection: %w", err)
-			}
-			if created && entry.Kind == model.CleanupItemEntry {
-				if r.TotalItems == math.MaxInt64 {
-					return fmt.Errorf("cleanup selected total overflow: %w", kernel.ErrStore)
+		if _, err := x.currentRun(ctx, e); err != nil {
+			return err
+		}
+		return x.publish(ctx, e, p, fence, true, func(ctx context.Context, r *model.CleanupRun, current *model.CleanupProgress) error {
+			if next.Phase == model.CleanupSkipping {
+				if err := x.versionOutcome(ctx, e, p, model.CleanupSkipped, next.Reason); err != nil {
+					return err
 				}
-				r.TotalItems++
 			}
-		}
-		if r.DryRun && next.Phase == model.CleanupRemoving {
-			afterVersion(&next)
-		}
-		next.Revision = current.Revision
-		*current = next
-		x.settleTraversal(r, next)
-		return nil
+			for _, entry := range entries {
+				if r.DryRun && entry.Kind == model.CleanupItemEntry {
+					entry.State = model.CleanupSelected
+				}
+				created, err := x.Store.Cleanup().CreateEntry(ctx, entry)
+				if err != nil {
+					return fmt.Errorf("record cleanup selection: %w", err)
+				}
+				if created && entry.Kind == model.CleanupItemEntry {
+					if r.TotalItems == math.MaxInt64 {
+						return fmt.Errorf("cleanup selected total overflow: %w", kernel.ErrStore)
+					}
+					r.TotalItems++
+				}
+			}
+			if r.DryRun && next.Phase == model.CleanupRemoving {
+				afterVersion(&next)
+			}
+			next.Revision = current.Revision
+			*current = next
+			x.settleTraversal(r, next)
+			return nil
+		})
 	})
 }
 

@@ -128,10 +128,17 @@ func (d Deps) restorePolicyCaller(ctx context.Context, reference kernel.Credenti
 	if err := model.ValidateCleanupCredential(reference); err != nil {
 		return nil, fmt.Errorf("cleanup caller reference: %w", err)
 	}
-	authority, err := d.currentAuthority(ctx, reference.Principal())
+	var authority policy
+	err := d.Store.Tx(ctx, func(ctx context.Context) error {
+		var err error
+		authority, err = d.currentAuthority(ctx, reference.Principal())
+		return err
+	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("restore cleanup caller authority: %w", err)
 	}
+	// Bind the original context: a page reader must not retain the closed
+	// transaction used to restore it; joined mutation callers keep theirs.
 	return accessapi.WithCaller(ctx, authority.principal, authority.decider), nil
 }
 
