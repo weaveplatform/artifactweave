@@ -59,6 +59,24 @@ func TestAccCleanupReportsSQL(t *testing.T) {
 	)
 }
 
+func TestAccCleanupReportsUnavailableStoreReturns501(t *testing.T) {
+	handler := harness.Router(harness.Config{})
+	for _, tc := range []struct{ name, path string }{
+		{"exact run", cleanupReports + "policy/1"},
+		{"run view", cleanupReports + "view"},
+		{"summary", cleanupReports + "summaryReports?policyKey=policy&triggerId=1"},
+		{"policy view", "/artifactory/api/cleanup/policies/view?itemTypes=package"},
+		{"CSV", cleanupReports + "downloadReport?policyKey=policy&runId=1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			response := support.Do(t, handler, http.MethodGet, tc.path, nil, "")
+			if response.Code != http.StatusNotImplemented {
+				t.Fatal("unavailable report binding changed its answer", response.Code)
+			}
+		})
+	}
+}
+
 func cleanupReportRun(t *testing.T, f *cleanupExecutorFixture, dry bool) model.CleanupRun {
 	t.Helper()
 	return cleanupPolicyReportRun(t, f, "execution-policy", dry)
