@@ -3,6 +3,7 @@ package model
 import (
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/retention/api"
 )
 
@@ -45,19 +46,23 @@ type CleanupPolicy struct {
 	Key string
 	// Revision fences queued work across edits, disablement and recreation.
 	// It is private state, not a field of the vendor policy representation.
-	Revision        string
-	Description     string
-	CronExp         string
-	ProjectKey      string
-	ItemType        CleanupItemType
-	DurationMinutes int
-	Enabled         bool
-	SkipTrashcan    bool
-	Criteria        CleanupCriteria
-	Created         time.Time
-	CreatedBy       string
-	Updated         time.Time
-	UpdatedBy       string
+	Revision string
+	// ExecutionCredential retains the verified enabling/updating caller, never
+	// a password, bearer token or cached administrator flag. A scheduled run
+	// must refresh this reference; CreatedBy/UpdatedBy alone grant no authority.
+	ExecutionCredential kernel.CredentialReference `json:"-"`
+	Description         string
+	CronExp             string
+	ProjectKey          string
+	ItemType            CleanupItemType
+	DurationMinutes     int
+	Enabled             bool
+	SkipTrashcan        bool
+	Criteria            CleanupCriteria
+	Created             time.Time
+	CreatedBy           string
+	Updated             time.Time
+	UpdatedBy           string
 }
 
 // CleanupRun is one execution of a cleanup policy.
@@ -76,4 +81,16 @@ type CleanupRun struct {
 	CleanedItems int64
 	CleanedSize  int64
 	Report       []byte
+}
+
+// CleanupExecution is private durable run state, separate from report bytes.
+// The frozen policy and clock survive policy edits/deletion and process restart.
+// Occurrence identifies a scheduler fire; empty denotes a distinct manual run.
+// Neither this state nor its credential reference is a public report payload.
+type CleanupExecution struct {
+	RunID      int64  `json:"-"`
+	Occurrence string `json:"-"`
+	Policy     CleanupPolicy
+	Credential kernel.CredentialReference
+	At         time.Time
 }

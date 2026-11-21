@@ -24,6 +24,9 @@ type policyAuthority string
 func (a policyAuthority) Any() bool                  { return a != "none" }
 func (a policyAuthority) Allows(project string) bool { return a == "*" || string(a) == project }
 func (policyAuthority) Name() string                 { return "admin" }
+func (policyAuthority) Credential() kernel.CredentialReference {
+	return kernel.CredentialReference{Name: "admin", TokenID: "verified-test-token"}
+}
 
 func world(t *testing.T, authority string) (cleanup.Service, *inmem.Store) {
 	t.Helper()

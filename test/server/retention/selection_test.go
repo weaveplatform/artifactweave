@@ -35,6 +35,9 @@ type selectionAuthority string
 func (a selectionAuthority) Any() bool                  { return a != "none" }
 func (a selectionAuthority) Allows(project string) bool { return a == "*" || string(a) == project }
 func (selectionAuthority) Name() string                 { return "selection-admin" }
+func (selectionAuthority) Credential() kernel.CredentialReference {
+	return kernel.CredentialReference{Name: "selection-admin", TokenID: "verified-test-token"}
+}
 
 type selectionWorld struct {
 	t         *testing.T

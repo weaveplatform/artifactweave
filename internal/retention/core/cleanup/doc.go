@@ -1,4 +1,5 @@
-// Package cleanup administers package cleanup policies and selects candidates.
+// Package cleanup administers package cleanup policies, selects candidates and
+// durably admits manual and scheduled runs.
 //
 // # Role
 //
@@ -23,6 +24,14 @@
 // Selection changes no content, usage, work, or policy state. A changed lead
 // during evaluation yields no candidates; execution must revalidate snapshots.
 //
+// ManualRun commits a run, its integer trigger identity, a private frozen policy
+// and original credential reference, and its distinct work item together.
+// ScheduledRun deduplicates the logical scheduler fire and fences its final
+// queue lease in that same transaction. An enabled legacy policy whose actor
+// is only a name needs verified re-enablement before scheduled execution.
+// Stop/StopAll and emergency DisableAll request STOPPING; only the executor
+// may mark a run terminal after fencing further destructive publication.
+//
 // # References
 //
 //   - docs/implementation/plan.md#p11-projects-webhooks-retention-replication.
@@ -32,5 +41,7 @@
 // # Status
 //
 // Implemented P11 policy administration and candidate evaluation (CLN-02/03).
-// Execution, stop operations and reports retain their CLN-04/05 owners.
+// CLN-04 run admission, private snapshots and durable stop requests are present.
+// Candidate execution/progress/terminal settlement remain in progress; report
+// wire formatting retains CLN-05. These helpers do not activate public routes.
 package cleanup

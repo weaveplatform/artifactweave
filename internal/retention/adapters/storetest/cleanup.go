@@ -16,19 +16,21 @@ import (
 func runCleanup(t *testing.T, newStore Factory) {
 	t.Run("CleanupPolicies", func(t *testing.T) { testCleanupPolicies(t, newStore(t)) })
 	t.Run("CleanupRuns", func(t *testing.T) { testCleanupRuns(t, newStore(t)) })
+	t.Run("CleanupExecutions", func(t *testing.T) { testCleanupExecutions(t, newStore(t)) })
 }
 
 func cleanupPolicy(key string, item model.CleanupItemType, project string) model.CleanupPolicy {
 	return model.CleanupPolicy{
-		Key:             key,
-		Revision:        "original-" + key,
-		Description:     "policy " + key,
-		CronExp:         "0 0 2 * * ?",
-		ProjectKey:      project,
-		ItemType:        item,
-		DurationMinutes: 60,
-		Enabled:         true,
-		SkipTrashcan:    true,
+		Key:                 key,
+		Revision:            "original-" + key,
+		ExecutionCredential: kernel.CredentialReference{Name: "admin", TokenID: "original-token"},
+		Description:         "policy " + key,
+		CronExp:             "0 0 2 * * ?",
+		ProjectKey:          project,
+		ItemType:            item,
+		DurationMinutes:     60,
+		Enabled:             true,
+		SkipTrashcan:        true,
 		Criteria: model.CleanupCriteria{
 			PackageTypes: []string{
 				"npm",

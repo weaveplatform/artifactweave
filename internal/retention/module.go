@@ -9,6 +9,7 @@ import (
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/cleanup"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/port"
 )
@@ -17,6 +18,7 @@ import (
 type Store interface {
 	port.Store
 	Schedules() schedule.Store
+	WorkQueue() work.WorkQueue
 }
 
 // Deps supplies current access and repository ownership over the same store.
@@ -31,8 +33,9 @@ type Deps struct {
 
 var errNoStore = errors.New("retention: Deps.Store is required")
 
-// Module owns package policy administration and metadata-only selection.
-// Execution/reports retain their CLN-04/05 owners; archive/restore retain P16.
+// Module owns package policy administration, selection and run admission.
+// The CLN-04 executor and CLN-05 report adapter remain separate; archive/restore
+// retain P16. Construction starts no worker or scheduler.
 type Module struct{ deps Deps }
 
 // New constructs the module without starting a scheduler or doing any I/O.
@@ -47,6 +50,7 @@ func New(d Deps) (*Module, error) {
 func (m *Module) Policies() cleanup.Service {
 	d := m.deps
 	s := cleanup.Service{Store: d.Store, Schedules: d.Store.Schedules(), Repositories: d.Repositories, Zone: d.Zone, Authorize: d.currentPolicy}
+	s.Work = d.Store.WorkQueue()
 	s.PackageIndex = d.PackageIndex
 	if d.Access.Projects != nil {
 		s.Guard, s.ProjectExists = d.Access.Projects.Guard, d.Access.Projects.Exists
@@ -55,15 +59,17 @@ func (m *Module) Policies() cleanup.Service {
 }
 
 type policy struct {
-	decider accessapi.Decider
-	name    string
+	decider    accessapi.Decider
+	name       string
+	credential kernel.CredentialReference
 }
 
 func (p policy) Any() bool { return p.decider.HasProjectAdministration() }
 func (p policy) Allows(project string) bool {
 	return p.decider.ManagesProject(project, accessapi.ProjectManage)
 }
-func (p policy) Name() string { return p.name }
+func (p policy) Name() string                           { return p.name }
+func (p policy) Credential() kernel.CredentialReference { return kernel.Clone(p.credential) }
 
 func (d Deps) currentPolicy(ctx context.Context) (cleanup.Policy, error) {
 	p, err := kernel.RequireAuthenticated(ctx)
@@ -90,5 +96,5 @@ func (d Deps) currentPolicy(ctx context.Context) (cleanup.Policy, error) {
 	if decider == nil {
 		return nil, kernel.ErrForbidden
 	}
-	return policy{decider: decider, name: p.Name}, nil
+	return policy{decider: decider, name: p.Name, credential: p.CredentialReference()}, nil
 }
