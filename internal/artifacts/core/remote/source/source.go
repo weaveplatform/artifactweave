@@ -55,6 +55,10 @@ type Resource struct {
 	// SmartAQL is a closed read-only items.find operation. It uses transient
 	// metadata and the discovered peer search endpoint, never a generic POST.
 	SmartAQL string
+	// PullStorage admits only the closed read-only Storage API queries used by
+	// replication discovery. Their transient documents must never become an
+	// artifact or a reusable authority-bearing management cache entry.
+	PullStorage bool
 	// Adapter targets never change Path, which remains the authorization and
 	// cache identity. UpstreamPath is escaped and repository-relative;
 	// ExternalURL is a metadata-selected absolute URL subject to the transport's
@@ -711,6 +715,9 @@ func validateMetadataMethod(q Request) error {
 		return ErrInvalidRequest
 	}
 	if r.Method != http.MethodPost {
+		if r.PullStorage {
+			return validatePullStorageGET(r)
+		}
 		if len(r.PostBody) != 0 || r.Transient &&
 			(q.Repo.PackageType != repo.GitLFS || validateGitLFSLocksGET(r) != nil) {
 			return ErrInvalidRequest
@@ -1094,6 +1101,9 @@ func safeError(err error) error {
 }
 
 func validateAdapterContract(r Resource) error {
+	if err := validatePullStorageContract(r); err != nil {
+		return err
+	}
 	if err := validateCocoaPodsGitContract(r); err != nil {
 		return err
 	}
@@ -1142,6 +1152,43 @@ func validateAdapterContract(r Resource) error {
 		}
 	}
 	return nil
+}
+
+func validatePullStorageContract(r Resource) error {
+	if !r.PullStorage {
+		return nil
+	}
+	return validatePullStorageGET(r)
+}
+
+func validPullStorageRepresentation(r Resource) bool {
+	return r.Kind == ResourceKindMetadata && r.Method == http.MethodGet && r.Transient && r.NoCacheFile &&
+		r.ExternalURL != "" && r.CheckURL != nil && r.UpstreamPath == "" && r.EscapedPath == "" &&
+		r.Variant == "replication-storage-v1" && r.ValidateMetadata != nil && r.Validate == nil &&
+		!r.RequireSmart && r.SmartAQL == "" && len(r.PostBody) == 0 && !r.ChecksumOnly && !r.RepositoryFile &&
+		r.SelectedContent == nil && r.Checksums == (kernel.Checksums{}) && r.Range == "" &&
+		r.IfRange == "" && r.IfNoneMatch == "" && r.IfModifiedSince == ""
+}
+
+func validatePullStorageGET(r Resource) error {
+	if !validPullStorageRepresentation(r) {
+		return ErrInvalidRequest
+	}
+	u, err := url.Parse(r.ExternalURL)
+	if err != nil || u.User != nil || u.Fragment != "" || !strings.Contains(u.Path, "/api/storage/") {
+		return ErrInvalidRequest
+	}
+	query, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return ErrInvalidRequest
+	}
+	if len(query) == 0 || len(query) == 1 && len(query["properties"]) == 1 && query.Get("properties") == "" ||
+		len(query) == 3 && len(query["list"]) == 1 && query.Get("list") == "" &&
+			len(query["deep"]) == 1 && query.Get("deep") == "1" &&
+			len(query["listFolders"]) == 1 && query.Get("listFolders") == "0" {
+		return nil
+	}
+	return ErrInvalidRequest
 }
 
 func invalidAdapterURLGuard(r Resource) bool {
