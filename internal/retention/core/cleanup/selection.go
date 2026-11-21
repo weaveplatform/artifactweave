@@ -20,6 +20,10 @@ type SelectionSnapshot struct {
 	At     time.Time
 }
 
+// Snapshot drift is a reasoned candidate refusal; authority/store failures
+// retain their errors rather than becoming apparently successful empty pages.
+var errCandidateChanged = fmt.Errorf("cleanup file page changed version: %w", kernel.ErrConflict)
+
 // Selection traverses only existing index metadata, in bounded pages. Its rule
 // is immutable: editing/disabling a policy fences new run admission, not a run
 // already admitted through WithPolicy. Each page still refreshes authority and
@@ -240,7 +244,7 @@ func (s *Selection) files(ctx context.Context, ref artifactsapi.IndexVersion, pa
 		}
 		for _, file := range out {
 			if !sameVersionRevision(file.Version, ref) {
-				return fmt.Errorf("cleanup file page changed version: %w", kernel.ErrConflict)
+				return errCandidateChanged
 			}
 		}
 		return nil //nolint:wrapcheck // run names the failed cleanup transaction

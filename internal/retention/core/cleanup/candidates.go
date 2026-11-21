@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash"
 	"time"
@@ -80,10 +81,21 @@ func (s *Selection) Candidates(ctx context.Context, ref artifactsapi.IndexVersio
 		Version:        current,
 		Reason:         s.criteria.identityReason(versionIdentity(current)),
 	}
+	result, err := s.evaluateCandidates(ctx, out, page)
+	if errors.Is(err, errCandidateChanged) {
+		out.Reason = ReasonChanged
+		return out, nil
+	}
+	return result, err
+}
+
+func (s *Selection) evaluateCandidates(ctx context.Context, out CandidatePage, page kernel.Page) (CandidatePage, error) {
+	current := out.Version
 	if out.Reason != ReasonSelected {
 		return out, nil
 	}
 	var lead leadResult
+	var err error
 	if s.needsLead() {
 		lead, err = s.leads(ctx, current)
 		if err != nil {

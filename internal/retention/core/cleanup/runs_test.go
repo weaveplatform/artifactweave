@@ -91,7 +91,35 @@ func TestUnitCleanupManualAdmissionRollsBackWithQueueAndRetainsFrozenHistory(t *
 		t.Fatal("policy edit rewrote admitted execution state")
 	}
 	must(t, s.Delete(ctx, "run-policy"))
-	must(t, s.Stop(ctx, r.ID))
+	if err := s.Stop(ctx, r.ID); !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal("ended run accepted a stop after policy deletion", err)
+	}
+}
+
+func TestUnitCleanupTerminalRunsRejectIndividualStops(t *testing.T) {
+	for _, status := range []api.RunStatus{api.RunCompleted, api.RunCompletedWithErrors, api.RunStopped, api.RunFailed} {
+		t.Run(string(status), func(t *testing.T) {
+			s, db := world(t, "*")
+			s.Work = db.WorkQueue()
+			ctx := t.Context()
+			_, err := s.Create(ctx, "terminal-run", input("terminal-run", "alpha"))
+			must(t, err)
+			r, err := s.ManualRun(ctx, "terminal-run", true)
+			must(t, err)
+			r.Status, r.Ended = status, s.Now()
+			must(t, db.Cleanup().UpdateRun(ctx, r))
+			s.Work = refusingRunQueue{db.WorkQueue()}
+			if err := s.Stop(ctx, r.ID); !errors.Is(err, kernel.ErrInvalid) {
+				t.Fatal("terminal run accepted an individual stop or requeued work", err)
+			}
+			must(t, s.StopAll(ctx))
+			after, err := db.Cleanup().Run(ctx, r.ID)
+			must(t, err)
+			if !reflect.DeepEqual(r, after) {
+				t.Fatal("stop rewrote terminal history")
+			}
+		})
+	}
 }
 
 func TestUnitCleanupDisabledPolicyPermitsOnlyDryAdmission(t *testing.T) {

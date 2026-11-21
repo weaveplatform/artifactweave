@@ -226,7 +226,7 @@ func (s Service) stopRun(ctx context.Context, id int64) error {
 		return fmt.Errorf("read cleanup stop state: %w", err)
 	}
 	if r.Status.Terminal() {
-		return nil
+		return fmt.Errorf("cleanup run already ended: %w", kernel.ErrInvalid)
 	}
 	if r.Status != api.RunStopping {
 		r.Status = api.RunStopping

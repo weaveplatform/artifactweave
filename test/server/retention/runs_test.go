@@ -103,6 +103,7 @@ func cleanupRunRoutes(t *testing.T, db harness.Store) {
 	if r := run(stopped); r.Status != retapi.RunStopped || r.CleanedItems != 0 {
 		t.Fatal("registered worker did not settle stop")
 	}
+	w.request(http.MethodPut, stopPath+strconv.FormatInt(stopped, 10), "admin", `{"action":"stop"}`, http.StatusBadRequest)
 	f.preserved(t)
 	dry := admit(runPath + "?dryRun=true")
 	process()
@@ -124,7 +125,7 @@ func cleanupRunRoutes(t *testing.T, db harness.Store) {
 		_, err := db.Items().GetByID(f.ctx, id)
 		storekit.WantErr(t, err, kernel.ErrNotFound)
 	}
-	w.request(http.MethodPut, stopPath+strconv.FormatInt(actual, 10), "admin", `{"action":"stop"}`, http.StatusAccepted)
+	w.request(http.MethodPut, stopPath+strconv.FormatInt(actual, 10), "admin", `{"action":"stop"}`, http.StatusBadRequest)
 	for _, id := range []string{"0", "-1", "999999"} {
 		want := http.StatusBadRequest
 		if id == "999999" {
