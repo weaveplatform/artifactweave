@@ -19,7 +19,7 @@ func (c cleanupStore) RunPage(ctx context.Context, q port.RunListing) (port.RunP
 	out := port.RunPage{Runs: []model.CleanupRunSnapshot{}}
 	err := c.s.Do(ctx, func() error {
 		rows := []model.CleanupRunSnapshot{}
-		for _, run := range c.runs().All(nil, nil) {
+		for _, run := range c.runs().Rows {
 			e, found := c.executions().Get(run.ID)
 			if !found || !cleanupRunVisible(run, e, q) {
 				continue

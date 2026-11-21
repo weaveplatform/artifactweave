@@ -96,6 +96,7 @@ type CleanupRunSnapshot struct {
 
 // CleanupSnapshot removes private execution bindings from a history projection.
 func CleanupSnapshot(run CleanupRun, policy CleanupPolicy) CleanupRunSnapshot {
+	run.Report = nil // legacy report blobs are not part of bounded run metadata
 	policy.ExecutionCredential, policy.ProjectIncarnation = kernel.CredentialReference{}, ""
 	return CleanupRunSnapshot{Run: run, Policy: policy}
 }

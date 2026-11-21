@@ -23,9 +23,10 @@ func (c cleanupStore) OutcomeTotals(ctx context.Context, run int64) (model.Clean
 		}
 		type contentGroup struct{ count, virtual, size int64 }
 		groups := map[contentKey]contentGroup{}
-		for _, entry := range c.entries().All(func(k cleanupEntryKey, _ model.CleanupEntry) bool {
-			return k.run == run && k.kind == model.CleanupItemEntry
-		}, nil) {
+		for entryKey, entry := range c.entries().Rows {
+			if entryKey.run != run || entryKey.kind != model.CleanupItemEntry {
+				continue
+			}
 			size, hash := entry.Snapshot.Size, entry.Snapshot.Actual.SHA256
 			if entry.State == model.CleanupDeleted {
 				if entry.Removed == nil {

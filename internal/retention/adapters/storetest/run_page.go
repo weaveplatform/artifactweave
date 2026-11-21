@@ -33,7 +33,20 @@ func testCleanupRunPages(t *testing.T, store port.Store) {
 		storekit.Must(t, cs.DeletePolicy(ctx, key))
 		return r
 	}
-	g := create("r-g", "", "", model.CleanupRun{Started: storekit.At(1), TotalItems: 10, CleanedItems: 1, CleanedSize: 100, Status: api.RunCompleted, TriggeredBy: "Z"})
+	g := create(
+		"r-g",
+		"",
+		"",
+		model.CleanupRun{
+			Started:      storekit.At(1),
+			TotalItems:   10,
+			CleanedItems: 1,
+			CleanedSize:  100,
+			Status:       api.RunCompleted,
+			TriggeredBy:  "Z",
+			Report:       []byte("private legacy report"),
+		},
+	)
 	a := create(
 		"r-a",
 		"alpha",
@@ -59,6 +72,9 @@ func testCleanupRunPages(t *testing.T, store port.Store) {
 	ids := func(page port.RunPage) []int64 {
 		out := make([]int64, 0, len(page.Runs))
 		for _, snapshot := range page.Runs {
+			if len(snapshot.Run.Report) != 0 {
+				t.Fatal("run page hydrated a private report blob")
+			}
 			if snapshot.Policy.ExecutionCredential != (kernel.CredentialReference{}) || snapshot.Policy.ProjectIncarnation != "" {
 				t.Fatal("view exposed private execution binding")
 			}
