@@ -80,7 +80,7 @@ func cleanupRemovalContract(t *testing.T, db harness.Store) {
 	request(
 		http.MethodPatch,
 		"/artifactory/api/metadata/removal/"+path+"?recursiveProperties=0",
-		`{"props":{"quality":["eligible"]},"stats":{"downloadCount":4}}`,
+		`{"props":{"quality":["eligible","other"]},"stats":{"downloadCount":4}}`,
 		http.StatusNoContent,
 	)
 	it := storekit.Get[artifactmodel.Item](t)(db.Items().Get(ctx, "removal", false, path))
@@ -108,7 +108,7 @@ func cleanupRemovalContract(t *testing.T, db harness.Store) {
 		return rows[0]
 	}
 	principal := storekit.Get[kernel.Principal](t)(access.Authenticator.Basic(ctx, "cleanup-worker", "pw"))
-	selected := artifactsapi.RemovalRequest{Credential: principal.CredentialReference(), Item: snapshot(), PropertyNames: []string{"quality"}}
+	selected := artifactsapi.RemovalRequest{Credential: principal.CredentialReference(), Item: snapshot(), Properties: map[string][]string{"quality": {"eligible"}}}
 	revalidate := func(ctx context.Context) error {
 		current, err := artifactAPI.PackageIndex.Version(ctx, ref, 0)
 		if err != nil {

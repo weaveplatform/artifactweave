@@ -63,8 +63,14 @@ func newRemovalFixture(t *testing.T) *removalFixture {
 		t.Fatal("selected file fixture missing")
 	}
 	w := &removalFixture{
-		db: db, items: items, repo: c,
-		request: api.RemovalRequest{Credential: kernel.CredentialReference{Name: "caller", TokenID: "original-token"}, Item: rows[0], PropertyNames: []string{"quality", "absent"}},
+		db:    db,
+		items: items,
+		repo:  c,
+		request: api.RemovalRequest{
+			Credential: kernel.CredentialReference{Name: "caller", TokenID: "original-token"},
+			Item:       rows[0],
+			Properties: map[string][]string{"quality": {"eligible"}, "absent": {"value"}},
+		},
 		decider: &accessapitest.Decider{AllowsFunc: func(rt accessapi.ResourceType, r accessapi.Repo, _ string, want accessapi.Actions) bool {
 			return rt == accessapi.ResourceArtifact && r.Key == c.Key && r.Class == string(c.Class) && want == accessapi.ActionDelete
 		}},
@@ -178,6 +184,34 @@ func TestUnitGuardedRemovalRefreshesCredentialAfterSelection(t *testing.T) {
 	storekit.WantErr(t, err, kernel.ErrBadCredentials)
 	_, err = w.db.Items().GetByID(ctx, w.request.Item.ID)
 	storekit.Must(t, err)
+}
+
+func TestUnitGuardedRemovalUsesTheSelectedPropertyProjection(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		stored model.Properties
+		query  map[string][]string
+	}{
+		{"included value with unrelated sibling", model.Properties{"quality": {"eligible", "other"}}, map[string][]string{"quality": {"eligible"}}},
+		{"excluded value absent from an existing key", model.Properties{"quality": {"good"}}, map[string][]string{"quality": {"blocked"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w, ctx := newRemovalFixture(t), t.Context()
+			before := w.request.Item
+			storekit.Must(t, w.db.Items().SetProperties(ctx, before.ID, tc.stored, before.PropertiesModified))
+			rows, _, err := pkgindex.NewReader(w.db, nil).Files(ctx, before.Version, tc.query, kernel.Page{Limit: 1})
+			storekit.Must(t, err)
+			if len(rows) != 1 {
+				t.Fatal("selected item missing")
+			}
+			w.request.Item, w.request.Properties = rows[0], tc.query
+			result, err := w.service.Remove(ctx, w.request, w.revalidate, w.record)
+			storekit.Must(t, err)
+			if result.Files != 1 || result.Items[0].ID != before.ID {
+				t.Fatal("unchanged eligible property projection was refused")
+			}
+		})
+	}
 }
 
 func TestUnitGuardedRemovalRollback(t *testing.T) {

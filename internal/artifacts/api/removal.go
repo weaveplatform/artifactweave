@@ -7,13 +7,13 @@ import (
 )
 
 // RemovalRequest names one selected indexed file, never a recursive subtree.
-// PropertyNames includes every property used by selection, including names that
-// were absent. Credential is a private reference to the original verified caller.
+// Properties repeats the exact key/value projection used by selection, including
+// requested values that were absent. Credential is the original caller reference.
 type RemovalRequest struct {
-	Credential    kernel.CredentialReference
-	Item          IndexFile
-	PropertyNames []string
-	SkipTrashcan  bool
+	Credential   kernel.CredentialReference
+	Item         IndexFile
+	Properties   map[string][]string
+	SkipTrashcan bool
 }
 
 // RemovedItem records an actual committed candidate or format-owned companion.

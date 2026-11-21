@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"hash"
 	"math"
-	"slices"
 
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -107,12 +106,7 @@ func (x Executor) removeStep(ctx context.Context, e model.CleanupExecution, p mo
 	if err != nil {
 		return fmt.Errorf("read next cleanup intent: %w", err)
 	}
-	names := make([]string, 0, len(s.properties))
-	for name := range s.properties {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	_, err = x.Removal.Remove(ctx, artifactsapi.RemovalRequest{Credential: e.Credential, Item: entry.Snapshot, PropertyNames: names, SkipTrashcan: e.Policy.SkipTrashcan},
+	_, err = x.Removal.Remove(ctx, artifactsapi.RemovalRequest{Credential: e.Credential, Item: entry.Snapshot, Properties: s.properties, SkipTrashcan: e.Policy.SkipTrashcan},
 		func(ctx context.Context) error { return x.unchangedVersion(ctx, p, s) },
 		func(ctx context.Context, result artifactsapi.RemovalResult) error {
 			return x.publish(ctx, e, p, fence, true, func(ctx context.Context, r *model.CleanupRun, _ *model.CleanupProgress) error {

@@ -46,13 +46,13 @@ func validate(req api.RemovalRequest) error {
 	if _, _, _, err := kernel.SplitItemPath(f.Path); err != nil {
 		return fmt.Errorf("removal item path: %w", err)
 	}
-	for _, name := range req.PropertyNames {
+	for name := range req.Properties {
 		if err := model.ValidatePropertyKey(name); err != nil {
 			return fmt.Errorf("removal property name: %w: %w", kernel.ErrInvalid, err)
 		}
 	}
 	for name := range f.Properties {
-		if !slices.Contains(req.PropertyNames, name) {
+		if _, ok := req.Properties[name]; !ok {
 			return fmt.Errorf("removal snapshot omits a property selector: %w", kernel.ErrInvalid)
 		}
 	}
@@ -184,10 +184,12 @@ func (r remover) current(ctx context.Context, req api.RemovalRequest) error {
 		!current.PropertiesModified.Equal(expected.PropertiesModified) || !stats.LastDownloaded.Equal(expected.LastDownloaded) {
 		return fmt.Errorf("selected removal item changed: %w", kernel.ErrConflict)
 	}
-	selected := make(map[string][]string, len(req.PropertyNames))
-	for _, name := range req.PropertyNames {
-		if values, ok := properties[name]; ok {
-			selected[name] = values
+	selected := make(map[string][]string, len(req.Properties))
+	for name, wanted := range req.Properties {
+		for _, value := range properties[name] {
+			if slices.Contains(wanted, value) {
+				selected[name] = append(selected[name], value)
+			}
 		}
 	}
 	if !maps.EqualFunc(selected, expected.Properties, slices.Equal[[]string]) {
