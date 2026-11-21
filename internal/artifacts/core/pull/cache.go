@@ -152,6 +152,11 @@ func (s Source) Fetch(ctx context.Context, selected api.PullItem, publication ap
 			if err != nil {
 				return err
 			}
+			if publication.Record != nil {
+				if err := publication.Record(ctx, out); err != nil {
+					return fmt.Errorf("record selected pull cache: %w", err)
+				}
+			}
 			return publication.Fence(ctx) //nolint:wrapcheck // the worker owns the last local fence
 		})
 	})

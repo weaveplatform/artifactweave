@@ -199,6 +199,42 @@ func fileInfo(path string) string {
 
 const listQuery = "?deep=1&list=&listFolders=0&mdTimestamps=1"
 
+func TestAccPullStorageAbsenceNeedsExistingNamespaceAndExactFileMiss(t *testing.T) {
+	for _, mode := range []string{"absent", "present", "missing-namespace", "denied", "offline", "virtual-omission"} {
+		t.Run(mode, func(t *testing.T) {
+			w := fixture(t)
+			switch mode {
+			case "present":
+				w.set("/selected/a", fileInfo("selected/a"))
+			case "missing-namespace":
+				w.documents[""] = response{status: http.StatusNotFound}
+			case "denied":
+				w.documents["/selected/a"] = response{status: http.StatusForbidden}
+			case "offline":
+				offline := true
+				w.request.Repo.Offline = &offline
+				if err := w.db.Repos().Update(t.Context(), w.request.Repo); err != nil {
+					t.Fatal(err)
+				}
+			case "virtual-omission":
+				w.documents["/selected/a"] = response{status: http.StatusBadRequest}
+			}
+			reader := w.reader("selected")
+			absent, err := reader.Absent(t.Context(), "selected/a")
+			if mode == "absent" {
+				if err != nil || !absent {
+					t.Fatal("exact existing-namespace miss was not proven", err)
+				}
+			} else if absent || mode != "present" && err == nil {
+				t.Fatal("offline, namespace loss, denial or omission authorized cache deletion", err)
+			}
+			if mode == "offline" && w.count() != 0 {
+				t.Fatal("replication absence check bypassed offline controls")
+			}
+		})
+	}
+}
+
 func TestAccFilesVerifyOrdinaryStorageMetadataAndResumeBoundedPages(t *testing.T) {
 	w := fixture(t)
 	w.set("/selected", `{"repo":"source","path":"/selected","children":[]}`)

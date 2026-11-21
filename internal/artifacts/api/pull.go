@@ -45,7 +45,19 @@ type PullItem struct {
 // is last in a publication transaction, after all domain and event effects.
 type PullPublication struct {
 	Check func(context.Context) error
-	Fence func(context.Context) error
+	// Record joins successful cache/property publication before Fence. The
+	// direction driver advances its durable selected intent here atomically.
+	Record func(context.Context, PullCached) error
+	Fence  func(context.Context) error
+}
+
+// PullCacheCandidate binds all current representations and format companions
+// of one selected canonical cache path. It grants no upstream or Delete right.
+type PullCacheCandidate struct {
+	Repository PullRepository `json:"repository"`
+	Selection  PullSelection  `json:"selection"`
+	Path       string         `json:"path"`
+	Version    string         `json:"version"`
 }
 
 // PullCached identifies an actual P9 representation, including raw protocol
@@ -72,4 +84,10 @@ type PullSource interface {
 	// the exact committed representation, then runs checkpoint work. The
 	// callback must perform no network I/O and end with its ownership fence.
 	WithCurrent(context.Context, PullCached, func(context.Context) error) error
+	// CachedItems reads a bounded current cache page without contacting peers.
+	CachedItems(context.Context, PullRepository, PullSelection, kernel.Page) ([]PullCacheCandidate, string, error)
+	// Remove requires exact upstream absence, current Delete on the normal
+	// removal group, and unchanged cache facts. Record receives actual paths
+	// after cache/item/index/event effects, before the final execution fence.
+	Remove(context.Context, PullCacheCandidate, PullPublication, func(context.Context, []string) error) ([]string, error)
 }

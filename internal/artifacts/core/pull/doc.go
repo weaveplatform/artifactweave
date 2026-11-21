@@ -18,6 +18,9 @@
 // mapped canonical selection, immutable per-entry snapshots, ordinary verified
 // cache receipts and current-authority checkpoint transactions. Selected user
 // properties share cache ownership rules and preserve local annotations.
+// Cache candidates pin all path representations and format-owned companions;
+// exact source absence permits local removal/checkpoint work under the final
+// execution fence, without an upstream mutation.
 //
 // # Invariants
 //
@@ -34,7 +37,7 @@
 // # Status
 //
 // The peer adapter/catalog and Generic/Maven cache admission are implemented,
-// including virtual upstream discovery. Durable federation pull progress,
-// deletion reconciliation and native protocol qualification remain integration
+// including virtual upstream discovery and verified cache reconciliation.
+// Durable federation pull progress and native protocol qualification remain integration
 // work; a selected or cached snapshot alone does not complete a logical run.
 package pull

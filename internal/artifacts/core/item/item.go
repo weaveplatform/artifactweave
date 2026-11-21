@@ -122,6 +122,9 @@ type Target struct {
 	Repo   repo.Config
 	Cached bool
 	Path   string
+	// ExactCache limits retrieval invalidation to this file and its normal
+	// format companions. It is not recursive user deletion or a folder target.
+	ExactCache bool
 	// CheckCurrent rechecks the original client's operation inside publication,
 	// using its transaction context and the actual admitted path. The owning
 	// adapter supplies it for client writes; server-derived metadata keeps its
@@ -1061,7 +1064,7 @@ func (s *Service) remove(
 			}
 			if _, err := s.invalidateCache(
 				ctx,
-				Target{Repo: t.Repo, Cached: t.Cached, Path: sc.FullPath()},
+				Target{Repo: t.Repo, Cached: t.Cached, Path: sc.FullPath(), ExactCache: t.ExactCache},
 				by,
 			); err != nil {
 				return err

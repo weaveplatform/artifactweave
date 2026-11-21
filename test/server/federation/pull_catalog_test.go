@@ -92,7 +92,7 @@ func qualifyPullCatalogProcesses(t *testing.T, driver string, virtual, populate 
 			w.request(w.source, http.MethodPut, "/artifactory/api/repositories/pull-remote", string(configuration), http.StatusOK)
 			actions := accessapi.ActionRead
 			if populate {
-				actions |= accessapi.ActionWrite | accessapi.ActionAnnotate
+				actions |= accessapi.ActionWrite | accessapi.ActionAnnotate | accessapi.ActionDelete
 			}
 			if err = w.runtime.Store.Permissions().Create(t.Context(), accesstest.Permission{Name: "pull-current-reader", Resources: map[accessapi.ResourceType]accesstest.Resource{
 				accessapi.ResourceArtifact: {
@@ -213,6 +213,39 @@ func qualifyPulledCache(t *testing.T, w *pushWorld, ctx context.Context, catalog
 		t.Fatal("selected properties did not accompany cache progress", err)
 	}
 	qualifyPulledProperties(t, w, ctx, catalog, selected, publication, peerKey, path)
+	qualifyPulledRemoval(t, w, ctx, catalog, selected, publication, peerKey, path)
+}
+
+func qualifyPulledRemoval(t *testing.T, w *pushWorld, ctx context.Context, catalog artifactsapi.PullSource,
+	selected artifactsapi.PullItem, grant artifactsapi.PullPublication, peerKey, path string,
+) {
+	t.Helper()
+	candidates, next, err := catalog.CachedItems(ctx, selected.Repository, selected.Selection, kernel.Page{Limit: 10})
+	if err != nil || next != "" || len(candidates) != 1 || candidates[0].Path != path {
+		t.Fatal("real cache deletion candidate", err)
+	}
+	w.request(w.target, http.MethodDelete, itemRoute("target", path), "", http.StatusNoContent)
+	refused := grant
+	refused.Fence = func(context.Context) error { return kernel.ErrConflict }
+	if _, err := catalog.Remove(ctx, candidates[0], refused, nil); !errors.Is(err, kernel.ErrConflict) {
+		t.Fatal("expired worker deleted real cache state", err)
+	}
+	if _, err := w.runtime.Store.Items().Get(ctx, "pull-remote", true, path); err != nil {
+		t.Fatal("lost lease did not roll back SQL cache deletion", err)
+	}
+	paths, err := catalog.Remove(ctx, candidates[0], grant, func(tx context.Context, paths []string) error {
+		if !w.runtime.Store.InTx(tx) || len(paths) == 0 {
+			t.Fatal("cache deletion checkpoint escaped SQL transaction")
+		}
+		return w.runtime.Store.Settings().Put(tx, "verified-pull-removal", true)
+	})
+	if err != nil || len(paths) == 0 {
+		t.Fatal("verified SQL cache deletion", err)
+	}
+	w.request(w.source, http.MethodGet, itemRoute("pull-remote-cache", path), "", http.StatusNotFound)
+	if count := w.bridge.count(http.MethodDelete, "/artifactory/"+peerKey+"/"+path); count != 0 {
+		t.Fatal("cache reconciliation issued an upstream DELETE")
+	}
 }
 
 func qualifyPulledProperties(t *testing.T, w *pushWorld, ctx context.Context, catalog artifactsapi.PullSource,

@@ -13,11 +13,44 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pull"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artifactory "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 )
 
 const metadataLimit = 64 << 20
+
+// Absent requires an existing namespace and an exact item-info 404. A virtual
+// listing can omit a file for permission reasons, so it never proves deletion.
+func (r *Reader) Absent(ctx context.Context, path string) (bool, error) {
+	if path == "" || !within(r.root, path) {
+		return false, source.ErrInvalidRequest
+	}
+	anchor, err := r.inspectRepository(ctx)
+	if err != nil {
+		if errors.Is(err, kernel.ErrNotFound) && !errors.Is(err, source.ErrAssumedOffline) {
+			return false, source.ErrSuperseded
+		}
+		return false, err
+	}
+	if !anchor.Folder {
+		return false, source.ErrInvalidResult
+	}
+	_, err = r.info(ctx, path)
+	if err == nil {
+		return false, nil
+	}
+	if errors.Is(err, source.ErrAssumedOffline) || unsupportedInfo(err) {
+		return false, source.ErrUnsupported
+	}
+	if !errors.Is(err, kernel.ErrNotFound) {
+		return false, err
+	}
+	if err := r.Revalidate(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
+}
 
 // Inspect verifies computed facts at the exact configured repository and path.
 // Download URIs and original/client-declared checksums convey no authority.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	artifactevents "github.com/weaveplatform/artifactweave/internal/artifacts/core/events"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // Zap expires upstream metadata and clears negative state while retaining all
@@ -44,6 +45,9 @@ func (s *Service) invalidateCache(ctx context.Context, t Target, by string) (int
 	if !t.Cached || t.Repo.Class != repo.Remote {
 		return 0, nil
 	}
+	if t.ExactCache {
+		return s.invalidateExactCache(ctx, t, by)
+	}
 	raw, err := artifactevents.RawCache(ctx, s.Store, t.Repo.Key, t.Path)
 	if err != nil {
 		return 0, fmt.Errorf("item: capture invalidated cache: %w", err)
@@ -58,4 +62,33 @@ func (s *Service) invalidateCache(ctx context.Context, t Target, by string) (int
 		}
 	}
 	return n, nil
+}
+
+func (s *Service) invalidateExactCache(ctx context.Context, t Target, by string) (int64, error) {
+	if _, err := s.Store.RemoteCache().Source(ctx, t.Repo.Key); err != nil {
+		return 0, fmt.Errorf("item: guard exact cache deletion: %w", err)
+	}
+	page := kernel.Page{Limit: 64}
+	var count int64
+	for {
+		entries, next, err := s.Store.RemoteCache().Exact(ctx, t.Repo.Key, t.Path, page)
+		if err != nil {
+			return 0, fmt.Errorf("item: read exact cache deletion: %w", err)
+		}
+		for _, entry := range entries {
+			if err := s.Store.RemoteCache().Evict(ctx, entry.Token); err != nil {
+				return 0, fmt.Errorf("item: evict exact cache deletion: %w", err)
+			}
+			if entry.ItemID == 0 && entry.Blob.Checksums.SHA256 != "" {
+				if err := s.emitRawDeleted(ctx, entry, by); err != nil {
+					return 0, err
+				}
+			}
+			count++
+		}
+		if next == "" {
+			return count, nil
+		}
+		page.After = next
+	}
 }

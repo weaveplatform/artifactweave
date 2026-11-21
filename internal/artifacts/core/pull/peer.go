@@ -27,6 +27,9 @@ type Peer interface {
 	Binding() string
 	CheckRead(context.Context, string) error
 	Inspect(context.Context, string) (Entry, error)
+	// Absent proves an exact item-info miss under an existing namespace.
+	// Offline, denied, filtered omission and missing namespaces are not absence.
+	Absent(context.Context, string) (bool, error)
 	Files(context.Context, kernel.Page) ([]Entry, string, error)
 	Properties(context.Context, string) (model.Properties, error)
 	Revalidate(context.Context) error
