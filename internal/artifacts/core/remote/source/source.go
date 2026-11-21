@@ -1187,13 +1187,22 @@ func validatePullStorageGET(r Resource) error {
 	if err != nil {
 		return ErrInvalidRequest
 	}
-	if len(query) == 0 || len(query) == 1 && len(query["properties"]) == 1 && query.Get("properties") == "" ||
-		len(query) == 3 && len(query["list"]) == 1 && query.Get("list") == "" &&
-			len(query["deep"]) == 1 && query.Get("deep") == "1" &&
-			len(query["listFolders"]) == 1 && query.Get("listFolders") == "0" {
+	if len(query) == 0 || len(query) == 1 && len(query["properties"]) == 1 && query.Get("properties") == "" || validPullStorageList(query) {
 		return nil
 	}
 	return ErrInvalidRequest
+}
+
+func validPullStorageList(query url.Values) bool {
+	if len(query) != 3 && len(query) != 4 {
+		return false
+	}
+	if len(query) == 4 && (len(query["mdTimestamps"]) != 1 || query.Get("mdTimestamps") != "1") {
+		return false
+	}
+	return len(query["list"]) == 1 && query.Get("list") == "" &&
+		len(query["deep"]) == 1 && (query.Get("deep") == "0" || query.Get("deep") == "1") &&
+		len(query["listFolders"]) == 1 && query.Get("listFolders") == "0"
 }
 
 func invalidAdapterURLGuard(r Resource) bool {

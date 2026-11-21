@@ -29,7 +29,10 @@ func TestUnitPullStorageAdmitsOnlyClosedTransientReadOperations(t *testing.T) {
 	for _, test := range []struct {
 		name, query string
 	}{
-		{"info", ""}, {"properties", "?properties"}, {"files", "?list&deep=1&listFolders=0"},
+		{"info", ""},
+		{"properties", "?properties"},
+		{"files", "?list&deep=1&listFolders=0"},
+		{"file-metadata-list", "?list&deep=0&listFolders=0&mdTimestamps=1"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			q := pullStorageRequest(t)
@@ -67,6 +70,9 @@ func TestUnitPullStorageAdmitsOnlyClosedTransientReadOperations(t *testing.T) {
 		{"other-operation", func(r *source.Resource) { r.ExternalURL += "?stats" }},
 		{"mixed-modes", func(r *source.Resource) { r.ExternalURL += "?list&deep=1&listFolders=0&properties" }},
 		{"duplicate-query", func(r *source.Resource) { r.ExternalURL += "?properties&properties" }},
+		{"unsupported-depth", func(r *source.Resource) { r.ExternalURL += "?list&deep=2&listFolders=0" }},
+		{"extra-list-mode", func(r *source.Resource) { r.ExternalURL += "?list&deep=1&listFolders=0&extra=1" }},
+		{"duplicate-metadata-flags", func(r *source.Resource) { r.ExternalURL += "?list&deep=1&listFolders=0&mdTimestamps=1&mdTimestamps=1" }},
 		{"invalid-query", func(r *source.Resource) { r.ExternalURL += "?properties=%xx" }},
 		{"other-api", func(r *source.Resource) { r.ExternalURL = "https://peer.example/artifactory/api/security/users" }},
 		{"embedded-auth", func(r *source.Resource) {

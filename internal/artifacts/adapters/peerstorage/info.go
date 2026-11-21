@@ -13,6 +13,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pull"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artifactory "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 )
 
@@ -21,6 +22,14 @@ const metadataLimit = 64 << 20
 // Inspect verifies computed facts at the exact configured repository and path.
 // Download URIs and original/client-declared checksums convey no authority.
 func (r *Reader) Inspect(ctx context.Context, path string) (pull.Entry, error) {
+	entry, err := r.info(ctx, path)
+	if path != "" && unsupportedInfo(err) {
+		return r.exactListedFile(ctx, path)
+	}
+	return entry, err
+}
+
+func (r *Reader) info(ctx context.Context, path string) (pull.Entry, error) {
 	var entry pull.Entry
 	err := r.read(ctx, path, nil, func(ctx context.Context, body io.Reader) error {
 		var err error
@@ -111,6 +120,18 @@ func (r *Reader) Properties(ctx context.Context, path string) (model.Properties,
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, kernel.ErrNotFound) {
+			// 7.x answers an existing item with no properties as 404 too.
+			// Confirm that exact file still exists under current authority;
+			// a missing/denied file can never authorize an empty sync snapshot.
+			entry, inspectErr := r.Inspect(ctx, path)
+			if inspectErr == nil && !entry.Folder {
+				return model.Properties{}, nil
+			}
+			if inspectErr != nil {
+				return nil, inspectErr
+			}
+		}
 		return nil, err
 	}
 	return properties, nil

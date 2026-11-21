@@ -197,7 +197,7 @@ func fileInfo(path string) string {
 	)
 }
 
-const listQuery = "?deep=1&list=&listFolders=0"
+const listQuery = "?deep=1&list=&listFolders=0&mdTimestamps=1"
 
 func TestAccFilesVerifyOrdinaryStorageMetadataAndResumeBoundedPages(t *testing.T) {
 	w := fixture(t)
@@ -267,6 +267,29 @@ func TestAccPullDiscoveryAcceptsTheConfiguredUpstreamsCacheAliasMetadata(t *test
 	}
 }
 
+func TestAccPullDiscoveryTreatsReservedAndEncodedLookingNamesAsLiteralSegments(t *testing.T) {
+	for _, path := range []string{"a;b?c#d% space+é.bin", "%2e%2e/file.bin", "%2F/not-an-absolute-path.bin"} {
+		t.Run(path, func(t *testing.T) {
+			w := fixture(t)
+			encoded, err := json.Marshal(map[string]any{"files": []map[string]any{{"uri": "/" + path, "folder": false}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.set(listQuery, string(encoded))
+			w.set("/"+path, fileInfo(path))
+			files, next, err := w.reader("").Files(t.Context(), kernel.Page{})
+			if err != nil || next != "" || len(files) != 1 || files[0].Path != path {
+				t.Fatalf("literal selected name %+v %q %v", files, next, err)
+			}
+			w.mu.Lock()
+			defer w.mu.Unlock()
+			if len(w.requests) != 3 || w.requests[2] != "/"+path {
+				t.Fatal("a decoded name changed repository/path/query authority")
+			}
+		})
+	}
+}
+
 func TestAccPullMetadataRejectsMalformedOrEscapingListings(t *testing.T) {
 	for _, test := range []struct{ name, body string }{
 		{"missing-files", `{}`},
@@ -282,7 +305,6 @@ func TestAccPullMetadataRejectsMalformedOrEscapingListings(t *testing.T) {
 		{"untyped", `{"files":[{"uri":"/a"}]}`},
 		{"relative", `{"files":[{"uri":"a","folder":false}]}`},
 		{"escape", `{"files":[{"uri":"/../a","folder":false}]}`},
-		{"encoded-escape", `{"files":[{"uri":"/%2e%2e/a","folder":false}]}`},
 		{"duplicate-entry", `{"files":[{"uri":"/a","folder":false},{"uri":"/a","folder":false}]}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -350,6 +372,30 @@ func TestAccPullMetadataRejectsIncompleteFileFacts(t *testing.T) {
 	}
 }
 
+func TestAccPullProperties404RequiresAnExistingReadableFile(t *testing.T) {
+	for _, mode := range []string{"no-properties", "deleted", "denied"} {
+		t.Run(mode, func(t *testing.T) {
+			w := fixture(t)
+			if mode == "no-properties" {
+				w.set("/a.bin", fileInfo("a.bin"))
+			}
+			if mode == "denied" {
+				w.mu.Lock()
+				w.documents["/a.bin"] = response{status: http.StatusForbidden}
+				w.mu.Unlock()
+			}
+			properties, err := w.reader("").Properties(t.Context(), "a.bin")
+			if mode == "no-properties" {
+				if err != nil || properties == nil || len(properties) != 0 {
+					t.Fatalf("existing empty properties: %+v %v", properties, err)
+				}
+			} else if err == nil || properties != nil {
+				t.Fatal("unverified file absence became an empty property sync", err)
+			}
+		})
+	}
+}
+
 func TestAccPullDiscoveryRejectsInvalidBindingsAndEscapingSelectedPaths(t *testing.T) {
 	for _, test := range []struct {
 		name string
@@ -370,7 +416,7 @@ func TestAccPullDiscoveryRejectsInvalidBindingsAndEscapingSelectedPaths(t *testi
 	}
 	w := fixture(t)
 	r := w.reader("selected")
-	for _, path := range []string{"other/file", "selected/../other", "selected/%2e%2e/file"} {
+	for _, path := range []string{"other/file", "selected/../other"} {
 		if _, err := r.Inspect(t.Context(), path); err == nil || w.count() != 0 {
 			t.Fatalf("escaping selected path %q reached network: %v requests=%d", path, err, w.count())
 		}
@@ -558,5 +604,85 @@ func TestAccPullDiscoveryLayoutRootScanRequiresActualRootRead(t *testing.T) {
 	}
 	if err = r.CheckRead(t.Context(), "other/file"); !errors.Is(err, source.ErrDenied) {
 		t.Fatal("selection escaped canonical scope", err)
+	}
+}
+
+func listFacts(paths ...string) string {
+	rows := make([]map[string]any, 0, len(paths))
+	for _, path := range paths {
+		rows = append(rows, map[string]any{
+			"uri": "/" + path, "folder": false, "size": 4, "sha2": strings.Repeat("a", 64),
+			"lastModified": "2026-11-20T10:00:00Z", "mdTimestamps": map[string]string{"properties": "2026-11-20T11:00:00Z"},
+		})
+	}
+	raw, _ := json.Marshal(map[string]any{"files": rows})
+	return string(raw)
+}
+
+func virtualInfo(w *world, paths ...string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for _, path := range paths {
+		w.documents[path] = response{status: http.StatusBadRequest}
+	}
+}
+
+func TestAccPullVirtualStorageUsesCompleteListFactsAndExactFileLookup(t *testing.T) {
+	w := fixture(t)
+	virtualInfo(w, "", "/a", "/b", "/missing")
+	w.set(listQuery, listFacts("b", "a"))
+	w.set("?deep=0&list=&listFolders=0&mdTimestamps=1", listFacts("b", "a"))
+	r := w.reader("")
+	files, next, err := r.Files(t.Context(), kernel.Page{Limit: 1})
+	if err != nil || len(files) != 1 || files[0].Path != "a" || files[0].Checksums.SHA256 != strings.Repeat("a", 64) || files[0].Size != 4 || next == "" {
+		t.Fatalf("virtual computed facts %+v next=%q err=%v", files, next, err)
+	}
+	if !files[0].Updated.Equal(time.Date(2026, 11, 20, 11, 0, 0, 0, time.UTC)) {
+		t.Fatal("virtual property timestamp was lost")
+	}
+	last, final, err := r.Files(t.Context(), kernel.Page{Limit: 1, After: next})
+	if err != nil || len(last) != 1 || last[0].Path != "b" || final != "" {
+		t.Fatalf("virtual continuation %+v %q %v", last, final, err)
+	}
+	inspected, err := r.Inspect(t.Context(), "b")
+	if err != nil || inspected != last[0] {
+		t.Fatalf("exact virtual file %+v %v", inspected, err)
+	}
+	properties, err := r.Properties(t.Context(), "b")
+	if err != nil || properties == nil || len(properties) != 0 {
+		t.Fatal("existing virtual file with no properties", err)
+	}
+	if _, err = r.Inspect(t.Context(), "missing"); !errors.Is(err, source.ErrSuperseded) || errors.Is(err, kernel.ErrNotFound) {
+		t.Fatal("filtered listing omission became authoritative file absence", err)
+	}
+}
+
+func TestAccPullVirtualStorageRefusesIncompleteComputedFactsAndAuthFailures(t *testing.T) {
+	for _, mode := range []string{"missing-facts", "bad-digest", "negative-size", "forbidden"} {
+		t.Run(mode, func(t *testing.T) {
+			w := fixture(t)
+			virtualInfo(w, "")
+			body := listFacts("a")
+			switch mode {
+			case "missing-facts":
+				body = `{"files":[{"uri":"/a","folder":false}]}`
+			case "bad-digest":
+				body = strings.Replace(body, strings.Repeat("a", 64), strings.Repeat("z", 64), 1)
+			case "negative-size":
+				body = strings.Replace(body, `"size":4`, `"size":-1`, 1)
+			case "forbidden":
+				w.mu.Lock()
+				w.documents[""] = response{status: http.StatusForbidden}
+				w.mu.Unlock()
+			}
+			w.set(listQuery, body)
+			files, next, err := w.reader("").Files(t.Context(), kernel.Page{})
+			if err == nil || len(files) != 0 || next != "" {
+				t.Fatalf("unverified virtual selection %+v %q %v", files, next, err)
+			}
+			if mode == "forbidden" && w.count() != 1 {
+				t.Fatal("authorization failure fell back to another peer operation")
+			}
+		})
 	}
 }

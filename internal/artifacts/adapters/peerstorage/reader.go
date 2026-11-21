@@ -50,7 +50,7 @@ func New(ctx context.Context, service *source.Service, request source.Request,
 	if err != nil {
 		return nil, fmt.Errorf("identify pull peer: %w", err)
 	}
-	if _, err = peer.StorageURL(root, nil); err != nil {
+	if _, err = peerStorageURL(peer, root, nil); err != nil {
 		return nil, fmt.Errorf("address pull root: %w", err)
 	}
 	request.Resource = source.Resource{
@@ -134,7 +134,7 @@ func (r *Reader) read(ctx context.Context, path string, query url.Values,
 func metadataRequest(q source.Request, peer remote.SmartPeer, path string, query url.Values,
 	decode func(context.Context, io.Reader) error,
 ) (source.Request, error) {
-	target, err := peer.StorageURL(path, query)
+	target, err := peerStorageURL(peer, path, query)
 	if err != nil {
 		return source.Request{}, fmt.Errorf("address pull metadata: %w", err)
 	}
