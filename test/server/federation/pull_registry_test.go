@@ -25,11 +25,19 @@ import (
 )
 
 func TestAccSinglePullRegistryProcessesSQLite(t *testing.T) {
-	qualifyPullRegistryProcesses(t, "sqlite")
+	qualifyPullRegistryProcesses(t, "sqlite", false)
 }
 
 func TestAccSinglePullRegistryProcessesPostgres(t *testing.T) {
-	qualifyPullRegistryProcesses(t, "postgres")
+	qualifyPullRegistryProcesses(t, "postgres", false)
+}
+
+func TestAccSinglePullRegistryVirtualProcessesSQLite(t *testing.T) {
+	qualifyPullRegistryProcesses(t, "sqlite", true)
+}
+
+func TestAccSinglePullRegistryVirtualProcessesPostgres(t *testing.T) {
+	qualifyPullRegistryProcesses(t, "postgres", true)
 }
 
 func registryDigest(body []byte) string {
@@ -105,7 +113,7 @@ func helmPullLayer(t *testing.T) []byte {
 	return data.Bytes()
 }
 
-func qualifyPullRegistryProcesses(t *testing.T, backend string) {
+func qualifyPullRegistryProcesses(t *testing.T, backend string, virtual bool) {
 	t.Helper()
 	for _, kind := range []string{"docker", "oci", "helmoci"} {
 		t.Run(kind, func(t *testing.T) {
@@ -164,8 +172,17 @@ func qualifyPullRegistryProcesses(t *testing.T, backend string) {
 				}
 				nativeRegistryRequest(t, w, w.target, http.MethodPut, "/artifactory/api/docker/target/v2/team/image/manifests/multi", indexType, index, http.StatusCreated)
 			}
+			upstreamKey := "target"
+			if virtual {
+				upstreamKey = "target-view"
+				body, err := json.Marshal(map[string]any{"rclass": "virtual", "packageType": kind, "repositories": []string{"target"}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				w.request(w.target, http.MethodPut, "/artifactory/api/repositories/"+upstreamKey, string(body), http.StatusOK)
+			}
 			configuration, err := json.Marshal(map[string]any{
-				"rclass": "remote", "packageType": kind, "url": w.bridge.URL + "/artifactory/api/docker/target", "username": "receiver", "password": "pw",
+				"rclass": "remote", "packageType": kind, "url": w.bridge.URL + "/artifactory/api/docker/" + upstreamKey, "username": "receiver", "password": "pw",
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -205,7 +222,27 @@ func qualifyPullRegistryProcesses(t *testing.T, backend string) {
 					t.Fatal("native selected file has no verified cache receipt", item.Path, item.Outcome, item.Reason)
 				}
 			}
-			if index != nil {
+			manifestRoute := "/artifactory/api/docker/" + upstreamKey + "/v2/team/image/manifests/" + tag
+			layerRoute := "/artifactory/api/docker/" + upstreamKey + "/v2/team/image/blobs/" + layerDigest
+			beforeManifest, beforeLayer := w.bridge.count(http.MethodGet, manifestRoute), w.bridge.count(http.MethodGet, layerRoute)
+			warm, err := pull.Start(
+				accessapi.WithCaller(t.Context(), principal, nil),
+				replication.PullRequest{ID: "native-cache-warm", TargetKey: targets[0].Key, TargetRevision: targets[0].Revision, Root: "team/image"},
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for step := 0; step < 40 && !warm.Phase.Terminal(); step++ {
+				warm, err = pull.Step(t.Context(), warm.Reference, w.fence)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if warm.Phase != model.PullComplete || w.bridge.count(http.MethodGet, manifestRoute) != beforeManifest || w.bridge.count(http.MethodGet, layerRoute) != beforeLayer {
+				t.Fatal("warm native pull refetched payloads or failed to settle")
+			}
+			if index != nil && !virtual {
 				ctx := accessapi.WithCaller(t.Context(), principal, nil)
 				source := w.runtime.Artifacts.API().PullSource
 				candidates, _, err := source.CachedItems(ctx, run.Binding.Source, run.Binding.Selection(), kernel.Page{Limit: 30})
