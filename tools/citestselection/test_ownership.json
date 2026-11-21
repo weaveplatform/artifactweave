@@ -380,6 +380,7 @@
     ],
     "test/server/retention": [
       "policies_test.go",
+      "removal_test.go",
       "selection_changes_test.go",
       "selection_test.go"
     ]
