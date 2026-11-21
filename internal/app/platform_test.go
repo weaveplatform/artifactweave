@@ -637,7 +637,7 @@ func TestAccMigrateCommand(t *testing.T) {
 	}
 	want := "schema version 0 of 3 (sqlite, platform)\n" +
 		"schema version 7 of 7 (sqlite, artifacts)\n" +
-		"schema version 0 of 5 (sqlite, access)\n"
+		"schema version 0 of 6 (sqlite, access)\n"
 	for _, m := range []string{"notifications", "retention", "federation", "releases", "workers"} {
 		latest := 1
 		if m == "retention" || m == "federation" {
