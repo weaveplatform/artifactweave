@@ -131,7 +131,7 @@ func policyRoutes(t *testing.T, db harness.Store) {
 		t.Fatal("delete lost existing run history", err)
 	}
 	w.request("GET", policies+"/own-policy", "cleanup-owner", "", 404)
-	w.request("PUT", policies+"/global-policy/run", "admin", "", 501)
+	w.request("PUT", policies+"/global-policy/run", "admin", "", 400)
 	for _, user := range []string{"", "cleanup-user"} {
 		want := 403
 		if user == "" {
@@ -201,6 +201,9 @@ func TestAccPackageCleanupUnavailableStoreReturns501(t *testing.T) {
 		{"DELETE", one, ""},
 		{"POST", one + "/enablement", `{"enabled":true}`},
 		{"PUT", "/artifactory/api/cleanup/policies/forceDisableAll", ""},
+		{"PUT", one + "/run", ""},
+		{"PUT", "/artifactory/api/cleanup/policies/runs/1", `{"action":"stop"}`},
+		{"PUT", "/artifactory/api/cleanup/policies/runs/forceStopAll", ""},
 	} {
 		r := support.Do(t, h, request.method, request.path, map[string]string{"Content-Type": "application/json"}, request.body)
 		if r.Code != http.StatusNotImplemented {

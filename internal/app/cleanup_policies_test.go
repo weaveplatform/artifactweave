@@ -26,6 +26,9 @@ func cleanupPolicyMatrix() []matrixRow {
 		row("DELETE "+one, mine, "", administrators, 200).seeding(seed),
 		row("POST "+one+"/enablement", mine+"/enablement", `{"enabled":true}`, administrators, 200).seeding(seed),
 		at("PUT /artifactory/api/cleanup/policies/forceDisableAll", "", administrators, 200).seeding(seed),
+		row("PUT "+one+"/run", base+"/missing-{p}/run", "", administrators, 404),
+		row("PUT /artifactory/api/cleanup/policies/runs/{runId}", "/artifactory/api/cleanup/policies/runs/999999", `{"action":"stop"}`, administrators, 404),
+		at("PUT /artifactory/api/cleanup/policies/runs/forceStopAll", "", administrators, 202),
 	}
 }
 
@@ -44,6 +47,17 @@ func cleanupPolicyStatusRows() []statusCase {
 		{"GET " + one, path, "", "", 401},
 		{"GET " + one, base + "/missing-policy", "admin", "", 404},
 		{"PUT " + one, path, "admin", body, 200},
+		{"PUT " + one + "/run", path + "/run", "admin", "", 400},
+		{"PUT " + one + "/run", base + "/missing-policy/run", "admin", "", 404},
+		{"PUT " + one + "/run", path + "/run", "user", "", 403},
+		{"PUT " + one + "/run", path + "/run", "", "", 401},
+		{"PUT /artifactory/api/cleanup/policies/runs/{runId}", "/artifactory/api/cleanup/policies/runs/999999", "admin", `{"action":"stop"}`, 404},
+		{"PUT /artifactory/api/cleanup/policies/runs/{runId}", "/artifactory/api/cleanup/policies/runs/0", "admin", `{"action":"stop"}`, 400},
+		{"PUT /artifactory/api/cleanup/policies/runs/{runId}", "/artifactory/api/cleanup/policies/runs/999999", "user", `{"action":"stop"}`, 403},
+		{"PUT /artifactory/api/cleanup/policies/runs/{runId}", "/artifactory/api/cleanup/policies/runs/999999", "", `{"action":"stop"}`, 401},
+		{"PUT /artifactory/api/cleanup/policies/runs/forceStopAll", "/artifactory/api/cleanup/policies/runs/forceStopAll", "admin", "", 202},
+		{"PUT /artifactory/api/cleanup/policies/runs/forceStopAll", "/artifactory/api/cleanup/policies/runs/forceStopAll", "user", "", 403},
+		{"PUT /artifactory/api/cleanup/policies/runs/forceStopAll", "/artifactory/api/cleanup/policies/runs/forceStopAll", "", "", 401},
 		{"POST " + one + "/enablement", path + "/enablement", "admin", `{"enabled":true}`, 200},
 		{"PUT /artifactory/api/cleanup/policies/forceDisableAll", "/artifactory/api/cleanup/policies/forceDisableAll", "admin", "", 200},
 		{"DELETE " + one, path, "admin", "", 200},

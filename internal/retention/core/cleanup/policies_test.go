@@ -24,6 +24,9 @@ type policyAuthority string
 func (a policyAuthority) Any() bool                  { return a != "none" }
 func (a policyAuthority) Allows(project string) bool { return a == "*" || string(a) == project }
 func (policyAuthority) Name() string                 { return "admin" }
+func (policyAuthority) Credential() kernel.CredentialReference {
+	return kernel.CredentialReference{Name: "admin", TokenID: "verified-test-token"}
+}
 
 func world(t *testing.T, authority string) (cleanup.Service, *inmem.Store) {
 	t.Helper()
@@ -33,9 +36,16 @@ func world(t *testing.T, authority string) (cleanup.Service, *inmem.Store) {
 		must(t, db.Repos().Create(t.Context(), *repo.Defaults(&repo.Config{Key: key + "-npm", Class: repo.Local, PackageType: repo.NPM, ProjectKey: key})))
 	}
 	s := cleanup.Service{
+		Restore: func(ctx context.Context, reference kernel.CredentialReference) (context.Context, error) {
+			return kernel.WithPrincipal(ctx, reference.Principal()), db.Projects().Guard(ctx)
+		},
 		Store: db, Schedules: db.Schedules(), Repositories: db.Repos(), Guard: db.Projects().Guard,
 		Now:           func() time.Time { return time.Date(2026, 11, 20, 1, 0, 0, 0, time.UTC) },
 		ProjectExists: func(ctx context.Context, key string) error { _, err := db.Projects().Get(ctx, key); return err },
+		ProjectIncarnation: func(ctx context.Context, key string) (string, error) {
+			authority, err := db.Projects().Authority(ctx, key)
+			return string(authority.Incarnation), err
+		},
 		Authorize: func(ctx context.Context) (cleanup.Policy, error) {
 			if err := db.Projects().Guard(ctx); err != nil {
 				return nil, err

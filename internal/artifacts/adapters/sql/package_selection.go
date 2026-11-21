@@ -57,6 +57,17 @@ func (p packages) IndexVersions(ctx context.Context, ref api.IndexPackage, keep 
 }
 
 func (p packages) IndexVersion(ctx context.Context, ref api.IndexVersion, keep int) (api.IndexVersion, error) {
+	if keep < 0 {
+		return api.IndexVersion{}, fmt.Errorf("negative version retention: %w", kernel.ErrInvalid)
+	}
+	// Hold the same row every linked-item mutation updates. The revision
+	// read below then fences concurrent companions until the effect commits.
+	var id int64
+	err := p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
+		"SELECT id FROM package_versions WHERE id = ?"+p.s.LockClause(ctx)), ref.ID).Scan(&id)
+	if err != nil {
+		return api.IndexVersion{}, p.s.Wrap("guard indexed version", err)
+	}
 	rows, _, err := p.indexVersions(ctx, ref.Package, keep, kernel.Page{Limit: 1}, &ref)
 	if err != nil {
 		return api.IndexVersion{}, err
@@ -90,7 +101,7 @@ func (p packages) indexVersions(ctx context.Context, ref api.IndexPackage, keep 
 	}
 	query := "WITH target AS (SELECT p.id FROM packages p JOIN repositories r ON r.key = p.repo_key WHERE " + where + "), " +
 		"cutoff AS (SELECT order_key, version FROM package_versions WHERE package_id = (SELECT id FROM target) ORDER BY order_key DESC, version DESC LIMIT 1 OFFSET ?) " +
-		"SELECT v.id, v.version, v.order_key, v.created_at, v.last_downloaded_at, " +
+		"SELECT v.id, v.version, v.order_key, v.created_at, v.last_downloaded_at, v.mutation_revision, " +
 		"CASE WHEN cutoff.order_key IS NULL OR v.order_key > cutoff.order_key OR (v.order_key = cutoff.order_key AND v.version >= cutoff.version) THEN TRUE ELSE FALSE END " +
 		"FROM package_versions v JOIN target ON target.id = v.package_id LEFT JOIN cutoff ON TRUE WHERE " + versionWhere + " ORDER BY v.version LIMIT ?"
 	args = append(args, max(1, keep)-1)
@@ -100,7 +111,7 @@ func (p packages) indexVersions(ctx context.Context, ref api.IndexPackage, keep 
 	err = p.s.Rows(ctx, "index versions", query, args, func(row *sql.Rows) error {
 		entry := api.IndexVersion{Package: kernel.Clone(ref)}
 		var created, downloaded sql.NullInt64
-		if err := row.Scan(&entry.ID, &entry.Version, &entry.OrderKey, &created, &downloaded, &entry.Protected); err != nil {
+		if err := row.Scan(&entry.ID, &entry.Version, &entry.OrderKey, &created, &downloaded, &entry.MutationRevision, &entry.Protected); err != nil {
 			return err //nolint:wrapcheck // Rows supplies context
 		}
 		entry.Created, entry.LastDownloaded = dialect.FromMicros(created), dialect.FromMicros(downloaded)

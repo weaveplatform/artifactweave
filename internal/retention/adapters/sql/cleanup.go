@@ -19,25 +19,29 @@ func (s *Store) Cleanup() port.CleanupStore { return cleanupStore{s} }
 type cleanupStore struct{ s *Store }
 
 const policyCols = "key, revision, description, cron_exp, project_key, item_type, duration_minutes, enabled, " +
-	"skip_trashcan, criteria, created_at, created_by, updated_at, updated_by"
+	"skip_trashcan, criteria, created_at, created_by, updated_at, updated_by, execution_credential, project_incarnation"
 
 func policyArgs(p model.CleanupPolicy) ([]any, error) {
 	criteria, err := dialect.ToJSON(p.Criteria)
 	if err != nil {
 		return nil, err
 	}
+	credential, err := dialect.ToJSON(p.ExecutionCredential)
+	if err != nil {
+		return nil, err
+	}
 	return []any{
 		p.Key, p.Revision, p.Description, p.CronExp, p.ProjectKey, p.ItemType, p.DurationMinutes, p.Enabled,
 		p.SkipTrashcan, criteria, dialect.Micros(p.Created), p.CreatedBy, dialect.Micros(p.Updated),
-		p.UpdatedBy,
+		p.UpdatedBy, credential, p.ProjectIncarnation,
 	}, nil
 }
 
 func scanPolicy(row interface{ Scan(...any) error }) (model.CleanupPolicy, error) {
 	var (
-		p                model.CleanupPolicy
-		criteria         sql.NullString
-		created, updated sql.NullInt64
+		p                    model.CleanupPolicy
+		criteria, credential sql.NullString
+		created, updated     sql.NullInt64
 	)
 	if err := row.Scan(
 		&p.Key,
@@ -54,10 +58,15 @@ func scanPolicy(row interface{ Scan(...any) error }) (model.CleanupPolicy, error
 		&p.CreatedBy,
 		&updated,
 		&p.UpdatedBy,
+		&credential,
+		&p.ProjectIncarnation,
 	); err != nil {
 		return p, err //nolint:wrapcheck // wrapped by the caller
 	}
 	p.Created, p.Updated = dialect.FromMicros(created), dialect.FromMicros(updated)
+	if err := dialect.FromJSON(credential, &p.ExecutionCredential); err != nil {
+		return p, err
+	}
 	return p, dialect.FromJSON(criteria, &p.Criteria)
 }
 

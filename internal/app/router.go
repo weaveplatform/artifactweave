@@ -725,7 +725,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	// with the management body limit, and the replay wrapping each keyed
 	// operation. The VCS file downloads also keep their request, whose
 	// conditional and range headers decide their answer.
-	keyed := newKeyedOperations(cfg, artAPI)
+	keyed := newKeyedOperations(cfg, artAPI, cleanupOps)
 	r.Group(func(g chi.Router) {
 		g.Use(
 			middleware.BodyLimit(middleware.ManagementBodyLimit),

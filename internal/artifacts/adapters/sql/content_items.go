@@ -266,7 +266,13 @@ func (i items) Create(ctx context.Context, it model.Item) (model.Item, error) {
 
 func (i items) put(ctx context.Context, it model.Item, statement string) (model.Item, error) {
 	if i.s.storage == nil {
-		return i.putRow(ctx, it, statement)
+		var out model.Item
+		err := i.s.Tx(ctx, func(ctx context.Context) error {
+			var err error
+			out, err = i.putRow(ctx, it, statement)
+			return err
+		})
+		return out, err
 	}
 	it, err := canonical(it)
 	if err != nil {
@@ -342,6 +348,9 @@ func (i items) putRow(ctx context.Context, it model.Item, statement string) (mod
 	)
 	if err != nil {
 		return it, err
+	}
+	if err := i.s.itemVersionsChanged(ctx, "id = ?", id); err != nil {
+		return model.Item{}, err
 	}
 	return i.GetByID(ctx, id)
 }
@@ -480,6 +489,9 @@ func (i items) Delete(
 				args = append(args, it.ID)
 			}
 		}
+		if err := i.s.itemVersionsChanged(ctx, where, args...); err != nil {
+			return err
+		}
 		if err := i.s.Rows(ctx, "delete items", "DELETE FROM items WHERE "+where+" RETURNING "+itemCols, args,
 			func(rs *sql.Rows) error {
 				it, err := scanItem(rs)
@@ -570,10 +582,15 @@ func (i items) EnsureRoot(ctx context.Context, r model.Item) (model.Item, error)
 }
 
 func (i items) DeleteRoot(ctx context.Context, repoKey string, cached bool) error {
-	_, err := i.s.Exec(ctx, "delete the root of "+repoKey,
-		"DELETE FROM items WHERE repo_key = ? AND cached = ? AND path = ? AND name = ?",
-		repoKey, cached, kernel.RootPath, kernel.RootPath)
-	return err
+	return i.s.Tx(ctx, func(ctx context.Context) error {
+		where := "repo_key = ? AND cached = ? AND path = ? AND name = ?"
+		args := []any{repoKey, cached, kernel.RootPath, kernel.RootPath}
+		if err := i.s.itemVersionsChanged(ctx, where, args...); err != nil {
+			return err
+		}
+		_, err := i.s.Exec(ctx, "delete the root of "+repoKey, "DELETE FROM items WHERE "+where, args...)
+		return err
+	})
 }
 
 func (i items) FindByChecksum(
@@ -696,7 +713,10 @@ func (i items) changeProperties(
 		}
 		_, err = i.s.Exec(ctx, "stamp properties",
 			"UPDATE items SET props_modified_at = ? WHERE id = ?", stamp, id)
-		return err
+		if err != nil {
+			return err
+		}
+		return i.s.itemVersionsChanged(ctx, "id = ?", id)
 	})
 }
 
@@ -800,6 +820,9 @@ func (i items) RecordDownload(ctx context.Context, id int64, d port.Download) er
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
 		}
+		if err := i.s.itemVersionsChanged(ctx, "id = ?", id); err != nil {
+			return err
+		}
 		if _, err := i.s.Exec(
 			ctx,
 			"record download",
@@ -835,6 +858,9 @@ func (i items) RecordDownload(ctx context.Context, id int64, d port.Download) er
 func (i items) PutStats(ctx context.Context, id int64, st model.ItemStats) error {
 	return i.s.Tx(ctx, func(ctx context.Context) error {
 		if err := i.requireItem(ctx, id); err != nil {
+			return err
+		}
+		if err := i.s.itemVersionsChanged(ctx, "id = ?", id); err != nil {
 			return err
 		}
 		_, err := i.s.Exec(

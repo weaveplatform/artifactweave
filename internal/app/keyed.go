@@ -16,6 +16,7 @@ import (
 	pfedgen "github.com/weaveplatform/artifactweave/internal/platform/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/platform/gen/worker"
 	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
+	retentionhttp "github.com/weaveplatform/artifactweave/internal/retention/adapters/http"
 )
 
 // keyedOperations is what the generated servers' keyed operations share
@@ -32,10 +33,13 @@ type keyedOperations struct {
 // newKeyedOperations collects the bindings of every module that serves a
 // keyed operation. With no store, the replay has none, and a keyed request
 // answers as its binding's resource check does, or 501.
-func newKeyedOperations(cfg RouterConfig, art artifactshttp.ArtifactoryAPI) keyedOperations {
+func newKeyedOperations(cfg RouterConfig, art artifactshttp.ArtifactoryAPI, cleanup retentionhttp.PackagePoliciesAPI) keyedOperations {
 	k := keyedOperations{bindings: map[string]map[string]idempotency.Binding{
 		"artifactory": art.KeyedBindings(),
 	}}
+	for name, binding := range cleanup.KeyedBindings() {
+		k.bindings["artifactory"][name] = binding
+	}
 	if cfg.Store != nil {
 		k.replay = idempotency.Replay{Store: cfg.Store.Replays(), Tx: cfg.Store}
 	}

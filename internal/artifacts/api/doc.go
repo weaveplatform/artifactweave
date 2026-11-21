@@ -1,8 +1,9 @@
 // Package api is the artifacts module's published surface for other modules:
 // the repository operations they call (Repositories, with RepoFilter and the
 // shared names ErrChanged, MsgKeyExists and IsNull), layout checks and bounded
-// package-index snapshots, which API holds as the module binds them. It also
-// supplies immutable event facts and secret-free project repository projections.
+// package-index snapshots and guarded file removal, which API holds as the
+// module binds them. It also supplies immutable event facts and secret-free
+// project repository projections.
 // The repository configuration model is its subpackage repo.
 //
 // # Role
@@ -24,7 +25,8 @@
 // the interfaces:
 // internal/artifacts/core/repos's NewRepositories binds Repositories over
 // the store and access's Keys and Projects, and artifacts/core/layout's
-// Checker implements Layouts; pkgindex.NewReader supplies PackageIndex.
+// Checker implements Layouts; pkgindex.NewReader supplies PackageIndex, and
+// removal.New supplies ItemRemoval over the normal item service and current access.
 //
 // # Outputs
 //
@@ -46,6 +48,9 @@
 //   - StorageUsage supplies canonical logical byte totals. StorageWatch
 //     prepares content/ownership accounting before mutation and records actual
 //     row deltas for whole-operation quota settlement, without credentials.
+//   - ItemRemoval: current credential/native Delete and exact file facts fence
+//     normal item/trash/index/event mutations. The owner's selection check and
+//     durable acknowledgement join the deletion transaction; failures roll it back.
 //   - API: the contracts as the module binds them, consumed by configuration,
 //     retention and the application composition.
 //
@@ -100,6 +105,8 @@
 // artifacts settings are not published here (decision 0044). P11 events.go
 // publishes typed artifact/property, Docker and build topics and immutable
 // fact values, independently of vendor webhook envelopes.
+// P11 ItemRemoval supplies retention's guarded deletion boundary; retention
+// retains policy interpretation, run state and reporting.
 //
 // # Testing
 //

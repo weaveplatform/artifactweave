@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/apilimit"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/platform/gen/operations"
+	retentionhttp "github.com/weaveplatform/artifactweave/internal/retention/adapters/http"
 )
 
 // Every operation whose spec declares IdempotencyKey has a replay binding
@@ -19,7 +20,7 @@ import (
 // is what turns the replay on, so a declaration without a binding would
 // answer a keyed request 500 rather than run it unprotected.
 func TestUnitKeyedOperationsHaveBindings(t *testing.T) {
-	k := newKeyedOperations(RouterConfig{}, newArtifactoryAPI(RouterConfig{}))
+	k := newKeyedOperations(RouterConfig{}, newArtifactoryAPI(RouterConfig{}), retentionhttp.PackagePoliciesAPI{})
 	declared := map[string]map[string]bool{}
 	for _, op := range operations.Table {
 		if !op.IdempotencyKey {

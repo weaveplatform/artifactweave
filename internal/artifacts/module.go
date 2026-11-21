@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/removal"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/transfer"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
@@ -191,6 +192,7 @@ func New(d Deps) (*Module, error) {
 	m.api.TransferSource = transfer.Source{
 		Store: d.Store, Blobs: d.Blobs, Guard: m.guardAuthority, Current: m.currentTransferCaller,
 	}
+	m.api.ItemRemoval = removal.New(d.Store, m.items, m.currentRemovalCaller)
 	// Assigned only when present: a nil queue in the interface would be a
 	// typed nil, which the item service would call instead of skipping.
 	if d.Work != nil {
@@ -199,9 +201,30 @@ func New(d Deps) (*Module, error) {
 	return m, nil
 }
 
-// API returns the module's published repository, layout and package-index contracts,
+// API returns the module's repository, layout, package-index, transfer-source and guarded-removal contracts,
 // bound by New.
 func (m *Module) API() artifactsapi.API { return m.api }
+
+func (m *Module) currentRemovalCaller(ctx context.Context, reference kernel.CredentialReference) (kernel.Principal, accessapi.Decider, error) {
+	if m.access.Projects == nil || m.access.Authenticator == nil || m.access.Authorizer == nil {
+		return kernel.Principal{}, nil, fmt.Errorf("removal access contracts unavailable: %w", kernel.ErrStore)
+	}
+	if err := m.access.Projects.Guard(ctx); err != nil {
+		return kernel.Principal{}, nil, fmt.Errorf("guard removal authority: %w", err)
+	}
+	p, err := m.access.Authenticator.Current(ctx, reference.Principal())
+	if errors.Is(err, kernel.ErrNotFound) {
+		return kernel.Principal{}, nil, kernel.ErrBadCredentials
+	}
+	if err != nil {
+		return kernel.Principal{}, nil, fmt.Errorf("current removal credential: %w", err)
+	}
+	d, err := m.access.Authorizer.For(ctx, p)
+	if err != nil {
+		return kernel.Principal{}, nil, fmt.Errorf("current removal permissions: %w", err)
+	}
+	return p, d, nil
+}
 
 func (m *Module) guardAuthority(ctx context.Context) error {
 	if m.access.Projects == nil {

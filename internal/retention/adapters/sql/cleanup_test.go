@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
@@ -27,6 +28,10 @@ func TestAccCleanupUnmigrated(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 	cs := retsql.New(dialect.New(db, sqlite.Dialect, nil)).Cleanup()
+	execution := model.CleanupExecution{
+		RunID: 1, Occurrence: "fire", Policy: model.CleanupPolicy{Key: "p", Revision: "rev", ItemType: model.CleanupPackage},
+		Credential: kernel.CredentialReference{Name: "caller", TokenID: "verified-token"}, At: time.Now(),
+	}
 	ops := map[string]error{
 		"create policy": cs.CreatePolicy(ctx, model.CleanupPolicy{Key: "k"}),
 		"policy":        sqltest.Err(cs.Policy(ctx, "k")),
@@ -35,10 +40,13 @@ func TestAccCleanupUnmigrated(t *testing.T) {
 		"policies": sqltest.Err(
 			cs.Policies(ctx, port.PolicyFilter{ItemType: "package", ProjectKey: "p"}),
 		),
-		"create run": sqltest.Err(cs.CreateRun(ctx, model.CleanupRun{PolicyKey: "k"})),
-		"run":        sqltest.Err(cs.Run(ctx, 1)),
-		"update run": cs.UpdateRun(ctx, model.CleanupRun{ID: 1}),
-		"last run":   sqltest.Err(cs.LastRun(ctx, "k")),
+		"create run":       sqltest.Err(cs.CreateRun(ctx, model.CleanupRun{PolicyKey: "k"})),
+		"run":              sqltest.Err(cs.Run(ctx, 1)),
+		"update run":       cs.UpdateRun(ctx, model.CleanupRun{ID: 1}),
+		"last run":         sqltest.Err(cs.LastRun(ctx, "k")),
+		"create execution": cs.CreateExecution(ctx, execution),
+		"execution":        sqltest.Err(cs.Execution(ctx, 1)),
+		"occurrence":       sqltest.Err(cs.ExecutionForOccurrence(ctx, "fire")),
 		"runs": sqltest.Err3(cs.Runs(ctx, port.RunFilter{
 			PolicyKey: "k", ItemType: "package",
 			Statuses: []api.RunStatus{api.RunCompleted},

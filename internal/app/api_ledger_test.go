@@ -276,6 +276,7 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 		"internal/configuration/adapters/http",
 		"internal/federation/adapters/http",
 		"internal/notifications/adapters/http",
+		"internal/retention/adapters/http",
 	} {
 		found, err := filepath.Glob(filepath.Join(root, dir, "*.go"))
 		if err != nil {
@@ -286,18 +287,19 @@ func apiReviewHandlers(t *testing.T) map[string]apiReviewHandler {
 	// The artifactory spec's operations are split over partials, which the
 	// router's composites embed; each receiver keys its handlers by its spec.
 	specOf := map[string]string{
-		"ArtifactoryAPI":   "artifactory",
-		"VCSAPI":           "artifactory",
-		"NPMAPI":           "artifactory",
-		"DockerAPI":        "artifactory",
-		"DebianAPI":        "artifactory",
-		"CranAPI":          "artifactory",
-		"RPMAPI":           "artifactory",
-		"SecurityAPI":      "artifactory",
-		"SystemAPI":        "artifactory",
-		"AccessService":    "access",
-		"SubscriptionsAPI": "event",
-		"ReplicationAPI":   "artifactory",
+		"ArtifactoryAPI":     "artifactory",
+		"VCSAPI":             "artifactory",
+		"NPMAPI":             "artifactory",
+		"DockerAPI":          "artifactory",
+		"DebianAPI":          "artifactory",
+		"CranAPI":            "artifactory",
+		"RPMAPI":             "artifactory",
+		"SecurityAPI":        "artifactory",
+		"SystemAPI":          "artifactory",
+		"AccessService":      "access",
+		"SubscriptionsAPI":   "event",
+		"ReplicationAPI":     "artifactory",
+		"PackagePoliciesAPI": "artifactory",
 	}
 	out := map[string]apiReviewHandler{}
 	for _, file := range files {
@@ -383,6 +385,7 @@ func apiReviewCollections(
 func apiReviewPolicy(e *apiReviewOperation) {
 	method, path, _ := strings.Cut(e.Route, " ")
 	cleanupPolicy := false
+	cleanupExecution := false
 	switch e.OperationID {
 	case "getAllPackageCleanupPolicies",
 		"createPackageCleanupPolicy",
@@ -392,6 +395,8 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		"enableDisablePackageCleanupPolicy",
 		"disableAllCleanupPolicies":
 		cleanupPolicy = e.State == "implemented"
+	case "runPackageCleanupPolicy", "stopRunningCleanupPolicy", "stopAllRunningCleanupPolicies":
+		cleanupExecution = e.State == "implemented"
 	}
 	projectRepository := false
 	switch e.OperationID {
@@ -418,9 +423,6 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	if accesshttp.APIRecoveryRequest(r) {
 		e.Admission = "administrator recovery reserve: 2 concurrent and 60/min per process; 5s deadline"
 	}
-	if cleanupPolicy {
-		e.Admission += "; current platform/project administration refreshed under the project guard before disclosure/publication; project administrators require own-project collection filter"
-	}
 	if projectRepository {
 		e.Admission += "; current platform administration refreshed under the project guard before repository lookup and retained through publication"
 	}
@@ -438,10 +440,9 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		if method == "GET" {
 			e.Effects = "authorized policy configuration read; optional repository availability projection never rewrites stored criteria"
 		} else {
-			e.Effects = "atomic policy generation and schedule position publication; create is disabled, enablement is separate, and deletion retains run history; no candidate selection or artifact deletion"
+			e.Effects = "atomic policy generation and schedule position publication; create is disabled, enablement is separate, active-run update/delete is refused, and deletion retains run history; ordinary disable retains admitted runs, force-disable requests STOPPING and wakes their work"
 			e.Retry = "no Idempotency-Key; reconcile policy state after ambiguous completion; identical configuration/enablement preserves generation and queued position, while edits and disablement fence old queued work"
 		}
-		e.Evidence = append(e.Evidence, "internal/retention/core/cleanup/policies.go", "test/server/retention/policies_test.go", "internal/app/storetest/cleanup_policies.go")
 	}
 	if projectRepository {
 		if method == "GET" {
@@ -482,6 +483,23 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		}
 	}
 	e.Family, e.Pagination, e.Evidence = apiReviewPersistence(path)
+	if cleanupPolicy {
+		e.Evidence = append(e.Evidence, "internal/retention/core/cleanup/policies.go", "test/server/retention/policies_test.go", "internal/app/storetest/cleanup_policies.go")
+	}
+	if cleanupExecution {
+		e.Effects = "atomic STOPPING request and queue wake for durable worker settlement; terminal history retained; policies remain enabled"
+		if e.OperationID == "runPackageCleanupPolicy" {
+			e.Effects = "atomic integer run/trigger, frozen private policy/caller snapshot, bounded progress and distinct work enqueue, sharing a receipt transaction when keyed; worker performs normal guarded item/trash/index/usage/event deletion; dry-run records selection only"
+		}
+		e.Evidence = append(e.Evidence,
+			"internal/retention/adapters/http/runs.go",
+			"internal/retention/adapters/http/idempotency.go",
+			"internal/retention/core/cleanup/runs.go",
+			"internal/retention/core/cleanup/executor.go",
+			"test/server/retention/runs_test.go",
+			"internal/app/runtime_schedules_test.go",
+		)
+	}
 	if path == "/artifactory/api/huggingfaceml/{repoKey}/api/artifactweave/migrations/legacy-layout" {
 		e.Effects = "administrator-only bounded copy of one legacy revision; atomic item/index publication preserves source bytes/properties/access policy; quiesced writes/configuration required"
 		e.Retry = "no key required; repeat the identical mapping with dry_run=true after ambiguous completion: ready permits apply, complete is a no-op; conflicting destinations return 409; reapply never rewinds an advanced ref"
@@ -517,6 +535,15 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		}
 	}
 	apiReviewDerive(e)
+	if cleanupPolicy {
+		e.Admission += "; current platform/project administration refreshed under the project guard before disclosure/publication; project administrators require own-project collection filter"
+	}
+	if cleanupExecution {
+		e.Admission += "; current platform/project administration under the project guard; force-stop-all requires platform administration"
+		if e.OperationID == "runPackageCleanupPolicy" {
+			e.Retry += "; optional key replays the committed integer trigger under current policy/project authority; dryRun participates in the fingerprint; unkeyed admissions remain distinct"
+		}
+	}
 }
 
 // apiReviewClasses are the classes decision 0043 has a spec operation

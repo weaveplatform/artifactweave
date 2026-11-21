@@ -45,6 +45,10 @@
 // before calling a business handler outside the admission transaction. Already
 // admitted jobs keep the queue's at-least-once semantics; owners fence later
 // publication points when a running job needs to observe subsequent changes.
+// Execute supplies a transient Trigger.Fence for durable owner admission. Call
+// it last in the owner's transaction, after domain writes, so an expired lease
+// rolls back the run and any child queue item. Never persist that callback or
+// acquire another domain lock after it.
 // Existing HandleEvery maintenance jobs remain independent.
 //
 // # References

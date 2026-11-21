@@ -19,6 +19,7 @@ import (
 // comparator cutoffs and snapshots, on the same fixtures for every adapter.
 func RunPackageIndexSelection(t *testing.T, newStore Factory) {
 	t.Helper()
+	t.Run("mutation revisions", func(t *testing.T) { indexMutationRevisions(t, newStore) })
 	t.Run("scope before paging", func(t *testing.T) {
 		indexRepositoryScope(t, newStore)
 	})
