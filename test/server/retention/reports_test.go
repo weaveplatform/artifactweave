@@ -166,12 +166,26 @@ func cleanupReportsContract(t *testing.T, db harness.Store) {
 	f.preserved(t)
 	actual := cleanupReportRun(t, f, false)
 	check(actual)
-	response := w.request(http.MethodGet, cleanupReports+"view?policyKey=execution-policy&pageSize=1&sortBy=runId&sortOrder=desc", "admin", "", http.StatusOK)
+	response := w.request(
+		http.MethodGet,
+		cleanupReports+"view?policyKey=execution-policy&itemTypes=package&status=COMPLETED&pageSize=1&sortBy=runId&sortOrder=desc",
+		"admin",
+		"",
+		http.StatusOK,
+	)
 	var page artgen.CleanupPolicyRunView
 	storekit.Must(t, json.Unmarshal(response.Body.Bytes(), &page))
 	if page.RunViews == nil || len(*page.RunViews) != 1 || httpkit.Deref((*page.RunViews)[0].RunId) != int(actual.ID) || page.Pagination == nil ||
 		httpkit.Deref(page.Pagination.Total) != 2 {
 		t.Fatal("run view did not apply stable paging/counts")
+	}
+	for _, filters := range []string{"itemTypes=package&status=FAILED", "itemTypes=build&status=COMPLETED"} {
+		response = w.request(http.MethodGet, cleanupReports+"view?policyKey=execution-policy&"+filters, "admin", "", http.StatusOK)
+		var empty artgen.CleanupPolicyRunView
+		storekit.Must(t, json.Unmarshal(response.Body.Bytes(), &empty))
+		if empty.Pagination == nil || httpkit.Deref(empty.Pagination.Total) != 0 || empty.RunViews == nil || len(*empty.RunViews) != 0 {
+			t.Fatal("nonmatching public status/item type consumed a page", filters)
+		}
 	}
 	response = w.request(http.MethodGet, "/artifactory/api/cleanup/policies/view?itemTypes=package&policyKey=execution-policy", "admin", "", http.StatusOK)
 	var policiesView artgen.CleanupPolicyView
@@ -192,6 +206,7 @@ func cleanupReportsContract(t *testing.T, db harness.Store) {
 		{"wrong policy", cleanupReports + "different-policy/" + strconv.FormatInt(actual.ID, 10), "admin", http.StatusNotFound},
 		{"missing report", cleanupReports + "downloadReport?policyKey=execution-policy&runId=999999", "admin", http.StatusNotFound},
 		{"invalid page", cleanupReports + "view?page=0", "admin", http.StatusBadRequest},
+		{"invalid page size", cleanupReports + "view?pageSize=0", "admin", http.StatusBadRequest},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			world := policyWorld{t: t, store: db, h: f.handler}

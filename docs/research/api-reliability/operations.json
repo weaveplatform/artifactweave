@@ -5172,29 +5172,46 @@
     "route": "GET /artifactory/api/cleanup/policies/runs/downloadReport",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "downloadCleanupPolicyRunReport",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Streams the run's per-item report as CSV, one row per selected item with its repository, path, size and outcome. Downloading sets reportDownloaded on the policy's last-run data. Answers 404 while the run has produced no report yet. Requires a platform admin, or a project admin when the policy belongs to their project.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/retention/adapters/http/item_report.go: PackagePoliciesAPI.DownloadCleanupPolicyRunReport",
+    "direct_calls": [
+      "s.service",
+      "svc.OpenItemReport"
+    ],
+    "review_family": "cleanup-reports",
+    "effects": "current-authorized policy/run metadata and saved outcome reads; original project lifetime retained; no artifact deletion, upstream request or restoration of saved execution credentials; completed local CSV response marks only reportDownloaded after a final authority refresh",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/retention/adapters/http/reports.go",
+      "internal/retention/adapters/http/item_report.go",
+      "internal/retention/core/cleanup/reports.go",
+      "internal/retention/core/cleanup/item_report.go",
+      "internal/retention/core/cleanup/run_view.go",
+      "internal/retention/adapters/sql/run_page.go",
+      "internal/retention/adapters/sql/outcomes.go",
+      "test/server/retention/reports_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /artifactory/api/cleanup/policies/runs/summaryReports",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "viewCleanupPolicyRunSummaryReport",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns the summary of one run: the policy snapshot it ran with, its timing and its counts. Available once the run has started; counters grow while it runs. Requires a platform admin, or a project admin when the policy belongs to their project.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/retention/adapters/http/reports.go: PackagePoliciesAPI.ViewCleanupPolicyRunSummaryReport",
+    "direct_calls": [
+      "artgen.ViewCleanupPolicyRunSummaryReport200JSONResponse",
+      "s.service",
+      "svc.Report"
+    ],
+    "review_family": "cleanup-reports",
+    "effects": "current-authorized policy/run metadata and saved outcome reads; original project lifetime retained; no artifact deletion, upstream request or restoration of saved execution credentials",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.runConfiguration.target.packageTypes[]",
@@ -5204,22 +5221,38 @@
       "200 application/json.runConfiguration.target.reposExcluded[]",
       "200 application/json.runConfiguration.target.reposIncluded[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/retention/adapters/http/reports.go",
+      "internal/retention/adapters/http/item_report.go",
+      "internal/retention/core/cleanup/reports.go",
+      "internal/retention/core/cleanup/item_report.go",
+      "internal/retention/core/cleanup/run_view.go",
+      "internal/retention/adapters/sql/run_page.go",
+      "internal/retention/adapters/sql/outcomes.go",
+      "test/server/retention/reports_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /artifactory/api/cleanup/policies/runs/view",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getCleanupPolicyRunsView",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns one page of cleanup runs across policies, filtered and sorted by the query parameters. Omitting every filter lists all runs the caller may see, newest first. Requires a platform admin, or a project admin when the policy belongs to their project.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/retention/adapters/http/reports.go: PackagePoliciesAPI.GetCleanupPolicyRunsView",
+    "direct_calls": [
+      "httpkit.Deref",
+      "model.CleanupItemType",
+      "port.RunOrder",
+      "retapi.RunStatus",
+      "s.service",
+      "svc.Runs"
+    ],
+    "review_family": "cleanup-reports",
+    "effects": "current-authorized policy/run metadata and saved outcome reads; original project lifetime retained; no artifact deletion, upstream request or restoration of saved execution credentials",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "declared_page_controls": [
       "query page: Optional query parameter. Page to return, counting from 1. Defaults to 1. The response's pagination object reports currentPage, lastPage, pageSize and total, so a client can walk the pages.",
@@ -5228,50 +5261,87 @@
     "response_collections": [
       "200 application/json.runViews[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared page",
+    "pagination_execution": "page (position page, size pageSize, next link); cleanup-reports: default25/max500, page-number offset; immutable execution project/lifetime and filters in SQL before COUNT and LIMIT/OFFSET; bytewise public-field order with numeric run-ID ties; total/current/last page metadata; legacy report payload is not read",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/retention/adapters/http/reports.go",
+      "internal/retention/adapters/http/item_report.go",
+      "internal/retention/core/cleanup/reports.go",
+      "internal/retention/core/cleanup/item_report.go",
+      "internal/retention/core/cleanup/run_view.go",
+      "internal/retention/adapters/sql/run_page.go",
+      "internal/retention/adapters/sql/outcomes.go",
+      "test/server/retention/reports_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /artifactory/api/cleanup/policies/runs/{policyKey}/{triggerId}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getRunByTriggerId",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns the status and counters of one run of a policy, running or finished. Requires a platform admin, or a project admin when the policy belongs to their project.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/retention/adapters/http/reports.go: PackagePoliciesAPI.GetRunByTriggerId",
+    "direct_calls": [
+      "artgen.GetRunByTriggerId200JSONResponse",
+      "s.service",
+      "svc.Report"
+    ],
+    "review_family": "cleanup-reports",
+    "effects": "current-authorized policy/run metadata and saved outcome reads; original project lifetime retained; no artifact deletion, upstream request or restoration of saved execution credentials",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.includedProjects[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/retention/adapters/http/reports.go",
+      "internal/retention/adapters/http/item_report.go",
+      "internal/retention/core/cleanup/reports.go",
+      "internal/retention/core/cleanup/item_report.go",
+      "internal/retention/core/cleanup/run_view.go",
+      "internal/retention/adapters/sql/run_page.go",
+      "internal/retention/adapters/sql/outcomes.go",
+      "test/server/retention/reports_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /artifactory/api/cleanup/policies/view",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getCleanupPoliciesView",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns every policy of the requested item types with its schedule and last-run outcome, optionally filtered by policyKey and projectKey. Used for an overview screen. Requires a platform admin, or a project admin when the policy belongs to their project.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "handler": "internal/retention/adapters/http/reports.go: PackagePoliciesAPI.GetCleanupPoliciesView",
+    "direct_calls": [
+      "httpkit.Deref",
+      "model.CleanupItemType",
+      "s.service",
+      "strings.Split",
+      "strings.TrimSpace",
+      "svc.PolicyViews"
+    ],
+    "review_family": "cleanup-reports",
+    "effects": "current-authorized policy/run metadata and saved outcome reads; original project lifetime retained; no artifact deletion, upstream request or restoration of saved execution credentials",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.policies[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: administrator-defined configuration in the authorized global/project scope, with current labels and last-run/schedule metadata under one authority transaction; commit or visibility failure must not publish a partial overview; cleanup-reports: complete current policy configuration snapshot under current administration authority; last-run queries use one SQL row within immutable execution scope and next-run metadata requires the enabled matching schedule revision",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/retention/adapters/http/reports.go",
+      "internal/retention/adapters/http/item_report.go",
+      "internal/retention/core/cleanup/reports.go",
+      "internal/retention/core/cleanup/item_report.go",
+      "internal/retention/core/cleanup/run_view.go",
+      "internal/retention/adapters/sql/run_page.go",
+      "internal/retention/adapters/sql/outcomes.go",
+      "test/server/retention/reports_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
