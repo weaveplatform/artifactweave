@@ -9574,7 +9574,7 @@ paths:
       x-cost: expensive
   /api/replication/{repoPath}:
     get:
-      description: Not implemented; answers 501. It would report the outcome of the last replication that touched a repository or a folder in it, read from the replication properties the run annotated on the items. The caller would need read permission on the repository.
+      description: Reports durable single-replication outcomes for a repository or folder, including never_run, incomplete, error and partial_failure. Folder status uses actual selected or affected paths and does not inherit an unrelated repository completion. Requires current read permission covering the requested subtree; status reads never open target credentials or grant transfer authority.
       operationId: getReplicationStatus
       parameters:
         - description: Required path parameter. Repository key, optionally followed by a folder path. May span several segments.
@@ -9592,6 +9592,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReplicationStatus'
           description: The status.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository path was malformed or the repository has no single-replication direction.
         '401':
           content:
             application/json:
@@ -9609,7 +9615,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The repository or path does not exist.
+          description: The repository does not exist. Paths without retained effects report never_run.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
@@ -9619,7 +9625,7 @@ paths:
         - replication
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreplicationstatus.md
-      x-tier: stub
+      x-tier: implemented
       x-idempotency: safe
       x-cost: ordinary
   /api/replications/channels/release:
@@ -28149,7 +28155,7 @@ components:
           type: string
       type: object
     ReplicationStatus:
-      description: 'Replication status read from the replication properties the last run annotated on the items under a path. The shape differs by repository class: a local repository with several push targets lists them in targets; a remote repository reports the single pull in status and lastCompleted.'
+      description: 'Status from durable execution and selected-effect evidence under the current repository lifetime. A local repository lists its single push target in targets; a remote repository reports the pull in status and lastCompleted. A folder with no selected or affected paths is never_run. A newer incomplete run retains the previous lastCompleted instant.'
       properties:
         lastCompleted:
           description: Optional within this object. When the last run under this path finished.

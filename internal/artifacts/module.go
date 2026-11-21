@@ -172,6 +172,7 @@ func New(d Deps) (*Module, error) {
 		allowedPrivateOrigins: d.Settings.AllowedPrivateOrigins,
 		gcInterval:            d.Settings.GCInterval,
 		api: artifactsapi.API{
+			Lifetimes:    repos.NewRepositoryLifetimes(d.Store),
 			Repositories: repos.NewRepositories(d.Store, d.Access.Keys, d.Access.Projects, d.RepositoryLifecycle),
 			Layouts:      layout.Checker{},
 		},

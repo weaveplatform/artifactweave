@@ -2,13 +2,17 @@ package federation_test
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 func TestAccSingleReplicationWorkerProcessesSQLite(t *testing.T) {
@@ -33,6 +37,7 @@ func qualifyReplicationWorkerProcesses(t *testing.T, backend string) {
 				w, _, _ = newPullDriverWorld(t, backend, false)
 				repository, path, body, destination = "pull-remote", pullFaultPath, pullFaultBody, "pull-remote-cache"
 			}
+			publicStatus(t, w, repository+"/selected", "admin", http.StatusOK, model.ReplicationNeverRun)
 			principal, err := w.runtime.Auth.Basic(t.Context(), "admin", "pw")
 			if err != nil {
 				t.Fatal(err)
@@ -45,6 +50,7 @@ func qualifyReplicationWorkerProcesses(t *testing.T, backend string) {
 			if err != nil {
 				t.Fatal("admit real queued transfer", err)
 			}
+			publicStatus(t, w, repository, "admin", http.StatusOK, model.ReplicationIncomplete)
 			if _, err := w.runtime.Work.RunDue(t.Context(), replication.ExecutionWorkKind); err != nil {
 				t.Fatal("dispatch real replication worker", err)
 			}
@@ -78,10 +84,68 @@ func qualifyReplicationWorkerProcesses(t *testing.T, backend string) {
 			if err != nil || status.Latest.Status != model.ReplicationOK || status.LastCompleted.IsZero() {
 				t.Fatal("actual transfer did not publish matching scoped status", err)
 			}
+			publicStatus(t, w, repository+"/selected", "admin", http.StatusOK, model.ReplicationOK)
+			publicStatus(t, w, repository+"/private", "admin", http.StatusOK, model.ReplicationNeverRun)
+			if err := w.runtime.Store.Users().Create(t.Context(), accesstest.User{Name: "status-reader", PasswordHash: support.CheapHash}); err != nil {
+				t.Fatal(err)
+			}
+			if err := w.runtime.Store.Permissions().
+				Create(t.Context(), accesstest.Permission{Name: "selected-status-only", Resources: map[accessapi.ResourceType]accesstest.Resource{
+					accessapi.ResourceArtifact: {
+						Targets: map[string]accesstest.Target{repository: {Include: []string{"selected/**"}}},
+						Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"status-reader": accessapi.ActionRead}},
+					},
+				}}); err != nil {
+				t.Fatal(err)
+			}
+			publicStatus(t, w, repository+"/selected", "status-reader", http.StatusOK, model.ReplicationOK)
+			publicStatus(t, w, repository, "status-reader", http.StatusForbidden, "")
+			publicStatus(t, w, repository+"/private", "status-reader", http.StatusForbidden, "")
+			publicStatus(t, w, repository+"/selected", "", http.StatusUnauthorized, "")
 			unrelated, err := w.runtime.Store.Executions().PathStatus(t.Context(), run.Binding.TargetKey, run.Binding.Repository.Incarnation, "private")
 			if err != nil || !unrelated.Latest.Started.IsZero() {
 				t.Fatal("repository completion fabricated unrelated folder evidence", err)
 			}
 		})
+	}
+}
+
+func publicStatus(t *testing.T, w *pushWorld, path, user string, want int, state model.ReplicationStatus) {
+	t.Helper()
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, w.source+"/artifactory/api/replication/"+path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user != "" {
+		request.SetBasicAuth(user, "pw")
+	}
+	response, err := w.client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil || response.StatusCode != want {
+		t.Fatalf("public replication status: got%d want%d: %s err=%v", response.StatusCode, want, body, err)
+	}
+	if want != http.StatusOK {
+		return
+	}
+	var view struct {
+		Status  model.ReplicationStatus `json:"status"`
+		Targets []struct {
+			Status model.ReplicationStatus `json:"status"`
+			URL    string                  `json:"url"`
+		} `json:"targets"`
+	}
+	if err := json.Unmarshal(body, &view); err != nil {
+		t.Fatal(err)
+	}
+	actual := view.Status
+	if len(view.Targets) > 0 {
+		actual = view.Targets[0].Status
+	}
+	if actual != state {
+		t.Fatalf("public replication status got%s want%s: %s", actual, state, body)
 	}
 }

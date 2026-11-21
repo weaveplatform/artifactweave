@@ -67,8 +67,10 @@
 // author persistence, exclusive generation-fenced target ownership, and active
 // transfer renewal/cancellation. Coordinator/Worker now restore original authors,
 // admit distinct manual/stable Quartz lifetimes, and join actual push/pull
-// checkpoints with idempotent selected-path evidence. Public execute/status
-// adapters and remaining runtime qualification are still integration work. Multi-push,
+// checkpoints with idempotent selected-path evidence. StatusReader returns current
+// target/repository lifetime history without opening credentials. Its HTTP route
+// requires current Read covering the selected subtree. Public execute admission
+// and remaining runtime qualification are still integration work. Multi-push,
 // event-triggered and binary-existence optimization remain P37.
 //
 // # Testing

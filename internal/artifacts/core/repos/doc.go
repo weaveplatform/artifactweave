@@ -29,6 +29,8 @@
 // # Outputs
 //
 //   - NewRepositories: the artifacts module's Repositories.
+//   - NewRepositoryLifetimes: secret-free persistent incarnation reads. Callers
+//     hold the shared project guard and authorize before reading a lifetime.
 //   - A configuration prepared and checked for a write (PrepareCreate,
 //     CheckMembers, CheckKeypairs, CheckEnvironments), a patch merged into
 //     a stored configuration (Merge), whether an update owes a reindex

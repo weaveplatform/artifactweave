@@ -7491,36 +7491,46 @@
   },
   {
     "route": "GET /artifactory/api/replication/*",
-    "state": "stub: 501",
-    "handler": "internal/app/router.go: handwrittenStub",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes",
-    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/app/router.go: internal/federation/adapters/http.ReplicationAPI.getStatus-fm",
+    "review_family": "single-replication-status",
+    "effects": "read-only current target/repository lifetime and selected-effect history; no sealed credentials, artifact/cache mutation, upstream request or queue admission",
+    "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; current credential and Read covering the requested subtree refreshed under the shared project guard",
+    "pagination_execution": "one current single-target configuration; secret-free target keyset pages of 100; indexed current target/repository incarnation and exact-or-descendant selected effects; latest scoped outcome plus retained last completion",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/federation/adapters/http/status.go",
+      "internal/federation/status.go",
+      "internal/federation/core/replication/status.go",
+      "internal/federation/adapters/sql/execution_effect.go",
+      "test/server/federation/execution_runtime_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /artifactory/api/replication/{repoPath}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getReplicationStatus",
-    "state": "stub: 501",
-    "contract": "Not implemented; answers 501. It would report the outcome of the last replication that touched a repository or a folder in it, read from the replication properties the run annotated on the items. The caller would need read permission on the repository.",
-    "handler": "internal/app/router.go: handwrittenStub",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "state": "partial: native dispatch; supported modes follow the contract",
+    "contract": "Reports durable single-replication outcomes for a repository or folder, including never_run, incomplete, error and partial_failure. Folder status uses actual selected or affected paths and does not inherit an unrelated repository completion. Requires current read permission covering the requested subtree; status reads never open target credentials or grant transfer authority.",
+    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "review_family": "single-replication-status",
+    "effects": "read-only current target/repository lifetime and selected-effect history; no sealed credentials, artifact/cache mutation, upstream request or queue admission",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.targets[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/federation/adapters/http/status.go",
+      "internal/federation/status.go",
+      "internal/federation/core/replication/status.go",
+      "internal/federation/adapters/sql/execution_effect.go",
+      "test/server/federation/execution_runtime_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

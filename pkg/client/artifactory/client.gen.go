@@ -5955,7 +5955,7 @@ type ReplicationRequest struct {
 	Username *string `json:"username,omitempty"`
 }
 
-// ReplicationStatus Replication status read from the replication properties the last run annotated on the items under a path. The shape differs by repository class: a local repository with several push targets lists them in targets; a remote repository reports the single pull in status and lastCompleted.
+// ReplicationStatus Status from durable execution and selected-effect evidence under the current repository lifetime. A local repository lists its single push target in targets; a remote repository reports the pull in status and lastCompleted. A folder with no selected or affected paths is never_run. A newer incomplete run retains the previous lastCompleted instant.
 type ReplicationStatus struct {
 	// LastCompleted Optional within this object. When the last run under this path finished.
 	LastCompleted *time.Time `json:"lastCompleted,omitempty"`

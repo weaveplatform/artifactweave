@@ -4,6 +4,7 @@ package api
 // implementation of each contract, as the module binds them.
 type API struct {
 	Repositories   Repositories
+	Lifetimes      RepositoryLifetimes
 	Layouts        Layouts
 	PackageIndex   PackageIndex
 	TransferSource TransferSource

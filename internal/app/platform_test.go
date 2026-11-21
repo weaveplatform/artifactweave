@@ -644,7 +644,7 @@ func TestAccMigrateCommand(t *testing.T) {
 			latest = 5
 		}
 		if m == "federation" {
-			latest = 4
+			latest = 7
 		}
 		want += fmt.Sprintf("schema version 0 of %d (sqlite, %s)\n", latest, m)
 	}

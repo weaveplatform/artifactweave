@@ -33,6 +33,7 @@ type Deps struct {
 	Store        Store
 	Access       accessapi.API
 	Ownership    artifactsapi.ProjectRepositoryLookup
+	Lifetimes    artifactsapi.RepositoryLifetimes
 	Repositories artifactsapi.Repositories
 	Zone         string
 }

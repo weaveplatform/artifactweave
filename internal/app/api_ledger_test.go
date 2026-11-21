@@ -436,6 +436,10 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		e.Effects = "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible"
 		e.Retry = "reconcile the addressed resource; verb alone is not proof of safe retry for every mode"
 	}
+	if method == http.MethodGet && (path == "/artifactory/api/replication/{repoPath}" || path == "/artifactory/api/replication/*") {
+		e.Effects = "read-only current target/repository lifetime and selected-effect history; no sealed credentials, artifact/cache mutation, upstream request or queue admission"
+		e.Admission += "; current credential and Read covering the requested subtree refreshed under the shared project guard"
+	}
 	if cleanupPolicy {
 		if method == "GET" {
 			e.Effects = "authorized policy configuration read; optional repository availability projection never rewrites stored criteria"
@@ -863,6 +867,15 @@ func (c *apiReviewClasses) pagingText() string {
 }
 
 func apiReviewPersistence(path string) (string, string, []string) {
+	if path == "/artifactory/api/replication/{repoPath}" || path == "/artifactory/api/replication/*" {
+		return "single-replication-status", "one current single-target configuration; secret-free target keyset pages of 100; indexed current target/repository incarnation and exact-or-descendant selected effects; latest scoped outcome plus retained last completion", []string{
+			"internal/federation/adapters/http/status.go",
+			"internal/federation/status.go",
+			"internal/federation/core/replication/status.go",
+			"internal/federation/adapters/sql/execution_effect.go",
+			"test/server/federation/execution_runtime_test.go",
+		}
+	}
 	if family, execution, evidence := apiReviewCleanupReports(path); family != "" {
 		return family, execution, evidence
 	}
