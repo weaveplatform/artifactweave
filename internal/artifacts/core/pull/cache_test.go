@@ -179,3 +179,51 @@ func TestUnitPullFetchRefusesTransactionsAndIncompleteExecutionAuthority(t *test
 		t.Fatal("altered selected facts reached P9", err)
 	}
 }
+
+func TestUnitPullFreshPolicyPropertySyncRenewsEverySharedRepresentation(t *testing.T) {
+	w := fixture(t)
+	selection := api.PullSelection{Properties: true}
+	selectFile := func() api.PullItem {
+		t.Helper()
+		w.peer.entries = []pull.Entry{file("a")}
+		w.peer.props = model.Properties{"quality": {"upstream"}}
+		repository := binding(t, w, selection)
+		items, _, err := w.source.Items(t.Context(), repository, selection, kernel.Page{})
+		if err != nil || len(items) != 1 {
+			t.Fatal(err)
+		}
+		return items[0]
+	}
+	selected := selectFile()
+	entry := retainedFile(t, w, selected)
+	key := entry.Token.Key
+	key.Variant = "same-item-query-variant"
+	token, err := w.db.RemoteCache().Begin(t.Context(), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.db.RemoteCache().Put(t.Context(), token, entry); err != nil {
+		t.Fatal(err)
+	}
+	w.config.RetrievalCachePeriodSecs = new(12345)
+	if err := w.db.Repos().Update(t.Context(), w.config); err != nil {
+		t.Fatal(err)
+	}
+	selected = selectFile()
+	w.source.Read = func(context.Context, source.Request) (source.Result, error) {
+		return source.Result{CacheEntry: &entry}, nil
+	}
+	proof, err := w.source.Fetch(t.Context(), selected, publication())
+	if err != nil {
+		t.Fatal("fresh property pull rejected a shared warm representation", err)
+	}
+	if err := w.source.WithCurrent(t.Context(), proof, func(context.Context) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []model.RemoteCacheKey{entry.Token.Key, key} {
+		current, err := w.db.RemoteCache().Read(t.Context(), key)
+		if err != nil || current.Smart == nil || len(current.Smart.OwnedProperties["quality"]) != 1 {
+			t.Fatal("shared representation lost remote property ownership", err)
+		}
+	}
+}

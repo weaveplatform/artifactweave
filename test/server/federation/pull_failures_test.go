@@ -381,3 +381,95 @@ func qualifyPullPolicyRecovery(t *testing.T, backend string) {
 		t.Fatal("cache reconciliation sent upstream DELETE")
 	}
 }
+
+func TestAccSinglePullPropertyPolicyVariantsSQLite(t *testing.T) {
+	qualifyPullPropertyPolicyVariants(t, "sqlite")
+}
+
+func TestAccSinglePullPropertyPolicyVariantsPostgres(t *testing.T) {
+	qualifyPullPropertyPolicyVariants(t, "postgres")
+}
+
+func qualifyPullPropertyPolicyVariants(t *testing.T, backend string) {
+	t.Helper()
+	w, driver, run := newPullDriverWorld(t, backend, false)
+	finish := func(run model.PullRun) model.PullRun {
+		t.Helper()
+		var err error
+		for step := 0; step < 20 && !run.Phase.Terminal(); step++ {
+			run, err = driver.Step(t.Context(), run.Reference, w.fence)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		if run.Phase != model.PullComplete {
+			t.Fatal("property policy pull did not complete")
+		}
+		return run
+	}
+	run = finish(run)
+	entries, _, err := w.runtime.Store.RemoteCache().Exact(t.Context(), "pull-remote", pullFaultPath, kernel.Page{Limit: 20})
+	if err != nil || len(entries) != 1 || entries[0].ItemID == 0 {
+		t.Fatal("verified real cache fixture", err)
+	}
+	entry := entries[0]
+	key := entry.Token.Key
+	key.Variant = "same-item-query-variant"
+	if err := w.runtime.Store.Tx(t.Context(), func(ctx context.Context) error {
+		token, err := w.runtime.Store.RemoteCache().Begin(ctx, key)
+		if err != nil {
+			return err
+		}
+		_, err = w.runtime.Store.RemoteCache().Put(ctx, token, entry)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	w.request(w.target, http.MethodPut, "/artifactory/api/storage/target/"+pullFaultPath+"?properties=quality=upstream", "", http.StatusNoContent)
+	w.request(w.source, http.MethodPut, "/artifactory/api/storage/pull-remote-cache/"+pullFaultPath+"?properties=kept=local", "", http.StatusNoContent)
+	if err := w.runtime.Store.Permissions().Create(t.Context(), accesstest.Permission{Name: "property-sync-reader", Resources: map[accessapi.ResourceType]accesstest.Resource{
+		accessapi.ResourceArtifact: {
+			Targets: map[string]accesstest.Target{"pull-remote": {Include: []string{"selected/**"}}},
+			Actions: accesstest.Grants{Users: map[string]accessapi.Actions{"replica-reader": accessapi.ActionAnnotate}},
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	w.request(w.source, http.MethodPost, "/artifactory/api/repositories/pull-remote", `{"retrievalCachePeriodSecs":12345}`, http.StatusOK)
+	w.request(w.source, http.MethodPost, replicationPath+"pull-remote", `{"syncProperties":true}`, http.StatusOK)
+	targets, err := w.runtime.Store.Replications().ForRepo(t.Context(), "pull-remote")
+	if err != nil || len(targets) != 1 {
+		t.Fatal(err)
+	}
+	principal, err := w.runtime.Auth.Basic(t.Context(), "replica-reader", "pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err = driver.Start(
+		accessapi.WithCaller(t.Context(), principal, nil),
+		replication.PullRequest{ID: "property-policy-cohort", TargetKey: targets[0].Key, TargetRevision: targets[0].Revision, Root: "selected"},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := w.bridge.count(http.MethodGet, itemRoute("target", pullFaultPath))
+	run = finish(run)
+	item, err := w.runtime.Store.PullProgress().Item(t.Context(), run.Reference, model.PullFetch, pullFaultPath)
+	if err != nil || item.Outcome != model.PullSucceeded || item.Cache == nil || w.bridge.count(http.MethodGet, itemRoute("target", pullFaultPath)) != before {
+		t.Fatal("property cohort did not retain successful warm receipt", err)
+	}
+	entries, _, err = w.runtime.Store.RemoteCache().Exact(t.Context(), "pull-remote", pullFaultPath, kernel.Page{Limit: 20})
+	if err != nil || len(entries) != 2 {
+		t.Fatal("shared representations changed", err)
+	}
+	for _, entry := range entries {
+		if entry.Smart == nil || len(entry.Smart.OwnedProperties["quality"]) != 1 || entry.Smart.OwnedProperties["quality"][0] != "upstream" {
+			t.Fatal("shared cache variant lost property ownership")
+		}
+	}
+	properties, err := w.runtime.Store.Items().Properties(t.Context(), entry.ItemID)
+	if err != nil || len(properties["kept"]) != 1 || properties["kept"][0] != "local" {
+		t.Fatal("property synchronization replaced a local annotation", err)
+	}
+}

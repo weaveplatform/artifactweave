@@ -242,6 +242,15 @@ func qualifyPullRegistryProcesses(t *testing.T, backend string, virtual bool) {
 			if warm.Phase != model.PullComplete || w.bridge.count(http.MethodGet, manifestRoute) != beforeManifest || w.bridge.count(http.MethodGet, layerRoute) != beforeLayer {
 				t.Fatal("warm native pull refetched payloads or failed to settle")
 			}
+			warmItems, continuation, err := w.runtime.Store.PullProgress().Items(t.Context(), warm.Reference, false, kernel.Page{Limit: 20})
+			if err != nil || continuation != "" || len(warmItems) != len(items) {
+				t.Fatal("warm native pull lost selected intents", err)
+			}
+			for index, item := range warmItems {
+				if item.Path != items[index].Path || item.Outcome != model.PullSucceeded || item.Cache == nil {
+					t.Fatal("warm native selection has no successful verified cache receipt", item.Path, item.Outcome, item.Reason)
+				}
+			}
 			if index != nil && !virtual {
 				ctx := accessapi.WithCaller(t.Context(), principal, nil)
 				source := w.runtime.Artifacts.API().PullSource
