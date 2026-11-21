@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Moves the JFrog Terraform providers the app-layer references in
-# deploy/artifactweave/terraform use (jfrog/artifactory, jfrog/platform) to
+# deploy/artifactweave/terraform use (jfrog/artifactory, jfrog/platform,
+# jfrog/project) to
 # their latest releases, everywhere they are pinned:
 #
 #   - each reference's versions.tf;
@@ -23,18 +24,18 @@
 #
 # With GITHUB_OUTPUT set, update writes changed (true|false), major
 # (true|false) and versions ("artifactory 12.11.15 and platform 2.2.12") for
-# deps-refresh.yml. ARTIFACTORY_TARGET and PLATFORM_TARGET name a version
+# deps-refresh.yml. ARTIFACTORY_TARGET, PLATFORM_TARGET and PROJECT_TARGET name a version
 # instead of the latest release; JFROG_PROVIDERS_ROOT names the tree to work
 # on. It never moves a pin backwards.
 set -euo pipefail
 
-# The key both providers' SHA256SUMS are signed with, as the Terraform
+# The key the providers' SHA256SUMS are signed with, as the Terraform
 # registry publishes it for the jfrog namespace
 # (registry.terraform.io/v1/providers/jfrog/<name>/<version>/download/...,
 # signing_keys). A signature by any other key fails the update: a rotated key
 # is a change a person reviews, not one this script follows.
 JFROG_SIGNING_FINGERPRINT=7F2AD74397A7E25E2D0B082E2FA4D2A520237FA7
-PROVIDERS="artifactory platform"
+PROVIDERS="artifactory platform project"
 PLATFORMS="linux_amd64 linux_arm64 darwin_amd64 darwin_arm64"
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -206,12 +207,9 @@ update() {
 	work=$(mktemp -d)
 	mirror=$work/mirror/registry.terraform.io/jfrog
 	while read -r name from to kind; do
-		case $kind in
-		patch | minor | major) ;;
-		*) continue ;;
-		esac
-		changed=true
-		[ "$kind" = major ] && major=true
+		# Every reference's lock is rebuilt below. Its unchanged providers
+		# must also be present in the verified mirror, even for a one-pin bump.
+		[ "$kind" = downgrade ] && to=$from
 		mkdir -p "$work/$name" "$mirror/$name"
 		fetch_sums "$name" "$to" "$work/$name"
 		sums="$work/$name/terraform-provider-${name}_${to}_SHA256SUMS"
@@ -223,6 +221,12 @@ update() {
 				(sha256sum -c - 2>/dev/null || shasum -a 256 -c -) >/dev/null ||
 				die "$zip does not match its signed SHA256SUMS"
 		done
+		case $kind in
+		patch | minor | major) ;;
+		*) continue ;;
+		esac
+		changed=true
+		[ "$kind" = major ] && major=true
 		rewrite_run_sh "$root/test/terraform/run.sh" "$name" "$to" "$sums"
 		for ref in $(references); do
 			grep -q "source *= *\"jfrog/$name\"" "$ref/versions.tf" && rewrite_versions_tf "$ref/versions.tf" "$name" "$to"
@@ -272,6 +276,7 @@ dry_run() {
 	cp -R "$root/deploy" "$copy/deploy"
 	cp -R "$root/test/terraform" "$copy/test/terraform"
 	cp "$root/.terraform-docs.yml" "$copy/"
+	cp "$root/Makefile" "$copy/"
 	[ -d "$root/.tools" ] && ln -s "$root/.tools" "$copy/.tools"
 	JFROG_PROVIDERS_ROOT=$copy GITHUB_OUTPUT='' "$here/jfrog-providers.sh" update
 	echo "== the update would change:"

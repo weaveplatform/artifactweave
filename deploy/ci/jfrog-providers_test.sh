@@ -39,6 +39,7 @@ mkdir -p "$fixture/test/terraform"
 cp "$here/../../test/terraform/run.sh" "$fixture/test/terraform/run.sh"
 check "pinned artifactory" "$(sed -n 's/^ARTIFACTORY_VERSION=//p' "$fixture/test/terraform/run.sh")" "$(pinned artifactory)"
 check "pinned platform" "$(sed -n 's/^PLATFORM_VERSION=//p' "$fixture/test/terraform/run.sh")" "$(pinned platform)"
+check "pinned project" "$(sed -n 's/^PROJECT_VERSION=//p' "$fixture/test/terraform/run.sh")" "$(pinned project)"
 
 # rewrite_versions_tf moves only the named provider's block, wherever its
 # version line sits relative to its source.
@@ -54,6 +55,10 @@ terraform {
       version = "1.0.0"
       source  = "jfrog/platform"
     }
+    project = {
+      source  = "jfrog/project"
+      version = "1.0.0"
+    }
   }
 }
 EOF
@@ -63,7 +68,11 @@ check "platform block kept" 'version = "1.0.0"' "$(tfline 8)"
 rewrite_versions_tf "$fixture/versions.tf" platform 3.0.0
 check "platform version before source moved" 'version = "3.0.0"' "$(tfline 8)"
 check "platform version stays above its source" 'source = "jfrog/platform"' "$(tfline 9)"
-check "lines kept" 12 "$(wc -l <"$fixture/versions.tf" | tr -d ' ')"
+check "project block kept" 'version = "1.0.0"' "$(tfline 13)"
+rewrite_versions_tf "$fixture/versions.tf" project 4.0.0
+check "project block moved independently" 'version = "4.0.0"' "$(tfline 13)"
+check "artifactory block still kept" 'version = "2.0.0"' "$(tfline 5)"
+check "lines kept" 16 "$(wc -l <"$fixture/versions.tf" | tr -d ' ')"
 
 # rewrite_run_sh moves the version and the four zip sums of one provider.
 sums=$fixture/terraform-provider-artifactory_9.9.9_SHA256SUMS
@@ -94,6 +103,67 @@ check "prose replaced" "installs 2.2.12 and v2.2.12, then 2.2.12 2.2.12 again" \
 	"$(sed -n 1p "$fixture/deploy/artifactweave/terraform/x/README.md")"
 check "prose untouched" "not 12.2.11 nor 2.2.110 nor 2.2.12.3" \
 	"$(sed -n 2p "$fixture/deploy/artifactweave/terraform/x/README.md")"
+
+# Rebuilding a mixed-provider lock needs unchanged release archives too. Run
+# the real update orchestration with offline release bytes and a lock command
+# that refuses any missing archive; a requested downgrade must retain its pin.
+set +e
+(
+	set -e
+	root=$fixture/mixed-provider-update
+	mkdir -p "$root/deploy" "$root/test/terraform" "$root/reference"
+	printf '#!/usr/bin/env bash\nexit 0\n' >"$root/deploy/check.sh"
+	printf '#!/usr/bin/env bash\nexit 0\n' >"$root/test/terraform/run.sh"
+	chmod +x "$root/deploy/check.sh" "$root/test/terraform/run.sh"
+	echo 'source = "jfrog/artifactory"' >"$root/reference/versions.tf"
+	report() {
+		printf '%s\n' 'artifactory 1.0.0 1.0.1 patch' 'platform 2.0.0 1.0.0 downgrade' 'project 3.0.0 3.0.0 none'
+	}
+	fetch_sums() {
+		local name=$1 version=$2 dir=$3 p zip
+		for p in $PLATFORMS; do
+			zip="terraform-provider-${name}_${version}_${p}.zip"
+			printf '%s  %s\n' "$(printf '%s' "$zip" | shasum -a 256 | cut -d' ' -f1)" "$zip"
+		done >"$dir/terraform-provider-${name}_${version}_SHA256SUMS"
+	}
+	curl() {
+		local output= url=
+		while [ $# -gt 0 ]; do
+			case $1 in
+			-o) output=$2; shift 2 ;;
+			*) url=$1; shift ;;
+			esac
+		done
+		printf '%s' "${url##*/}" >"$output"
+	}
+	rewrite_run_sh() { echo "$2" >>"$root/rewritten"; }
+	rewrite_versions_tf() { :; }
+	rewrite_prose() { :; }
+	terraform_on_path() { :; }
+	references() { echo "$root/reference"; }
+	terraform() {
+		local mirror name version p
+		[ "$1 $2" = 'providers lock' ] || return 1
+		mirror=${3#-fs-mirror=}
+		for name in $PROVIDERS; do
+			case $name in
+			artifactory) version=1.0.1 ;;
+			platform) version=2.0.0 ;;
+			project) version=3.0.0 ;;
+			esac
+			for p in $PLATFORMS; do
+				[ -f "$mirror/registry.terraform.io/jfrog/$name/terraform-provider-${name}_${version}_${p}.zip" ] || return 1
+			done
+		done
+		echo 'locked every required release' >.terraform.lock.hcl
+	}
+	update >/dev/null
+	[ "$(cat "$root/rewritten")" = artifactory ]
+	[ "$(cat "$root/reference/.terraform.lock.hcl")" = 'locked every required release' ]
+)
+mixed_update_rc=$?
+set -e
+check "mixed locks keep unchanged and non-downgraded providers available" 0 "$mixed_update_rc"
 
 # verify_sums: the real release checks, a tampered copy does not.
 if command -v gpg >/dev/null; then

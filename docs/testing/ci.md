@@ -1249,17 +1249,20 @@ for example `make oci-conformance OCI_TEST_CONTENT_MANAGEMENT=0`, runs without t
 
 ## Terraform scenarios
 
+All deployment roots require Terraform **1.17 or later**; CI pins **1.17.1**.
+
 `make terraform` runs `test/terraform/run.sh` over `TERRAFORM_SCENARIOS`: the repositories,
-identity, OIDC, CDN repositories, remote repositories, virtual repositories, webhooks and single
-replication references in `deploy/artifactweave/terraform/`. `test/terraform/` holds only
+identity, OIDC, CDN repositories, remote repositories, virtual repositories, webhooks, single
+replication and projects references in `deploy/artifactweave/terraform/`. `test/terraform/` holds only
 the driver.
 - It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` and
-  `terraform-provider-platform_<version>_<os>_<arch>.zip` once into a filesystem mirror,
+  `terraform-provider-platform_<version>_<os>_<arch>.zip` and
+  `terraform-provider-project_<version>_<os>_<arch>.zip` once into a filesystem mirror,
   checking each against the SHA-256 pinned in the script. The zips come from JFrog's GitHub
   releases only: the Terraform and OpenTofu registries point at the same assets, so there
   is no second source, and the job fails when GitHub is down
   ([#1341](https://github.com/weaveplatform/artifactweave/issues/1341)).
-- It points `TF_CLI_CONFIG_FILE` at a CLI configuration that installs both providers only
+- It points `TF_CLI_CONFIG_FILE` at a CLI configuration that installs all three providers only
   from that mirror.
 - For each scenario it runs `terraform init -lockfile=readonly` and `terraform validate`.
 
@@ -1277,7 +1280,8 @@ release zips by SHA-256, so `deps-refresh.yml`'s `jfrog-providers` job runs
 3. Moves the version in every reference's `versions.tf`, and the version and the four zip
    checksums in `run.sh`.
 4. Writes each lock afresh with `terraform providers lock -fs-mirror` from a mirror of the
-   four zips, each checked against the signed sums.
+   four zips per provider, each checked against the signed sums. Unchanged providers remain
+   in the mirror when another pin moves, and requested downgrades retain the current release.
 5. Moves the versions the READMEs name and regenerates their terraform-docs sections.
 6. Runs `run.sh validate` over every reference, so the pins, checksums and locks agree
    before anything is committed.
@@ -1290,7 +1294,7 @@ it. The script never moves a pin backwards.
 
 `make jfrog-providers` (`MODE=check|update|dry-run`, default `dry-run`) runs the same
 script locally. `dry-run` updates a copy of the tree and prints the diff;
-`ARTIFACTORY_TARGET` and `PLATFORM_TARGET` name a version instead of the latest release.
+`ARTIFACTORY_TARGET`, `PLATFORM_TARGET` and `PROJECT_TARGET` name a version instead of the latest release.
 `deploy/ci/jfrog-providers_test.sh`, which `make deploy-check` runs, checks the rewrites and
 the signature check offline. Its signature cases use the real 12.11.14 `SHA256SUMS` and
 signature committed in `deploy/ci/testdata/jfrog-providers`.
@@ -1302,7 +1306,7 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
    requests with a 503 that the provider does not retry (#1147). The provider's usage
    reports (`POST /artifactory/api/system/usage`, one for every resource operation) are
    ordinary requests, so the other budgets keep their defaults (#1597). If a later step fails,
-   `run.sh` prints the last 300 lines of the server log.
+   `run.sh` prints the last 300 lines of the server log and retains its private work directory.
 2. Mint an admin access token with the bootstrap admin's password
    (`POST /access/api/v1/tokens`), which the server takes because step 1 starts it with
    `ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH=true`. The providers authenticate only with a Bearer
@@ -1350,7 +1354,17 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
      sealed persistent credentials and no target/upstream requests. Destroy both
      configurations and repositories, observe GET404 for the configurations, then remove
      the fixture proxy. This proves configuration lifecycle; transfer and scheduling
-     workers have separate P11 tickets (#1760).
+     workers have separate P11 tickets (#1760);
+   - **projects:** apply all nine planned project resource types, including the legacy and
+     replacement project aliases, and require an empty refreshed plan. Read repository
+     assignment directly, then perform native allowed/denied requests as project users.
+     Apply a second revision changing group roles, an environment, standard sharing and
+     hard/soft quota, and require another empty plan. The quota proof streams one file
+     of 1 GiB minus 1 MiB and reuses its checksum for a second logical reference: hard
+     quota refuses it, soft quota admits it. Destroy all 24 resources and verify public
+     absence. Sanitized version/digest/effect evidence joins the coverage artifact;
+     Terraform state stays private. Missing resources or runner steps fail the required
+     native inventory (#1748).
 4. Require `terraform plan -detailed-exitcode` to exit 0.
 5. Destroy.
 
