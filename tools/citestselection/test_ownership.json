@@ -259,6 +259,7 @@
       "permissions_walk_test.go",
       "project_publication_sql_test.go",
       "project_publication_test.go",
+      "project_quota_mutations_test.go",
       "project_quota_test.go",
       "project_repositories_test.go",
       "project_repository_bindings_sql_test.go",
