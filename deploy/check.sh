@@ -2,8 +2,8 @@
 # Static checks and mocked tests over every Terraform root under deploy/ and
 # test/terraform, with pinned tools (decision 0030):
 #
-#   check.sh        the prove-matrix and jfrog-providers table tests and the
-#                   contract lint, then fmt, validate, tflint, trivy,
+#   check.sh        the scenario driver, prove-matrix and jfrog-providers tests
+#                   and contract lint, then fmt, validate, tflint, trivy,
 #                   terraform test and the terraform-docs drift check
 #   check.sh docs   rewrite the terraform-docs sections of the READMEs
 #   check.sh tools  fetch the pinned tools into .tools/ and stop
@@ -59,6 +59,8 @@ fail() {
 if [ "$mode" = check ]; then
 	echo "== prove-matrix"
 	"$root/deploy/ci/prove-matrix_test.sh" || fail "prove-matrix.sh chooses the wrong scenarios (deploy/ci/prove-matrix_test.sh)"
+	echo "== scenario-ci"
+	python3 "$root/deploy/ci/scenario_ci_test.py" || fail "the scenario driver misjudges Azure cleanup (deploy/ci/scenario_ci_test.py)"
 	echo "== jfrog-providers"
 	"$root/deploy/ci/jfrog-providers_test.sh" || fail "jfrog-providers.sh rewrites the pins wrongly (deploy/ci/jfrog-providers_test.sh)"
 	echo "== contract"

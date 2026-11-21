@@ -701,13 +701,18 @@ azure_delete_front_doors() { # instance
 # for every tagged DNS record set in the zones the deployer can see: a
 # custom domain's validation TXT record and CNAME.
 azure_cdn_records() {
-  local group zone
+  local group zone zones records
+  zones=$(az network dns zone list --only-show-errors --query '[].[resourceGroup, name]' -o tsv) || return 1
   while IFS=$'\t' read -r group zone; do
     [ -n "$zone" ] || continue
-    az network dns record-set list --resource-group "$group" --zone-name "$zone" --only-show-errors -o json |
-      jq -r --arg g "$group" --arg z "$zone" '.[] | (.metadata // {}) as $m | select($m["artifactweave-scenario"] != null) |
-        [$g, $z, (.type | split("/") | last | ascii_downcase), .name, ($m["expires-at"] // ""), ($m.instance // ""), $m["artifactweave-scenario"]] | @tsv'
-  done < <(az network dns zone list --only-show-errors --query '[].[resourceGroup, name]' -o tsv)
+    records=$(az network dns record-set list --resource-group "$group" --zone-name "$zone" --only-show-errors -o json) || return 1
+    # Bash collapses empty tab fields; keep the instance in its column even
+    # when an orphaned record has lost its expiry metadata.
+    jq -r --arg g "$group" --arg z "$zone" '.[] | (.metadata // {}) as $m | select($m["artifactweave-scenario"] != null) |
+      [$g, $z, (.type | split("/") | last | ascii_downcase), .name, $m["expires-at"], $m.instance, $m["artifactweave-scenario"]] |
+      map(if . == null or . == "" then "-" else . end) | @tsv' \
+      <<<"$records" || return 1
+  done <<<"$zones"
 }
 
 # reap_azure_cdn deletes the tagged DNS records of instances that have no
@@ -719,7 +724,7 @@ reap_azure_cdn() {
     [ -n "$name" ] || continue
     in_scope "$inst" || continue
     ours "$scenario" || continue
-    if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
+    if [[ $live != *" $inst "* ]] && [[ $exp =~ ^[0-9]+$ ]] && [ "$exp" -le "$now" ]; then
       if az network dns record-set "$type" delete --resource-group "$group" --zone-name "$zone" \
         --name "$name" --yes --only-show-errors; then
         summary "Deleted orphaned record \`$name\` ($type in \`$zone\`, instance \`$inst\`, expired $(utc "$exp"))."
@@ -872,19 +877,32 @@ reap() {
 # begins (a mirror's ...-m and a multi-region's ...-mr in the same run).
 check_clean() {
   : "${RUN_TAG:?RUN_TAG is required}"
-  local left=0 scenario instance
-  while read -r scenario instance; do
-    if [[ $instance == "$RUN_TAG"-* ]]; then
-      summary "**Left behind:** the state of \`$CLOUD/$scenario\` instance \`$instance\`."
-      left=1
+  local attempt=1 attempts=1
+  # Front Door deletion can finish before Azure's resource inventory catches
+  # up. Both failed CDN proofs became empty within 20 seconds without another
+  # resource deletion. Allow a minute of retry delays, still requiring an
+  # empty scan; failed reads abort instead of being mistaken for deletion.
+  case $CLOUD in azure | multicloud) attempts=13 ;; esac
+  while :; do
+    local left=0 scenario instance state_list confirming=
+    state_list=$(states)
+    while read -r scenario instance; do
+      if [[ $instance == "$RUN_TAG"-* ]]; then
+        summary "**Left behind:** the state of \`$CLOUD/$scenario\` instance \`$instance\`."
+        left=1
+      fi
+    done <<<"$state_list"
+    if [ "$attempt" -lt "$attempts" ]; then confirming=1; fi
+    local c
+    for c in $CLOUDS; do leftovers "$c"; done
+    if [ "$left" = 0 ]; then
+      summary "Nothing of run \`$RUN_TAG\` remains in \`$CLOUD\`."
+      return 0
     fi
-  done < <(states)
-  local c
-  for c in $CLOUDS; do leftovers "$c"; done
-  if [ "$left" = 0 ]; then
-    summary "Nothing of run \`$RUN_TAG\` remains in \`$CLOUD\`."
-  fi
-  [ "$left" = 0 ]
+    [ "$attempt" -lt "$attempts" ] || return 1
+    sleep 5
+    attempt=$((attempt + 1))
+  done
 }
 
 # leftovers reports the labelled buckets or resources of the run's instances
@@ -905,25 +923,33 @@ leftovers() { # cloud
     gcp_cdn_leftovers
     ;;
   azure)
-    local type
+    local type resources records
+    # Capture reads before iterating: a process substitution's failed query
+    # otherwise looks exactly like an empty inventory and can pass the proof.
+    resources=$(az resource list --resource-group "$PLATFORM_AZURE_RESOURCE_GROUP" --only-show-errors -o json)
+    resources=$(jq -r --arg tag "$RUN_TAG-" '.[] | select((.tags.instance // "") | startswith($tag)) | [(.type | ascii_downcase), .name] | @tsv' <<<"$resources")
     while IFS=$'\t' read -r type line; do
       [ -n "$line" ] || continue
       if [ "$type" = microsoft.cdn/profiles ]; then
-        summary "**Left behind, billed by the hour:** Front Door profile \`$line\`."
+        if [ -n "${confirming:-}" ]; then
+          summary "Waiting for deletion confirmation of Front Door profile \`$line\`."
+        else
+          summary "**Left behind, billed by the hour:** Front Door profile \`$line\`."
+        fi
       else
         summary "**Left behind:** resource \`$line\`."
       fi
       left=1
-    done < <(az resource list --resource-group "$PLATFORM_AZURE_RESOURCE_GROUP" --only-show-errors -o json |
-      jq -r --arg tag "$RUN_TAG-" '.[] | select((.tags.instance // "") | startswith($tag)) | [(.type | ascii_downcase), .name] | @tsv')
+    done <<<"$resources"
     # azure/cdn's DNS records, which no other scenario makes.
     [ "$CLOUD" = azure ] || return 0
     local group zone name exp inst
+    records=$(azure_cdn_records)
     while IFS=$'\t' read -r group zone type name exp inst _; do
       [[ $inst == "$RUN_TAG"-* ]] || continue
       summary "**Left behind:** record \`$name\` ($type in \`$zone\`)."
       left=1
-    done < <(azure_cdn_records)
+    done <<<"$records"
     ;;
   aws)
     local exp inst region
