@@ -122,6 +122,7 @@ index sqlite_autoindex_project_authority_guard_1 project_authority_guard
 index sqlite_autoindex_project_members_1 project_members
 index sqlite_autoindex_project_repositories_1 project_repositories
 index sqlite_autoindex_project_repository_shares_1 project_repository_shares
+index sqlite_autoindex_project_storage_1 project_storage
 index sqlite_autoindex_projects_1 projects
 index sqlite_autoindex_release_bundles_1 release_bundles
 index sqlite_autoindex_remote_cache_1 remote_cache
@@ -240,6 +241,7 @@ table project_authority_guard project_authority_guard CREATE TABLE project_autho
 table project_members project_members CREATE TABLE project_members(project_key TEXT NOT NULL REFERENCES projects(key)ON DELETE CASCADE,principal_type TEXT NOT NULL,principal_name TEXT NOT NULL,roles TEXT,PRIMARY KEY(project_key,principal_type,principal_name))
 table project_repositories project_repositories CREATE TABLE project_repositories(repo_key TEXT PRIMARY KEY,project_key TEXT NOT NULL DEFAULT '',environments TEXT,shared_with_all BOOLEAN NOT NULL DEFAULT FALSE,shared_read_only BOOLEAN NOT NULL DEFAULT FALSE,updated_at BIGINT,sharing_revision TEXT NOT NULL DEFAULT '')
 table project_repository_shares project_repository_shares CREATE TABLE project_repository_shares(repo_key TEXT NOT NULL REFERENCES project_repositories(repo_key)ON DELETE CASCADE,project_key TEXT NOT NULL,PRIMARY KEY(repo_key,project_key))
+table project_storage project_storage CREATE TABLE project_storage(project_key TEXT PRIMARY KEY REFERENCES projects(key)ON DELETE CASCADE,bytes INTEGER NOT NULL CHECK(bytes >= 0),warning_key TEXT NOT NULL DEFAULT '')
 table projects projects CREATE TABLE projects(key TEXT PRIMARY KEY,display_name TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',storage_quota_bytes BIGINT NOT NULL DEFAULT 0,soft_limit BOOLEAN NOT NULL DEFAULT FALSE,quota_email BOOLEAN NOT NULL DEFAULT FALSE,admin_privileges TEXT,incarnation TEXT NOT NULL DEFAULT '',policy_revision TEXT NOT NULL DEFAULT '')
 table release_bundles release_bundles CREATE TABLE release_bundles(name TEXT NOT NULL,version TEXT NOT NULL,state TEXT NOT NULL,storing_repo TEXT NOT NULL DEFAULT '',project_key TEXT NOT NULL DEFAULT '',origin TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',signed_at BIGINT,signing_key_alias TEXT NOT NULL DEFAULT '',signature BLOB,notes TEXT,spec TEXT,PRIMARY KEY(name,version))
 table remote_cache remote_cache CREATE TABLE remote_cache(repo_key TEXT NOT NULL REFERENCES repositories(key)ON DELETE CASCADE,cache_id TEXT NOT NULL,path TEXT NOT NULL,doc TEXT NOT NULL,PRIMARY KEY(repo_key,cache_id))
