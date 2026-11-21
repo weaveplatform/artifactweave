@@ -65,6 +65,10 @@ func newSelectionWorld(t *testing.T, db app.RouterStore) *selectionWorld {
 		PackageIndex:  pkgindex.NewReader(db, formats.For, &item.Service{Store: db}),
 		Now:           func() time.Time { return w.now },
 		ProjectExists: func(ctx context.Context, key string) error { _, err := db.Projects().Get(ctx, key); return err },
+		ProjectIncarnation: func(ctx context.Context, key string) (string, error) {
+			authority, err := db.Projects().Authority(ctx, key)
+			return string(authority.Incarnation), err
+		},
 		Authorize: func(ctx context.Context) (cleanup.Policy, error) {
 			if err := db.Projects().Guard(ctx); err != nil {
 				return nil, err

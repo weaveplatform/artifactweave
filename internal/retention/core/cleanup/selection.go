@@ -71,6 +71,13 @@ func (s *Selection) run(ctx context.Context, fn func(context.Context) error) err
 		if !authority.Allows(s.snapshot.Policy.ProjectKey) {
 			return kernel.ErrForbidden
 		}
+		// Legacy previews describe a rule without granting execution. Newly
+		// bound snapshots cannot silently move to a recreated project key.
+		if s.snapshot.Policy.ProjectIncarnation != "" {
+			if err := s.service.currentProject(ctx, s.snapshot.Policy); err != nil {
+				return err
+			}
+		}
 		return fn(ctx)
 	})
 }

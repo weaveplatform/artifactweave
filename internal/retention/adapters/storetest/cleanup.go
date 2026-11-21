@@ -20,7 +20,7 @@ func runCleanup(t *testing.T, newStore Factory) {
 }
 
 func cleanupPolicy(key string, item model.CleanupItemType, project string) model.CleanupPolicy {
-	return model.CleanupPolicy{
+	p := model.CleanupPolicy{
 		Key:                 key,
 		Revision:            "original-" + key,
 		ExecutionCredential: kernel.CredentialReference{Name: "admin", TokenID: "original-token"},
@@ -46,6 +46,10 @@ func cleanupPolicy(key string, item model.CleanupItemType, project string) model
 		Updated:   storekit.At(1),
 		UpdatedBy: "ann",
 	}
+	if project != "" {
+		p.ProjectIncarnation = "lifetime-" + project
+	}
+	return p
 }
 
 func testCleanupPolicies(t *testing.T, s port.Store) {

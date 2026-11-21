@@ -47,6 +47,9 @@ type CleanupPolicy struct {
 	// Revision fences queued work across edits, disablement and recreation.
 	// It is private state, not a field of the vendor policy representation.
 	Revision string
+	// ProjectIncarnation binds this policy to one project lifetime, even when
+	// a platform administrator could administer a later project with that key.
+	ProjectIncarnation string `json:"-"`
 	// ExecutionCredential retains the verified enabling/updating caller, never
 	// a password, bearer token or cached administrator flag. A scheduled run
 	// must refresh this reference; CreatedBy/UpdatedBy alone grant no authority.
@@ -88,9 +91,10 @@ type CleanupRun struct {
 // Occurrence identifies a scheduler fire; empty denotes a distinct manual run.
 // Neither this state nor its credential reference is a public report payload.
 type CleanupExecution struct {
-	RunID      int64  `json:"-"`
-	Occurrence string `json:"-"`
-	Policy     CleanupPolicy
-	Credential kernel.CredentialReference
-	At         time.Time
+	RunID              int64  `json:"-"`
+	Occurrence         string `json:"-"`
+	Policy             CleanupPolicy
+	Credential         kernel.CredentialReference
+	ProjectIncarnation string
+	At                 time.Time
 }

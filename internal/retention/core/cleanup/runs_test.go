@@ -52,7 +52,8 @@ func TestUnitCleanupManualAdmissionRollsBackWithQueueAndRetainsFrozenHistory(t *
 	e, err := db.Cleanup().Execution(ctx, r.ID)
 	must(t, err)
 	if e.Policy.ProjectKey != "alpha" || e.Policy.Revision == "" || !e.At.Equal(s.Now()) ||
-		!reflect.DeepEqual(e.Credential, policyAuthority("*").Credential()) || e.Policy.ExecutionCredential.Name != "" {
+		!reflect.DeepEqual(e.Credential, policyAuthority("*").Credential()) || e.Policy.ExecutionCredential.Name != "" ||
+		e.ProjectIncarnation == "" || e.Policy.ProjectIncarnation != "" {
 		t.Fatal("run did not retain its frozen policy/clock and original credential")
 	}
 	queued, err := db.WorkQueue().Get(ctx, cleanup.WorkKind, strconv.FormatInt(r.ID, 10))

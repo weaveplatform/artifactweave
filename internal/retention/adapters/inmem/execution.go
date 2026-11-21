@@ -19,6 +19,7 @@ func (c cleanupStore) occurrences() *memtx.Table[string, int64] {
 
 func (c cleanupStore) CreateExecution(ctx context.Context, e model.CleanupExecution) error {
 	e.Policy.ExecutionCredential = kernel.CredentialReference{}
+	e.Policy.ProjectIncarnation = ""
 	if err := e.Validate(); err != nil {
 		return err //nolint:wrapcheck // the model names the invalid execution
 	}

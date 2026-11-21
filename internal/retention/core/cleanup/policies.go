@@ -41,15 +41,16 @@ type RepositoryReader interface {
 // callback performs network I/O; run admission through WithPolicy also remains
 // inside the transaction. Selection is metadata-only; CLN-04 owns execution.
 type Service struct {
-	Store         port.Store
-	Schedules     schedule.Store
-	Repositories  RepositoryReader
-	PackageIndex  artifactsapi.PackageIndex
-	ProjectExists func(context.Context, string) error
-	Authorize     func(context.Context) (Policy, error)
-	Guard         func(context.Context) error
-	Work          work.WorkQueue
-	Now           func() time.Time
+	Store              port.Store
+	Schedules          schedule.Store
+	Repositories       RepositoryReader
+	PackageIndex       artifactsapi.PackageIndex
+	ProjectExists      func(context.Context, string) error
+	ProjectIncarnation func(context.Context, string) (string, error)
+	Authorize          func(context.Context) (Policy, error)
+	Guard              func(context.Context) error
+	Work               work.WorkQueue
+	Now                func() time.Time
 	// Zone is the server's configured IANA timezone; empty uses deterministic UTC.
 	Zone string
 }
@@ -112,6 +113,11 @@ func (s Service) Create(ctx context.Context, key string, in model.CleanupPolicy)
 		if err := s.validate(ctx, key, &in); err != nil {
 			return err
 		}
+		var err error
+		in.ProjectIncarnation, err = s.projectIncarnation(ctx, in.ProjectKey)
+		if err != nil {
+			return err
+		}
 		in.Revision, in.Created, in.Updated = rand.Text(), s.now(), s.now()
 		in.ExecutionCredential = kernel.CredentialReference{}
 		in.CreatedBy, in.UpdatedBy = authority.Name(), authority.Name()
@@ -146,7 +152,12 @@ func (s Service) Update(ctx context.Context, key string, in model.CleanupPolicy)
 			return err
 		}
 		in.Created, in.CreatedBy, in.Enabled = old.Created, old.CreatedBy, old.Enabled
+		in.ProjectIncarnation, err = s.projectIncarnation(ctx, in.ProjectKey)
+		if err != nil {
+			return err
+		}
 		if old.Revision != "" && reflect.DeepEqual(configuration(in), configuration(old)) &&
+			old.ProjectIncarnation == in.ProjectIncarnation &&
 			(!old.Enabled || reflect.DeepEqual(old.ExecutionCredential, authority.Credential())) {
 			out = old
 			return nil
@@ -219,7 +230,15 @@ func (s Service) Enable(ctx context.Context, key string, enabled bool) error {
 		if err != nil {
 			return err
 		}
-		if p.Enabled == enabled && p.Revision != "" && (!enabled || reflect.DeepEqual(p.ExecutionCredential, authority.Credential())) {
+		changedProject := false
+		if enabled {
+			incarnation, err := s.projectIncarnation(ctx, p.ProjectKey)
+			if err != nil {
+				return err
+			}
+			changedProject, p.ProjectIncarnation = incarnation != p.ProjectIncarnation, incarnation
+		}
+		if p.Enabled == enabled && p.Revision != "" && !changedProject && (!enabled || reflect.DeepEqual(p.ExecutionCredential, authority.Credential())) {
 			return nil
 		}
 		p.Enabled = enabled
@@ -369,6 +388,9 @@ func (s Service) WithPolicy(ctx context.Context, key, revision string, effect fu
 		}
 		if p.ItemType != model.CleanupPackage || !p.Enabled || revision == "" || p.Revision != revision {
 			return nil
+		}
+		if err := s.currentProject(ctx, p); err != nil {
+			return err
 		}
 		if err := effect(ctx, p); err != nil {
 			return fmt.Errorf("cleanup admitted effect: %w", err)

@@ -26,8 +26,10 @@ func testCleanupExecutions(t *testing.T, s port.Store) {
 	}
 	r := newRun()
 	credential := p.ExecutionCredential
+	incarnation := p.ProjectIncarnation
 	p.ExecutionCredential = kernel.CredentialReference{}
-	e := model.CleanupExecution{RunID: r.ID, Occurrence: "logical-scheduled-fire", Policy: p, Credential: credential, At: storekit.At(4)}
+	p.ProjectIncarnation = ""
+	e := model.CleanupExecution{RunID: r.ID, Occurrence: "logical-scheduled-fire", Policy: p, Credential: credential, ProjectIncarnation: incarnation, At: storekit.At(4)}
 	storekit.Must(t, cs.CreateExecution(ctx, e))
 	storekit.Same(t, "execution roundtrip", e, storekit.Get[model.CleanupExecution](t)(cs.Execution(ctx, r.ID)))
 	storekit.Same(t, "occurrence resolves original run", e, storekit.Get[model.CleanupExecution](t)(cs.ExecutionForOccurrence(ctx, e.Occurrence)))

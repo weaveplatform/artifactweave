@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	accessmodel "github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/storekit"
@@ -28,16 +29,33 @@ func (q cleanupEnqueueFault) Enqueue(ctx context.Context, kind, key string, payl
 	return errCleanupEnqueue
 }
 
-func testCleanupRunAdmission(t *testing.T, db Store) {
-	ctx := t.Context()
-	now := time.Date(2026, 11, 20, 1, 0, 0, 0, time.UTC)
-	s := cleanup.Service{
+func cleanupRunService(db Store, now func() time.Time) cleanup.Service {
+	return cleanup.Service{
 		Store: db, Work: db.WorkQueue(), Schedules: db.Schedules(), Guard: db.Projects().Guard,
-		Now: func() time.Time { return now },
+		ProjectExists: func(ctx context.Context, key string) error {
+			if _, err := db.Projects().Get(ctx, key); err != nil {
+				return fmt.Errorf("current cleanup fixture project: %w", err)
+			}
+			return nil
+		},
+		ProjectIncarnation: func(ctx context.Context, key string) (string, error) {
+			authority, err := db.Projects().Authority(ctx, key)
+			if err != nil {
+				return "", fmt.Errorf("current cleanup fixture lifetime: %w", err)
+			}
+			return string(authority.Incarnation), nil
+		},
+		Now: now,
 		Authorize: func(ctx context.Context) (cleanup.Policy, error) {
 			return cleanupAuthority{}, db.Projects().Guard(ctx)
 		},
 	}
+}
+
+func testCleanupRunAdmission(t *testing.T, db Store) {
+	ctx := t.Context()
+	now := time.Date(2026, 11, 20, 1, 0, 0, 0, time.UTC)
+	s := cleanupRunService(db, func() time.Time { return now })
 	p := model.CleanupPolicy{
 		Key: "admission", Revision: "initial-admission-revision", ItemType: model.CleanupPackage, Enabled: true,
 		ExecutionCredential: (cleanupAuthority{}).Credential(),
@@ -111,13 +129,7 @@ func testCleanupRunAdmission(t *testing.T, db Store) {
 func testCleanupRunConcurrentAdmission(t *testing.T, db Store) {
 	ctx := t.Context()
 	now := time.Date(2026, 11, 20, 1, 0, 0, 0, time.UTC)
-	s := cleanup.Service{
-		Store: db, Work: db.WorkQueue(), Schedules: db.Schedules(), Guard: db.Projects().Guard,
-		Now: func() time.Time { return now },
-		Authorize: func(ctx context.Context) (cleanup.Policy, error) {
-			return cleanupAuthority{}, db.Projects().Guard(ctx)
-		},
-	}
+	s := cleanupRunService(db, func() time.Time { return now })
 	p := model.CleanupPolicy{
 		Key: "concurrent-admission", Revision: "concurrent-revision", ItemType: model.CleanupPackage, Enabled: true,
 		ExecutionCredential: (cleanupAuthority{}).Credential(),
@@ -153,4 +165,39 @@ func testCleanupRunConcurrentAdmission(t *testing.T, db Store) {
 	if len(runs) != 1 || runs[0].TriggerID != runs[0].ID {
 		t.Fatal("concurrent admission lost or duplicated its stable integer trigger")
 	}
+}
+
+func testCleanupRunProjectLifetime(t *testing.T, db Store) {
+	ctx := t.Context()
+	now := time.Date(2026, 11, 20, 1, 0, 0, 0, time.UTC)
+	s := cleanupRunService(db, func() time.Time { return now })
+	storekit.Must(t, db.Projects().Create(ctx, accessmodel.Project{Key: "alpha"}))
+	_, err := s.Create(ctx, "project-lifetime", model.CleanupPolicy{
+		Key: "project-lifetime", ProjectKey: "alpha",
+		Criteria: model.CleanupCriteria{PackageTypes: []string{"npm"}, Repos: []string{"**"}, IncludedPackages: []string{"**"}},
+	})
+	storekit.Must(t, err)
+	storekit.Must(t, s.Enable(ctx, "project-lifetime", true))
+	p, err := s.Get(ctx, "project-lifetime", false)
+	storekit.Must(t, err)
+	r, err := s.ManualRun(ctx, p.Key, false)
+	storekit.Must(t, err)
+	original, err := db.Cleanup().Execution(ctx, r.ID)
+	storekit.Must(t, err)
+	if original.ProjectIncarnation == "" || original.ProjectIncarnation != p.ProjectIncarnation {
+		t.Fatal("project run was admitted without the policy's lifetime fence")
+	}
+	storekit.Must(t, db.Projects().Delete(ctx, "alpha"))
+	storekit.Must(t, db.Projects().Create(ctx, accessmodel.Project{Key: "alpha"}))
+	_, err = s.ManualRun(ctx, p.Key, false)
+	storekit.WantErr(t, err, kernel.ErrConflict)
+	storekit.Must(t, s.Enable(ctx, p.Key, true))
+	fresh, err := s.Get(ctx, p.Key, false)
+	storekit.Must(t, err)
+	if fresh.ProjectIncarnation == original.ProjectIncarnation || fresh.Revision == p.Revision {
+		t.Fatal("verified re-enablement reused the ended policy/project generation")
+	}
+	retained, err := db.Cleanup().Execution(ctx, r.ID)
+	storekit.Must(t, err)
+	storekit.Same(t, "project recreation retains the original run snapshot", original, retained)
 }

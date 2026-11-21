@@ -29,6 +29,9 @@
 // ScheduledRun deduplicates the logical scheduler fire and fences its final
 // queue lease in that same transaction. An enabled legacy policy whose actor
 // is only a name needs verified re-enablement before scheduled execution.
+// Project policies also retain the owning project incarnation. A reused key
+// cannot admit old work or reuse a bound preview, even for a platform admin;
+// verified re-enablement binds a new policy generation without rewriting history.
 // Stop/StopAll and emergency DisableAll request STOPPING; only the executor
 // may mark a run terminal after fencing further destructive publication.
 //

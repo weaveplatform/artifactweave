@@ -48,8 +48,9 @@ type CleanupStore interface {
 	// CreateExecution persists the private snapshot of an existing run. A
 	// nonempty occurrence is unique across scheduler retries, including after
 	// the policy is deleted; an empty one never coalesces manual runs.
-	// The frozen policy omits its configuration credential: Credential alone
-	// records this run's actor. Times use the shared UTC microsecond precision.
+	// The frozen policy omits its private configuration bindings: Credential
+	// and ProjectIncarnation retain this run's own binding. Times use the
+	// shared UTC microsecond precision.
 	CreateExecution(context.Context, model.CleanupExecution) error
 	// Execution locks the snapshot inside a transaction. Acquire current
 	// project authority before this run lock, and the queue lease after it.

@@ -60,6 +60,7 @@ func Run(t *testing.T, newStore Factory) {
 	t.Run("CleanupPolicyConcurrentDisable", func(t *testing.T) { testCleanupPolicyConcurrentDisable(t, newStore(t)) })
 	t.Run("CleanupRunAdmission", func(t *testing.T) { testCleanupRunAdmission(t, newStore(t)) })
 	t.Run("CleanupRunConcurrentAdmission", func(t *testing.T) { testCleanupRunConcurrentAdmission(t, newStore(t)) })
+	t.Run("CleanupRunProjectLifetime", func(t *testing.T) { testCleanupRunProjectLifetime(t, newStore(t)) })
 	accstoretest.Run(t, func(t *testing.T) accport.Store { return newStore(t) })
 	ntfstoretest.Run(t, func(t *testing.T) ntfport.Store { return newStore(t) })
 	retstoretest.Run(t, func(t *testing.T) retport.Store { return newStore(t) })

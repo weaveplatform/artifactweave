@@ -13,6 +13,8 @@ var _ accessapi.Projects = (*Projects)(nil)
 
 // Project is one project as Projects holds it.
 type Project struct {
+	// Incarnation is the explicit lifetime used by durable-work tests.
+	Incarnation string
 	// Environments are the project's environment names, in any order;
 	// Projects.Environments sorts them.
 	Environments []string
@@ -31,6 +33,7 @@ type Projects struct {
 	GuardFunc            func(context.Context) error
 	BindRepositoryFunc   func(context.Context, string, string, []string, bool) error
 	RemoveRepositoryFunc func(context.Context, string) error
+	IncarnationFunc      func(context.Context, string) (string, error)
 	// Projects maps a project key to the project.
 	Projects map[string]Project
 	// Global is the global environments' names, in any order, which
@@ -103,4 +106,23 @@ func (p *Projects) Exists(_ context.Context, project string) error {
 		return nil
 	}
 	return fmt.Errorf("accessapitest: project %q: %w", project, kernel.ErrNotFound)
+}
+
+// Incarnation returns the configured lifetime or a store failure for an
+// existing fixture that has no explicit lifetime; a key alone is no fence.
+func (p *Projects) Incarnation(ctx context.Context, project string) (string, error) {
+	if p.IncarnationFunc != nil {
+		return p.IncarnationFunc(ctx, project)
+	}
+	if p.Err != nil {
+		return "", p.Err
+	}
+	value, ok := p.Projects[project]
+	if !ok {
+		return "", fmt.Errorf("accessapitest: project %q: %w", project, kernel.ErrNotFound)
+	}
+	if value.Incarnation == "" {
+		return "", fmt.Errorf("accessapitest: project has no explicit lifetime: %w", kernel.ErrStore)
+	}
+	return value.Incarnation, nil
 }

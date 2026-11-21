@@ -120,6 +120,9 @@ func (s Service) admitRun(ctx context.Context, p model.CleanupPolicy, authority 
 	if credential.Name != authority.Name() {
 		return model.CleanupRun{}, kernel.ErrBadCredentials
 	}
+	if err := s.currentProject(ctx, p); err != nil {
+		return model.CleanupRun{}, err
+	}
 	active, _, err := s.Store.Cleanup().Runs(ctx, port.RunFilter{PolicyKey: p.Key, ItemType: model.CleanupPackage, Statuses: activeStatuses}, kernel.Page{Limit: 1})
 	if err != nil {
 		return model.CleanupRun{}, fmt.Errorf("read active cleanup runs: %w", err)
@@ -141,8 +144,9 @@ func (s Service) admitRun(ctx context.Context, p model.CleanupPolicy, authority 
 	if err := s.Store.Cleanup().UpdateRun(ctx, r); err != nil {
 		return model.CleanupRun{}, fmt.Errorf("assign cleanup trigger identity: %w", err)
 	}
-	p.ExecutionCredential = kernel.CredentialReference{}
-	execution := model.CleanupExecution{RunID: r.ID, Occurrence: occurrence, Policy: kernel.Clone(p), Credential: credential, At: s.now()}
+	incarnation := p.ProjectIncarnation
+	p.ExecutionCredential, p.ProjectIncarnation = kernel.CredentialReference{}, ""
+	execution := model.CleanupExecution{RunID: r.ID, Occurrence: occurrence, Policy: kernel.Clone(p), Credential: credential, ProjectIncarnation: incarnation, At: s.now()}
 	if err := s.Store.Cleanup().CreateExecution(ctx, execution); err != nil {
 		return model.CleanupRun{}, fmt.Errorf("record cleanup execution snapshot: %w", err)
 	}
