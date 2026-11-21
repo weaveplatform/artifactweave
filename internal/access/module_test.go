@@ -534,6 +534,19 @@ func TestUnitStoreBindings(t *testing.T) {
 			t.Errorf("%s Exists(ml) = %v, want nil", name, err)
 		}
 		sameError(t, name+" Exists(missing)", projects.Exists(ctx, "missing"), noProject)
+		lifetime, err := projects.Incarnation(ctx, "ml")
+		must(t, err)
+		authority, err := st.Projects().Authority(ctx, "ml")
+		must(t, err)
+		if lifetime == "" || lifetime != string(authority.Incarnation) {
+			t.Error("project API lost the owning lifetime identity")
+		}
+		_, missingLifetime := projects.Incarnation(ctx, "missing")
+		_, missingAuthority := st.Projects().Authority(ctx, "missing")
+		sameError(t, name+" Incarnation(missing)", missingLifetime, missingAuthority)
+		_, canceledLifetime := projects.Incarnation(canceled, "ml")
+		_, canceledAuthority := st.Projects().Authority(canceled, "ml")
+		sameError(t, name+" Incarnation with a canceled context", canceledLifetime, canceledAuthority)
 	}
 
 	var unused bool

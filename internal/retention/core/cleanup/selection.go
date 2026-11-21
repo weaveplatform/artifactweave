@@ -20,6 +20,10 @@ type SelectionSnapshot struct {
 	At     time.Time
 }
 
+// Snapshot drift is a reasoned candidate refusal; authority/store failures
+// retain their errors rather than becoming apparently successful empty pages.
+var errCandidateChanged = fmt.Errorf("cleanup file page changed version: %w", kernel.ErrConflict)
+
 // Selection traverses only existing index metadata, in bounded pages. Its rule
 // is immutable: editing/disabling a policy fences new run admission, not a run
 // already admitted through WithPolicy. Each page still refreshes authority and
@@ -29,7 +33,15 @@ type Selection struct {
 	snapshot   SelectionSnapshot
 	criteria   versionCriteria
 	properties map[string][]string
+	boundary   func(context.Context) error
 }
+
+// repositoryUnavailable keeps preview's scope refusal while letting execution
+// retire a saved parent that no longer appears in its authorized traversal.
+type repositoryUnavailable struct{}
+
+func (*repositoryUnavailable) Error() string { return "cleanup repository is no longer in scope" }
+func (*repositoryUnavailable) Unwrap() error { return kernel.ErrForbidden }
 
 // Select starts a read-only evaluation of an authorized package policy. It
 // starts no work and allows previewing an inactive policy. CLN-04 owns durable
@@ -41,24 +53,28 @@ func (s Service) Select(ctx context.Context, key string) (*Selection, error) {
 		if err != nil {
 			return err
 		}
-		if s.PackageIndex == nil {
-			return fmt.Errorf("cleanup package index unavailable: %w", kernel.ErrStore)
-		}
-		if err := validateCriteria(p.ProjectKey, p.Criteria); err != nil {
-			return err
-		}
-		at := s.now()
-		out = &Selection{service: s, snapshot: SelectionSnapshot{Policy: kernel.Clone(p), At: at}, criteria: newVersionCriteria(p.Criteria, at)}
-		out.properties = make(map[string][]string)
-		for _, conditions := range []map[string][]string{p.Criteria.IncludedProperties, p.Criteria.ExcludedProperties} {
-			for name, values := range conditions {
-				out.properties[name] = append(out.properties[name], values...)
-			}
-		}
-		return nil
+		out, err = s.selection(SelectionSnapshot{Policy: p, At: s.now()})
+		return err
 	})
 	if err != nil {
 		return nil, err
+	}
+	return out, nil
+}
+
+func (s Service) selection(snapshot SelectionSnapshot) (*Selection, error) {
+	if s.PackageIndex == nil {
+		return nil, fmt.Errorf("cleanup package index unavailable: %w", kernel.ErrStore)
+	}
+	if err := validateCriteria(snapshot.Policy.ProjectKey, snapshot.Policy.Criteria); err != nil {
+		return nil, err
+	}
+	snapshot = kernel.Clone(snapshot)
+	out := &Selection{service: s, snapshot: snapshot, criteria: newVersionCriteria(snapshot.Policy.Criteria, snapshot.At), properties: make(map[string][]string)}
+	for _, conditions := range []map[string][]string{snapshot.Policy.Criteria.IncludedProperties, snapshot.Policy.Criteria.ExcludedProperties} {
+		for name, values := range conditions {
+			out.properties[name] = append(out.properties[name], values...)
+		}
 	}
 	return out, nil
 }
@@ -70,6 +86,18 @@ func (s *Selection) run(ctx context.Context, fn func(context.Context) error) err
 	return s.service.run(ctx, func(ctx context.Context, authority Policy) error {
 		if !authority.Allows(s.snapshot.Policy.ProjectKey) {
 			return kernel.ErrForbidden
+		}
+		// Legacy previews describe a rule without granting execution. Newly
+		// bound snapshots cannot silently move to a recreated project key.
+		if s.snapshot.Policy.ProjectIncarnation != "" {
+			if err := s.service.currentProject(ctx, s.snapshot.Policy); err != nil {
+				return err
+			}
+		}
+		if s.boundary != nil {
+			if err := s.boundary(ctx); err != nil {
+				return err
+			}
 		}
 		return fn(ctx)
 	})
@@ -127,7 +155,7 @@ func (s *Selection) repository(ctx context.Context, ref artifactsapi.IndexReposi
 		return fmt.Errorf("current cleanup repository scope: %w", err)
 	}
 	if len(rows) != 1 || rows[0].Key != ref.Key {
-		return kernel.ErrForbidden
+		return &repositoryUnavailable{}
 	}
 	actual := rows[0]
 	if actual.Project != ref.Project || actual.Class != ref.Class || actual.PackageType != ref.PackageType || actual.HasFederatedMembers != ref.HasFederatedMembers ||
@@ -211,7 +239,15 @@ func (s *Selection) files(ctx context.Context, ref artifactsapi.IndexVersion, pa
 		}
 		var err error
 		out, next, err = s.service.PackageIndex.Files(ctx, ref, s.properties, page)
-		return err //nolint:wrapcheck // run names the failed cleanup transaction
+		if err != nil {
+			return err //nolint:wrapcheck // run names the failed cleanup transaction
+		}
+		for _, file := range out {
+			if !sameVersionRevision(file.Version, ref) {
+				return errCandidateChanged
+			}
+		}
+		return nil //nolint:wrapcheck // run names the failed cleanup transaction
 	})
 	if err != nil {
 		return nil, "", err

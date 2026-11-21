@@ -89,3 +89,14 @@ func (b projects) Exists(ctx context.Context, project string) error {
 	_, err := b.st.Projects().Get(ctx, project)
 	return err //nolint:wrapcheck // the store's errors are the contract's
 }
+
+func (b projects) Incarnation(ctx context.Context, project string) (string, error) {
+	authority, err := b.st.Projects().Authority(ctx, project)
+	if err != nil {
+		return "", err //nolint:wrapcheck // retain the store's identity and failure classification
+	}
+	if authority.Incarnation == "" {
+		return "", fmt.Errorf("project has no lifetime identity: %w", kernel.ErrStore)
+	}
+	return string(authority.Incarnation), nil
+}

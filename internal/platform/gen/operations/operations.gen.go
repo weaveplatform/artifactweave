@@ -222,7 +222,7 @@ var Table = []Operation{
 	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/cleanup/packages/policies/{policyKey}", OperationID: "createPackageCleanupPolicy", Cost: "expensive", Idempotency: "natural"},
 	{Service: "artifactory", Method: "PUT", Pattern: "/artifactory/api/cleanup/packages/policies/{policyKey}", OperationID: "updatePackageCleanupPolicy", Cost: "expensive", Idempotency: "natural"},
 	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/cleanup/packages/policies/{policyKey}/enablement", OperationID: "enableDisablePackageCleanupPolicy", Cost: "expensive", Idempotency: "natural"},
-	{Service: "artifactory", Method: "PUT", Pattern: "/artifactory/api/cleanup/packages/policies/{policyKey}/run", OperationID: "runPackageCleanupPolicy", Cost: "expensive", Idempotency: "key"},
+	{Service: "artifactory", Method: "PUT", Pattern: "/artifactory/api/cleanup/packages/policies/{policyKey}/run", OperationID: "runPackageCleanupPolicy", Cost: "expensive", Idempotency: "key", IdempotencyKey: true},
 	{Service: "artifactory", Method: "PUT", Pattern: "/artifactory/api/cleanup/policies/forceDisableAll", OperationID: "disableAllCleanupPolicies", Cost: "expensive", Idempotency: "natural"},
 	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/cleanup/policies/runs/downloadReport", OperationID: "downloadCleanupPolicyRunReport", Cost: "ordinary", Idempotency: "safe"},
 	{Service: "artifactory", Method: "PUT", Pattern: "/artifactory/api/cleanup/policies/runs/forceStopAll", OperationID: "stopAllRunningCleanupPolicies", Cost: "expensive", Idempotency: "natural"},

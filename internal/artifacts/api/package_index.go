@@ -49,12 +49,17 @@ type IndexPackage struct {
 // Version string, not the mutable comparator rank, is the continuation key.
 // CLN-04 must recheck current identity, criteria and authority before effects.
 type IndexVersion struct {
-	Package                 IndexPackage
-	ID                      int64
-	Version                 string
-	OrderKey                int64
-	Protected               bool
-	Created, LastDownloaded time.Time
+	Package IndexPackage
+	ID      int64
+	// MutationRevision changes atomically with version metadata, linked items,
+	// properties, downloads and links. LeadRevision binds the classifier/layout.
+	// Equality is meaningful only for this same immutable version identity;
+	// these opaque values confer no authority and are not public wire fields.
+	MutationRevision, LeadRevision string
+	Version                        string
+	OrderKey                       int64
+	Protected                      bool
+	Created, LastDownloaded        time.Time
 }
 
 // IndexFile captures a linked item's content and mutable selection facts. IDs
@@ -117,5 +122,8 @@ type PackageIndex interface {
 	// requested-property and download-statistics projection per statement. Map
 	// keys select property names; values are caller criteria, not query filters.
 	// Lead comes from this format's classifier, without reading blob contents.
+	// Each returned Version carries this read's current mutation/classifier
+	// markers. A caller retaining a multi-page snapshot checks them on every
+	// page and again under its publication guard before using that snapshot.
 	Files(context.Context, IndexVersion, map[string][]string, kernel.Page) ([]IndexFile, string, error)
 }

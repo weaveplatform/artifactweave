@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/cleanup"
@@ -19,6 +20,9 @@ type fullPolicy struct{}
 func (fullPolicy) Any() bool          { return true }
 func (fullPolicy) Allows(string) bool { return true }
 func (fullPolicy) Name() string       { return "admin" }
+func (fullPolicy) Credential() kernel.CredentialReference {
+	return kernel.CredentialReference{Name: "admin", TokenID: "verified-test-token"}
+}
 
 func TestUnitPackagePolicyHTTPStatusesAndWireRoundTrip(t *testing.T) {
 	db := inmem.New()

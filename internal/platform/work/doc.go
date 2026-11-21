@@ -37,7 +37,8 @@
 //     and work.max_attempts.
 //   - The handlers, registered per kind before Run: Handle for work that
 //     runs as soon as it is due, HandleEvery for periodic work that waits
-//     for a timer.
+//     for a timer. A dispatch sets WorkItem.FinalAttempt from this queue's
+//     configured retry limit, without persisting the hint.
 //   - Enqueue's kind, key and payload (a small JSON document), called with
 //     the context of the caller's transaction; EnsureFresh's kind and key.
 //
@@ -46,7 +47,7 @@
 //   - Queue, with Handle, HandleEvery, Enqueue, Run, RunDue, EnsureFresh and
 //     WaitIdle; Handler, Options, Backoff and the defaults; the sentinels
 //     ErrPermanent, ErrParked, ErrNoHandler, ErrOptions, ErrDuplicateHandler
-//     and ErrPanic.
+//     ErrPanic and ErrUnsettled.
 //   - The port: Store; WorkQueue, with WorkLease, WorkFailure, the bounds
 //     MaxWorkKind, MaxWorkKey and MaxWorkPayload, and ValidateWork and
 //     ValidateLease, which every adapter applies; LeaseStore.
@@ -59,6 +60,11 @@
 //
 // # Invariants
 //
+//   - Ordinary failed handlers retain the configured retry/park policy. An
+//     owner whose final business outcome could not be persisted returns
+//     ErrUnsettled to retain retryable work, with normal backoff and fencing,
+//     until it can publish that outcome. It must not drop an unfinished
+//     outcome by returning success merely to avoid parking.
 //   - Work is enqueued inside the caller's transaction, so it is asked for
 //     exactly when the change that needs it commits and never after a
 //     rollback; this node's workers are woken once it has committed.

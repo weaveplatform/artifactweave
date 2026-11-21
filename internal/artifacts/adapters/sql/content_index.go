@@ -313,7 +313,10 @@ func (p packages) PutVersion(
 			return err
 		}
 		out, err = p.Version(ctx, v.PackageID, v.Version)
-		return err
+		if err != nil {
+			return err
+		}
+		return p.versionChanged(ctx, out.ID)
 	})
 	return out, err
 }
@@ -341,6 +344,9 @@ func (p packages) reorder(ctx context.Context, pkg model.Package) error {
 			v.OrderKey,
 			v.ID,
 		); err != nil {
+			return err
+		}
+		if err := p.versionChanged(ctx, v.ID); err != nil {
 			return err
 		}
 	}
@@ -418,7 +424,7 @@ func (p packages) LinkFile(ctx context.Context, f model.VersionFile) error {
 				return fmt.Errorf("link file: %s %d: %w", check.what, check.id, kernel.ErrNotFound)
 			}
 		}
-		_, err := p.s.Exec(ctx, "link file", dialect.InsertIgnore(
+		result, err := p.s.Exec(ctx, "link file", dialect.InsertIgnore(
 			"package_version_files",
 			[]string{
 				"version_id",
@@ -426,7 +432,13 @@ func (p packages) LinkFile(ctx context.Context, f model.VersionFile) error {
 			},
 			[]string{"version_id", "item_id"},
 		), f.VersionID, f.ItemID)
-		return err
+		if err != nil {
+			return err
+		}
+		if result > 0 {
+			return p.versionChanged(ctx, f.VersionID)
+		}
+		return nil
 	})
 }
 
@@ -458,7 +470,11 @@ func (p packages) VersionOf(ctx context.Context, itemID int64) (model.PackageVer
 }
 
 func (p packages) RecordVersionDownload(ctx context.Context, versionID int64, at time.Time) error {
-	return p.s.ExecOne(ctx, fmt.Sprintf("record download of version %d", versionID),
-		"UPDATE package_versions SET last_downloaded_at = ? WHERE id = ?", dialect.Micros(at),
-		versionID)
+	return p.s.Tx(ctx, func(ctx context.Context) error {
+		if err := p.versionChanged(ctx, versionID); err != nil {
+			return err
+		}
+		return p.s.ExecOne(ctx, fmt.Sprintf("record download of version %d", versionID),
+			"UPDATE package_versions SET last_downloaded_at = ? WHERE id = ?", dialect.Micros(at), versionID)
+	})
 }

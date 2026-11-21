@@ -87,6 +87,10 @@ type Trigger struct {
 	Revision  string    `json:"revision"`
 	Fire      time.Time `json:"fire"`
 	ID        string    `json:"id"`
+	// Fence is installed only for this leased execution, never serialized.
+	// An owner that durably admits work calls it last in the same transaction,
+	// after its domain writes. No new domain lock may follow this lease fence.
+	Fence func(context.Context) error `json:"-"`
 }
 
 func triggerFor(state State) Trigger {
@@ -242,6 +246,16 @@ func (s *Service) Execute(ctx context.Context, item work.WorkItem, handlers map[
 	run := handlers[trigger.Reference.Kind]
 	if run == nil {
 		return fmt.Errorf("schedule owner has no handler: %w", work.ErrPermanent)
+	}
+	trigger.Fence = func(ctx context.Context) error {
+		until, err := s.Store.WorkQueue().GuardLease(ctx, item.Kind, item.Key, item.Generation)
+		if err != nil {
+			return fmt.Errorf("guard scheduled occurrence publication: %w", err)
+		}
+		if !until.After(s.now()) {
+			return fmt.Errorf("scheduled occurrence publication lease expired: %w", kernel.ErrConflict)
+		}
+		return ctx.Err()
 	}
 	if err := run(ctx, trigger); err != nil {
 		return fmt.Errorf("scheduled work: %w", err)

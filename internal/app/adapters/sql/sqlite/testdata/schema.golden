@@ -26,6 +26,7 @@ index builds_latest builds CREATE INDEX builds_latest ON builds(project_key,name
 index bundle_artifacts_sha256 bundle_artifacts CREATE INDEX bundle_artifacts_sha256 ON bundle_artifacts(sha256)
 index bundle_audits_bundle bundle_audits CREATE INDEX bundle_audits_bundle ON bundle_audits(bundle_name,created_at,id)
 index bundle_audits_created bundle_audits CREATE INDEX bundle_audits_created ON bundle_audits(created_at,id)
+index cleanup_pending cleanup_entries CREATE INDEX cleanup_pending ON cleanup_entries(run_id,version_id,state,is_lead,lead_rank,lead_tie,entity_id)
 index cleanup_runs_policy cleanup_runs CREATE INDEX cleanup_runs_policy ON cleanup_runs(policy_key,id)
 index cold_blob_replicas_member cold_blob_replicas CREATE INDEX cold_blob_replicas_member ON cold_blob_replicas(member,updated_at,sha256)
 index cold_blob_replicas_queue cold_blob_replicas CREATE INDEX cold_blob_replicas_queue ON cold_blob_replicas(state,member,updated_at,sha256)
@@ -91,7 +92,11 @@ index sqlite_autoindex_bundle_artifacts_1 bundle_artifacts
 index sqlite_autoindex_bundle_exports_1 bundle_exports
 index sqlite_autoindex_bundle_keeps_1 bundle_keeps
 index sqlite_autoindex_certificates_1 certificates
+index sqlite_autoindex_cleanup_entries_1 cleanup_entries
+index sqlite_autoindex_cleanup_executions_1 cleanup_executions
+index sqlite_autoindex_cleanup_executions_2 cleanup_executions
 index sqlite_autoindex_cleanup_policies_1 cleanup_policies
+index sqlite_autoindex_cleanup_progress_1 cleanup_progress
 index sqlite_autoindex_cold_blob_replicas_1 cold_blob_replicas
 index sqlite_autoindex_cold_blobs_1 cold_blobs
 index sqlite_autoindex_config_documents_1 config_documents
@@ -207,7 +212,10 @@ table bundle_audits bundle_audits CREATE TABLE bundle_audits(id INTEGER PRIMARY 
 table bundle_exports bundle_exports CREATE TABLE bundle_exports(bundle_name TEXT NOT NULL,bundle_version TEXT NOT NULL,status TEXT NOT NULL DEFAULT '',archive_sha256 TEXT NOT NULL DEFAULT '',created_at BIGINT,PRIMARY KEY(bundle_name,bundle_version),FOREIGN KEY(bundle_name,bundle_version)REFERENCES release_bundles(name,version)ON DELETE CASCADE)
 table bundle_keeps bundle_keeps CREATE TABLE bundle_keeps(bundle_name TEXT NOT NULL,bundle_version TEXT NOT NULL,PRIMARY KEY(bundle_name,bundle_version),FOREIGN KEY(bundle_name,bundle_version)REFERENCES release_bundles(name,version)ON DELETE CASCADE)
 table certificates certificates CREATE TABLE certificates(alias TEXT PRIMARY KEY,pem TEXT NOT NULL DEFAULT '',issued_to TEXT NOT NULL DEFAULT '',issued_by TEXT NOT NULL DEFAULT '',issued_on BIGINT,valid_until BIGINT,fingerprint TEXT NOT NULL DEFAULT '',private_key BLOB)
-table cleanup_policies cleanup_policies CREATE TABLE cleanup_policies(key TEXT PRIMARY KEY,description TEXT NOT NULL DEFAULT '',cron_exp TEXT NOT NULL DEFAULT '',project_key TEXT NOT NULL DEFAULT '',item_type TEXT NOT NULL DEFAULT '',duration_minutes INTEGER NOT NULL DEFAULT 0,enabled BOOLEAN NOT NULL DEFAULT FALSE,skip_trashcan BOOLEAN NOT NULL DEFAULT FALSE,criteria TEXT,created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',updated_at BIGINT,updated_by TEXT NOT NULL DEFAULT '',revision TEXT NOT NULL DEFAULT '')
+table cleanup_entries cleanup_entries CREATE TABLE cleanup_entries(run_id BIGINT NOT NULL REFERENCES cleanup_runs(id),kind TEXT NOT NULL,entity_id BIGINT NOT NULL,version_id BIGINT NOT NULL,revision BIGINT NOT NULL,state TEXT NOT NULL,is_lead BOOLEAN NOT NULL,lead_rank BIGINT NOT NULL,lead_tie TEXT NOT NULL,snapshot TEXT NOT NULL,PRIMARY KEY(run_id,kind,entity_id))
+table cleanup_executions cleanup_executions CREATE TABLE cleanup_executions(run_id BIGINT PRIMARY KEY REFERENCES cleanup_runs(id),occurrence TEXT UNIQUE,snapshot TEXT NOT NULL)
+table cleanup_policies cleanup_policies CREATE TABLE cleanup_policies(key TEXT PRIMARY KEY,description TEXT NOT NULL DEFAULT '',cron_exp TEXT NOT NULL DEFAULT '',project_key TEXT NOT NULL DEFAULT '',item_type TEXT NOT NULL DEFAULT '',duration_minutes INTEGER NOT NULL DEFAULT 0,enabled BOOLEAN NOT NULL DEFAULT FALSE,skip_trashcan BOOLEAN NOT NULL DEFAULT FALSE,criteria TEXT,created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',updated_at BIGINT,updated_by TEXT NOT NULL DEFAULT '',revision TEXT NOT NULL DEFAULT '',execution_credential TEXT,project_incarnation TEXT NOT NULL DEFAULT '')
+table cleanup_progress cleanup_progress CREATE TABLE cleanup_progress(run_id BIGINT PRIMARY KEY REFERENCES cleanup_runs(id),revision BIGINT NOT NULL,snapshot TEXT NOT NULL)
 table cleanup_runs cleanup_runs CREATE TABLE cleanup_runs(id INTEGER PRIMARY KEY AUTOINCREMENT,policy_key TEXT NOT NULL,trigger_id BIGINT NOT NULL DEFAULT 0,item_type TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT '',dry_run BOOLEAN NOT NULL DEFAULT FALSE,manual BOOLEAN NOT NULL DEFAULT FALSE,triggered_by TEXT NOT NULL DEFAULT '',started_at BIGINT,ended_at BIGINT,total_items BIGINT NOT NULL DEFAULT 0,cleaned_items BIGINT NOT NULL DEFAULT 0,cleaned_size BIGINT NOT NULL DEFAULT 0,report TEXT)
 table cold_blob_replicas cold_blob_replicas CREATE TABLE cold_blob_replicas(sha256 TEXT NOT NULL,member TEXT NOT NULL,state TEXT NOT NULL,size BIGINT NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,last_error TEXT NOT NULL DEFAULT '',updated_at BIGINT NOT NULL DEFAULT 0,PRIMARY KEY(sha256,member))
 table cold_blobs cold_blobs CREATE TABLE cold_blobs(sha256 TEXT PRIMARY KEY,sha512 TEXT NOT NULL DEFAULT '',sha1 TEXT NOT NULL DEFAULT '',md5 TEXT NOT NULL DEFAULT '',size BIGINT NOT NULL,created_at BIGINT,ref_count BIGINT NOT NULL DEFAULT 0,state TEXT NOT NULL DEFAULT 'live',deleted_at BIGINT)
@@ -232,7 +240,7 @@ table outbox outbox CREATE TABLE outbox(origin TEXT NOT NULL,stream TEXT NOT NUL
 table outbox_consumers outbox_consumers CREATE TABLE outbox_consumers(origin TEXT NOT NULL,stream TEXT NOT NULL,consumer TEXT NOT NULL,acked_seq BIGINT NOT NULL CHECK(acked_seq >= 0),PRIMARY KEY(origin,stream,consumer),FOREIGN KEY(origin,stream)REFERENCES outbox_sequences(origin,stream))
 table outbox_sequences outbox_sequences CREATE TABLE outbox_sequences(origin TEXT NOT NULL,stream TEXT NOT NULL,last_seq BIGINT NOT NULL DEFAULT 0,pruned_through BIGINT NOT NULL DEFAULT 0,PRIMARY KEY(origin,stream))
 table package_version_files package_version_files CREATE TABLE package_version_files(version_id BIGINT NOT NULL REFERENCES package_versions(id)ON DELETE CASCADE,item_id BIGINT NOT NULL REFERENCES items(id)ON DELETE CASCADE,PRIMARY KEY(version_id,item_id))
-table package_versions package_versions CREATE TABLE package_versions(id INTEGER PRIMARY KEY AUTOINCREMENT,package_id BIGINT NOT NULL REFERENCES packages(id)ON DELETE CASCADE,version TEXT NOT NULL,order_key BIGINT NOT NULL DEFAULT 0,created_at BIGINT,last_downloaded_at BIGINT,metadata TEXT)
+table package_versions package_versions CREATE TABLE package_versions(id INTEGER PRIMARY KEY AUTOINCREMENT,package_id BIGINT NOT NULL REFERENCES packages(id)ON DELETE CASCADE,version TEXT NOT NULL,order_key BIGINT NOT NULL DEFAULT 0,created_at BIGINT,last_downloaded_at BIGINT,metadata TEXT,mutation_revision TEXT NOT NULL DEFAULT 'initial' CHECK(mutation_revision <> ''))
 table packages packages CREATE TABLE packages(id INTEGER PRIMARY KEY AUTOINCREMENT,repo_key TEXT NOT NULL,package_type TEXT NOT NULL DEFAULT '',name TEXT NOT NULL,created_at BIGINT)
 table pairing_nonces pairing_nonces CREATE TABLE pairing_nonces(nonce_hash BLOB PRIMARY KEY,use_case TEXT NOT NULL,expires_at BIGINT,redeemed_at BIGINT)
 table peer_cursors peer_cursors CREATE TABLE peer_cursors(peer TEXT NOT NULL,stream TEXT NOT NULL,acked_seq BIGINT NOT NULL DEFAULT 0,last_sent_at BIGINT,last_error TEXT NOT NULL DEFAULT '',PRIMARY KEY(peer,stream))

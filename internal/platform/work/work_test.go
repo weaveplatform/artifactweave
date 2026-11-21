@@ -527,6 +527,37 @@ func TestUnitPermanentRefusalParksWithoutRetry(t *testing.T) {
 	}
 }
 
+func TestUnitFinalAttemptCanRetainUnsettledOutcomeUntilPublication(t *testing.T) {
+	w := newWorld(t, work.Options{MaxAttempts: 1, Backoff: func(int) time.Duration { return 0 }})
+	attempts := 0
+	if err := w.q.Handle(kind, func(_ context.Context, item work.WorkItem) error {
+		attempts++
+		if !item.FinalAttempt {
+			t.Error("handler was not told about its configured final attempt")
+		}
+		if attempts == 1 {
+			return errors.Join(work.ErrUnsettled, errors.New("business outcome write unavailable"))
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	w.enqueue("unsettled")
+	if n, err := w.q.RunDue(t.Context(), kind); n != 1 || err != nil {
+		t.Fatal("initial run failed", n, err)
+	}
+	row, err := w.item("unsettled")
+	if err != nil || row.State != work.WorkPending || row.Attempts != 1 {
+		t.Fatal("unrecorded outcome was parked or dropped", row, err)
+	}
+	if n, err := w.q.RunDue(t.Context(), kind); n != 1 || err != nil {
+		t.Fatal("outcome publication did not retry", n, err)
+	}
+	if _, err := w.item("unsettled"); !errors.Is(err, kernel.ErrNotFound) || attempts != 2 {
+		t.Fatal("settled outcome was not completed", attempts, err)
+	}
+}
+
 // Dashboards and alert rules select the queue's metrics by their
 // instrumentation scope, the package's import path (decision 0044). The
 // second kind has no handler, so its item waits and the two gauges have a

@@ -126,6 +126,7 @@ func (i items) put(ctx context.Context, it model.Item, create bool) (model.Item,
 			i.byPath().Put(keyOf(it), it.ID)
 		}
 		i.t().Put(it.ID, it)
+		i.versionsChanged(it.ID)
 		it, _ = i.t().Get(it.ID)
 		if i.s.storage != nil {
 			return storekit.RecordStorageChange(ctx, change, after-before)
@@ -276,6 +277,7 @@ func (i items) Delete(
 // remove deletes an item with everything that hangs off it, as the SQL
 // foreign keys cascade.
 func (i items) remove(it model.Item) {
+	i.versionsChanged(it.ID)
 	i.t().Del(it.ID)
 	i.byPath().Del(keyOf(it))
 	i.props().Del(it.ID)
@@ -451,6 +453,7 @@ func (i items) writeProperties(id int64, props model.Properties, at time.Time) {
 		it.PropertiesModified = time.Time{}
 	}
 	i.t().Put(id, it)
+	i.versionsChanged(id)
 }
 
 func (i items) SetProperties(
@@ -527,6 +530,7 @@ func (i items) RecordDownload(ctx context.Context, id int64, d port.Download) er
 			st.LastDownloaded, st.LastDownloadedBy = d.At, d.By
 		}
 		i.stats().Put(id, st)
+		i.versionsChanged(id)
 		return nil
 	})
 }
@@ -537,6 +541,7 @@ func (i items) PutStats(ctx context.Context, id int64, st model.ItemStats) error
 			return err
 		}
 		i.stats().Put(id, st)
+		i.versionsChanged(id)
 		return nil
 	})
 }

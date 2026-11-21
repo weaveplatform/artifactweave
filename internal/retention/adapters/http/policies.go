@@ -12,8 +12,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/retention/core/cleanup"
 )
 
-// PackagePoliciesAPI implements only package configuration and emergency
-// disablement. Run/report, build, bundle and archive routes keep their owners.
+// PackagePoliciesAPI implements package configuration, execution admission and
+// cooperative stop controls. Reports, build, bundle and archive retain owners.
 type PackagePoliciesAPI struct{ Policies *cleanup.Service }
 
 func (s PackagePoliciesAPI) service() (cleanup.Service, error) {
@@ -30,7 +30,11 @@ func policyError(ctx context.Context, err error) error {
 		return nil
 	case errors.As(err, &response):
 		return err
-	case errors.Is(err, kernel.ErrBadCredentials), errors.Is(err, kernel.ErrForbidden), errors.Is(err, kernel.ErrPasswordExpired), errors.Is(err, kernel.ErrAPIRestricted):
+	case errors.Is(err, kernel.ErrBadCredentials),
+		errors.Is(err, kernel.ErrUnauthenticated),
+		errors.Is(err, kernel.ErrForbidden),
+		errors.Is(err, kernel.ErrPasswordExpired),
+		errors.Is(err, kernel.ErrAPIRestricted):
 		return err
 	case errors.Is(err, kernel.ErrInvalid):
 		return apierror.New(http.StatusBadRequest, err.Error())

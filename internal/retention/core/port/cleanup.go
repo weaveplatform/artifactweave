@@ -23,6 +23,7 @@ type RunFilter struct {
 
 // CleanupStore persists package and build cleanup policies and their runs.
 type CleanupStore interface {
+	CleanupProgressStore
 	// CreatePolicy stores p; kernel.ErrConflict when the key exists.
 	CreatePolicy(ctx context.Context, p model.CleanupPolicy) error
 	// Policy returns the policy.
@@ -44,4 +45,17 @@ type CleanupStore interface {
 	Runs(ctx context.Context, f RunFilter, p kernel.Page) ([]model.CleanupRun, string, error)
 	// LastRun returns a policy's most recent run.
 	LastRun(ctx context.Context, policyKey string) (model.CleanupRun, error)
+
+	// CreateExecution persists the private snapshot of an existing run. A
+	// nonempty occurrence is unique across scheduler retries, including after
+	// the policy is deleted; an empty one never coalesces manual runs.
+	// The frozen policy omits its private configuration bindings: Credential
+	// and ProjectIncarnation retain this run's own binding. Times use the
+	// shared UTC microsecond precision.
+	CreateExecution(context.Context, model.CleanupExecution) error
+	// Execution locks the snapshot inside a transaction. Acquire current
+	// project authority before this run lock, and the queue lease after it.
+	Execution(context.Context, int64) (model.CleanupExecution, error)
+	// ExecutionForOccurrence resolves a nonempty logical scheduler fire.
+	ExecutionForOccurrence(context.Context, string) (model.CleanupExecution, error)
 }
