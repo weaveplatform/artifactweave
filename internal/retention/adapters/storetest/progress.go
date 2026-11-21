@@ -24,6 +24,7 @@ func testCleanupProgress(t *testing.T, s port.Store) {
 	storekit.WantErr(t, cs.CreateProgress(ctx, p), kernel.ErrInvalid)
 	write(func(ctx context.Context) error { return cs.CreateProgress(ctx, p) })
 	storekit.Same(t, "initial continuation", p, storekit.Get[model.CleanupProgress](t)(cs.Progress(ctx, r.ID)))
+	testCleanupInvalidProgress(t, s, p)
 	storekit.WantErr(t, s.Tx(ctx, func(ctx context.Context) error { return cs.CreateProgress(ctx, p) }), kernel.ErrConflict)
 	next := p
 	next.Revision, next.Phase, next.Version.ID = 2, model.CleanupRemoving, 9
@@ -31,6 +32,15 @@ func testCleanupProgress(t *testing.T, s port.Store) {
 	write(func(ctx context.Context) error { return cs.AdvanceProgress(ctx, p.Revision, next) })
 	p = next
 	storekit.WantErr(t, s.Tx(ctx, func(ctx context.Context) error { return cs.AdvanceProgress(ctx, 1, next) }), kernel.ErrConflict)
+	withErrors := p
+	withErrors.Revision++
+	withErrors.HadErrors = true
+	write(func(ctx context.Context) error { return cs.AdvanceProgress(ctx, p.Revision, withErrors) })
+	p = withErrors
+	cleared := p
+	cleared.Revision++
+	cleared.HadErrors = false
+	storekit.WantErr(t, s.Tx(ctx, func(ctx context.Context) error { return cs.AdvanceProgress(ctx, p.Revision, cleared) }), kernel.ErrConflict)
 
 	entries := []model.CleanupEntry{
 		cleanupIntent(r.ID, 7, nil),
@@ -50,6 +60,7 @@ func testCleanupProgress(t *testing.T, s port.Store) {
 			return nil
 		})
 	}
+	testCleanupInvalidEntries(t, s, entries[0])
 	write(func(ctx context.Context) error {
 		created, err := cs.CreateEntry(ctx, entries[0])
 		if err == nil && created {
@@ -108,6 +119,9 @@ func testCleanupProgress(t *testing.T, s port.Store) {
 		entry.Removed = &artifactsapi.RemovedItem{ID: id, Path: entry.Snapshot.Path, Size: entry.Snapshot.Size}
 		write(func(ctx context.Context) error { return cs.AdvanceEntry(ctx, 1, entry) })
 		storekit.WantErr(t, s.Tx(ctx, func(ctx context.Context) error { return cs.AdvanceEntry(ctx, 1, entry) }), kernel.ErrConflict)
+		duplicate := entry
+		duplicate.Revision++
+		storekit.WantErr(t, s.Tx(ctx, func(ctx context.Context) error { return cs.AdvanceEntry(ctx, entry.Revision, duplicate) }), kernel.ErrConflict)
 	}
 	_, err = cs.PendingEntry(ctx, r.ID, 9)
 	storekit.WantErr(t, err, kernel.ErrNotFound)
