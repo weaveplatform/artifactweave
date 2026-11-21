@@ -86,6 +86,14 @@ type CleanupRun struct {
 	Report       []byte
 }
 
+// CleanupRunSnapshot pairs public run facts with the policy it actually used.
+// It contains no execution credential or project-lifetime capability. Later
+// policy edits, deletion or reuse of its key cannot change this history.
+type CleanupRunSnapshot struct {
+	Run    CleanupRun
+	Policy CleanupPolicy
+}
+
 // CleanupExecution is private durable run state, separate from report bytes.
 // The frozen policy and clock survive policy edits/deletion and process restart.
 // Occurrence identifies a scheduler fire; empty denotes a distinct manual run.
