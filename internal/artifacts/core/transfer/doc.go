@@ -27,6 +27,13 @@
 //
 // # Status
 //
-// P11 source boundary in implementation. Transport, durable progress and
+// Implemented P11 source boundary. Transport, durable progress and
 // replication orchestration remain owned by federation.
+//
+// # Testing
+//
+// Source unit tests cover current authority, selection and immutable snapshots.
+// Server source contracts exercise real item/metadata writes, overwrite and
+// credential/permission revocation across reference, SQLite and PostgreSQL
+// stores. Federation process tests consume this API for actual target effects.
 package transfer

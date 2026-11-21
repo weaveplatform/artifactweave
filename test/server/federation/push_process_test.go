@@ -69,18 +69,25 @@ func TestAccSinglePushTargetProcess(t *testing.T) {
 			t.Error("close target runtime")
 		}
 	})
-	if err := runtime.Store.Users().Create(t.Context(), accesstest.User{Name: "receiver", PasswordHash: support.CheapHash}); err != nil {
-		t.Fatal("create native target receiver", err)
-	}
-	if err := runtime.Store.Permissions().Create(t.Context(), accesstest.Permission{Name: "receiver-target-only", Resources: map[accessapi.ResourceType]accesstest.Resource{
-		accessapi.ResourceArtifact: {
-			Targets: map[string]accesstest.Target{"target": {}},
-			Actions: accesstest.Grants{
-				Users: map[string]accessapi.Actions{"receiver": accessapi.ActionRead | accessapi.ActionWrite | accessapi.ActionDelete | accessapi.ActionAnnotate},
-			},
-		},
-	}}); err != nil {
-		t.Fatal("grant native receiver authority", err)
+	for _, receiver := range []struct {
+		name    string
+		actions accessapi.Actions
+	}{
+		{"receiver", accessapi.ActionRead | accessapi.ActionWrite | accessapi.ActionDelete | accessapi.ActionAnnotate},
+		{"receiver-readonly", accessapi.ActionRead},
+	} {
+		if err := runtime.Store.Users().Create(t.Context(), accesstest.User{Name: receiver.name, PasswordHash: support.CheapHash}); err != nil {
+			t.Fatal("create native target receiver", err)
+		}
+		if err := runtime.Store.Permissions().
+			Create(t.Context(), accesstest.Permission{Name: receiver.name + "-target-only", Resources: map[accessapi.ResourceType]accesstest.Resource{
+				accessapi.ResourceArtifact: {
+					Targets: map[string]accesstest.Target{"target": {}},
+					Actions: accesstest.Grants{Users: map[string]accessapi.Actions{receiver.name: receiver.actions}},
+				},
+			}}); err != nil {
+			t.Fatal("grant native receiver authority", err)
+		}
 	}
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -107,6 +114,7 @@ func pushRuntimeRouter(runtime *app.Runtime) http.Handler {
 	return harness.Router(harness.Config{
 		Store: runtime.Store, Blobs: runtime.Blobs, Auth: runtime.Auth, Tokens: runtime.Tokens, Keys: runtime.Keys,
 		Federation: runtime.Federation, Work: runtime.Work,
+		PasswordHash:  support.TestHash,
 		RemoteSources: runtime.Artifacts.RemoteSources(), RemoteHTTP: runtime.Artifacts.RemoteHTTP(), VirtualCache: runtime.Artifacts.VirtualCache(),
 		Logger: slog.New(slog.DiscardHandler),
 	})

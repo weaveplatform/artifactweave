@@ -40,4 +40,10 @@
 // scratch schemas. Target configuration and subprocess logs are private files;
 // helper stdout is captured and only its owned loopback readiness address is
 // consumed. Every target process is drained and joined by its owner.
+// Recovery tests lose upload/property/delete acknowledgements after native
+// commit, reopen the source runtime/database, and reject duplicate mutations.
+// Current-fence tests block transfer while content, original credentials or
+// target configuration change. Failure tests use native 401/403 responses and
+// controlled checksum, 503 and socket-timeout faults. Maven tests check native
+// metadata and checksum companions; native-client consumption belongs to REP-05.
 package federation

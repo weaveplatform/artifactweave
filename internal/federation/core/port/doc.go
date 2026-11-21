@@ -90,13 +90,17 @@
 // stores (pull request 3). Moved here in P9d, where Store is declared. The
 // services that call the ports arrive with P11 (replication), P13 (peer trust
 // and federated repositories) and P14 (platform federation and topology).
+// P11 adds ConfigurationStore, durable PushProgressStore and the separate
+// current-policy PushConnections network boundary.
 //
 // # Testing
 //
-// The package declares only ports, so it has no tests of its own. The
-// metadata store's Replications, Peers, PairingNonces, FederationMembers,
+// Closed target-failure classifications have unit tests. The metadata store's
+// Replications, Peers, PairingNonces, FederationMembers,
 // FullSyncs, AccessTargets, PlatformFederations and Topologies contract
 // subtests run the ports on its in-memory, SQLite and PostgreSQL stores,
 // and compile-time assertions in the in-memory and SQL stores' tests show
 // that both satisfy Store.
+// PushProgress contract tests additionally prove exact bindings, monotonic CAS,
+// bounded pending recovery, rollback and retention across target deletion.
 package port

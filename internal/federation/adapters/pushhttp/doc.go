@@ -49,13 +49,14 @@
 //
 // # Status
 //
-// P11 single-push target adapter; application composition and process-to-process
-// qualification belong to the complete REP-02 delivery.
+// P11 REP-02 single-push target adapter. The federation module opens its factory
+// at application startup and closes it after the owning workers stop.
 //
 // # Testing
 //
-// Owned chi HTTP fixtures
-// verify wire paths, authenticated effects, metadata replacement, safe errors,
-// bounded listing and current connection policy. They are not a substitute for
-// the required source/target application acceptance tests.
+// Owned chi HTTP fixtures verify paths, authenticated effects, metadata
+// replacement, safe errors, bounded listing and current connection policy.
+// test/server/federation separately qualifies the production adapter against a
+// real target process on SQLite/PostgreSQL, including interrupted acknowledgements,
+// restart, revocation, native refusals, metadata discrepancies and timeouts.
 package pushhttp

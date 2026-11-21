@@ -35,6 +35,8 @@ type pushWorld struct {
 	source  string
 	target  string
 	client  *http.Client
+	server  *httptest.Server
+	bridge  *pushBridge
 }
 
 func pushConfig(t *testing.T, driver, dsn string) config.Config {
@@ -51,21 +53,22 @@ func pushConfig(t *testing.T, driver, dsn string) config.Config {
 func newPushWorld(t *testing.T, driver, sourceDSN, targetDSN, packageType string) *pushWorld {
 	t.Helper()
 	target := startPushTarget(t, pushConfig(t, driver, targetDSN))
+	bridge := newPushBridge(t, target)
 	cfg := pushConfig(t, driver, sourceDSN)
-	cfg.Remote.AllowedPrivateOrigins = []string{target}
+	cfg.Remote.AllowedPrivateOrigins = []string{bridge.URL}
 	runtime, err := app.OpenRuntime(t.Context(), cfg, slog.New(slog.DiscardHandler), harness.AppOptions())
 	if err != nil {
 		t.Fatal("open source runtime", err)
 	}
+	server := httptest.NewServer(pushRuntimeRouter(runtime))
+	w := &pushWorld{t: t, runtime: runtime, config: cfg, source: server.URL, target: target, client: &http.Client{Timeout: 10 * time.Second}, server: server, bridge: bridge}
 	t.Cleanup(func() {
-		if err := runtime.Close(context.Background()); err != nil {
+		w.client.CloseIdleConnections()
+		w.server.Close()
+		if err := w.runtime.Close(context.Background()); err != nil {
 			t.Error("close source runtime", err)
 		}
 	})
-	server := httptest.NewServer(pushRuntimeRouter(runtime))
-	t.Cleanup(server.Close)
-	w := &pushWorld{t: t, runtime: runtime, config: cfg, source: server.URL, target: target, client: &http.Client{Timeout: 10 * time.Second}}
-	t.Cleanup(w.client.CloseIdleConnections)
 	repository, err := json.Marshal(map[string]string{"rclass": "local", "packageType": packageType})
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +123,7 @@ func itemRoute(repository, path string) string {
 func (w *pushWorld) configure(include, exclude string, deletes, properties bool) model.Replication {
 	w.t.Helper()
 	body, err := json.Marshal(map[string]any{
-		"url": w.target + "/artifactory/target", "username": "receiver", "password": "pw", "enabled": true,
+		"url": w.bridge.URL + "/artifactory/target", "username": "receiver", "password": "pw", "enabled": true,
 		"cronExp": "0 0 2 * * ?", "syncDeletes": deletes, "syncProperties": properties, "includePathPrefixPattern": include, "excludePathPrefixPattern": exclude,
 	})
 	if err != nil {

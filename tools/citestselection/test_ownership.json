@@ -365,7 +365,11 @@
       "system_health_test.go"
     ],
     "test/server/federation": [
+      "push_bridge_test.go",
+      "push_failures_test.go",
+      "push_fences_test.go",
       "push_process_test.go",
+      "push_recovery_test.go",
       "push_test.go",
       "replication_test.go"
     ],

@@ -48,8 +48,16 @@
 //
 // # Status
 //
-// Configuration is implemented by REP-01. REP-02 supplies the source/progress
-// contracts and bounded driver; target HTTP policy and application integration
-// remain part of REP-02, and dispatch/reporting belong to REP-04. Multi-push,
+// Configuration is implemented by REP-01. REP-02 supplies source/progress
+// contracts, the bounded driver, guarded target HTTP and application bindings.
+// Dispatch/reporting belong to REP-04. Multi-push,
 // event-triggered and binary-existence optimization remain P37.
+//
+// # Testing
+//
+// Core race tests cover intent/checkpoint rollback, checksum/property settlement,
+// scoped reconciliation and current source/configuration/ownership fences.
+// test/server/federation exercises real source runtimes and separate target
+// processes on SQLite/PostgreSQL, including native Maven effects, response loss,
+// restart, current authority and target failures.
 package replication
