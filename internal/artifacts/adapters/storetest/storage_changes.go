@@ -111,6 +111,29 @@ func RunStorageChanges(t *testing.T, newStore func(*testing.T, api.StorageWatch)
 	storekit.WantErr(t, err, kernel.ErrNotFound)
 	assertStorageWitness(t, st, 5)
 	watch.recordFail = false
+	// Handle invalid writes inside a larger unit of work. Even the memory
+	// runner, which lets callers handle joined errors, must not retain an
+	// invalid row or overwrite content before logical-size validation.
+	for _, name := range []string{"negative-new", "one"} {
+		err := st.Tx(ctx, func(ctx context.Context) error {
+			_, refused := st.Items().Put(ctx, model.Item{RepoKey: "items", Name: name, Size: -1})
+			if !errors.Is(refused, kernel.ErrStore) {
+				return fmt.Errorf("negative logical size was not refused: %w", errors.Join(kernel.ErrInvalid, refused))
+			}
+			return nil
+		})
+		// SQL joins retain the inner refusal; memory may commit a handled
+		// error. Both must preserve exactly the same valid content/counter.
+		if err != nil && !errors.Is(err, kernel.ErrStore) {
+			t.Fatal(err)
+		}
+	}
+	_, err = st.Items().Get(ctx, "items", false, "negative-new")
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+	if retained := storekit.Get[model.Item](t)(st.Items().GetByID(ctx, one.ID)); retained.Size != 3 {
+		t.Fatal("handled invalid overwrite changed the item", retained.Size)
+	}
+	assertStorageWitness(t, st, 5)
 	removed := storekit.Get[port.DeleteResult](t)(st.Items().Delete(ctx, "items", false, "."))
 	if removed.Bytes != 3 {
 		t.Fatal("deletion accounted for folder metadata or cached rows", removed.Bytes)

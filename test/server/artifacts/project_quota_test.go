@@ -164,11 +164,22 @@ func TestAccProjectQuotaTransformedPOMReads(t *testing.T) {
 			const path = "org/acme/app/1.0/app-1.0.pom"
 			const body = `<project><modelVersion>4.0.0</modelVersion><groupId>org.acme</groupId><artifactId>app</artifactId><version>1.0</version><repositories/><name>kept</name></project>`
 			call(http.MethodPut, "/artifactory/source-maven/"+path, body, http.StatusCreated)
+			source, err := w.Runtime.Store.Items().Get(t.Context(), "source-maven", false, path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			source.Modified = time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+			if _, err := w.Runtime.Store.Items().Put(t.Context(), source); err != nil {
+				t.Fatal(err)
+			}
 			var cleaned string
 			var etag string
 			for range 2 {
 				rec := call(http.MethodGet, "/artifactory/alpha-virtual/"+path, "", http.StatusOK)
 				cleaned, etag = rec.Body.String(), rec.Header().Get("ETag")
+				if rec.Header().Get("Last-Modified") != source.Modified.Format(http.TimeFormat) {
+					t.Fatal("transient transformation changed its date for unchanged source content")
+				}
 				if strings.Contains(rec.Body.String(), "<repositories") || !strings.Contains(rec.Body.String(), "<name>kept</name>") {
 					t.Fatal("quota pressure changed POM cleanup")
 				}
@@ -192,6 +203,14 @@ func TestAccProjectQuotaTransformedPOMReads(t *testing.T) {
 			conditional := w.Request(http.MethodGet, "/artifactory/alpha-virtual/"+path, "admin", "", "If-None-Match", etag)
 			if conditional.Code != http.StatusNotModified {
 				t.Fatal("transient POM did not preserve conditional delivery", conditional.Code)
+			}
+			dateConditional := w.Request(http.MethodGet, "/artifactory/alpha-virtual/"+path, "admin", "", "If-Modified-Since", source.Modified.Format(http.TimeFormat))
+			if dateConditional.Code != http.StatusNotModified {
+				t.Fatal("transient POM lost date conditional delivery", dateConditional.Code)
+			}
+			dateRange := w.Request(http.MethodGet, "/artifactory/alpha-virtual/"+path, "admin", "", "Range", "bytes=0-9", "If-Range", source.Modified.Format(http.TimeFormat))
+			if dateRange.Code != http.StatusPartialContent || dateRange.Body.String() != cleaned[:10] {
+				t.Fatal("transient POM lost date-based range delivery", dateRange.Code)
 			}
 			call(http.MethodPut, "/access/api/v1/projects/alpha", `{"storage_quota_bytes":1000000}`, http.StatusOK)
 			call(http.MethodGet, "/artifactory/alpha-virtual/"+path, "", http.StatusOK)

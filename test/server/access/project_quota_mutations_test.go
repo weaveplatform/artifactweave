@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -242,4 +243,123 @@ func projectQuotaPublicationFailures(t *testing.T, db harness.Store) {
 	}
 	quotaMutationCall(t, h, http.MethodPut, path, "shortened!", http.StatusCreated)
 	quotaMutationBytes(t, db, "alpha", 10)
+}
+
+func TestAccProjectQuotaCompetingMutations(t *testing.T) {
+	projectQuotaCompetingMutations(t, inmem.New())
+}
+
+func TestAccProjectQuotaSQLCompetingMutations(t *testing.T) {
+	projectRepositorySQL(t, projectQuotaCompetingMutations)
+}
+
+func projectQuotaCompetingMutations(t *testing.T, db harness.Store) {
+	t.Helper()
+	support.Seed(t, db)
+	blobs, err := fs.New(t.TempDir())
+	storekit.Must(t, err)
+	h := quotaMutationRouter(t, db, blobs)
+	for _, key := range []string{"alpha", "beta"} {
+		quotaMutationCall(t, h, http.MethodPost, "/access/api/v1/projects", `{"project_key":"`+key+`","display_name":"`+key+`","storage_quota_bytes":100}`, http.StatusCreated)
+	}
+	for _, key := range []string{"alpha-local", "unowned-a", "unowned-b"} {
+		body := `{"rclass":"local","packageType":"generic"}`
+		if key == "alpha-local" {
+			body = `{"rclass":"local","packageType":"generic","projectKey":"alpha"}`
+		}
+		quotaMutationCall(t, h, http.MethodPut, "/artifactory/api/repositories/"+key, body, http.StatusOK)
+	}
+	for _, name := range []string{"one.bin", "two.bin"} {
+		quotaMutationCall(t, h, http.MethodPut, "/artifactory/alpha-local/"+name, strings.Repeat(name[:1], 35), http.StatusCreated)
+	}
+	type result struct {
+		name     string
+		response *httptest.ResponseRecorder
+	}
+	race := func(names []string, path func(string) string, body func(string) string) []result {
+		t.Helper()
+		start, results := make(chan struct{}), make(chan result, len(names))
+		var workers sync.WaitGroup
+		for _, name := range names {
+			workers.Go(func() {
+				<-start
+				results <- result{name: name, response: support.Do(t, h, http.MethodPut, path(name), support.Basic("admin", "pw"), body(name))}
+			})
+		}
+		close(start)
+		workers.Wait()
+		close(results)
+		var out []result
+		for value := range results {
+			out = append(out, value)
+		}
+		return out
+	}
+	overwrites := race(
+		[]string{"one.bin", "two.bin"},
+		func(name string) string { return "/artifactory/alpha-local/" + name },
+		func(name string) string { return strings.Repeat(name[:1], 55) },
+	)
+	accepted, refused := 0, 0
+	for _, value := range overwrites {
+		want := strings.Repeat(value.name[:1], 35)
+		switch value.response.Code {
+		case http.StatusCreated:
+			accepted++
+			want = strings.Repeat(value.name[:1], 55)
+		case http.StatusForbidden:
+			refused++
+		default:
+			t.Fatalf("competing overwrite failed outside quota admission: %d %s", value.response.Code, value.response.Body)
+		}
+		if rec := quotaMutationCall(t, h, http.MethodGet, "/artifactory/alpha-local/"+value.name, "", http.StatusOK); rec.Body.String() != want {
+			t.Fatal("refused concurrent overwrite changed content", value.name)
+		}
+	}
+	if accepted != 1 || refused != 1 {
+		t.Fatal("competing overwrites exceeded remaining quota", accepted, refused)
+	}
+	quotaMutationBytes(t, db, "alpha", 90)
+	for _, key := range []string{"unowned-a", "unowned-b"} {
+		quotaMutationCall(t, h, http.MethodPut, "/artifactory/"+key+"/item.bin", strings.Repeat(key[len(key)-1:], 60), http.StatusCreated)
+	}
+	attachments := race(
+		[]string{"unowned-a", "unowned-b"},
+		func(name string) string { return "/access/api/v1/projects/_/attach/repositories/" + name + "/beta" },
+		func(string) string { return "" },
+	)
+	accepted, refused = 0, 0
+	for _, value := range attachments {
+		wantOwner := ""
+		switch value.response.Code {
+		case http.StatusNoContent:
+			accepted++
+			wantOwner = "beta"
+		case http.StatusForbidden:
+			refused++
+		default:
+			t.Fatalf("competing attachment failed outside quota admission: %d %s", value.response.Code, value.response.Body)
+		}
+		configuration, err := db.Repos().Get(t.Context(), value.name)
+		if err != nil || configuration.ProjectKey != wantOwner {
+			t.Fatal("refused concurrent attachment changed canonical ownership", value.name, configuration.ProjectKey, err)
+		}
+		if rec := quotaMutationCall(
+			t,
+			h,
+			http.MethodGet,
+			"/artifactory/"+value.name+"/item.bin",
+			"",
+			http.StatusOK,
+		); rec.Body.String() != strings.Repeat(
+			value.name[len(value.name)-1:],
+			60,
+		) {
+			t.Fatal("competing attachment changed repository content")
+		}
+	}
+	if accepted != 1 || refused != 1 {
+		t.Fatal("competing attachments exceeded remaining quota", accepted, refused)
+	}
+	quotaMutationBytes(t, db, "beta", 60)
 }

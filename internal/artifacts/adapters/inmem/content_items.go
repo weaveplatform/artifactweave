@@ -90,6 +90,16 @@ func (i items) put(ctx context.Context, it model.Item, create bool) (model.Item,
 		return it, err
 	}
 	err = i.s.storageWrite(ctx, func(ctx context.Context) error {
+		var after int64
+		if i.s.storage != nil {
+			// Validate before any path/row mutation. A caller may handle a
+			// joined memory transaction's error without rolling it back.
+			bytes, validationErr := storekit.LogicalItemBytes(it)
+			if validationErr != nil {
+				return fmt.Errorf("validate logical item bytes: %w", validationErr)
+			}
+			after = bytes
+		}
 		change, err := storekit.PrepareStorageContent(ctx, i.s.storage, it.RepoKey)
 		if err != nil {
 			return err //nolint:wrapcheck // storekit names the accounting boundary
@@ -118,10 +128,6 @@ func (i items) put(ctx context.Context, it model.Item, create bool) (model.Item,
 		i.t().Put(it.ID, it)
 		it, _ = i.t().Get(it.ID)
 		if i.s.storage != nil {
-			after, err := storekit.LogicalItemBytes(it)
-			if err != nil {
-				return err //nolint:wrapcheck // storekit names the accounting boundary
-			}
 			return storekit.RecordStorageChange(ctx, change, after-before)
 		}
 		return nil

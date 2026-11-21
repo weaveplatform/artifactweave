@@ -106,7 +106,7 @@ func (s *Kit) pomBeforeReturn(r *http.Request, st Store, v repo.Config, path str
 			// Optional retention has rolled back. The transformed bytes are
 			// already owned by this request, so serve them without a CAS
 			// reference while retaining the source's final delivery fence.
-			return pomTransientFound(v, cleaned, original), nil
+			return pomTransientFound(v, cleaned, it.Modified, original), nil
 		}
 		return Found{}, s.pomError("Failed to import file to local storage", err)
 	}
@@ -117,7 +117,10 @@ type pomTransientBody struct{ *bytes.Reader }
 
 func (pomTransientBody) Close() error { return nil }
 
-func pomTransientFound(v repo.Config, data []byte, original source.Result) Found {
+func pomTransientFound(v repo.Config, data []byte, modified time.Time, original source.Result) Found {
+	// There is no retained copy creation time to reuse. Keep the source's
+	// modification time stable across reads rather than inventing a new date
+	// on each response and invalidating If-Modified-Since/If-Range.
 	hasher := blob.NewHasher()
 	_, _ = hasher.Write(data)
 	digests := hasher.Sum()
@@ -125,7 +128,7 @@ func pomTransientFound(v repo.Config, data []byte, original source.Result) Found
 	return Found{Repo: v, remote: &remoteRead{result: source.Result{
 		Stream: &source.Stream{
 			Status: http.StatusOK, Body: pomTransientBody{bytes.NewReader(data)},
-			Representation: source.Representation{Size: int64(len(data)), MediaType: "application/xml", Modified: time.Now().UTC(), Checksums: sums, OriginalChecksums: sums},
+			Representation: source.Representation{Size: int64(len(data)), MediaType: "application/xml", Modified: modified, Checksums: sums, OriginalChecksums: sums},
 		},
 		Revalidate: original.Revalidate, Used: original.Used,
 	}}}

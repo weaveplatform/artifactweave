@@ -129,7 +129,9 @@ Virtual Maven POM cleanup applies the same optional-retention rule: cleaned
 bytes can be served with their transformed checksums without a stored virtual
 copy when quota refuses it. Existing source delivery checks and successful-use
 callbacks still apply; unrelated transformation/storage failures keep their
-existing answers.
+existing answers. The transient POM's modification date uses its source's
+stable date (or remains unknown), preserving date-based validators without
+inventing a fresh creation time for each request.
 
 Actual deltas settle for the complete metadata transaction before event/lease
 publication fences. This admits net-zero moves above a lowered quota and rolls
