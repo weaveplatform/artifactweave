@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -19,6 +20,10 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/gen/operations"
 	pgdrv "github.com/weaveplatform/artifactweave/internal/platform/sql/postgres"
 	platsqltest "github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
+	retapi "github.com/weaveplatform/artifactweave/internal/retention/api"
+	"github.com/weaveplatform/artifactweave/internal/retention/core/cleanup"
+	retport "github.com/weaveplatform/artifactweave/internal/retention/core/port"
 )
 
 // keyedRequest is one request of a keyed operation's row.
@@ -30,6 +35,10 @@ type keyedRequest struct{ method, path, body string }
 type keyedRow struct {
 	request, other keyedRequest
 	effects        func(t *testing.T, s *appsql.Store) int
+	prepare        func(t *testing.T, s keyedServer)
+	// A queued admission may refuse overlapping unkeyed work. Zero expects
+	// another successful effect, as the synchronous operations do.
+	repeatStatus int
 }
 
 // keyedFixtureRuns are the runs every row's fixture publishes: three of
@@ -54,6 +63,26 @@ func runsDeleted(t *testing.T, s *appsql.Store) int {
 // by service and operation ID; TestAccKeyedOperationsReplayOnce fails for an
 // operation without one, so a new key operation is added here.
 var keyedRows = map[string]keyedRow{
+	"artifactory runPackageCleanupPolicy": {
+		request: keyedRequest{
+			method: http.MethodPut,
+			path:   "/artifactory/api/cleanup/packages/policies/keyed-cleanup/run?dryRun=true",
+		},
+		other: keyedRequest{
+			method: http.MethodPut,
+			path:   "/artifactory/api/cleanup/packages/policies/keyed-cleanup/run?dryRun=false",
+		},
+		prepare: func(t *testing.T, s keyedServer) {
+			t.Helper()
+			wantStatus(t, s.send(t, keyedRequest{
+				method: http.MethodPost,
+				path:   "/artifactory/api/cleanup/packages/policies/keyed-cleanup",
+				body:   `{"key":"keyed-cleanup","searchCriteria":{"packageTypes":["generic"],"repos":["**"],"includedPackages":["**"]}}`,
+			}, ""), http.StatusCreated)
+		},
+		effects:      cleanupAdmissions,
+		repeatStatus: http.StatusBadRequest,
+	},
 	"artifactory appendBuild": {
 		request: keyedRequest{http.MethodPost, buildsPath + "/append/app/1", `[{"id":"once"}]`},
 		other:   keyedRequest{http.MethodPost, buildsPath + "/append/app/1", `[{"id":"other"}]`},
@@ -110,6 +139,32 @@ var keyedRows = map[string]keyedRow{
 	},
 }
 
+func cleanupAdmissions(t *testing.T, s *appsql.Store) int {
+	t.Helper()
+	runs, _, err := s.Cleanup().Runs(
+		t.Context(), retport.RunFilter{PolicyKey: "keyed-cleanup"}, kernel.Page{Limit: 10},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, run := range runs {
+		if run.ID <= 0 || run.ID != run.TriggerID {
+			t.Fatal("cleanup admission lost its stable integer trigger")
+		}
+		if !run.DryRun || run.Status != retapi.RunInProgress {
+			t.Fatal("cleanup admission lost its active dry-run selection")
+		}
+		queued, err := s.WorkQueue().Get(t.Context(), cleanup.WorkKind, strconv.FormatInt(run.ID, 10))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if queued.State != work.WorkPending || queued.Generation != 0 {
+			t.Fatal("cleanup admission did not retain untouched queued work")
+		}
+	}
+	return len(runs)
+}
+
 // keyedServer is a fresh store of backend, seeded with the fixture's runs,
 // behind the server.
 type keyedServer struct {
@@ -117,7 +172,7 @@ type keyedServer struct {
 	handler http.Handler
 }
 
-func newKeyedServer(t *testing.T, backend, dsn string) keyedServer {
+func newKeyedServer(t *testing.T, backend, dsn string, row keyedRow) keyedServer {
 	t.Helper()
 	ctx := t.Context()
 	var (
@@ -151,7 +206,11 @@ func newKeyedServer(t *testing.T, backend, dsn string) keyedServer {
 			fmt.Sprintf(`{"name":"app","number":"1","started":%q,"modules":[]}`, started),
 		), http.StatusNoContent)
 	}
-	return keyedServer{store: s, handler: h}
+	server := keyedServer{store: s, handler: h}
+	if row.prepare != nil {
+		row.prepare(t, server)
+	}
+	return server
 }
 
 func (k keyedServer) send(t *testing.T, r keyedRequest, key string) *httptest.ResponseRecorder {
@@ -178,8 +237,8 @@ func answer(rec *httptest.ResponseRecorder) string {
 // Every served operation that declares IdempotencyKey, on SQLite and
 // PostgreSQL: the same key twice has one effect and answers the same; the
 // same key with other bytes or effect parameters answers 422 and has none;
-// without a key the operation answers as it does with one and repeats its
-// effect, as it always has.
+// without a key the operation answers as it does with one and either repeats
+// its effect or preserves its refusal of overlapping queued work.
 func TestAccKeyedOperationsReplayOnce(t *testing.T) {
 	index, err := operations.NewIndex(operations.Table)
 	if err != nil {
@@ -223,7 +282,12 @@ func TestAccKeyedOperationsReplayOnce(t *testing.T) {
 			}
 			for id, row := range keyedRows {
 				t.Run(id, func(t *testing.T) {
-					keyed := newKeyedServer(t, backend, dsn)
+					keyed := newKeyedServer(
+						t,
+						backend,
+						dsn,
+						row,
+					)
 					first := keyed.send(t, row.request, `"once"`)
 					if first.Code/100 != 2 {
 						t.Fatalf("keyed: %s", answer(first))
@@ -251,13 +315,25 @@ func TestAccKeyedOperationsReplayOnce(t *testing.T) {
 						t.Errorf("after a refused reuse: %d effects, want 1", n)
 					}
 
-					plain := newKeyedServer(t, backend, dsn)
+					plain := newKeyedServer(
+						t,
+						backend,
+						dsn,
+						row,
+					)
 					if got := plain.send(t, row.request, ""); answer(got) != answer(first) {
 						t.Errorf("without a key\n%s\nwant\n%s", answer(got), answer(first))
 					}
-					plain.send(t, row.request, "")
-					if n := row.effects(t, plain.store); n != 2 {
-						t.Errorf("without a key twice: %d effects, want 2", n)
+					repeated := plain.send(t, row.request, "")
+					wantEffects := 2
+					if row.repeatStatus != 0 {
+						wantStatus(t, repeated, row.repeatStatus)
+						wantEffects = 1
+					} else if repeated.Code/100 != 2 {
+						t.Fatalf("unkeyed repeat: %s", answer(repeated))
+					}
+					if n := row.effects(t, plain.store); n != wantEffects {
+						t.Errorf("without a key twice: %d effects, want %d", n, wantEffects)
 					}
 				})
 			}
