@@ -9,6 +9,7 @@ import (
 	"io"
 	"time"
 
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx"
@@ -98,7 +99,7 @@ func (w Worker) Execute(ctx context.Context, item work.WorkItem) error {
 			if !item.FinalAttempt || ctx.Err() != nil {
 				return err
 			}
-			if settlement := w.abort(ctx, ref, fence); settlement != nil {
+			if settlement := w.abort(ctx, ref, executionFailure(err), fence); settlement != nil {
 				return errors.Join(work.ErrUnsettled, err, settlement)
 			}
 		}
@@ -183,7 +184,27 @@ func (w Worker) enter(ctx context.Context, run model.ExecutionRun, fence PushFen
 	})
 }
 
-func (w Worker) abort(ctx context.Context, ref model.ExecutionReference, fence PushFence) error {
+func executionFailure(err error) model.ExecutionFailure {
+	switch {
+	case errors.Is(err, kernel.ErrForbidden), errors.Is(err, kernel.ErrBadCredentials), errors.Is(err, kernel.ErrUnauthenticated),
+		errors.Is(err, kernel.ErrAPIRestricted), errors.Is(err, kernel.ErrPasswordExpired), errors.Is(err, artifactsapi.ErrPullDenied):
+		return model.ExecutionAuthorityDenied
+	case errors.Is(err, kernel.ErrConflict), errors.Is(err, kernel.ErrNotFound), errors.Is(err, artifactsapi.ErrPullChanged):
+		return model.ExecutionConfigurationChanged
+	case errors.Is(err, artifactsapi.ErrPullOffline):
+		return model.ExecutionSourceOffline
+	case errors.Is(err, artifactsapi.ErrPullNotStored):
+		return model.ExecutionNotStored
+	case errors.Is(err, artifactsapi.ErrPullIntegrity):
+		return model.ExecutionIntegrityFailed
+	case errors.Is(err, artifactsapi.ErrPullUnsupported), errors.Is(err, ErrPushStatistics):
+		return model.ExecutionUnsupported
+	default:
+		return model.ExecutionRetryExhausted
+	}
+}
+
+func (w Worker) abort(ctx context.Context, ref model.ExecutionReference, failure model.ExecutionFailure, fence PushFence) error {
 	err := w.Store.Tx(ctx, func(ctx context.Context) error {
 		if err := w.Configurations.Guard(ctx); err != nil {
 			return fmt.Errorf("guard failed replication settlement: %w", err)
@@ -196,6 +217,7 @@ func (w Worker) abort(ctx context.Context, ref model.ExecutionReference, fence P
 			next := run
 			next.Version++
 			next.Phase = model.ExecutionAborted
+			next.Failure = failure
 			if now := w.now(); now.After(next.Updated) {
 				next.Updated = now
 			}

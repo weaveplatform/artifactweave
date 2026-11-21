@@ -29,6 +29,7 @@ func runExecutions(t *testing.T, newStore Factory) {
 	t.Run("Executions", func(t *testing.T) {
 		t.Run("immutable identity and occurrence", func(t *testing.T) { executionIdentity(t, newStore(t)) })
 		t.Run("transactional recovery", func(t *testing.T) { executionRecovery(t, newStore(t)) })
+		t.Run("closed failure recovery", func(t *testing.T) { executionFailureRecovery(t, newStore(t)) })
 		t.Run("selected effects and replay", func(t *testing.T) { executionEffects(t, newStore(t)) })
 		t.Run("scoped secret-free status", func(t *testing.T) { executionScopedStatus(t, newStore(t)) })
 	})
@@ -101,4 +102,28 @@ func executionRecovery(t *testing.T, db port.Store) {
 	storekit.Same(t, "partial failure is not OK", model.ReplicationPartialFailure, retained.Status())
 	completed.Version++
 	storekit.WantErr(t, db.Tx(ctx, func(ctx context.Context) error { return progress.Advance(ctx, retained.Version, completed) }), kernel.ErrConflict)
+}
+
+func executionFailureRecovery(t *testing.T, db port.Store) {
+	t.Helper()
+	ctx := t.Context()
+	run := storekit.Get[model.ExecutionRun](t)(db.Executions().Create(ctx, "failed-run", executionBinding(""), storekit.At(1)))
+	next := run
+	next.Version++
+	next.Phase = model.ExecutionAborted
+	next.Failure = model.ExecutionAuthorityDenied
+	next.Updated, next.Completed = storekit.At(2), storekit.At(2)
+	next.Outcomes = model.ExecutionOutcomes{Succeeded: 1, Pending: 1}
+	err := db.Tx(ctx, func(ctx context.Context) error {
+		if err := db.Executions().Advance(ctx, run.Version, next); err != nil {
+			return fmt.Errorf("advance failed execution rollback fixture: %w", err)
+		}
+		return errExecutionRollback
+	})
+	storekit.WantErr(t, err, errExecutionRollback)
+	storekit.Same(t, "failed publication preserves unfinished dispatch", run, storekit.Get[model.ExecutionRun](t)(db.Executions().Run(ctx, run.Reference)))
+	storekit.Must(t, db.Tx(ctx, func(ctx context.Context) error { return db.Executions().Advance(ctx, run.Version, next) }))
+	storekit.Same(t, "closed failure and real counts survive", next, storekit.Get[model.ExecutionRun](t)(db.Executions().Run(ctx, run.Reference)))
+	storekit.Same(t, "admission replay retains failure", next, storekit.Get[model.ExecutionRun](t)(db.Executions().Create(ctx, "failed-run", executionBinding(""), storekit.At(3))))
+	storekit.WantErr(t, db.Tx(ctx, func(ctx context.Context) error { return db.Executions().Advance(ctx, run.Version, next) }), kernel.ErrConflict)
 }

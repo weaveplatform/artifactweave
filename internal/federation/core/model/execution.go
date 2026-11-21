@@ -38,6 +38,32 @@ type ExecutionBinding struct {
 // by the direction driver and can survive interruption of a queue attempt.
 type ExecutionPhase string
 
+// ExecutionFailure is a closed private diagnostic. Raw peer, credential and
+// database error strings must never enter durable execution or queue records.
+type ExecutionFailure string
+
+// Closed execution failure codes, independent of raw transport diagnostics.
+const (
+	ExecutionRetryExhausted       ExecutionFailure = "retry_exhausted"
+	ExecutionTransferFailed       ExecutionFailure = "transfer_failed"
+	ExecutionAuthorityDenied      ExecutionFailure = "authority_denied"
+	ExecutionConfigurationChanged ExecutionFailure = "configuration_changed"
+	ExecutionSourceOffline        ExecutionFailure = "source_offline"
+	ExecutionNotStored            ExecutionFailure = "source_not_stored"
+	ExecutionIntegrityFailed      ExecutionFailure = "integrity_failed"
+	ExecutionUnsupported          ExecutionFailure = "unsupported"
+)
+
+func (f ExecutionFailure) valid() bool {
+	switch f {
+	case ExecutionRetryExhausted, ExecutionTransferFailed, ExecutionAuthorityDenied, ExecutionConfigurationChanged,
+		ExecutionSourceOffline, ExecutionNotStored, ExecutionIntegrityFailed, ExecutionUnsupported:
+		return true
+	default:
+		return false
+	}
+}
+
 // Durable logical dispatch phases, independent of queue attempt generations.
 const (
 	ExecutionPending  ExecutionPhase = "pending"
@@ -63,6 +89,7 @@ type ExecutionRun struct {
 	Binding   ExecutionBinding   `json:"binding"`
 	Version   int64              `json:"version"`
 	Phase     ExecutionPhase     `json:"phase"`
+	Failure   ExecutionFailure   `json:"failure"`
 	Outcomes  ExecutionOutcomes  `json:"outcomes"`
 	Started   time.Time          `json:"started"`
 	Updated   time.Time          `json:"updated"`
@@ -136,6 +163,9 @@ func (r ExecutionRun) Validate() error {
 		return err
 	}
 	terminal := r.Phase == ExecutionComplete || r.Phase == ExecutionAborted
+	if r.Phase == ExecutionAborted && !r.Failure.valid() || r.Phase != ExecutionAborted && r.Failure != "" {
+		return fmt.Errorf("invalid execution failure code: %w", kernel.ErrInvalid)
+	}
 	if r.Version < 1 || r.Started.IsZero() || r.Updated.Before(r.Started) || terminal != !r.Completed.IsZero() ||
 		terminal && (r.Completed.Before(r.Started) || r.Updated.Before(r.Completed)) {
 		return fmt.Errorf("invalid execution lifecycle: %w", kernel.ErrInvalid)

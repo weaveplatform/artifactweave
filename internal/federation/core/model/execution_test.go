@@ -49,6 +49,9 @@ func TestUnitExecutionStatusNeedsCompleteActualOutcomes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			run := executionRun(t)
 			run.Phase, run.Outcomes = test.phase, test.outcomes
+			if test.phase == model.ExecutionAborted {
+				run.Failure = model.ExecutionAuthorityDenied
+			}
 			if test.phase == model.ExecutionComplete || test.phase == model.ExecutionAborted {
 				run.Completed = run.Started
 			}
@@ -86,5 +89,23 @@ func TestUnitExecutionAdvanceCannotRebindOrEraseProvenEffects(t *testing.T) {
 	next.Version++
 	if err := model.ValidateExecutionAdvance(terminal, next); !errors.Is(err, kernel.ErrConflict) {
 		t.Fatal("terminal execution was reopened", err)
+	}
+}
+
+func TestUnitExecutionFailureCodesRejectRawDiagnosticsAndNonterminalFailure(t *testing.T) {
+	for _, failure := range []model.ExecutionFailure{model.ExecutionRetryExhausted, model.ExecutionTransferFailed, model.ExecutionAuthorityDenied, model.ExecutionConfigurationChanged, model.ExecutionSourceOffline, model.ExecutionNotStored, model.ExecutionIntegrityFailed, model.ExecutionUnsupported} {
+		run := executionRun(t)
+		run.Failure = failure
+		if run.Validate() == nil {
+			t.Fatal("unfinished execution accepted terminal failure")
+		}
+		run.Phase, run.Completed = model.ExecutionAborted, run.Started
+		if err := run.Validate(); err != nil {
+			t.Fatal("closed execution failure rejected", err)
+		}
+		run.Failure = "peer_password_must_not_be_persisted"
+		if run.Validate() == nil {
+			t.Fatal("raw diagnostic accepted as execution failure")
+		}
 	}
 }

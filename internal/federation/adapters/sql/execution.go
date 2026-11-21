@@ -20,7 +20,7 @@ func (s *Store) Executions() port.ExecutionProgressStore { return executions{s} 
 type executions struct{ s *Store }
 
 const executionColumns = "run_id, incarnation, target_key, repo_key, repo_incarnation, direction, occurrence, " +
-	"binding_json, version, phase, succeeded, failed, skipped, pending, started_at, updated_at, completed_at"
+	"binding_json, version, phase, failure_reason, succeeded, failed, skipped, pending, started_at, updated_at, completed_at"
 
 func scanExecution(row interface{ Scan(...any) error }) (model.ExecutionRun, error) {
 	var run model.ExecutionRun
@@ -28,7 +28,7 @@ func scanExecution(row interface{ Scan(...any) error }) (model.ExecutionRun, err
 	var occurrence sql.NullString
 	var started, updated, completed sql.NullInt64
 	if err := row.Scan(&run.Reference.ID, &run.Reference.Incarnation, &target, &repository, &incarnation,
-		&direction, &occurrence, &document, &run.Version, &run.Phase, &run.Outcomes.Succeeded, &run.Outcomes.Failed,
+		&direction, &occurrence, &document, &run.Version, &run.Phase, &run.Failure, &run.Outcomes.Succeeded, &run.Outcomes.Failed,
 		&run.Outcomes.Skipped, &run.Outcomes.Pending, &started, &updated, &completed); err != nil {
 		return model.ExecutionRun{}, err //nolint:wrapcheck // store supplies driver/scan context
 	}
@@ -67,7 +67,7 @@ func (p executions) Create(ctx context.Context, id string, binding model.Executi
 		_, err := p.s.Exec(ctx, "claim replication execution",
 			dialect.InsertIgnore("replication_executions", dialect.OpsCols(executionColumns), []string{"run_id"}),
 			id, candidate.Reference.Incarnation, binding.TargetKey, binding.Repository.Key, binding.Repository.Incarnation,
-			binding.Direction, dialect.NullString(binding.Occurrence), document, candidate.Version, candidate.Phase,
+			binding.Direction, dialect.NullString(binding.Occurrence), document, candidate.Version, candidate.Phase, candidate.Failure,
 			candidate.Outcomes.Succeeded, candidate.Outcomes.Failed, candidate.Outcomes.Skipped, candidate.Outcomes.Pending,
 			dialect.Micros(candidate.Started), dialect.Micros(candidate.Updated), dialect.Micros(candidate.Completed))
 		if err != nil {
@@ -126,8 +126,8 @@ func (p executions) Advance(ctx context.Context, expected int64, next model.Exec
 		return fmt.Errorf("validate execution advance: %w", err)
 	}
 	count, err := p.s.Exec(ctx, "advance replication execution",
-		"UPDATE replication_executions SET version=?,phase=?,succeeded=?,failed=?,skipped=?,pending=?,updated_at=?,completed_at=? "+
-			"WHERE run_id=? AND incarnation=? AND version=?", next.Version, next.Phase, next.Outcomes.Succeeded,
+		"UPDATE replication_executions SET version=?,phase=?,failure_reason=?,succeeded=?,failed=?,skipped=?,pending=?,updated_at=?,completed_at=? "+
+			"WHERE run_id=? AND incarnation=? AND version=?", next.Version, next.Phase, next.Failure, next.Outcomes.Succeeded,
 		next.Outcomes.Failed, next.Outcomes.Skipped, next.Outcomes.Pending, dialect.Micros(next.Updated), dialect.Micros(next.Completed),
 		next.Reference.ID, next.Reference.Incarnation, expected)
 	if err != nil {

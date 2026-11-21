@@ -44,7 +44,8 @@ func TestAccReplicationExecutionReopenRetainsOccurrenceAndActualOutcomes(t *test
 	run := storekit.Get[model.ExecutionRun](t)(first.Executions().Create(t.Context(), "execution", executionSQLBinding(), time.Unix(1, 0)))
 	next := run
 	next.Version++
-	next.Phase, next.Updated = model.ExecutionRunning, time.Unix(2, 0)
+	next.Phase, next.Updated = model.ExecutionAborted, time.Unix(2, 0)
+	next.Completed, next.Failure = next.Updated, model.ExecutionRetryExhausted
 	next.Outcomes = model.ExecutionOutcomes{Succeeded: 2, Pending: 1}
 	storekit.Must(t, first.Tx(t.Context(), func(ctx context.Context) error { return first.Executions().Advance(ctx, run.Version, next) }))
 	storekit.Must(t, first.DB().Close())
@@ -57,11 +58,11 @@ func TestAccReplicationExecutionReopenRetainsOccurrenceAndActualOutcomes(t *test
 		next,
 		storekit.Get[model.ExecutionRun](t)(second.Executions().Create(t.Context(), "execution", executionSQLBinding(), time.Unix(9, 0))),
 	)
-	storekit.Same(t, "restart remains incomplete", model.ReplicationIncomplete, next.Status())
+	storekit.Same(t, "restart retains truthful failure", model.ReplicationPartialFailure, next.Status())
 }
 
 func TestAccReplicationExecutionRejectsCorruptPrivateProvenance(t *testing.T) {
-	for _, field := range []string{"binding_json", "target_key", "repo_key", "repo_incarnation", "direction", "occurrence"} {
+	for _, field := range []string{"binding_json", "target_key", "repo_key", "repo_incarnation", "direction", "occurrence", "failure_reason"} {
 		t.Run(field, func(t *testing.T) {
 			store := fedsql.New(sqltest.OpenSQLite(t, fedsql.Module))
 			run := storekit.Get[model.ExecutionRun](t)(store.Executions().Create(t.Context(), "execution", executionSQLBinding(), time.Unix(1, 0)))

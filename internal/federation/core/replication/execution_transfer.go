@@ -217,8 +217,10 @@ func finishTransferExecution(ctx context.Context, progress port.ExecutionProgres
 	}
 	next.Completed = next.Updated
 	next.Phase = model.ExecutionAborted
+	next.Failure = model.ExecutionTransferFailed
 	if complete {
 		next.Phase = model.ExecutionComplete
+		next.Failure = ""
 	}
 	if err := progress.Advance(ctx, current.Version, next); err != nil {
 		return fmt.Errorf("project terminal transfer: %w", err)

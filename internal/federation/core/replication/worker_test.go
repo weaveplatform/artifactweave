@@ -137,12 +137,13 @@ func TestUnitReplicationWorkerRetryResumesPendingProofAndSanitizesQueueErrors(t 
 
 func TestUnitReplicationWorkerExhaustionSettlesFailureWithoutFalseSuccess(t *testing.T) {
 	w := newExecutionWorld(t, model.ReplicationPull)
-	w.pull.fetchError = errors.New("temporary peer failure")
+	w.pull.fetchError = errors.New("temporary peer failure with private diagnostic")
 	w.item.FinalAttempt = true
 	must(t, w.worker.Execute(t.Context(), w.item))
 	run, err := w.db.Executions().Run(t.Context(), w.run.Reference)
 	must(t, err)
-	if run.Phase != model.ExecutionAborted || run.Status() != model.ReplicationError || run.Outcomes.Succeeded != 0 || run.Outcomes.Pending != 1 {
+	if run.Phase != model.ExecutionAborted || run.Failure != model.ExecutionRetryExhausted || run.Status() != model.ReplicationError || run.Outcomes.Succeeded != 0 ||
+		run.Outcomes.Pending != 1 {
 		t.Fatal("exhausted transfer fabricated terminal success")
 	}
 }

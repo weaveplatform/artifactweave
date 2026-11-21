@@ -11,6 +11,7 @@ CREATE TABLE replication_executions (
     binding_json TEXT NOT NULL,
     version BIGINT NOT NULL CHECK (version > 0),
     phase TEXT NOT NULL,
+    failure_reason TEXT NOT NULL DEFAULT '',
     succeeded BIGINT NOT NULL DEFAULT 0 CHECK (succeeded >= 0),
     failed BIGINT NOT NULL DEFAULT 0 CHECK (failed >= 0),
     skipped BIGINT NOT NULL DEFAULT 0 CHECK (skipped >= 0),

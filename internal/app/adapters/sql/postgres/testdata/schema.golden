@@ -861,6 +861,7 @@ column replication_executions.occurrence text
 column replication_executions.binding_json text NOT NULL
 column replication_executions.version bigint NOT NULL
 column replication_executions.phase text NOT NULL
+column replication_executions.failure_reason text NOT NULL DEFAULT ''::text
 column replication_executions.succeeded bigint NOT NULL DEFAULT 0
 column replication_executions.failed bigint NOT NULL DEFAULT 0
 column replication_executions.skipped bigint NOT NULL DEFAULT 0
