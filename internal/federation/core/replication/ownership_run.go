@@ -38,8 +38,12 @@ func (o Ownership) Run(ctx context.Context, item work.WorkItem, target string,
 				return
 			case <-ticker.C:
 				if err := o.Renew(runCtx, owner); err != nil {
-					failure <- fmt.Errorf("replication target renewal ended: %w", err)
-					cancel()
+					// Normal callback completion also cancels this context. An
+					// interrupted heartbeat must not turn that success into retry.
+					if runCtx.Err() == nil {
+						failure <- fmt.Errorf("replication target renewal ended: %w", err)
+						cancel()
+					}
 					return
 				}
 			}

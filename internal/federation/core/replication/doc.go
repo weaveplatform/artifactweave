@@ -62,9 +62,11 @@
 // Configuration is implemented by REP-01. REP-02 supplies source/progress
 // contracts, the bounded driver, guarded target HTTP and application bindings.
 // REP-03 supplies durable verified owning-cache pull, including native registry
-// admission. REP-04 supplies guarded Quartz lifecycle positions and private
-// author persistence. Dispatch and path-aware reporting remain integration work.
-// Multi-push,
+// admission.
+// REP-04 supplies guarded Quartz configuration/lifecycle positions and private
+// author persistence, exclusive generation-fenced target ownership, and active
+// transfer renewal/cancellation. Run dispatch, current author restoration and path-aware
+// reporting remain integration work. Multi-push,
 // event-triggered and binary-existence optimization remain P37.
 //
 // # Testing

@@ -39,6 +39,10 @@
 //     immutable caller/source bindings and actual artifact-owner receipts.
 //     They distinguish pending/failed/skipped work from successful cache and
 //     deletion effects; persistence and dispatch belong to the owning services.
+//   - ExecutionRun/ExecutionBinding link one private logical dispatch to its
+//     exact transfer lifetime. ExecutionOutcomes derives truthful public status
+//     without treating pending, failed or uncertain work as successful. These
+//     types do not themselves persist, schedule or dispatch a run.
 //   - Peer with Has and DeriveStatus, PeerStatus, UseCase with
 //     KnownUseCase, PairingNonce with Usable, and PairingTokenTTL.
 //   - Stamp with After; StreamKind with RepositoryStream, AccessStream,
@@ -102,6 +106,8 @@
 //
 // # Testing
 //
+//   - execution_test.go: actual-outcome status, unfinished/overflow refusal,
+//     immutable lifetime/credential bindings and monotonic retry evidence.
 //   - model_test.go: TestUnitDirectionFor (locals push, remotes pull,
 //     virtuals do not replicate), TestUnitPeer (known and unknown use cases,
 //     Has, the four statuses and a never-seen peer, nonce expiry and single
