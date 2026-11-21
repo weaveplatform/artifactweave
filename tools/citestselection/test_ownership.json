@@ -311,6 +311,7 @@
       "reindex_test.go",
       "remote_folder_authority_test.go",
       "remote_folder_listing_test.go",
+      "replication_source_test.go",
       "repo_environments_test.go",
       "repositories_format_class_test.go",
       "repositories_paging_test.go",

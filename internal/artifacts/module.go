@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/smart"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/transfer"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/cocoapods"
@@ -52,6 +53,7 @@ type Store interface {
 	repos.Store
 	remote.Store
 	upstream.ResolverStore
+	InTx(context.Context) bool
 }
 
 // Deps is what app passes New: what the module's services and its remote
@@ -186,6 +188,9 @@ func New(d Deps) (*Module, error) {
 	}
 	m.items.GuardAuthority = m.guardAuthority
 	m.api.PackageIndex = pkgindex.NewReader(d.Store, formats.For, m.items)
+	m.api.TransferSource = transfer.Source{
+		Store: d.Store, Blobs: d.Blobs, Guard: m.guardAuthority, Current: m.currentTransferCaller,
+	}
 	// Assigned only when present: a nil queue in the interface would be a
 	// typed nil, which the item service would call instead of skipping.
 	if d.Work != nil {
@@ -206,6 +211,31 @@ func (m *Module) guardAuthority(ctx context.Context) error {
 		return fmt.Errorf("artifact current authority: %w", err)
 	}
 	return nil
+}
+
+func (m *Module) currentTransferCaller(ctx context.Context) (accessapi.Decider, error) {
+	p, err := kernel.RequireAuthenticated(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("content source caller: %w", err)
+	}
+	if m.access.Projects == nil || m.access.Authenticator == nil || m.access.Authorizer == nil {
+		return nil, fmt.Errorf("content source access contracts unavailable: %w", kernel.ErrStore)
+	}
+	if p.Registry != nil {
+		return nil, kernel.ErrForbidden
+	}
+	p, err = m.access.Authenticator.Current(ctx, p)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return nil, kernel.ErrBadCredentials
+	}
+	if err != nil {
+		return nil, fmt.Errorf("current content source credential: %w", err)
+	}
+	decider, err := m.access.Authorizer.For(ctx, p)
+	if err != nil {
+		return nil, fmt.Errorf("current content source permissions: %w", err)
+	}
+	return decider, nil
 }
 
 // VirtualCache is shared by protocol reads and member-write invalidation.
