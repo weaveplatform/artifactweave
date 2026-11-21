@@ -246,7 +246,7 @@ func (c pushConnection) Inspect(ctx context.Context, path string) (port.PushTarg
 	return kernel.Clone(row), nil
 }
 
-func (c pushConnection) Put(ctx context.Context, source artifactsapi.TransferItem, body io.ReadSeeker) error {
+func (c pushConnection) Put(ctx context.Context, source artifactsapi.TransferItem, body io.ReadSeeker, before port.PushMutationFence) error {
 	if err := c.outside(ctx); err != nil {
 		return err
 	}
@@ -255,6 +255,9 @@ func (c pushConnection) Put(ctx context.Context, source artifactsapi.TransferIte
 	}
 	content, err := io.ReadAll(body)
 	if err != nil {
+		return err
+	}
+	if err := before(ctx); err != nil {
 		return err
 	}
 	c.w.puts++
@@ -270,8 +273,11 @@ func (c pushConnection) Put(ctx context.Context, source artifactsapi.TransferIte
 	return c.w.putError
 }
 
-func (c pushConnection) Properties(ctx context.Context, path string, properties map[string][]string) error {
+func (c pushConnection) Properties(ctx context.Context, path string, properties map[string][]string, before port.PushMutationFence) error {
 	if err := c.outside(ctx); err != nil {
+		return err
+	}
+	if err := before(ctx); err != nil {
 		return err
 	}
 	c.w.patches++
@@ -293,13 +299,16 @@ func (c pushConnection) Files(ctx context.Context, _ string, page kernel.Page) (
 	return pushFixturePage(rows, page, func(row port.PushTargetItem) string { return row.Path })
 }
 
-func (c pushConnection) Delete(ctx context.Context, path string, expected model.PushTargetSnapshot) error {
+func (c pushConnection) Delete(ctx context.Context, path string, expected model.PushTargetSnapshot, before port.PushMutationFence) error {
 	if err := c.outside(ctx); err != nil {
 		return err
 	}
 	current, found := c.w.target[path]
 	if !found || current.Snapshot != expected {
 		return kernel.ErrConflict
+	}
+	if err := before(ctx); err != nil {
+		return err
 	}
 	c.w.deletes++
 	delete(c.w.target, path)

@@ -189,6 +189,12 @@ func (s Source) Items(ctx context.Context, repository api.TransferRepository, qu
 				}
 				return s.project(ctx, decider, repository, query, scope, rows, &out)
 			}
+			if err == nil && it.Folder && page.After == "" && scope.matches(it.FullPath()) {
+				// An explicitly selected folder is itself an item, even empty.
+				// Its cursor sorts before descendants and keeps this page bounded.
+				next = kernel.Cursor(it.FullPath())
+				return s.project(ctx, decider, repository, query, scope, []model.Item{it}, &out)
+			}
 		}
 		var err error
 		rows, next, err = s.Store.Items().DescendantsByFullPath(ctx, repository.Key, false, scope.root, page)

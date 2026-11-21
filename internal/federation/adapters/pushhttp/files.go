@@ -206,6 +206,18 @@ func (c *connection) aql(ctx context.Context, root string, last fileKey, limit i
 func (c *connection) fileList(ctx context.Context, root string, last fileKey, limit int) ([]fileKey, error) {
 	if root != "" {
 		item, err := c.info(ctx, root)
+		if errors.Is(err, kernel.ErrNotFound) {
+			// A missing selected path is empty only under a currently readable,
+			// existing repository. AQL alone cannot prove this namespace exists.
+			anchor, anchorErr := c.info(ctx, "")
+			if anchorErr != nil {
+				return nil, anchorErr
+			}
+			if !anchor.Snapshot.Folder {
+				return nil, port.PushTargetInvalid
+			}
+			return []fileKey{}, nil
+		}
 		if err != nil {
 			return nil, err
 		}

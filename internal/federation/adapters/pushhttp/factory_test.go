@@ -228,7 +228,7 @@ func TestUnitTargetUploadLostAcknowledgementDoesNotReplay(t *testing.T) {
 		}
 		return true
 	}
-	if err := connection.Put(t.Context(), artifactsapi.TransferItem{Path: "file", Size: int64(len(body)), Actual: sums(body)}, bytes.NewReader(body)); err == nil {
+	if err := connection.Put(t.Context(), artifactsapi.TransferItem{Path: "file", Size: int64(len(body)), Actual: sums(body)}, bytes.NewReader(body), allowMutation); err == nil {
 		t.Fatal("lost acknowledgement reported success")
 	}
 	item, err := connection.Inspect(t.Context(), "file")

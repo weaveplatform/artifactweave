@@ -128,10 +128,16 @@ func (c *connection) info(ctx context.Context, path string) (port.PushTargetItem
 	}
 	var info artifactory.FileInfo
 	if json.Unmarshal(encoded, &info) != nil || info.Repo == nil || *info.Repo != c.endpoint.Repository() ||
-		info.Path == nil || *info.Path != "/"+path || info.LastModified == nil || info.LastUpdated == nil {
+		info.Path == nil || *info.Path != "/"+path {
 		return port.PushTargetItem{}, fmt.Errorf("validate target item namespace and timestamps: %w", port.PushTargetInvalid)
 	}
-	snapshot := model.PushTargetSnapshot{Modified: *info.LastModified, Updated: *info.LastUpdated}
+	snapshot := model.PushTargetSnapshot{}
+	if info.LastModified != nil {
+		snapshot.Modified = *info.LastModified
+	}
+	if info.LastUpdated != nil {
+		snapshot.Updated = *info.LastUpdated
+	}
 	if children, folder := document["children"]; folder {
 		var entries []artifactory.FolderChild
 		if json.Unmarshal(children, &entries) != nil || entries == nil || info.Size != nil || info.Checksums != nil {
@@ -139,6 +145,9 @@ func (c *connection) info(ctx context.Context, path string) (port.PushTargetItem
 		}
 		snapshot.Folder = true
 	} else {
+		if info.LastModified == nil || info.LastUpdated == nil {
+			return port.PushTargetItem{}, port.PushTargetInvalid
+		}
 		if info.Size == nil || info.Checksums == nil || info.Checksums.Sha256 == nil {
 			return port.PushTargetItem{}, fmt.Errorf("target omitted computed file size or checksum: %w", port.PushTargetInvalid)
 		}
@@ -232,7 +241,10 @@ func (c *connection) properties(ctx context.Context, path string) (map[string][]
 	return *document.Properties, nil
 }
 
-func (c *connection) Put(ctx context.Context, item artifactsapi.TransferItem, body io.ReadSeeker) error {
+func (c *connection) Put(ctx context.Context, item artifactsapi.TransferItem, body io.ReadSeeker, before port.PushMutationFence) error {
+	if before == nil {
+		return fmt.Errorf("missing replication mutation fence: %w", kernel.ErrInvalid)
+	}
 	target, err := c.endpoint.ItemURL(item.Path)
 	if err != nil {
 		return fmt.Errorf("address replication upload: %w", err)
@@ -266,6 +278,9 @@ func (c *connection) Put(ctx context.Context, item artifactsapi.TransferItem, bo
 			headers.Set("X-Checksum-Md5", item.Actual.MD5)
 		}
 	}
+	if err := c.beforeMutation(ctx, before); err != nil {
+		return err
+	}
 	response, err := c.request(ctx, http.MethodPut, target, reader, length, headers)
 	if err != nil {
 		return err
@@ -277,7 +292,10 @@ func (c *connection) Put(ctx context.Context, item artifactsapi.TransferItem, bo
 	return nil
 }
 
-func (c *connection) Properties(ctx context.Context, path string, desired map[string][]string) error {
+func (c *connection) Properties(ctx context.Context, path string, desired map[string][]string, before port.PushMutationFence) error {
+	if before == nil {
+		return fmt.Errorf("missing replication mutation fence: %w", kernel.ErrInvalid)
+	}
 	observed, err := c.Inspect(ctx, path)
 	if err != nil {
 		return err
@@ -308,6 +326,9 @@ func (c *connection) Properties(ctx context.Context, path string, desired map[st
 		return fmt.Errorf("address replication property update: %w", err)
 	}
 	target.RawQuery = "recursiveProperties=0"
+	if err := c.beforeMutation(ctx, before); err != nil {
+		return err
+	}
 	response, err := c.request(ctx, http.MethodPatch, target, bytes.NewReader(body), int64(len(body)), http.Header{"Content-Type": {"application/json"}})
 	if err != nil {
 		return err
@@ -323,7 +344,10 @@ func sameSnapshot(a, b model.PushTargetSnapshot) bool {
 	return a.Folder == b.Folder && a.Size == b.Size && a.Actual == b.Actual && a.Modified.Equal(b.Modified) && a.Updated.Equal(b.Updated)
 }
 
-func (c *connection) Delete(ctx context.Context, path string, expected model.PushTargetSnapshot) error {
+func (c *connection) Delete(ctx context.Context, path string, expected model.PushTargetSnapshot, before port.PushMutationFence) error {
+	if before == nil {
+		return fmt.Errorf("missing replication mutation fence: %w", kernel.ErrInvalid)
+	}
 	observed, err := c.Inspect(ctx, path)
 	if err != nil {
 		return err
@@ -337,6 +361,9 @@ func (c *connection) Delete(ctx context.Context, path string, expected model.Pus
 	}
 	// The native API has no documented conditional checksum delete. This
 	// fresh check narrows the race; it cannot atomically exclude remote writers.
+	if err := c.beforeMutation(ctx, before); err != nil {
+		return err
+	}
 	response, err := c.request(ctx, http.MethodDelete, target, nil, 0, nil)
 	if err != nil {
 		return err
@@ -344,6 +371,16 @@ func (c *connection) Delete(ctx context.Context, path string, expected model.Pus
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusNoContent {
 		return statusError(response.StatusCode)
+	}
+	return nil
+}
+
+func (c *connection) beforeMutation(ctx context.Context, before port.PushMutationFence) error {
+	if ctx == nil || c.inTx(ctx) {
+		return fmt.Errorf("replication mutation fence needs an external context: %w", kernel.ErrInvalid)
+	}
+	if err := before(ctx); err != nil {
+		return fmt.Errorf("refresh replication mutation authority: %w", err)
 	}
 	return nil
 }

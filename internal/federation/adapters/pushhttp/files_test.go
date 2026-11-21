@@ -30,7 +30,7 @@ func TestUnitTargetEmptyAQLDoesNotEndReconciliation(t *testing.T) {
 		}
 		paths = append(paths, items[0].Path)
 		// Deletes change the list between pages; an offset would skip a row.
-		if err := connection.Delete(t.Context(), items[0].Path, items[0].Snapshot); err != nil {
+		if err := connection.Delete(t.Context(), items[0].Path, items[0].Snapshot, allowMutation); err != nil {
 			t.Fatal(err)
 		}
 		if next == "" {
@@ -232,5 +232,35 @@ func TestUnitTargetFullButCappedAQLStillVerifiesStorage(t *testing.T) {
 	items, next, err := connection.Files(t.Context(), "", kernel.Page{Limit: 1})
 	if !errors.Is(err, errUnavailable) || items != nil || next != "" {
 		t.Fatal("hard-limit notification bypassed storage verification", items, next, err)
+	}
+}
+
+func TestUnitTargetMissingScopeRequiresReadableRepositoryAnchor(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		status int
+		body   string
+		want   error
+	}{
+		{"readable empty folder", 200, `{"repo":"repo","path":"/","children":[]}`, nil},
+		{"forbidden", 403, `{}`, port.PushTargetForbidden},
+		{"missing repository", 404, `{}`, kernel.ErrNotFound},
+		{"wrong namespace", 200, `{"repo":"elsewhere","path":"/","children":[]}`, port.PushTargetInvalid},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f, _, _, connection := newFixture(t)
+			f.hook = func(writer http.ResponseWriter, request *http.Request) bool {
+				if request.URL.Path != deployment+"/api/storage/repo" {
+					return false
+				}
+				writer.WriteHeader(test.status)
+				_, _ = io.WriteString(writer, test.body)
+				return true
+			}
+			rows, next, err := connection.Files(t.Context(), "selected", kernel.Page{Limit: 1})
+			if !errors.Is(err, test.want) || len(rows) != 0 || next != "" {
+				t.Fatal("missing scope did not preserve authenticated namespace boundary", err, len(rows), next)
+			}
+		})
 	}
 }

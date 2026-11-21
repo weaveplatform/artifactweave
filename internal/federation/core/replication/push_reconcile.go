@@ -108,7 +108,11 @@ func (p Push) delete(ctx context.Context, run model.PushRun, item model.PushItem
 	if err != nil {
 		return err
 	}
-	if err := connection.Delete(ctx, item.Path, *item.Target); err != nil {
+	if err := connection.Delete(ctx, item.Path, *item.Target, p.mutationFence(run, gate, fence)); err != nil {
+		var refused *pushMutationRefusal
+		if errors.As(err, &refused) {
+			return err
+		}
 		if errors.Is(err, kernel.ErrConflict) {
 			return p.outcome(ctx, run, item, fence, model.PushSkipped, "target_changed")
 		}

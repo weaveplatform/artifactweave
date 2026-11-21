@@ -125,7 +125,7 @@ func (p Push) item(ctx context.Context, run model.PushRun, item model.PushItem, 
 	}
 	if item.Phase == model.PushContentVerified && run.Binding.SyncProperties {
 		if !samePushProperties(item.Source.Properties, observed.Properties) {
-			if err := connection.Properties(ctx, item.Path, item.Source.Properties); err != nil {
+			if err := connection.Properties(ctx, item.Path, item.Source.Properties, p.mutationFence(run, p.sourceGate(*item.Source), fence)); err != nil {
 				return p.targetError(ctx, run, item, fence, err)
 			}
 			connection, err = p.connection(ctx, run, p.sourceGate(*item.Source), fence)
@@ -184,7 +184,7 @@ func (p Push) upload(ctx context.Context, run model.PushRun, item model.PushItem
 	if body != nil {
 		content = body
 	}
-	if err := connection.Put(ctx, *item.Source, content); err != nil {
+	if err := connection.Put(ctx, *item.Source, content, p.mutationFence(run, p.sourceGate(*item.Source), fence)); err != nil {
 		return fmt.Errorf("upload selected push content: %w", err)
 	}
 	return nil

@@ -3,6 +3,7 @@ package federation
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
@@ -137,14 +139,17 @@ func (m *Module) restorePushCaller(ctx context.Context, reference kernel.Credent
 	return bound, nil
 }
 
-// Persisted singleton name and derivation purpose are private protocol state:
-// changing either would invalidate every admitted transport binding on restart.
-const pushPolicyKeySetting = "replication.internal_policy_key"
+// These private singleton identities are persisted protocol state. The random
+// key lives in ConfigDocument.Secrets so ordinary config-secret sealing/reseal
+// preserves its value across master-key rotation; active-key derivation cannot.
+const (
+	pushPolicyKeySetting                      = "replication.internal_policy_key"
+	pushPolicyKeyKind    configdoc.ConfigKind = "replication_internal"
+	pushPolicyKeyName                         = "connection_policy"
+	pushPolicyKeySecret                       = "revision_key"
+)
 
 func (m *Module) pushPolicyKey(ctx context.Context, store pushStore) ([]byte, error) {
-	if m.deps.Keys != nil {
-		return m.deps.Keys.Derive("single-push-connection-policy"), nil
-	}
 	var key []byte
 	err := store.Tx(ctx, func(tx context.Context) error {
 		holder := rand.Text()
@@ -156,18 +161,26 @@ func (m *Module) pushPolicyKey(ctx context.Context, store pushStore) ([]byte, er
 		if !held {
 			return fmt.Errorf("replication policy key initializer is busy: %w", kernel.ErrConflict)
 		}
-		err = store.Settings().Get(tx, pushPolicyKeySetting, &key)
+		document, err := store.Configs().Get(tx, pushPolicyKeyKind, pushPolicyKeyName)
 		if errors.Is(err, kernel.ErrNotFound) {
 			key = make([]byte, 32)
 			if _, err = rand.Read(key); err != nil {
 				return fmt.Errorf("generate replication policy key: %w", err)
 			}
-			err = store.Settings().Put(tx, pushPolicyKeySetting, key)
+			document = configdoc.ConfigDocument{
+				Kind:     pushPolicyKeyKind,
+				Key:      pushPolicyKeyName,
+				Document: []byte(`{}`),
+				Secrets:  map[string]string{pushPolicyKeySecret: base64.StdEncoding.EncodeToString(key)},
+				Updated:  now,
+			}
+			err = store.Configs().Put(tx, document)
 		}
 		if err != nil {
 			return fmt.Errorf("persist replication policy key: %w", err)
 		}
-		if len(key) != 32 {
+		key, err = base64.StdEncoding.DecodeString(document.Secrets[pushPolicyKeySecret])
+		if err != nil || len(key) != 32 {
 			return fmt.Errorf("invalid replication policy key: %w", kernel.ErrStore)
 		}
 		if err := store.Leases().Release(tx, pushPolicyKeySetting, holder); err != nil {

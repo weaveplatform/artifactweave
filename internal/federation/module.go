@@ -14,7 +14,6 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
-	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
@@ -34,7 +33,6 @@ type Deps struct {
 	Ownership    artifactsapi.ProjectRepositoryLookup
 	Repositories artifactsapi.Repositories
 	Zone         string
-	Keys         *crypt.Keyring
 }
 
 var errNoStore = errors.New("federation: Deps.Store is required")

@@ -88,7 +88,7 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	}
 	accessAPI := acc.API()
 	fed, err := federation.New(federation.Deps{
-		Store: d.store, Access: accessAPI, Keys: d.keys, Ownership: repos.NewProjectRepositoryLookup(d.store),
+		Store: d.store, Access: accessAPI, Ownership: repos.NewProjectRepositoryLookup(d.store),
 		Repositories: repos.NewRepositories(d.store, accessAPI.Keys, accessAPI.Projects),
 	})
 	if err != nil {

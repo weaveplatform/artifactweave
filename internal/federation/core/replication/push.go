@@ -158,6 +158,22 @@ func (p Push) Step(ctx context.Context, ref model.PushReference, fence PushFence
 // pushGate validates source facts before taking private progress locks.
 type pushGate func(context.Context, func(context.Context) error) error
 
+type pushMutationRefusal struct{ cause error }
+
+func (e *pushMutationRefusal) Error() string {
+	return "replication: current mutation authority refused"
+}
+func (e *pushMutationRefusal) Unwrap() error { return e.cause }
+
+func (p Push) mutationFence(run model.PushRun, gate pushGate, fence PushFence) port.PushMutationFence {
+	return func(ctx context.Context) error {
+		if _, err := p.connection(ctx, run, gate, fence); err != nil {
+			return &pushMutationRefusal{cause: err}
+		}
+		return nil
+	}
+}
+
 func (p Push) withRun(ctx context.Context, expected model.PushRun, gate pushGate, fence PushFence, effect func(context.Context, model.PushRun, port.PushConnection) error) error {
 	return p.Configurations.WithTarget(ctx, expected.Binding.TargetKey, expected.Binding.TargetRevision, func(ctx context.Context, target model.Replication) error {
 		repository, err := p.Source.Repository(ctx, target.RepoKey)

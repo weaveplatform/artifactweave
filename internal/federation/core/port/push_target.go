@@ -17,6 +17,12 @@ type PushTargetItem struct {
 	Properties map[string][]string
 }
 
+// PushMutationFence refreshes local source/configuration/ownership immediately
+// before a remote mutation, after any blocking metadata reads or body rewind.
+// It opens only a short local transaction and returns on the external context;
+// no metadata transaction or local lock may span the following HTTP exchange.
+type PushMutationFence func(context.Context) error
+
 // PushConnection performs normal authenticated destination repository APIs.
 // Every method except Revision performs network I/O and must refuse an enclosing
 // metadata transaction. A successful response transfers no local authority.
@@ -28,17 +34,17 @@ type PushConnection interface {
 	Inspect(context.Context, string) (PushTargetItem, error)
 	// Put uses normal item admission and hooks, never a physical blob path or
 	// checksum-only shortcut. A folder has no body; a file body stays caller-owned.
-	Put(context.Context, artifactsapi.TransferItem, io.ReadSeeker) error
+	Put(context.Context, artifactsapi.TransferItem, io.ReadSeeker, PushMutationFence) error
 	// Properties replaces the selected item's user property set through normal
 	// metadata APIs, explicitly removing destination-only keys without recursion.
-	Properties(context.Context, string, map[string][]string) error
+	Properties(context.Context, string, map[string][]string, PushMutationFence) error
 	// Files returns a bounded deterministic page. Empty pages may continue;
 	// filtering never turns an unreadable response into an authorized absence.
 	Files(context.Context, string, kernel.Page) ([]PushTargetItem, string, error)
 	// Delete refreshes the exact observed file before normal DELETE. A changed
 	// file or folder is refused. Cross-server atomicity is not implied: the
 	// driver separately checks current source absence before and after I/O.
-	Delete(context.Context, string, model.PushTargetSnapshot) error
+	Delete(context.Context, string, model.PushTargetSnapshot, PushMutationFence) error
 }
 
 // PushConnections refreshes current local connection policy for the given

@@ -232,7 +232,7 @@ func TestUnitTargetNormalAdmissionMetadataAndExactDeletion(t *testing.T) {
 	path := "@scope/a;b?c#d%2F space+é.pkg"
 	body := []byte("replicated package bytes")
 	reader := &ownedBody{Reader: bytes.NewReader(body)}
-	if err := connection.Put(ctx, artifactsapi.TransferItem{Path: path, Size: int64(len(body)), Actual: sums(body)}, reader); err != nil {
+	if err := connection.Put(ctx, artifactsapi.TransferItem{Path: path, Size: int64(len(body)), Actual: sums(body)}, reader, allowMutation); err != nil {
 		t.Fatal(err)
 	}
 	if reader.closed {
@@ -242,33 +242,33 @@ func TestUnitTargetNormalAdmissionMetadataAndExactDeletion(t *testing.T) {
 	if err != nil || initial.Snapshot.Actual != sums(body) || initial.Snapshot.Size != int64(len(body)) || len(initial.Properties) != 0 {
 		t.Fatal("upload metadata", initial, err)
 	}
-	if err := connection.Properties(ctx, path, map[string][]string{"old": {"remove"}, "keep": {"first"}}); err != nil {
+	if err := connection.Properties(ctx, path, map[string][]string{"old": {"remove"}, "keep": {"first"}}, allowMutation); err != nil {
 		t.Fatal(err)
 	}
-	if err := connection.Properties(ctx, path, map[string][]string{"keep": {"second", "third"}}); err != nil {
+	if err := connection.Properties(ctx, path, map[string][]string{"keep": {"second", "third"}}, allowMutation); err != nil {
 		t.Fatal(err)
 	}
 	current, err := connection.Inspect(ctx, path)
 	if err != nil || len(current.Properties) != 1 || !slices.Equal(current.Properties["keep"], []string{"second", "third"}) {
 		t.Fatal("properties were not replaced", current, err)
 	}
-	if err := connection.Delete(ctx, path, initial.Snapshot); !errors.Is(err, kernel.ErrConflict) {
+	if err := connection.Delete(ctx, path, initial.Snapshot, allowMutation); !errors.Is(err, kernel.ErrConflict) {
 		t.Fatal("changed file was deleted", err)
 	}
-	if err := connection.Delete(ctx, path, current.Snapshot); err != nil {
+	if err := connection.Delete(ctx, path, current.Snapshot, allowMutation); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := connection.Inspect(ctx, path); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("deleted item survived", err)
 	}
-	if err := connection.Put(ctx, artifactsapi.TransferItem{Path: "folder", Folder: true}, nil); err != nil {
+	if err := connection.Put(ctx, artifactsapi.TransferItem{Path: "folder", Folder: true}, nil, allowMutation); err != nil {
 		t.Fatal(err)
 	}
 	folder, err := connection.Inspect(ctx, "folder")
 	if err != nil || !folder.Snapshot.Folder {
 		t.Fatal(folder, err)
 	}
-	if err := connection.Delete(ctx, "folder", folder.Snapshot); !errors.Is(err, kernel.ErrConflict) {
+	if err := connection.Delete(ctx, "folder", folder.Snapshot, allowMutation); !errors.Is(err, kernel.ErrConflict) {
 		t.Fatal("folder deletion admitted", err)
 	}
 	f.mu.Lock()
@@ -287,11 +287,11 @@ func TestUnitTargetNetworkRefusesMetadataTransactions(t *testing.T) {
 		operations := []func() error{
 			func() error { _, err := connection.Inspect(ctx, "file"); return err },
 			func() error {
-				return connection.Put(ctx, artifactsapi.TransferItem{Path: "file", Actual: sums(nil)}, bytes.NewReader(nil))
+				return connection.Put(ctx, artifactsapi.TransferItem{Path: "file", Actual: sums(nil)}, bytes.NewReader(nil), allowMutation)
 			},
-			func() error { return connection.Properties(ctx, "file", nil) },
+			func() error { return connection.Properties(ctx, "file", nil, allowMutation) },
 			func() error { _, _, err := connection.Files(ctx, "", kernel.Page{}); return err },
-			func() error { return connection.Delete(ctx, "file", model.PushTargetSnapshot{}) },
+			func() error { return connection.Delete(ctx, "file", model.PushTargetSnapshot{}, allowMutation) },
 		}
 		for _, operation := range operations {
 			if err := operation(); !errors.Is(err, kernel.ErrInvalid) {
@@ -353,3 +353,5 @@ func TestUnitTargetNoPropertiesStillRequiresExistingUnchangedItem(t *testing.T) 
 		t.Fatal("missing item accepted as no properties", err)
 	}
 }
+
+func allowMutation(context.Context) error { return nil }

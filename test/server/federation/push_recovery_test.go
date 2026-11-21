@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -83,7 +84,7 @@ func TestAccSinglePushRecoveryPostgres(t *testing.T) { qualifyPushRecovery(t, "p
 
 func qualifyPushRecovery(t *testing.T, backend string) {
 	t.Helper()
-	for _, effect := range []string{"upload", "properties", "delete"} {
+	for _, effect := range []string{"upload", "properties", "delete", "master key rotation"} {
 		t.Run(effect, func(t *testing.T) {
 			w := newPushBackendWorld(t, backend)
 			const path = "selected/file.bin"
@@ -149,6 +150,15 @@ func qualifyPushRecovery(t *testing.T, backend string) {
 				if string(data) != content {
 					t.Fatal("target did not commit before acknowledgement was cut")
 				}
+			}
+			if effect == "master key rotation" {
+				w.config.MasterKeyPrevious = w.config.MasterKey
+				w.config.MasterKey = "v2:" + strings.Repeat("replacement-push-key-", 3)
+				push = w.restartSource()
+				if _, err := w.runtime.Store.Reseal(t.Context()); err != nil {
+					t.Fatal("reseal owned source database", err)
+				}
+				w.config.MasterKeyPrevious = ""
 			}
 			push = w.restartSource()
 			persisted, err := w.runtime.Store.PushProgress().Run(t.Context(), run.Reference)

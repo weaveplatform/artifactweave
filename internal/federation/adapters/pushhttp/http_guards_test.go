@@ -113,16 +113,16 @@ func TestUnitTargetBodyTimeoutAndRequestCancellationRemainRetryable(t *testing.T
 func TestUnitTargetInputAndPropertyResponseGuards(t *testing.T) {
 	f, _, _, connection := newFixture(t)
 	f.items["file"] = fixtureItem{body: []byte("content")}
-	if err := connection.Put(t.Context(), artifactsapi.TransferItem{Path: "file", Folder: true}, bytes.NewReader(nil)); !errors.Is(err, port.PushTargetInvalid) {
+	if err := connection.Put(t.Context(), artifactsapi.TransferItem{Path: "file", Folder: true}, bytes.NewReader(nil), allowMutation); !errors.Is(err, port.PushTargetInvalid) {
 		t.Fatal("folder accepted a body", err)
 	}
-	if err := connection.Put(t.Context(), artifactsapi.TransferItem{Path: "file"}, nil); !errors.Is(err, port.PushTargetInvalid) {
+	if err := connection.Put(t.Context(), artifactsapi.TransferItem{Path: "file"}, nil, allowMutation); !errors.Is(err, port.PushTargetInvalid) {
 		t.Fatal("file accepted missing body and checksum", err)
 	}
-	if err := connection.Properties(t.Context(), "file", map[string][]string{"empty": {}}); !errors.Is(err, port.PushTargetMetadata) {
+	if err := connection.Properties(t.Context(), "file", map[string][]string{"empty": {}}, allowMutation); !errors.Is(err, port.PushTargetMetadata) {
 		t.Fatal("empty property value accepted", err)
 	}
-	if err := connection.Properties(t.Context(), "file", nil); err != nil {
+	if err := connection.Properties(t.Context(), "file", nil, allowMutation); err != nil {
 		t.Fatal("already empty properties failed", err)
 	}
 	for _, response := range []string{`{}`, `{"properties":null}`, `{"properties":`, `{"errors":[{"status":404,"message":"Item does not exist"}]}`} {
@@ -142,7 +142,7 @@ func TestUnitTargetInputAndPropertyResponseGuards(t *testing.T) {
 			t.Fatal("invalid properties accepted", item, err)
 		}
 	}
-	if err := connection.Delete(t.Context(), "../outside", model.PushTargetSnapshot{}); err == nil {
+	if err := connection.Delete(t.Context(), "../outside", model.PushTargetSnapshot{}, allowMutation); err == nil {
 		t.Fatal("invalid deletion path admitted")
 	}
 }
@@ -182,11 +182,11 @@ func TestUnitTargetWriteAndListingRefusalsPreserveEffects(t *testing.T) {
 			f.mu.Unlock()
 			switch test.name {
 			case "upload":
-				err = connection.Put(t.Context(), artifactsapi.TransferItem{Path: "file", Size: int64(len(body)), Actual: sums(body)}, bytes.NewReader(body))
+				err = connection.Put(t.Context(), artifactsapi.TransferItem{Path: "file", Size: int64(len(body)), Actual: sums(body)}, bytes.NewReader(body), allowMutation)
 			case "properties":
-				err = connection.Properties(t.Context(), "file", nil)
+				err = connection.Properties(t.Context(), "file", nil, allowMutation)
 			case "delete":
-				err = connection.Delete(t.Context(), "file", expected.Snapshot)
+				err = connection.Delete(t.Context(), "file", expected.Snapshot, allowMutation)
 			case "search", "listing":
 				var items []port.PushTargetItem
 				var next string
@@ -204,6 +204,58 @@ func TestUnitTargetWriteAndListingRefusalsPreserveEffects(t *testing.T) {
 			defer f.mu.Unlock()
 			if !bytes.Equal(f.items["file"].body, body) || len(f.items["file"].properties) != 1 {
 				t.Fatal("refused request changed target effects")
+			}
+		})
+	}
+}
+
+func TestUnitTargetMutationRequiresFreshExternalFence(t *testing.T) {
+	for _, method := range []string{http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		t.Run(method, func(t *testing.T) {
+			f, _, store, connection := newFixture(t)
+			f.items["file"] = fixtureItem{body: []byte("retained"), properties: map[string][]string{"old": {"keep"}}}
+			observed, err := connection.Inspect(t.Context(), "file")
+			if err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			before := func(ctx context.Context) error {
+				if store.InTx(ctx) {
+					t.Fatal("mutation fence inside transaction")
+				}
+				calls++
+				return kernel.ErrForbidden
+			}
+			operation := func(fence port.PushMutationFence) error {
+				switch method {
+				case http.MethodPut:
+					return connection.Put(
+						t.Context(),
+						artifactsapi.TransferItem{Path: "file", Size: 11, Actual: sums([]byte("replacement"))},
+						bytes.NewReader([]byte("replacement")),
+						fence,
+					)
+				case http.MethodPatch:
+					return connection.Properties(t.Context(), "file", map[string][]string{"new": {"replace"}}, fence)
+				default:
+					return connection.Delete(t.Context(), "file", observed.Snapshot, fence)
+				}
+			}
+			if err := operation(nil); !errors.Is(err, kernel.ErrInvalid) {
+				t.Fatal("missing mutation fence accepted", err)
+			}
+			if err := operation(before); !errors.Is(err, kernel.ErrForbidden) || calls != 1 {
+				t.Fatal("fresh mutation refusal ignored", err, calls)
+			}
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			if string(f.items["file"].body) != "retained" || len(f.items["file"].properties) != 1 {
+				t.Fatal("denied mutation changed native state")
+			}
+			for _, request := range f.requests {
+				if strings.HasPrefix(request, method+" ") {
+					t.Fatal("mutation reached target after fence refusal")
+				}
 			}
 		})
 	}
