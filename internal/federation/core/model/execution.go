@@ -158,16 +158,26 @@ func (r ExecutionRun) Status() ReplicationStatus {
 	if r.Validate() != nil {
 		return ReplicationUnknown
 	}
-	if r.Phase == ExecutionPending || r.Phase == ExecutionRunning {
+	return r.Outcomes.Status(r.Phase)
+}
+
+// Status derives a scoped outcome without reading an execution's private
+// binding. Status stores use it only after selecting exact retained evidence.
+func (o ExecutionOutcomes) Status(phase ExecutionPhase) ReplicationStatus {
+	if o.Validate() != nil || phase != ExecutionPending && phase != ExecutionRunning && phase != ExecutionComplete && phase != ExecutionAborted ||
+		phase == ExecutionComplete && o.Pending != 0 {
+		return ReplicationUnknown
+	}
+	if phase == ExecutionPending || phase == ExecutionRunning {
 		return ReplicationIncomplete
 	}
-	if r.Phase == ExecutionAborted || r.Outcomes.Failed > 0 {
-		if r.Outcomes.Succeeded > 0 {
+	if phase == ExecutionAborted || o.Failed > 0 {
+		if o.Succeeded > 0 {
 			return ReplicationPartialFailure
 		}
 		return ReplicationError
 	}
-	if r.Outcomes.Skipped > 0 {
+	if o.Skipped > 0 {
 		return ReplicationWarn
 	}
 	return ReplicationOK

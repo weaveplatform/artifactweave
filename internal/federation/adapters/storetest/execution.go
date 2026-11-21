@@ -29,6 +29,8 @@ func runExecutions(t *testing.T, newStore Factory) {
 	t.Run("Executions", func(t *testing.T) {
 		t.Run("immutable identity and occurrence", func(t *testing.T) { executionIdentity(t, newStore(t)) })
 		t.Run("transactional recovery", func(t *testing.T) { executionRecovery(t, newStore(t)) })
+		t.Run("selected effects and replay", func(t *testing.T) { executionEffects(t, newStore(t)) })
+		t.Run("scoped secret-free status", func(t *testing.T) { executionScopedStatus(t, newStore(t)) })
 	})
 }
 

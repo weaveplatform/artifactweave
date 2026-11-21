@@ -24,4 +24,12 @@ type ExecutionProgressStore interface {
 	// Advance requires an enclosing transaction and exact prior version.
 	// Callers fence work ownership after all progress/status/event writes.
 	Advance(context.Context, int64, model.ExecutionRun) error
+	// RecordEffect joins the transfer intent's mutation transaction. It updates
+	// exact evidence, indexed paths and cumulative counters atomically. A replay
+	// never counts twice; stale versions and changed fingerprints conflict.
+	RecordEffect(context.Context, model.ExecutionEffect) error
+	Effect(context.Context, model.ExecutionReference, string) (model.ExecutionEffect, error)
+	// PathStatus selects actual selected/effect evidence for the current target
+	// and repository lifetime, without opening credentials or private bindings.
+	PathStatus(context.Context, string, string, string) (model.ExecutionPathState, error)
 }

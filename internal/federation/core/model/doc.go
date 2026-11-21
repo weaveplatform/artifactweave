@@ -44,6 +44,9 @@
 //     without treating pending, failed or uncertain work as successful. These
 //     Executions persists them independently of queue and target rows; the
 //     values themselves do not schedule or dispatch a run.
+//   - ExecutionEffect retains the exact transfer intent/version, sanitized
+//     outcome and actual affected paths. ApplyExecutionEffect updates counters
+//     once per observation; ExecutionPathState reports only matching evidence.
 //   - Peer with Has and DeriveStatus, PeerStatus, UseCase with
 //     KnownUseCase, PairingNonce with Usable, and PairingTokenTTL.
 //   - Stamp with After; StreamKind with RepositoryStream, AccessStream,
