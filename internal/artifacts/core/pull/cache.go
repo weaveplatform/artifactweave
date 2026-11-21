@@ -128,7 +128,7 @@ func (s Source) Fetch(ctx context.Context, selected api.PullItem, publication ap
 		}
 	}
 	if result.CacheEntry == nil {
-		return api.PullCached{}, fmt.Errorf("pull response did not populate cache: %w", source.ErrUnsupported)
+		return api.PullCached{}, fmt.Errorf("pull response did not populate cache: %w: %w", api.ErrPullNotStored, source.ErrUnsupported)
 	}
 	proof, err := cached(selected, *result.CacheEntry)
 	if err != nil {

@@ -2,9 +2,22 @@ package api
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+)
+
+// Pull failure categories let another module make recovery decisions without
+// importing artifacts' source/transport implementation or retaining raw errors.
+var (
+	ErrPullChanged     = errors.New("artifacts: selected pull facts changed")
+	ErrPullDenied      = errors.New("artifacts: pull authority refused")
+	ErrPullOffline     = errors.New("artifacts: pull source is offline")
+	ErrPullNotStored   = errors.New("artifacts: pull response was not stored")
+	ErrPullIntegrity   = errors.New("artifacts: pull representation failed validation")
+	ErrPullUnsupported = errors.New("artifacts: pull operation is unsupported")
+	ErrPullTemporary   = errors.New("artifacts: pull source temporarily unavailable")
 )
 
 // PullSelection bounds canonical remote-cache paths independently of the

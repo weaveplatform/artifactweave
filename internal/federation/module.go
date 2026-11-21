@@ -43,6 +43,7 @@ type Module struct {
 	deps            Deps
 	pushMu          sync.Mutex
 	push            *replication.Push
+	pull            *replication.Pull
 	pushConnections *pushhttp.Factory
 	closed          bool
 }

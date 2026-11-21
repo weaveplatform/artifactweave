@@ -194,9 +194,9 @@ func New(d Deps) (*Module, error) {
 		Store: d.Store, Blobs: d.Blobs, Guard: m.guardAuthority, Current: m.currentTransferCaller,
 	}
 	m.api.ItemRemoval = removal.New(d.Store, m.items, m.currentRemovalCaller)
-	m.api.PullSource = pull.Source{
+	m.api.PullSource = pull.Public{Source: pull.Source{
 		Content: m.items, InTx: m.store.InTx, Open: m.currentPullSource, Peer: openPullPeer, Read: m.readPullContent,
-	}
+	}}
 	// Assigned only when present: a nil queue in the interface would be a
 	// typed nil, which the item service would call instead of skipping.
 	if d.Work != nil {

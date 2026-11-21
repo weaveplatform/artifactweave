@@ -80,6 +80,12 @@ func (s Source) prepare(ctx context.Context, key string, selection api.PullSelec
 	if service == nil || q.Repo.Key != key || q.Repo.Class != repo.Remote || q.CacheOnly {
 		return selectionState{}, source.ErrInvalidRequest
 	}
+	if q.Repo.StoreArtifactsLocally != nil && !*q.Repo.StoreArtifactsLocally {
+		return selectionState{}, api.ErrPullNotStored
+	}
+	if q.Repo.Offline != nil && *q.Repo.Offline {
+		return selectionState{}, api.ErrPullOffline
+	}
 	state := selectionState{request: q, include: antpath.CompilePattern(selection.Include)}
 	if selection.Exclude != "" {
 		exclude := antpath.CompilePattern(selection.Exclude)

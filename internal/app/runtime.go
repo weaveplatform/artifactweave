@@ -261,6 +261,12 @@ func OpenRuntime(
 		art.Close()
 		return nil, errors.Join(err, st.Close())
 	}
+	if err := mods.federation.OpenPull(ctx, art.API().PullSource); err != nil {
+		stop()
+		mods.federation.Close()
+		art.Close()
+		return nil, errors.Join(err, st.Close())
+	}
 	// A snapshot of a virtual repository walks its members as the package
 	// handlers do (itemkit.Kit.Packages), so the work's kit needs the
 	// store that walk reads; it keeps no merge, as a snapshot builds its

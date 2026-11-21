@@ -13,6 +13,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 )
@@ -147,10 +149,7 @@ func qualifyPullCatalogProcesses(t *testing.T, driver string, virtual, populate 
 						return nil
 					},
 				}
-				proof, err = catalog.Fetch(ctx, items[0], publication)
-				if err != nil || proof.Version == "" || proof.Representation == "" {
-					t.Fatal("cold pull did not retain ordinary cache provenance", err)
-				}
+				proof = qualifyPullDriver(t, w, ctx, selection, path, publication.Fence)
 				qualifyPulledCache(t, w, ctx, catalog, items[0], proof, publication, peerKey, path, body)
 			}
 			before := w.bridge.count(http.MethodGet, "/artifactory/api/storage/"+peerKey+"/"+root)
@@ -174,6 +173,55 @@ func qualifyPullCatalogProcesses(t *testing.T, driver string, virtual, populate 
 			}
 		})
 	}
+}
+
+func qualifyPullDriver(t *testing.T, w *pushWorld, ctx context.Context, selection artifactsapi.PullSelection, path string,
+	fence replication.PushFence,
+) artifactsapi.PullCached {
+	t.Helper()
+	configuration, err := json.Marshal(map[string]any{
+		"enabled": true, "syncProperties": selection.Properties, "includePathPrefixPattern": selection.Include,
+		"excludePathPrefixPattern": selection.Exclude,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.request(w.source, http.MethodPut, replicationPath+"pull-remote", string(configuration), http.StatusCreated)
+	targets, err := w.runtime.Store.Replications().ForRepo(ctx, "pull-remote")
+	if err != nil || len(targets) != 1 {
+		t.Fatal("pull target admission fixture", err)
+	}
+	driver, err := w.runtime.Federation.Puller()
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := driver.Start(ctx, replication.PullRequest{
+		ID: "real-cache-pull", TargetKey: targets[0].Key, TargetRevision: targets[0].Revision, Root: selection.Root,
+	}, nil)
+	if err != nil {
+		t.Fatal("admit durable owning-cache pull", err)
+	}
+	for step := 0; step < 12 && !run.Phase.Terminal(); step++ {
+		// Each step takes a fresh driver value and restores the retained caller;
+		// only durable progress may carry selection and completion across calls.
+		driver, err = w.runtime.Federation.Puller()
+		if err != nil {
+			t.Fatal(err)
+		}
+		run, err = driver.Step(t.Context(), run.Reference, fence)
+		if err != nil {
+			t.Fatal("bounded owning-cache pull", err)
+		}
+	}
+	if run.Phase != model.PullComplete {
+		t.Fatal("durable owning-cache traversal did not settle")
+	}
+	items, next, err := w.runtime.Store.PullProgress().Items(ctx, run.Reference, false, kernel.Page{Limit: 10})
+	if err != nil || next != "" || len(items) != 1 || items[0].Path != path || items[0].Outcome != model.PullSucceeded ||
+		items[0].Cache == nil || items[0].Cache.Version == "" || items[0].Cache.Representation == "" {
+		t.Fatal("completed transfer has no actual durable cache receipt", err)
+	}
+	return *items[0].Cache
 }
 
 func qualifyPulledCache(t *testing.T, w *pushWorld, ctx context.Context, catalog artifactsapi.PullSource,
