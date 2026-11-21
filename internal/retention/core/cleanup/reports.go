@@ -31,6 +31,12 @@ func (s Service) Run(ctx context.Context, policyKey string, trigger int64) (mode
 }
 
 func (s Service) readRun(ctx context.Context, policyKey string, trigger int64, authority Policy) (model.CleanupRunSnapshot, error) {
+	if err := ctx.Err(); err != nil {
+		return model.CleanupRunSnapshot{}, fmt.Errorf("cleanup history request canceled: %w", err)
+	}
+	if policyKey == "" || trigger <= 0 {
+		return model.CleanupRunSnapshot{}, fmt.Errorf("a policy key and positive trigger are required: %w", kernel.ErrInvalid)
+	}
 	execution, err := s.Store.Cleanup().Execution(ctx, trigger)
 	if err != nil {
 		return model.CleanupRunSnapshot{}, fmt.Errorf("read cleanup history scope: %w", err)
@@ -77,26 +83,31 @@ func (s Service) Report(ctx context.Context, policyKey string, trigger int64) (R
 	}
 	var out RunReport
 	err := s.run(ctx, func(ctx context.Context, authority Policy) error {
-		history, err := s.readRun(ctx, policyKey, trigger, authority)
-		if err != nil {
-			return err
-		}
-		execution, err := s.Store.Cleanup().Execution(ctx, trigger)
-		if err != nil {
-			return fmt.Errorf("read cleanup report selection clock: %w", err)
-		}
-		totals, err := s.Store.Cleanup().OutcomeTotals(ctx, trigger)
-		if err != nil {
-			return fmt.Errorf("read cleanup report outcomes: %w", err)
-		}
-		if history.Run.CleanedItems != totals.Deleted || history.Run.CleanedSize != totals.DeletedVirtualBytes {
-			return fmt.Errorf("cleanup report counters disagree with acknowledged effects: %w", kernel.ErrStore)
-		}
-		out = RunReport{Snapshot: history, Totals: totals, SelectedAt: execution.At, ObservedAt: s.now()}
-		return nil
+		var err error
+		out, err = s.readReport(ctx, policyKey, trigger, authority)
+		return err
 	})
 	if err != nil {
 		return RunReport{}, err
 	}
 	return out, nil
+}
+
+func (s Service) readReport(ctx context.Context, policyKey string, trigger int64, authority Policy) (RunReport, error) {
+	history, err := s.readRun(ctx, policyKey, trigger, authority)
+	if err != nil {
+		return RunReport{}, err
+	}
+	execution, err := s.Store.Cleanup().Execution(ctx, trigger)
+	if err != nil {
+		return RunReport{}, fmt.Errorf("read cleanup report selection clock: %w", err)
+	}
+	totals, err := s.Store.Cleanup().OutcomeTotals(ctx, trigger)
+	if err != nil {
+		return RunReport{}, fmt.Errorf("read cleanup report outcomes: %w", err)
+	}
+	if history.Run.CleanedItems != totals.Deleted || history.Run.CleanedSize != totals.DeletedVirtualBytes {
+		return RunReport{}, fmt.Errorf("cleanup report counters disagree with acknowledged effects: %w", kernel.ErrStore)
+	}
+	return RunReport{Snapshot: history, Totals: totals, SelectedAt: execution.At, ObservedAt: s.now()}, nil
 }
