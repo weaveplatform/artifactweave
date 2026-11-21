@@ -302,6 +302,7 @@
       "mirrors_test.go",
       "multipart_test.go",
       "overwrite_test.go",
+      "project_quota_test.go",
       "properties_long_test.go",
       "protocol_download_policy_test.go",
       "redirect_test.go",

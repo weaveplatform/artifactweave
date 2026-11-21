@@ -116,6 +116,16 @@ item; a standard share adds no receiving-project charge. Archive quotas remain P
 The precise treatment of these internal representations is an **[I]** local
 accounting decision, not a vendor runtime observation.
 
+**[I]** a remote read whose optional cache publication cannot fit a hard quota
+uses the existing validated transient path. Its attempted metadata publication
+rolls back, leaving usage and any previous retained copy unchanged; each caller
+owns a separate transient body and repeats current authority checks. The first
+validated admission attempt can require a second upstream exchange for the
+owned response, as with an initially unknown no-store response. This does not
+bypass cache-fill permissions, integrity checks or unrelated storage failures.
+Successful reads do not mark a healthy upstream as failed because local cache
+capacity was refused. Soft/unlimited projects retain ordinary cache behavior.
+
 Actual deltas settle for the complete metadata transaction before event/lease
 publication fences. This admits net-zero moves above a lowered quota and rolls
 back refused ownership transfers with their counters. Quota/email edits settle

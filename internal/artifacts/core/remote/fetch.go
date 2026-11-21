@@ -162,6 +162,18 @@ func (p *Policy) fetch(
 	u := p.upload(q, permit, opts.Revision, token, res, false)
 	committed, err := p.cache(ctx, q, permit, opts, u)
 	if err != nil {
+		if errors.Is(err, kernel.ErrStorageQuota) {
+			// Retaining a copy is optional for this read. Quota admission has
+			// already rolled its metadata back; do not turn that local refusal
+			// into an upstream failure or disclose another caller's shared
+			// reader. As with an unknown no-store response, each reader makes
+			// its own validated transient exchange under current authority.
+			if err := p.RecordResponse(ctx, q, permit, opts.Revision, res); err != nil {
+				return out, err
+			}
+			out.isTransient = true
+			return out, nil
+		}
 		failure := PolicyError(err)
 		if stateErr := p.RecordFailure(ctx, q, permit, opts.Revision, failure); stateErr != nil {
 			return out, stateErr
