@@ -19,6 +19,7 @@ import (
 func testCleanupRunPages(t *testing.T, store port.Store) {
 	t.Helper()
 	ctx, cs := t.Context(), store.Cleanup()
+	labels := map[string]string{"r-a": "Zulu alpha", "r-c": "Alpha renamed"}
 	create := func(key, project, incarnation string, r model.CleanupRun) model.CleanupRun {
 		t.Helper()
 		p := cleanupPolicy(key, model.CleanupPackage, project)
@@ -32,7 +33,10 @@ func testCleanupRunPages(t *testing.T, store port.Store) {
 		storekit.Must(t, cs.UpdateRun(ctx, r))
 		storekit.Must(
 			t,
-			cs.CreateExecution(ctx, model.CleanupExecution{RunID: r.ID, Policy: p, Credential: p.ExecutionCredential, ProjectIncarnation: incarnation, At: storekit.At(5)}),
+			cs.CreateExecution(
+				ctx,
+				model.CleanupExecution{RunID: r.ID, Policy: p, Credential: p.ExecutionCredential, ProjectIncarnation: incarnation, DisplayProject: labels[key], At: storekit.At(5)},
+			),
 		)
 		if r.CleanedItems > 0 {
 			storekit.Must(t, store.Tx(ctx, func(ctx context.Context) error {
@@ -99,6 +103,13 @@ func testCleanupRunPages(t *testing.T, store port.Store) {
 			if snapshot.Policy.ExecutionCredential != (kernel.CredentialReference{}) || snapshot.Policy.ProjectIncarnation != "" {
 				t.Fatal("view exposed private execution binding")
 			}
+			wantDisplay := labels[snapshot.Run.PolicyKey]
+			if wantDisplay == "" {
+				wantDisplay = snapshot.Policy.ProjectKey
+			}
+			if snapshot.DisplayProject != wantDisplay {
+				t.Fatal("view lost frozen display label or legacy key fallback")
+			}
 			out = append(out, snapshot.Run.ID)
 		}
 		return out
@@ -147,7 +158,7 @@ func testCleanupRunPages(t *testing.T, store port.Store) {
 		{by: port.RunOrderID, ascending: []int64{g.ID, a.ID, c.ID, d.ID, e.ID}},
 		{by: port.RunOrderItemType, ascending: []int64{g.ID, a.ID, c.ID, d.ID, e.ID}},
 		{by: port.RunOrderPolicy, ascending: []int64{a.ID, c.ID, d.ID, e.ID, g.ID}},
-		{by: port.RunOrderProject, ascending: []int64{g.ID, e.ID, a.ID, c.ID, d.ID}},
+		{by: port.RunOrderProject, ascending: []int64{g.ID, e.ID, c.ID, a.ID, d.ID}},
 		{by: port.RunOrderStarted, ascending: []int64{d.ID, e.ID, g.ID, c.ID, a.ID}},
 		{by: port.RunOrderEnded, ascending: []int64{d.ID, e.ID, g.ID, c.ID, a.ID}},
 		{by: port.RunOrderTotal, ascending: []int64{d.ID, g.ID, e.ID, a.ID, c.ID}},

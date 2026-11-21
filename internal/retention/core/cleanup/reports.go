@@ -64,7 +64,7 @@ func (s Service) readRun(ctx context.Context, policyKey string, trigger int64, a
 	if !sameRun || !samePolicy || !packageRun || !supportedStatus {
 		return model.CleanupRunSnapshot{}, kernel.ErrNotFound
 	}
-	return model.CleanupSnapshot(run, policy), nil
+	return model.CleanupSnapshot(run, policy, execution.DisplayProject), nil
 }
 
 // RunReport combines a currently authorized history snapshot and its exact

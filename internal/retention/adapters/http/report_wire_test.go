@@ -52,7 +52,7 @@ func TestUnitCleanupReportWireUsesFrozenRuleAndTruthfulSizes(t *testing.T) {
 		Report:       []byte("do-not-render"),
 	}
 	report := cleanup.RunReport{
-		Snapshot:   model.CleanupRunSnapshot{Run: r, Policy: p},
+		Snapshot:   model.CleanupRunSnapshot{Run: r, Policy: p, DisplayProject: "Original Alpha"},
 		SelectedAt: at,
 		ObservedAt: at.AddDate(0, 1, 0),
 		Totals:     model.CleanupOutcomeTotals{Items: 3, Deleted: 2, Failed: 1, DeletedVirtualBytes: 10, DeletedContentBytes: 5},
@@ -82,7 +82,7 @@ func TestUnitCleanupReportWireUsesFrozenRuleAndTruthfulSizes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if *view.CleanedSize != 5 || *view.CleanedItems != 2 || *view.RunId != 7 || *view.DisplayProject != "alpha" || len(*view.IncludedProjects) != 1 {
+	if *view.CleanedSize != 5 || *view.CleanedItems != 2 || *view.RunId != 7 || *view.DisplayProject != "Original Alpha" || len(*view.IncludedProjects) != 1 {
 		t.Fatal("run response lost identity/scope or used virtual size")
 	}
 	report.Snapshot.Run.DryRun = true

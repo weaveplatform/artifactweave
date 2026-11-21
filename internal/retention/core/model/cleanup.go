@@ -91,18 +91,22 @@ type CleanupRun struct {
 // It contains no execution credential or project-lifetime capability. Later
 // policy edits, deletion or reuse of its key cannot change this history.
 type CleanupRunSnapshot struct {
-	Run    CleanupRun
-	Policy CleanupPolicy
+	Run            CleanupRun
+	Policy         CleanupPolicy
+	DisplayProject string
 	// CleanedContentBytes deduplicates actual acknowledged content. Run's
 	// private CleanedSize retains the per-item total used by the executor.
 	CleanedContentBytes int64
 }
 
 // CleanupSnapshot removes private execution bindings from a history projection.
-func CleanupSnapshot(run CleanupRun, policy CleanupPolicy) CleanupRunSnapshot {
+func CleanupSnapshot(run CleanupRun, policy CleanupPolicy, display string) CleanupRunSnapshot {
 	run.Report = nil // legacy report blobs are not part of bounded run metadata
 	policy.ExecutionCredential, policy.ProjectIncarnation = kernel.CredentialReference{}, ""
-	return CleanupRunSnapshot{Run: run, Policy: policy}
+	if display == "" {
+		display = policy.ProjectKey
+	}
+	return CleanupRunSnapshot{Run: run, Policy: policy, DisplayProject: display}
 }
 
 // CleanupExecution is private durable run state, separate from report bytes.
@@ -115,5 +119,8 @@ type CleanupExecution struct {
 	Policy             CleanupPolicy
 	Credential         kernel.CredentialReference
 	ProjectIncarnation string
-	At                 time.Time
+	// DisplayProject is descriptive admission-time metadata, never ownership.
+	// Older snapshots omit it and retain their original project-key label.
+	DisplayProject string `json:"display_project,omitempty"`
+	At             time.Time
 }

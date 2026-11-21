@@ -36,7 +36,7 @@ func runWire(s model.CleanupRunSnapshot, content int64) (artgen.CleanupPolicyRun
 		RunId: &id, PolicyKey: &r.PolicyKey, ItemType: httpkit.PtrTo(artgen.CleanupPolicyRunViewEntryItemType(r.ItemType)),
 		Status: httpkit.PtrTo(artgen.CleanupPolicyRunViewEntryStatus(r.Status)), DryRun: &r.DryRun, Manual: &r.Manual,
 		TriggeredBy: httpkit.PtrTo(runActor(r)), TotalItems: &r.TotalItems, CleanedItems: &r.CleanedItems, CleanedSize: &content,
-		DisplayProject: optionalString(p.ProjectKey), IncludedProjects: optionalList(coveredProjects(p)),
+		DisplayProject: optionalString(s.DisplayProject), IncludedProjects: optionalList(coveredProjects(p)),
 	}
 	if !r.Started.IsZero() {
 		out.StartTime = httpkit.PtrTo(r.Started.UnixMilli())
@@ -138,7 +138,7 @@ func policyViewWire(view cleanup.PolicyOverview) (artgen.CleanupPolicyEntry, err
 		PolicyKey:        &p.Key,
 		Enabled:          &p.Enabled,
 		ItemType:         httpkit.PtrTo(string(p.ItemType)),
-		DisplayProject:   optionalString(p.ProjectKey),
+		DisplayProject:   optionalString(view.DisplayProject),
 		IncludedProjects: optionalList(coveredProjects(p)),
 	}
 	if !view.Next.IsZero() {

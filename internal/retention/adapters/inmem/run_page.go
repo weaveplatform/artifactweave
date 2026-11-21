@@ -24,7 +24,7 @@ func (c cleanupStore) RunPage(ctx context.Context, q port.RunListing) (port.RunP
 			if !found || !cleanupRunVisible(run, e, q) {
 				continue
 			}
-			rows = append(rows, model.CleanupSnapshot(run, e.Policy))
+			rows = append(rows, model.CleanupSnapshot(run, e.Policy, e.DisplayProject))
 		}
 		if err := c.runContent(rows); err != nil {
 			return err
@@ -99,7 +99,7 @@ func compareCleanupRun(a, b model.CleanupRunSnapshot, by port.RunOrder) int {
 	case port.RunOrderPolicy:
 		return cmp.Compare(x.PolicyKey, y.PolicyKey)
 	case port.RunOrderProject:
-		return cmp.Compare(a.Policy.ProjectKey, b.Policy.ProjectKey)
+		return cmp.Compare(a.DisplayProject, b.DisplayProject)
 	case port.RunOrderEnded:
 		return compareRunTime(x.Ended, y.Ended)
 	case port.RunOrderTotal:

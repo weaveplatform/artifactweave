@@ -47,6 +47,7 @@ type Service struct {
 	PackageIndex       artifactsapi.PackageIndex
 	ProjectExists      func(context.Context, string) error
 	ProjectIncarnation func(context.Context, string) (string, error)
+	ProjectDisplayName func(context.Context, string) (string, error)
 	Authorize          func(context.Context) (Policy, error)
 	// Restore binds the original current principal and permission decider to
 	// the supplied transaction context. A persisted name alone grants nothing.

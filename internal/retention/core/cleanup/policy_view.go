@@ -22,9 +22,10 @@ type PolicyViewQuery struct {
 // PolicyOverview keeps schedule and last-run metadata under current authority.
 // A configured future policy family never gains a fabricated package run.
 type PolicyOverview struct {
-	Policy model.CleanupPolicy
-	Last   *model.CleanupRunSnapshot
-	Next   time.Time
+	Policy         model.CleanupPolicy
+	DisplayProject string
+	Last           *model.CleanupRunSnapshot
+	Next           time.Time
 }
 
 // PolicyViews reads only metadata. Historical execution ownership is checked
@@ -61,27 +62,12 @@ func (s Service) PolicyViews(ctx context.Context, q PolicyViewQuery) ([]PolicyOv
 			if p.ProjectKey != q.ProjectKey || q.PolicyKey != "" && p.Key != q.PolicyKey || !slices.Contains(q.ItemTypes, p.ItemType) {
 				continue
 			}
-			view := PolicyOverview{Policy: model.CleanupSnapshot(model.CleanupRun{}, p).Policy}
-			if p.ItemType == model.CleanupPackage {
-				rows, err := s.Store.Cleanup().RunPage(ctx, port.RunListing{Scopes: []port.RunScope{scope}, PolicyKey: p.Key, Limit: 1, Order: port.RunOrderID, Descending: true})
-				if err != nil {
-					return fmt.Errorf("read policy last run: %w", err)
-				}
-				if len(rows.Runs) != 0 {
-					view.Last = &rows.Runs[0]
-				}
-				if p.Enabled {
-					if s.Schedules == nil {
-						return fmt.Errorf("cleanup schedules unavailable: %w", kernel.ErrStore)
-					}
-					position, err := s.Schedules.Get(ctx, schedule.Reference{Kind: ScheduleKind, Key: p.Key})
-					if err != nil && !errors.Is(err, kernel.ErrNotFound) {
-						return fmt.Errorf("read policy next run: %w", err)
-					}
-					if err == nil && position.Enabled && position.Revision == p.Revision {
-						view.Next = position.Next
-					}
-				}
+			if scope.Incarnation != "" && p.ProjectIncarnation != "" && p.ProjectIncarnation != scope.Incarnation {
+				continue
+			}
+			view, err := s.policyOverview(ctx, p, scope)
+			if err != nil {
+				return err
 			}
 			out = append(out, view)
 		}
@@ -91,4 +77,36 @@ func (s Service) PolicyViews(ctx context.Context, q PolicyViewQuery) ([]PolicyOv
 		return nil, err
 	}
 	return out, nil
+}
+
+func (s Service) policyOverview(ctx context.Context, p model.CleanupPolicy, scope port.RunScope) (PolicyOverview, error) {
+	display, err := s.policyProjectDisplayName(ctx, p)
+	if err != nil {
+		return PolicyOverview{}, err
+	}
+	view := PolicyOverview{Policy: model.CleanupSnapshot(model.CleanupRun{}, p, display).Policy, DisplayProject: display}
+	if p.ItemType != model.CleanupPackage {
+		return view, nil
+	}
+	rows, err := s.Store.Cleanup().RunPage(ctx, port.RunListing{Scopes: []port.RunScope{scope}, PolicyKey: p.Key, Limit: 1, Order: port.RunOrderID, Descending: true})
+	if err != nil {
+		return PolicyOverview{}, fmt.Errorf("read policy last run: %w", err)
+	}
+	if len(rows.Runs) != 0 {
+		view.Last = &rows.Runs[0]
+	}
+	if !p.Enabled {
+		return view, nil
+	}
+	if s.Schedules == nil {
+		return PolicyOverview{}, fmt.Errorf("cleanup schedules unavailable: %w", kernel.ErrStore)
+	}
+	position, err := s.Schedules.Get(ctx, schedule.Reference{Kind: ScheduleKind, Key: p.Key})
+	if err != nil && !errors.Is(err, kernel.ErrNotFound) {
+		return PolicyOverview{}, fmt.Errorf("read policy next run: %w", err)
+	}
+	if err == nil && position.Enabled && position.Revision == p.Revision {
+		view.Next = position.Next
+	}
+	return view, nil
 }

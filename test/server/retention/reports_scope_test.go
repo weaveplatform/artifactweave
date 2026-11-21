@@ -56,6 +56,13 @@ func cleanupReportProjectHistory(t *testing.T, db harness.Store) {
 	download := cleanupReports + "downloadReport?policyKey=" + key + "&runId=" + id
 	w.request(http.MethodGet, exact, "report-alpha", "", http.StatusOK)
 	w.request(http.MethodGet, summary, "report-alpha", "", http.StatusOK)
+	w.request(http.MethodPut, "/access/api/v1/projects/alpha", "admin", `{"project_key":"alpha","display_name":"Renamed current project"}`, http.StatusOK)
+	response := w.request(http.MethodGet, exact, "report-alpha", "", http.StatusOK)
+	var frozen artgen.CleanupPolicyRunViewEntry
+	storekit.Must(t, json.Unmarshal(response.Body.Bytes(), &frozen))
+	if httpkit.Deref(frozen.DisplayProject) != "Original alpha" {
+		t.Fatal("project rename rewrote the admitted run display name")
+	}
 	w.request(http.MethodGet, download, "report-alpha", "", http.StatusNotFound)
 	for _, path := range []string{exact, summary, download, cleanupReports + "view?projectKey=alpha", "/artifactory/api/cleanup/policies/view?itemTypes=package&projectKey=alpha"} {
 		w.request(http.MethodGet, path, "report-beta", "", http.StatusForbidden)
@@ -77,10 +84,11 @@ func cleanupReportProjectHistory(t *testing.T, db harness.Store) {
 	w.request(http.MethodGet, exact, "report-beta", "", http.StatusForbidden)
 	page("alpha", "report-alpha", "", 1)
 	page("beta", "report-beta", "", 0)
-	response := w.request(http.MethodGet, "/artifactory/api/cleanup/policies/view?itemTypes=package&projectKey=beta&policyKey="+key, "report-beta", "", http.StatusOK)
+	response = w.request(http.MethodGet, "/artifactory/api/cleanup/policies/view?itemTypes=package&projectKey=beta&policyKey="+key, "report-beta", "", http.StatusOK)
 	var overview artgen.CleanupPolicyView
 	storekit.Must(t, json.Unmarshal(response.Body.Bytes(), &overview))
-	if overview.Policies == nil || len(*overview.Policies) != 1 || (*overview.Policies)[0].LastRunData != nil {
+	if overview.Policies == nil || len(*overview.Policies) != 1 || (*overview.Policies)[0].LastRunData != nil ||
+		httpkit.Deref((*overview.Policies)[0].DisplayProject) != "Original beta" {
 		t.Fatal("reused policy inherited another project's last run")
 	}
 	w.request(http.MethodDelete, "/artifactory/api/repositories/alpha-npm", "admin", "", http.StatusOK)
@@ -96,7 +104,7 @@ func cleanupReportProjectHistory(t *testing.T, db harness.Store) {
 	response = w.request(http.MethodGet, exact, "admin", "", http.StatusOK)
 	var history artgen.CleanupPolicyRunViewEntry
 	storekit.Must(t, json.Unmarshal(response.Body.Bytes(), &history))
-	if httpkit.Deref(history.DisplayProject) != "alpha" {
+	if httpkit.Deref(history.DisplayProject) != "Original alpha" {
 		t.Fatal("old run was attributed to the recreated project's display name")
 	}
 }
