@@ -31,6 +31,10 @@
 //   - PushProgressStore: immutable logical run/intent creation, exact-lifetime
 //     reads, monotonic version CAS and bounded pending-item recovery. Private
 //     execution evidence survives target deletion and queue completion.
+//   - PushConnections/PushConnection: local current connection resolution and
+//     authenticated destination inspection, upload, properties, bounded files
+//     and exact file deletion. Network calls never join a metadata transaction.
+//     PushTargetFailure retains only closed permanent refusal reason codes.
 //   - PeerStore: Put, Get, List and Delete; AddNonce, RedeemNonce and
 //     PruneNonces.
 //   - FederationStore: SetMembers, Members and MembersWithPeer;

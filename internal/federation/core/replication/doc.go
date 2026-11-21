@@ -24,6 +24,12 @@
 // cannot become URL references or matrix/query parameters. These helpers perform
 // no HTTP requests; the executing transfer must still enforce current authority,
 // credentials, destination policy and durable acknowledgement checkpoints.
+// Push supplies the bounded single-target driver over TransferSource and
+// PushConnections. It records intents/cursors together, verifies destination
+// content and properties, recovers unknown acknowledgements by observing remote
+// state, and rechecks source/configuration/transport and work ownership before
+// local success publication. All remote operations stay outside metadata
+// transactions. Explicit missing statistics capability is refused at admission.
 //
 // # References
 //
@@ -42,6 +48,8 @@
 //
 // # Status
 //
-// Configuration is implemented by REP-01. Transfer and execution are separate
-// P11 owners; multi-push, event-triggered and checksum behavior remain P37.
+// Configuration is implemented by REP-01. REP-02 supplies the source/progress
+// contracts and bounded driver; target HTTP policy and application integration
+// remain part of REP-02, and dispatch/reporting belong to REP-04. Multi-push,
+// event-triggered and binary-existence optimization remain P37.
 package replication
