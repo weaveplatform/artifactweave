@@ -50,6 +50,10 @@ func (e pushEndpoint) storageURL(path string) (*url.URL, error) {
 	return e.route(e.prefix+"/api/storage/"+e.repository, path)
 }
 
+func (e pushEndpoint) metadataURL(path string) (*url.URL, error) {
+	return e.route(e.prefix+"/api/metadata/"+e.repository, path)
+}
+
 func (e pushEndpoint) route(base, path string) (*url.URL, error) {
 	if e.repository == "" || !canonicalPushPath(path) {
 		return nil, fmt.Errorf("invalid replication item path: %w", kernel.ErrInvalid)

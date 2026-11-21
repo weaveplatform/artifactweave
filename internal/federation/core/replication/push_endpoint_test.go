@@ -16,7 +16,9 @@ func TestUnitPushEndpointPreservesRepositoryAndEscapesFileNames(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, path := range []string{"nested/file.pkg", "@scope/pkg/a;b?c#d%2F space+é.pkg", "api/storage/other/file", "%2e%2e/%2fhost"} {
-			for name, route := range map[string]func(string) (*url.URL, error){"item": endpoint.itemURL, "storage": endpoint.storageURL} {
+			for name, route := range map[string]func(string) (*url.URL, error){
+				"item": endpoint.itemURL, "storage": endpoint.storageURL, "metadata": endpoint.metadataURL,
+			} {
 				u, err := route(path)
 				if err != nil {
 					t.Fatal(raw, name, path, err)
@@ -24,6 +26,9 @@ func TestUnitPushEndpointPreservesRepositoryAndEscapesFileNames(t *testing.T) {
 				prefix := endpoint.prefix + "/repo/"
 				if name == "storage" {
 					prefix = endpoint.prefix + "/api/storage/repo/"
+				}
+				if name == "metadata" {
+					prefix = endpoint.prefix + "/api/metadata/repo/"
 				}
 				reparsed, err := url.Parse(u.String())
 				if err != nil || reparsed.Scheme != "https" || reparsed.Host != "target.invalid" || reparsed.Path != prefix+path || reparsed.RawQuery != "" ||
@@ -57,7 +62,7 @@ func TestUnitPushEndpointRejectsUntrustedReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, path := range []string{"", ".", "..", "a/../b", "//other.invalid/file", "/outside", "trailing/", "a//b", "a\\b", "a\x00b", string([]byte{0xff})} {
-		for _, route := range []func(string) (*url.URL, error){endpoint.itemURL, endpoint.storageURL} {
+		for _, route := range []func(string) (*url.URL, error){endpoint.itemURL, endpoint.storageURL, endpoint.metadataURL} {
 			if _, err := route(path); !errors.Is(err, kernel.ErrInvalid) {
 				t.Fatal("noncanonical item reference admitted", path, err)
 			}
