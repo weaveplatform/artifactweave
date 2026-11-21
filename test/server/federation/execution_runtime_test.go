@@ -139,6 +139,12 @@ func qualifyReplicationWorkerProcesses(t *testing.T, backend string) {
 			w.request(w.source, http.MethodPost, "/artifactory/api/system/replications/block", "", http.StatusOK)
 			publicExecute(t, w, repository, "admin", "", http.StatusConflict)
 			w.request(w.source, http.MethodPost, "/artifactory/api/system/replications/unblock", "", http.StatusOK)
+			if direction == model.ReplicationPull {
+				w.request(w.source, http.MethodPost, "/artifactory/api/repositories/"+repository, `{"offline":true}`, http.StatusOK)
+				publicExecute(t, w, repository, "admin", "", http.StatusConflict)
+				w.request(w.source, http.MethodPost, "/artifactory/api/repositories/"+repository, `{"offline":false,"storeArtifactsLocally":false}`, http.StatusOK)
+				publicExecute(t, w, repository, "admin", "", http.StatusConflict)
+			}
 
 			publicStatus(t, w, repository+"/selected", "", http.StatusUnauthorized, "")
 			unrelated, err := w.runtime.Store.Executions().PathStatus(t.Context(), run.Binding.TargetKey, run.Binding.Repository.Incarnation, "private")

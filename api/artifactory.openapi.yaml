@@ -9568,7 +9568,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The configuration changed, is disabled, or the applicable replication direction is blocked.
+          description: The configuration changed, is disabled, the direction is blocked, or the source is offline or does not retain artifacts.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '501':

@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
@@ -45,13 +46,20 @@ func replicationError(ctx context.Context, err error) error {
 		errors.Is(err, kernel.ErrPasswordExpired),
 		errors.Is(err, kernel.ErrAPIRestricted):
 		return err
-	case errors.Is(err, replication.ErrMultipleTargets), errors.Is(err, replication.ErrAdvancedConfiguration):
+	case errors.Is(err, replication.ErrMultipleTargets), errors.Is(err, replication.ErrAdvancedConfiguration),
+		errors.Is(err, replication.ErrPushStatistics), errors.Is(err, artifactsapi.ErrPullUnsupported):
 		return apierror.ErrNotImplemented
+	case errors.Is(err, artifactsapi.ErrPullDenied):
+		return kernel.ErrForbidden
+	case errors.Is(err, artifactsapi.ErrPullOffline):
+		return apierror.New(http.StatusConflict, "Replication source is offline")
+	case errors.Is(err, artifactsapi.ErrPullNotStored):
+		return apierror.New(http.StatusConflict, "Replication source does not retain artifacts locally")
 	case errors.Is(err, kernel.ErrInvalid):
 		return apierror.New(http.StatusBadRequest, err.Error())
 	case errors.Is(err, kernel.ErrNotFound):
 		return apierror.New(http.StatusNotFound, "Replication configuration or repository not found")
-	case errors.Is(err, kernel.ErrConflict):
+	case errors.Is(err, kernel.ErrConflict), errors.Is(err, artifactsapi.ErrPullChanged):
 		return apierror.New(http.StatusConflict, "Replication configuration changed")
 	default:
 		httpkit.NoteCause(ctx, err)

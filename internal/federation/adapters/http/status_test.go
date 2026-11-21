@@ -3,15 +3,18 @@ package federationhttp
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
@@ -81,5 +84,31 @@ func TestUnitReplicationExecuteRejectsAmbiguousBodiesAndUndeliveredOptions(t *te
 	}
 	if err := executionBody(strings.NewReader(`[{"password":"private-must-not-be-ignored"}]`)); !errors.Is(err, apierror.ErrNotImplemented) {
 		t.Fatal("one-shot options silently discarded", err)
+	}
+}
+
+func TestUnitReplicationAdmissionMapsClosedSourceRefusalsWithoutDiagnostics(t *testing.T) {
+	for _, test := range []struct {
+		cause  error
+		status int
+	}{
+		{artifactsapi.ErrPullOffline, http.StatusConflict},
+		{artifactsapi.ErrPullNotStored, http.StatusConflict},
+		{artifactsapi.ErrPullChanged, http.StatusConflict},
+		{artifactsapi.ErrPullUnsupported, http.StatusNotImplemented},
+		{replication.ErrPushStatistics, http.StatusNotImplemented},
+	} {
+		err := replicationError(t.Context(), fmt.Errorf("private-upstream-diagnostic: %w", test.cause))
+		var answer *apierror.Error
+		if !errors.As(err, &answer) || answer.Status != test.status || strings.Contains(err.Error(), "private-upstream-diagnostic") {
+			t.Fatal("source refusal became generic failure or leaked cause", err)
+		}
+	}
+	if err := replicationError(
+		t.Context(),
+		fmt.Errorf("private-upstream-diagnostic: %w", artifactsapi.ErrPullDenied),
+	); !errors.Is(err, kernel.ErrForbidden) ||
+		strings.Contains(err.Error(), "private-upstream-diagnostic") {
+		t.Fatal("source authority refusal changed or leaked cause", err)
 	}
 }
