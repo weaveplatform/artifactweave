@@ -256,6 +256,8 @@ func (s *Store) PushProgress() fedport.PushProgressStore { return s.federation.P
 
 // PullProgress returns the federation module's durable owning-cache intents.
 func (s *Store) PullProgress() fedport.PullProgressStore { return s.federation.PullProgress() }
+// Executions returns durable single-replication dispatch state.
+func (s *Store) Executions() fedport.ExecutionProgressStore { return s.federation.Executions() }
 
 // Peers is the federation module's peer store.
 func (s *Store) Peers() fedport.PeerStore { return s.federation.Peers() }

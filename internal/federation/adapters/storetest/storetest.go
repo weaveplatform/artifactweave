@@ -11,7 +11,7 @@ import (
 type Factory func(t *testing.T) port.Store
 
 // Run runs the federation contract on stores from newStore, one subtest per
-// concern, each on a store of its own: Replications, PushProgress, Peers, PairingNonces,
+// concern, each on a store of its own: Replications, PushProgress, Executions, Peers, PairingNonces,
 // FederationMembers, FullSyncs, AccessTargets, PlatformFederations and
 // Topologies.
 func Run(t *testing.T, newStore Factory) {
@@ -19,5 +19,6 @@ func Run(t *testing.T, newStore Factory) {
 	runReplications(t, newStore)
 	runPushProgress(t, newStore)
 	runPullProgress(t, newStore)
+	runExecutions(t, newStore)
 	runPeers(t, newStore)
 }

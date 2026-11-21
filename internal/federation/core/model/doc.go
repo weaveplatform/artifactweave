@@ -42,7 +42,8 @@
 //   - ExecutionRun/ExecutionBinding link one private logical dispatch to its
 //     exact transfer lifetime. ExecutionOutcomes derives truthful public status
 //     without treating pending, failed or uncertain work as successful. These
-//     types do not themselves persist, schedule or dispatch a run.
+//     Executions persists them independently of queue and target rows; the
+//     values themselves do not schedule or dispatch a run.
 //   - Peer with Has and DeriveStatus, PeerStatus, UseCase with
 //     KnownUseCase, PairingNonce with Usable, and PairingTokenTTL.
 //   - Stamp with After; StreamKind with RepositoryStream, AccessStream,
