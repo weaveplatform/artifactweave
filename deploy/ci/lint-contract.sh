@@ -289,8 +289,8 @@ lint_scenario() {
       case $x in alias*) v "$r" S3 "provider \"$n\" has an alias" ;; esac
     done < <(providers $files)
     x=$(sed -n -E 's/^[ ]*required_version[ ]*=[ ]*">=[ ]*1\.([0-9]+).*/\1/p' "$d/versions.tf" 2>/dev/null | head -1)
-    if [ -z "$x" ] || [ "$x" -lt 9 ]; then
-      v "$r" S3 "versions.tf's required_version is not \">= 1.9\""
+    if [ -z "$x" ] || [ "$x" -lt 17 ]; then
+      v "$r" S3 "versions.tf's required_version is not \">= 1.17\""
     fi
     if providers $files | grep -q $'\tazurerm\t$'; then
       providers $files | grep -q -E $'\tazurerm\tstorage_use_azuread[ ]*=[ ]*true' ||
@@ -694,7 +694,7 @@ EOF
     s=$f/deploy/platform/terraform/$cloud/good
     {
       echo 'terraform {'
-      echo '  required_version = ">= 1.9"'
+      echo '  required_version = ">= 1.17"'
       echo '  required_providers {'
       echo "    $prov = {"
       echo "      source = \"hashicorp/$prov\""
@@ -787,7 +787,7 @@ EOF
   s=$f/deploy/platform/terraform/multicloud/good
   w "$s/versions.tf" <<'EOF'
 terraform {
-  required_version = ">= 1.9"
+  required_version = ">= 1.17"
   required_providers {
     aws = {
       source = "hashicorp/aws"
@@ -928,7 +928,7 @@ self_test() {
   c s2-other-cloud S2 $sc "sed -i.bak 's#modules/aws/storage#modules/gcp/storage#' $sc/main.tf"
   c s3-provider-elsewhere S3 $sc "printf 'provider \"aws\" {\n}\n' >>$sc/main.tf"
   c s3-alias S3 $sc "printf 'provider \"aws\" {\n  alias  = \"replica\"\n  region = \"x\"\n}\n' >>$sc/versions.tf"
-  c s3-version S3 $sc "sed -i.bak 's#>= 1.9#>= 1.6#' $sc/versions.tf"
+  c s3-version S3 $sc "sed -i.bak 's#>= 1.17#>= 1.16#' $sc/versions.tf"
   c s3-azuread S3 $sz "sed -i.bak '/storage_use_azuread/d' $sz/versions.tf"
   c s3-registrations S3 $sz "sed -i.bak '/resource_provider_registrations/d' $sz/versions.tf"
   c s3-scope S3 $sg "printf 'variable \"project_id\" {\n  type        = string\n  description = \"x\"\n  default     = \"p\"\n}\n' >$base/v && awk '/^variable \"project_id\"/{s=1} s&&/^}/{s=0;next} !s' $sg/variables.tf >$base/t && cat $base/t $base/v >$sg/variables.tf"

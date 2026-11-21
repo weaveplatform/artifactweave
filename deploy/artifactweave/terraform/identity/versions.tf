@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.17"
   required_providers {
     # Keep both in step with the pins and checksums in test/terraform/run.sh
     # (decision 0030, rule A3).

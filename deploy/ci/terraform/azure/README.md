@@ -70,7 +70,7 @@ zone per month (about $0.50) and stays, because its delegation does.
 
 | Name | Version |
 | ---- | ------- |
-| terraform | >= 1.7 |
+| terraform | >= 1.17 |
 | azurerm | ~> 5.9 |
 
 ### Providers

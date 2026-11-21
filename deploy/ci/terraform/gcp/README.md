@@ -68,7 +68,7 @@ does.
 
 | Name | Version |
 | ---- | ------- |
-| terraform | >= 1.7 |
+| terraform | >= 1.17 |
 | google | ~> 8.6 |
 
 ### Providers

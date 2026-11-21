@@ -16,9 +16,11 @@
 # bootstrap admin's password, which the server takes because it starts with
 # token.allow_basic_auth on; TERRAFORM_ACCESS_TOKEN overrides it.
 set -euo pipefail
+umask 077
 
 ARTIFACTORY_VERSION=12.11.14
 PLATFORM_VERSION=2.2.11
+PROJECT_VERSION=1.9.9
 # From each release's SHA256SUMS. A case, not an associative array, because
 # macOS ships bash 3.2.
 provider_sha256() {
@@ -31,6 +33,10 @@ provider_sha256() {
 	platform_linux_arm64) echo 5375c863eb7d1f530dfabdde697c8452f0c09199b740a8116cb54e35858e4a37 ;;
 	platform_darwin_amd64) echo 3f4c08b6a6e5b210d37074a048c56a3a03cbada451a5e5fd2b9a8257bf07f953 ;;
 	platform_darwin_arm64) echo 7af6f2b15b6cea1357bdf35da3dfe4da8656e15369ad672069ad994f3418e50b ;;
+	project_linux_amd64) echo 142ff8bf830be159625cb7ff5f7faa8019a70a45be6c60656f46f1eecab5bed1 ;;
+	project_linux_arm64) echo 23a3659229c2b994642ea2f823dae017e101201205b0e67fa5a2c1e53f37bb9b ;;
+	project_darwin_amd64) echo 1fb9ae65b8372e110a312afee0bf5a5e8d983fc57bff55d260371c87a4089238 ;;
+	project_darwin_arm64) echo cf2ad3e93fdd891ab2de2705b967dba5c11c281b37c6454e858750784d596e87 ;;
 	esac
 }
 
@@ -39,6 +45,7 @@ shift || true
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
 python3 -I "$here/check-webhooks.py" --inventory "$root"
+python3 -I "$here/check-projects.py" --inventory "$root"
 scenarios=("$@")
 [ ${#scenarios[@]} -gt 0 ] || scenarios=(deploy/artifactweave/terraform/repositories)
 work=${TERRAFORM_WORK:-}
@@ -60,7 +67,13 @@ cleanup() {
 		echo "run.sh: exit $rc; the last 300 lines of the server log:" >&2
 		tail -n 300 "$work/server.log" >&2
 	fi
-	if [ -n "${owned:-}" ]; then rm -rf "$work"; fi
+	if [ -n "${owned:-}" ]; then
+		if [ "$rc" -eq 0 ]; then
+			rm -rf "$work"
+		else
+			echo "run.sh: retained private failure evidence in $work" >&2
+		fi
+	fi
 }
 trap cleanup EXIT
 
@@ -92,15 +105,16 @@ mirror=${TERRAFORM_PROVIDER_MIRROR:-$work/mirror}
 if [ -z "${TERRAFORM_PROVIDER_MIRROR:-}" ]; then
 	mirror_provider artifactory "$ARTIFACTORY_VERSION"
 	mirror_provider platform "$PLATFORM_VERSION"
+	mirror_provider project "$PROJECT_VERSION"
 fi
 cat >"$work/terraformrc" <<RC
 provider_installation {
   filesystem_mirror {
     path    = "$mirror"
-    include = ["registry.terraform.io/jfrog/artifactory", "registry.terraform.io/jfrog/platform"]
+    include = ["registry.terraform.io/jfrog/artifactory", "registry.terraform.io/jfrog/platform", "registry.terraform.io/jfrog/project"]
   }
   direct {
-    exclude = ["registry.terraform.io/jfrog/artifactory", "registry.terraform.io/jfrog/platform"]
+    exclude = ["registry.terraform.io/jfrog/artifactory", "registry.terraform.io/jfrog/platform", "registry.terraform.io/jfrog/project"]
   }
 }
 RC
@@ -125,8 +139,12 @@ done
 # match the acceptance build: unit tests run with -race, which forces atomic
 # counters, and covdata merge refuses to mix counter modes.
 module=$(cd "$root" && go list -m)
-echo "Terraform provider conformance: application $(git -C "$root" rev-parse HEAD)"
+TERRAFORM_APPLICATION_COMMIT=$(git -C "$root" rev-parse HEAD)
+export TERRAFORM_APPLICATION_COMMIT
+echo "Terraform provider conformance: application $TERRAFORM_APPLICATION_COMMIT"
 terraform version
+TERRAFORM_CLI_VERSION=$(terraform version -json | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["terraform_version"])')
+export TERRAFORM_CLI_VERSION
 (cd "$root" && go build -cover -covermode=atomic -coverpkg="${TERRAFORM_COVERPKG:-$module/...}" -o "$work/artifactweave" ./cmd/artifactweave)
 port=${TERRAFORM_PORT:-18081}
 url="http://127.0.0.1:$port"
@@ -385,6 +403,24 @@ apply_single_replication() {
 	python3 -I "$here/check-replications.py" --check "$work/replication-repositories.json" "$work/replication-identity.json" "$work/data" "$work/server.log"
 }
 
+# A real native provider proof, including current content authority and quota
+# effects. Only names/digests and assertion results join retained CI coverage;
+# sensitive Terraform state remains in the isolated private work directory.
+apply_projects() {
+	export TF_VAR_resource_prefix=tfp11 TF_VAR_revision=1 \
+		TF_VAR_user_password=Terraform-project-user-1
+	project_evidence="${GOCOVERDIR:-$work/cover}/project-provider-evidence.json"
+	tf apply -auto-approve
+	tf plan -detailed-exitcode
+	tf output -json fixture >"$work/project-fixture.json"
+	python3 -I "$here/check-projects.py" --check "$root" "$work/project-fixture.json" "$dir/terraform.tfstate" "$project_evidence"
+	export TF_VAR_revision=2
+	tf apply -auto-approve
+	tf plan -detailed-exitcode
+	tf output -json fixture >"$work/project-fixture.json"
+	python3 -I "$here/check-projects.py" --check "$root" "$work/project-fixture.json" "$dir/terraform.tfstate" "$project_evidence"
+}
+
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
 	case $scenario in
@@ -396,6 +432,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/virtual-repositories) apply_virtual_repositories ;;
 	deploy/artifactweave/terraform/webhooks) apply_webhooks ;;
 	deploy/artifactweave/terraform/single-replication) apply_single_replication ;;
+	deploy/artifactweave/terraform/projects) apply_projects ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1
@@ -414,5 +451,8 @@ for scenario in "${scenarios[@]}"; do
 	if [ "$scenario" = deploy/artifactweave/terraform/single-replication ]; then
 		python3 -I "$here/check-replications.py" --deleted "$work/replication-repositories.json"
 		python3 -I "$here/check-replications.py" --remove-proxy
+	fi
+	if [ "$scenario" = deploy/artifactweave/terraform/projects ]; then
+		python3 -I "$here/check-projects.py" --deleted "$work/project-fixture.json" "$project_evidence"
 	fi
 done

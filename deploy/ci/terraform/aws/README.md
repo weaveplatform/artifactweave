@@ -73,7 +73,7 @@ zone is billed per zone per month (about $0.50) and stays, because its delegatio
 
 | Name | Version |
 | ---- | ------- |
-| terraform | >= 1.10 |
+| terraform | >= 1.17 |
 | aws | ~> 6.67 |
 
 ### Providers

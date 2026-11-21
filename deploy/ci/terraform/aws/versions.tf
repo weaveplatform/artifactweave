@@ -1,6 +1,6 @@
 terraform {
   # The S3 backend's use_lockfile needs 1.10; mocked tests need 1.7.
-  required_version = ">= 1.10"
+  required_version = ">= 1.17"
   required_providers {
     aws = {
       source  = "hashicorp/aws"

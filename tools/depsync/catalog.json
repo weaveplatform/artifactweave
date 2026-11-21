@@ -468,6 +468,10 @@
       "path": "test/terraform/run.sh",
       "pattern": "^PLATFORM_VERSION=([0-9.]+)$"
     },
+    "project-provider": {
+      "path": "test/terraform/run.sh",
+      "pattern": "^PROJECT_VERSION=([0-9.]+)$"
+    },
     "lua-abi": {
       "path": "test/acceptance/clients/luarocks.Dockerfile",
       "pattern": "https://www.lua.org/ftp/lua-([0-9]+\\.[0-9]+)\\.[0-9]+\\.tar.gz"

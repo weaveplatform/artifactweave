@@ -17,6 +17,7 @@ empty plan and destroys it, so a reference that stops working fails the build (s
 | [oidc](terraform/oidc/README.md) | OIDC token exchange for CI: a GitHub Actions provider and a generic one (`platform_oidc_configuration`), each with an identity mapping (`platform_oidc_identity_mapping`), one for a named user and one for a group through a synthetic subject | `url`, `access_token`, `github_organization`, `ci_project_path` |
 | [remote-repositories](terraform/remote-repositories/README.md) | Fourteen remote repository types, a proxy, cache/fetch/auth/header settings and format-specific endpoints; configuration proof separate from native downloads | `url`, `access_token`, `upstream_urls`, proxy and test/production credentials |
 | [virtual-repositories](terraform/virtual-repositories/README.md) | A virtual repository of each of the 33 types with an `artifactory_virtual_<type>_repository` resource, each over a local and a remote member and deploying to the local one, with every virtual field set away from its default, and the GPG and RSA key pairs they sign with (`artifactory_keypair`); configuration proof separate from virtual resolution | `url`, `access_token`, `upstream_url`, two GPG key pairs and an RSA key pair |
+| [projects](terraform/projects/README.md) | Projects, members, roles, an environment, synchronous repository attachment, standard shares and hard/soft quotas, verified through real content effects and revocation | `url`, `access_token`, `user_password` |
 
 Every name a reference creates (repository keys, users, groups, permissions, OIDC providers)
 is an input with a default you can keep or change. Each README follows
@@ -30,7 +31,7 @@ rules A1 to A4).
 |---|---|---|
 | `jfrog/artifactory` | Repositories, items, users, groups, scoped tokens, key pairs | 12.11.14 |
 | `jfrog/platform` | Access groups and permissions, OIDC configurations and identity mappings | 2.2.11 |
-| `jfrog/project` | Projects with their members, roles and environments | not yet used by a reference |
+| `jfrog/project` | Projects, members, roles, environments, repository attachment and standard sharing | 1.9.9 |
 
 All three take the base URL without `/artifactory` and an access token, which they send as a
 Bearer token:
@@ -42,6 +43,11 @@ provider "artifactory" {
 }
 
 provider "platform" {
+  url          = "https://artifactweave.example.com"
+  access_token = var.access_token
+}
+
+provider "project" {
   url          = "https://artifactweave.example.com"
   access_token = var.access_token
 }
@@ -72,10 +78,11 @@ Pass the token in a sensitive variable, for example `TF_VAR_access_token`; never
 
 ## Version policy
 
-Each reference pins its providers exactly (`version = "12.11.14"`, not a range), and
+Each reference requires Terraform 1.17 or later and pins its providers exactly
+(`version = "12.11.14"`, not a range), and
 `test/terraform/run.sh` pins the same versions with the SHA-256 of every release zip it
 installs. The `version` attributes, the checksums in `run.sh` and each scenario's
-`.terraform.lock.hcl` move together, by hand, following the steps in
+`.terraform.lock.hcl` move together through the signed-release refresher described in
 [docs/testing/ci.md](../../docs/testing/ci.md#terraform-scenarios). Dependabot leaves these
 roots alone, because it would change a version without the checksums `run.sh` checks it
 against.

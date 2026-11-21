@@ -2,7 +2,7 @@
 
 `run.sh` applies the app-layer references in
 [deploy/artifactweave/terraform](../../deploy/artifactweave/terraform) against a running
-artifactweave, with the real `jfrog/artifactory` and `jfrog/platform` providers. The
+artifactweave, with the real `jfrog/artifactory`, `jfrog/platform` and `jfrog/project` providers. The
 scenarios, and how to apply one to your own instance, are described in
 [Managing artifactweave with Terraform](../../deploy/artifactweave/README.md). This directory
 holds only the driver.
@@ -35,7 +35,7 @@ moving to a new provider version.
 The apply run starts the server with `api.budget_timeout` at its 5s maximum. Terraform deletes
 up to ten resources at once, and on SQLite the default 500ms admission deadline can refuse one
 of those requests with a 503 that the provider does not retry (#1147). A failed run prints the
-end of the server log.
+end of the server log and retains its private work directory, including Terraform state.
 
 The remote-repositories scenario covers all fourteen P9 provider resource types. It applies
 two revisions, requires an empty refreshed plan after each, checks API configuration and

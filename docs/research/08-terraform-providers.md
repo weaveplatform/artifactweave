@@ -189,7 +189,7 @@ No active data sources.
 
 | Resource | Endpoints and required status |
 |---|---|
-| `project` | `POST /access/api/v1/projects` 201, `GET/PUT/DELETE .../{key}` 200/200/204; sends `admin_privileges{manage_members,manage_resources,manage_remote_repository,index_resources}`, `soft_limit`, `storage_quota_email_notification`; nested users, groups, roles and repositories go through the endpoints below |
+| `project` (legacy) and `project_project` | `POST /access/api/v1/projects` 201, `GET/PUT/DELETE .../{key}` 200/200/204; sends `admin_privileges{manage_members,manage_resources,manage_remote_repository,index_resources}`, `soft_limit`, `storage_quota_email_notification`; nested users, groups, roles and repositories go through the endpoints below |
 | `project_user`, `project_group` | `GET /access/api/v1/projects/{key}/users\|groups` 200, `PUT/DELETE .../{users\|groups}/{name}` 200/204 |
 | `project_role` | `GET/POST /access/api/v1/projects/{key}/roles` 200/201, `PUT/DELETE .../roles/{name}` 200/204; validator has 32 actions and omits `READ_POLICIES_SECURITY` |
 | `project_repository` | `PUT /access/api/v1/projects/_/attach/repositories/{repo}/{key}?force=true` **204**, then polls `GET /artifactory/api/repositories/{key}` with backoff until `projectKey` equals the project (attach must be synchronous); `DELETE .../attach/repositories/{repo}` 204; `GET /artifactory/api/repositories?project={key}`; `GET /access/api/v1/projects/_/repositories/{repo}` |
@@ -197,6 +197,13 @@ No active data sources.
 | `project_environment` | `POST/GET /access/api/v1/projects/{key}/environments` 201/200, `POST .../{env}/rename` 200, `DELETE .../{env}` 204 |
 
 No data sources.
+
+Pinned provider 1.9.9 exposes both project aliases; it deprecates the legacy `project`
+resource. The [pinned source](https://github.com/jfrog/terraform-provider-project/blob/v1.9.9/docs/resources/project.md)
+defines that compatibility. P11/#1748 exercises both aliases and every standalone resource
+above through the required `projects` fixture, including empty plans, native role/share
+revocation, quota effects and verified destruction. This is ArtifactWeave application
+evidence, separate from vendor runtime observations.
 
 ## CI notes
 

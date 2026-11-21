@@ -102,6 +102,8 @@ type harness struct {
 	// plain follows redirects and carries no credentials, as a package
 	// client does once it leaves the registry.
 	plain *http.Client
+	// dnsLookup lets readiness checks observe the runner's own resolver.
+	dnsLookup func(context.Context, string) ([]string, error)
 	// What a restart keeps: the binary, the configuration, the data
 	// directory and the master key that seals it, and the test's context,
 	// which outlives the subtest that restarts.
@@ -126,6 +128,7 @@ func start(t *testing.T) *harness {
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 		},
 		plain:     &http.Client{Timeout: 10 * time.Minute},
+		dnsLookup: net.DefaultResolver.LookupHost,
 		ctx:       t.Context(),
 		bin:       mustEnv(t, "ARTIFACTWEAVE_BIN"),
 		dataDir:   t.TempDir(),
