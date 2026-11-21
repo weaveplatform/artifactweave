@@ -640,8 +640,11 @@ func TestAccMigrateCommand(t *testing.T) {
 		"schema version 0 of 6 (sqlite, access)\n"
 	for _, m := range []string{"notifications", "retention", "federation", "releases", "workers"} {
 		latest := 1
-		if m == "retention" || m == "federation" {
+		if m == "retention" {
 			latest = 2
+		}
+		if m == "federation" {
+			latest = 3
 		}
 		want += fmt.Sprintf("schema version 0 of %d (sqlite, %s)\n", latest, m)
 	}

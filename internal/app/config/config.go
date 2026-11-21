@@ -116,8 +116,9 @@ type Config struct {
 	Virtual           Virtual          `yaml:"virtual"`
 }
 
-// Remote supplies exact operator-approved private source origins.
-// Repository URL patterns still independently authorize each archive URL.
+// Remote supplies exact operator-approved private outbound origins for remote
+// sources and single replication. Repository URL patterns still independently
+// authorize each archive URL; replication uses its exact configured target.
 type Remote struct {
 	AllowedPrivateOrigins []string `yaml:"allowed_private_origins"`
 }

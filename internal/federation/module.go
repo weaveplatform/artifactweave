@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/federation/adapters/pushhttp"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -37,7 +39,13 @@ var errNoStore = errors.New("federation: Deps.Store is required")
 
 // Module owns single-target configuration. Transfer and execution are separate
 // services; constructing this module starts no workers and makes no remote I/O.
-type Module struct{ deps Deps }
+type Module struct {
+	deps            Deps
+	pushMu          sync.Mutex
+	push            *replication.Push
+	pushConnections *pushhttp.Factory
+	closed          bool
+}
 
 // New constructs the module without reading or writing its dependencies.
 func New(d Deps) (*Module, error) {

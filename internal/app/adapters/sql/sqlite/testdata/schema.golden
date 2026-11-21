@@ -63,6 +63,8 @@ index project_repositories_project project_repositories CREATE INDEX project_rep
 index project_repository_shares_project project_repository_shares CREATE INDEX project_repository_shares_project ON project_repository_shares(project_key,repo_key)
 index projects_by_name projects CREATE INDEX projects_by_name ON projects(display_name,key)
 index release_bundles_project release_bundles CREATE INDEX release_bundles_project ON release_bundles(project_key,name,version)
+index replication_push_items_pending replication_push_items CREATE INDEX replication_push_items_pending ON replication_push_items(run_id,phase,operation_key)
+index replication_push_runs_target replication_push_runs CREATE INDEX replication_push_runs_target ON replication_push_runs(target_key,phase,run_id)
 index replications_repo replications CREATE INDEX replications_repo ON replications(repo_key,replication_key)
 index repositories_class repositories CREATE INDEX repositories_class ON repositories(rclass,key)
 index repositories_package_type repositories CREATE INDEX repositories_package_type ON repositories(package_type,key)
@@ -127,6 +129,9 @@ index sqlite_autoindex_projects_1 projects
 index sqlite_autoindex_release_bundles_1 release_bundles
 index sqlite_autoindex_remote_cache_1 remote_cache
 index sqlite_autoindex_remote_sources_1 remote_sources
+index sqlite_autoindex_replication_push_items_1 replication_push_items
+index sqlite_autoindex_replication_push_runs_1 replication_push_runs
+index sqlite_autoindex_replication_push_runs_2 replication_push_runs
 index sqlite_autoindex_replication_runs_1 replication_runs
 index sqlite_autoindex_replications_1 replications
 index sqlite_autoindex_repositories_1 repositories
@@ -246,6 +251,8 @@ table projects projects CREATE TABLE projects(key TEXT PRIMARY KEY,display_name 
 table release_bundles release_bundles CREATE TABLE release_bundles(name TEXT NOT NULL,version TEXT NOT NULL,state TEXT NOT NULL,storing_repo TEXT NOT NULL DEFAULT '',project_key TEXT NOT NULL DEFAULT '',origin TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',signed_at BIGINT,signing_key_alias TEXT NOT NULL DEFAULT '',signature BLOB,notes TEXT,spec TEXT,PRIMARY KEY(name,version))
 table remote_cache remote_cache CREATE TABLE remote_cache(repo_key TEXT NOT NULL REFERENCES repositories(key)ON DELETE CASCADE,cache_id TEXT NOT NULL,path TEXT NOT NULL,doc TEXT NOT NULL,PRIMARY KEY(repo_key,cache_id))
 table remote_sources remote_sources CREATE TABLE remote_sources(repo_key TEXT PRIMARY KEY REFERENCES repositories(key)ON DELETE CASCADE,doc TEXT NOT NULL)
+table replication_push_items replication_push_items CREATE TABLE replication_push_items(run_id TEXT NOT NULL,run_incarnation TEXT NOT NULL,operation_key TEXT NOT NULL,intent_fingerprint TEXT NOT NULL,action TEXT NOT NULL,path TEXT NOT NULL,version BIGINT NOT NULL CHECK(version > 0),phase TEXT NOT NULL,document TEXT NOT NULL,PRIMARY KEY(run_id,operation_key),FOREIGN KEY(run_id,run_incarnation)REFERENCES replication_push_runs(run_id,incarnation)ON DELETE CASCADE)
+table replication_push_runs replication_push_runs CREATE TABLE replication_push_runs(run_id TEXT PRIMARY KEY,incarnation TEXT NOT NULL,target_key TEXT NOT NULL,binding_json TEXT NOT NULL,version BIGINT NOT NULL CHECK(version > 0),phase TEXT NOT NULL,source_cursor TEXT NOT NULL DEFAULT '',target_cursor TEXT NOT NULL DEFAULT '',source_done BOOLEAN NOT NULL DEFAULT FALSE,target_done BOOLEAN NOT NULL DEFAULT FALSE,started_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,completed_at BIGINT,UNIQUE(run_id,incarnation))
 table replication_runs replication_runs CREATE TABLE replication_runs(replication_key TEXT NOT NULL REFERENCES replications(replication_key)ON DELETE CASCADE,started_at BIGINT NOT NULL,completed_at BIGINT,status TEXT NOT NULL DEFAULT '',PRIMARY KEY(replication_key,started_at))
 table replications replications CREATE TABLE replications(replication_key TEXT PRIMARY KEY,repo_key TEXT NOT NULL,url TEXT NOT NULL DEFAULT '',username TEXT NOT NULL DEFAULT '',password BLOB,enabled BOOLEAN NOT NULL DEFAULT FALSE,cron_exp TEXT NOT NULL DEFAULT '',event_replication BOOLEAN NOT NULL DEFAULT FALSE,sync_deletes BOOLEAN NOT NULL DEFAULT FALSE,sync_properties BOOLEAN NOT NULL DEFAULT FALSE,sync_statistics BOOLEAN NOT NULL DEFAULT FALSE,include_prefix TEXT NOT NULL DEFAULT '',exclude_prefix TEXT NOT NULL DEFAULT '',proxy TEXT NOT NULL DEFAULT '',disable_proxy BOOLEAN NOT NULL DEFAULT FALSE,check_binary_existence BOOLEAN NOT NULL DEFAULT FALSE,socket_timeout_ms BIGINT NOT NULL DEFAULT 0,private_revision TEXT NOT NULL DEFAULT '')
 table repositories repositories CREATE TABLE repositories(key TEXT PRIMARY KEY,rclass TEXT NOT NULL,package_type TEXT NOT NULL DEFAULT '',project_key TEXT NOT NULL DEFAULT '',created_at BIGINT NOT NULL,updated_at BIGINT NOT NULL,doc TEXT NOT NULL,header_secrets_version INTEGER NOT NULL DEFAULT 0)

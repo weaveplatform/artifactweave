@@ -16,7 +16,7 @@ type ConfigurationStore interface {
 // change they record (decision 0021), so the federation stores run inside
 // that unit of work rather than one of their own.
 type Store interface {
-	ConfigurationStore
+	PushStore
 	Peers() PeerStore
 	Federation() FederationStore
 	Platform() PlatformStore

@@ -16,6 +16,20 @@
 // atomic bulk enablement and global pause controls. An omitted credential is
 // merged before the store's whole-row replacement. WithTarget guards bounded
 // metadata bookkeeping; it never holds a transaction over network I/O.
+// The push path scope combines an exact requested root with repository-relative
+// Ant include/exclude criteria; exclusions win for both enumeration and exact
+// destination reconciliation. A path match grants no content permission.
+// Target routes append escaped file-name segments to the configured repository
+// and derive storage metadata routes under its deployment prefix. File names
+// cannot become URL references or matrix/query parameters. These helpers perform
+// no HTTP requests; the executing transfer must still enforce current authority,
+// credentials, destination policy and durable acknowledgement checkpoints.
+// Push supplies the bounded single-target driver over TransferSource and
+// PushConnections. It records intents/cursors together, verifies destination
+// content and properties, recovers unknown acknowledgements by observing remote
+// state, and rechecks source/configuration/transport and work ownership before
+// local success publication. All remote operations stay outside metadata
+// transactions. Explicit missing statistics capability is refused at admission.
 //
 // # References
 //
@@ -34,6 +48,16 @@
 //
 // # Status
 //
-// Configuration is implemented by REP-01. Transfer and execution are separate
-// P11 owners; multi-push, event-triggered and checksum behavior remain P37.
+// Configuration is implemented by REP-01. REP-02 supplies source/progress
+// contracts, the bounded driver, guarded target HTTP and application bindings.
+// Dispatch/reporting belong to REP-04. Multi-push,
+// event-triggered and binary-existence optimization remain P37.
+//
+// # Testing
+//
+// Core race tests cover intent/checkpoint rollback, checksum/property settlement,
+// scoped reconciliation and current source/configuration/ownership fences.
+// test/server/federation exercises real source runtimes and separate target
+// processes on SQLite/PostgreSQL, including native Maven effects, response loss,
+// restart, current authority and target failures.
 package replication

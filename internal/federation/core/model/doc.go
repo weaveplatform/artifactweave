@@ -14,6 +14,8 @@
 // platform/outbox (the clock a Stamp carries) and retention/api (the status
 // a full-sync run reports), each another module's api or the platform, as
 // decision 0044's dependency rules allow.
+// Private push snapshots use artifacts/api.TransferItem and kernel credential
+// references; neither a snapshot nor a stored reference grants current access.
 //
 // # Inputs
 //
@@ -28,6 +30,10 @@
 //
 //   - Replication, ReplicationRun, ReplicationDirection with DirectionFor,
 //     and ReplicationStatus.
+//   - PushRun/PushBinding and PushItem preserve private logical execution,
+//     source/target intent and monotonic verification independently of the
+//     queue and public replication status. Their validation grants no current
+//     content or transport authority.
 //   - Peer with Has and DeriveStatus, PeerStatus, UseCase with
 //     KnownUseCase, PairingNonce with Usable, and PairingTokenTTL.
 //   - Stamp with After; StreamKind with RepositoryStream, AccessStream,

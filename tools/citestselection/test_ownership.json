@@ -311,6 +311,7 @@
       "reindex_test.go",
       "remote_folder_authority_test.go",
       "remote_folder_listing_test.go",
+      "replication_source_test.go",
       "repo_environments_test.go",
       "repositories_format_class_test.go",
       "repositories_paging_test.go",
@@ -364,6 +365,14 @@
       "system_health_test.go"
     ],
     "test/server/federation": [
+      "push_bridge_test.go",
+      "push_failures_test.go",
+      "push_fences_test.go",
+      "push_process_test.go",
+      "push_read_fences_test.go",
+      "push_recovery_test.go",
+      "push_scope_edges_test.go",
+      "push_test.go",
       "replication_test.go"
     ],
     "test/server/notifications": [

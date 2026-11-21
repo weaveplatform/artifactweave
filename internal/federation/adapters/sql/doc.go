@@ -1,5 +1,6 @@
 // Package sql is the SQL implementation of the federation module's stores:
-// replications with their sealed passwords and their runs, peers and
+// replications with their sealed passwords, public runs and private push
+// progress, peers and
 // pairing nonces, federated repository members and full syncs, Access
 // Federation targets, platform federations and topologies, with the
 // module's registration with the SQL layer.
@@ -7,13 +8,13 @@
 // # Role
 //
 // federation module, adapter layer (SQL). Store implements the module's
-// port.Store (port.ReplicationStore, port.PeerStore, port.FederationStore
+// port.Store (port.ReplicationStore, port.PushProgressStore, port.PeerStore, port.FederationStore
 // and port.PlatformStore over the shared unit of work) over a shared
 // dialect.Store, on SQLite and PostgreSQL alike. Module registers the
 // federation stream (adapters/sql/migrations) and the sealed column
 // replications.password, sixth in the canonical module order. The composite
 // SQL store in app/adapters/sql builds one Store over its own dialect
-// store, delegates Replications, Peers, Federation and Platform to it and
+// store, delegates Replications, PushProgress, Peers, Federation and Platform to it and
 // names Module in its module list. The package imports the standard
 // library, the kernel, the platform, the module's core and its stream only,
 // and retention/api, whose run statuses a full sync records; through the
@@ -28,7 +29,7 @@
 //
 // # Outputs
 //
-//   - Store, from New, with Replications, Peers, Federation and Platform,
+//   - Store, from New, with Replications, PushProgress, Peers, Federation and Platform,
 //     and the dialect store's Tx, AfterCommit and Close.
 //   - Module: the name federation, the stream migrations.FS and the sealed
 //     column replications.password.
@@ -40,6 +41,9 @@
 //     module's store began it (decision 0044, "Persistence"). That is what
 //     lets a federation change and the outbox entry that records it commit
 //     together (decision 0021).
+//   - Private push runs retain immutable provenance independently of target
+//     settings and queue rows. Progress changes require an enclosing transaction
+//     and a matching version; a failed write cannot advance traversal or evidence.
 //   - Every column the store seals is in Module: replications.password,
 //     with the purpose "replications.password" and the replication's key as
 //     the row id, so key rotation re-seals it (decision 0017). Neither ever
@@ -79,8 +83,12 @@
 //
 //   - sql_test.go: TestAccContract runs the federation contract
 //     (adapters/storetest.Run) on SQLite in memory and in a file through
-//     sqltest.RunModule. The metadata store's contract runs the same cases
-//     on PostgreSQL.
+//     sqltest.RunModule, explicitly including PostgreSQL for the competing
+//     progress compare-and-swap contract. The composite store also runs the
+//     shared cases on PostgreSQL.
+//   - push_test.go: TestAccPushProgressReopen closes and reopens a file database
+//     before replaying the same run and intent; TestAccPushProgressWriteFaults
+//     injects failed writes and checks that progress remains unchanged.
 //   - replication_test.go: TestAccReplicationsFaults (a fault injected after
 //     a successful statement fails the write), TestAccReplicationsSealed (a
 //     sealed password refuses a read without the keyring, and one written
