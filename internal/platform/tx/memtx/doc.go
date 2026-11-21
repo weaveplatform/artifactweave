@@ -28,6 +28,8 @@
 //
 //   - Store, from New, with Tx, AfterCommit and Close (tx.Runner and the
 //     metadata store's lifetime), Do, InTx and NextID.
+//     NewWithMiddleware additionally surrounds a new root's ordinary callback
+//     after snapshot/binding and before finalizers. Nested joins run it once.
 //   - Table, from TableOf, with Rows, Get, Has, Put, Del, All and
 //     DeleteWhere.
 //   - Paginate, KeyStrings and CompareKey: keyset pages and their cursors.

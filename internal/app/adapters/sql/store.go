@@ -4,14 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	accsql "github.com/weaveplatform/artifactweave/internal/access/adapters/sql"
+	accmodel "github.com/weaveplatform/artifactweave/internal/access/core/model"
 	accport "github.com/weaveplatform/artifactweave/internal/access/core/port"
+	"github.com/weaveplatform/artifactweave/internal/access/core/project"
 	artsql "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/sql"
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	artport "github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	fedsql "github.com/weaveplatform/artifactweave/internal/federation/adapters/sql"
 	fedport "github.com/weaveplatform/artifactweave/internal/federation/core/port"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	ntfsql "github.com/weaveplatform/artifactweave/internal/notifications/adapters/sql"
 	ntfport "github.com/weaveplatform/artifactweave/internal/notifications/core/port"
 	"github.com/weaveplatform/artifactweave/internal/platform/apilimit"
@@ -96,11 +101,32 @@ func Open(ctx context.Context, db *sql.DB, d dialect.Dialect, o Options) (*Store
 // layout watch with the platform's config store: a layout document that is
 // created, changed or deleted fences the remote repositories that use it,
 // in the same transaction (decision 0007).
+// Project storage accounting surrounds every root transaction on this shared
+// backend; actual artifact changes and durable warnings settle before fences.
 func New(db *sql.DB, d dialect.Dialect, keys *crypt.Keyring) *Store {
-	s := &Store{Store: dialect.New(db, d, keys)}
-	s.artifacts = artsql.New(s.Store)
+	s := &Store{}
+	accounting := &project.StorageAccounting{
+		Service: project.Service{
+			Store: s,
+			StorageBytes: func(ctx context.Context, key string) (int64, error) {
+				usage, ok := s.artifacts.Repos().(artapi.StorageUsage)
+				if !ok {
+					return 0, fmt.Errorf("project storage totals unavailable: %w", kernel.ErrStore)
+				}
+				return usage.ProjectStorageBytes(ctx, key) //nolint:wrapcheck // the scalar reader names its operation
+			},
+			StorageWarning: func(ctx context.Context, warning accmodel.ProjectStorageWarning) error {
+				return project.EnqueueStorageWarning(ctx, s.WorkQueue(), warning, time.Now()) //nolint:wrapcheck // the handoff names its operation
+			},
+		},
+		Repository: func(ctx context.Context, key string) (artapi.ProjectRepository, error) {
+			return s.Repos().ProjectRepository(ctx, key) //nolint:wrapcheck // the repository projection names its operation
+		},
+	}
+	s.Store = dialect.NewWithMiddleware(db, d, keys, accounting.Middleware)
+	s.artifacts = artsql.NewWithStorageWatch(s.Store, accounting)
 	s.platform = platsql.New(s.Store, s.artifacts.LayoutWatch())
-	s.access = accsql.New(s.Store)
+	s.access = accsql.NewWithStorageWatch(s.Store, accounting.Policy)
 	s.notifications = ntfsql.New(s.Store)
 	s.retention = retsql.New(s.Store)
 	s.federation = fedsql.New(s.Store)

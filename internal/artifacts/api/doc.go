@@ -19,8 +19,9 @@
 // # Inputs
 //
 // The package declares contracts and immutable facts; their implementations
-// consume current authority, index identities and bounded page requests.
-// The artifacts module implements the interfaces:
+// consume current authority, transactional context, index identities, bounded
+// page requests and descriptive storage facts. The artifacts module implements
+// the interfaces:
 // internal/artifacts/core/repos's NewRepositories binds Repositories over
 // the store and access's Keys and Projects, and artifacts/core/layout's
 // Checker implements Layouts; pkgindex.NewReader supplies PackageIndex.
@@ -42,6 +43,9 @@
 //   - PackageIndex: bounded repository/package/version/file snapshots and
 //     comparator retention cutoffs. Callers hold current authority; snapshots
 //     disclose no credentials and never authorize deletion.
+//   - StorageUsage supplies canonical logical byte totals. StorageWatch
+//     prepares content/ownership accounting before mutation and records actual
+//     row deltas for whole-operation quota settlement, without credentials.
 //   - API: the contracts as the module binds them, consumed by configuration,
 //     retention and the application composition.
 //

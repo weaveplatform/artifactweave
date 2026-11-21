@@ -15,9 +15,10 @@ import (
 // shares. It implements tx.Runner and is safe for concurrent use. The zero
 // value is not usable; call New.
 type Store struct {
-	gate   chan struct{}
-	tables map[string]snapshotter
-	seqs   map[string]int64
+	gate       chan struct{}
+	tables     map[string]snapshotter
+	seqs       map[string]int64
+	middleware platformtx.Middleware
 }
 
 // New returns an empty database.
@@ -27,6 +28,16 @@ func New() *Store {
 		tables: map[string]snapshotter{},
 		seqs:   map[string]int64{},
 	}
+}
+
+// NewWithMiddleware constructs a database whose new root transactions surround
+// ordinary work with middleware. It runs after snapshot/binding and before
+// finalizers, so its own writes roll back with business work. A nil middleware
+// preserves New's behavior; every module adapter shares the returned backend.
+func NewWithMiddleware(middleware platformtx.Middleware) *Store {
+	s := New()
+	s.middleware = middleware
+	return s
 }
 
 type (
@@ -137,7 +148,12 @@ func (s *Store) Tx(ctx context.Context, fn func(context.Context) error) error {
 		}
 	}()
 	ctx = tx.before.Bind(context.WithValue(ctx, txKey{s}, tx))
-	err := fn(ctx)
+	var err error
+	if s.middleware != nil {
+		err = s.middleware(ctx, fn)
+	} else {
+		err = fn(ctx)
+	}
 	if err == nil {
 		if err := tx.before.Run(ctx); err != nil {
 			return fmt.Errorf("inmem: finalize transaction: %w", err)

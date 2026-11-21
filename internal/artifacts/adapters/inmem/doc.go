@@ -29,6 +29,11 @@
 //     Blobs, Replicas, GitLFSLocks, BowerRegistrations, UploadDigests,
 //     Builds, ArchivedItems, ColdBlobs and ColdReplicas, LayoutWatch, and memtx's
 //     Tx, AfterCommit and Close.
+//   - Repos also supplies port.StorageUsage, summing canonical owned item and
+//     raw-cache bytes in place, without copying configurations or content.
+//   - NewWithStorageWatch installs the composition's accounting observer.
+//     Configured item mutations use Tx snapshots rather than bare Do, so a
+//     refused accounting handoff restores item rows and their dependent state.
 //
 // # Invariants
 //

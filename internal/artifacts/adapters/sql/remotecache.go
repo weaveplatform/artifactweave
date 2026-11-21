@@ -75,20 +75,24 @@ func (r remoteRecords) Entry(
 }
 
 func (r remoteRecords) PutEntry(ctx context.Context, e model.RemoteCacheEntry) error {
-	_, err := r.s.Exec(
-		ctx,
-		"write remote cache",
-		dialect.Upsert(
-			"remote_cache",
-			[]string{"repo_key", "cache_id", "path", "doc"},
-			[]string{"repo_key", "cache_id"},
-		),
-		e.Token.Key.RepoKey,
-		port.RemoteCacheID(e.Token.Key),
-		e.Token.Key.Path,
-		dialect.MustJSON(kernel.Normalise(e)),
-	)
-	return err
+	return r.s.storageWrite(ctx, func(ctx context.Context) error {
+		return storekit.WriteRawStorage(ctx, r.s.storage, e, r.Entry, func() error {
+			_, err := r.s.Exec(
+				ctx,
+				"write remote cache",
+				dialect.Upsert(
+					"remote_cache",
+					[]string{"repo_key", "cache_id", "path", "doc"},
+					[]string{"repo_key", "cache_id"},
+				),
+				e.Token.Key.RepoKey,
+				port.RemoteCacheID(e.Token.Key),
+				e.Token.Key.Path,
+				dialect.MustJSON(kernel.Normalise(e)),
+			)
+			return err
+		})
+	})
 }
 
 func (r remoteRecords) Entries(

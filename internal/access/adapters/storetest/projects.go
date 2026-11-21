@@ -15,6 +15,7 @@ func runProjects(t *testing.T, newStore Factory) {
 	t.Run("PrincipalProjects", func(t *testing.T) { RunPrincipalProjects(t, newStore(t)) })
 	t.Run("ProjectRolePages", func(t *testing.T) { RunProjectRolePages(t, newStore) })
 	t.Run("Projects", func(t *testing.T) { testProjects(t, newStore(t)) })
+	t.Run("ProjectStorage", func(t *testing.T) { RunProjectStorage(t, newStore) })
 	t.Run("Roles", func(t *testing.T) { testRoles(t, newStore(t)) })
 	t.Run("Environments", func(t *testing.T) { testEnvironments(t, newStore(t)) })
 	t.Run("ProjectMembers", func(t *testing.T) { testProjectMembers(t, newStore(t)) })

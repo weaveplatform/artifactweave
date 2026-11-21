@@ -10,11 +10,27 @@ import (
 // Store is the SQL implementation of the access module's stores. It is
 // built over a shared dialect.Store, so every call joins the transaction
 // that the caller's context carries, whichever module's store began it.
-type Store struct{ *dialect.Store }
+type Store struct {
+	*dialect.Store
+	storagePolicy func(context.Context, string) error
+}
 
 // New returns the access module's stores over db, which must hold the
 // module stream's tables.
 func New(db *dialect.Store) *Store { return &Store{Store: db} }
+
+// NewWithStorageWatch binds project quota-policy changes to the application's
+// root accounting transaction. Standalone access stores have no artifact totals.
+func NewWithStorageWatch(db *dialect.Store, changed func(context.Context, string) error) *Store {
+	return &Store{Store: db, storagePolicy: changed}
+}
+
+func (s *Store) storageChanged(ctx context.Context, key string) error {
+	if s.storagePolicy == nil {
+		return nil
+	}
+	return s.storagePolicy(ctx, key) //nolint:wrapcheck // the root accounting watch names its failure
+}
 
 // Module registers the access module with the SQL layer: its migration
 // stream, under the name that keys the stream's rows in schema_migrations;

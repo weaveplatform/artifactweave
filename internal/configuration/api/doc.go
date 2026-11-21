@@ -30,8 +30,10 @@
 //     apply` prints.
 //   - ErrInvalid: the sentinel that every refusal of a descriptor wraps.
 //   - System: the minimum download redirect size the descriptor set.
+//   - Mail: the current mail-server settings, with a guarded local snapshot
+//     and password excluded from JSON. Only delivery opens that secret.
 //   - Settings: the configuration options the module's code reads.
-//   - API: one implementation of Descriptor and of System.
+//   - API: one implementation of Descriptor, System and Mail.
 //
 // # Invariants
 //

@@ -8,6 +8,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
+	"github.com/weaveplatform/artifactweave/internal/configuration/core/system"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx"
 )
@@ -57,9 +58,14 @@ type Deps struct {
 // DownloadRedirectMinSize. Nothing is read or written until a method is
 // called.
 func NewAPI(d Deps) configapi.API {
+	var guard func(context.Context) error
+	if d.Projects != nil {
+		guard = d.Projects.Guard
+	}
 	return configapi.API{
 		Descriptor: descriptorAPI{d: d},
 		System:     systemAPI{configs: d.Configs},
+		Mail:       system.Mail{Configs: d.Configs, Tx: d.Tx, Guard: guard},
 	}
 }
 

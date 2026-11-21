@@ -56,7 +56,7 @@ type Module struct {
 	settings configapi.Settings
 }
 
-// New binds configuration/api's Descriptor and System over d with the
+// New binds configuration/api's Descriptor, System and Mail over d with the
 // descriptor core. It does no I/O, and calls nothing on the store until a
 // method of the API is called; it refuses only Deps without a store.
 func New(d Deps) (*Module, error) {
@@ -76,9 +76,7 @@ func New(d Deps) (*Module, error) {
 	}, nil
 }
 
-// API returns the module's published surface: the Descriptor that parses and
-// applies configuration descriptors, and the System that other modules read
-// the descriptor's settings through.
+// API returns the descriptor and the current system/mail settings readers.
 func (m *Module) API() configapi.API { return m.api }
 
 // Settings returns the Settings from Deps.

@@ -64,10 +64,12 @@ func (r remoteRecords) Entry(
 }
 
 func (r remoteRecords) PutEntry(ctx context.Context, e model.RemoteCacheEntry) error {
-	return r.s.Do(
-		ctx,
-		func() error { r.entries().Put(port.RemoteCacheID(e.Token.Key), e); return nil },
-	)
+	return r.s.storageWrite(ctx, func(ctx context.Context) error {
+		return storekit.WriteRawStorage(ctx, r.s.storage, e, r.Entry, func() error {
+			r.entries().Put(port.RemoteCacheID(e.Token.Key), e)
+			return nil
+		})
+	})
 }
 
 func (r remoteRecords) Entries(

@@ -13,7 +13,7 @@ import (
 
 // VirtualCopies returns the durable metadata of virtual-owned transformed files.
 func (s *Store) VirtualCopies() virtual.CopyStore {
-	return storekit.NewVirtualCopies(s, copyRecords{s})
+	return storekit.NewVirtualCopiesWithStorageWatch(s, copyRecords{s}, s.storage)
 }
 
 type copyRecords struct{ s *Store }

@@ -59,6 +59,10 @@
 //
 // # Invariants
 //
+//   - NewWithMiddleware optionally surrounds a root transaction's ordinary
+//     work after binding and before finalizers. A configured store refuses a
+//     join whose root used another uninstrumented wrapper of its pool, so
+//     transaction-wide publication invariants cannot be silently bypassed.
 //   - The unit of work is keyed to one *sql.DB. A context carries at most one
 //     transaction, and only stores over its pool join it, so every module
 //     store is built over the same Store: a store over another pool writes

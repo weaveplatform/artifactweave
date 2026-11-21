@@ -16,8 +16,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
-// Both moves pause before flushing work. Each transaction must lock its
-// work rows in sorted order, even though it visits destination then source.
+// The root project guard serializes opposite moves before their work rows.
+// Each transaction must still flush work in sorted order, even though it
+// visits destination then source, and both moves must finish after release.
 func TestAccSymbolsOppositeMovesOnPostgres(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
@@ -44,6 +45,16 @@ func TestAccSymbolsOppositeMovesOnPostgres(t *testing.T) {
 	}
 	entered := make(chan struct{}, 2)
 	resume := make(chan struct{})
+	var workers sync.WaitGroup
+	defer func() {
+		cancel()
+		select {
+		case <-resume:
+		default:
+			close(resume)
+		}
+		workers.Wait()
+	}()
 	done := make(chan error, 2)
 	for _, move := range []struct {
 		from, to repo.Config
@@ -56,7 +67,9 @@ func TestAccSymbolsOppositeMovesOnPostgres(t *testing.T) {
 			Store: db,
 			pause: &enqueuePause{entered: entered, resume: resume},
 		}
+		workers.Add(1)
 		go func() {
+			defer workers.Done()
 			_, err := svc.Transfer(
 				ctx,
 				item.Transfer{
@@ -69,13 +82,36 @@ func TestAccSymbolsOppositeMovesOnPostgres(t *testing.T) {
 			done <- err
 		}()
 	}
-	for range 2 {
+	select {
+	case <-entered:
+	case err := <-done:
+		t.Fatalf("move before barrier: %v", err)
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	tick := time.NewTicker(10 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		var blocked bool
+		if err := db.DB().QueryRowContext(ctx, `SELECT EXISTS (
+			SELECT 1 FROM pg_stat_activity a WHERE datname = current_database()
+			AND query LIKE 'SELECT id FROM project_authority_guard%'
+			AND cardinality(pg_blocking_pids(a.pid)) > 0
+			AND EXISTS (SELECT 1 FROM pg_locks l WHERE l.pid = a.pid
+			AND l.relation = 'project_authority_guard'::regclass))`).Scan(&blocked); err != nil {
+			t.Fatal(err)
+		}
+		if blocked {
+			break
+		}
 		select {
 		case <-entered:
+			t.Fatal("opposite moves bypassed the root project guard")
 		case err := <-done:
 			t.Fatalf("move before barrier: %v", err)
 		case <-ctx.Done():
 			t.Fatal(ctx.Err())
+		case <-tick.C:
 		}
 	}
 	close(resume)

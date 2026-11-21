@@ -51,6 +51,12 @@
 //     one page.
 //   - Module: the name artifacts, the stream migrations.FS, the two sealed
 //     columns and the BeforeReseal and AfterMigrate hooks.
+//   - Repos also supplies port.StorageUsage: one scalar UNION ALL aggregate
+//     over canonical ownership, item files and raw cache bodies. It opens no
+//     sealed configuration and avoids an item/cache join cross product.
+//   - NewWithStorageWatch installs the composition's accounting observer.
+//     Configured item Put/Create/Delete join a metadata transaction and record
+//     actual logical deltas; a refused handoff rolls their row changes back.
 //
 // # Invariants
 //

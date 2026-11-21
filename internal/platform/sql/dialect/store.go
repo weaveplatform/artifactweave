@@ -12,6 +12,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	platformtx "github.com/weaveplatform/artifactweave/internal/platform/tx"
 )
 
 // ErrNoKeyring reports a sealed value read by a store opened without a
@@ -24,9 +25,10 @@ var ErrNoKeyring = errors.New("sqlcommon: value is sealed but no keyring is conf
 // to the pool, so every store built over one Store shares it. A Store is safe
 // for concurrent use.
 type Store struct {
-	db   *sql.DB
-	d    Dialect
-	keys *crypt.Keyring
+	db         *sql.DB
+	d          Dialect
+	keys       *crypt.Keyring
+	middleware platformtx.Middleware
 }
 
 // New wraps an open, migrated pool for one dialect. keys seals secret
@@ -35,6 +37,18 @@ type Store struct {
 func New(db *sql.DB, d Dialect, keys *crypt.Keyring) *Store {
 	return &Store{db: db, d: d, keys: keys}
 }
+
+// NewWithMiddleware constructs a store whose root transactions surround
+// ordinary work with middleware. Configure it before exposing this shared
+// backend to module adapters; nil preserves New's behavior. The middleware
+// runs inside rollback protection, before any before-commit finalizer.
+func NewWithMiddleware(db *sql.DB, d Dialect, keys *crypt.Keyring, middleware platformtx.Middleware) *Store {
+	s := New(db, d, keys)
+	s.middleware = middleware
+	return s
+}
+
+type middlewareKey struct{ store *Store }
 
 // DB returns the pool, for tests and the migrate command.
 func (s *Store) DB() *sql.DB { return s.db }
@@ -51,7 +65,24 @@ func (s *Store) Dialect() Dialect { return s.d }
 // and an error fn returns fails that transaction even if the outer function
 // drops it.
 func (s *Store) Tx(ctx context.Context, fn func(context.Context) error) error {
-	return runTx(ctx, s.db, s.d, fn)
+	if s.middleware == nil {
+		return runTx(ctx, s.db, s.d, fn)
+	}
+	joined := s.InTx(ctx)
+	if !joined {
+		// runTx keeps this root context for finalizers. Bind the marker here,
+		// so a callback joining this configured store retains its admission.
+		ctx = context.WithValue(ctx, middlewareKey{s}, true)
+	}
+	return runTx(ctx, s.db, s.d, func(ctx context.Context) error {
+		if joined {
+			if ctx.Value(middlewareKey{s}) != true {
+				return platformtx.ErrMiddleware
+			}
+			return fn(ctx)
+		}
+		return s.middleware(ctx, fn)
+	})
 }
 
 // AfterCommit queues fn until the transaction ctx carries commits, and runs

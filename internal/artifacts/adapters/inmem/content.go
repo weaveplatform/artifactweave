@@ -8,6 +8,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/storekit"
+	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -33,15 +35,22 @@ func (r repos) Create(ctx context.Context, c repo.Config) error {
 		return fmt.Errorf("create repository: key is required: %w", kernel.ErrInvalid)
 	}
 	return r.s.Tx(ctx, func(ctx context.Context) error {
+		change, err := storekit.PrepareStorageOwnership(ctx, r.s.storage, artapi.StorageOwnership{Repository: c.Key, Project: c.ProjectKey})
+		if err != nil {
+			return err //nolint:wrapcheck // storekit names the accounting boundary
+		}
 		if r.t().Has(c.Key) {
 			return memtx.Conflict("repository", c.Key)
 		}
 		r.t().Put(c.Key, c)
-		return remoteRecords(r).PutSource(
+		if err := remoteRecords(r).PutSource(
 			ctx,
 			c.Key,
 			model.RemoteSourceState{Source: port.NewRemoteSource(c.Key)},
-		)
+		); err != nil {
+			return err
+		}
+		return storekit.RecordRepositoryStorage(ctx, change, r, c.Key)
 	})
 }
 
@@ -76,6 +85,10 @@ func (r repos) Update(ctx context.Context, c repo.Config) error {
 			return memtx.NotFound("repository", c.Key)
 		}
 		old, _ := r.t().Get(c.Key)
+		change, err := storekit.PrepareStorageOwnership(ctx, r.s.storage, artapi.StorageOwnership{Repository: c.Key, PreviousProject: old.ProjectKey, Project: c.ProjectKey})
+		if err != nil {
+			return err //nolint:wrapcheck // storekit names the accounting boundary
+		}
 		if port.RemotePolicyChanged(old, c) {
 			state, err := remoteRecords(r).Source(ctx, c.Key)
 			if err != nil {
@@ -94,7 +107,7 @@ func (r repos) Update(ctx context.Context, c repo.Config) error {
 			}
 		}
 		r.t().Put(c.Key, c)
-		return nil
+		return storekit.RecordRepositoryStorage(ctx, change, r, c.Key)
 	})
 }
 
@@ -103,11 +116,21 @@ func (r repos) Delete(ctx context.Context, key string) error {
 		if !r.t().Has(key) {
 			return memtx.NotFound("repository", key)
 		}
+		previous, _ := r.t().Get(key)
+		change, err := storekit.PrepareStorageOwnership(ctx, r.s.storage, artapi.StorageOwnership{Repository: key, PreviousProject: previous.ProjectKey})
+		if err != nil {
+			return err //nolint:wrapcheck // storekit names the accounting boundary
+		}
 		if err := r.s.VirtualCopies().DeleteRepo(ctx, key); err != nil {
 			return fmt.Errorf("remove virtual copies: %w", err)
 		}
 		if _, err := r.s.RemoteCache().Invalidate(ctx, key, "", false); err != nil {
 			return err //nolint:wrapcheck // the remote cache names the operation
+		}
+		// Capture the remaining total after raw-cache invalidation, before
+		// removing configuration. Retained item rows may still exist here.
+		if err := storekit.RecordRepositoryStorage(ctx, change, r, key); err != nil {
+			return err //nolint:wrapcheck // storekit names the accounting boundary
 		}
 		r.t().Del(key)
 		gitLFSLocks(r).rows().DeleteWhere(func(_ string, v model.GitLFSLock) bool {

@@ -48,6 +48,14 @@ has Security REST and Access bootstrap replacements; that does not remove genera
 XML import from scope. Product-specific sections follow their feature phases in the
 [capability roadmap](../../implementation/capability-roadmap.md).
 
+PRJ-04 supplies the narrow `mailServer` dependency for quota notifications through
+the same PATCH, config-apply and bootstrap path. Its documented singleton fields
+merge into the existing mail configuration document; the password is separated
+and sealed with the configured keyring. Settings and password are read together
+under the shared guard before delivery starts. Disabled mail and string clearing
+are explicit; whole-section null is refused. This does not supply P12 XML rendering,
+mail testing endpoints or the remaining system administration.
+
 ## Rationale
 
 The Artifactory descriptor is the format Artifactory users already have in version

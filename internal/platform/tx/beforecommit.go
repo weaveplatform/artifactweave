@@ -36,11 +36,12 @@ func BeforeCommit(ctx context.Context, fn func(context.Context) error) error {
 // defer Close on every exit. Runner stays small so other implementations need
 // not support before-commit work; BeforeCommit fails explicitly on those.
 type Finalizers struct {
-	mu      sync.Mutex
-	started bool
-	closed  bool
-	err     error
-	before  []func(context.Context) error
+	mu          sync.Mutex
+	started     bool
+	closed      bool
+	err         error
+	before      []func(context.Context) error
+	publication func(context.Context) error
 }
 
 // Bind returns a context whose before-commit work belongs to f. A joined
@@ -109,4 +110,5 @@ func (f *Finalizers) Close() {
 	defer f.mu.Unlock()
 	f.closed = true
 	f.before = nil
+	f.publication = nil
 }

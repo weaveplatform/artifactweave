@@ -735,6 +735,14 @@ constraint project_repository_shares.project_repository_shares_pkey PRIMARY KEY 
 constraint project_repository_shares.project_repository_shares_repo_key_fkey FOREIGN KEY (repo_key) REFERENCES project_repositories(repo_key) ON DELETE CASCADE
 index project_repository_shares.project_repository_shares_pkey CREATE UNIQUE INDEX project_repository_shares_pkey ON project_repository_shares USING btree (repo_key, project_key)
 index project_repository_shares.project_repository_shares_project CREATE INDEX project_repository_shares_project ON project_repository_shares USING btree (project_key, repo_key)
+table project_storage
+column project_storage.project_key text COLLATE "C" NOT NULL
+column project_storage.bytes bigint NOT NULL
+column project_storage.warning_key text NOT NULL DEFAULT ''::text
+constraint project_storage.project_storage_bytes_check CHECK ((bytes >= 0))
+constraint project_storage.project_storage_pkey PRIMARY KEY (project_key)
+constraint project_storage.project_storage_project_key_fkey FOREIGN KEY (project_key) REFERENCES projects(key) ON DELETE CASCADE
+index project_storage.project_storage_pkey CREATE UNIQUE INDEX project_storage_pkey ON project_storage USING btree (project_key)
 table projects
 column projects.key text COLLATE "C" NOT NULL
 column projects.display_name text NOT NULL DEFAULT ''::text

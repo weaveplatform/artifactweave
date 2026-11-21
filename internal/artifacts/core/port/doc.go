@@ -65,6 +65,10 @@
 //   - RemoteCacheStore, with NewRemoteSource, RemoteConfigChanged,
 //     RemoteSourceConfig, RemotePolicyChanged, RemoteCacheID,
 //     ValidateRemoteKey, RemotePathMatches and ValidateRemoteEntry.
+//   - StorageUsage: scalar current-project and repository logical byte totals
+//     for quota initialization and ownership changes. Item-backed cache entries
+//     are counted through items; raw positive bodies are counted separately,
+//     including when a later negative response retains their content.
 //   - Store: tx.Runner and the 14 accessors Repos, RemoteCache, Items,
 //     Blobs, Replicas, Trash, Packages, GitLFSLocks, BowerRegistrations,
 //     UploadDigests, Builds, ArchivedItems, ColdBlobs and ColdReplicas.

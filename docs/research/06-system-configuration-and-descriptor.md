@@ -292,26 +292,31 @@ security:
 ### What artifactweave serves
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
-  `proxies`, `propertySets`, `repoLayouts` and `downloadRedirectConfig`
-  (`internal/configuration/core/descriptor/parse.go`, `redirect.go`). The last applies
+  `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`,
+  `downloadRedirectConfig`, `mailServer` and the `security.anonAccessEnabled` setting
+  (`internal/configuration/core/descriptor`). Download redirect configuration applies
   the whole-MB `fileMinimumSize` setting used by CDN/storage redirects
   ([research 19](19-cdn-and-download-redirect.md#5-artifactweave-today)). Artifactory
   applies every section its YAML pages document ([D]
   https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration.md). A document
   with any other top-level section answers 400 naming each such section and listing the
-  seven, and changes nothing. The check runs before `${NAME}` references are resolved, so the
+  supported sections, and changes nothing. The check runs before `${NAME}` references are resolved, so the
   error names the section rather than a variable inside it. The other sections arrive with
-  their features: `backups`, `mailServer`, `gcConfig`, `trashcanConfig`, `quotaConfig`,
-  `systemMessageConfig` and `security` in P12 ([plan](../implementation/plan.md)), and
-  `federatedRepositories` in P13. P36 completes scheduled backup and migration workflows;
+  their features: `backups`, `gcConfig`, `trashcanConfig`, `quotaConfig`,
+  `systemMessageConfig` and the remaining baseline security settings in P12
+  ([plan](../implementation/plan.md)). Stored federated repository configuration does
+  not establish P13 peer synchronization. P36 completes scheduled backup and migration workflows;
   human identity settings follow P21/P22, and product settings follow their owners in the
   [capability roadmap](../implementation/capability-roadmap.md). P20 inventories the
   descriptor/XSD fields individually so a named section cannot conceal an unowned gap.
   A 200 for an unapplied section would tell a pipeline that configuration
-  is in force when it is not, and their contents are not stored meanwhile because
-  `mailServer` and `security` carry passwords. No acceptance scenario, reference deployment
-  or client flow served so far sends one of them: the `artifactory_*` resources that write
-  them also read the XML `GET`, which P12 brings.
+  is in force when it is not. Unsupported contents are not stored, including any secrets.
+  PRJ-04 supplies the narrow documented singleton `mailServer` fields needed for quota
+  delivery. Its password is separated into the existing sealed secret store; omitted
+  fields are retained and null clears strings. Whole-section null is refused; disable
+  notifications with `enabled: false`. Delivery reads settings and credentials under one
+  guarded local transaction before network I/O. Full XML `GET`, mail testing endpoints
+  and the provider mail-resource read workflow remain P12.
 - A successful patch answers `<n> changes to config merged successfully` as `text/plain`,
   with no newline after it, `<n>` counted as "Semantics" describes ([J] RTFACT-31174,
   RTFACT-17040; [S] `MapToDiffConverter`). `artifactweave config apply` prints its own

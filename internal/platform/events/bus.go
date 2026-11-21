@@ -190,6 +190,9 @@ func (b *Bus) apply(ctx context.Context, item work.WorkItem, expected outbox.Pos
 				return fmt.Errorf("consume event %s/%d: %w", event.Origin, event.Seq, err)
 			}
 		}
+		if err := tx.CheckPublication(ctx); err != nil {
+			return fmt.Errorf("settle event consumer effects: %w", err)
+		}
 		if err := b.store.Events().Ack(ctx, expected, event.Seq); err != nil {
 			return fmt.Errorf("acknowledge event %s/%d: %w", event.Origin, event.Seq, err)
 		}
@@ -202,6 +205,9 @@ func (b *Bus) apply(ctx context.Context, item work.WorkItem, expected outbox.Pos
 }
 
 func (b *Bus) guardLease(ctx context.Context, item work.WorkItem) error {
+	if err := tx.CheckPublication(ctx); err != nil {
+		return fmt.Errorf("settle event dispatch publication: %w", err)
+	}
 	until, err := b.store.WorkQueue().GuardLease(ctx, item.Kind, item.Key, item.Generation)
 	if err != nil {
 		return fmt.Errorf("guard event dispatch lease: %w", err)

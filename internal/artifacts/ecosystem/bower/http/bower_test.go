@@ -57,8 +57,12 @@ func newFixture(t *testing.T) *fixture {
 	return f
 }
 
-func (f *fixture) mount(svc *source.Service) {
+func (f *fixture) mount(svc *source.Service, wrap ...func(pkgroute.Store) pkgroute.Store) {
 	f.sources = svc
+	var backend pkgroute.Store = f.db
+	for _, w := range wrap {
+		backend = w(backend)
+	}
 	r := chi.NewRouter()
 	r.Use(accesstest.Over(f.t, f.db).Middleware(f.t, true, func(r *http.Request) kernel.Principal {
 		user := r.Header.Get("X-User")
@@ -66,7 +70,7 @@ func (f *fixture) mount(svc *source.Service) {
 	}))
 	options := pkgroute.Options{
 		CurrentAccess: f.currentAccess,
-		Store:         f.db, Items: func() *item.Service { return f.items },
+		Store:         backend, Items: func() *item.Service { return f.items },
 		Logger: slog.New(slog.NewTextHandler(&f.logs, nil)),
 		Fault:  func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 		ItemError: func(_ context.Context, _ string, err error) error {

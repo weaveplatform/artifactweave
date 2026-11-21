@@ -1,3 +1,4 @@
+@descriptor
 Feature: Configuration descriptor
   Artifactory's YAML descriptor applied as a patch (decision 0009), as
   configuration-as-code pipelines and the artifactory_* configuration
@@ -90,13 +91,49 @@ Feature: Configuration descriptor
       localRepositories:
         refused-local:
           type: generic
-      mailServer:
-        host: smtp.example
+      backups:
+        nightly: {}
       """
     Then the response status is 400
-    And the response body contains "sections not supported: mailServer"
+    And the response body contains "sections not supported: backups"
     When I GET "/artifactory/api/repositories/refused-local" as admin
     Then the response status is 404
+
+  Scenario: An admin configures and clears mail credentials through the descriptor
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      mailServer:
+        enabled: false
+        host: smtp.invalid
+        port: 2525
+        password: mail-private-fixture
+      """
+    Then the response status is 200
+    And the response body is "4 changes to config merged successfully"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      mailServer:
+        enabled: false
+        host: smtp.invalid
+        port: 2525
+        password: mail-private-fixture
+      """
+    Then the response status is 200
+    And the response body is "4 changes to config merged successfully"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      mailServer:
+        password: null
+      """
+    Then the response status is 200
+    And the response body is "1 changes to config merged successfully"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      mailServer:
+        port: "2525"
+      """
+    Then the response status is 400
+    And the response body contains "mailServer.port"
 
   Scenario: An empty descriptor is refused rather than deleting every repository
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:

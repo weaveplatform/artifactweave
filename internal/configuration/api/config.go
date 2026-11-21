@@ -104,4 +104,5 @@ type System interface {
 type API struct {
 	Descriptor Descriptor
 	System     System
+	Mail       Mail
 }
