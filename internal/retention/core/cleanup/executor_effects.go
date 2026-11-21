@@ -2,12 +2,8 @@ package cleanup
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"hash"
 	"math"
 
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
@@ -16,80 +12,21 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/retention/core/port"
 )
 
-func fileFingerprint(h hash.Hash, file artifactsapi.IndexFile) error {
-	encoder := json.NewEncoder(h)
-	if err := encoder.Encode(leadEvidence(file)); err != nil {
-		return fmt.Errorf("encode cleanup content facts: %w", err)
-	}
-	// Keep the fingerprint's private representation independent of API JSON.
-	lead := struct {
-		Cached   bool   `json:"cached"`
-		Known    bool   `json:"known"`
-		Found    bool   `json:"found"`
-		Single   bool   `json:"single"`
-		Rank     int64  `json:"rank"`
-		TieBreak string `json:"tie_break"`
-	}{Cached: file.Cached, Known: file.Lead != nil}
-	if file.Lead != nil {
-		lead.Found, lead.Single, lead.Rank, lead.TieBreak = file.Lead.Found, file.Lead.Single, file.Lead.Rank, file.Lead.TieBreak
-	}
-	err := encoder.Encode(lead)
-	if err != nil {
-		return fmt.Errorf("encode cleanup file facts: %w", err)
-	}
-	return nil
+func sameVersionRevision(a, b artifactsapi.IndexVersion) bool {
+	return a.ID == b.ID && a.MutationRevision == b.MutationRevision && a.LeadRevision == b.LeadRevision
 }
 
-// unchangedVersion compares current files with ALL unremoved selected facts,
-// not just the next file. This also protects a newer file that a lead's normal
-// companion deletion might otherwise reach. Own committed removals are excluded
-// from the expected set, so restart and multi-lead versions remain resumable.
+// The owner locks this version row and every linked mutation replaces its
+// revision in that same transaction. This checks the complete selected set
+// without walking all current and saved files again for every removal.
 func (x Executor) unchangedVersion(ctx context.Context, p model.CleanupProgress, s *Selection) error {
 	v, err := s.currentVersion(ctx, p.Version)
 	if err != nil {
 		return err
 	}
-	if v.Protected || !v.LastDownloaded.Equal(p.Version.LastDownloaded) || s.criteria.identityReason(versionIdentity(v)) != ReasonSelected {
-		return fmt.Errorf("cleanup version protection changed: %w", kernel.ErrConflict)
-	}
-	expected, actual := sha256.New(), sha256.New()
-	page := kernel.Page{Limit: executionPageSize}
-	for {
-		rows, next, err := x.Store.Cleanup().Entries(ctx, port.CleanupEntryQuery{RunID: p.RunID, VersionID: p.Version.ID, Kind: model.CleanupItemEntry}, page)
-		if err != nil {
-			return fmt.Errorf("read selected cleanup facts: %w", err)
-		}
-		for _, entry := range rows {
-			if entry.State == model.CleanupDeleted || entry.Snapshot.ID == 0 {
-				continue
-			}
-			if err := fileFingerprint(expected, entry.Snapshot); err != nil {
-				return fmt.Errorf("fingerprint selected cleanup files: %w", err)
-			}
-		}
-		if next == "" {
-			break
-		}
-		page.After = next
-	}
-	page = kernel.Page{Limit: executionPageSize}
-	for {
-		rows, next, err := s.files(ctx, v, page)
-		if err != nil {
-			return err
-		}
-		for _, file := range rows {
-			if err := fileFingerprint(actual, file); err != nil {
-				return fmt.Errorf("fingerprint current cleanup files: %w", err)
-			}
-		}
-		if next == "" {
-			break
-		}
-		page.After = next
-	}
-	if hex.EncodeToString(expected.Sum(nil)) != hex.EncodeToString(actual.Sum(nil)) {
-		return fmt.Errorf("cleanup version files changed: %w", kernel.ErrConflict)
+	if v.MutationRevision == "" || v.LeadRevision == "" || !sameVersionRevision(v, p.Version) ||
+		v.Protected || !v.LastDownloaded.Equal(p.Version.LastDownloaded) || s.criteria.identityReason(versionIdentity(v)) != ReasonSelected {
+		return fmt.Errorf("cleanup version snapshot changed: %w", kernel.ErrConflict)
 	}
 	return nil
 }
@@ -109,8 +46,14 @@ func (x Executor) removeStep(ctx context.Context, e model.CleanupExecution, p mo
 	_, err = x.Removal.Remove(ctx, artifactsapi.RemovalRequest{Credential: e.Credential, Item: entry.Snapshot, Properties: s.properties, SkipTrashcan: e.Policy.SkipTrashcan},
 		func(ctx context.Context) error { return x.unchangedVersion(ctx, p, s) },
 		func(ctx context.Context, result artifactsapi.RemovalResult) error {
-			return x.publish(ctx, e, p, fence, true, func(ctx context.Context, r *model.CleanupRun, _ *model.CleanupProgress) error {
-				return x.acknowledge(ctx, e.RunID, p.Version.ID, r, result)
+			return x.publish(ctx, e, p, fence, true, func(ctx context.Context, r *model.CleanupRun, next *model.CleanupProgress) error {
+				if err := x.acknowledge(ctx, e.RunID, p.Version.ID, r, result); err != nil {
+					return err
+				}
+				// Only the owner's same-transaction effect acknowledgement can
+				// advance this marker. A pruned identity cannot adopt a new ID.
+				next.Version.MutationRevision = result.VersionMutationRevision
+				return nil
 			})
 		})
 	return err //nolint:wrapcheck // guarded removal preserves its refusal classification

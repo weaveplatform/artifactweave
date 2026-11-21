@@ -139,7 +139,7 @@ func (x Executor) discoverCandidates(ctx context.Context, e model.CleanupExecuti
 	if p.FileAfter == "" {
 		next.Version = page.Version
 	}
-	if p.FileAfter != "" && !page.Version.LastDownloaded.Equal(p.Version.LastDownloaded) {
+	if p.FileAfter != "" && (!sameVersionRevision(page.Version, p.Version) || !page.Version.LastDownloaded.Equal(p.Version.LastDownloaded)) {
 		page.Reason, page.Items = ReasonChanged, nil
 	}
 	if page.Reason != ReasonSelected {

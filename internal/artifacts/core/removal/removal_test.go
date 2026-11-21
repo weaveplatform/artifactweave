@@ -30,6 +30,53 @@ import (
 
 var removalAt = time.Date(2026, 11, 21, 0, 0, 0, 0, time.UTC)
 
+type removalRevisionStore struct {
+	item.Store
+	packages port.PackageStore
+}
+
+func (s removalRevisionStore) Packages() port.PackageStore { return s.packages }
+
+type removalWithoutRevision struct{ port.PackageStore }
+
+type removalRevisionFault struct {
+	port.PackageStore
+	port.PackageIndexPages
+}
+
+func (removalRevisionFault) IndexVersion(context.Context, api.IndexVersion, int) (api.IndexVersion, error) {
+	return api.IndexVersion{}, kernel.ErrStore
+}
+
+func TestUnitGuardedRemovalRevisionFailureRollsBack(t *testing.T) {
+	for _, unavailable := range []bool{false, true} {
+		t.Run(fmt.Sprintf("projection unavailable %t", unavailable), func(t *testing.T) {
+			w := newRemovalFixture(t)
+			service := w.service.(remover)
+			var packages port.PackageStore = removalRevisionFault{w.db.Packages(), w.db.Packages().(port.PackageIndexPages)}
+			if unavailable {
+				packages = removalWithoutRevision{w.db.Packages()}
+			}
+			service.store = removalRevisionStore{w.db, packages}
+			beforeEvents := len(w.events(t))
+			recorded := false
+			result, err := service.Remove(t.Context(), w.request, w.revalidate, func(context.Context, api.RemovalResult) error {
+				recorded = true
+				return nil
+			})
+			if !errors.Is(err, kernel.ErrStore) || recorded || result.Files != 0 || len(result.Items) != 0 {
+				t.Fatal("failed revision capture acknowledged a deletion", result, err)
+			}
+			_, err = w.db.Items().GetByID(t.Context(), w.request.Item.ID)
+			storekit.Must(t, err)
+			trash := storekit.Get[[]model.TrashEntry](t)(w.db.Trash().Find(t.Context(), w.repo.Key, w.request.Item.Path))
+			if len(trash) != 0 || len(w.events(t)) != beforeEvents {
+				t.Fatal("failed revision checkpoint left native trash/event effects")
+			}
+		})
+	}
+}
+
 type removalFixture struct {
 	db           *inmem.Store
 	items        *item.Service

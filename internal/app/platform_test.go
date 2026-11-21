@@ -628,15 +628,15 @@ func TestAccMigrateCommand(t *testing.T) {
 	}
 
 	// --module limits each action to one stream.
-	const applied = "applied 7 migration(s): [artifacts:1 artifacts:2 artifacts:3 artifacts:4 artifacts:5 artifacts:6 artifacts:7]\n"
+	const applied = "applied 8 migration(s): [artifacts:1 artifacts:2 artifacts:3 artifacts:4 artifacts:5 artifacts:6 artifacts:7 artifacts:8]\n"
 	if got := run("up", 0, "artifacts"); got != applied {
 		t.Fatalf("up --module artifacts: %q", got)
 	}
-	if got := run("version", 0, "artifacts"); got != "schema version 7 of 7 (sqlite, artifacts)\n" {
+	if got := run("version", 0, "artifacts"); got != "schema version 8 of 8 (sqlite, artifacts)\n" {
 		t.Fatalf("version --module artifacts: %q", got)
 	}
 	want := "schema version 0 of 3 (sqlite, platform)\n" +
-		"schema version 7 of 7 (sqlite, artifacts)\n" +
+		"schema version 8 of 8 (sqlite, artifacts)\n" +
 		"schema version 0 of 6 (sqlite, access)\n"
 	for _, m := range []string{"notifications", "retention", "federation", "releases", "workers"} {
 		latest := 1
@@ -654,7 +654,7 @@ func TestAccMigrateCommand(t *testing.T) {
 	if got := run("down", -1, "platform"); got != "reverted 0 migration(s): []\n" {
 		t.Fatalf("down --module platform with nothing applied: %q", got)
 	}
-	if got := run("down", -1, "artifacts"); got != "reverted 1 migration(s): [artifacts:7]\n" {
+	if got := run("down", -1, "artifacts"); got != "reverted 1 migration(s): [artifacts:8]\n" {
 		t.Fatalf("down --module artifacts: %q", got)
 	}
 	for _, action := range []string{"up", "down", "version"} {

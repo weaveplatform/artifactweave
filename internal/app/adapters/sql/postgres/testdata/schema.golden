@@ -649,6 +649,8 @@ column package_versions.order_key bigint NOT NULL DEFAULT 0
 column package_versions.created_at bigint
 column package_versions.last_downloaded_at bigint
 column package_versions.metadata text
+column package_versions.mutation_revision text COLLATE "C" NOT NULL DEFAULT 'initial'::text
+constraint package_versions.package_versions_mutation_revision_check CHECK ((mutation_revision <> ''::text))
 constraint package_versions.package_versions_package_id_fkey FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE
 constraint package_versions.package_versions_pkey PRIMARY KEY (id)
 index package_versions.package_versions_order CREATE INDEX package_versions_order ON package_versions USING btree (package_id, order_key, version)

@@ -265,6 +265,7 @@ func (p packages) Delete(ctx context.Context, id int64) error {
 // lock.
 func (p packages) removeVersion(id int64) {
 	p.versions().Del(id)
+	p.revisions().Del(id)
 	p.files().DeleteWhere(func(f model.VersionFile, _ bool) bool { return f.VersionID == id })
 }
 
@@ -284,9 +285,16 @@ func (p packages) sorted(packageID int64) []model.PackageVersion {
 // the lock.
 func (p packages) reorder(pkg model.Package) {
 	vs := p.sorted(pkg.ID)
+	old := make(map[int64]int64, len(vs))
+	for _, v := range vs {
+		old[v.ID] = v.OrderKey
+	}
 	model.AssignOrderKeys(model.ComparatorFor(pkg.Type), vs)
 	for _, v := range vs {
-		p.versions().Put(v.ID, v)
+		if old[v.ID] != v.OrderKey {
+			p.versions().Put(v.ID, v)
+			p.versionChanged(v.ID)
+		}
 	}
 }
 
@@ -316,6 +324,7 @@ func (p packages) PutVersion(
 			v.Metadata = nil
 		}
 		p.versions().Put(v.ID, v)
+		p.versionChanged(v.ID)
 		p.reorder(pkg)
 		out, _ = p.versions().Get(v.ID)
 		return nil
@@ -372,7 +381,10 @@ func (p packages) LinkFile(ctx context.Context, f model.VersionFile) error {
 		if !memtx.TableOf[int64, model.Item](p.s.Store, "items").Has(f.ItemID) {
 			return memtx.NotFound("link file: item", f.ItemID)
 		}
-		p.files().Put(f, true)
+		if !p.files().Has(f) {
+			p.files().Put(f, true)
+			p.versionChanged(f.VersionID)
+		}
 		return nil
 	})
 }
@@ -417,6 +429,7 @@ func (p packages) RecordVersionDownload(ctx context.Context, versionID int64, at
 		}
 		v.LastDownloaded = at
 		p.versions().Put(versionID, v)
+		p.versionChanged(versionID)
 		return nil
 	})
 }

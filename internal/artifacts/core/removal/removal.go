@@ -2,6 +2,7 @@ package removal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -127,7 +128,17 @@ func (r remover) Remove(
 			}
 			out.Items = append(out.Items, api.RemovedItem{ID: removed.ID, Path: removed.FullPath(), Size: removed.Size, SHA256: removed.Actual.SHA256})
 		}
-		if err := record(ctx, api.RemovalResult{Files: out.Files, Bytes: out.Bytes, Items: slices.Clone(out.Items)}); err != nil {
+		// The owner can observe expected pruning without an inner use-case Tx
+		// marking this successful effect rollback-only on ErrNotFound. Never
+		// adopt a new version ID merely because its version string matches.
+		out.VersionMutationRevision, err = r.versionRevision(ctx, req.Item.Version)
+		if err != nil {
+			return err
+		}
+		if err := record(
+			ctx,
+			api.RemovalResult{Files: out.Files, Bytes: out.Bytes, Items: slices.Clone(out.Items), VersionMutationRevision: out.VersionMutationRevision},
+		); err != nil {
 			return fmt.Errorf("record selected removal: %w", err)
 		}
 		return nil
@@ -136,6 +147,21 @@ func (r remover) Remove(
 		return api.RemovalResult{}, fmt.Errorf("guarded indexed removal: %w", err)
 	}
 	return out, nil
+}
+
+func (r remover) versionRevision(ctx context.Context, ref api.IndexVersion) (string, error) {
+	versions, ok := r.store.Packages().(port.PackageIndexPages)
+	if !ok {
+		return "", fmt.Errorf("removal version projection unavailable: %w", kernel.ErrStore)
+	}
+	current, err := versions.IndexVersion(ctx, ref, 0)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read post-removal version revision: %w", err)
+	}
+	return current.MutationRevision, nil
 }
 
 func (r remover) repository(ctx context.Context, expected api.IndexRepository) (repo.Config, error) {

@@ -31,6 +31,10 @@ type RemovalResult struct {
 	Items []RemovedItem
 	Files int64
 	Bytes int64
+	// VersionMutationRevision is the original version identity's marker after
+	// native hooks; empty means that identity was pruned/replaced. Only an
+	// acknowledgement in this transaction may advance a saved selection to it.
+	VersionMutationRevision string
 }
 
 // ItemRemoval rechecks the original credential, native Delete permission and

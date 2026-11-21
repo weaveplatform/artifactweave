@@ -235,7 +235,15 @@ func (s *Selection) files(ctx context.Context, ref artifactsapi.IndexVersion, pa
 		}
 		var err error
 		out, next, err = s.service.PackageIndex.Files(ctx, ref, s.properties, page)
-		return err //nolint:wrapcheck // run names the failed cleanup transaction
+		if err != nil {
+			return err //nolint:wrapcheck // run names the failed cleanup transaction
+		}
+		for _, file := range out {
+			if !sameVersionRevision(file.Version, ref) {
+				return fmt.Errorf("cleanup file page changed version: %w", kernel.ErrConflict)
+			}
+		}
+		return nil //nolint:wrapcheck // run names the failed cleanup transaction
 	})
 	if err != nil {
 		return nil, "", err

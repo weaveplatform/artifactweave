@@ -179,6 +179,29 @@ func cleanupBlockedExecution(t *testing.T, newStore func(*testing.T) harness.Sto
 			f.preserved(t)
 		})
 	}
+	t.Run("removal does not rescan a complete version", func(t *testing.T) {
+		f := cleanupLargeVersion(t, newStore(t))
+		run, w := f.selected(t)
+		selected := storekit.Get[model.CleanupRun](t)(f.db.Cleanup().Run(f.ctx, run.ID))
+		if selected.TotalItems != 65 {
+			t.Fatal("large version did not retain its complete selected set", selected.TotalItems)
+		}
+		progress := storekit.Get[model.CleanupProgress](t)(f.db.Cleanup().Progress(f.ctx, run.ID))
+		counter := &cleanupPageBarrier{}
+		executor := f.executor
+		executor.Policies.PackageIndex = cleanupCountedPages{executor.Policies.PackageIndex, counter}
+		storekit.Must(t, executor.Execute(f.ctx, w))
+		finished := storekit.Get[model.CleanupRun](t)(f.db.Cleanup().Run(f.ctx, run.ID))
+		if counter.pages.Load() != 0 || finished.Status != retapi.RunCompleted || finished.CleanedItems != selected.TotalItems {
+			t.Fatal("removal rescanned file pages or rejected its own committed mutations", counter.pages.Load(), finished.Status, finished.CleanedItems)
+		}
+		// The newest version remains the unchanged comparator-protection control.
+		versions, _, err := f.artifacts.PackageIndex.Versions(f.ctx, progress.Package, 0, kernel.Page{Limit: 2})
+		storekit.Must(t, err)
+		if len(versions) != 1 || versions[0].Version != "2" || !versions[0].Protected {
+			t.Fatal("cleanup changed the protected newest version")
+		}
+	})
 	t.Run("stop between discovery pages", func(t *testing.T) {
 		f := cleanupLargeVersion(t, newStore(t))
 		policy, err := f.policies.Get(f.caller, "execution-policy", false)

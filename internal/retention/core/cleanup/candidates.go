@@ -120,7 +120,7 @@ func (s *Selection) Candidates(ctx context.Context, ref artifactsapi.IndexVersio
 		out.Version, out.Reason = latest, ReasonProtected
 		return out, nil
 	}
-	if s.needsLead() && !latest.LastDownloaded.Equal(current.LastDownloaded) {
+	if !sameVersionRevision(latest, current) || s.needsLead() && !latest.LastDownloaded.Equal(current.LastDownloaded) {
 		out.Version, out.Reason = latest, ReasonChanged
 		return out, nil
 	}
