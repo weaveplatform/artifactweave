@@ -168,6 +168,155 @@ func (w *removalFixture) events(t *testing.T) []outbox.Event {
 	return rows
 }
 
+func (w *removalFixture) preserved(t *testing.T, before model.Item, eventCount int) {
+	t.Helper()
+	current := storekit.Get[model.Item](t)(w.db.Items().GetByID(t.Context(), before.ID))
+	storekit.Same(t, "refused removal retains the exact item", before, current)
+	trash := storekit.Get[[]model.TrashEntry](t)(w.db.Trash().Find(t.Context(), w.repo.Key, before.FullPath()))
+	if len(trash) != 0 || len(w.events(t)) != eventCount {
+		t.Fatal("refused removal published trash or deletion events")
+	}
+	version := storekit.Get[model.PackageVersion](t)(w.db.Packages().Version(
+		t.Context(), w.request.Item.Version.Package.ID, w.request.Item.Version.Version,
+	))
+	if version.ID != w.request.Item.Version.ID {
+		t.Fatal("refused removal changed the selected package version")
+	}
+	var ack api.RemovalResult
+	storekit.WantErr(t, w.db.Settings().Get(t.Context(), "removal-test-ack", &ack), kernel.ErrNotFound)
+}
+
+func TestUnitGuardedRemovalRefusesInvalidRequestsBeforePublication(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*api.RemovalRequest)
+		want   error
+	}{
+		{
+			name: "missing credential identity",
+			mutate: func(req *api.RemovalRequest) {
+				req.Credential.Name = ""
+			},
+			want: kernel.ErrBadCredentials,
+		},
+		{
+			name: "unverified credential",
+			mutate: func(req *api.RemovalRequest) {
+				req.Credential.TokenID = ""
+			},
+			want: kernel.ErrBadCredentials,
+		},
+		{
+			name: "anonymous credential",
+			mutate: func(req *api.RemovalRequest) {
+				req.Credential.Anonymous = true
+			},
+			want: kernel.ErrBadCredentials,
+		},
+		{
+			name: "registry credential",
+			mutate: func(req *api.RemovalRequest) {
+				req.Credential.Registry = &kernel.RegistryReference{}
+			},
+			want: kernel.ErrBadCredentials,
+		},
+		{
+			name: "missing indexed item identity",
+			mutate: func(req *api.RemovalRequest) {
+				req.Item.ID = 0
+			},
+			want: kernel.ErrInvalid,
+		},
+		{
+			name: "cached file",
+			mutate: func(req *api.RemovalRequest) {
+				req.Item.Cached = true
+			},
+			want: kernel.ErrInvalid,
+		},
+		{
+			name: "federated peers require their own lifecycle",
+			mutate: func(req *api.RemovalRequest) {
+				req.Item.Version.Package.Repository.HasFederatedMembers = true
+			},
+			want: kernel.ErrInvalid,
+		},
+		{
+			name: "noncanonical item path",
+			mutate: func(req *api.RemovalRequest) {
+				req.Item.Path = "../one.bin"
+			},
+			want: kernel.ErrInvalidItemPath,
+		},
+		{
+			name: "invalid property selector",
+			mutate: func(req *api.RemovalRequest) {
+				req.Properties["bad/name"] = []string{"value"}
+			},
+			want: kernel.ErrInvalid,
+		},
+		{
+			name: "missing selected property projection",
+			mutate: func(req *api.RemovalRequest) {
+				delete(req.Properties, "quality")
+			},
+			want: kernel.ErrInvalid,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newRemovalFixture(t)
+			before := storekit.Get[model.Item](t)(w.db.Items().GetByID(t.Context(), w.request.Item.ID))
+			events := len(w.events(t))
+			req := kernel.Clone(w.request)
+			tc.mutate(&req)
+			service := w.service.(remover)
+			called := false
+			service.authorize = func(context.Context, kernel.CredentialReference) (kernel.Principal, accessapi.Decider, error) {
+				called = true
+				return kernel.Principal{}, nil, errRemovalInjected
+			}
+			result, err := service.Remove(t.Context(), req, w.revalidate, w.record)
+			storekit.WantErr(t, err, tc.want)
+			if called || result.Files != 0 || result.Bytes != 0 || len(result.Items) != 0 {
+				t.Fatal("invalid removal reached publication or returned effects")
+			}
+			w.preserved(t, before, events)
+		})
+	}
+}
+
+func TestUnitGuardedRemovalRequiresEveryPublicationDependency(t *testing.T) {
+	type invocation struct {
+		owner      remover
+		revalidate func(context.Context) error
+		record     func(context.Context, api.RemovalResult) error
+	}
+	for _, tc := range []struct {
+		name string
+		omit func(*invocation)
+	}{
+		{name: "store", omit: func(c *invocation) { c.owner.store = nil }},
+		{name: "item mutation service", omit: func(c *invocation) { c.owner.items = nil }},
+		{name: "current authority", omit: func(c *invocation) { c.owner.authorize = nil }},
+		{name: "selection fence", omit: func(c *invocation) { c.revalidate = nil }},
+		{name: "effect acknowledgement", omit: func(c *invocation) { c.record = nil }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newRemovalFixture(t)
+			before := storekit.Get[model.Item](t)(w.db.Items().GetByID(t.Context(), w.request.Item.ID))
+			events := len(w.events(t))
+			call := invocation{owner: w.service.(remover), revalidate: w.revalidate, record: w.record}
+			tc.omit(&call)
+			result, err := call.owner.Remove(t.Context(), w.request, call.revalidate, call.record)
+			storekit.WantErr(t, err, kernel.ErrStore)
+			if result.Files != 0 || result.Bytes != 0 || len(result.Items) != 0 {
+				t.Fatal("unavailable removal returned effects")
+			}
+			w.preserved(t, before, events)
+		})
+	}
+}
+
 func TestUnitGuardedRemovalEffectsAndRestore(t *testing.T) {
 	for _, skip := range []bool{false, true} {
 		t.Run(fmt.Sprintf("skip trash %t", skip), func(t *testing.T) {
