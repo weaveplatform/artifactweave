@@ -390,6 +390,7 @@
       "executor_test.go",
       "policies_test.go",
       "removal_test.go",
+      "reports_scope_test.go",
       "reports_stream_test.go",
       "reports_test.go",
       "runs_test.go",

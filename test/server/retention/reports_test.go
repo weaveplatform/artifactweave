@@ -61,8 +61,13 @@ func TestAccCleanupReportsSQL(t *testing.T) {
 
 func cleanupReportRun(t *testing.T, f *cleanupExecutorFixture, dry bool) model.CleanupRun {
 	t.Helper()
+	return cleanupPolicyReportRun(t, f, "execution-policy", dry)
+}
+
+func cleanupPolicyReportRun(t *testing.T, f *cleanupExecutorFixture, key string, dry bool) model.CleanupRun {
+	t.Helper()
 	w := policyWorld{t: t, store: f.db, h: f.handler}
-	response := w.request(http.MethodPut, policies+"/execution-policy/run?dryRun="+strconv.FormatBool(dry), "admin", "", http.StatusAccepted)
+	response := w.request(http.MethodPut, policies+"/"+key+"/run?dryRun="+strconv.FormatBool(dry), "admin", "", http.StatusAccepted)
 	var trigger artgen.CleanupRunTrigger
 	storekit.Must(t, json.Unmarshal(response.Body.Bytes(), &trigger))
 	if trigger.TriggerId == nil || *trigger.TriggerId <= 0 {
