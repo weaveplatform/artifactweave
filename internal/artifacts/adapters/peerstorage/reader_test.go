@@ -29,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
 )
@@ -262,6 +263,40 @@ func TestAccFilesVerifyOrdinaryStorageMetadataAndResumeBoundedPages(t *testing.T
 	}
 	if w.count() != 8 {
 		t.Fatalf("unexpected requests %d: only anchor, complete list and selected info are allowed", w.count())
+	}
+}
+
+func TestAccMappedStorageDeduplicatesNativeCopiesBeforeResumablePagination(t *testing.T) {
+	w := fixture(t)
+	hex := strings.Repeat("a", 64)
+	root := "team/image"
+	w.set("/"+root, `{"repo":"source","path":"/team/image","children":[]}`)
+	names := []string{"z/sha256__" + hex, "v1/list.manifest.json", "a/sha256__" + hex, "_uploads/sha256__" + hex, "v1/manifest.json"}
+	files := make([]map[string]any, 0, len(names))
+	for _, name := range names {
+		files = append(files, map[string]any{"uri": "/" + name, "folder": false})
+		w.set("/"+root+"/"+name, fileInfo(root+"/"+name))
+	}
+	body, err := json.Marshal(map[string]any{"files": files})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.set("/"+root+listQuery, string(body))
+	open := func() *peerstorage.Reader {
+		t.Helper()
+		reader, err := peerstorage.NewMappedFiles(t.Context(), w.service, w.request, root, remote.DiscoveryScope{Path: root}, root, "registry-files-v1", docker.StoragePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reader
+	}
+	first, next, err := open().Files(t.Context(), kernel.Page{Limit: 1})
+	if err != nil || len(first) != 1 || first[0].Path != root+"/_uploads/sha256__"+hex || next == "" {
+		t.Fatal("native canonical copy was not selected before pagination", err)
+	}
+	second, final, err := open().Files(t.Context(), kernel.Page{Limit: 1, After: next})
+	if err != nil || len(second) != 1 || second[0].Path != root+"/v1/manifest.json" || final != "" {
+		t.Fatal("resumed native page repeated aliases or changed the preferred spelling", err)
 	}
 }
 

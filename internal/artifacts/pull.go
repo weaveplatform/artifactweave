@@ -20,6 +20,13 @@ func (m *Module) readPullContent(ctx context.Context, request source.Request) (s
 	service := m.remoteSources
 	if docker.Serves(request.Repo.PackageType) {
 		service = m.registrySources
+		resource, ok := docker.StorageResource(request.Resource.Path)
+		if !ok {
+			return source.Result{}, source.ErrUnsupported
+		}
+		resource.SelectedContent = request.Resource.SelectedContent
+		resource.RepositoryFile = resource.Kind == source.ResourceKindMetadata
+		request.Resource = resource
 	}
 	if service == nil {
 		return source.Result{}, source.ErrUnavailable
@@ -27,12 +34,49 @@ func (m *Module) readPullContent(ctx context.Context, request source.Request) (s
 	return service.Read(remote.WithSmart(ctx, false), request) //nolint:wrapcheck // retain the ordinary P9 refusal
 }
 
-func openPullPeer(ctx context.Context, service *source.Service, request source.Request, root string, scope remote.DiscoveryScope) (pull.Peer, error) {
+func (m *Module) openPullPeer(ctx context.Context, service *source.Service, request source.Request, root string, scope remote.DiscoveryScope) (pull.Peer, error) {
+	if docker.Serves(request.Repo.PackageType) {
+		reader, err := peerstorage.NewMappedFiles(ctx, service, request, docker.StorageRoot(root), scope, root, "registry-storage-v1", docker.StoragePath)
+		if err != nil {
+			return nil, fmt.Errorf("open native pull storage: %w", err)
+		}
+		return nativePullPeer{Peer: reader, module: m, request: request}, nil
+	}
 	reader, err := peerstorage.New(ctx, service, request, root, scope)
 	if err != nil {
 		return nil, fmt.Errorf("open ordinary pull storage: %w", err)
 	}
 	return reader, nil
+}
+
+type nativePullPeer struct {
+	pull.Peer
+	module  *Module
+	request source.Request
+}
+
+func (p nativePullPeer) Absent(ctx context.Context, path string) (bool, error) {
+	absent, err := p.Peer.Absent(ctx, path)
+	if err != nil {
+		return false, fmt.Errorf("native pull storage absence: %w", err)
+	}
+	if !absent {
+		return false, nil
+	}
+	// A storage spelling's 404 cannot prove a native digest/tag absent: an
+	// index or another tag copy can still supply the registry operation.
+	if p.module.registrySources == nil || p.module.store.InTx(ctx) {
+		return false, source.ErrUnavailable
+	}
+	content, ok := p.module.registrySources.HTTP.(*docker.RegistryContent)
+	if !ok {
+		return false, source.ErrUnavailable
+	}
+	missing, err := content.Missing(ctx, p.module.registrySources, p.request, path)
+	if err != nil {
+		return false, fmt.Errorf("native pull registry absence: %w", err)
+	}
+	return missing, nil
 }
 
 func (m *Module) currentPullSource(ctx context.Context, key, root string) (*source.Service, source.Request, error) {

@@ -29,6 +29,38 @@ type Reader struct {
 	root      string
 	authority *source.Authority
 	binding   string
+	filePath  func(string) string
+	selection string
+}
+
+// NewMappedFiles retains the owner's canonical namespace while reading the
+// configured peer's storage subtree. Mapping only orders/selects local results;
+// it cannot change the peer endpoint or grant access. Its revision and scope
+// participate in the private cursor binding.
+func NewMappedFiles(ctx context.Context, service *source.Service, request source.Request, root string, scope remote.DiscoveryScope,
+	selection, revision string, path func(string) string,
+) (*Reader, error) {
+	if path == nil || revision == "" {
+		return nil, source.ErrInvalidRequest
+	}
+	reader, err := New(ctx, service, request, root, scope)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal([]string{reader.binding, selection, revision})
+	if err != nil {
+		return nil, source.ErrInvalidRequest
+	}
+	hash := sha256.Sum256(raw)
+	reader.binding, reader.filePath, reader.selection = hex.EncodeToString(hash[:]), path, selection
+	return reader, nil
+}
+
+func (r *Reader) canonical(path string) string {
+	if r.filePath != nil {
+		return r.filePath(path)
+	}
+	return path
 }
 
 // Binding returns the private source/options/scope fingerprint, never raw

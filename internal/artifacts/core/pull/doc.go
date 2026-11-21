@@ -41,7 +41,12 @@
 //
 // The peer adapter/catalog and Generic/Maven cache admission are implemented,
 // including virtual upstream discovery and verified cache reconciliation.
+// Docker/OCI/Helm OCI storage files use normal native registry/cache identities;
+// canonical aliases are deduplicated before bounded pagination. Native absence
+// probes protect still-live manifest-list and tag/blob aliases from deletion.
 // Federation's bounded Pull driver now persists traversal/intent state and joins
-// actual owner receipts before completion. Native protocol qualification remains
-// open; a selected or cached snapshot alone does not complete a logical run.
+// actual owner receipts before completion. Two-app SQLite/PostgreSQL tests cover
+// native manifests, lists and Helm charts, offline reads and storage aliases.
+// Broader native/provider CI qualification remains open; a selected or cached
+// snapshot alone does not complete a logical run.
 package pull

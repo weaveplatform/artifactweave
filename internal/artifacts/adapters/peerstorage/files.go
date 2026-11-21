@@ -25,6 +25,7 @@ type cursor struct {
 type listedEntry struct {
 	file     pull.Entry
 	complete bool
+	key      string
 }
 
 func unsupportedInfo(err error) bool {
@@ -69,7 +70,7 @@ func (r *Reader) Files(ctx context.Context, page kernel.Page) ([]pull.Entry, str
 	next := ""
 	if len(listed) > page.Limit {
 		listed = listed[:page.Limit]
-		raw, err := json.Marshal(cursor{Binding: r.binding, Last: listed[len(listed)-1].file.Path})
+		raw, err := json.Marshal(cursor{Binding: r.binding, Last: listed[len(listed)-1].key})
 		if err != nil {
 			return nil, "", invalid()
 		}
@@ -196,12 +197,23 @@ func (r *Reader) listEntries(ctx context.Context, decoder *json.Decoder, last st
 		if err != nil {
 			return nil, err
 		}
-		if path <= last || exact != "" && path != exact {
+		key := r.canonical(path)
+		if key <= last || exact != "" && path != exact || r.filePath != nil && !within(r.selection, key) {
 			continue
 		}
-		index, duplicate := slices.BinarySearchFunc(entries, path, func(entry listedEntry, path string) int { return strings.Compare(entry.file.Path, path) })
+		entry.key = key
+		index, duplicate := slices.BinarySearchFunc(entries, key, func(entry listedEntry, path string) int { return strings.Compare(entry.key, path) })
 		if duplicate {
-			return nil, invalid()
+			previous := entries[index]
+			if r.filePath == nil || previous.file.Path == path {
+				return nil, invalid()
+			}
+			// Prefer the native canonical spelling, otherwise the lexically
+			// first equivalent copy. Wire ordering cannot change a saved intent.
+			if path == key || previous.file.Path != key && path < previous.file.Path {
+				entries[index] = entry
+			}
+			continue
 		}
 		if index < limit {
 			entries = slices.Insert(entries, index, entry)
@@ -281,7 +293,7 @@ func (r *Reader) virtualFiles(ctx context.Context, page kernel.Page, last string
 	next := ""
 	if len(listed) > page.Limit {
 		listed = listed[:page.Limit]
-		raw, _ := json.Marshal(cursor{Binding: r.binding, Last: listed[len(listed)-1].file.Path})
+		raw, _ := json.Marshal(cursor{Binding: r.binding, Last: listed[len(listed)-1].key})
 		next = base64.RawURLEncoding.EncodeToString(raw)
 	}
 	entries := make([]pull.Entry, 0, len(listed))

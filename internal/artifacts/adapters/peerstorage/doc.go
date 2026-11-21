@@ -25,7 +25,9 @@
 // No arbitrary URLs, writes or upstream pagination parameters are exposed.
 // Complete metadata is validated before a page is returned; no transaction
 // spans HTTP. The owner authorizes mapped file paths before consuming their
-// facts or admitting content.
+// facts or admitting content. Native file mapping deduplicates aliases in the
+// canonical namespace before keyset pagination and binds the mapping revision
+// and original selection into restart cursors.
 //
 // # References
 //

@@ -2,6 +2,7 @@ package pull_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 )
 
 type peer struct {
@@ -140,6 +142,27 @@ func TestUnitPullCatalogBindsCurrentSourceAndReturnsOnlySelectedReadableFiles(t 
 	w.peer.binding = "new-options-hash"
 	if _, _, err = w.source.Items(t.Context(), r, selection, kernel.Page{}); !errors.Is(err, source.ErrSuperseded) || w.peer.filesCalls != 1 {
 		t.Fatal("saved binding reused superseded transport credentials", err)
+	}
+}
+
+func TestUnitPullEquivalentMavenLayoutsKeepMetadataAndCanonicalFolderAuthority(t *testing.T) {
+	w := fixture(t)
+	w.config.PackageType, w.config.RepoLayoutRef, w.config.RemoteRepoLayoutRef = repo.Maven, "canonical-maven", "upstream-maven"
+	definition := json.RawMessage(`{"artifactPathPattern":"[orgPath]/[module]/[baseRev]/[module]-[baseRev].[ext]"}`)
+	for _, name := range []string{"canonical-maven", "upstream-maven"} {
+		if err := w.db.Configs().Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigLayout, Key: name, Document: definition}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.db.Repos().Update(t.Context(), w.config); err != nil {
+		t.Fatal(err)
+	}
+	selection := api.PullSelection{Root: "com/acme/lib"}
+	w.peer.entries = []pull.Entry{file("com/acme/lib/1.0/lib-1.0.jar"), file("com/acme/lib/maven-metadata.xml")}
+	repository := binding(t, w, selection)
+	items, _, err := w.source.Items(t.Context(), repository, selection, kernel.Page{})
+	if err != nil || len(items) != 2 || items[1].Path != "com/acme/lib/maven-metadata.xml" || w.root != selection.Root || w.scope.Root {
+		t.Fatal("equivalent named layouts lost metadata or widened directory authority", err)
 	}
 }
 

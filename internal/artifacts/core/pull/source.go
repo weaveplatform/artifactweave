@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/kernel/antpath"
@@ -97,7 +98,9 @@ func (s Source) prepare(ctx context.Context, key string, selection api.PullSelec
 		if err != nil {
 			return selectionState{}, fmt.Errorf("prepare pull layout: %w", err)
 		}
-		if q.Repo.RemoteRepoLayoutRef != "" && q.Repo.RemoteRepoLayoutRef != q.Repo.RepoLayoutRef {
+		canonical, upstream := state.mapping.Canonical().Definition(), state.mapping.Upstream().Definition()
+		canonical.Name, upstream.Name = "", ""
+		if canonical != upstream {
 			// A canonical directory may not identify an upstream directory.
 			// Root scanning requires actual root Read and each returned file is
 			// separately mapped and authorized in its canonical selection.
@@ -199,6 +202,9 @@ func (s selectionState) selected(ctx context.Context, repository api.PullReposit
 	path := entry.Path
 	if entry.Folder {
 		return api.PullItem{}, false, source.ErrInvalidResult
+	}
+	if docker.Serves(s.request.Repo.PackageType) {
+		path = docker.StoragePath(path)
 	}
 	if s.mapped {
 		mapped, ok, err := s.mapping.MapFile(path)
