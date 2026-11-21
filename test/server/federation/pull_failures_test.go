@@ -109,7 +109,7 @@ func TestAccSinglePullBlockedPublicationPostgres(t *testing.T) {
 
 func qualifyPullBlockedPublication(t *testing.T, backend string) {
 	t.Helper()
-	for _, change := range []string{"permissions", "caller-credential", "source-credentials", "disabled", "lease-lost"} {
+	for _, change := range []string{"permissions", "caller-credential", "source-credentials", "source-url", "source-recreated", "disabled", "lease-lost"} {
 		t.Run(change, func(t *testing.T) {
 			w, driver, run := newPullDriverWorld(t, backend, false)
 			if _, err := driver.Step(t.Context(), run.Reference, w.fence); err != nil {
@@ -168,6 +168,16 @@ func qualifyPullBlockedPublication(t *testing.T, backend string) {
 					`{"email":"replica-reader@example.invalid","password":"replacement-password"}`, http.StatusCreated)
 			case "source-credentials":
 				w.request(w.source, http.MethodPost, "/artifactory/api/repositories/pull-remote", `{"password":"replacement-peer-password"}`, http.StatusOK)
+			case "source-url":
+				body, err := json.Marshal(map[string]string{"url": w.bridge.URL + "/artifactory/replaced-source"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				w.request(w.source, http.MethodPost, "/artifactory/api/repositories/pull-remote", string(body), http.StatusOK)
+			case "source-recreated":
+				w.request(w.source, http.MethodDelete, "/artifactory/api/repositories/pull-remote", "", http.StatusOK)
+				configurePullRemote(t, w, nil)
+				w.request(w.source, http.MethodPut, replicationPath+"pull-remote", `{"enabled":true,"syncProperties":false}`, http.StatusCreated)
 			case "disabled":
 				w.request(w.source, http.MethodPost, replicationPath+"pull-remote", `{"enabled":false}`, http.StatusOK)
 			case "lease-lost":
