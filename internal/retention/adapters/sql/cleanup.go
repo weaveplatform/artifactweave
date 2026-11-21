@@ -220,6 +220,26 @@ func (c cleanupStore) Run(ctx context.Context, id int64) (model.CleanupRun, erro
 	return r, c.s.Wrap(fmt.Sprintf("get cleanup run %d", id), err)
 }
 
+func (c cleanupStore) RunMetadata(ctx context.Context, id int64) (model.CleanupRun, error) {
+	r, err := scanRun(c.s.Q(ctx).QueryRowContext(ctx,
+		c.s.Dialect().Rebind("SELECT "+runMetadataColumns("")+" FROM cleanup_runs WHERE id = ?"), id))
+	return r, c.s.Wrap(fmt.Sprintf("get cleanup run metadata %d", id), err)
+}
+
+// Aliases are fixed adapter identifiers. Replacing the report column with NULL
+// retains one scanner while preventing legacy blobs from being read at all.
+func runMetadataColumns(alias string) string {
+	columns := []string{alias + "id"}
+	for _, column := range strings.Split(runCols, ", ") {
+		if column == "report" {
+			columns = append(columns, "NULL")
+			continue
+		}
+		columns = append(columns, alias+column)
+	}
+	return strings.Join(columns, ", ")
+}
+
 func (c cleanupStore) UpdateRun(ctx context.Context, r model.CleanupRun) error {
 	sets := make([]string, 0, len(dialect.OpsCols(runCols)))
 	for _, col := range dialect.OpsCols(runCols) {

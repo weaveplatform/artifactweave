@@ -11,7 +11,7 @@ func (c cleanupStore) MarkReportDownloaded(ctx context.Context, id int64) error 
 	if err := c.transaction(ctx); err != nil {
 		return err
 	}
-	r, err := c.Run(ctx, id)
+	r, err := c.RunMetadata(ctx, id)
 	if err != nil {
 		return err
 	}

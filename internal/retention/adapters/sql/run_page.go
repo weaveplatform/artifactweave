@@ -27,20 +27,9 @@ func (c cleanupStore) RunPage(ctx context.Context, q port.RunListing) (port.RunP
 	if q.Offset >= out.Total {
 		return out, nil
 	}
-	// Legacy report blobs can be arbitrarily large. Run views read metadata;
-	// CSV traverses durable outcome pages separately.
-	columns := []string{"r.id"}
-	for _, column := range strings.Split(runCols, ", ") {
-		if column == "report" {
-			columns = append(columns, "NULL")
-			continue
-		}
-		columns = append(columns, "r."+column)
-	}
 	policy := c.runSnapshotField("Policy")
-	query := "SELECT " + strings.Join(
-		columns,
-		", ",
+	query := "SELECT " + runMetadataColumns(
+		"r.",
 	) + ", " + policy + ", " + c.runContentExpression() + " AS cleaned_content_bytes, " + c.runDisplayProject() + from + " ORDER BY " + c.runOrdering(
 		q,
 	) + " LIMIT ? OFFSET ?"

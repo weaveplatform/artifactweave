@@ -1364,7 +1364,15 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
      quota refuses it, soft quota admits it. Destroy all 24 resources and verify public
      absence. Sanitized version/digest/effect evidence joins the coverage artifact;
      Terraform state stays private. Missing resources or runner steps fail the required
-     native inventory (#1748).
+     native inventory (#1748);
+   - **package-cleanup:** create a disabled Maven policy, run it dry and parse its CSV
+     against the retained artifact bytes. Require an empty refreshed plan, update and
+     separately enable the policy, then run actual cleanup. Check the deleted older
+     version, retained latest version and rebuilt Maven metadata, and compare the
+     summary with the CSV. Require another empty plan, destroy the policy and repository,
+     and require both delete responses to be 200. The earlier dry-run and actual CSVs
+     must remain readable after deletion. The required inventory refuses an omitted
+     resource, provider pin, scenario or execution hook (#1759).
 4. Require `terraform plan -detailed-exitcode` to exit 0.
 5. Destroy.
 

@@ -161,7 +161,13 @@ func testCleanupRuns(t *testing.T, s port.Store) {
 		runs = append(runs, r)
 	}
 	storekit.Same(t, "Run", runs[2], storekit.Get[model.CleanupRun](t)(cs.Run(ctx, runs[2].ID)))
-	_, err := cs.Run(ctx, runs[4].ID+100)
+	metadata := runs[2]
+	metadata.Report = nil
+	storekit.Same(t, "RunMetadata", metadata, storekit.Get[model.CleanupRun](t)(cs.RunMetadata(ctx, metadata.ID)))
+	storekit.Same(t, "metadata read preserves report", runs[2], storekit.Get[model.CleanupRun](t)(cs.Run(ctx, metadata.ID)))
+	_, err := cs.RunMetadata(ctx, runs[4].ID+100)
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+	_, err = cs.Run(ctx, runs[4].ID+100)
 	storekit.WantErr(t, err, kernel.ErrNotFound)
 
 	runs[2].Status, runs[2].Ended, runs[2].Report = api.RunCompletedWithErrors, storekit.At(

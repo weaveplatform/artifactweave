@@ -33,6 +33,7 @@ func TestUnitCleanupHistoryRetainsOriginalPolicyAndScope(t *testing.T) {
 	must(t, s.Delete(ctx, p.Key))
 	_, err = s.Create(ctx, p.Key, input(p.Key, "beta"))
 	must(t, err)
+	s.Store = cleanupBoundaryStore{Store: db, cleanup: metadataOnlyReportStore{CleanupStore: db.Cleanup()}}
 	alpha := s
 	alpha.Authorize = func(ctx context.Context) (cleanup.Policy, error) {
 		return policyAuthority("alpha"), db.Projects().Guard(ctx)
@@ -66,6 +67,14 @@ func TestUnitCleanupHistoryRetainsOriginalPolicyAndScope(t *testing.T) {
 	if !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("history accepted a mismatched trigger identity", err)
 	}
+}
+
+// A report must not hydrate legacy blobs, including before it checks scope or
+// computes summary totals. The real metadata adapter remains in use.
+type metadataOnlyReportStore struct{ port.CleanupStore }
+
+func (metadataOnlyReportStore) Run(context.Context, int64) (model.CleanupRun, error) {
+	return model.CleanupRun{}, errCleanupBoundary
 }
 
 type reportOutcomeFailure struct {
@@ -128,6 +137,7 @@ func TestUnitCleanupReportsDistinguishSelectedAndCommittedEffects(t *testing.T) 
 			}
 			must(t, db.Cleanup().UpdateRun(ctx, r))
 			must(t, s.Delete(ctx, p.Key))
+			s.Store = cleanupBoundaryStore{Store: db, cleanup: metadataOnlyReportStore{CleanupStore: db.Cleanup()}}
 			report, err := s.Report(ctx, p.Key, r.ID)
 			must(t, err)
 			if report.Snapshot.Run.ID != r.ID || report.Snapshot.Run.DryRun != dry || report.Totals.Items != 3 {

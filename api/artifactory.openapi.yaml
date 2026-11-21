@@ -24279,7 +24279,7 @@ components:
           format: int64
           type: integer
         cleanedSize:
-          description: Optional within this object. Bytes freed by the deletions, counting each blob once.
+          description: Optional within this object. Content bytes acknowledged as deleted, counting shared content once (0 for a dry run). Physical blob reclamation occurs independently.
           format: int64
           type: integer
         displayProject:
@@ -24385,11 +24385,11 @@ components:
           format: int64
           type: integer
         processedPhysicalSizeBytes:
-          description: Optional within this object. Bytes actually released from the blob store, counting shared content once.
+          description: Optional within this object. Content bytes acknowledged as deleted (or selected for a dry run), counting shared content once. Physical blob reclamation occurs independently.
           format: int64
           type: integer
         processedVirtualSizeBytes:
-          description: Optional within this object. Sum of the deleted items' sizes, counting shared content once per item.
+          description: Optional within this object. Sum of the deleted items' sizes (or selected items for a dry run), counting shared content once per item.
           format: int64
           type: integer
         totalItems:

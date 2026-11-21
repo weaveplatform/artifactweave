@@ -39,6 +39,9 @@ type CleanupStore interface {
 	CreateRun(ctx context.Context, r model.CleanupRun) (model.CleanupRun, error)
 	// Run returns the run with id.
 	Run(ctx context.Context, id int64) (model.CleanupRun, error)
+	// RunMetadata returns the run without reading its legacy report blob.
+	// Report readers traverse bounded durable outcome pages independently.
+	RunMetadata(ctx context.Context, id int64) (model.CleanupRun, error)
 	// UpdateRun replaces a run.
 	UpdateRun(ctx context.Context, r model.CleanupRun) error
 	// Runs returns matching runs newest first.

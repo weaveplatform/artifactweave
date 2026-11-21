@@ -53,7 +53,7 @@ func (s Service) readRun(ctx context.Context, policyKey string, trigger int64, a
 			return model.CleanupRunSnapshot{}, fmt.Errorf("read cleanup history project: %w", err)
 		}
 	}
-	run, err := s.Store.Cleanup().Run(ctx, trigger)
+	run, err := s.Store.Cleanup().RunMetadata(ctx, trigger)
 	if err != nil {
 		return model.CleanupRunSnapshot{}, fmt.Errorf("read cleanup history run: %w", err)
 	}

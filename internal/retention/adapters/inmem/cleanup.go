@@ -104,6 +104,22 @@ func (c cleanupStore) Run(ctx context.Context, id int64) (model.CleanupRun, erro
 	return out, err
 }
 
+func (c cleanupStore) RunMetadata(ctx context.Context, id int64) (model.CleanupRun, error) {
+	var out model.CleanupRun
+	err := c.s.Do(ctx, func() error {
+		r, ok := c.runs().Rows[id]
+		if !ok {
+			return memtx.NotFound("cleanup run", id)
+		}
+		// Drop the borrowed slice before cloning so metadata reads do not copy
+		// the legacy blob or expose mutable store state.
+		r.Report = nil
+		out = kernel.Clone(r)
+		return nil
+	})
+	return out, err
+}
+
 func (c cleanupStore) UpdateRun(ctx context.Context, r model.CleanupRun) error {
 	return c.s.Do(ctx, func() error {
 		if !c.runs().Has(r.ID) {

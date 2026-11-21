@@ -3919,7 +3919,7 @@ type CleanupPolicyRunViewEntry struct {
 	// CleanedItems Optional within this object. Number of items deleted (0 for a dry run).
 	CleanedItems *int64 `json:"cleanedItems,omitempty"`
 
-	// CleanedSize Optional within this object. Bytes freed by the deletions, counting each blob once.
+	// CleanedSize Optional within this object. Content bytes acknowledged as deleted, counting shared content once (0 for a dry run). Physical blob reclamation occurs independently.
 	CleanedSize *int64 `json:"cleanedSize,omitempty"`
 
 	// DisplayProject Optional within this object. Display name of the owning project; absent for a global policy.
@@ -4003,10 +4003,10 @@ type CleanupProcessedItemsSummary struct {
 	// ProcessedItems Optional within this object. Items deleted (or that would be deleted, for a dry run).
 	ProcessedItems *int64 `json:"processedItems,omitempty"`
 
-	// ProcessedPhysicalSizeBytes Optional within this object. Bytes actually released from the blob store, counting shared content once.
+	// ProcessedPhysicalSizeBytes Optional within this object. Content bytes acknowledged as deleted (or selected for a dry run), counting shared content once. Physical blob reclamation occurs independently.
 	ProcessedPhysicalSizeBytes *int64 `json:"processedPhysicalSizeBytes,omitempty"`
 
-	// ProcessedVirtualSizeBytes Optional within this object. Sum of the deleted items' sizes, counting shared content once per item.
+	// ProcessedVirtualSizeBytes Optional within this object. Sum of the deleted items' sizes (or selected items for a dry run), counting shared content once per item.
 	ProcessedVirtualSizeBytes *int64 `json:"processedVirtualSizeBytes,omitempty"`
 
 	// TotalItems Optional within this object. Items the selection matched.
