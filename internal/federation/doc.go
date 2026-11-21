@@ -53,7 +53,9 @@
 //
 // # Status
 //
-// REP-01 configuration and REP-02 bounded push are implemented. Execution and
-// scheduling are separate P11 tickets; peer and advanced federation remain P13,
-// P14 and P37. The application opens push before running its work queue.
+// REP-01 configuration and REP-02 bounded push are implemented. REP-03 supplies
+// durable owning-cache pull with current source/caller/configuration fences;
+// native protocol qualification remains open. REP-04 retains orchestration and
+// public status. Advanced federation remains P13/P14/P37. The application opens
+// both transfer drivers before running its work queue.
 package federation

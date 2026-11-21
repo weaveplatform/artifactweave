@@ -21,6 +21,9 @@
 // Cache candidates pin all path representations and format-owned companions;
 // exact source absence permits local removal/checkpoint work under the final
 // execution fence, without an upstream mutation.
+// Public supplies the published ErrPull recovery categories while preserving
+// errors.Is causes. Offline and no-store owners refuse admission before peer
+// discovery; a transient response cannot become a retained cache receipt.
 //
 // # Invariants
 //
@@ -38,6 +41,7 @@
 //
 // The peer adapter/catalog and Generic/Maven cache admission are implemented,
 // including virtual upstream discovery and verified cache reconciliation.
-// Durable federation pull progress and native protocol qualification remain integration
-// work; a selected or cached snapshot alone does not complete a logical run.
+// Federation's bounded Pull driver now persists traversal/intent state and joins
+// actual owner receipts before completion. Native protocol qualification remains
+// open; a selected or cached snapshot alone does not complete a logical run.
 package pull

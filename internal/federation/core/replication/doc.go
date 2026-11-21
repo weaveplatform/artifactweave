@@ -30,6 +30,11 @@
 // state, and rechecks source/configuration/transport and work ownership before
 // local success publication. All remote operations stay outside metadata
 // transactions. Explicit missing statistics capability is refused at admission.
+// Pull supplies bounded owning-cache transfer over artifacts/api.PullSource.
+// It restores the original credential per step, recovers pending intents before
+// advancing cursors, and records verified cache/removal results in the artifact
+// owner's transaction. Current source/options/configuration and the final work
+// fence guard publication; no-store/offline admission retains its refusal.
 //
 // # References
 //
@@ -50,7 +55,8 @@
 //
 // Configuration is implemented by REP-01. REP-02 supplies source/progress
 // contracts, the bounded driver, guarded target HTTP and application bindings.
-// Dispatch/reporting belong to REP-04. Multi-push,
+// REP-03 supplies durable owning-cache pull and application bindings; native
+// protocol qualification remains open. Dispatch/reporting belong to REP-04. Multi-push,
 // event-triggered and binary-existence optimization remain P37.
 //
 // # Testing
