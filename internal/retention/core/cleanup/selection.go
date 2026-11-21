@@ -31,6 +31,13 @@ type Selection struct {
 	properties map[string][]string
 }
 
+// repositoryUnavailable keeps preview's scope refusal while letting execution
+// retire a saved parent that no longer appears in its authorized traversal.
+type repositoryUnavailable struct{}
+
+func (*repositoryUnavailable) Error() string { return "cleanup repository is no longer in scope" }
+func (*repositoryUnavailable) Unwrap() error { return kernel.ErrForbidden }
+
 // Select starts a read-only evaluation of an authorized package policy. It
 // starts no work and allows previewing an inactive policy. CLN-04 owns durable
 // run admission; these descriptive results alone grant no execution authority.
@@ -138,7 +145,7 @@ func (s *Selection) repository(ctx context.Context, ref artifactsapi.IndexReposi
 		return fmt.Errorf("current cleanup repository scope: %w", err)
 	}
 	if len(rows) != 1 || rows[0].Key != ref.Key {
-		return kernel.ErrForbidden
+		return &repositoryUnavailable{}
 	}
 	actual := rows[0]
 	if actual.Project != ref.Project || actual.Class != ref.Class || actual.PackageType != ref.PackageType || actual.HasFederatedMembers != ref.HasFederatedMembers ||

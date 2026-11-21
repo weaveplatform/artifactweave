@@ -181,8 +181,12 @@ func (x Executor) acknowledge(ctx context.Context, run, version int64, r *model.
 
 func (x Executor) skipStep(ctx context.Context, e model.CleanupExecution, p model.CleanupProgress, fence func(context.Context) error) error {
 	return x.publish(ctx, e, p, fence, true, func(ctx context.Context, r *model.CleanupRun, current *model.CleanupProgress) error {
+		state := model.CleanupPending
+		if r.DryRun {
+			state = model.CleanupSelected
+		}
 		rows, next, err := x.Store.Cleanup().
-			Entries(ctx, port.CleanupEntryQuery{RunID: e.RunID, VersionID: p.Version.ID, Kind: model.CleanupItemEntry, State: model.CleanupPending}, kernel.Page{Limit: executionPageSize})
+			Entries(ctx, port.CleanupEntryQuery{RunID: e.RunID, VersionID: p.Version.ID, Kind: model.CleanupItemEntry, State: state}, kernel.Page{Limit: executionPageSize})
 		if err != nil {
 			return fmt.Errorf("list refused cleanup intents: %w", err)
 		}
@@ -223,9 +227,62 @@ func (x Executor) refuseVersion(ctx context.Context, e model.CleanupExecution, p
 					return fmt.Errorf("record denied cleanup intent: %w", err)
 				}
 				current.HadErrors = true
+				return x.versionOutcome(ctx, e, p, model.CleanupEntryFailed, "delete_permission_denied")
 			} else {
 				current.Phase, current.Reason = model.CleanupSkipping, string(ReasonChanged)
+				return x.versionOutcome(ctx, e, p, model.CleanupSkipped, string(ReasonChanged))
 			}
+		})
+	})
+}
+
+func (x Executor) versionOutcome(ctx context.Context, e model.CleanupExecution, p model.CleanupProgress, state model.CleanupEntryState, reason string) error {
+	entry, err := x.Store.Cleanup().Entry(ctx, e.RunID, model.CleanupVersionEntry, p.Version.ID)
+	if errors.Is(err, kernel.ErrNotFound) {
+		_, err = x.Store.Cleanup().CreateEntry(ctx, versionDecision(e.RunID, p.Version, state, reason))
+		if err != nil {
+			return fmt.Errorf("record absent cleanup version decision: %w", err)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read cleanup version decision: %w", err)
+	}
+	if entry.State == model.CleanupEntryFailed || entry.State == state && entry.Reason == reason {
+		return nil
+	}
+	old := entry.Revision
+	entry.Revision++
+	entry.State, entry.Reason = state, reason
+	if err := x.Store.Cleanup().AdvanceEntry(ctx, old, entry); err != nil {
+		return fmt.Errorf("record cleanup version outcome: %w", err)
+	}
+	return nil
+}
+
+// A repository/package/version may disappear between durable pages. Advance
+// past its saved parent cursor rather than retrying an obsolete parent forever.
+func (x Executor) skipTraversal(ctx context.Context, e model.CleanupExecution, p model.CleanupProgress, fence func(context.Context) error) error {
+	return x.withCaller(ctx, e.Credential, func(ctx context.Context, authority Policy) error {
+		if !authority.Allows(e.Policy.ProjectKey) {
+			return kernel.ErrForbidden
+		}
+		if err := x.Policies.currentProject(ctx, e.Policy); err != nil {
+			return err
+		}
+		return x.publish(ctx, e, p, fence, true, func(ctx context.Context, r *model.CleanupRun, current *model.CleanupProgress) error {
+			switch p.Phase {
+			case model.CleanupPackages:
+				afterRepository(current)
+			case model.CleanupVersions:
+				afterPackage(current)
+			case model.CleanupCandidates:
+				current.Phase, current.Reason = model.CleanupSkipping, string(ReasonChanged)
+				if err := x.versionOutcome(ctx, e, p, model.CleanupSkipped, string(ReasonChanged)); err != nil {
+					return err
+				}
+			}
+			x.settleTraversal(r, *current)
 			return nil
 		})
 	})

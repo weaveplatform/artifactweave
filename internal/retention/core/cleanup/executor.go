@@ -206,6 +206,11 @@ func (x Executor) failedStep(ctx context.Context, e model.CleanupExecution, p mo
 	if p.Phase == model.CleanupRemoving && (errors.Is(err, kernel.ErrConflict) || errors.Is(err, kernel.ErrNotFound) || errors.Is(err, kernel.ErrForbidden)) {
 		return false, x.refuseVersion(ctx, e, p, fence, err)
 	}
+	var unavailable *repositoryUnavailable
+	if (p.Phase == model.CleanupPackages || p.Phase == model.CleanupVersions || p.Phase == model.CleanupCandidates) &&
+		(errors.Is(err, kernel.ErrNotFound) || errors.Is(err, kernel.ErrConflict) || errors.As(err, &unavailable)) {
+		return false, x.skipTraversal(ctx, e, p, fence)
+	}
 	return false, err
 }
 
@@ -263,6 +268,9 @@ func (x Executor) publish(
 	}
 	if err := effect(ctx, &r, &p); err != nil {
 		return err
+	}
+	if p.HadErrors && r.Status == api.RunInProgress {
+		r.Status = api.RunInProgressWithErrors
 	}
 	p.Revision++
 	if err := x.Store.Cleanup().AdvanceProgress(ctx, expected.Revision, p); err != nil {

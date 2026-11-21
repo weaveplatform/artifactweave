@@ -7020,6 +7020,9 @@ type GetPackageCleanupPolicyParams struct {
 type RunPackageCleanupPolicyParams struct {
 	// DryRun Optional query parameter. When true the run selects items and writes its report but deletes nothing. Defaults to false.
 	DryRun *bool `form:"dryRun,omitempty" json:"dryRun,omitempty"`
+
+	// IdempotencyKey Optional header parameter. A quoted ASCII key (1-128 letters, digits, dot, underscore, colon or hyphen), for example "8e03978e-40d5-43e8-bc93-6894a57f9324". For 24 hours, a retry with the same key, credential, canonical resource and identical body bytes does not repeat the operation's effect: it answers the original success status, with the body built from the committed result after the current credential and permissions are checked again. Reuse with different bytes, or with a changed parameter that alters the effect, returns 422. A resource deleted since answers 404, one moved out of the request's scope 409. Only a success is kept, so a retry after a failure runs the operation again. Concurrent requests wait up to 30 seconds; 503 with Retry-After means retry the same key within its retention window. An operation that does not declare this parameter answers a key with 400.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // DisableAllCleanupPoliciesParams defines parameters for DisableAllCleanupPolicies.
@@ -10167,7 +10170,7 @@ type ClientInterface interface {
 
 	// RunPackageCleanupPolicy Run a package cleanup policy now
 	//
-	// Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects package versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Queues a run of the policy outside its schedule and returns at once with the run's identifier. An actual run requires an enabled policy; a dry run can use a disabled policy. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects package versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
 	//
 	// Corresponds with PUT /api/cleanup/packages/policies/{policyKey}/run (the `RunPackageCleanupPolicy` operationId).
 	RunPackageCleanupPolicy(ctx context.Context, policyKey string, params *RunPackageCleanupPolicyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -14368,7 +14371,7 @@ func (c *Client) EnableDisablePackageCleanupPolicy(ctx context.Context, policyKe
 
 // RunPackageCleanupPolicy Run a package cleanup policy now
 //
-// Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects package versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Queues a run of the policy outside its schedule and returns at once with the run's identifier. An actual run requires an enabled policy; a dry run can use a disabled policy. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects package versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
 //
 // Corresponds with PUT /api/cleanup/packages/policies/{policyKey}/run (the `RunPackageCleanupPolicy` operationId).
 func (c *Client) RunPackageCleanupPolicy(ctx context.Context, policyKey string, params *RunPackageCleanupPolicyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -23752,6 +23755,21 @@ func NewRunPackageCleanupPolicyRequest(server string, policyKey string, params *
 	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -37604,7 +37622,7 @@ type ClientWithResponsesInterface interface {
 
 	// RunPackageCleanupPolicyWithResponse Run a package cleanup policy now
 	//
-	// Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects package versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Queues a run of the policy outside its schedule and returns at once with the run's identifier. An actual run requires an enabled policy; a dry run can use a disabled policy. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects package versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -75084,7 +75102,7 @@ func (c *ClientWithResponses) EnableDisablePackageCleanupPolicyWithResponse(ctx 
 
 // RunPackageCleanupPolicyWithResponse Run a package cleanup policy now
 //
-// Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects package versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Queues a run of the policy outside its schedule and returns at once with the run's identifier. An actual run requires an enabled policy; a dry run can use a disabled policy. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects package versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -87004,6 +87022,9 @@ func ParseRunPackageCleanupPolicyResponse(rsp *http.Response) (*RunPackageCleanu
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case rsp.StatusCode == 422:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests

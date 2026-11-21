@@ -44,6 +44,7 @@ type cleanupExecutorFixture struct {
 	module      *retention.Module
 	policies    cleanup.Service
 	executor    cleanup.Executor
+	queue       *work.Queue
 	ids         []int64
 	now         time.Time
 }
@@ -51,6 +52,23 @@ type cleanupExecutorFixture struct {
 type cleanupBeforeAcknowledgement struct {
 	artifactsapi.ItemRemoval
 	before func()
+}
+
+type cleanupDeniedItem struct {
+	artifactsapi.ItemRemoval
+	id int64
+}
+
+func (r cleanupDeniedItem) Remove(
+	ctx context.Context,
+	request artifactsapi.RemovalRequest,
+	validate func(context.Context) error,
+	record func(context.Context, artifactsapi.RemovalResult) error,
+) (artifactsapi.RemovalResult, error) {
+	if request.Item.ID == r.id {
+		return artifactsapi.RemovalResult{}, kernel.ErrForbidden
+	}
+	return r.ItemRemoval.Remove(ctx, request, validate, record)
 }
 
 func (r cleanupBeforeAcknowledgement) Remove(
@@ -75,6 +93,7 @@ func newCleanupExecutorFixture(t *testing.T, db harness.Store) *cleanupExecutorF
 	access := accesstest.Over(t, db).API()
 	blobs := storekit.Get[*fs.Store](t)(fs.New(t.TempDir()))
 	queue := storekit.Get[*work.Queue](t)(work.New(db, work.Options{}))
+	f.queue = queue
 	artStore, ok := db.(artifactsmodule.Store)
 	if !ok {
 		t.Fatal("executor fixture has no artifacts store")
@@ -109,7 +128,15 @@ func newCleanupExecutorFixture(t *testing.T, db harness.Store) *cleanupExecutorF
 	f.module = storekit.Get[*retention.Module](
 		t,
 	)(
-		retention.New(retention.Deps{Store: retStore, Access: access, Repositories: repos.NewProjectRepositoryLookup(artStore), PackageIndex: f.artifacts.PackageIndex}),
+		retention.New(
+			retention.Deps{
+				Store:        retStore,
+				Access:       access,
+				Repositories: repos.NewProjectRepositoryLookup(artStore),
+				PackageIndex: f.artifacts.PackageIndex,
+				ItemRemoval:  f.artifacts.ItemRemoval,
+			},
+		),
 	)
 	f.policies = f.module.Policies()
 	f.policies.Now = func() time.Time { return f.now }
@@ -135,7 +162,8 @@ func newCleanupExecutorFixture(t *testing.T, db harness.Store) *cleanupExecutorF
 	if !ok {
 		t.Fatal("executor fixture has no execution store")
 	}
-	f.executor = cleanup.Executor{Store: f.store, Policies: f.policies, Removal: f.artifacts.ItemRemoval}
+	f.executor = storekit.Get[cleanup.Executor](t)(f.module.Executor())
+	f.executor.Policies = f.policies
 	return f
 }
 
@@ -246,6 +274,18 @@ func cleanupExecutorLifecycle(t *testing.T, newStore func(*testing.T) harness.St
 				t.Fatal("refused final fence published progress")
 			}
 		}, retapi.RunCompleted, 2},
+		{"partial item refusal", func(t *testing.T, f *cleanupExecutorFixture, r model.CleanupRun, w work.WorkItem) {
+			f.executor.Removal = cleanupDeniedItem{ItemRemoval: f.executor.Removal, id: f.ids[0]}
+			_, err := f.executor.Step(f.ctx, r.ID, func(ctx context.Context) error {
+				_, err := f.db.WorkQueue().GuardLease(ctx, w.Kind, w.Key, w.Generation)
+				return err
+			})
+			storekit.Must(t, err)
+			current := storekit.Get[model.CleanupRun](t)(f.db.Cleanup().Run(f.ctx, r.ID))
+			if current.Status != retapi.RunInProgressWithErrors || current.CleanedItems != 0 {
+				t.Fatal("per-item refusal did not record active partial failure")
+			}
+		}, retapi.RunCompletedWithErrors, 1},
 		{"shutdown", func(t *testing.T, f *cleanupExecutorFixture, r model.CleanupRun, w work.WorkItem) {
 			ctx, cancel := context.WithCancel(f.ctx)
 			cancel()

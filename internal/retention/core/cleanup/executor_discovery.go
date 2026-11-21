@@ -163,6 +163,11 @@ func (x Executor) publishDiscovery(
 	fence func(context.Context) error,
 ) error {
 	return x.publish(ctx, e, p, fence, true, func(ctx context.Context, r *model.CleanupRun, current *model.CleanupProgress) error {
+		if next.Phase == model.CleanupSkipping {
+			if err := x.versionOutcome(ctx, e, p, model.CleanupSkipped, next.Reason); err != nil {
+				return err
+			}
+		}
 		for _, entry := range entries {
 			if r.DryRun && entry.Kind == model.CleanupItemEntry {
 				entry.State = model.CleanupSelected

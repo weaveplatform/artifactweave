@@ -641,7 +641,7 @@ func TestAccMigrateCommand(t *testing.T) {
 	for _, m := range []string{"notifications", "retention", "federation", "releases", "workers"} {
 		latest := 1
 		if m == "retention" {
-			latest = 2
+			latest = 4
 		}
 		if m == "federation" {
 			latest = 3

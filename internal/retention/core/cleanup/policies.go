@@ -148,6 +148,9 @@ func (s Service) Update(ctx context.Context, key string, in model.CleanupPolicy)
 		if err != nil {
 			return err
 		}
+		if err := s.requireIdlePolicy(ctx, key); err != nil {
+			return err
+		}
 		if in.ProjectKey != old.ProjectKey {
 			return fmt.Errorf("policy project is immutable: %w", kernel.ErrInvalid)
 		}
@@ -282,12 +285,41 @@ func (s Service) Delete(ctx context.Context, key string) error {
 		if err != nil {
 			return err
 		}
+		if err := s.requireIdlePolicy(ctx, key); err != nil {
+			return err
+		}
 		if err := s.Store.Cleanup().DeletePolicy(ctx, key); err != nil {
 			return fmt.Errorf("delete cleanup policy: %w", err)
 		}
 		p.Enabled, p.CronExp = false, ""
 		return s.publishSchedule(ctx, p)
 	})
+}
+
+// Legacy placeholder run rows have no executable snapshot. Only a real admitted
+// active run prevents editing/deleting its policy; terminal history remains.
+func (s Service) requireIdlePolicy(ctx context.Context, key string) error {
+	page := kernel.Page{Limit: 100}
+	for {
+		runs, next, err := s.Store.Cleanup().Runs(ctx, port.RunFilter{PolicyKey: key, ItemType: model.CleanupPackage, Statuses: activeStatuses}, page)
+		if err != nil {
+			return fmt.Errorf("read active cleanup policy runs: %w", err)
+		}
+		for _, run := range runs {
+			_, err := s.Store.Cleanup().Execution(ctx, run.ID)
+			if errors.Is(err, kernel.ErrNotFound) {
+				continue
+			}
+			if err != nil {
+				return fmt.Errorf("read active cleanup execution: %w", err)
+			}
+			return fmt.Errorf("stop the active cleanup run before changing its policy: %w", kernel.ErrInvalid)
+		}
+		if next == "" {
+			return nil
+		}
+		page.After = next
+	}
 }
 
 func configuration(p model.CleanupPolicy) model.CleanupPolicy {

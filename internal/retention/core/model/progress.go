@@ -153,7 +153,7 @@ func ValidateCleanupEntryAdvance(old, next CleanupEntry) error {
 		return err
 	}
 	if !SameCleanupIntent(old, next) || next.Revision != old.Revision+1 || old.State == CleanupDeleted ||
-		old.State != CleanupPending && next.State != CleanupDeleted && old.Kind == CleanupItemEntry {
+		old.State != CleanupPending && next.State != CleanupDeleted && old.Kind == CleanupItemEntry && (old.State != CleanupSelected || next.State != CleanupSkipped) {
 		return fmt.Errorf("stale cleanup entry: %w", kernel.ErrConflict)
 	}
 	return nil

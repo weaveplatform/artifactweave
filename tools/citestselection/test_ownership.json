@@ -137,6 +137,7 @@
       "replication_matrix_test.go",
       "replication_status_test.go",
       "run_test.go",
+      "runtime_schedules_test.go",
       "runtime_test.go",
       "searches_routes_test.go",
       "seed_test.go",
@@ -240,6 +241,7 @@
       "subscriptions_test.go"
     ],
     "internal/retention/adapters/http": [
+      "idempotency_test.go",
       "policies_test.go"
     ],
     "test/server/access": [
@@ -379,11 +381,14 @@
       "subscriptions_test.go"
     ],
     "test/server/retention": [
+        "executor_changes_test.go",
+        "executor_concurrency_test.go",
       "executor_lifecycle_test.go",
       "executor_native_test.go",
       "executor_test.go",
       "policies_test.go",
       "removal_test.go",
+      "runs_test.go",
       "selection_changes_test.go",
       "selection_test.go"
     ]

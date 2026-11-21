@@ -42,7 +42,7 @@ func (s Service) ManualRun(ctx context.Context, key string, dryRun bool) (model.
 		if err != nil {
 			return err
 		}
-		if !p.Enabled || p.Revision == "" {
+		if !p.Enabled && !dryRun || p.Revision == "" {
 			return fmt.Errorf("cleanup policy is disabled: %w", kernel.ErrInvalid)
 		}
 		out, err = s.admitRun(ctx, p, authority, dryRun, true, "")
@@ -52,6 +52,45 @@ func (s Service) ManualRun(ctx context.Context, key string, dryRun bool) (model.
 		return model.CleanupRun{}, err
 	}
 	return out, nil
+}
+
+// RunTrigger confirms a retained admission for replay under current policy,
+// caller and project authority. It starts no work and returns no private state.
+func (s Service) RunTrigger(ctx context.Context, key string, id int64) (int64, error) {
+	var trigger int64
+	err := s.run(ctx, func(ctx context.Context, authority Policy) error {
+		p, err := s.policy(ctx, key, authority)
+		if err != nil {
+			return err
+		}
+		e, err := s.Store.Cleanup().Execution(ctx, id)
+		if err != nil {
+			return fmt.Errorf("read replayed cleanup admission: %w", err)
+		}
+		if e.Policy.Key != key {
+			return kernel.ErrNotFound
+		}
+		if e.Policy.ProjectKey != p.ProjectKey || !authority.Allows(e.Policy.ProjectKey) {
+			return kernel.ErrForbidden
+		}
+		e.Policy.ProjectIncarnation = e.ProjectIncarnation
+		if err := s.currentProject(ctx, e.Policy); err != nil {
+			return err
+		}
+		r, err := s.Store.Cleanup().Run(ctx, id)
+		if err != nil {
+			return fmt.Errorf("read replayed cleanup trigger: %w", err)
+		}
+		if r.PolicyKey != key || r.TriggerID != id {
+			return fmt.Errorf("cleanup replay identity changed: %w", kernel.ErrConflict)
+		}
+		trigger = r.TriggerID
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return trigger, nil
 }
 
 // ScheduledRun deduplicates a logical scheduler occurrence under the current
@@ -186,12 +225,29 @@ func (s Service) stopRun(ctx context.Context, id int64) error {
 	if err != nil {
 		return fmt.Errorf("read cleanup stop state: %w", err)
 	}
-	if r.Status.Terminal() || r.Status == api.RunStopping {
+	if r.Status.Terminal() {
 		return nil
 	}
-	r.Status = api.RunStopping
-	if err := s.Store.Cleanup().UpdateRun(ctx, r); err != nil {
-		return fmt.Errorf("request cleanup stop: %w", err)
+	if r.Status != api.RunStopping {
+		r.Status = api.RunStopping
+		if err := s.Store.Cleanup().UpdateRun(ctx, r); err != nil {
+			return fmt.Errorf("request cleanup stop: %w", err)
+		}
+	}
+	// Historical placeholder rows have no executor capability. Real runs must
+	// be re-enqueued so even parked work can publish its fenced STOPPED state.
+	_, err = s.Store.Cleanup().Execution(ctx, id)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read cleanup stop execution: %w", err)
+	}
+	if s.Work == nil {
+		return fmt.Errorf("cleanup work queue is unavailable: %w", kernel.ErrStore)
+	}
+	if err := s.Work.Enqueue(ctx, WorkKind, strconv.FormatInt(id, 10), nil, s.now()); err != nil {
+		return fmt.Errorf("enqueue cleanup stop settlement: %w", err)
 	}
 	return nil
 }

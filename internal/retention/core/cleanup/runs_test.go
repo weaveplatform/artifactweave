@@ -67,6 +67,23 @@ func TestUnitCleanupManualAdmissionRollsBackWithQueueAndRetainsFrozenHistory(t *
 	changed := input("run-policy", "alpha")
 	changed.Description = "updated after admission"
 	_, err = s.Update(ctx, "run-policy", changed)
+	if !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal("active policy was edited", err)
+	}
+	if err := s.Delete(ctx, "run-policy"); !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal("active policy was deleted", err)
+	}
+	must(t, s.Stop(ctx, r.ID))
+	stopping, err := db.Cleanup().Run(ctx, r.ID)
+	must(t, err)
+	if stopping.Status != api.RunStopping || stopping.Status.Terminal() || !stopping.Ended.IsZero() {
+		t.Fatal("stop claimed terminal completion before the executor fenced effects")
+	}
+	// This administration contract simulates the executor's terminal write;
+	// real effect/stop settlement is qualified by the server executor suite.
+	stopping.Status, stopping.Ended = api.RunStopped, s.Now()
+	must(t, db.Cleanup().UpdateRun(ctx, stopping))
+	_, err = s.Update(ctx, "run-policy", changed)
 	must(t, err)
 	after, err := db.Cleanup().Execution(ctx, r.ID)
 	must(t, err)
@@ -75,10 +92,96 @@ func TestUnitCleanupManualAdmissionRollsBackWithQueueAndRetainsFrozenHistory(t *
 	}
 	must(t, s.Delete(ctx, "run-policy"))
 	must(t, s.Stop(ctx, r.ID))
+}
+
+func TestUnitCleanupDisabledPolicyPermitsOnlyDryAdmission(t *testing.T) {
+	s, db := world(t, "*")
+	s.Work = db.WorkQueue()
+	ctx := t.Context()
+	_, err := s.Create(ctx, "disabled-dry", input("disabled-dry", "alpha"))
+	must(t, err)
+	if _, err := s.ManualRun(ctx, "disabled-dry", false); !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal("disabled policy admitted actual cleanup", err)
+	}
+	r, err := s.ManualRun(ctx, "disabled-dry", true)
+	must(t, err)
+	if !r.DryRun || r.ID <= 0 {
+		t.Fatal("disabled dry run was not durably admitted")
+	}
+	e, err := db.Cleanup().Execution(ctx, r.ID)
+	must(t, err)
+	if e.Policy.Enabled || e.Credential.Name == "" {
+		t.Fatal("dry run changed enablement or lost its verified caller")
+	}
+}
+
+func TestUnitCleanupRunReplayRefreshesCurrentScope(t *testing.T) {
+	s, db := world(t, "*")
+	s.Work = db.WorkQueue()
+	ctx := t.Context()
+	for _, key := range []string{"alpha", "beta"} {
+		_, err := s.Create(ctx, key+"-replay", input(key+"-replay", key))
+		must(t, err)
+	}
+	r, err := s.ManualRun(ctx, "alpha-replay", true)
+	must(t, err)
+	trigger, err := s.RunTrigger(ctx, "alpha-replay", r.ID)
+	must(t, err)
+	if trigger != r.ID {
+		t.Fatal("replay lost the accepted integer trigger")
+	}
+	if _, err := s.RunTrigger(ctx, "beta-replay", r.ID); !errors.Is(err, kernel.ErrNotFound) {
+		t.Fatal("another policy could replay this run", err)
+	}
+	revoked := s
+	revoked.Authorize = func(ctx context.Context) (cleanup.Policy, error) {
+		return policyAuthority("beta"), db.Projects().Guard(ctx)
+	}
+	if _, err := revoked.RunTrigger(ctx, "alpha-replay", r.ID); !errors.Is(err, kernel.ErrForbidden) {
+		t.Fatal("a receipt bypassed current project administration", err)
+	}
+	r.TriggerID++
+	must(t, db.Cleanup().UpdateRun(ctx, r))
+	if _, err := s.RunTrigger(ctx, "alpha-replay", r.ID); !errors.Is(err, kernel.ErrConflict) {
+		t.Fatal("replay accepted changed trigger identity", err)
+	}
+}
+
+func TestUnitCleanupStopRequeuesParkedRunAtomically(t *testing.T) {
+	s, db := world(t, "*")
+	s.Work = db.WorkQueue()
+	ctx := t.Context()
+	_, err := s.Create(ctx, "parked-run", input("parked-run", "alpha"))
+	must(t, err)
+	r, err := s.ManualRun(ctx, "parked-run", true)
+	must(t, err)
+	key := strconv.FormatInt(r.ID, 10)
+	w, taken, err := db.WorkQueue().LeaseKey(ctx, cleanup.WorkKind, key, work.WorkLease{Holder: "failed-worker", Now: s.Now(), Until: s.Now().Add(time.Minute)})
+	must(t, err)
+	if !taken {
+		t.Fatal("admitted work was not available")
+	}
+	must(t, db.WorkQueue().Fail(ctx, w.Kind, w.Key, w.Generation, work.WorkFailure{Park: true, Error: "store unavailable", RetryAt: s.Now().Add(time.Hour), Now: s.Now()}))
+	s.Work = refusingRunQueue{db.WorkQueue()}
+	if err := s.Stop(ctx, r.ID); !errors.Is(err, errRunEnqueue) {
+		t.Fatal("stop ignored a queue refusal", err)
+	}
+	unchanged, err := db.Cleanup().Run(ctx, r.ID)
+	must(t, err)
+	queued, err := db.WorkQueue().Get(ctx, w.Kind, w.Key)
+	must(t, err)
+	if unchanged.Status != api.RunInProgress || queued.State != work.WorkParked {
+		t.Fatal("failed wake retained a partial stop request")
+	}
+	s.Work = db.WorkQueue()
+	must(t, s.Stop(ctx, r.ID))
+	must(t, s.Stop(ctx, r.ID))
 	stopping, err := db.Cleanup().Run(ctx, r.ID)
 	must(t, err)
-	if stopping.Status != api.RunStopping || stopping.Status.Terminal() || !stopping.Ended.IsZero() {
-		t.Fatal("stop claimed terminal completion before the executor fenced effects")
+	queued, err = db.WorkQueue().Get(ctx, w.Kind, w.Key)
+	must(t, err)
+	if stopping.Status != api.RunStopping || queued.State != work.WorkPending || queued.Attempts != 0 || !queued.NotBefore.Equal(s.Now()) {
+		t.Fatal("stop did not wake parked work for executor settlement")
 	}
 }
 

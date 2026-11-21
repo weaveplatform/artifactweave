@@ -34,6 +34,7 @@
 // verified re-enablement binds a new policy generation without rewriting history.
 // Stop/StopAll and emergency DisableAll request STOPPING; only the executor
 // may mark a run terminal after fencing further destructive publication.
+// An explicit stop re-enqueues its real execution so parked work can settle.
 //
 // Executor reconstructs the frozen selection and restores the original current
 // principal with its permission decider inside each metadata transaction.
@@ -54,7 +55,7 @@
 //
 // Implemented P11 policy administration and candidate evaluation (CLN-02/03).
 // CLN-04 run admission, durable execution/progress and stop settlement are
-// present. Runtime worker/scheduler and public run/stop bindings remain in
-// progress; report wire formatting retains CLN-05. These helpers alone do not
-// activate public routes or start workers.
+// present, with public run/stop routes and application worker/scheduler wiring.
+// Construction starts no worker; the runtime registers handlers before starting
+// shared queue/discovery loops. Report wire formatting retains CLN-05.
 package cleanup

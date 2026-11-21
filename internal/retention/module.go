@@ -28,15 +28,15 @@ type Deps struct {
 	Access       accessapi.API
 	Repositories artifactsapi.ProjectRepositoryLookup
 	PackageIndex artifactsapi.PackageIndex
+	ItemRemoval  artifactsapi.ItemRemoval
 	// Zone is the server's schedule timezone; empty means UTC.
 	Zone string
 }
 
 var errNoStore = errors.New("retention: Deps.Store is required")
 
-// Module owns package policy administration, selection and run admission.
-// The CLN-04 executor and CLN-05 report adapter remain separate; archive/restore
-// retain P16. Construction starts no worker or scheduler.
+// Module owns package policy administration and execution. Report formatting
+// retains CLN-05; archive/restore retain P16. Construction starts no worker.
 type Module struct{ deps Deps }
 
 // New constructs the module without starting a scheduler or doing any I/O.
@@ -59,6 +59,43 @@ func (m *Module) Policies() cleanup.Service {
 		s.ProjectIncarnation = d.Access.Projects.Incarnation
 	}
 	return s
+}
+
+// Executor binds normal artifact removal to durable cleanup state.
+func (m *Module) Executor() (cleanup.Executor, error) {
+	store, ok := m.deps.Store.(port.CleanupExecutionStore)
+	if !ok || m.deps.ItemRemoval == nil || m.deps.PackageIndex == nil || m.deps.Access.Projects == nil || m.deps.Access.Authenticator == nil || m.deps.Access.Authorizer == nil {
+		return cleanup.Executor{}, fmt.Errorf("cleanup execution contracts unavailable: %w", kernel.ErrStore)
+	}
+	return cleanup.Executor{Store: store, Policies: m.Policies(), Removal: m.deps.ItemRemoval}, nil
+}
+
+// RegisterWork binds the persisted run kind before the application starts its
+// queue. It does not lease work or start a goroutine.
+func (m *Module) RegisterWork(queue *work.Queue) error {
+	if queue == nil {
+		return fmt.Errorf("cleanup work queue unavailable: %w", kernel.ErrStore)
+	}
+	executor, err := m.Executor()
+	if err != nil {
+		return err
+	}
+	if err := queue.Handle(cleanup.WorkKind, executor.Execute); err != nil {
+		return fmt.Errorf("register cleanup execution: %w", err)
+	}
+	return nil
+}
+
+// ScheduleHandlers supplies the shared scheduler's package-policy admission
+// handler. The occurrence and run queue writes share its final lease fence.
+func (m *Module) ScheduleHandlers() map[string]schedule.Handler {
+	policies := m.Policies()
+	return map[string]schedule.Handler{cleanup.ScheduleKind: func(ctx context.Context, trigger schedule.Trigger) error {
+		if _, err := policies.ScheduledRun(ctx, trigger); err != nil {
+			return fmt.Errorf("admit scheduled package cleanup: %w", err)
+		}
+		return nil
+	}}
 }
 
 type policy struct {
