@@ -34,8 +34,11 @@ const (
 // is one item per Kind and Key, so work asked for again while an item waits
 // coalesces into the run it is waiting for.
 type WorkItem struct {
-	Kind string
-	Key  string
+	// FinalAttempt is computed at dispatch from this queue's configured retry
+	// limit. It is not persisted or exposed by task inspection responses.
+	FinalAttempt bool `json:"-"`
+	Kind         string
+	Key          string
 	// Payload is a small JSON document from the latest enqueue.
 	Payload []byte
 	State   WorkState

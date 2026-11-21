@@ -22,6 +22,9 @@ type cleanupAuthority struct{}
 func (cleanupAuthority) Any() bool          { return true }
 func (cleanupAuthority) Allows(string) bool { return true }
 func (cleanupAuthority) Name() string       { return "admin" }
+func (cleanupAuthority) Credential() kernel.CredentialReference {
+	return kernel.CredentialReference{Name: "admin", TokenID: "verified-test-token"}
+}
 
 func testCleanupPolicyGenerations(t *testing.T, db Store) {
 	ctx := t.Context()

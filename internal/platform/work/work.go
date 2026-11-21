@@ -50,6 +50,9 @@ var (
 	ErrDuplicateHandler = errors.New("work: kind already has a handler")
 	// ErrPanic reports a handler that panicked.
 	ErrPanic = errors.New("work: handler panicked")
+	// ErrUnsettled retains retryable work when its owner could not durably
+	// publish a final business outcome. It does not bypass backoff or leases.
+	ErrUnsettled = errors.New("work: durable outcome is not settled")
 )
 
 // Handler does the work of one item. It must be idempotent: an item can run
@@ -396,6 +399,7 @@ func (q *Queue) run(ctx context.Context, it WorkItem) error {
 	defer cancel()
 	beat := make(chan struct{})
 	go q.heartbeat(runCtx, cancel, it, beat)
+	it.FinalAttempt = it.Attempts >= q.o.MaxAttempts
 	err := call(runCtx, h, it)
 	cancel()
 	<-beat
@@ -459,7 +463,7 @@ func (q *Queue) settle(ctx context.Context, it WorkItem, runErr error) {
 		outcome, err = "completed", q.q.Complete(sctx, it.Kind, it.Key, it.Generation, now)
 	case ctx.Err() != nil:
 		outcome, err = "released", q.q.Release(sctx, it.Kind, it.Key, it.Generation, now)
-	case it.Attempts >= q.o.MaxAttempts || errors.Is(runErr, ErrPermanent):
+	case !errors.Is(runErr, ErrUnsettled) && (it.Attempts >= q.o.MaxAttempts || errors.Is(runErr, ErrPermanent)):
 		outcome = "parked"
 		err = q.q.Fail(sctx, it.Kind, it.Key, it.Generation, WorkFailure{
 			Error: runErr.Error(), Park: true, RetryAt: now.Add(q.o.Backoff(it.Attempts)), Now: now,

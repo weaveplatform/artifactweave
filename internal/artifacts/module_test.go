@@ -55,8 +55,8 @@ func TestUnitNew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if api := m.API(); api.Repositories == nil || api.Layouts == nil || api.TransferSource == nil {
-		t.Errorf("API = %+v, want Repositories, Layouts and TransferSource bound", api)
+	if api := m.API(); api.Repositories == nil || api.Layouts == nil || api.TransferSource == nil || api.ItemRemoval == nil {
+		t.Errorf("API = %+v, want Repositories, Layouts, TransferSource and ItemRemoval bound", api)
 	}
 	if got := m.FormatSettings().TerraformBackend.Keys; got != keys {
 		t.Errorf("Terraform backend keys = %p, want the keyring %p", got, keys)

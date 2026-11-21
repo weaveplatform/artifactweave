@@ -40,4 +40,9 @@ type Projects interface {
 	// Exists returns nil when project exists; an error matching
 	// kernel.ErrNotFound when it does not.
 	Exists(ctx context.Context, project string) error
+	// Incarnation returns a project's opaque lifetime identity, not authority
+	// to act. A recreated key has a different identity. Hold Guard in the
+	// caller's transaction when binding or checking durable background work.
+	// A missing project returns kernel.ErrNotFound.
+	Incarnation(ctx context.Context, project string) (string, error)
 }

@@ -3257,9 +3257,10 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/enabledisablepackagecleanuppolicy.md
   /api/cleanup/packages/policies/{policyKey}/run:
     put:
-      description: Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects package versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+      description: Queues a run of the policy outside its schedule and returns at once with the run's identifier. An actual run requires an enabled policy; a dry run can use a disabled policy. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects package versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
       operationId: runPackageCleanupPolicy
       parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
         - description: Required path parameter. Key of the cleanup policy.
           in: path
           name: policyKey
@@ -3311,6 +3312,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The server failed to complete the operation; nothing was changed.
+        '422':
+          description: This unexpired key was used with different request bytes or dryRun selection.
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       summary: Run a package cleanup policy now

@@ -207,6 +207,7 @@ func (p packages) indexVersions(ctx context.Context, ref api.IndexPackage, keep 
 				Package: kernel.Clone(ref), ID: value.ID, Version: value.Version,
 				OrderKey: value.OrderKey, Created: value.Created, LastDownloaded: value.LastDownloaded,
 			}
+			entry.MutationRevision, _ = p.revisions().Get(value.ID)
 			out = indexFirst(out, entry, page.Limit+1, func(a, b api.IndexVersion) int { return strings.Compare(a.Version, b.Version) })
 		}
 		// Only page entries need protection facts; keeping an entire sorted

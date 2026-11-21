@@ -11,6 +11,7 @@ import (
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/model"
 	"github.com/weaveplatform/artifactweave/internal/retention/core/port"
 )
@@ -25,6 +26,7 @@ type Policy interface {
 	Any() bool
 	Allows(projectKey string) bool
 	Name() string
+	Credential() kernel.CredentialReference
 }
 
 // RepositoryReader reads ownership without opening remote credentials.
@@ -39,14 +41,19 @@ type RepositoryReader interface {
 // callback performs network I/O; run admission through WithPolicy also remains
 // inside the transaction. Selection is metadata-only; CLN-04 owns execution.
 type Service struct {
-	Store         port.Store
-	Schedules     schedule.Store
-	Repositories  RepositoryReader
-	PackageIndex  artifactsapi.PackageIndex
-	ProjectExists func(context.Context, string) error
-	Authorize     func(context.Context) (Policy, error)
-	Guard         func(context.Context) error
-	Now           func() time.Time
+	Store              port.Store
+	Schedules          schedule.Store
+	Repositories       RepositoryReader
+	PackageIndex       artifactsapi.PackageIndex
+	ProjectExists      func(context.Context, string) error
+	ProjectIncarnation func(context.Context, string) (string, error)
+	Authorize          func(context.Context) (Policy, error)
+	// Restore binds the original current principal and permission decider to
+	// the supplied transaction context. A persisted name alone grants nothing.
+	Restore func(context.Context, kernel.CredentialReference) (context.Context, error)
+	Guard   func(context.Context) error
+	Work    work.WorkQueue
+	Now     func() time.Time
 	// Zone is the server's configured IANA timezone; empty uses deterministic UTC.
 	Zone string
 }
@@ -109,7 +116,13 @@ func (s Service) Create(ctx context.Context, key string, in model.CleanupPolicy)
 		if err := s.validate(ctx, key, &in); err != nil {
 			return err
 		}
+		var err error
+		in.ProjectIncarnation, err = s.projectIncarnation(ctx, in.ProjectKey)
+		if err != nil {
+			return err
+		}
 		in.Revision, in.Created, in.Updated = rand.Text(), s.now(), s.now()
+		in.ExecutionCredential = kernel.CredentialReference{}
 		in.CreatedBy, in.UpdatedBy = authority.Name(), authority.Name()
 		if err := s.Store.Cleanup().CreatePolicy(ctx, in); err != nil {
 			return fmt.Errorf("create cleanup policy: %w", err)
@@ -135,6 +148,9 @@ func (s Service) Update(ctx context.Context, key string, in model.CleanupPolicy)
 		if err != nil {
 			return err
 		}
+		if err := s.requireIdlePolicy(ctx, key); err != nil {
+			return err
+		}
 		if in.ProjectKey != old.ProjectKey {
 			return fmt.Errorf("policy project is immutable: %w", kernel.ErrInvalid)
 		}
@@ -142,11 +158,17 @@ func (s Service) Update(ctx context.Context, key string, in model.CleanupPolicy)
 			return err
 		}
 		in.Created, in.CreatedBy, in.Enabled = old.Created, old.CreatedBy, old.Enabled
-		if old.Revision != "" && reflect.DeepEqual(configuration(in), configuration(old)) {
+		in.ProjectIncarnation, err = s.projectIncarnation(ctx, in.ProjectKey)
+		if err != nil {
+			return err
+		}
+		if old.Revision != "" && reflect.DeepEqual(configuration(in), configuration(old)) &&
+			old.ProjectIncarnation == in.ProjectIncarnation &&
+			(!old.Enabled || reflect.DeepEqual(old.ExecutionCredential, authority.Credential())) {
 			out = old
 			return nil
 		}
-		if err := s.replace(ctx, &in, authority.Name()); err != nil {
+		if err := s.replace(ctx, &in, authority); err != nil {
 			return err
 		}
 		out = in
@@ -214,16 +236,25 @@ func (s Service) Enable(ctx context.Context, key string, enabled bool) error {
 		if err != nil {
 			return err
 		}
-		if p.Enabled == enabled && p.Revision != "" {
+		changedProject := false
+		if enabled {
+			incarnation, err := s.projectIncarnation(ctx, p.ProjectKey)
+			if err != nil {
+				return err
+			}
+			changedProject, p.ProjectIncarnation = incarnation != p.ProjectIncarnation, incarnation
+		}
+		if p.Enabled == enabled && p.Revision != "" && !changedProject && (!enabled || reflect.DeepEqual(p.ExecutionCredential, authority.Credential())) {
 			return nil
 		}
 		p.Enabled = enabled
-		return s.replace(ctx, &p, authority.Name())
+		return s.replace(ctx, &p, authority)
 	})
 }
 
 // DisableAll is the emergency switch for the requested global/project scope,
-// including stored future item types. It preserves run history and admitted runs.
+// including stored future item types. It retains history and requests a stop for
+// admitted package runs in that scope, including a run whose policy was deleted.
 func (s Service) DisableAll(ctx context.Context, project string) error {
 	return s.run(ctx, func(ctx context.Context, authority Policy) error {
 		if !authority.Allows(project) {
@@ -238,11 +269,11 @@ func (s Service) DisableAll(ctx context.Context, project string) error {
 				continue
 			}
 			p.Enabled = false
-			if err := s.replace(ctx, &p, authority.Name()); err != nil {
+			if err := s.replace(ctx, &p, authority); err != nil {
 				return err
 			}
 		}
-		return nil
+		return s.stopRuns(ctx, &project)
 	})
 }
 
@@ -254,12 +285,41 @@ func (s Service) Delete(ctx context.Context, key string) error {
 		if err != nil {
 			return err
 		}
+		if err := s.requireIdlePolicy(ctx, key); err != nil {
+			return err
+		}
 		if err := s.Store.Cleanup().DeletePolicy(ctx, key); err != nil {
 			return fmt.Errorf("delete cleanup policy: %w", err)
 		}
 		p.Enabled, p.CronExp = false, ""
 		return s.publishSchedule(ctx, p)
 	})
+}
+
+// Legacy placeholder run rows have no executable snapshot. Only a real admitted
+// active run prevents editing/deleting its policy; terminal history remains.
+func (s Service) requireIdlePolicy(ctx context.Context, key string) error {
+	page := kernel.Page{Limit: 100}
+	for {
+		runs, next, err := s.Store.Cleanup().Runs(ctx, port.RunFilter{PolicyKey: key, ItemType: model.CleanupPackage, Statuses: activeStatuses}, page)
+		if err != nil {
+			return fmt.Errorf("read active cleanup policy runs: %w", err)
+		}
+		for _, run := range runs {
+			_, err := s.Store.Cleanup().Execution(ctx, run.ID)
+			if errors.Is(err, kernel.ErrNotFound) {
+				continue
+			}
+			if err != nil {
+				return fmt.Errorf("read active cleanup execution: %w", err)
+			}
+			return fmt.Errorf("stop the active cleanup run before changing its policy: %w", kernel.ErrInvalid)
+		}
+		if next == "" {
+			return nil
+		}
+		page.After = next
+	}
 }
 
 func configuration(p model.CleanupPolicy) model.CleanupPolicy {
@@ -286,8 +346,15 @@ func configuration(p model.CleanupPolicy) model.CleanupPolicy {
 	}
 }
 
-func (s Service) replace(ctx context.Context, p *model.CleanupPolicy, by string) error {
-	p.Revision, p.Updated, p.UpdatedBy = rand.Text(), s.now(), by
+func (s Service) replace(ctx context.Context, p *model.CleanupPolicy, authority Policy) error {
+	p.ExecutionCredential = kernel.CredentialReference{}
+	if p.Enabled {
+		p.ExecutionCredential = authority.Credential()
+		if err := model.ValidateCleanupCredential(p.ExecutionCredential); err != nil {
+			return err //nolint:wrapcheck // the model identifies the missing verified caller
+		}
+	}
+	p.Revision, p.Updated, p.UpdatedBy = rand.Text(), s.now(), authority.Name()
 	if err := s.Store.Cleanup().UpdatePolicy(ctx, *p); err != nil {
 		return fmt.Errorf("replace cleanup policy: %w", err)
 	}
@@ -356,6 +423,9 @@ func (s Service) WithPolicy(ctx context.Context, key, revision string, effect fu
 		}
 		if p.ItemType != model.CleanupPackage || !p.Enabled || revision == "" || p.Revision != revision {
 			return nil
+		}
+		if err := s.currentProject(ctx, p); err != nil {
+			return err
 		}
 		if err := effect(ctx, p); err != nil {
 			return fmt.Errorf("cleanup admitted effect: %w", err)

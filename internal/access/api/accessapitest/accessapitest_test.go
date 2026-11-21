@@ -528,7 +528,7 @@ func TestUnitProjects(t *testing.T) {
 	ctx := t.Context()
 	p := &accessapitest.Projects{
 		Projects: map[string]accessapitest.Project{
-			"ml":    {Environments: []string{"STAGE", "LAB"}, Members: []string{"ann"}},
+			"ml":    {Environments: []string{"STAGE", "LAB"}, Members: []string{"ann"}, Incarnation: "initial-lifetime"},
 			"empty": {},
 		},
 		Global: []string{"QA", "EDGE"},
@@ -563,7 +563,24 @@ func TestUnitProjects(t *testing.T) {
 	if err := p.Exists(ctx, "missing"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("Exists(missing) = %v, want ErrNotFound", err)
 	}
+	if lifetime, err := p.Incarnation(ctx, "ml"); err != nil || lifetime != "initial-lifetime" {
+		t.Error("project fixture lost the explicit lifetime", err)
+	}
+	if _, err := p.Incarnation(ctx, "empty"); !errors.Is(err, kernel.ErrStore) {
+		t.Error("a fixture key without a lifetime became a durable fence", err)
+	}
+	if _, err := p.Incarnation(ctx, "missing"); !errors.Is(err, kernel.ErrNotFound) {
+		t.Error("a missing fixture project has a lifetime", err)
+	}
+	p.IncarnationFunc = func(context.Context, string) (string, error) { return "scripted-lifetime", nil }
+	if lifetime, err := p.Incarnation(ctx, "ml"); err != nil || lifetime != "scripted-lifetime" {
+		t.Error("scripted project lifetime was ignored", err)
+	}
+	p.IncarnationFunc = nil
 	p.Err = errBoom
+	if _, err := p.Incarnation(ctx, "ml"); !errors.Is(err, errBoom) {
+		t.Error("project lifetime fixture swallowed the store failure", err)
+	}
 	envs, err := p.Environments(ctx, "ml")
 	if envs != nil || err != errBoom { //nolint:errorlint // Err, as it is
 		t.Errorf("failing Environments = %v, %v; want nil, Err", envs, err)

@@ -32,6 +32,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	"github.com/weaveplatform/artifactweave/internal/platform/mail"
+	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 	"github.com/weaveplatform/artifactweave/internal/platform/xzfile"
 )
@@ -76,6 +77,7 @@ type Runtime struct {
 	multipart *multipart.Service
 	// Work runs derived work after the changes that need it (decision 0033).
 	Work      *work.Queue
+	scheduler *schedule.Service
 	mirrors   []*mirror.Store
 	admin     *mirrorAdmin
 	stopLoops context.CancelFunc
@@ -219,6 +221,13 @@ func OpenRuntime(
 	if err := mods.events.RegisterWork(ctx); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
+	if err := mods.retention.RegisterWork(queue); err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	scheduler := &schedule.Service{Store: st}
+	if err := scheduler.Register(queue, mods.retention.ScheduleHandlers()); err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
 	warnings := project.WarningDelivery{Store: st, Queue: st.WorkQueue(), Mail: mods.configuration.API().Mail, Sender: mail.Sender{}}
 	if err := queue.Handle(project.StorageWarningKind, warnings.Handle); err != nil {
 		return nil, errors.Join(err, st.Close())
@@ -240,6 +249,7 @@ func OpenRuntime(
 		location:   hotTier.location(),
 		multipart:  parts,
 		Work:       queue,
+		scheduler:  scheduler,
 		stopLoops:  stop,
 	}
 	if err := art.OpenRemoteSources(ctx); err != nil {
@@ -285,6 +295,7 @@ func OpenRuntime(
 	// Stopping hands back the leases of runs it cuts short, so another node
 	// or the next start picks them up at once.
 	rt.loops.Go(func() { _ = queue.Run(lctx) })
+	rt.loops.Go(func() { runSchedules(lctx, scheduler, log) })
 	return rt, nil
 }
 
