@@ -74,6 +74,20 @@ test recorders, so exporters can be configured without code changes. The persist
 queue already uses an OpenTelemetry meter with no-op defaults and recorder tests
 (`internal/platform/work`); completing system-wide instrumentation/export remains P18.
 
+**Cancelled HTTP requests** ([#1816](https://github.com/weaveplatform/artifactweave/issues/1816)).
+If an error wraps `context.Canceled` and that HTTP request's context is itself
+cancelled, the shared error writer preserves the cause and aborts through the
+existing `http.ErrAbortHandler` boundary. It sends no replacement error response.
+The access record has `aborted: true`; before any response starts, `status: 0`
+and `bytes: 0` mean no response was published, not an HTTP status sent to the
+client. A response already started retains its actual status and byte count.
+This is artifactweave's local request-reliability policy, not an observation of
+Artifactory's wire behavior. An independent backend cancellation while the HTTP
+request remains live, an unrelated storage failure, a server deadline and a typed
+authentication/authorization refusal retain their existing response classification.
+The [operator reference](../../operations/configuration-reference.md#request-cancellation-diagnostics)
+explains how to distinguish these records from server failures.
+
 P12 owns the configuration logger endpoints. P38 extends that baseline with
 application/Distribution metrics, live log and debug controls, lock and background-task
 visibility, system information, support bundles and cloud log collection. P35 supplies
