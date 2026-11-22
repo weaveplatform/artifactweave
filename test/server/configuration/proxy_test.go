@@ -3,15 +3,26 @@ package configuration_test
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
 	"errors"
+	"fmt"
+	"io"
 	"maps"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
@@ -257,5 +268,167 @@ func TestAccPatchProxyPasswordKeepsAuthorizationAndValueCount(t *testing.T) {
 			t.Fatal("repeated public patch rewrote the proxy timestamp")
 		}
 		before = after
+	}
+}
+
+func TestAccProxyServicesDescriptorSQL(t *testing.T) {
+	keys := storekit.Get[*crypt.Keyring](t)(crypt.New(bytes.Repeat([]byte{9}, 32)))
+	sqltest.RunModule(t, appsql.Modules(), func(base *dialect.Store) *appsql.Store {
+		return appsql.New(base.DB(), base.Dialect(), keys)
+	}, func(t *testing.T, newStore func(*testing.T) *appsql.Store) {
+		for _, tc := range []struct {
+			name, services       string
+			explicit, historical bool
+		}{
+			{name: "provider explicit", services: `"jfrt,jfxr"`, explicit: true},
+			{name: "provider default", services: `"jfrt,jfxr"`},
+			{name: "empty default", services: `""`},
+			{name: "source separators", services: `"jfxr; jfrt\njfxr"`},
+			{name: "historical list", services: `["jfrt","jfxr"]`, historical: true},
+			{name: "historical null", services: `null`, historical: true},
+			{name: "historical absent", historical: true},
+		} {
+			for _, secure := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/https=%t", tc.name, secure), func(t *testing.T) {
+					proxyServicesRetrieval(t, newStore(t), keys, tc.services, tc.explicit, tc.historical, secure)
+				})
+			}
+		}
+	}, sqltest.WithPostgres(), sqltest.WithKeyring(keys))
+}
+
+func proxyServicesRetrieval(
+	t *testing.T, db *appsql.Store, keys *crypt.Keyring, services string,
+	explicit, historical, secure bool,
+) {
+	t.Helper()
+	originOptions := fakeupstream.Options{Auth: fakeupstream.Auth{Username: "origin-user", Password: "origin-private"}}
+	if secure {
+		originOptions.TLS = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
+	origin := fakeupstream.New(t, originOptions)
+	origin.Set("/item", fakeupstream.Resource{Body: []byte("descriptor-proxied-content")})
+	proxy := fakeupstream.NewProxy(t, fakeupstream.Auth{Username: "proxy-user", Password: "proxy-private"}, origin)
+	address := storekit.Get[*url.URL](t)(url.Parse(proxy.URL))
+	api := configurationAPI(t, db)
+	serviceValue := services
+	if historical {
+		serviceValue = `"jfrt,jfxr"`
+	}
+	selection := ""
+	if explicit {
+		selection = "    proxy: corp\n"
+	}
+	patch := fmt.Sprintf(`proxies:
+  corp:
+    host: %s
+    port: %s
+    username: proxy-user
+    password: proxy-private
+    platformDefault: true
+    services: %s
+remoteRepositories:
+  proxy-proof:
+    type: generic
+    url: %s
+    username: origin-user
+    password: origin-private
+%s`, address.Hostname(), address.Port(), serviceValue, origin.URL, selection)
+	applyConfiguration(t, api, t.Context(), patch)
+	before := proxyDocument(t, db)
+	if historical {
+		var document map[string]any
+		storekit.Must(t, json.Unmarshal(before.Document, &document))
+		delete(document, "services")
+		if services != "" {
+			var value any
+			storekit.Must(t, json.Unmarshal([]byte(services), &value))
+			document["services"] = value
+		}
+		before.Document = storekit.Get[[]byte](t)(json.Marshal(document))
+		storekit.Must(t, db.Configs().Put(t.Context(), before))
+	}
+	snapshot := proxySQLSnapshot(db, keys)
+	sealed := snapshot(t, before)
+	resolverOptions := upstream.ResolverOptions{}
+	if secure {
+		resolverOptions.RootCAsPEM = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: origin.Certificate().Raw})
+	}
+	resolver := storekit.Get[*upstream.Resolver](t)(upstream.NewResolver(db, keys, resolverOptions))
+	configuration := storekit.Get[repo.Config](t)(db.Repos().Get(t.Context(), "proxy-proof"))
+	pool := &upstream.Pool{}
+	t.Cleanup(pool.Close)
+	resolve := func() (remote.Options, *upstream.Client) {
+		t.Helper()
+		var options remote.Options
+		storekit.Must(t, db.Tx(t.Context(), func(ctx context.Context) error {
+			var err error
+			options, err = resolver.Options(ctx, repo.Masked(configuration))
+			return err
+		}))
+		return options, storekit.Get[*upstream.Client](t)(pool.Client(repo.Masked(configuration), options))
+	}
+	options, client := resolve()
+	if proxy.Count("", "") != 0 || origin.Count("", "") != 0 {
+		t.Fatal("configuration resolution performed network I/O")
+	}
+	response := storekit.Get[*http.Response](t)(client.Do(t.Context(), remote.Request{
+		Method: http.MethodGet, Path: "item", Header: http.Header{
+			"Authorization": {"Bearer caller-private"}, "Proxy-Authorization": {"caller-private"}, "Cookie": {"caller=private"},
+		},
+	}))
+	content := storekit.Get[[]byte](t)(io.ReadAll(response.Body))
+	storekit.Must(t, response.Body.Close())
+	if response.StatusCode != http.StatusOK || string(content) != "descriptor-proxied-content" {
+		t.Fatal("descriptor proxy did not retrieve origin content", response.StatusCode)
+	}
+	requests, origins := proxy.Requests(), origin.Requests()
+	if len(requests) != 1 || len(origins) != 1 || !requests[0].Authorized || !origins[0].Authorized ||
+		origins[0].Header.Get("Proxy-Authorization") != "" || origins[0].Header.Get("Cookie") != "" {
+		t.Fatal("proxy and repository credential separation failed")
+	}
+	proxyAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte("proxy-user:proxy-private"))
+	if !requests[0].HeaderMatches("Proxy-Authorization", proxyAuth) {
+		t.Fatal("proxy did not receive its configured credential")
+	}
+	wantMethod := http.MethodGet
+	if secure {
+		wantMethod = http.MethodConnect
+	}
+	if requests[0].Method != wantMethod || secure && requests[0].Header.Get("Authorization") != "" {
+		t.Fatal("proxy routing or CONNECT credential boundary failed")
+	}
+	after := proxyDocument(t, db)
+	if !bytes.Equal(before.Document, after.Document) || !before.Updated.Equal(after.Updated) ||
+		!bytes.Equal(sealed, snapshot(t, after)) {
+		t.Fatal("proxy read rewrote public configuration or sealed credentials")
+	}
+	// Both a public-document update and a sealed-secret update must replace the
+	// pooled client. A revoked proxy credential must fail before origin retrieval.
+	applyConfiguration(t, api, t.Context(), "proxies:\n  corp:\n    services: 'jfrt'\n")
+	changed, replacement := resolve()
+	if changed.Revision == options.Revision || replacement == client {
+		t.Fatal("proxy configuration retained stale source/client state")
+	}
+	applyConfiguration(t, api, t.Context(), "proxies:\n  corp:\n    password: revoked-proxy-private\n")
+	rotated, revoked := resolve()
+	if rotated.Revision == changed.Revision || revoked == replacement || strings.Contains(rotated.Revision, "private") {
+		t.Fatal("proxy secret retained stale source/client state or disclosed credentials")
+	}
+	denied, err := revoked.Do(t.Context(), remote.Request{Method: http.MethodGet, Path: "item"})
+	if secure {
+		if !errors.Is(err, remote.ErrRequest) || strings.Contains(err.Error(), "private") {
+			t.Fatal("CONNECT denial lost its redacted request failure", err)
+		}
+	} else {
+		storekit.Must(t, err)
+		storekit.Must(t, denied.Body.Close())
+		if denied.StatusCode != http.StatusProxyAuthRequired {
+			t.Fatal("forward proxy did not deny its revoked credential", denied.StatusCode)
+		}
+	}
+	requests = proxy.Requests()
+	if len(requests) != 2 || requests[1].Authorized || origin.Count("", "") != 1 {
+		t.Fatal("revoked proxy credentials reached origin or leaked", err)
 	}
 }

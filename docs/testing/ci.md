@@ -49,6 +49,15 @@ files lie in `internal/app`, beside the router, and in the module suites
 selected test names as a `test-selection` artifact and reports selected and
 skipped lane reasons in its summary.
 
+The existing required core native lane owns the Go `@proxy_services` scenario
+under `@goproxy`/`@go`. It performs a cold build through a descriptor-created
+string-form proxy and checks the proxy/origin credential boundary. The Go client
+is required in this scenario; a missing executable fails it. The shared
+`test/server/configuration` package owns `TestAccProxyServicesDescriptorSQL` on
+SQLite and an owned PostgreSQL fixture, including HTTP, HTTPS/CONNECT, sealed
+secrets, historical-document preservation and source/client rotation. Shared
+proxy decoder changes retain the full profile and its 95%/90% coverage floors.
+
 Full qualification also requires `Go acceptance (Windows, SQLite paths)`.
 It runs the embedded driver's `TestAccOpenDB` contracts on `windows-latest`,
 including actual opened-file identity for literal URI characters, private memory
