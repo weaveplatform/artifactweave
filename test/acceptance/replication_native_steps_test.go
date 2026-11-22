@@ -96,7 +96,7 @@ func (w *world) qualifyNativeReplication(direction string) error {
 		return fmt.Errorf("write owned native replication settings: %w", err)
 	}
 	w.mavenImage = image
-	if err := w.runJVMRecipe([]string{"--entrypoint", "java"}, []string{
+	if err := w.runJVMRecipe([]string{"--pull", "never", "--entrypoint", "java"}, []string{
 		"-Duser.home=/work", "-jar", "/opt/ivy.jar", "-settings", "/work/replication-ivy.xml",
 		"-dependency", "selected.replication", "widget", "1.0", "-confs", "default",
 		"-cache", "/work/replication-ivy-cache", "-retrieve", "/work/replication-resolved/[artifact]-[revision].[ext]",

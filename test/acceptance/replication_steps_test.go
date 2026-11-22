@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/cucumber/godog"
 
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
+	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
 
 func (w *world) registerSingleReplication(sc *godog.ScenarioContext) {
@@ -29,7 +31,15 @@ func (w *world) startSingleReplication(backend string) error {
 		return fmt.Errorf("unsupported replication fixture backend")
 	}
 	if backend == "postgres" && os.Getenv("ARTIFACTWEAVE_TEST_POSTGRES_DSN") == "" {
-		return fmt.Errorf("required PostgreSQL replication qualification needs an explicit test connection")
+		// The normal Linux lane supplies Docker, not an ambient database.
+		// Preflight explicitly so PostgresDSN cannot silently skip a required
+		// direction/backend scenario when short mode or Docker is unavailable.
+		if testing.Short() {
+			return fmt.Errorf("required PostgreSQL replication qualification cannot run in short mode")
+		}
+		if err := containertest.CheckLinux(w.t.Context()); err != nil {
+			return fmt.Errorf("required PostgreSQL replication qualification needs a test connection or Linux containers: %w", err)
+		}
 	}
 	peer := newWorld(w.t)
 	w.replicationPeer = peer
