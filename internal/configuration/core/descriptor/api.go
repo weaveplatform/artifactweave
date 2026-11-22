@@ -49,7 +49,10 @@ type Deps struct {
 	// including a descriptor that also changes anonymous credential policy.
 	Projects accessapi.Projects
 	// Authentication and authorization are rechecked under Projects.Guard before
-	// exporting protected configuration. Nil supports stores without HTTP auth.
+	// exporting protected configuration. Both must be set for HTTP callers; both
+	// may be nil only for trusted embeddings that establish global administrator
+	// authority before XML. A one-sided binding is refused. Parse and CLI Apply
+	// do not use these read-authority contracts.
 	Authenticator accessapi.Authenticator
 	Authorizer    accessapi.Authorizer
 }

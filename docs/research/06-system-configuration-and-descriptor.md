@@ -412,6 +412,16 @@ security:
   currently publishes an older namespace; its claim to be the latest does not replace
   the pinned archive evidence. Repository-only REST fields without an XML descriptor
   representation are omitted; this export does not claim new runtime capabilities.
+  The CFG-01 review inventories all 141 JSON fields of the current repository model:
+  111 have class-specific XML projections and 30 are class identity, API-only bindings
+  or trust settings, legacy type-selection flags, credentials or JAXB-transient fields.
+  `HttpRepoDescriptor.retrieveSha256FromServer` and remote
+  `HuggingFaceMLRemoteConfiguration.mlRepoLayout` are visible even though the XSD lacks
+  them; the local `mlRepoLayout` field is transient. The JAXB enum annotations also
+  matter: XML uses `generic`, `yum` and `helmOci`, and lowercase VCS type/provider values,
+  while the shared remote JSON endpoint keeps its distinct Jackson enum spellings.
+  Checksum, snapshot, POM cleanup, Docker API and Terraform enum values already match
+  their stored representations. This audit preserves API-only and transient exclusions.
 - **Local engineering choice:** credentials are omitted from XML. Artifactory's encrypted
   password tokens are vendor-specific; returning sealed storage bytes or fabricated
   ciphertext would not be a portable credential. The pinned proxy reader copies the

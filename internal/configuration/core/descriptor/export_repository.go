@@ -139,8 +139,10 @@ var repositoryExportPaths = map[repo.Class][][2]string{
 		{"propagateQueryParams", "propagateQueryParams"},
 		{"clientTlsCertificate", "clientTlsCertificate"},
 		{"disableUrlNormalization", "disableUrlNormalization"},
+		{"retrieveSha256FromServer", "retrieveSha256FromServer"},
 		{"customHttpHeaders", "customHttpHeaders"},
 		{"hexPublicKey", "hex/hexPublicKey"},
+		{"mlRepoLayout", "huggingFace/mlRepoLayout"},
 	},
 	repo.Virtual: {
 		{"key", "key"},
@@ -243,13 +245,17 @@ func exportRepository(c repo.Config) (exportFields, error) {
 	if err := decoder.Decode(&fields); err != nil {
 		return exportFields{}, fmt.Errorf("decode export repository %s: %w", c.Key, err)
 	}
-	fields["packageType"] = repo.PackageTypeName(string(c.PackageType))
+	fields["packageType"] = repositoryXMLPackageType(c.PackageType)
 	out := exportFields{}
 	for _, mapping := range repositoryExportPaths[c.Class] {
 		key, path := mapping[0], mapping[1]
 		value, present := fields[key]
 		if !present || value == nil {
 			continue
+		}
+		if key == "vcsType" || key == "vcsGitProvider" {
+			// JAXB's XmlEnumValue differs from the uppercase Jackson JsonProperty.
+			value = strings.ToLower(fmt.Sprint(value))
 		}
 		switch key {
 		case "customHttpHeaders":
@@ -270,6 +276,19 @@ func exportRepository(c repo.Config) (exportFields, error) {
 		}
 	}
 	return out, nil
+}
+
+// RepoType's JAXB values mostly match the stored package type. These two
+// differ; PackageTypeName is its Jackson JSON spelling and is not XML.
+func repositoryXMLPackageType(kind repo.PackageType) string {
+	switch kind {
+	case repo.RPM:
+		return "yum"
+	case repo.HelmOCI:
+		return "helmOci"
+	default:
+		return string(kind)
+	}
 }
 
 func nestedValue(fields map[string]any, path []string) (any, bool) {

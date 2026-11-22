@@ -97,22 +97,25 @@ func (a exportAPI) XML(ctx context.Context) ([]byte, error) {
 }
 
 func (a exportAPI) currentAdmin(ctx context.Context) error {
-	p, _ := kernel.FromContext(ctx)
-	if a.d.Authenticator != nil {
-		var err error
-		p, err = a.d.Authenticator.Current(ctx, p)
-		if err != nil {
-			return fmt.Errorf("current configuration caller: %w", err)
-		}
+	if a.d.Authenticator == nil && a.d.Authorizer == nil {
+		// Trusted store embeddings establish the administrator before calling XML;
+		// HTTP bindings must supply both current identity and effective authority.
+		return nil
 	}
-	if a.d.Authorizer != nil {
-		decider, err := a.d.Authorizer.For(ctx, p)
-		if err != nil {
-			return fmt.Errorf("authorize configuration export: %w", err)
-		}
-		if !decider.IsAdmin() {
-			return kernel.ErrForbidden
-		}
+	if a.d.Authenticator == nil || a.d.Authorizer == nil {
+		return fmt.Errorf("incomplete export authority bindings: %w", kernel.ErrStore)
+	}
+	p, _ := kernel.FromContext(ctx)
+	p, err := a.d.Authenticator.Current(ctx, p)
+	if err != nil {
+		return fmt.Errorf("current configuration caller: %w", err)
+	}
+	decider, err := a.d.Authorizer.For(ctx, p)
+	if err != nil {
+		return fmt.Errorf("authorize configuration export: %w", err)
+	}
+	if !decider.IsAdmin() {
+		return kernel.ErrForbidden
 	}
 	return nil
 }

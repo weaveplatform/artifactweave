@@ -86,6 +86,10 @@
 // is present, and the caller owns Module.Close. app's runtime owns it, while
 // standalone routers require a cleanup registrar for internal bindings.
 //
+// P12 CFG-01 adds Export for the administrator-only XML GET; the configuration
+// HTTP adapter calls it through the composition's binding. The target layout's
+// System Get and Patch and events.go with ConfigurationChanged are not created.
+//
 // # Testing
 //
 // The package has no tests of its own. configuration/core/descriptor's

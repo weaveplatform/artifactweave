@@ -153,7 +153,7 @@ downloadRedirectConfig:
 	}
 	for path, want := range map[string]string{
 		"localRepositories/localRepository/key":                                                      "export-local",
-		"localRepositories/localRepository/type":                                                     "Generic",
+		"localRepositories/localRepository/type":                                                     "generic",
 		"localRepositories/localRepository/description":                                              "data <>&\"",
 		"remoteRepositories/remoteRepository/key":                                                    "export-remote",
 		"remoteRepositories/remoteRepository/username":                                               "remote-user",
@@ -309,10 +309,12 @@ func TestUnitExportFailuresNeverReturnPartialXML(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "current":
+				d.Authorizer = &accessapitest.Authorizer{}
 				d.Authenticator = &accessapitest.Authenticator{CurrentFunc: func(context.Context, kernel.Principal) (kernel.Principal, error) {
 					return kernel.Principal{}, errExportFailure
 				}}
 			case "authorize":
+				d.Authenticator = &accessapitest.Authenticator{}
 				d.Authorizer = &accessapitest.Authorizer{DecideFunc: func(context.Context, accessapi.Subject, bool) (accessapi.Decider, error) {
 					return nil, errExportFailure
 				}}
@@ -344,6 +346,8 @@ func TestUnitExportRechecksCurrentAdministratorAndTokenCeiling(t *testing.T) {
 			default:
 				ctx = kernel.WithPrincipal(ctx, kernel.Principal{Name: "admin", Admin: true})
 				d.Projects = &accessapitest.Projects{}
+				d.Authenticator = &accessapitest.Authenticator{}
+				d.Authorizer = &accessapitest.Authorizer{}
 				if name == "revoked" {
 					want = kernel.ErrBadCredentials
 					d.Authenticator = &accessapitest.Authenticator{
@@ -386,8 +390,8 @@ func TestUnitExportRepositoryXMLNamesAndCollections(t *testing.T) {
 			body: `{"key":"remote","rclass":"remote","packageType":"generic","proxy":"corp","vcsType":"GIT","vcsGitProvider":"GITHUB","vcsGitDownloadUrl":"https://git.invalid","feedContextPath":"v2","pyPIRepositorySuffix":"simple","externalDependenciesEnabled":false,"externalDependenciesPatterns":["**"],"contentSynchronisation":{"enabled":true,"statistics":{"enabled":false},"properties":{"enabled":true},"source":{"originAbsenceDetection":true}},"customHttpHeaders":[{"name":"X-Public","value":"value <>&","sensitive":false},{"name":"X-Private","value":"private-fixture","sensitive":true}]}`,
 			want: map[string]string{
 				"proxyRef":                                             "corp",
-				"vcs/type":                                             "GIT",
-				"vcs/git/provider":                                     "GITHUB",
+				"vcs/type":                                             "git",
+				"vcs/git/provider":                                     "github",
 				"vcs/git/downloadUrl":                                  "https://git.invalid",
 				"nuget/feedContextPath":                                "v2",
 				"pypi/repositorySuffix":                                "simple",
@@ -511,5 +515,176 @@ func TestUnitExportDoesNotPromoteStoredValueKeysToXMLNames(t *testing.T) {
 	_, body := exportXML(t, depsOf(t, db))
 	if strings.Contains(body, "<injected>") {
 		t.Fatal("stored value keys became XML names", body)
+	}
+}
+
+func TestUnitExportRejectsPartialAuthorityBindings(t *testing.T) {
+	for _, name := range []string{"current caller only", "authorizer only"} {
+		t.Run(name, func(t *testing.T) {
+			d := depsOf(t, inmem.New())
+			if name == "current caller only" {
+				d.Authenticator = &accessapitest.Authenticator{CurrentFunc: func(context.Context, kernel.Principal) (kernel.Principal, error) {
+					return kernel.Principal{Name: "admin", Admin: false}, nil
+				}}
+			} else {
+				d.Authorizer = &accessapitest.Authorizer{DecideFunc: func(context.Context, accessapi.Subject, bool) (accessapi.Decider, error) {
+					return &accessapitest.Decider{Admin: true}, nil
+				}}
+			}
+			ctx := kernel.WithPrincipal(t.Context(), kernel.Principal{Name: "admin", Admin: true})
+			body, err := NewAPI(d).Export.XML(ctx)
+			if !errors.Is(err, kernel.ErrStore) || body != nil {
+				t.Fatalf("partial authority binding published XML: %q %v", body, err)
+			}
+		})
+	}
+}
+
+func TestUnitExportJavaOnlyRemoteFields(t *testing.T) {
+	d := depsOf(t, inmem.New())
+	flag := false
+	if err := d.Repositories.Create(t.Context(), repo.Config{
+		Key: "java-remote", Class: repo.Remote, PackageType: repo.HuggingFaceML, URL: "https://upstream.invalid/repo",
+		RetrieveSha256FromServer: &flag, MLRepoLayout: &flag,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	node, _ := exportXML(t, d)
+	for _, path := range []string{"retrieveSha256FromServer", "huggingFace/mlRepoLayout"} {
+		if got := xmlText(t, node, "remoteRepositories/remoteRepository/"+path); got != "false" {
+			t.Fatalf("%s = %q, want explicit false", path, got)
+		}
+	}
+	patch, err := Parse([]byte("remoteRepositories:\n  java-remote:\n    retrieveSha256FromServer: true\n"), noEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Apply(t.Context(), d, patch, now, false); err != nil {
+		t.Fatal(err)
+	}
+	node, _ = exportXML(t, d)
+	if got := xmlText(t, node, "remoteRepositories/remoteRepository/retrieveSha256FromServer"); got != "true" {
+		t.Fatal("PATCH-owned Java-only field did not round-trip", got)
+	}
+}
+
+func TestUnitExportUsesXMLPackageTypeEnumValues(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		kind repo.PackageType
+		want string
+	}{
+		{"generic", repo.Generic, "generic"},
+		{"rpm", repo.RPM, "yum"},
+		{"helm oci", repo.HelmOCI, "helmOci"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fields, err := exportRepository(repo.Config{Key: "enum", Class: repo.Local, PackageType: tc.kind})
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, err := xml.Marshal(fields)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var node exportNode
+			if err := xml.Unmarshal(body, &node); err != nil {
+				t.Fatal(err)
+			}
+			if got := xmlText(t, node, "type"); got != tc.want {
+				t.Fatalf("XML type = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestUnitExportTrustedEmbeddingAndCompleteAuthority(t *testing.T) {
+	for _, name := range []string{"trusted embedding", "complete HTTP authority"} {
+		t.Run(name, func(t *testing.T) {
+			d := depsOf(t, inmem.New())
+			if name == "complete HTTP authority" {
+				d.Authenticator = &accessapitest.Authenticator{CurrentFunc: func(context.Context, kernel.Principal) (kernel.Principal, error) {
+					return kernel.Principal{Name: "current-admin", Admin: true}, nil
+				}}
+				d.Authorizer = &accessapitest.Authorizer{DecideFunc: func(_ context.Context, subject accessapi.Subject, _ bool) (accessapi.Decider, error) {
+					if subject.Name != "current-admin" {
+						t.Fatalf("authorized stale caller %q", subject.Name)
+					}
+					return &accessapitest.Decider{Admin: true}, nil
+				}}
+			}
+			ctx := kernel.WithPrincipal(t.Context(), kernel.Principal{Name: "initial-admin", Admin: true})
+			body, err := NewAPI(d).Export.XML(ctx)
+			if err != nil || len(body) == 0 {
+				t.Fatalf("valid authority binding failed: %q %v", body, err)
+			}
+		})
+	}
+}
+
+func TestUnitExportJAXBTransientAndClassSpecificValues(t *testing.T) {
+	flag := true
+	for _, class := range []repo.Class{repo.Local, repo.Remote} {
+		t.Run(string(class), func(t *testing.T) {
+			cfg := repo.Config{
+				Key: "audit", Class: class, PackageType: repo.HuggingFaceML, MLRepoLayout: &flag,
+				ProjectKey: "api-only-project", Environments: []string{"api-only-environment"},
+				P2ChildOrigins: []string{"https://api-only.invalid"}, DockerProjectID: "api-only-docker-project",
+				ForceP2Authentication: &flag, EnableNormalizedVersion: &flag, EncryptStates: &flag,
+				ForceMetadataNameVersion: &flag, ForceNonDuplicateChart: &flag,
+				SendContext: &flag, PassThrough: &flag, Curated: &flag, EnableConanSupport: &flag,
+				PodsCdnURL: "https://api-only-cdn.invalid",
+			}
+			fields, err := exportRepository(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, err := xml.Marshal(fields)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []string{"projectKey", "environments", "p2ChildOrigins", "dockerProjectId", "forceP2Authentication", "enableNormalizedVersion", "encryptStates", "forceMetadataNameVersion", "forceNonDuplicateChart", "sendContext", "passThrough", "curated", "enableConanSupport", "podsCdnUrl"} {
+				if strings.Contains(string(body), "<"+name+">") {
+					t.Error("API-only or XmlTransient field exported", name)
+				}
+			}
+			if got := strings.Contains(string(body), "<mlRepoLayout>true</mlRepoLayout>"); got != (class == repo.Remote) {
+				t.Fatal("mlRepoLayout did not follow its class-specific JAXB visibility", string(body))
+			}
+		})
+	}
+}
+
+func TestUnitExportVCSUsesXMLEnumValues(t *testing.T) {
+	for _, tc := range []struct {
+		provider repo.VCSGitProvider
+		want     string
+	}{
+		{repo.GitHub, "github"},
+		{repo.GitHubEnterprise, "githubenterprise"},
+		{repo.GitLab, "gitlab"},
+		{repo.Bitbucket, "bitbucket"},
+		{repo.OldStash, "oldstash"},
+		{repo.Stash, "stash"},
+		{repo.ArtifactoryVCS, "artifactory"},
+		{repo.CustomVCS, "custom"},
+	} {
+		t.Run(string(tc.provider), func(t *testing.T) {
+			fields, err := exportRepository(repo.Config{Key: "vcs", Class: repo.Remote, PackageType: repo.VCS, VCSType: "GIT", VCSGitProvider: tc.provider})
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, err := xml.Marshal(fields)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var node exportNode
+			if err := xml.Unmarshal(body, &node); err != nil {
+				t.Fatal(err)
+			}
+			if xmlText(t, node, "vcs/type") != "git" || xmlText(t, node, "vcs/git/provider") != tc.want {
+				t.Fatal("Jackson enum spelling reached XML", string(body))
+			}
+		})
 	}
 }

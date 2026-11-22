@@ -7,6 +7,9 @@ import "context"
 // recheck the caller's current administrator authority there, and return bytes
 // only after commit. An error returns no document. Credentials, sensitive header
 // values and environment references are never included.
+// HTTP bindings supply both current authentication and effective authorization;
+// one-sided bindings fail. A trusted store embedding may omit both only when its
+// caller establishes global administrator authority before invoking XML.
 //
 // Subsequent descriptor sections extend the core's typed export document and join
 // this same read, using their owning module's api with its transaction context.
