@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -270,12 +269,29 @@ func qualifyPullRegistryProcesses(t *testing.T, backend string, virtual bool) {
 				publication := artifactsapi.PullPublication{Check: func(context.Context) error { return nil }, Fence: w.fence}
 				// The storage spelling manifest.json is absent; list.manifest.json
 				// still serves the native tag and must protect the cached index.
-				_, err = source.Remove(ctx, candidate, publication, func(context.Context, []string) error {
-					t.Fatal("live native index deletion reached publication")
+				retained := false
+				removed, err := source.Remove(ctx, candidate, publication, func(_ context.Context, paths []string) error {
+					if len(paths) != 0 {
+						t.Fatal("live native index was acknowledged as deleted")
+					}
+					retained = true
 					return nil
 				})
-				if !errors.Is(err, artifactsapi.ErrPullChanged) {
-					t.Fatal("storage alias miss was accepted as native absence", err)
+				if err != nil || len(removed) != 0 || !retained {
+					t.Fatal("live native index was not retained without removal evidence", err)
+				}
+				remaining, _, err := source.CachedItems(ctx, run.Binding.Source, run.Binding.Selection(), kernel.Page{Limit: 30})
+				if err != nil {
+					t.Fatal(err)
+				}
+				unchanged := false
+				for _, entry := range remaining {
+					if entry.Path == candidate.Path && entry.Version == candidate.Version {
+						unchanged = true
+					}
+				}
+				if !unchanged {
+					t.Fatal("retained native index lost its cache representation")
 				}
 				for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusBadGateway, http.StatusMethodNotAllowed} {
 					w.bridge.intercept(func(out http.ResponseWriter, request *http.Request) bool {

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
@@ -69,16 +71,28 @@ func TestUnitPullCacheRemovalNeedsExactAbsenceAndCurrentRepresentation(t *testin
 }
 
 func TestUnitPullPresentSourceSettlesRetentionWithCurrentAuthorityAndFinalFence(t *testing.T) {
-	for _, mode := range []string{"commit", "lost-lease", "changed-cache", "revoked"} {
+	for _, mode := range []string{"commit", "lost-lease", "changed-cache", "revoked", "delete-revoked"} {
 		t.Run(mode, func(t *testing.T) {
 			w, entry, candidate := removalFixture(t)
 			w.peer.absent = false
+			canDelete := true
+			open := w.source.Open
+			w.source.Open = func(ctx context.Context, key, root string) (*source.Service, source.Request, error) {
+				svc, q, err := open(ctx, key, root)
+				q.Access = &accessapitest.Decider{Admin: true, AllowsFunc: func(_ accessapi.ResourceType, _ accessapi.Repo, _ string, want accessapi.Actions) bool {
+					return canDelete || want&accessapi.ActionDelete == 0
+				}}
+				return svc, q, err
+			}
 			w.peer.afterAbsence = func() {
 				if w.db.InTx(t.Context()) {
 					t.Fatal("upstream observation occurred in a metadata transaction")
 				}
 				if mode == "revoked" {
 					w.openErr = kernel.ErrForbidden
+				}
+				if mode == "delete-revoked" {
+					canDelete = false
 				}
 				if mode == "changed-cache" {
 					if _, err := w.db.RemoteCache().Put(t.Context(), entry.Token, entry); err != nil {

@@ -244,6 +244,9 @@ func (s Source) Remove(ctx context.Context, candidate api.PullCacheCandidate, pu
 			// Presence is ordinary reconciliation, not changed source evidence.
 			// Acknowledge only retention, after checking the selected cache is
 			// still current; no item, index, blob or property is mutated.
+			if err := deleteAuthority(ctx, state, candidate.Selection, []string{candidate.Path}); err != nil {
+				return err
+			}
 			if record != nil {
 				if err := record(ctx, nil); err != nil {
 					return fmt.Errorf("record selected cache retention: %w", err)

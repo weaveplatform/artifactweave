@@ -103,7 +103,7 @@ type PullSource interface {
 	// removal group, and unchanged cache facts. Record receives actual paths
 	// after cache/item/index/event effects, before the final execution fence.
 	// If the upstream still has this file, Record receives no paths in a
-	// transaction after current source/cache checks and before Fence. That
+	// transaction after current source/cache and selected Delete checks, before Fence. That
 	// observation acknowledges retention, never successful deletion. It cannot
 	// turn an empty removal receipt into acknowledged removal evidence.
 	Remove(context.Context, PullCacheCandidate, PullPublication, func(context.Context, []string) error) ([]string, error)
