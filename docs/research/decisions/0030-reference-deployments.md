@@ -322,11 +322,15 @@ proof: `test/terraform/run.sh` in the gated `terraform` job is its test. Its fix
 sets their own and the driver passes the fixture's.
 
 The driver starts its own isolated SQLite/filesystem instance and requires the
-live child's exact structured listener event before readiness or authentication.
+live child's structured listener event for its private ephemeral backend. An
+owned TCP forwarder verifies the child's accepted socket for every connection
+before forwarding bytes, then pins that peer without reconnecting. Linux `/proc`
+and macOS `lsof` provide endpoint/inode ownership evidence; missing proof fails
+closed, including during shutdown drain or provider reconnects.
 Inherited application variables cannot select an operator's metadata/blob stores.
 `TERRAFORM_WORK` retains a parent containing a new private `run.*` directory per
 invocation; the driver prints that path and preserves earlier evidence and state.
-Its owned-child/spied-listener regressions run in `deploy/check.sh`; the existing
+Its owned-child/Go-chi-spy regressions run in `deploy/check.sh`; the existing
 provider lane retains pinned apply, refreshed empty-plan and destroy qualification
 (#1845).
 

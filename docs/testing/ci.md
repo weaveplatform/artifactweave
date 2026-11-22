@@ -1298,16 +1298,22 @@ darwin on amd64 and arm64.
 
 In apply mode the driver starts an owned atomic-coverage server with explicit private
 SQLite/filesystem configuration. It removes inherited `ARTIFACTWEAVE_*` settings only
-for that child, leaving caller and client options intact. The fresh JSON log must name
-the requested bound loopback address, and the child must remain live before and after
-bounded readiness. Failure or the ten-second startup deadline prevents authentication
+for that child, leaving caller and client options intact. The fresh JSON log names
+the child's private ephemeral backend. An owned TCP forwarder binds the requested
+frontend and checks Linux `/proc` or macOS `/usr/sbin/lsof` evidence that each connected
+peer socket belongs to the child before forwarding client bytes. Verified connections
+stay pinned without reconnecting; replacement listeners during shutdown drain cannot
+receive authentication or provider traffic. Missing socket evidence fails closed.
+Failure or the ten-second startup deadline prevents authentication
 and provider effects; direct fixture HTTP bypasses ambient proxies. `TERRAFORM_PORT`
 retains its default 18081. `TERRAFORM_WORK` retains a parent directory containing a new
 private `run.*` per invocation; the printed path locates its configuration, state and
 startup evidence. Automatic workspaces are removed on success and retained on failure.
 `python3 -I test/terraform/driver_test.py`, also run by `make deploy-check`, checks
 failed/occupied/missing-listener/racing-exit/timeout startup with only owned ephemeral
-listeners and stub clients. Real provider effects remain the existing provider lane's
+listeners, a Go/chi HTTP model built once and stub clients. Draining-child/replacement
+and native-provider reconnect cases exercise connection ownership after startup.
+Real provider effects remain the existing provider lane's
 responsibility (#1845).
 
 The providers move automatically. Dependabot cannot move them, because `run.sh` pins their

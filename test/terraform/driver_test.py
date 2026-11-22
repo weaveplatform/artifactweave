@@ -1,61 +1,38 @@
 """Exercise the real shell driver with owned children and loopback spies only."""
 
 from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
 import shutil
+import socket
 import subprocess
 import tempfile
-import threading
 import time
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
 SCENARIO = "deploy/artifactweave/terraform/oidc"
-APP = r'''#!/usr/bin/env python3
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import json, os, pathlib, signal, sys, time
-args = sys.argv
+FIXTURE = None
+CURL = r'''#!/usr/bin/env python3
+import os, pathlib, signal, socket, subprocess, sys, time
+from urllib.parse import urlsplit
 work = pathlib.Path(os.environ["DRIVER_TEST_ROOT"])
-(work / "child-pid").write_text(str(os.getpid()))
-behavior = os.environ["DRIVER_TEST_BEHAVIOR"]
-if behavior == "exit":
-    sys.exit(1)
-address = args[args.index("--listen") + 1]
-port = int(address.rsplit(":", 1)[1])
-if "--config" in args:
-    cfg = json.loads(pathlib.Path(args[args.index("--config") + 1]).read_text())
-    (work / "child-config.json").write_text(json.dumps(cfg))
-(work / "child-env.json").write_text(json.dumps({k: v for k, v in os.environ.items()
-    if k.startswith("ARTIFACTWEAVE_") or k in ("HOME", "GOCOVERDIR")}))
-if behavior in ("no-event", "wrong-event", "exit-on-readiness"):
-    if behavior != "no-event":
-        print(json.dumps({"msg": "artifactweave listening", "addr": address
-            if behavior == "exit-on-readiness" else "127.0.0.1:1"}), flush=True)
-    if behavior == "exit-on-readiness":
-        while not (work / "readiness-started").exists(): time.sleep(.01)
-        sys.exit(1)
-    while True: time.sleep(1)
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, *args): pass
-    def reply(self, data, status=200):
-        with (work / "requests.jsonl").open("a") as out:
-            out.write(json.dumps({"method": self.command, "path": self.path}) + "\n")
-        self.send_response(status)
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-    def do_GET(self): self.reply(b"ready", 503 if behavior == "timeout" else 200)
-    def do_POST(self):
-        self.rfile.read(int(self.headers.get("Content-Length", "0")))
-        self.reply(b'{"access_token":"owned-test-token"}')
-server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-print(json.dumps({"msg": "artifactweave listening", "addr": address}), flush=True)
-signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-server.serve_forever()
+held = None
+if os.environ["DRIVER_TEST_BEHAVIOR"] == "draining" and not (work / "listener-closed").exists():
+    url = urlsplit(sys.argv[-1])
+    held = socket.create_connection((url.hostname, url.port), timeout=2)
+    held.sendall(b"GET /held HTTP/1.1\r\nHost: fixture\r\n\r\n")
+    deadline = time.monotonic() + 3
+    while not (work / "held-request").exists() and time.monotonic() < deadline: time.sleep(.01)
+    assert (work / "held-request").exists()
+    os.kill(int((work / "child-pid").read_text()), signal.SIGTERM)
+    while not (work / "replacement-ready").exists() and time.monotonic() < deadline: time.sleep(.01)
+    assert (work / "replacement-ready").exists()
+result = subprocess.run([os.environ["DRIVER_TEST_REAL_CURL"], *sys.argv[1:]])
+if held: held.close()
+sys.exit(result.returncode)
 '''
 GO = r'''#!/usr/bin/env python3
 import os, pathlib, shutil, sys
@@ -71,6 +48,23 @@ import json, os, pathlib, sys
 if sys.argv[1] == "version":
     print('{"terraform_version":"1.17.1"}' if "-json" in sys.argv else "Terraform v1.17.1")
 else:
+    if os.environ["DRIVER_TEST_BEHAVIOR"] == "draining-provider" and sys.argv[2] == "apply":
+        import signal, socket, time, urllib.request
+        from urllib.parse import urlsplit
+        work = pathlib.Path(os.environ["DRIVER_TEST_ROOT"])
+        url = urlsplit(os.environ["TF_VAR_url"])
+        held = socket.create_connection((url.hostname, url.port), timeout=2)
+        held.sendall(b"GET /held HTTP/1.1\r\nHost: fixture\r\n\r\n")
+        deadline = time.monotonic() + 3
+        while not (work / "held-request").exists() and time.monotonic() < deadline: time.sleep(.01)
+        assert (work / "held-request").exists()
+        os.kill(int((work / "child-pid").read_text()), signal.SIGTERM)
+        while not (work / "replacement-ready").exists() and time.monotonic() < deadline: time.sleep(.01)
+        assert (work / "replacement-ready").exists()
+        request = urllib.request.Request(os.environ["TF_VAR_url"] + "/provider-fixture", data=b"fixture",
+                                         headers={"Authorization": "Bearer owned-provider-fixture-token"})
+        try: urllib.request.urlopen(request, timeout=2).read()
+        except OSError: sys.exit(1)
     if os.environ.get("DRIVER_TEST_PROBE_CLIENT") and sys.argv[2] in ("apply", "plan", "destroy"):
         import urllib.request
         urllib.request.urlopen(os.environ["TF_VAR_url"] + "/artifactory/api/v1/system/readiness", timeout=2).read()
@@ -79,44 +73,42 @@ else:
 '''
 
 
+class Requests:
+    def __init__(self, path):
+        self.path = path
+
+    def read(self):
+        return [json.loads(line) for line in self.path.read_text().splitlines()] if self.path.exists() else []
+
+    def __iter__(self): return iter(self.read())
+    def __eq__(self, other): return self.read() == other
+    def __repr__(self): return repr(self.read())
+
+
+@contextmanager
+def owned_spy(work, port=0, replacement=False):
+    record = Path(tempfile.mkdtemp(prefix="spy-", dir=work))
+    args = [str(FIXTURE), "spy", str(record), str(work), str(port)]
+    if replacement: args.append("replace")
+    with (record / "process.log").open("w") as log:
+        process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
+    try:
+        if not replacement:
+            deadline = time.monotonic() + 3
+            while not (record / "ready").exists() and time.monotonic() < deadline:
+                assert process.poll() is None, "owned chi spy failed to bind"
+                time.sleep(.01)
+            port = int((record / "ready").read_text())
+        yield port, Requests(record / "requests.jsonl")
+    finally:
+        if process.poll() is None: process.terminate()
+        process.wait(timeout=3)
+
+
 @contextmanager
 def spy(work):
-    requests = []
-
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *args):
-            pass
-
-        def do_GET(self):
-            requests.append({"method": "GET", "path": self.path})
-            (work / "readiness-started").touch()
-            if (work / "child-pid").exists():
-                pid = int((work / "child-pid").read_text())
-                deadline = time.monotonic() + 2
-                while alive(pid) and time.monotonic() < deadline:
-                    time.sleep(.01)
-            self.reply(b"ready")
-
-        def do_POST(self):
-            requests.append({"method": "POST", "path": self.path})
-            self.rfile.read(int(self.headers.get("Content-Length", "0")))
-            self.reply(b'{"access_token":"owned-test-token"}')
-
-        def reply(self, data):
-            self.send_response(200)
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield server.server_port, requests
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join()
+    with owned_spy(work) as value:
+        yield value
 
 
 def alive(pid):
@@ -127,17 +119,43 @@ def alive(pid):
         return False
 
 
+@contextmanager
+def replacement_spy(work, port):
+    with owned_spy(work, port, replacement=True) as (_, requests):
+        yield requests
+
+
 class DriverTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        global FIXTURE
+        if os.environ.get("DRIVER_TEST_FIXTURE_BIN"):
+            FIXTURE = Path(os.environ["DRIVER_TEST_FIXTURE_BIN"])
+            assert FIXTURE.is_file(), "prebuilt chi fixture missing"
+            return
+        cls.fixture_work = tempfile.TemporaryDirectory(prefix="provider-driver-chi-")
+        cls.addClassCleanup(cls.fixture_work.cleanup)
+        FIXTURE = Path(cls.fixture_work.name) / "server"
+        env = dict(os.environ, GOWORK="off")
+        result = subprocess.run(["go", "build", "-o", str(FIXTURE), "./test/terraform/testdata/server"],
+                                cwd=ROOT, env=env, capture_output=True, text=True, timeout=90)
+        if result.returncode:
+            raise AssertionError("chi fixture build failed: " + result.stderr)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="provider-driver-test-")
         self.addCleanup(self.temp.cleanup)
         self.work = Path(self.temp.name)
         self.bin = self.work / "bin"
         self.bin.mkdir()
-        for name, source in (("go", GO), ("terraform", TERRAFORM), ("app", APP)):
+        for name, source in (("go", GO), ("terraform", TERRAFORM), ("curl", CURL)):
             path = self.bin / name
             path.write_text(source)
             path.chmod(0o700)
+        (self.bin / "git").write_text('#!/usr/bin/env python3\nprint("owned-driver-regression")\n')
+        (self.bin / "git").chmod(0o700)
+        shutil.copyfile(FIXTURE, self.bin / "app")
+        (self.bin / "app").chmod(0o700)
         self.retained = self.work / "retained"
         self.retained.mkdir()
         (self.retained / "existing-evidence").write_text("keep")
@@ -146,6 +164,7 @@ class DriverTest(unittest.TestCase):
         env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ["PATH"],
                    DRIVER_TEST_ROOT=str(self.work), DRIVER_TEST_APP=str(self.bin / "app"),
                    DRIVER_TEST_BEHAVIOR=behavior, TERRAFORM_WORK=str(self.retained),
+                   DRIVER_TEST_REAL_CURL=shutil.which("curl"),
                    TERRAFORM_PORT=str(port), TERRAFORM_PROVIDER_MIRROR=str(self.work / "mirror"),
                    GOCOVERDIR=str(self.work / "coverage"), NO_PROXY="", no_proxy="")
         env.pop("TERRAFORM_ACCESS_TOKEN", None)
@@ -157,6 +176,8 @@ class DriverTest(unittest.TestCase):
         marker = self.work / "child-pid"
         if marker.exists():
             self.assertFalse(alive(int(marker.read_text())), "owned child was not reaped")
+        for marker in self.retained.glob("run.*/forwarder.ready"):
+            self.assertFalse(alive(json.loads(marker.read_text())["pid"]), "owned forwarder was not reaped")
         return result
 
     def assert_no_effects(self, result, requests):
@@ -168,6 +189,43 @@ class DriverTest(unittest.TestCase):
     def test_failed_child_does_not_authenticate_to_healthy_listener(self):
         with spy(self.work) as (port, requests):
             self.assert_no_effects(self.run_driver("exit", port), requests)
+            self.assertEqual(requests, [])
+
+    def test_draining_child_does_not_authorize_replacement_listener(self):
+        with socket.socket() as reservation:
+            reservation.bind(("127.0.0.1", 0))
+            port = reservation.getsockname()[1]
+        with replacement_spy(self.work, port) as requests:
+            result = self.run_driver("draining", port)
+            self.assertTrue((self.work / "held-request").exists())
+            self.assertTrue((self.work / "replacement-ready").exists())
+            if os.environ.get("DRIVER_TEST_EVIDENCE"):
+                Path(os.environ["DRIVER_TEST_EVIDENCE"]).write_text(json.dumps({
+                    "baseline": "8d33fc0bc57cc3f0b1ddb7529f1051c5b65be308",
+                    "parent_exit": result.returncode, "requests": list(requests),
+                    "held_owned_request": True, "owned_replacement_bound": True,
+                    "child_live_when_replacement_received_auth": (self.work / "replacement-auth-while-child-live").exists(),
+                }, indent=2) + "\n")
+            self.assert_no_effects(result, requests)
+
+    def test_provider_reconnect_does_not_reach_draining_child_replacement(self):
+        with socket.socket() as reservation:
+            reservation.bind(("127.0.0.1", 0))
+            port = reservation.getsockname()[1]
+        with replacement_spy(self.work, port) as requests:
+            result = self.run_driver("draining-provider", port)
+            self.assertTrue((self.work / "held-request").exists())
+            self.assertTrue((self.work / "replacement-ready").exists())
+            self.assert_no_effects(result, requests)
+            self.assertEqual(requests, [])
+
+    def test_connected_socket_requires_child_ownership_evidence(self):
+        with socket.socket() as reservation:
+            reservation.bind(("127.0.0.1", 0))
+            front = reservation.getsockname()[1]
+        with spy(self.work) as (foreign, requests):
+            result = self.run_driver("foreign-event", front, {"DRIVER_TEST_FOREIGN_PORT": str(foreign)})
+            self.assert_no_effects(result, requests)
             self.assertEqual(requests, [])
 
     def test_occupied_port_does_not_authenticate_or_stop_occupant(self):
@@ -183,14 +241,17 @@ class DriverTest(unittest.TestCase):
             self.assertEqual(requests, [])
             self.assertTrue((self.retained / "server.log").exists())
 
-    def test_listener_event_must_name_the_requested_address(self):
+    def test_listener_event_must_name_a_private_loopback_address(self):
         with spy(self.work) as (port, requests):
             self.assert_no_effects(self.run_driver("wrong-event", port), requests)
             self.assertEqual(requests, [])
 
     def test_child_exit_during_readiness_fails_before_authentication(self):
-        with spy(self.work) as (port, requests):
-            self.assert_no_effects(self.run_driver("exit-on-readiness", port), requests)
+        with socket.socket() as reservation:
+            reservation.bind(("127.0.0.1", 0))
+            port = reservation.getsockname()[1]
+        self.assert_no_effects(self.run_driver("exit-on-readiness", port), [])
+        self.assertTrue((self.work / "readiness-started").exists())
 
     def test_owned_listener_readiness_timeout_fails_before_authentication(self):
         with spy(self.work) as (port, _):

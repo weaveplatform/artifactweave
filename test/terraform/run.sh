@@ -66,6 +66,7 @@ echo "Terraform provider workspace: $work"
 fixture_no_proxy="127.0.0.1,localhost${NO_PROXY:+,$NO_PROXY}${no_proxy:+,$no_proxy}"
 export NO_PROXY="$fixture_no_proxy" no_proxy="$fixture_no_proxy"
 server=
+forwarder=
 server_ready=
 require_server() {
 	if ! kill -0 "$server" 2>/dev/null; then
@@ -73,6 +74,12 @@ require_server() {
 		wait "$server" || status=$?
 		server=
 		echo "Terraform fixture server exited (status $status)" >&2
+		exit 1
+	fi
+	if [ -n "$forwarder" ] && ! kill -0 "$forwarder" 2>/dev/null; then
+		wait "$forwarder" || true
+		forwarder=
+		echo "Terraform fixture connection owner proof failed" >&2
 		exit 1
 	fi
 }
@@ -88,6 +95,10 @@ curl() {
 }
 cleanup() {
 	rc=$?
+	if [ -n "$forwarder" ]; then
+		kill -TERM "$forwarder" 2>/dev/null || true
+		wait "$forwarder" 2>/dev/null || true
+	fi
 	if [ -n "$server" ]; then
 		kill -TERM "$server" 2>/dev/null || true
 		wait "$server" 2>/dev/null || true
@@ -97,6 +108,9 @@ cleanup() {
 	if [ "$rc" -ne 0 ] && [ -s "$work/server.log" ]; then
 		echo "run.sh: exit $rc; the last 300 lines of the server log:" >&2
 		tail -n 300 "$work/server.log" >&2
+	fi
+	if [ "$rc" -ne 0 ] && [ -s "$work/forwarder.log" ]; then
+		tail -n 30 "$work/forwarder.log" >&2
 	fi
 	if [ -n "${owned:-}" ]; then
 		if [ "$rc" -eq 0 ]; then
@@ -201,9 +215,14 @@ server=$!
 startup_deadline=$((SECONDS + 10))
 while [ "$SECONDS" -lt "$startup_deadline" ]; do
 	require_server
-	if python3 -I "$here/fixture-server.py" listening "$work/server.log" "127.0.0.1:$port"; then
+	if backend=$(python3 -I "$here/fixture-server.py" address "$work/server.log"); then
 		require_server
-		if command curl --noproxy '*' --max-time 1 -fs "$url/artifactory/api/v1/system/readiness" >/dev/null; then
+		if [ -z "$forwarder" ]; then
+			python3 -I "$here/fixture-server.py" forward "$server" "$backend" "$port" "$work/forwarder.ready" \
+				>"$work/forwarder.log" 2>&1 &
+			forwarder=$!
+		fi
+		if [ -f "$work/forwarder.ready" ] && command curl --noproxy '*' --max-time 2 -fs "$url/artifactory/api/v1/system/readiness" >/dev/null; then
 			require_server
 			server_ready=1
 			break

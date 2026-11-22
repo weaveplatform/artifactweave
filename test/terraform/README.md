@@ -39,12 +39,17 @@ end of the server log and retains its private work directory, including Terrafor
 
 The server receives an explicit private configuration for SQLite and filesystem storage;
 inherited `ARTIFACTWEAVE_*` variables are removed only from that child. The caller's
-environment and `HOME` remain intact. Its fresh JSON startup log must report the exact
-bound loopback address before the driver polls readiness, and the child must remain live
-through that check. Startup failure, an occupied port, missing listener evidence or the
-ten-second readiness deadline stops the run before token creation or provider effects.
-Fixture HTTP bypasses host proxy settings. `TERRAFORM_PORT` still selects the loopback
-port (default 18081).
+environment and `HOME` remain intact. The child binds a private ephemeral loopback backend
+and reports its address in its fresh JSON startup log. An owned TCP forwarder binds
+`TERRAFORM_PORT` (default 18081). Before forwarding any client bytes on each connection,
+it proves the connected backend peer socket belongs to the child: Linux uses the child's
+`/proc` socket inode/endpoint records; macOS uses `/usr/sbin/lsof` established endpoints.
+Missing ownership evidence fails closed. Each verified connection stays pinned to that
+peer; it never reconnects or retries against a replacement listener. This also protects
+native provider and Python checker reconnects while the child drains after shutdown.
+Startup failure, an occupied frontend, missing listener/socket evidence or the ten-second
+readiness deadline stops the run before token creation or provider effects. Fixture HTTP
+bypasses host proxy settings. Cleanup reaps the owned forwarder before the child.
 
 `TERRAFORM_WORK` names a retained parent directory. Each invocation creates a private
 `run.*` child, prints its path, and keeps it on success or failure. This preserves earlier
@@ -53,7 +58,10 @@ or listening event. Without that option, successful temporary workspaces are rem
 failed ones retained. Cleanup signals and reaps only the child started by this run.
 
 `python3 -I test/terraform/driver_test.py` exercises the shell entry point with owned
-ephemeral listeners and stub Go/Terraform clients. `make deploy-check` runs the same
+ephemeral listeners, a Go/chi HTTP fixture built once, and stub Go/Terraform clients. The
+draining-child cases hold an active request, signal shutdown and bind an owned replacement
+spy; neither authentication nor provider reconnects may send it request bytes.
+`make deploy-check` runs the same
 regressions; the pinned provider lane supplies real apply/plan/destroy evidence.
 
 The remote-repositories scenario covers all fourteen P9 provider resource types. It applies
