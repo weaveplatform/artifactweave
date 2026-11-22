@@ -17,6 +17,13 @@ import (
 // 500, so its cause goes to the access log (NoteCause). Cancellation of the
 // request itself aborts through net/http without publishing a response.
 func WriteErr(w http.ResponseWriter, r *http.Request, err error) {
+	WriteErrProfile(w, r, ErrorProfile(r), err)
+}
+
+// WriteErrProfile renders err with profile for a handler that owns its wire
+// envelope independently of the router. Like WriteErr, it records unexpected
+// causes and aborts matching request cancellation before publishing a response.
+func WriteErrProfile(w http.ResponseWriter, r *http.Request, profile apierror.Profile, err error) {
 	// A disconnected client can cancel a concurrent lookup after another
 	// request was refused. Preserve the cause without inventing a server 500.
 	if errors.Is(err, context.Canceled) && errors.Is(r.Context().Err(), context.Canceled) {
@@ -27,7 +34,7 @@ func WriteErr(w http.ResponseWriter, r *http.Request, err error) {
 	if !errors.As(err, &typed) {
 		NoteCause(r.Context(), err)
 	}
-	apierror.Write(w, ErrorProfile(r), err)
+	apierror.Write(w, profile, err)
 }
 
 // WriteJSON writes v as a JSON body with status. The status line is out

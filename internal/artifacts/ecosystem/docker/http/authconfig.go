@@ -10,6 +10,7 @@ import (
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
 )
@@ -58,10 +59,11 @@ func (g *Registry) writeAuth(w http.ResponseWriter, r *http.Request, s apierror.
 		case !errors.Is(err, kernel.ErrNotFound):
 			// A user an OIDC token names need not be stored; any other
 			// failure is the store's.
+			err = fmt.Errorf("get user %s: %w", p.Name, err)
 			if g.fault != nil {
-				g.fault(r, fmt.Errorf("get user %s: %w", p.Name, err))
+				g.fault(r, err)
 			}
-			apierror.Write(w, s, err)
+			httpkit.WriteErrProfile(w, r, s, err)
 			return
 		}
 	}

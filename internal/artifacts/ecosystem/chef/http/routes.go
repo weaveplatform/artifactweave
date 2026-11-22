@@ -30,7 +30,7 @@ func (s ChefAPI) RegisterChefReindex(r chi.Router) {
 		}
 		_, err := s.Reindex(r.Context(), repo.Chef, chi.URLParam(r, "repoKey"), "", true)
 		if err != nil {
-			apierror.Write(w, apierror.ProfileArtifactory, err)
+			httpkit.WriteErrProfile(w, r, apierror.ProfileArtifactory, err)
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain")

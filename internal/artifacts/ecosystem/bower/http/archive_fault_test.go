@@ -270,7 +270,25 @@ func TestAccBowerLocalArchiveFailureDoesNotDeliverPartialBytes(t *testing.T) {
 				WithContext(ctx)
 			r.Header.Set("X-User", "admin")
 			out := httptest.NewRecorder()
-			f.router.ServeHTTP(out, r)
+			out.Code = 0
+			// Direct router calls do not have net/http's abort boundary.
+			aborted := func() (caught any) {
+				defer func() { caught = recover() }()
+				f.router.ServeHTTP(out, r)
+				return nil
+			}()
+			if fault == "cancelled" {
+				if aborted != http.ErrAbortHandler { //nolint:errorlint // net/http requires this exact sentinel
+					t.Fatal("cancelled archive did not abort", aborted)
+				}
+				if out.Code != 0 || out.Body.Len() != 0 || len(out.Header()) != 0 {
+					t.Fatalf("cancelled archive published a response: %d %s", out.Code, out.Body)
+				}
+				return
+			}
+			if aborted != nil {
+				t.Fatal("archive failure panicked", aborted)
+			}
 			if out.Code != http.StatusInternalServerError ||
 				bytes.HasPrefix(out.Body.Bytes(), []byte{0x1f, 0x8b}) {
 				t.Fatalf("failed archive delivered: %d %s", out.Code, out.Body)

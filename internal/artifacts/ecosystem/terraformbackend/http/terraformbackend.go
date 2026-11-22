@@ -20,6 +20,7 @@ import (
 	tfbe "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
@@ -191,7 +192,7 @@ func (h handler) error(w http.ResponseWriter, r *http.Request, err error) {
 	if !errors.As(err, &typed) && h.o.Fault != nil {
 		h.o.Fault(r, err)
 	}
-	apierror.Write(w, apierror.ProfileTerraformBackend, err)
+	httpkit.WriteErrProfile(w, r, apierror.ProfileTerraformBackend, err)
 }
 
 func decode(w http.ResponseWriter, r *http.Request, v any) error {

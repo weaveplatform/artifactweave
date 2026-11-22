@@ -61,7 +61,7 @@ func (s PuppetAPI) RegisterPuppetMetadataRoutes(r chi.Router, o pkgroute.Options
 				true,
 			)
 			if err != nil {
-				apierror.Write(w, apierror.ProfileArtifactory, err)
+				httpkit.WriteErrProfile(w, r, apierror.ProfileArtifactory, err)
 				return
 			}
 			w.Header().Set("Content-Type", "text/plain")

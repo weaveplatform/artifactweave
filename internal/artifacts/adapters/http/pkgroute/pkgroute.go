@@ -26,6 +26,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
@@ -80,7 +81,8 @@ type Options struct {
 	// Created answers 201 to a deploy that stored it, with the item routes'
 	// deploy body. Nil answers 201 with no body.
 	Created func(w http.ResponseWriter, r *http.Request, it model.Item)
-	// Fault records an unexpected error for the access log; nil drops it.
+	// Fault records an unexpected error for the embedding caller; nil adds
+	// no callback to the shared request cause recording.
 	Fault func(*http.Request, error)
 	// NoUpstream reports whether a package handler's walk through the
 	// virtual repository v leaves out its remote members' upstreams and
@@ -668,7 +670,7 @@ func (k *Kit) Error(w http.ResponseWriter, r *http.Request, err error) {
 	if !errors.As(err, &typed) && k.o.Fault != nil {
 		k.o.Fault(r, err)
 	}
-	apierror.Write(w, k.p.ErrorProfile, err)
+	httpkit.WriteErrProfile(w, r, k.p.ErrorProfile, err)
 }
 
 // Can reports whether the caller holds every action in want on path in the
