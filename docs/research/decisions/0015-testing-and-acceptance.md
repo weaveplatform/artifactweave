@@ -107,6 +107,13 @@ section 9):
 - **Categories.** Pull, Push, Content Discovery and Content Management are all on. The job
   fails on any failed specification, never on a skipped one.
 
+**NTLM proxy native proof (#1835).** The core lane's `@generic_remote` ownership
+includes `@ntlm_proxy`; its JFrog CLI step fails when the required binary is absent.
+A controlled proxy independently verifies NTLMv2 proof, domain/workstation and the
+same socket, while separate origin records and downloaded files prove cold bytes.
+Transport suites additionally cover failure, rotation, SQLite and PostgreSQL.
+Replication's separate consumer is #1848, not an effect claimed by this scenario.
+
 **Terraform scenarios.** `test/terraform/run.sh` applies the app-layer references in
 `deploy/artifactweave/terraform` (decision 0030), covering the implemented P0–P8 resources
 of the JFrog providers, against the binary, then plans (no changes allowed), then

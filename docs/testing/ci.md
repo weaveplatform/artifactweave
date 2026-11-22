@@ -1696,7 +1696,11 @@ also cover upstream version searches and permission-safe differing-layout discov
 application and controlled upstream. It proves cold `jf rt direct-download` and curl
 GETs, warm reuse during an upstream outage, cache-alias `jf rt dl`/AQL search, a reader
 with Read and Deploy/Cache filling the cache (#1587), exact downloaded bytes, upstream
-request counts and repository deletion. Client configuration and output directories are isolated per scenario.
+request counts and repository deletion. `@ntlm_proxy` shares the required core
+native lane and requires the pinned JFrog CLI even locally: two cold files pass
+through one independently verified NTLMv2 proxy handshake. Proxy/origin request
+records assert domain/workstation, connection reuse and credential separation.
+Client configuration and output directories are isolated per scenario.
 The local macOS run passed 1 scenario/44 steps in 2.12 seconds (7.10 seconds reported
 by Go including startup); this is not a Linux full-suite timing estimate. No timeout
 or matrix change is needed. Runtime race tests additionally cover HEAD/ranges/304,

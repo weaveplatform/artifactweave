@@ -14,6 +14,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
+	"github.com/weaveplatform/artifactweave/internal/platform/outbound"
 )
 
 type sourceSecurity struct {
@@ -21,6 +22,7 @@ type sourceSecurity struct {
 	config      repo.Config
 	policy      *destinationPolicy
 	proxy       *url.URL
+	ntlm        *outbound.NTLMProxy
 	roots       *x509.CertPool
 	certificate tls.Certificate
 }
@@ -78,10 +80,11 @@ func (s *sourceSecurity) prepare(req *http.Request) error {
 }
 
 type secureTransport struct {
-	source  *sourceSecurity
-	base    *http.Transport
-	mu      sync.Mutex
-	clients map[string]*http.Transport
+	source     *sourceSecurity
+	base       *http.Transport
+	mu         sync.Mutex
+	clients    map[string]*http.Transport
+	forwarders map[*http.Transport]http.RoundTripper
 }
 
 func (s *sourceSecurity) transport(base *http.Transport) (http.RoundTripper, func()) {
@@ -96,6 +99,7 @@ func (t *secureTransport) close() {
 		tr.CloseIdleConnections()
 	}
 	t.clients = make(map[string]*http.Transport)
+	t.forwarders = make(map[*http.Transport]http.RoundTripper)
 	t.base.CloseIdleConnections()
 }
 
@@ -128,7 +132,22 @@ func (t *secureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		noAuth := req.Context().Value(noCrossOriginAuthKey{}) == true &&
 			remote.Origin(req.URL) != remote.Origin(t.source.base)
 		tr := t.forAuthority(req.URL, proxy, noAuth)
-		res, roundErr := tr.RoundTrip(physical)
+		t.mu.Lock()
+		forward := t.forwarders[tr]
+		t.mu.Unlock()
+		var res *http.Response
+		var roundErr error
+		if forward != nil {
+			res, roundErr = forward.RoundTrip(physical)
+		} else {
+			res, roundErr = tr.RoundTrip(physical)
+		}
+		if errors.Is(roundErr, outbound.ErrSecurity) {
+			roundErr = remote.ErrSecurity
+		}
+		if errors.Is(roundErr, outbound.ErrConnection) {
+			roundErr = remote.ErrConnection
+		}
 		if roundErr == nil {
 			res.Request = req
 			return res, nil
@@ -167,14 +186,18 @@ func (t *secureTransport) forAuthority(logical, proxy *url.URL, noAuth bool) *ht
 	}
 	tr.Proxy = nil
 	if proxy != nil {
-		if logical.Scheme == "http" && net.ParseIP(logical.Hostname()) == nil {
+		if logical.Scheme == "http" && net.ParseIP(logical.Hostname()) == nil || t.source.ntlm != nil && logical.Scheme == "https" {
 			// A forward proxy must replace Host with the absolute URI's authority.
 			// CONNECT preserves virtual-host routing while pinning the checked IP.
 			tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 				return t.tunnel(ctx, network, addr, proxy)
 			}
 		} else {
-			tr.Proxy = http.ProxyURL(proxy)
+			physicalProxy := *proxy
+			if t.source.ntlm != nil {
+				physicalProxy.User = nil
+			}
+			tr.Proxy = http.ProxyURL(&physicalProxy)
 			if proxy.Scheme == "https" {
 				tr.DialTLSContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
 					return t.dialProxy(ctx, network, proxy)
@@ -182,12 +205,19 @@ func (t *secureTransport) forAuthority(logical, proxy *url.URL, noAuth bool) *ht
 			}
 		}
 	}
+	if t.source.ntlm != nil && proxy != nil && logical.Scheme == "http" && net.ParseIP(logical.Hostname()) != nil {
+		if t.forwarders == nil {
+			t.forwarders = make(map[*http.Transport]http.RoundTripper)
+		}
+		t.forwarders[tr] = t.source.ntlm.ForwardTransport(tr)
+	}
 	// Metadata can name many public authorities. Bound retained connection pools;
 	// an evicted pool's in-flight requests keep their own transport alive.
 	if len(t.clients) >= 32 {
 		for old, client := range t.clients {
 			client.CloseIdleConnections()
 			delete(t.clients, old)
+			delete(t.forwarders, client)
 			break
 		}
 	}
@@ -244,6 +274,20 @@ func (t *secureTransport) tunnel(
 	req, err := http.NewRequestWithContext(ctx, http.MethodConnect, "http://"+addr, nil)
 	if err != nil {
 		return nil, remote.ErrSecurity
+	}
+	if t.source.ntlm != nil {
+		tunnel, ntlmErr := t.source.ntlm.Connect(ctx, conn, addr, t.base.MaxResponseHeaderBytes)
+		success = ntlmErr == nil
+		if errors.Is(ntlmErr, outbound.ErrSecurity) {
+			return nil, remote.ErrSecurity
+		}
+		if errors.Is(ntlmErr, outbound.ErrConnection) {
+			return nil, remote.ErrConnection
+		}
+		if ntlmErr != nil {
+			return nil, safeError(ntlmErr)
+		}
+		return tunnel, nil
 	}
 	if proxy.User != nil {
 		password, _ := proxy.User.Password()

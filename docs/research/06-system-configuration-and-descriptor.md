@@ -342,6 +342,15 @@ security:
     loginAttempts: 5
 ```
 
+Proxy `domain` and `ntHost` are runtime NTLMv2 settings for artifact remote sources
+(#1835), using the configured username and sealed proxy password. This follows the
+7.161.26 `ProxyDescriptor` / `artifactory.xsd` field meanings: domain/realm and the
+computer name of this client. [MS-NTHT](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-ntht/f8064832-931f-4516-9557-01630745732f)
+supplies the HTTP proxy handshake, while the [remote transport contract](../implementation/remote-http-transport.md)
+distinguishes local pinning, CONNECT and supported NTLMv2 capability restrictions.
+The separate replication consumer remains #1848; proxy redirects remain #1836.
+No Windows administration or LDAP NTLM login is implied.
+
 ### What artifactweave serves
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,

@@ -77,8 +77,20 @@ application checks do not replace network egress controls. A malicious configure
 can disregard CONNECT targets, and unlisted provider-specific metadata services still
 require network policy. Certificate-chain/hostname verification is implemented; online
 CRL/OCSP revocation checking is not. P18 must review revocation requirements and these
-residual boundaries. DNS-named plain HTTP sources require proxy CONNECT support; P12
-owns NTLM and proxy-credential redirect settings, which currently fail closed. Cookie
+residual boundaries. DNS-named HTTP sources and HTTPS sources require CONNECT support; literal-IP HTTP
+retains absolute-form forwarding. NTLM proxy credentials are confined to a bounded,
+same-connection 407 exchange. CONNECT isolates origin credentials/client certificates;
+a trusted HTTP forward proxy sees the separately configured origin Authorization
+header as before, and must remove Proxy-Authorization before forwarding. Body-bearing
+forward requests authenticate with HEAD before sending their body once; automatic
+mutation replay remains disabled. The
+implementation refuses NTLMv1, signing/sealing/key exchange, required MIC and channel
+binding, and never falls back to Basic for a configured NTLM identity. NTLM itself
+provides no proxy server authentication or transport encryption; HTTPS proxy TLS is
+verified separately. A configured HTTP proxy remains a trusted network boundary.
+Domain/workstation/password changes rotate the pool; stale publication still needs
+the fences described above. `redirectedToHosts` remains refused under #1836;
+replication's separate NTLM consumer is tracked by #1848. Cookie
 domain/path/secure semantics permit eligible cookies across ports within one source;
 jars are isolated between repositories and source revisions. Response-body integrity,
 authenticated cache partitioning and format metadata rewriting have separate adapter
