@@ -28,6 +28,7 @@ func executionBinding(occurrence string) model.ExecutionBinding {
 func runExecutions(t *testing.T, newStore Factory) {
 	t.Run("Executions", func(t *testing.T) {
 		t.Run("immutable identity and occurrence", func(t *testing.T) { executionIdentity(t, newStore(t)) })
+		t.Run("invalid execution provenance and proof", func(t *testing.T) { executionValidation(t, newStore(t)) })
 		t.Run("immutable one-shot options", func(t *testing.T) { executionOptions(t, newStore(t)) })
 		t.Run("explicit destination history", func(t *testing.T) { executionDestinations(t, newStore(t)) })
 		t.Run("distinct selection counts", func(t *testing.T) { executionSelectionCount(t, newStore(t)) })

@@ -26,6 +26,16 @@ type executionWorld struct {
 
 func newExecutionWorld(t *testing.T, direction model.ReplicationDirection) *executionWorld {
 	t.Helper()
+	return newExecutionWorldWithOptions(t, direction, nil)
+}
+
+func newExecutionWorldWithOptions(t *testing.T, direction model.ReplicationDirection, input *replication.ExecutionInput) *executionWorld {
+	t.Helper()
+	return newExecutionWorldWithLimit(t, direction, input, 0)
+}
+
+func newExecutionWorldWithLimit(t *testing.T, direction model.ReplicationDirection, input *replication.ExecutionInput, limit int) *executionWorld {
+	t.Helper()
 	out := &executionWorld{}
 	var core *world
 	var ctx context.Context
@@ -39,7 +49,9 @@ func newExecutionWorld(t *testing.T, direction model.ReplicationDirection) *exec
 		p.addSource("selected/file", "verified bytes")
 		ctx = accessapi.WithCaller(t.Context(), kernel.Principal{Name: "original", TokenID: "verified-token"}, nil)
 		start = func(ctx context.Context, request replication.TransferRequest) (replication.TransferAdmission, error) {
-			run, err := p.push.Start(ctx, replication.PushRequest{ID: request.ID, TargetKey: request.TargetKey, TargetRevision: request.TargetRevision, Root: request.Root}, nil)
+			driver := p.push
+			driver.Configurations = driver.Configurations.WithExecutionOptions(request.Options)
+			run, err := driver.Start(ctx, replication.PushRequest{ID: request.ID, TargetKey: request.TargetKey, TargetRevision: request.TargetRevision, Root: request.Root}, nil)
 			return replication.TransferAdmission{ID: run.Reference.ID, Incarnation: run.Reference.Incarnation, Repository: run.Binding.Source}, err
 		}
 		step = func(ctx context.Context, run model.ExecutionRun, fence replication.PushFence) error {
@@ -51,7 +63,14 @@ func newExecutionWorld(t *testing.T, direction model.ReplicationDirection) *exec
 		out.pull, core, repository, ctx = p, p.world, "remote", authorized
 		p.add(existing, "selected/file")
 		start = func(ctx context.Context, request replication.TransferRequest) (replication.TransferAdmission, error) {
-			run, err := p.driver.Start(ctx, replication.PullRequest{ID: request.ID, TargetKey: request.TargetKey, TargetRevision: request.TargetRevision, Root: request.Root}, nil)
+			driver := p.driver
+			driver.Configurations = driver.Configurations.WithExecutionOptions(request.Options)
+			run, err := driver.Start(ctx, replication.PullRequest{ID: request.ID, TargetKey: request.TargetKey, TargetRevision: request.TargetRevision, Root: request.Root}, nil)
+			if err == nil {
+				for index := range p.items {
+					p.items[index].Selection = run.Binding.Selection()
+				}
+			}
 			return replication.TransferAdmission{ID: run.Reference.ID, Incarnation: run.Reference.Incarnation, Repository: run.Binding.Source.Repository}, err
 		}
 		step = func(ctx context.Context, run model.ExecutionRun, fence replication.PushFence) error {
@@ -60,11 +79,26 @@ func newExecutionWorld(t *testing.T, direction model.ReplicationDirection) *exec
 		restore = p.driver.Restore
 	}
 	out.db = dispatchStore{Store: core.db, platform: platforminmem.New(core.db.Store)}
+	if limit > 0 {
+		core.policy = authority{any: true, project: core.repos.values[repository].ProjectKey}
+		core.service.UserQueryLimit = limit
+		if out.push != nil {
+			out.push.push.Configurations = core.service
+		} else {
+			out.pull.driver.Configurations = core.service
+		}
+	}
 	now := func() time.Time { return time.Unix(100, 0) }
 	coordinator := replication.Coordinator{
 		Store: out.db, Configurations: core.service, Drivers: map[model.ReplicationDirection]replication.TransferStart{direction: start}, Restore: restore, Now: now,
 	}
-	run, err := coordinator.Execute(ctx, repository, "selected")
+	var run model.ExecutionRun
+	var err error
+	if input == nil {
+		run, err = coordinator.Execute(ctx, repository, "selected")
+	} else {
+		run, err = coordinator.ExecuteWithOptions(ctx, repository, "selected", *input)
+	}
 	must(t, err)
 	out.run = run
 	out.worker = replication.Worker{
