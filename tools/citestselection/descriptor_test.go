@@ -19,7 +19,8 @@ func TestUnitDescriptorProviderControlsAreRequired(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return string(data)
+		// Windows checkouts may convert to CRLF; the anchors below match lines.
+		return strings.ReplaceAll(string(data), "\r\n", "\n")
 	}
 	const scenario = "deploy/artifactweave/terraform/configuration"
 	if !strings.Contains(read("Makefile"), "\t"+scenario) {
