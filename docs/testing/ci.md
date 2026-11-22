@@ -265,6 +265,15 @@ its 35-minute timeout. Build failures abort before acceptance starts, and test
 failures remain blocking. The result file stays on tmpfs so disk exhaustion cannot
 hide an image-build failure.
 
+The core job also runs `TestAccTerraformModuleInit` from the Terraform server
+package with the checksum-verified Terraform binary installed by
+`registry-clients`. Full qualification and narrow Terraform selections require
+this exact test to exist and the binary to be executable. Its native module
+install and signed-download authentication, HEAD, Range and disabled-user checks
+contribute atomic coverage to `cover-accept`. The package acceptance lane keeps
+the same test in its inventory, but does not install native clients; the provider
+conformance and godog registry scenarios supply separate evidence.
+
 The `@agentplugins_clients` scenarios in the required native acceptance
 partition run the [pinned JFrog CLI](ci-native-client-inventory.md) against the local server. They isolate the
 CLI's home directory and cover Cursor v1 install/v2 update, byte-identical

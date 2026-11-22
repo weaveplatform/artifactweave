@@ -816,6 +816,21 @@ jobs:
           ARTIFACTWEAVE_BAZEL_CLIENT: '1'
         run: go test ./internal/artifacts/ecosystem/bazelmodules/http -run '^TestAccBazelClient$' -count=1 -timeout=7m -v
 
+      # The package lane has no installed Terraform. Run this signed-download
+      # regression here too, where the pinned client is required (#1840).
+      - name: Terraform module init and signed download native acceptance
+        if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',terraform,')
+        env:
+          TERRAFORM_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
+        run: |
+          [ -x "$ARTIFACTWEAVE_TERRAFORM_BIN" ] || { echo 'pinned Terraform executable is required'; exit 1; }
+          go test -list '^TestAccTerraformModuleInit$' ./test/server/artifacts/terraform > "$RUNNER_TEMP/terraform-module-tests.txt"
+          grep -qx 'TestAccTerraformModuleInit' "$RUNNER_TEMP/terraform-module-tests.txt"
+          mkdir -p cover/accept
+          go test -cover -covermode=atomic -coverpkg="${TERRAFORM_COVERPKG:-github.com/weaveplatform/artifactweave/...}" \
+            ./test/server/artifacts/terraform -run '^TestAccTerraformModuleInit$' \
+            -count=1 -timeout=3m -v -args -test.gocoverdir="$PWD/cover/accept"
+
       - name: Terraform and OpenTofu GitHub snapshot native acceptance
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',terraform,')
         env:

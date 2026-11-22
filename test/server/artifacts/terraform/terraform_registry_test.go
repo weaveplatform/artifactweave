@@ -40,6 +40,9 @@ func TestAccTerraformModuleInit(t *testing.T) {
 	}
 	db := inmem.New()
 	cheapSeed(t, db)
+	// Deployment records an event origin, so establish the token issuer's
+	// identity before deploying content rather than trying to replace it.
+	tokens, _ := seedTokens(t, db)
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +70,6 @@ func TestAccTerraformModuleInit(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	tokens, _ := seedTokens(t, db)
 	issued, err := tokens.Issue(t.Context(), token.Request{Username: "admin", ByAdmin: true})
 	if err != nil {
 		t.Fatal(err)
