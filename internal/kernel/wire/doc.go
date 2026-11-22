@@ -9,13 +9,16 @@
 //
 // kernel layer: the JFrog wire forms (camelCase, snake_case and kebab-case
 // mixed as JFrog sends them), which converters and handlers map to and from
-// the domain model. It declares types only and imports nothing, so the
-// generated artifactory server and client, the converters and the handlers
-// can all name these types without depending on the domain model.
+// the domain model. The generated servers, clients, converters and handlers
+// can name these types without depending on the domain model. The proxy
+// form also decodes its string/list JSON representations using the standard
+// library; proxy selection and transport policy stay with its consumers.
 //
 // # Inputs
 //
-// None at run time: the package declares types only.
+// ProxyConfiguration.UnmarshalJSON reads stored proxy JSON, normalizing
+// descriptor/provider service strings and historical string lists. The
+// other wire forms are declarative types encoded by their owners.
 //
 // # Outputs
 //
@@ -71,11 +74,13 @@
 // P4; the blob mirror summary in P2b (#66, #87); the multipart upload
 // status in P3 (#91); the proxy descriptor (#645) and the Smart Remote
 // statistics (#675) in P9. Moved here in P9d.
+// Proxy service representation compatibility is implemented in P12 (#1846).
 //
 // # Testing
 //
-// The package has no tests of its own, since it holds no logic. The tests
-// of the code that encodes each form pin its JSON:
+// TestUnitProxyConfigurationServices pins proxy normalization, historical
+// lists, absent/null clearing and malformed-shape redaction.
+// The tests of the code that encodes and consumes each form also pin its JSON:
 //
 //   - The permission, user and group forms: the domain model's round trips
 //     (TestUnitPermissionV1RoundTrip, TestUnitPermissionV2RoundTrip,
