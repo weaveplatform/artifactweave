@@ -139,7 +139,11 @@ func replicationBytes(instance *world, repository, path, expected string) error 
 }
 
 func (w *world) executeAndWaitReplication(repository string) error {
-	if _, err := replicationFixtureRequest(w, http.MethodPost, "/artifactory/api/replication/execute/"+repository+"/selected", "[]", http.StatusAccepted); err != nil {
+	return w.executeAndWaitReplicationPath(repository, "selected")
+}
+
+func (w *world) executeAndWaitReplicationPath(repository, root string) error {
+	if _, err := replicationFixtureRequest(w, http.MethodPost, "/artifactory/api/replication/execute/"+repository+"/"+root, "[]", http.StatusAccepted); err != nil {
 		return err
 	}
 	deadline := time.NewTimer(30 * time.Second)

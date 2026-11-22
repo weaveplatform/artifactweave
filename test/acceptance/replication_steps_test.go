@@ -21,6 +21,7 @@ func (w *world) registerSingleReplication(sc *godog.ScenarioContext) {
 	sc.Step(`^the replication instances retain independent repository bytes$`, w.replicationStoresIndependent)
 	sc.Step(`^ordinary "(push|pull)" replication transfers scoped bytes, properties and deletes between the instances$`, w.qualifyOrdinaryReplication)
 	sc.Step(`^a fresh native Maven consumer resolves the "(push|pull)" replicated package while its source is stopped$`, w.qualifyNativeReplication)
+	sc.Step(`^the pinned provider applies, updates, executes and destroys both single replication resources$`, w.qualifyProviderReplication)
 }
 
 func (w *world) startSingleReplication(backend string) error {
@@ -66,7 +67,7 @@ func (w *world) startSingleReplication(backend string) error {
 // replicationFixtureRequest addresses only one of the child worlds. Fixture
 // administration is separate from the nonadministrator peer transport that the
 // transfer scenarios configure; native clients receive isolated credentials.
-func replicationFixtureRequest(instance *world, method, path, body string, want int) ([]byte, error) {
+func replicationFixtureRequest(instance *world, method, path, body string, want int, mediaType ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(instance.t.Context(), 15*time.Second)
 	defer cancel()
 	request, err := http.NewRequestWithContext(ctx, method, instance.url+path, strings.NewReader(body))
@@ -75,6 +76,9 @@ func replicationFixtureRequest(instance *world, method, path, body string, want 
 	}
 	request.SetBasicAuth("admin", testAdminPassword)
 	request.Header.Set("Content-Type", "application/json")
+	if len(mediaType) > 0 {
+		request.Header.Set("Content-Type", mediaType[0])
+	}
 	client := &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	response, err := client.Do(request)
 	if err != nil {

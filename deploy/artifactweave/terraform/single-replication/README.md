@@ -1,9 +1,11 @@
 # single-replication: push and pull configuration
 
 This reference manages one local push target and one remote pull configuration
-using `jfrog/artifactory` 12.11.14. It qualifies configuration administration and
-credential lifecycle. Transfer, execution and scheduling workers have separate
-P11 tickets; these fixtures make no claim about moving content.
+using `jfrog/artifactory` 12.11.14. The configuration runner qualifies administration
+and credential lifecycle. The required `@replication_provider` acceptance matrix
+also applies these resources to two isolated applications, executes push/pull,
+checks destination/cache bytes and deletions, and destroys the managed resources
+on both SQLite and PostgreSQL.
 
 ## What it configures
 
@@ -34,7 +36,9 @@ revision          = 1
 
 Pass `TF_VAR_access_token`, `TF_VAR_target_password` and
 `TF_VAR_upstream_password` through the environment. Revision 2 changes
-configuration fields and rotates the supplied credentials.
+configuration fields and rotates the supplied credentials. The peer accounts are
+`replicator-<revision>` for push and `replication-upstream-user-<revision>` for pull;
+grant them access only to their corresponding peer repositories.
 
 ## Applying it
 
@@ -48,6 +52,11 @@ The follow-up plan must exit zero. Set `revision=2`, rotate the credentials, app
 and require another empty plan. Each configuration keeps its public target key
 across the update. Event-driven and checksum options stay false; their true
 forms remain unsupported rather than becoming configuration-only no-ops.
+
+Revision 2 exercises the stored statistics flag by default. Set
+`sync_statistics=false` and apply before executing ordinary P11 transfers;
+statistics merging remains unsupported. The provider matrix verifies the explicit
+501 refusal before applying this supported executing configuration.
 
 ## Security
 
@@ -113,6 +122,7 @@ No modules.
 | proxy\_key | Existing descriptor-managed proxy referenced by the push configuration. | `string` | n/a | yes |
 | repository\_prefix | Prefix for the local source and remote cache repository keys. | `string` | `"managed-replication"` | no |
 | revision | Configuration revision; revision 2 rotates secrets and changes control fields. | `number` | `1` | no |
+| sync\_statistics | Exercise the stored statistics flag; set false before ordinary P11 transfer qualification. | `bool` | `true` | no |
 | target\_password | Push authentication secret; Terraform retains its sensitive input in state. | `string` | n/a | yes |
 | target\_url | Absolute target repository URL stored in the push configuration. | `string` | n/a | yes |
 | upstream\_password | Remote write-only upstream secret; never retained in Terraform state. | `string` | n/a | yes |

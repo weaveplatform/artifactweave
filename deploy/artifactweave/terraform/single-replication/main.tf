@@ -5,7 +5,7 @@ resource "artifactory_local_generic_repository" "source" {
 resource "artifactory_remote_generic_repository" "cache" {
   key                 = "${var.repository_prefix}-remote"
   url                 = var.upstream_url
-  username            = "replication-upstream-user"
+  username            = "replication-upstream-user-${var.revision}"
   password_wo         = var.upstream_password
   password_wo_version = tostring(var.revision)
 }
@@ -22,7 +22,7 @@ resource "artifactory_local_repository_single_replication" "push" {
   socket_timeout_millis               = var.revision == 1 ? 15000 : 25000
   sync_deletes                        = var.revision == 2
   sync_properties                     = var.revision == 1
-  sync_statistics                     = var.revision == 2
+  sync_statistics                     = var.revision == 2 && var.sync_statistics
   include_path_prefix_pattern         = var.revision == 1 ? "org/**" : "release/**"
   exclude_path_prefix_pattern         = "**/temporary/**"
   proxy                               = var.proxy_key

@@ -715,7 +715,7 @@ jobs:
           # Full runs split NuGet and JVM recipes into required partitions.
           # Narrow Maven runs retain the JVM recipes in this job.
           # The JFrog Gradle wrapper remains informational in its own job.
-          ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes' || needs.impact.outputs.tags }}
+          ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes' || needs.impact.outputs.tags }}&&~@replication_provider
         run: |
           accept_pid=
           accept_done=0
@@ -1179,6 +1179,17 @@ jobs:
 
       - name: Apply, plan and destroy the scenarios against artifactweave
         run: make terraform TERRAFORM_MODE=apply
+
+      - name: Two-instance single replication through the pinned provider
+        env:
+          ARTIFACTWEAVE_ACCEPT_TAGS: '@replication_provider'
+          ARTIFACTWEAVE_REPLICATION_EVIDENCE_DIR: ${{ github.workspace }}/cover/terraform/replication-evidence
+          ARTIFACTWEAVE_GOCOVERDIR: ${{ github.workspace }}/cover/terraform/replication
+          ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
+        run: |
+          export ARTIFACTWEAVE_TERRAFORM_BIN="$(command -v terraform)"
+          mkdir -p "$ARTIFACTWEAVE_GOCOVERDIR"
+          GOWORK=off GOFLAGS=-p=2 GOMAXPROCS=2 go test -count=1 -timeout=20m -run '^TestAccFeatures$' ./test/acceptance
 
       - name: Upload Terraform coverage
         if: always()

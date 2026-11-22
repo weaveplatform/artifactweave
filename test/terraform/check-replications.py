@@ -56,7 +56,7 @@ def check(keys_file, identity_file, data_dir, server_log):
         expected["url"] = os.environ["TF_VAR_target_url" if direction == "push" else "TF_VAR_upstream_url"]
         if direction == "push":
             expected.update({"username": "replicator-" + str(revision), "socketTimeoutMillis": 15000 if revision == 1 else 25000,
-                             "syncStatistics": revision == 2, "proxyRef": os.environ["TF_VAR_proxy_key"], "disableProxy": revision == 2})
+                             "syncStatistics": revision == 2 and os.environ.get("TF_VAR_sync_statistics", "true") == "true", "proxyRef": os.environ["TF_VAR_proxy_key"], "disableProxy": revision == 2})
             assert value.get("password") and value["password"] not in SECRETS, "push password was not masked"
         for field, want in expected.items():
             assert value.get(field) == want, direction + ": configuration mismatch: " + field
