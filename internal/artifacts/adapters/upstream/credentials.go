@@ -29,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel/wire"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/internal/platform/outbound"
 )
 
 // ResolverOptions is trusted application configuration, never upstream metadata.
@@ -144,10 +145,11 @@ func (r *Resolver) Options(ctx context.Context, c repo.Config) (remote.Options, 
 	if err := checkHeaders(stored.CustomHTTPHeaders); err != nil {
 		return remote.Options{}, err
 	}
-	proxy, proxyDoc, err := r.proxy(ctx, stored)
+	selected, err := r.proxy(ctx, stored)
 	if err != nil {
 		return remote.Options{}, err
 	}
+	proxy, proxyDoc := selected.url, selected.document
 	policy := &destinationPolicy{
 		private: map[string]bool{remote.Origin(base): true},
 		lookup:  r.options.LookupIP,
@@ -179,6 +181,7 @@ func (r *Resolver) Options(ctx context.Context, c repo.Config) (remote.Options, 
 		config:      stored,
 		policy:      policy,
 		proxy:       proxy,
+		ntlm:        selected.ntlm,
 		roots:       r.roots,
 		certificate: certificate,
 	}
@@ -258,47 +261,51 @@ func (r *Resolver) certificate(ctx context.Context, alias string) (accessapi.Cer
 	return cert, nil
 }
 
+type proxySelection struct {
+	url      *url.URL
+	document configdoc.ConfigDocument
+	ntlm     *outbound.NTLMProxy
+}
+
 func (r *Resolver) proxy(
 	ctx context.Context,
 	c repo.Config,
-) (*url.URL, configdoc.ConfigDocument, error) {
+) (proxySelection, error) {
 	if enabled(c.DisableProxy) {
-		return nil, configdoc.ConfigDocument{}, nil
+		return proxySelection{}, nil
 	}
 	var doc configdoc.ConfigDocument
 	if c.Proxy != "" {
 		var err error
 		doc, err = r.store.Configs().Get(ctx, configdoc.ConfigProxy, c.Proxy)
 		if err != nil {
-			return nil, doc, configurationError(err)
+			return proxySelection{}, configurationError(err)
 		}
 	} else {
 		docs, err := r.store.Configs().List(ctx, configdoc.ConfigProxy)
 		if err != nil {
-			return nil, doc, configurationError(err)
+			return proxySelection{}, configurationError(err)
 		}
 		for _, candidate := range docs {
 			var p wire.ProxyConfiguration
 			if json.Unmarshal(candidate.Document, &p) != nil {
-				return nil, doc, remote.ErrConfiguration
+				return proxySelection{}, remote.ErrConfiguration
 			}
 			if candidate.Enabled && p.PlatformDefault && proxyService(p.Services) {
 				if doc.Key != "" {
-					return nil, doc, remote.ErrConfiguration
+					return proxySelection{}, remote.ErrConfiguration
 				}
 				doc = candidate
 			}
 		}
 		if doc.Key == "" {
-			return nil, doc, nil
+			return proxySelection{}, nil
 		}
 	}
 	var p wire.ProxyConfiguration
 	if !doc.Enabled || json.Unmarshal(doc.Document, &p) != nil || p.Port < 1 || p.Port > 65535 ||
-		p.Domain != "" ||
-		p.NTHost != "" ||
 		p.RedirectedToHosts != "" {
-		return nil, doc, remote.ErrConfiguration
+		return proxySelection{}, remote.ErrConfiguration
 	}
 	host := p.Host
 	if !strings.Contains(host, "://") {
@@ -306,14 +313,21 @@ func (r *Resolver) proxy(
 	}
 	u, err := remote.CheckedURL(host)
 	if err != nil || u.Path != "" && u.Path != "/" || u.RawQuery != "" || u.Port() != "" {
-		return nil, doc, remote.ErrConfiguration
+		return proxySelection{}, remote.ErrConfiguration
 	}
 	u.Host = net.JoinHostPort(u.Hostname(), strconv.Itoa(p.Port))
 	u.Path = ""
 	if p.Username != "" || doc.Secrets["password"] != "" {
 		u.User = url.UserPassword(p.Username, doc.Secrets["password"])
 	}
-	return u, doc, nil
+	var ntlm *outbound.NTLMProxy
+	if p.Domain != "" || p.NTHost != "" {
+		ntlm, err = outbound.NewNTLMProxy(p.Username, doc.Secrets["password"], p.Domain, p.NTHost)
+		if err != nil {
+			return proxySelection{}, remote.ErrConfiguration
+		}
+	}
+	return proxySelection{url: u, document: doc, ntlm: ntlm}, nil
 }
 
 func proxyService(services []string) bool {

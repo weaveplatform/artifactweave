@@ -57,6 +57,7 @@ type world struct {
 	chefUp            *httptest.Server
 	puppetUp          *httptest.Server
 	remote            *fakeupstream.Server
+	ntlmProxy         *fakeupstream.NTLMProxy
 	podSource         *fakeupstream.Server
 	aiEditor          *aiEditorFixture
 	p2Child           *fakeupstream.Server

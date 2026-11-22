@@ -59,6 +59,12 @@ under the shared guard before delivery starts. Disabled mail and string clearing
 are explicit; whole-section null is refused. CFG-01 includes these public mail settings in XML; mail testing endpoints and the
 remaining system administration retain their P12 owners.
 
+P12/#1835 gives remote-source proxy `domain` and `ntHost` runtime effects: NTLMv2
+proxy-account domain and client workstation, through the existing resolver and sealed
+password. Configuration storage is unchanged. The [transport contract](../../implementation/remote-http-transport.md)
+records the supported exchange and explicit limits; `redirectedToHosts` stays refused
+under #1836, and replication's separate consumer is tracked by #1848.
+
 ## Rationale
 
 The Artifactory descriptor is the format Artifactory users already have in version

@@ -79,8 +79,12 @@ with exact configured-private authority grants and unconditional known-metadata 
 Cross-origin credentials require `allowAnyHostAuth` and HTTPS. These deliberate security
 restrictions and the DNS-named HTTP proxy CONNECT requirement are recorded in the
 [transport contract](../../implementation/remote-http-transport.md#resolved-source-security-618);
-RC-6/#216 still owns observed Artifactory comparisons. NTLM/domain and proxy credential
-redirect settings fail closed pending their P12 proxy/global-configuration implementation.
+RC-6/#216 still owns observed Artifactory comparisons. P12/#1835 adds NTLMv2
+proxy domain/workstation authentication through the shared platform outbound CONNECT
+helper, preserving this source boundary and sealed revision rotation. Its explicit
+protocol/CONNECT limits and independent native proof are in the transport contract.
+Proxy credential redirects remain refused under #1836; replication's consumer remains
+separate under #1848.
 Proxy service strings from the descriptor/provider and historical stored lists
 share one read decoder. String separators follow the pinned Artifactory source;
 explicit selection and platform-default `jfrt` filtering retain their existing

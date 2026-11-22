@@ -13,7 +13,7 @@
 // (dependency rule 1); production code never does. It is a package of its
 // own beneath the upstream transport (artifacts/adapters/upstream), whose
 // tests, like core remote's and the slices', send to its servers; it
-// imports only chi and the standard library, never the transport, so that
+// imports chi and protocol primitives, never the transport, so that
 // any test may use it.
 //
 // # Inputs
@@ -28,7 +28,8 @@
 //     and can require a client certificate; the clock, often Clock.Now; a
 //     Basic or Bearer Auth policy; and the fixture secrets to redact.
 //   - For NewProxy, the proxy's Auth policy and the running fixtures it may
-//     reach.
+//     reach. NewNTLMProxy independently verifies NTLMv2 domain/workstation
+//     and proof over CONNECT or absolute-form forwarding.
 //
 // # Outputs
 //

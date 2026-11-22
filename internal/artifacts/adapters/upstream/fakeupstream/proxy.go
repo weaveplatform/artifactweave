@@ -1,6 +1,7 @@
 package fakeupstream
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"net"
@@ -15,8 +16,12 @@ import (
 // accidentally turn a fault test into a public-registry fetch. CONNECT can tunnel
 // either scheme; the client still verifies the destination's certificate.
 func NewProxy(t testing.TB, auth Auth, targets ...*Server) *Server {
+	return newProxy(t, Options{Auth: auth}, nil, targets...)
+}
+
+func newProxy(t testing.TB, options Options, ntlm *NTLMProxy, targets ...*Server) *Server {
 	t.Helper()
-	p := &proxy{allowed: make(map[string]string), connections: make(map[net.Conn]struct{})}
+	p := &proxy{allowed: make(map[string]string), connections: make(map[net.Conn]struct{}), ntlm: ntlm}
 	for _, target := range targets {
 		u, err := url.Parse(target.URL)
 		if err != nil {
@@ -28,7 +33,7 @@ func NewProxy(t testing.TB, auth Auth, targets ...*Server) *Server {
 	p.transport.Proxy = nil
 	s := start(
 		t,
-		Options{Auth: auth},
+		options,
 		func(s *Server) http.Handler { p.server = s; return http.HandlerFunc(p.serve) },
 	)
 	s.beforeClose = p.close
@@ -36,6 +41,7 @@ func NewProxy(t testing.TB, auth Auth, targets ...*Server) *Server {
 }
 
 type proxy struct {
+	ntlm        *NTLMProxy
 	server      *Server
 	allowed     map[string]string
 	transport   *http.Transport
@@ -57,10 +63,23 @@ func (p *proxy) close() {
 }
 
 func (p *proxy) serve(w http.ResponseWriter, r *http.Request) {
+	if p.ntlm != nil && r.Method == http.MethodConnect {
+		p.serveNTLM(w, r)
+		return
+	}
 	allowed := p.server.options.Auth.accepts(r, true)
+	if p.ntlm != nil {
+		if !p.ntlm.options.Forward {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		allowed = p.ntlm.authenticate(w, r)
+	}
 	p.server.record(r, allowed)
 	if !allowed {
-		p.server.options.Auth.challenge(w, true)
+		if p.ntlm == nil {
+			p.server.options.Auth.challenge(w, true)
+		}
 		return
 	}
 	if r.Method == http.MethodConnect {
@@ -104,6 +123,10 @@ func (p *proxy) connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer client.Close()
+	p.pipeTunnel(client, buffered, upstream)
+}
+
+func (p *proxy) pipeTunnel(client net.Conn, buffered *bufio.ReadWriter, upstream net.Conn) {
 	p.mu.Lock()
 	if p.isClosed {
 		p.mu.Unlock()

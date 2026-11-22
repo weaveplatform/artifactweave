@@ -55,7 +55,8 @@
 //     image, service and scope, and never follow a redirect to a CDN or to
 //     another image.
 //   - The remote: sentinel texts, ErrRegistryChallenge's text and the
-//     redirect, proxy and destination behaviour stay byte-identical.
+//     redirect and destination contracts retain their classifications. NTLMv2
+//     proxy authentication uses the platform outbound connection helper.
 //
 // # References
 //
@@ -85,7 +86,8 @@
 //
 // # Status
 //
-// Implemented P9. Moved here in P9d, which narrowed the resolver's store to
+// Implemented P9 and P12 NTLMv2 proxy authentication. Moved here in P9d,
+// which narrowed the resolver's store to
 // ResolverStore (https://github.com/weaveplatform/artifactweave/issues/1091).
 //
 // # Testing
