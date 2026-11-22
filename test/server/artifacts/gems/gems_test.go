@@ -254,8 +254,8 @@ func TestAccNativeLocalFederatedVirtual(t *testing.T) {
 
 func TestAccNativePushAndPermissions(t *testing.T) {
 	w := newWorld(t)
-	// A native route wins over handwritten stubs, while an unrelated
-	// unimplemented handwritten operation keeps its documented 501.
+	// Native routes win over handwritten stubs. XML GET is implemented; the
+	// P36 XML replacement POST remains an unrelated 501 control.
 	status(
 		t,
 		w.do(http.MethodGet, "/artifactory/api/gems/gems-local/names", "admin", nil),
@@ -263,7 +263,7 @@ func TestAccNativePushAndPermissions(t *testing.T) {
 	)
 	status(
 		t,
-		w.do(http.MethodGet, "/artifactory/api/system/configuration", "admin", nil),
+		w.do(http.MethodPost, "/artifactory/api/system/configuration", "admin", nil),
 		http.StatusNotImplemented,
 	)
 	status(
