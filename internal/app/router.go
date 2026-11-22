@@ -210,7 +210,7 @@ type RouterConfig struct {
 	// /api/system/configuration applies and GET exports the descriptor; item routes
 	// read its minimum redirect size. When its descriptor, export and system contracts are nil and
 	// Store is set, NewRouter binds one over Store and Access with the
-	// descriptor core, as it binds Access. Without a store it stays zero.
+	// configuration module, as it binds Access. Without a store it stays zero.
 	Configuration configapi.API
 	// Retention owns package policy administration; a router with only Store
 	// binds the same module after Access, as runtime module assembly does.
@@ -377,7 +377,7 @@ func accessUnset(a accessapi.API) bool {
 }
 
 // withConfiguration returns cfg with Configuration bound over its store by
-// the configuration module when cfg sets a store and neither descriptor nor
+// the configuration module when cfg sets a store and no descriptor, export or
 // system contract. It runs after withAccess: the descriptor checks the key
 // pairs and environments that repository entries name, and writes the
 // anonymous access setting, through cfg.Access.
