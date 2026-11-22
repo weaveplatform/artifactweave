@@ -631,3 +631,8 @@ and HTTP producers, and calls configuration Module.Close after draining requests
 No logger override is stored as configuration, and a module without an actual
 logging mechanism does not advertise a logger API. The constructor remains free
 of I/O and starts no timer until an authorized Set succeeds.
+The configuration binding uses its store's existing InTx inspection to reject
+transaction-scoped Set/Delete before entering the volatile core service; Level can
+join a read transaction. Standalone router composition requires an explicit
+cleanup registrar before creating its own session service, and preserves any
+injected Loggers API and its external lifecycle.

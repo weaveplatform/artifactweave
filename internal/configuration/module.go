@@ -24,6 +24,8 @@ import (
 // transaction ctx carries.
 type Store interface {
 	tx.Runner
+	// InTx identifies calls that would join an enclosing authority transaction.
+	InTx(context.Context) bool
 	Configs() configdoc.ConfigStore
 }
 
@@ -80,9 +82,30 @@ func New(d Deps) (*Module, error) {
 	var loggers *system.Loggers
 	if d.Logging != nil {
 		loggers = system.NewLoggers(system.LoggerDeps{Control: d.Logging, Authorize: d.loggerAdministrator})
-		api.Loggers = loggers
+		api.Loggers = loggerBinding{Loggers: loggers, store: d.Store}
 	}
 	return &Module{api: api, settings: d.Settings, loggers: loggers}, nil
+}
+
+// Volatile changes cannot acknowledge an enclosing transaction's future
+// outcome. Refuse the join before core can change a decision or a timer.
+type loggerBinding struct {
+	*system.Loggers
+	store Store
+}
+
+func (b loggerBinding) Set(ctx context.Context, classes map[string]string, seconds int) error {
+	if b.store.InTx(ctx) {
+		return fmt.Errorf("%w: logger mutations require a standalone call", configapi.ErrInvalidLoggerSettings)
+	}
+	return b.Loggers.Set(ctx, classes, seconds) //nolint:wrapcheck // preserve the configuration service's error classification
+}
+
+func (b loggerBinding) Delete(ctx context.Context) error {
+	if b.store.InTx(ctx) {
+		return fmt.Errorf("%w: logger mutations require a standalone call", configapi.ErrInvalidLoggerSettings)
+	}
+	return b.Loggers.Delete(ctx) //nolint:wrapcheck // preserve the configuration service's error classification
 }
 
 // API returns the descriptor and the current system/mail settings readers.

@@ -570,8 +570,10 @@ func apiReviewLoggers(e *apiReviewOperation) {
 	case "setLoggerDebugLevels":
 		e.Effects = "one process-local 1-100-name temporary level session over actual structured loggers; no persistence; expiry and shutdown restore the current original baseline"
 		e.Retry += "; inspect the current level after ambiguous completion; an active session refuses POST with 400, so replace using DELETE then POST"
+		e.Admission += "; module mutation refuses an enclosing metadata transaction before runtime effects"
 	case "deleteLoggerDebugLevels":
 		e.Effects = "clear the process-local temporary logger session, restore current original handler decisions and join its timer callback; no-op when idle"
+		e.Admission += "; module mutation refuses an enclosing metadata transaction before runtime effects"
 	case "getLoggerDebugLevel":
 		e.Effects = "read the effective process-local logger level; unknown names return the root level; no logger registration or persistent state"
 	default:

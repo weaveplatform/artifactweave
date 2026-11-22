@@ -106,3 +106,8 @@ transactions publish no level change. DELETE, timer expiry and runtime shutdown
 restore the original handler's current baseline. See [decision 0016](0016-observability-and-health.md)
 for lifecycle ownership and [research 06](../06-system-configuration-and-descriptor.md)
 for the primary contract and explicit local choices.
+
+Logger Set/Delete reject a context already inside this metadata store's
+transaction, before changing runtime decisions or timers. Volatile changes do not
+join descriptor transactions or defer an acknowledged success until an outer
+commit; only their own completed authority transaction can permit publication.

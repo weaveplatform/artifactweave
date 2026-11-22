@@ -7,10 +7,13 @@ import (
 	"log/slog"
 	"slices"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
+	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/logging"
 )
@@ -19,6 +22,103 @@ type loggerStore struct {
 	Store
 	refuseCommit bool
 	inside       bool
+}
+
+type loggerOuterStore struct {
+	*inmem.Store
+	failCommit bool
+}
+
+func (s *loggerOuterStore) Tx(ctx context.Context, fn func(context.Context) error) error {
+	joined := s.InTx(ctx)
+	err := s.Store.Tx(ctx, fn)
+	if err == nil && !joined && s.failCommit {
+		return kernel.ErrStore
+	}
+	return err
+}
+
+func TestUnitLoggerMutationsRespectTransactionOutcomes(t *testing.T) {
+	for _, operation := range []string{"set", "delete"} {
+		for _, outcome := range []string{"rollback", "commit failure", "standalone commit failure"} {
+			t.Run(operation+"/"+outcome, func(t *testing.T) {
+				synctest.Test(t, func(t *testing.T) {
+					st := &loggerOuterStore{Store: inmem.New()}
+					control := logging.New(slog.New(slog.NewJSONHandler(io.Discard, nil)))
+					logger := control.Logger("artifactweave.http")
+					access := accessapi.API{
+						Projects: &accessapitest.Projects{GuardFunc: func(context.Context) error { return nil }},
+						Authenticator: &accessapitest.Authenticator{CurrentFunc: func(_ context.Context, p kernel.Principal) (kernel.Principal, error) {
+							return p, nil
+						}},
+						Authorizer: &accessapitest.Authorizer{DecideFunc: func(context.Context, accessapi.Subject, bool) (accessapi.Decider, error) {
+							return &accessapitest.Decider{Admin: true}, nil
+						}},
+					}
+					module, err := New(Deps{Store: st, Access: access, Logging: control})
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer module.Close()
+					ctx := kernel.WithPrincipal(t.Context(), kernel.Principal{Name: "admin", Admin: true})
+					classes := map[string]string{"artifactweave.http": "debug"}
+					if operation == "delete" {
+						if err := module.API().Loggers.Set(ctx, classes, 1); err != nil {
+							t.Fatal(err)
+						}
+					}
+					wantDebug := operation == "delete"
+					st.failCommit = outcome != "rollback"
+					marker := errors.New("outer rollback")
+					mutate := func(ctx context.Context) error {
+						if operation == "set" {
+							return module.API().Loggers.Set(ctx, classes, 1)
+						}
+						return module.API().Loggers.Delete(ctx)
+					}
+					if outcome == "standalone commit failure" {
+						if err := mutate(ctx); !errors.Is(err, kernel.ErrStore) {
+							t.Fatal("failed standalone authority commit was acknowledged", err)
+						}
+					} else {
+						var mutationErr error
+						outerErr := st.Tx(ctx, func(ctx context.Context) error {
+							mutationErr = mutate(ctx)
+							if logger.Enabled(ctx, slog.LevelDebug) != wantDebug {
+								t.Error("transaction-scoped mutation changed a real logger before the outer outcome")
+							}
+							level, err := module.API().Loggers.Level(ctx, "artifactweave.http")
+							wantLevel := "info"
+							if wantDebug {
+								wantLevel = "debug"
+							}
+							if err != nil || level != wantLevel {
+								t.Errorf("transaction-scoped read = %q, %v; want %q", level, err, wantLevel)
+							}
+							if outcome == "rollback" {
+								return marker
+							}
+							return nil
+						})
+						if !errors.Is(mutationErr, configapi.ErrInvalidLoggerSettings) {
+							t.Errorf("transaction-scoped %s = %v; want explicit refusal", operation, mutationErr)
+						}
+						if outcome == "rollback" && !errors.Is(outerErr, marker) || outcome == "commit failure" && !errors.Is(outerErr, kernel.ErrStore) {
+							t.Fatal("outer transaction outcome changed", outerErr)
+						}
+					}
+					if logger.Enabled(ctx, slog.LevelDebug) != wantDebug {
+						t.Error("failed enclosing transaction changed runtime levels")
+					}
+					time.Sleep(2 * time.Second)
+					synctest.Wait()
+					if logger.Enabled(ctx, slog.LevelDebug) {
+						t.Fatal("refused mutation left a session or stopped the original expiry")
+					}
+				})
+			})
+		}
+	}
 }
 
 func (s *loggerStore) Tx(ctx context.Context, fn func(context.Context) error) error {

@@ -100,6 +100,8 @@ import (
 // composite SQL store is a RouterStore, as is the in-memory composite that
 // the tests build routers over.
 type RouterStore interface {
+	// Configuration's bindings inspect enclosing authority transactions.
+	configuration.Store
 	retention.Store
 	federation.Store
 	// The artifacts handlers, with their item kit, package routes and
@@ -156,8 +158,10 @@ type RouterConfig struct {
 	Logger *slog.Logger
 	// Logging shares actual level decisions with the owning runtime.
 	Logging *logging.Control
-	// OnClose registers cleanup for modules built by this router. Embedders
-	// supply their lifecycle registrar; production passes runtime-owned APIs.
+	// OnClose registers cleanup for modules built by this router, after the
+	// handler drains. Required to bind internally owned logger sessions; nil
+	// leaves that API unavailable. Injected Configuration APIs keep their owner.
+	// Production supplies the runtime-owned configuration API instead.
 	OnClose func(func())
 	// RemoteSources is the direct remote read boundary. Nil preserves cache-only
 	// behavior; production activation belongs to the adapter tickets. Native
@@ -382,13 +386,21 @@ func withConfiguration(cfg RouterConfig) RouterConfig {
 		cfg.Configuration.System != nil {
 		return cfg
 	}
+	ownedLogging := cfg.Logging
+	if cfg.OnClose == nil || cfg.Configuration.Loggers != nil {
+		ownedLogging = nil
+	}
 	m, err := configuration.New(configuration.Deps{
 		Store:        cfg.Store,
 		Repositories: repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects, repositoryLifecycle(cfg)),
-		Layouts:      layout.Checker{}, Access: cfg.Access, Logging: cfg.Logging, Log: cfg.Logger,
+		Layouts:      layout.Checker{}, Access: cfg.Access, Logging: ownedLogging, Log: cfg.Logger,
 	})
 	if err == nil {
-		cfg.Configuration = m.API()
+		bound := m.API()
+		if cfg.Configuration.Loggers != nil {
+			bound.Loggers = cfg.Configuration.Loggers
+		}
+		cfg.Configuration = bound
 		if cfg.OnClose != nil {
 			cfg.OnClose(m.Close)
 		}
@@ -499,6 +511,13 @@ func newArtifactoryAPI(cfg RouterConfig) artifactshttp.ArtifactoryAPI {
 	return artifactshttp.New(artifactsDeps(cfg))
 }
 
+func routerLogger(cfg RouterConfig, name string) *slog.Logger {
+	if cfg.Logging != nil {
+		return cfg.Logging.Logger(name)
+	}
+	return cfg.Logger.With("logger", name)
+}
+
 // NewRouter returns the handler for every JFrog path prefix over cfg:
 // /artifactory, /access, /event, /router, /jfconnect and /v2; /distribution,
 // /worker, /pfed and /grid, whose specified operations answer 501 until they
@@ -509,10 +528,15 @@ func newArtifactoryAPI(cfg RouterConfig) artifactshttp.ArtifactoryAPI {
 // Access or Configuration contract, NewRouter binds them over it first, as
 // RouterConfig.Access and RouterConfig.Configuration describe.
 func NewRouter(cfg RouterConfig) http.Handler {
-	if cfg.Logging == nil {
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
+	}
+	if cfg.Logging == nil && cfg.OnClose != nil {
 		cfg.Logging = logging.New(cfg.Logger)
 	}
-	cfg.Logger = cfg.Logging.Logger("artifactweave")
+	if cfg.Logging != nil {
+		cfg.Logger = cfg.Logging.Logger("artifactweave")
+	}
 	cfg = withConfiguration(withFederation(withAccess(cfg)))
 	if cfg.Notifications == nil && cfg.Store != nil {
 		// New refuses only a nil store and performs no I/O.
@@ -588,7 +612,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		BaseURL:       cfg.BaseURL,
 		Settings:      configapi.Settings{DockerSubdomainMatch: cfg.DockerSubdomainMatch},
 		Configuration: cfg.Configuration,
-		Logger:        cfg.Logging.Logger("artifactweave.configuration"),
+		Logger:        routerLogger(cfg, "artifactweave.configuration"),
 	})
 	accessHTTP := accesshttp.New(accesshttp.Deps{
 		API:           cfg.Access,
@@ -601,7 +625,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		},
 		PasswordHash:  cfg.PasswordHash,
 		CompatVersion: cfg.CompatVersion,
-		Log:           cfg.Logging.Logger("artifactweave.access"),
+		Log:           routerLogger(cfg, "artifactweave.access"),
 		Repositories:  repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
 	})
 	// The artifacts repositories collection, and access's key pairs.
@@ -614,8 +638,8 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	r.Use(
 		httpkit.ErrorProfiles(errorProfileRules),
 		middleware.RequestID,
-		middleware.RecoverPanic(cfg.Logging.Logger("artifactweave.http"), redactLoggedPath),
-		middleware.AccessLog(cfg.Logging.Logger("artifactweave.http"), redactLoggedPath),
+		middleware.RecoverPanic(routerLogger(cfg, "artifactweave.http"), redactLoggedPath),
+		middleware.AccessLog(routerLogger(cfg, "artifactweave.http"), redactLoggedPath),
 		baseurl.Middleware(cfg.BaseURL),
 		remote.OriginTrace,
 		smart.SmartTrace,

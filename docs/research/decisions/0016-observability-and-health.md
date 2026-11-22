@@ -99,6 +99,10 @@ POST is refused with 400; replace with DELETE followed by POST, as the primary
 [Set API](https://docs.jfrog.com/administration/reference/setloggerdebuglevels)
 instructs. Unknown classes have no effect and GET uses the root level. These
 process-local controls persist no configuration and are absent after restart.
+An internally owned standalone-router logger binding requires an `OnClose`
+registrar; without one its logger API remains unavailable and no internal control
+or session service is created. Callers drain HTTP, then invoke registered cleanup;
+injected logger APIs retain their external ownership, including partial APIs.
 Naming, effective-level aliases and source distinctions are recorded in
 [research 06](../06-system-configuration-and-descriptor.md). P35 owns cross-node
 propagation. P38 extends that baseline with
