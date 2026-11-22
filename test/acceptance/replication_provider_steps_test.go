@@ -31,7 +31,6 @@ func (w *world) qualifyProviderReplication() (result error) {
 		return fmt.Errorf("create owned provider workspace: %w", err)
 	}
 	const scenario = "deploy/artifactweave/terraform/single-replication"
-	tfDir := filepath.Join(work, "scenarios", scenario)
 	peer := w.replicationPeer
 	if peer == nil {
 		return fmt.Errorf("provider qualification requires two owned applications")
@@ -119,7 +118,8 @@ func (w *world) qualifyProviderReplication() (result error) {
 	}
 	// The existing bootstrap checks release SHA256s and initializes the copied
 	// lockfile through its private mirror. Validate mode starts no application.
-	if _, err := run("bash", filepath.Join(repoRoot, "test/terraform/run.sh"), "validate", scenario); err != nil {
+	tfDir, err := prepareReplicationProviderWorkspace(work, scenario, env, run)
+	if err != nil {
 		return err
 	}
 	tf := func(args ...string) ([]byte, error) {
@@ -227,6 +227,79 @@ func (w *world) qualifyProviderReplication() (result error) {
 	}
 	w.t.Log("Replication provider proof: Terraform1.17.1, jfrog/artifactory12.11.14, apply/empty-plan/update/execute/verified bytes/deletes/destroy PASS")
 	return nil
+}
+
+func prepareReplicationProviderWorkspace(
+	work, scenario string,
+	env map[string]string,
+	run func(string, ...string) ([]byte, error),
+) (string, error) {
+	entries, err := os.ReadDir(work)
+	if err != nil {
+		return "", fmt.Errorf("inspect provider workspace before bootstrap: %w", err)
+	}
+	previous := make(map[string]bool, len(entries))
+	for _, entry := range entries {
+		previous[entry.Name()] = true
+	}
+	output, err := run("bash", filepath.Join(repoRoot, "test/terraform/run.sh"), "validate", scenario)
+	if err != nil {
+		return "", err
+	}
+	dir, config, err := replicationProviderWorkspace(work, scenario, output, previous)
+	if err != nil {
+		return "", err
+	}
+	// The driver retains a fresh run.* child, not the requested parent. Both
+	// continuation paths must use that same initialized workspace; provider.log
+	// and sanitized evidence deliberately stay in the parent.
+	env["TF_CLI_CONFIG_FILE"] = config
+	return dir, nil
+}
+
+func replicationProviderWorkspace(work, scenario string, output []byte, previous map[string]bool) (string, string, error) {
+	invalid := fmt.Errorf("provider bootstrap did not report one fresh private workspace")
+	const prefix = "Terraform provider workspace: "
+	var reported string
+	var seen bool
+	for _, line := range strings.Split(string(output), "\n") {
+		if path, found := strings.CutPrefix(line, prefix); found {
+			if seen {
+				return "", "", invalid
+			}
+			seen = true
+			reported = strings.TrimSuffix(path, "\r")
+		}
+	}
+	name := filepath.Base(reported)
+	if !filepath.IsAbs(reported) || !strings.HasPrefix(name, "run.") || name == "run." || previous[name] {
+		return "", "", invalid
+	}
+	info, err := os.Lstat(reported)
+	if err != nil || !info.IsDir() || info.Mode().Perm()&0o077 != 0 {
+		return "", "", invalid
+	}
+	parent, err := filepath.EvalSymlinks(work)
+	if err != nil {
+		return "", "", invalid
+	}
+	actual, err := filepath.EvalSymlinks(reported)
+	if err != nil || filepath.Dir(actual) != parent {
+		return "", "", invalid
+	}
+	dir := filepath.Join(actual, "scenarios", scenario)
+	config := filepath.Join(actual, "terraformrc")
+	for path, directory := range map[string]bool{dir: true, config: false} {
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil || resolved != path {
+			return "", "", invalid
+		}
+		info, err := os.Stat(path)
+		if err != nil || (directory && !info.IsDir()) || (!directory && !info.Mode().IsRegular()) {
+			return "", "", invalid
+		}
+	}
+	return dir, config, nil
 }
 
 func (w *world) replicationProviderCommand(program string, args []string, overrides map[string]string, secrets []string, logPath string) ([]byte, error) {

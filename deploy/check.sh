@@ -63,6 +63,8 @@ if [ "$mode" = check ]; then
 	python3 "$root/deploy/ci/scenario_ci_test.py" || fail "the scenario driver misjudges Azure cleanup (deploy/ci/scenario_ci_test.py)"
 	echo "== jfrog-providers"
 	"$root/deploy/ci/jfrog-providers_test.sh" || fail "jfrog-providers.sh rewrites the pins wrongly (deploy/ci/jfrog-providers_test.sh)"
+	echo "== provider-driver"
+	python3 -I "$root/test/terraform/driver_test.py" || fail "provider driver accepted an unowned server (test/terraform/driver_test.py)"
 	echo "== contract"
 	"$root/deploy/ci/lint-contract.sh" || fail "a Terraform root breaks the reference-deployment contract (deploy/ci/lint-contract.sh)"
 	"$root/deploy/ci/lint-contract.sh" --self-test || fail "the contract lint misjudges its fixtures (deploy/ci/lint-contract.sh --self-test)"

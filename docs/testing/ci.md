@@ -1296,6 +1296,38 @@ the driver.
 Each scenario's committed `.terraform.lock.hcl` holds its providers' hashes for linux and
 darwin on amd64 and arm64.
 
+In apply mode the driver starts an owned atomic-coverage server with explicit private
+SQLite/filesystem configuration. It removes inherited `ARTIFACTWEAVE_*` settings only
+for that child, leaving caller and client options intact. The fresh JSON log names
+the child's private ephemeral backend. An owned TCP forwarder binds the requested
+frontend and checks Linux `/proc` or macOS `/usr/sbin/lsof` evidence that each connected
+peer socket belongs to the child before forwarding client bytes. Verified connections
+stay pinned without reconnecting; replacement listeners during shutdown drain cannot
+receive authentication or provider traffic. Missing socket evidence fails closed.
+On failure the frontend stays bound in quarantine, refusing further connections,
+until active client commands finish and parent cleanup reaps it; a private failure
+marker also rejects subsequent commands. Provider retries cannot reach a replacement
+frontend during that interval.
+Failure or the ten-second startup deadline prevents authentication
+and provider effects; direct fixture HTTP bypasses ambient proxies. `TERRAFORM_PORT`
+retains its default 18081. `TERRAFORM_WORK` retains a parent directory containing a new
+private `run.*` per invocation; the printed path locates its configuration, state and
+startup evidence. Automatic workspaces are removed on success and retained on failure.
+`python3 -I test/terraform/driver_test.py`, also run by `make deploy-check`, checks
+failed/occupied/missing-listener/racing-exit/timeout startup with only owned ephemeral
+listeners, a Go/chi HTTP model built once and stub clients. Draining-child/replacement
+and native-provider reconnect cases exercise connection ownership after startup.
+Real provider effects remain the existing provider lane's
+responsibility (#1845).
+
+The two-instance `@replication_provider` step also selects the acceptance harness's
+`TestUnitReplicationProvider*` workspace contracts in its existing Linux provider job,
+with race detection and shuffled execution. Its caller validates the driver's single
+effective-workspace output, uses that fresh child's scenario and CLI configuration paths,
+and keeps `provider.log` plus sanitized evidence in the requested parent. Missing,
+duplicate, stale or escaping workspace output fails before provider continuation. This
+native-harness ownership does not add a pipeline or change the three-OS package-unit lane.
+
 The providers move automatically. Dependabot cannot move them, because `run.sh` pins their
 release zips by SHA-256, so `deps-refresh.yml`'s `jfrog-providers` job runs
 `deploy/ci/jfrog-providers.sh update` every day. It:

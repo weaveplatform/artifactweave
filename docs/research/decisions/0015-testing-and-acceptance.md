@@ -114,6 +114,22 @@ destroys. Providers come from a filesystem mirror of the pinned release zips, bu
 time and checked against their SHA-256s, so the job does not depend on
 registry.terraform.io.
 
+The provider driver owns its fixture server and storage. It passes a private
+SQLite/filesystem configuration, isolates inherited application settings in that
+child, and accepts readiness only after the live child's fresh structured listener
+event names its private ephemeral backend. An owned TCP forwarder proves each
+connected peer socket belongs to that child before forwarding any client bytes,
+using Linux `/proc` or macOS `lsof`. A connection stays pinned to that peer without
+reconnecting, so a replacement listener cannot receive credentials while the child
+drains. Missing socket evidence fails closed. Failed startup, an occupied port,
+or a failed/quarantined forwarder aborts the run. The frontend remains bound in
+quarantine until active client commands finish and parent cleanup reaps it, so
+provider retries cannot reach a replacement frontend. Missing listener evidence
+or readiness timeout aborts before authentication or
+provider effects. A retained workspace contains a fresh subdirectory per run so
+state and startup evidence cannot carry over. Owned loopback spies and child
+Go/chi fixtures exercise these failures in the existing deployment checks (#1845).
+
 Each implementation phase must extend these scenarios for its provider resources and
 prove their actual behavior. P41 qualifies the expanded resource set; the current
 fixtures do not establish coverage of every capability in the

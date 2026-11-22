@@ -37,6 +37,47 @@ up to ten resources at once, and on SQLite the default 500ms admission deadline 
 of those requests with a 503 that the provider does not retry (#1147). A failed run prints the
 end of the server log and retains its private work directory, including Terraform state.
 
+The server receives an explicit private configuration for SQLite and filesystem storage;
+inherited `ARTIFACTWEAVE_*` variables are removed only from that child. The caller's
+environment and `HOME` remain intact. The child binds a private ephemeral loopback backend
+and reports its address in its fresh JSON startup log. An owned TCP forwarder binds
+`TERRAFORM_PORT` (default 18081). Before forwarding any client bytes on each connection,
+it proves the connected backend peer socket belongs to the child: Linux uses the child's
+`/proc` socket inode/endpoint records; macOS uses `/usr/sbin/lsof` established endpoints.
+Missing ownership evidence fails closed. Each verified connection stays pinned to that
+peer; it never reconnects or retries against a replacement listener. A connect or
+ownership-proof failure quarantines its still-bound frontend, refuses new connections and records a private failure
+marker until the parent's active client command finishes and cleanup reaps it. Provider
+retries cannot race a released frontend.
+Normal EOF/reset/broken pipe after peer verification closes only that fixed connection;
+any subsequent connection still requires independent ownership proof. This also protects
+native provider and Python checker reconnects while the child drains after shutdown.
+Startup failure, an occupied frontend, missing listener/socket evidence or the ten-second
+readiness deadline stops the run before token creation or provider effects. Fixture HTTP
+bypasses host proxy settings. Cleanup reaps the owned forwarder before the child.
+
+`TERRAFORM_WORK` names a retained parent directory. Each invocation creates a private
+`run.*` child, prints its path, and keeps it on success or failure. This preserves earlier
+evidence and prevents a later instance from inheriting an earlier run's state, configuration
+or listening event. Without that option, successful temporary workspaces are removed and
+failed ones retained. Cleanup signals and reaps only the forwarder and child it started.
+
+Callers continuing after validation consume the single `Terraform provider workspace: `
+output line and use that fresh child for both `scenarios/<scenario>` and `terraformrc`.
+The two-instance replication acceptance caller verifies it is a new private direct `run.*`
+child with contained configuration/scenario paths. Its `provider.log` and sanitized evidence
+remain in the caller-selected parent; earlier child state is preserved rather than resumed.
+The existing Linux provider CI step runs its isolated workspace contracts alongside the
+required `@replication_provider` two-backend scenarios. The native harness keeps its
+existing platform ownership rather than joining the three-OS package-unit matrix.
+
+`python3 -I test/terraform/driver_test.py` exercises the shell entry point with owned
+ephemeral listeners, a Go/chi HTTP fixture built once, and stub Go/Terraform clients. The
+draining-child cases hold an active request, signal shutdown and bind an owned replacement
+spy; neither authentication nor provider reconnects may send it request bytes.
+`make deploy-check` runs the same
+regressions; the pinned provider lane supplies real apply/plan/destroy evidence.
+
 The remote-repositories scenario covers all fourteen P9 provider resource types. It applies
 two revisions, requires an empty refreshed plan after each, checks API configuration and
 secret redaction, checks that persistent data contains no plaintext fixture credentials,
