@@ -84,6 +84,15 @@ allowing the descriptor's looser, JFrog-defined schema.
   `config apply` prints what it created, updated, deleted and left unchanged.
 - `config apply` is idempotent and reports a diff; it is safe in a CI job.
 - Secrets in descriptors are sealed on write ([0017](0017-sealed-columns-and-master-key.md)).
+- Proxy and property-set documents are validated after merging and before any
+  patch writes, including secret sealing. Proxy optional fields keep their
+  documented string/boolean types; property-set visibility, property flags and
+  predefined defaults are booleans. Property definitions and predefined-value
+  objects accept only their supported fields, with dynamic property/value names
+  kept as data. Both provider predefined-value maps and YAML lists (strings or
+  `{value, defaultValue}` objects) are accepted. Existing null clearing, omitted
+  fields and explicit false values retain their behavior. An invalid field
+  refuses the whole descriptor, including a dry run ([#1839](https://github.com/weaveplatform/artifactweave/issues/1839)).
 
 ## Verification
 

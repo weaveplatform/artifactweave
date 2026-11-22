@@ -135,6 +135,35 @@ Feature: Configuration descriptor
     Then the response status is 400
     And the response body contains "mailServer.port"
 
+  Scenario Outline: A malformed <kind> boolean refuses the whole mixed descriptor
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      localRepositories:
+        typed-kept: {type: generic, description: before}
+      """
+    Then the response status is 200
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      localRepositories:
+        typed-kept: {description: after}
+        typed-created: {type: generic}
+      <section>:
+        broken: <entry>
+      """
+    Then the response status is 400
+    And the response body contains "<field> must be a boolean"
+    When I GET "/artifactory/api/repositories/typed-kept" as admin
+    Then the response status is 200
+    And the JSON field "description" equals "before"
+    When I GET "/artifactory/api/repositories/typed-created" as admin
+    Then the response status is 404
+
+    Examples:
+      | kind             | section      | entry                                                                                   | field           |
+      | proxy            | proxies      | {host: proxy.invalid, port: 3128, platformDefault: {unexpected: true}}                  | platformDefault |
+      | predefined value | propertySets | {properties: {release: {predefinedValues: {ready: {defaultValue: {unexpected: true}}}}}} | defaultValue    |
+      | multiple choice  | propertySets | {properties: {release: {multipleChoice: {unexpected: true}}}}                           | multipleChoice  |
+
   Scenario: An empty descriptor is refused rather than deleting every repository
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
       """

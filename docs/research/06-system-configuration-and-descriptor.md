@@ -309,6 +309,20 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
 | `virtualRepositories.<key>` | `repositories[], includesPattern, excludesPattern, p2{urls[]}, keyPair, virtualCacheConfig{virtualRetrievalCachePeriodSecs}, forceMavenAuthentication` |
 | `federatedRepositories.<key>` | local keys plus `federatedMembers[]`, `proxy`, `primaryKeyPairRef` (list format in the docs; echoed but treated as local) |
 
+Proxy `platformDefault`, property-set `visible`, property
+`closedPredefinedValues`/`multipleChoice`, and predefined-value `defaultValue`
+are booleans; the other proxy fields except numeric `port` are strings ([S]
+provider 12.11.14 [proxy model](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_proxy.go)
+and [property-set model and transformation](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_property_set.go)).
+So `services` and `redirectedToHosts` are comma-separated strings, not lists,
+as the XSD's `ProxyType` also declares them `xs:string`.
+artifactweave validates these merged documents before publication. Property
+definitions accept the three fields above. Named predefined values accept
+`{defaultValue: <boolean>}` or null; YAML lists also accept strings and
+`{value: <string>, defaultValue: <boolean>}` objects. Unknown object fields and
+wrong scalar/container types refuse the entire patch; omitted values, explicit
+false and the existing null forms remain accepted.
+
 Example (from https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml.md):
 
 ```yaml
