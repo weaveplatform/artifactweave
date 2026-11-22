@@ -16,6 +16,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
@@ -23,11 +24,32 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
+	configuration "github.com/weaveplatform/artifactweave/internal/configuration"
+	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
+	"github.com/weaveplatform/artifactweave/internal/platform/testkit/storekit"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
+
+func configurationAPI(t *testing.T, db harness.Store) configapi.API {
+	t.Helper()
+	m, err := configuration.New(configuration.Deps{
+		Store: db, Repositories: support.Repositories(db), Layouts: support.Layouts(), Access: accesstest.Over(t, db).API(),
+	})
+	storekit.Must(t, err)
+	return m.API()
+}
+
+func applyConfiguration(t *testing.T, api configapi.API, ctx context.Context, yaml string) configapi.Result {
+	t.Helper()
+	plan, err := api.Descriptor.Parse([]byte(yaml), nil)
+	storekit.Must(t, err)
+	result, err := api.Descriptor.Apply(ctx, plan, time.Now(), false)
+	storekit.Must(t, err)
+	return result
+}
 
 // Config is the router configuration a test adjusts before the router is
 // built.

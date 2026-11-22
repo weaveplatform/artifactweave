@@ -303,6 +303,40 @@ remoteRepositories:
 	}
 }
 
+func TestUnitApplyEmptyProxyPasswordIsIdempotent(t *testing.T) {
+	db := inmem.New()
+	patch, err := Parse([]byte(`
+proxies:
+  empty:
+    host: proxy.invalid
+    port: 3128
+    password: ''
+`), noEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := Apply(t.Context(), depsOf(t, db), patch, now, false)
+	if err != nil || strings.Join(first.Created, " ") != "proxies.empty" {
+		t.Fatal("initial proxy descriptor did not create its document", err)
+	}
+	before, err := db.Configs().Get(t.Context(), configdoc.ConfigProxy, "empty")
+	if err != nil || len(before.Secrets) != 0 {
+		t.Fatal("empty password must not retain a secret row", err)
+	}
+	repeated, err := Apply(t.Context(), depsOf(t, db), patch, now.Add(time.Hour), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(repeated.Created)+len(repeated.Updated)+len(repeated.Deleted) != 0 ||
+		strings.Join(repeated.Unchanged, " ") != "proxies.empty" {
+		t.Error("repeated empty password must report an unchanged proxy", repeated)
+	}
+	after, err := db.Configs().Get(t.Context(), configdoc.ConfigProxy, "empty")
+	if err != nil || !after.Updated.Equal(before.Updated) || len(after.Secrets) != 0 {
+		t.Error("repeated empty password must preserve the stored timestamp and absent secrets", err)
+	}
+}
+
 func TestUnitApplyUpdatesAndDeletes(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
