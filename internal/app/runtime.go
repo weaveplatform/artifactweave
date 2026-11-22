@@ -27,6 +27,7 @@ import (
 	debianhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian/http"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/federation"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/session"
@@ -225,7 +226,14 @@ func OpenRuntime(
 		return nil, errors.Join(err, st.Close())
 	}
 	scheduler := &schedule.Service{Store: st}
-	if err := scheduler.Register(queue, mods.retention.ScheduleHandlers()); err != nil {
+	scheduleHandlers := mods.retention.ScheduleHandlers()
+	for kind, handler := range mods.federation.ScheduleHandlers() {
+		if _, exists := scheduleHandlers[kind]; exists {
+			return nil, errors.Join(fmt.Errorf("duplicate application schedule handler: %w", kernel.ErrStore), st.Close())
+		}
+		scheduleHandlers[kind] = handler
+	}
+	if err := scheduler.Register(queue, scheduleHandlers); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
 	warnings := project.WarningDelivery{Store: st, Queue: st.WorkQueue(), Mail: mods.configuration.API().Mail, Sender: mail.Sender{}}
@@ -262,6 +270,12 @@ func OpenRuntime(
 		return nil, errors.Join(err, st.Close())
 	}
 	if err := mods.federation.OpenPull(ctx, art.API().PullSource); err != nil {
+		stop()
+		mods.federation.Close()
+		art.Close()
+		return nil, errors.Join(err, st.Close())
+	}
+	if err := mods.federation.RegisterWork(queue); err != nil {
 		stop()
 		mods.federation.Close()
 		art.Close()

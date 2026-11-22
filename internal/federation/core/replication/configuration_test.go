@@ -80,6 +80,10 @@ func newWorld() *world {
 		Store: w.db, Ownership: w.repos, Repositories: w.repos, Settings: platforminmem.New(shared).Settings(),
 		Authorize: func(context.Context) (replication.Policy, error) { return w.policy, nil },
 		Guard:     func(context.Context) error { return nil },
+		Schedules: platforminmem.New(shared).Schedules(),
+		ScheduleAuthor: func(context.Context) (kernel.CredentialReference, error) {
+			return kernel.CredentialReference{Name: "schedule-author", TokenID: "verified-test-token"}, nil
+		},
 		ProxyExists: func(_ context.Context, key string) error {
 			if key == "corp" {
 				return nil

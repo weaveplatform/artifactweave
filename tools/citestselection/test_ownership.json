@@ -233,7 +233,9 @@
       "system_health_test.go"
     ],
     "internal/federation/adapters/http": [
-      "replication_test.go"
+      "execute_boundaries_test.go",
+      "replication_test.go",
+      "status_test.go"
     ],
     "internal/notifications/adapters/http": [
       "criteria_test.go",
@@ -351,9 +353,9 @@
       "virtual_adapter_special_test.go",
       "virtual_cache_test.go",
       "virtual_config_test.go",
+      "virtual_listing_fault_test.go",
       "virtual_members_test.go",
       "virtual_order_test.go",
-      "virtual_listing_fault_test.go",
       "virtual_remote_test.go",
       "virtual_status_test.go",
       "virtual_storage_test.go",
@@ -368,6 +370,12 @@
       "system_health_test.go"
     ],
     "test/server/federation": [
+      "execution_destination_test.go",
+      "execution_lease_test.go",
+      "execution_limit_test.go",
+      "execution_options_test.go",
+      "execution_restart_test.go",
+      "execution_runtime_test.go",
       "pull_catalog_test.go",
       "pull_failures_test.go",
       "pull_registry_test.go",

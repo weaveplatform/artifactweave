@@ -201,8 +201,7 @@ components:
         element and url may be omitted; for a push each element names a target.
       properties:
         checkBinaryExistenceInFilestore:
-          description: Optional within this object. Skip transferring content the target already holds. Accepted
-            and ignored.
+          description: Optional within this object. Binary-existence optimization is unsupported; true answers 501.
           type: boolean
         delete:
           default: false
@@ -239,9 +238,10 @@ components:
           type: string
       type: object
     ReplicationStatus:
-      description: 'Replication status read from the replication properties the last run annotated on the items
-        under a path. The shape differs by repository class: a local repository with several push targets lists
-        them in targets; a remote repository reports the single pull in status and lastCompleted.'
+      description: 'Status from durable execution and selected-effect evidence under the current repository lifetime.
+        A local repository lists its single push target in targets; a remote repository reports the pull in status
+        and lastCompleted. A folder with no selected or affected paths is never_run. A newer incomplete run retains
+        the previous lastCompleted instant.'
       properties:
         lastCompleted:
           description: Optional within this object. When the last run under this path finished.
@@ -370,15 +370,19 @@ paths:
       x-cost: expensive
   /api/replication/execute/{repoPath}:
     post:
-      description: 'Not implemented; answers 501. It would start a replication now, independently of any schedule.
-        The direction would follow the repository class: a local repository pushes to the targets in the body or,
-        when the body is omitted, to its stored configuration; a remote repository pulls from its upstream into the
-        cache, and its body may name at most one target. The path may name a folder below the repository to limit
-        the run. The run would be scheduled and the call would answer 200 with an empty body as soon as it is
-        accepted; progress and per-file messages would go to the server log, and the status operation would report
-        the outcome. A body with more than one target would be rejected with 400. Callers other than administrators
-        would be limited to the user query result limit when choosing files. The caller would need manage permission
-        on the repository.'
+      description: Starts one durable single-target execution using saved configuration or an explicit push destination. A local
+        repository pushes; a remote repository pulls into its owning cache. The optional folder path limits selection.
+        Returns 202 with an empty body after transfer progress, execution linkage and queue admission commit atomically.
+        Current repository management and transfer permissions apply. Repeated requests create distinct logical runs.
+        An omitted body or empty array uses saved options. One object supplies per-run selection defaults of properties
+        true, delete false, and no include/exclude restriction beyond the requested path. Per-run selection and push
+        credentials/proxy values are immutable and never change the saved configuration. An explicit push URL uses
+        only its supplied connection values and needs no saved configuration. Runs to the same canonical endpoint
+        share target exclusion; status includes secret-free explicit destination history under the current repository
+        lifetime. Nonadministrators may select at most search.user_query_limit distinct files; zero disables the cap.
+        Reaching the cap with more files to select stops the run before the next intent and reports incomplete selection
+        as an error or partial failure. Reconciliation never follows a truncated source walk. Binary-existence
+        optimization remains unsupported and answers 501. Multiple targets and null options answer 400.
       operationId: executePullPushReplication
       parameters:
       - description: Required path parameter. Repository key, optionally followed by a folder path, for example
@@ -406,11 +410,13 @@ paths:
               items:
                 $ref: '#/components/schemas/ReplicationRequest'
               type: array
-        description: Optional per-target options. Omitted uses the stored configuration.
+        description: Optional single-target options. Omitted or an empty array uses the saved configuration; one object supplies per-run options.
         required: false
       responses:
         '200':
-          description: The replication was accepted and scheduled; there is no body.
+          description: Not returned. Successful admission answers 202; transfer completion is reported through replication status.
+        '202':
+          description: The replication was durably accepted and queued; there is no body.
         '400':
           content:
             application/json:
@@ -430,22 +436,39 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks manage permission on the repository, or replication is globally blocked.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or single-target configuration does not exist.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The configuration changed, is disabled, the direction is blocked, or the source is offline or does not retain artifacts.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Binary-existence or statistics synchronization is unsupported.
       tags:
       - handwritten
       - replication
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/executepullpushreplication.md
-      x-tier: stub
-      x-idempotency: natural
-      x-idempotency-natural:
-      - path:repoPath
-      - 'body:'
+      x-tier: native
+      x-idempotency: none
+      x-idempotency-reason: external-effect
       x-cost: expensive
   /api/replication/{repoPath}:
     get:
-      description: Not implemented; answers 501. It would report the outcome of the last replication that touched a
-        repository or a folder in it, read from the replication properties the run annotated on the items. The
-        caller would need read permission on the repository.
+      description: Reports durable single-replication outcomes for a repository or folder, including never_run,
+        incomplete, error and partial_failure. Folder status uses actual selected or affected paths and does not
+        inherit an unrelated repository completion. Requires current read permission covering the requested subtree;
+        status reads never open target credentials or grant transfer authority.
       operationId: getReplicationStatus
       parameters:
       - description: Required path parameter. Repository key, optionally followed by a folder path. May span several
@@ -464,6 +487,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReplicationStatus'
           description: The status.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository path was malformed or the repository has no single-replication direction.
         '401':
           content:
             application/json:
@@ -481,13 +510,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The repository or path does not exist.
+          description: The repository does not exist. Paths without retained effects report never_run.
       tags:
       - handwritten
       - replication
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreplicationstatus.md
-      x-tier: stub
+      x-tier: implemented
       x-idempotency: safe
       x-cost: ordinary
   /api/replications/channels/release:

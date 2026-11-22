@@ -1,5 +1,5 @@
-// Package federationhttp serves single-target replication configuration and
-// enablement/global controls through the generated Artifactory strict API.
+// Package federationhttp serves single-target replication configuration,
+// enablement/global controls, durable execution and scoped status.
 //
 // # Role
 //
@@ -8,15 +8,20 @@
 //
 // # Inputs
 //
-// Generated replication request DTOs and the guarded configuration service.
-// Wire conversion remains here; core configuration has no generated API types.
+// Generated request/status DTOs, guarded configuration, the durable dispatch
+// coordinator and the current-authority status reader. Wire conversion remains
+// here; core services have no generated API types.
 //
 // # Outputs
 //
 // Seven strict operations composed into the app router: single-target CRUD,
 // global pause reads and block/unblock. PUT stores one target with 201, POST
 // patches it or applies reserved bulk enable/disable filters, and reads mask
-// passwords while keeping private worker revisions out of responses.
+// passwords while keeping private worker revisions out of responses. Two
+// handwritten greedy-path routes admit stored-config execution with 202 and
+// return read-authorized durable status with 200. Admission makes no peer call;
+// per-run options are immutable and credentials are separately sealed. Explicit
+// push destinations are independent of saved configuration and never inherit credentials.
 //
 // # References
 //
@@ -41,6 +46,7 @@
 //
 // # Status
 //
-// REP-01 configuration is implemented. Execute/status and advanced, event-driven
+// REP-01 configuration, durable single-target status and stored-config execute
+// are implemented. One-shot overrides and advanced, event-driven
 // and checksum replication retain their separate generated/deferred owners.
 package federationhttp

@@ -320,7 +320,7 @@ var Table = []Operation{
 	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/release/bundles/{bundleName}/{bundleVersion}", OperationID: "getReleaseBundleVersion", Cost: "ordinary", Idempotency: "safe"},
 	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/release/import", OperationID: "importReleaseBundleVersion", Cost: "expensive", Idempotency: "natural"},
 	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/release/import/{name}/{version}/status", OperationID: "getReleaseBundleVersionImportStatus", Cost: "ordinary", Idempotency: "safe"},
-	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/replication/execute/{repoPath}", OperationID: "executePullPushReplication", Handwritten: true, Cost: "expensive", Idempotency: "natural"},
+	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/replication/execute/{repoPath}", OperationID: "executePullPushReplication", Handwritten: true, Cost: "expensive", Idempotency: "none"},
 	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/replication/{repoPath}", OperationID: "getReplicationStatus", Handwritten: true, Cost: "ordinary", Idempotency: "safe"},
 	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/replications/channels/release", OperationID: "closeEventBasedPullReplicationChannels", Cost: "expensive", Idempotency: "natural"},
 	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/replications/channels/{repoKey}", OperationID: "getRemoteRepositoriesRegisteredForReplication", Cost: "ordinary", Idempotency: "safe", Pagination: "complete"},

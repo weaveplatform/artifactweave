@@ -53,9 +53,11 @@
 //
 // # Status
 //
-// REP-01 configuration and REP-02 bounded push are implemented. REP-03 supplies
-// durable owning-cache pull with current source/caller/configuration fences;
-// native protocol qualification remains open. REP-04 retains orchestration and
-// public status. Advanced federation remains P13/P14/P37. The application opens
-// both transfer drivers before running its work queue.
+// REP-01 configuration and REP-02/03 bounded direction drivers are implemented.
+// REP-04 binds durable manual/Quartz admission and generation-fenced workers to
+// actual transfer checkpoints and path evidence. Public stored-config execute
+// answers 202 after durable admission; status uses current read authority and
+// scoped evidence. Manual selection/transport overrides are sealed per run; explicit destinations need no saved row and retain independent history. Remaining
+// qualification is open. Advanced
+// federation remains P13/P14/P37. Both drivers open before the queue starts.
 package federation

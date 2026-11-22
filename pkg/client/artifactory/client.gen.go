@@ -5924,7 +5924,7 @@ type ReplicationRepositoryStatusStatus string
 
 // ReplicationRequest Per-target options for a replication started on demand. For a pull the array holds at most one element and url may be omitted; for a push each element names a target.
 type ReplicationRequest struct {
-	// CheckBinaryExistenceInFilestore Optional within this object. Skip transferring content the target already holds. Accepted and ignored.
+	// CheckBinaryExistenceInFilestore Optional within this object. Binary-existence optimization is unsupported; true answers 501.
 	CheckBinaryExistenceInFilestore *bool `json:"checkBinaryExistenceInFilestore,omitempty"`
 
 	// Delete Optional within this object. True also deletes items at the destination that are absent at the source. Defaults to false.
@@ -5955,7 +5955,7 @@ type ReplicationRequest struct {
 	Username *string `json:"username,omitempty"`
 }
 
-// ReplicationStatus Replication status read from the replication properties the last run annotated on the items under a path. The shape differs by repository class: a local repository with several push targets lists them in targets; a remote repository reports the single pull in status and lastCompleted.
+// ReplicationStatus Status from durable execution and selected-effect evidence under the current repository lifetime. A local repository lists its single push target in targets; a remote repository reports the pull in status and lastCompleted. A folder with no selected or affected paths is never_run. A newer incomplete run retains the previous lastCompleted instant.
 type ReplicationStatus struct {
 	// LastCompleted Optional within this object. When the last run under this path finished.
 	LastCompleted *time.Time `json:"lastCompleted,omitempty"`

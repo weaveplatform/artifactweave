@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
@@ -76,11 +77,18 @@ type Service struct {
 	Repositories interface {
 		Get(context.Context, string) (repo.Config, error)
 	}
-	Settings    settings.SettingsStore
-	ProxyExists func(context.Context, string) error
-	Authorize   func(context.Context) (Policy, error)
-	Guard       func(context.Context) error
-	Zone        string
+	Settings       settings.SettingsStore
+	ProxyExists    func(context.Context, string) error
+	Authorize      func(context.Context) (Policy, error)
+	Guard          func(context.Context) error
+	Zone           string
+	Schedules      schedule.Store
+	UserQueryLimit int
+	// ScheduleAuthor supplies a verified reference in tests/composition. Nil
+	// uses the authenticated request principal already checked by Authorize.
+	ScheduleAuthor   func(context.Context) (kernel.CredentialReference, error)
+	Now              func() time.Time
+	executionOptions *model.ExecutionOptions
 }
 
 func (s Service) run(ctx context.Context, fn func(context.Context, Policy) error) error {
@@ -193,6 +201,9 @@ func (s Service) save(ctx context.Context, key string, in Input, replace bool) e
 		if err := s.merge(ctx, repository, old, &next, in); err != nil {
 			return err
 		}
+		if err := s.bindScheduleAuthor(ctx, &next); err != nil {
+			return err
+		}
 		next.Revision = old.Revision
 		if old.Revision != "" && next == old {
 			return nil
@@ -201,7 +212,7 @@ func (s Service) save(ctx context.Context, key string, in Input, replace bool) e
 		if err := s.Store.Replications().Put(ctx, next); err != nil {
 			return fmt.Errorf("write replication configuration: %w", err)
 		}
-		return nil
+		return s.publishSchedule(ctx, next)
 	})
 }
 
@@ -222,7 +233,7 @@ func (s Service) Delete(ctx context.Context, key, targetURL string) error {
 		if err := s.Store.Replications().Delete(ctx, r.Key); err != nil {
 			return fmt.Errorf("delete replication configuration: %w", err)
 		}
-		return nil
+		return s.removeSchedule(ctx, r.Key)
 	})
 }
 
@@ -233,6 +244,9 @@ func (s Service) Delete(ctx context.Context, key, targetURL string) error {
 func (s Service) WithTarget(ctx context.Context, key, revision string, fn func(context.Context, model.Replication) error) error {
 	if s.Store == nil || s.Guard == nil || s.Ownership == nil {
 		return fmt.Errorf("replication worker contracts are unavailable: %w", kernel.ErrStore)
+	}
+	if s.executionOptions != nil && s.executionOptions.Independent {
+		return s.withExplicitTarget(ctx, key, revision, fn)
 	}
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		if err := s.Guard(ctx); err != nil {
@@ -269,6 +283,9 @@ func (s Service) WithTarget(ctx context.Context, key, revision string, fn func(c
 		}
 		if direction == model.ReplicationPush && blocks.Push || direction == model.ReplicationPull && blocks.Pull {
 			return kernel.ErrConflict
+		}
+		if s.executionOptions != nil {
+			r = s.executionOptions.Apply(r)
 		}
 		return fn(ctx, r)
 	})

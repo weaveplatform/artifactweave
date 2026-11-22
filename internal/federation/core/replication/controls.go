@@ -89,9 +89,13 @@ func (s Service) SetEnabled(ctx context.Context, enabled bool, include, exclude 
 			return fmt.Errorf("list replication controls: %w", err)
 		}
 		for _, r := range rows {
-			if len(include) > 0 && !matchesURL(include, r.URL) || matchesURL(exclude, r.URL) || r.Enabled == enabled {
+			if len(include) > 0 && !matchesURL(include, r.URL) || matchesURL(exclude, r.URL) {
 				continue
 			}
+			if r.Enabled == enabled && (!enabled || r.CronExp == "") {
+				continue
+			}
+			previous := r
 			if enabled {
 				repository, err := s.repository(ctx, r.RepoKey, policy)
 				if err != nil {
@@ -104,9 +108,19 @@ func (s Service) SetEnabled(ctx context.Context, enabled bool, include, exclude 
 					return err
 				}
 			}
-			r.Enabled, r.Revision = enabled, rand.Text()
+			r.Enabled = enabled
+			if err := s.bindScheduleAuthor(ctx, &r); err != nil {
+				return err
+			}
+			if r == previous {
+				continue
+			}
+			r.Revision = rand.Text()
 			if err := s.Store.Replications().Put(ctx, r); err != nil {
 				return fmt.Errorf("write replication enablement: %w", err)
+			}
+			if err := s.publishSchedule(ctx, r); err != nil {
+				return err
 			}
 		}
 		return nil

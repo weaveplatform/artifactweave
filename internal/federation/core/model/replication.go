@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // Replication is one replication target of a repository. Key is the
@@ -13,7 +14,11 @@ type Replication struct {
 	Key     string
 	// Revision is private worker authority. Administration rotates it when
 	// configuration changes, independently of the stable public target key.
-	Revision             string `json:"-"`
+	Revision string `json:"-"`
+	// ScheduleAuthor identifies the verified caller that authorized future
+	// occurrences. It contains no credential, groups or cached admin decision.
+	// Legacy configurations have no author and cannot start scheduled work.
+	ScheduleAuthor       kernel.CredentialReference `json:"-"`
 	URL                  string
 	Username             string
 	Password             string `json:"-"`
@@ -75,4 +80,14 @@ type ReplicationRun struct {
 	Started        time.Time
 	Completed      time.Time
 	Status         ReplicationStatus
+}
+
+// ReplicationTargetState is a secret-free projection of a current target's
+// repository-wide history. Latest may be incomplete while LastCompleted retains
+// a prior completion. Path-specific status requires selected-effect evidence;
+// this projection alone cannot claim that a run touched an arbitrary folder.
+type ReplicationTargetState struct {
+	Key, URL      string
+	Latest        ReplicationRun
+	LastCompleted time.Time
 }

@@ -10,7 +10,7 @@ type ConfigurationStore interface {
 }
 
 // Store is the part of the metadata store the federation module uses:
-// replications, peers, federated repository membership and full syncs, and
+// replications, durable dispatch/progress, peers, membership and full syncs, and
 // the platform federation records, with the shared unit of work
 // (tx.Runner). Stream positions are assigned in the transaction of the
 // change they record (decision 0021), so the federation stores run inside
@@ -18,6 +18,7 @@ type ConfigurationStore interface {
 type Store interface {
 	PushStore
 	PullStore
+	ExecutionStore
 	Peers() PeerStore
 	Federation() FederationStore
 	Platform() PlatformStore

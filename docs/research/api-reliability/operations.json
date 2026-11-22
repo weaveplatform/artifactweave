@@ -7491,36 +7491,46 @@
   },
   {
     "route": "GET /artifactory/api/replication/*",
-    "state": "stub: 501",
-    "handler": "internal/app/router.go: handwrittenStub",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes",
-    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/app/router.go: internal/federation/adapters/http.ReplicationAPI.getStatus-fm",
+    "review_family": "single-replication-status",
+    "effects": "read-only current target/repository lifetime and selected-effect history; no sealed credentials, artifact/cache mutation, upstream request or queue admission",
+    "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; current credential and Read covering the requested subtree refreshed under the shared project guard",
+    "pagination_execution": "one current single-target configuration; secret-free target keyset pages of 100; indexed current target/repository incarnation and exact-or-descendant selected effects; latest scoped outcome plus retained last completion",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/federation/adapters/http/status.go",
+      "internal/federation/status.go",
+      "internal/federation/core/replication/status.go",
+      "internal/federation/adapters/sql/execution_effect.go",
+      "test/server/federation/execution_runtime_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /artifactory/api/replication/{repoPath}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getReplicationStatus",
-    "state": "stub: 501",
-    "contract": "Not implemented; answers 501. It would report the outcome of the last replication that touched a repository or a folder in it, read from the replication properties the run annotated on the items. The caller would need read permission on the repository.",
-    "handler": "internal/app/router.go: handwrittenStub",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "state": "partial: native dispatch; supported modes follow the contract",
+    "contract": "Reports durable single-replication outcomes for a repository or folder, including never_run, incomplete, error and partial_failure. Folder status uses actual selected or affected paths and does not inherit an unrelated repository completion. Requires current read permission covering the requested subtree; status reads never open target credentials or grant transfer authority.",
+    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "review_family": "single-replication-status",
+    "effects": "read-only current target/repository lifetime and selected-effect history; no sealed credentials, artifact/cache mutation, upstream request or queue admission",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.targets[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/federation/adapters/http/status.go",
+      "internal/federation/status.go",
+      "internal/federation/core/replication/status.go",
+      "internal/federation/adapters/sql/execution_effect.go",
+      "test/server/federation/execution_runtime_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -17882,33 +17892,41 @@
   },
   {
     "route": "POST /artifactory/api/replication/execute/*",
-    "state": "stub: 501",
-    "handler": "internal/app/router.go: handwrittenStub",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes",
-    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/app/router.go: internal/federation/adapters/http.ReplicationAPI.execute-fm",
+    "review_family": "single-replication-execution",
+    "effects": "atomic direction progress, immutable execution linkage, separately sealed one-shot options and reference-only queue admission; no peer I/O during enqueue; explicit push destinations require no saved row and never inherit saved credentials",
+    "retry": "no Idempotency-Key; each accepted request creates a distinct logical execution; inspect durable status before retrying ambiguous admission",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; current repository management and original caller transfer authority before transactionally admitting work",
+    "pagination_execution": "one saved or explicit single target and canonical path; resolved one-shot options, transfer progress, execution and queue reference commit together; bounded direction steps and dual-generation ownership run outside HTTP admission",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/federation/adapters/http/execute.go",
+      "internal/federation/core/replication/coordinator.go",
+      "internal/federation/core/replication/worker.go",
+      "test/server/federation/execution_runtime_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /artifactory/api/replication/execute/{repoPath}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "executePullPushReplication",
-    "state": "stub: 501",
-    "contract": "Not implemented; answers 501. It would start a replication now, independently of any schedule. The direction would follow the repository class: a local repository pushes to the targets in the body or, when the body is omitted, to its stored configuration; a remote repository pulls from its upstream into the cache, and its body may name at most one target. The path may name a folder below the repository to limit the run. The run would be scheduled and the call would answer 200 with an empty body as soon as it is accepted; progress and per-file messages would go to the server log, and the status operation would report the outcome. A body with more than one target would be rejected with 400. Callers other than administrators would be limited to the user query result limit when choosing files. The caller would need manage permission on the repository.",
-    "handler": "internal/app/router.go: handwrittenStub",
-    "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoPath, body:",
+    "state": "partial: native dispatch; supported modes follow the contract",
+    "contract": "Starts one durable single-target execution using saved configuration or an explicit push destination. A local repository pushes; a remote repository pulls into its owning cache. The optional folder path limits selection. Returns 202 with an empty body after transfer progress, execution linkage and queue admission commit atomically. Current repository management and transfer permissions apply. Repeated requests create distinct logical runs. An omitted body or empty array uses saved options. One object supplies per-run selection defaults of properties true, delete false, and no include/exclude restriction beyond the requested path. Per-run selection and push credentials/proxy values are immutable and never change the saved configuration. An explicit push URL uses only its supplied connection values and needs no saved configuration. Runs to the same canonical endpoint share target exclusion; status includes secret-free explicit destination history under the current repository lifetime. Nonadministrators may select at most search.user_query_limit distinct files; zero disables the cap. Reaching the cap with more files to select stops the run before the next intent and reports incomplete selection as an error or partial failure. Reconciliation never follows a truncated source walk. Binary-existence optimization remains unsupported and answers 501. Multiple targets and null options answer 400.",
+    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "review_family": "single-replication-execution",
+    "effects": "atomic direction progress, immutable execution linkage, separately sealed one-shot options and reference-only queue admission; no peer I/O during enqueue; explicit push destinations require no saved row and never inherit saved credentials",
+    "retry": "none (external-effect): no retry protection; the effect reaches another service, peer, upstream or the file system and cannot roll back; reconcile before repeating",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/federation/adapters/http/execute.go",
+      "internal/federation/core/replication/coordinator.go",
+      "internal/federation/core/replication/worker.go",
+      "test/server/federation/execution_runtime_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

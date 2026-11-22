@@ -55,10 +55,52 @@ func (s Service) RefreshRepository(ctx context.Context, key string) error {
 		if err := s.Store.Replications().Put(ctx, target); err != nil {
 			return fmt.Errorf("refresh replication source: %w", err)
 		}
-		return nil
+		return s.publishSchedule(ctx, target)
 	})
 	if err != nil {
 		return fmt.Errorf("replication repository update: %w", err)
+	}
+	return nil
+}
+
+// ResetRepository removes target history and schedule positions at a repository
+// lifetime boundary. The caller owns repository deletion authorization. All
+// reads and writes join the same project-guarded metadata transaction.
+func (s Service) ResetRepository(ctx context.Context, key string) error {
+	if s.Store == nil || s.Guard == nil {
+		return fmt.Errorf("replication repository reset is unavailable: %w", kernel.ErrStore)
+	}
+	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := s.Guard(ctx); err != nil {
+			return fmt.Errorf("guard replication repository lifetime: %w", err)
+		}
+		var targets []string
+		page := kernel.Page{Limit: 100}
+		for {
+			states, next, err := s.Store.Replications().StatusTargets(ctx, key, page)
+			if err != nil {
+				return fmt.Errorf("read repository replication positions: %w", err)
+			}
+			for _, state := range states {
+				targets = append(targets, state.Key)
+			}
+			if next == "" {
+				break
+			}
+			page.After = next
+		}
+		if err := s.Store.Replications().DeleteForRepo(ctx, key); err != nil {
+			return fmt.Errorf("delete repository replication lifetimes: %w", err)
+		}
+		for _, target := range targets {
+			if err := s.removeSchedule(ctx, target); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("reset repository replications: %w", err)
 	}
 	return nil
 }

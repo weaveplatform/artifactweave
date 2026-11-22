@@ -29,7 +29,8 @@
 // # Outputs
 //
 //   - Replication, ReplicationRun, ReplicationDirection with DirectionFor,
-//     and ReplicationStatus.
+//     and ReplicationStatus. ReplicationTargetState is a credential-free
+//     repository history projection; it supplies no folder-level effect proof.
 //   - PushRun/PushBinding and PushItem preserve private logical execution,
 //     source/target intent and monotonic verification independently of the
 //     queue and public replication status. Their validation grants no current
@@ -38,6 +39,14 @@
 //     immutable caller/source bindings and actual artifact-owner receipts.
 //     They distinguish pending/failed/skipped work from successful cache and
 //     deletion effects; persistence and dispatch belong to the owning services.
+//   - ExecutionRun/ExecutionBinding link one private logical dispatch to its
+//     exact transfer lifetime. ExecutionOutcomes derives truthful public status
+//     without treating pending, failed or uncertain work as successful. These
+//     Executions persists them independently of queue and target rows; the
+//     values themselves do not schedule or dispatch a run.
+//   - ExecutionEffect retains the exact transfer intent/version, sanitized
+//     outcome and actual affected paths. ApplyExecutionEffect updates counters
+//     once per observation; ExecutionPathState reports only matching evidence.
 //   - Peer with Has and DeriveStatus, PeerStatus, UseCase with
 //     KnownUseCase, PairingNonce with Usable, and PairingTokenTTL.
 //   - Stamp with After; StreamKind with RepositoryStream, AccessStream,
@@ -101,6 +110,8 @@
 //
 // # Testing
 //
+//   - execution_test.go: actual-outcome status, unfinished/overflow refusal,
+//     immutable lifetime/credential bindings and monotonic retry evidence.
 //   - model_test.go: TestUnitDirectionFor (locals push, remotes pull,
 //     virtuals do not replicate), TestUnitPeer (known and unknown use cases,
 //     Has, the four statuses and a never-seen peer, nonce expiry and single

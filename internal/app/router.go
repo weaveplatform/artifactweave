@@ -394,7 +394,9 @@ func withFederation(cfg RouterConfig) RouterConfig {
 		return cfg
 	}
 	if m, err := federation.New(federation.Deps{
-		Store: cfg.Store, Access: cfg.Access, Ownership: repos.NewProjectRepositoryLookup(cfg.Store),
+		UserQueryLimit: cfg.Search.UserQueryLimit,
+		Lifetimes:      repos.NewRepositoryLifetimes(cfg.Store),
+		Store:          cfg.Store, Access: cfg.Access, Ownership: repos.NewProjectRepositoryLookup(cfg.Store),
 		Repositories: repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
 	}); err == nil {
 		// New refuses only a nil store, excluded above, and performs no I/O.
@@ -532,6 +534,12 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	if cfg.Federation != nil {
 		configurations := cfg.Federation.Configurations()
 		replicationOps.Configurations = &configurations
+		if status, err := cfg.Federation.Status(); err == nil {
+			replicationOps.Status = &status
+		}
+		if coordinator, err := cfg.Federation.Coordinator(); err == nil {
+			replicationOps.Executions = &coordinator
+		}
 	}
 	logger := cfg.Logger
 	if logger == nil {
@@ -676,6 +684,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	agentpluginshttp.AgentPluginItems{Kit: kit}.RegisterAgentMarketplaceRoutes(r)
 	cranOps.RegisterCranRoutes(r)
 	artAPI.RegisterTransferRoutes(r)
+	replicationOps.RegisterExecutionRoutes(r)
 	debianOps.RegisterDebianSnapshotRoutes(r)
 	artAPI.RegisterStorageRoutes(r)
 	artAPI.RegisterTrashRoutes(r)

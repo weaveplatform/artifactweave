@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
@@ -23,16 +24,19 @@ type Store interface {
 	port.ConfigurationStore
 	Settings() settings.SettingsStore
 	Configs() configdoc.ConfigStore
+	Schedules() schedule.Store
 }
 
 // Deps supplies current authority and canonical repository configuration over
 // the same guarded transaction. Zone is the server's schedule timezone.
 type Deps struct {
-	Store        Store
-	Access       accessapi.API
-	Ownership    artifactsapi.ProjectRepositoryLookup
-	Repositories artifactsapi.Repositories
-	Zone         string
+	Store          Store
+	Access         accessapi.API
+	Ownership      artifactsapi.ProjectRepositoryLookup
+	Lifetimes      artifactsapi.RepositoryLifetimes
+	Repositories   artifactsapi.Repositories
+	Zone           string
+	UserQueryLimit int
 }
 
 var errNoStore = errors.New("federation: Deps.Store is required")
@@ -66,6 +70,8 @@ func (d Deps) configurations() replication.Service {
 	s := replication.Service{
 		Store: d.Store, Settings: d.Store.Settings(), Ownership: d.Ownership,
 		Repositories: d.Repositories, Authorize: d.currentPolicy, Zone: d.Zone,
+		Schedules:      d.Store.Schedules(),
+		UserQueryLimit: d.UserQueryLimit,
 		ProxyExists: func(ctx context.Context, key string) error {
 			_, err := d.Store.Configs().Get(ctx, configdoc.ConfigProxy, key)
 			if err != nil {
@@ -97,16 +103,7 @@ func (l repositoryLifecycle) ResetRepository(ctx context.Context, key string) er
 	if l.deps.Access.Projects == nil {
 		return fmt.Errorf("replication repository guard is unavailable: %w", kernel.ErrStore)
 	}
-	err := l.deps.Store.Tx(ctx, func(ctx context.Context) error {
-		if err := l.deps.Access.Projects.Guard(ctx); err != nil {
-			return fmt.Errorf("guard replication repository lifetime: %w", err)
-		}
-		return l.deps.Store.Replications().DeleteForRepo(ctx, key)
-	})
-	if err != nil {
-		return fmt.Errorf("reset repository replications: %w", err)
-	}
-	return nil
+	return l.deps.configurations().ResetRepository(ctx, key) //nolint:wrapcheck // service supplies lifetime context
 }
 
 type policy struct{ decider accessapi.Decider }
