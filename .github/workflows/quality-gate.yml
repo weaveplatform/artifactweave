@@ -1214,7 +1214,9 @@ jobs:
         run: |
           export ARTIFACTWEAVE_TERRAFORM_BIN="$(command -v terraform)"
           mkdir -p "$ARTIFACTWEAVE_GOCOVERDIR"
-          GOWORK=off GOFLAGS=-p=2 GOMAXPROCS=2 go test -count=1 -timeout=20m -run '^TestAccFeatures$' ./test/acceptance
+          # This native harness is outside generic package selection; its
+          # workspace contracts belong beside the required provider effects.
+          GOWORK=off GOFLAGS=-p=2 GOMAXPROCS=2 go test -v -race -shuffle=on -count=1 -timeout=20m -run '^(TestUnitReplicationProvider.*|TestAccFeatures)$' ./test/acceptance
 
       - name: Upload Terraform coverage
         if: always()

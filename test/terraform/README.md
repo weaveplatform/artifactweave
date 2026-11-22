@@ -67,6 +67,9 @@ output line and use that fresh child for both `scenarios/<scenario>` and `terraf
 The two-instance replication acceptance caller verifies it is a new private direct `run.*`
 child with contained configuration/scenario paths. Its `provider.log` and sanitized evidence
 remain in the caller-selected parent; earlier child state is preserved rather than resumed.
+The existing Linux provider CI step runs its isolated workspace contracts alongside the
+required `@replication_provider` two-backend scenarios. The native harness keeps its
+existing platform ownership rather than joining the three-OS package-unit matrix.
 
 `python3 -I test/terraform/driver_test.py` exercises the shell entry point with owned
 ephemeral listeners, a Go/chi HTTP fixture built once, and stub Go/Terraform clients. The

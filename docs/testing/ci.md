@@ -1320,6 +1320,14 @@ and native-provider reconnect cases exercise connection ownership after startup.
 Real provider effects remain the existing provider lane's
 responsibility (#1845).
 
+The two-instance `@replication_provider` step also selects the acceptance harness's
+`TestUnitReplicationProvider*` workspace contracts in its existing Linux provider job,
+with race detection and shuffled execution. Its caller validates the driver's single
+effective-workspace output, uses that fresh child's scenario and CLI configuration paths,
+and keeps `provider.log` plus sanitized evidence in the requested parent. Missing,
+duplicate, stale or escaping workspace output fails before provider continuation. This
+native-harness ownership does not add a pipeline or change the three-OS package-unit lane.
+
 The providers move automatically. Dependabot cannot move them, because `run.sh` pins their
 release zips by SHA-256, so `deps-refresh.yml`'s `jfrog-providers` job runs
 `deploy/ci/jfrog-providers.sh update` every day. It:
