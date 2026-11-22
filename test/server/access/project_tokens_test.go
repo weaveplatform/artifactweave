@@ -8,9 +8,14 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
+	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/test/server/support"
+	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
 
 func TestAccProjectAdministratorMintsCurrentOwnProjectRoles(t *testing.T) {
@@ -114,4 +119,111 @@ func TestAccProjectAdministratorMintsCurrentOwnProjectRoles(t *testing.T) {
 			t.Fatal("recreated project revived old credential or disclosed private lifetime", r.Code)
 		}
 	}
+}
+
+func TestAccProjectContentTokenCeilingsAndRevocation(t *testing.T) {
+	projectContentTokenCeilings(t, inmem.New())
+}
+
+func TestAccProjectContentTokenSQLCeilingsAndRevocation(t *testing.T) {
+	projectRepositorySQL(t, projectContentTokenCeilings)
+}
+
+func projectContentTokenCeilings(t *testing.T, db harness.Store) {
+	t.Helper()
+	ctx := t.Context()
+	support.Seed(t, db)
+	if err := instance.EnsureInstance(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	tokens, err := token.New(ctx, db, token.Options{KeyBits: 1024})
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{
+		Hash: testHash, Tokens: tokens, Groups: db.Groups(), APIRestrictions: db.APIRestrictions(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	blobs, err := fs.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := New(Config{Store: db, Blobs: blobs, Auth: auth, Tokens: tokens, AllowBasicAuthTokens: true, PasswordHash: testHash})
+	for _, name := range []string{"content-owner", "content-consumer"} {
+		if err := db.Users().Create(ctx, accesstest.User{Name: name, PasswordHash: cheapHash}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const writer = `{"name":"content","type":"CUSTOM","actions":["READ_REPOSITORY","DEPLOY_CACHE_REPOSITORY"],"environments":["DEV"]}`
+	for _, project := range []string{"alpha", "beta"} {
+		projectRequest(t, h, http.MethodPost, "", "admin", `{"project_key":"`+project+`","display_name":"`+project+`"}`, http.StatusCreated)
+		projectRequest(t, h, http.MethodPost, "/"+project+"/roles", "admin", writer, http.StatusCreated)
+		wantStatus(t, do(t, h, http.MethodPut, "/artifactory/api/repositories/"+project+"-local", jsonAs(basic("admin", "pw")),
+			`{"rclass":"local","packageType":"generic","projectKey":"`+project+`"}`,
+		), http.StatusOK)
+	}
+	projectRequest(t, h, http.MethodPut, "/alpha/users/content-owner", "admin", `{"roles":["content"]}`, http.StatusOK)
+	projectRequest(t, h, http.MethodPut, "/beta/users/content-consumer", "admin", `{"roles":["content"]}`, http.StatusOK)
+	content := func(method, path, body string, headers map[string]string, want int) {
+		t.Helper()
+		response := do(t, h, method, "/artifactory/"+path, headers, body)
+		wantStatus(t, response, want)
+		if method == http.MethodGet && want == http.StatusOK && response.Body.String() != "current project content" {
+			t.Fatal("authorized native read returned different bytes")
+		}
+	}
+	for _, path := range []string{"alpha-local/allowed/file.bin", "alpha-local/private/file.bin", "beta-local/allowed/file.bin"} {
+		content(http.MethodPut, path, "current project content", basic("admin", "pw"), http.StatusCreated)
+	}
+	mint := func(name string) []string {
+		t.Helper()
+		body, err := json.Marshal(map[string]any{
+			"username": name, "scope": "applied-permissions/user artifact:alpha-local/allowed/**:r", "expires_in": 600, "include_reference_token": true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issued := mintAdmin(t, h, string(body))
+		access, _ := issued["access_token"].(string)
+		reference, _ := issued["reference_token"].(string)
+		if access == "" || reference == "" {
+			t.Fatal("content token fixture did not receive both credential forms")
+		}
+		return []string{access, reference}
+	}
+	owner, consumer := mint("content-owner"), mint("content-consumer")
+	assertCeilings := func(credentials []string, allowed int) {
+		t.Helper()
+		for _, credential := range credentials {
+			headers := bearerAuth(credential)
+			content(http.MethodGet, "alpha-local/allowed/file.bin", "", headers, allowed)
+			content(http.MethodGet, "alpha-local/private/file.bin", "", headers, http.StatusForbidden)
+			content(http.MethodGet, "beta-local/allowed/file.bin", "", headers, http.StatusForbidden)
+			content(http.MethodPut, "alpha-local/allowed/denied.bin", "refused", headers, http.StatusForbidden)
+		}
+		content(http.MethodGet, "alpha-local/allowed/denied.bin", "", basic("admin", "pw"), http.StatusNotFound)
+	}
+	// Positive Basic controls prove path/action restrictions come from the
+	// issued token ceiling, not a missing underlying project grant.
+	content(http.MethodGet, "alpha-local/private/file.bin", "", basic("content-owner", "pw"), http.StatusOK)
+	content(http.MethodPut, "alpha-local/allowed/write-control.bin", "current project content", basic("content-owner", "pw"), http.StatusCreated)
+	content(http.MethodGet, "beta-local/allowed/file.bin", "", basic("content-consumer", "pw"), http.StatusOK)
+	assertCeilings(owner, http.StatusOK)
+	assertCeilings(consumer, http.StatusForbidden)
+	share := "/_/share/repositories/alpha-local/beta"
+	projectRequest(t, h, http.MethodPut, share+"?readOnly=true", "admin", "", http.StatusNoContent)
+	content(http.MethodGet, "alpha-local/allowed/file.bin", "", basic("content-consumer", "pw"), http.StatusOK)
+	assertCeilings(consumer, http.StatusOK)
+	projectRequest(t, h, http.MethodDelete, share, "admin", "", http.StatusNoContent)
+	assertCeilings(consumer, http.StatusForbidden)
+	content(http.MethodGet, "alpha-local/allowed/file.bin", "", basic("content-consumer", "pw"), http.StatusForbidden)
+	projectRequest(t, h, http.MethodPut, "/alpha/roles/content", "admin", `{"name":"content","type":"CUSTOM","actions":[],"environments":["DEV"]}`, http.StatusOK)
+	assertCeilings(owner, http.StatusForbidden)
+	projectRequest(t, h, http.MethodPut, "/alpha/roles/content", "admin", writer, http.StatusOK)
+	assertCeilings(owner, http.StatusOK)
+	projectRequest(t, h, http.MethodDelete, "/alpha/users/content-owner", "admin", "", http.StatusNoContent)
+	assertCeilings(owner, http.StatusForbidden)
+	content(http.MethodGet, "alpha-local/allowed/file.bin", "", basic("content-owner", "pw"), http.StatusForbidden)
 }
