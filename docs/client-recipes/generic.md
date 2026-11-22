@@ -39,7 +39,7 @@ jf rt u readme.md "$AW_REPO/" --flat --server-id=aw
 
 ## Install or resolve
 
-Classes: **local, remote, virtual, federated**. Reads use the selected repository; remote reads require an administrator-configured upstream.
+Classes: **local, remote, virtual, federated**. Reads use the selected repository; remote reads require an administrator-configured upstream. An administrator may configure an NTLMv2 outbound proxy with domain and ntHost (DNS-named HTTP and HTTPS origins require CONNECT support); the generic remote native acceptance verifies the proxy proof and exact downloaded bytes.
 
 ```sh
 jf rt dl "$AW_REPO/readme.md" "$AW_WORK/download/" --flat --fail-no-op --server-id=aw
@@ -61,3 +61,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/steps_test.go](../../test/acceptance/steps_test.go).
 - Evidence: [test/acceptance/features/proxy_redirects.feature](../../test/acceptance/features/proxy_redirects.feature).
 - Evidence: [test/acceptance/proxy_redirect_steps_test.go](../../test/acceptance/proxy_redirect_steps_test.go).
+- Evidence: [test/acceptance/features/ntlm_proxy.feature](../../test/acceptance/features/ntlm_proxy.feature).
+- Evidence: [test/acceptance/remote_steps_test.go](../../test/acceptance/remote_steps_test.go).

@@ -51,15 +51,18 @@
 //     forwarded.
 //   - An actual redirected bodyless GET/HEAD can answer one target Basic
 //     challenge with proxy credentials at an exact redirectedToHosts hostname
-//     and configured proxy port. It grants no destination reachability,
-//     repository identity or headers, and NoCrossOriginAuth forbids it.
+//     and configured proxy port; with an NTLM proxy domain the Basic username
+//     is the NT principal name, DOMAIN\user. It grants no destination
+//     reachability, repository identity or headers, and NoCrossOriginAuth
+//     forbids it.
 //   - The caller owns every response body that a successful Fetch, Do or
 //     Send returns, and closes it.
 //   - Registry tokens are isolated by source identity, credential revision,
 //     image, service and scope, and never follow a redirect to a CDN or to
 //     another image.
 //   - The remote: sentinel texts, ErrRegistryChallenge's text and the
-//     redirect, proxy and destination behaviour stay byte-identical.
+//     redirect and destination contracts retain their classifications. NTLMv2
+//     proxy authentication uses the platform outbound connection helper.
 //
 // # References
 //
@@ -89,7 +92,8 @@
 //
 // # Status
 //
-// Implemented P9. Moved here in P9d, which narrowed the resolver's store to
+// Implemented P9 and P12 NTLMv2 proxy authentication. Moved here in P9d,
+// which narrowed the resolver's store to
 // ResolverStore (https://github.com/weaveplatform/artifactweave/issues/1091).
 // P12 adds scoped redirected Basic proxy credentials (#1836).
 //

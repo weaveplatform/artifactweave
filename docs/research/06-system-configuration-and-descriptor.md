@@ -342,6 +342,15 @@ security:
     loginAttempts: 5
 ```
 
+Proxy `domain` and `ntHost` are runtime NTLMv2 settings for artifact remote sources
+(#1835), using the configured username and sealed proxy password. This follows the
+7.161.26 `ProxyDescriptor` / `artifactory.xsd` field meanings: domain/realm and the
+computer name of this client. [MS-NTHT](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-ntht/f8064832-931f-4516-9557-01630745732f)
+supplies the HTTP proxy handshake, while the [remote transport contract](../implementation/remote-http-transport.md)
+distinguishes local pinning, CONNECT and supported NTLMv2 capability restrictions.
+The separate replication consumer remains #1848.
+No Windows administration or LDAP NTLM login is implied.
+
 ### Proxy redirect credential contract
 
 The [official proxy guide](https://jfrog.com/help/r/jfrog-platform-administration-documentation/define-proxies)
@@ -404,8 +413,13 @@ TLS identity or cookies beyond their independent rules. DNS is checked and pinne
 both attempts; HTTPS downgrade remains refused. The sealed proxy document/secret
 already participates in the source HMAC and transactional publication fence.
 Controlled native and SQLite/PostgreSQL proofs cover content and failed publication.
-P19/#216 retains live comparison; #1835 owns NTLM and #1848 broader replication proxy
-configuration, preserving its independent endpoint and replay restrictions.
+With an NTLM `domain`, `HttpBuilderBase.proxy` registers `NTCredentials` (7.86.2 source;
+the 13.21.0 class retains the `NTCredentials`/`redirectToHostProxies` references) for
+the same listed hosts, so Apache's `BasicScheme` sends the
+[NTUserPrincipal](https://github.com/apache/httpcomponents-client/blob/4.5.x/httpclient/src/main/java/org/apache/http/auth/NTUserPrincipal.java)
+name: root-locale upper-case domain, a backslash and the username. artifactweave sends that
+name in the redirected Basic retry. P19/#216 retains live comparison; #1848 owns broader
+replication proxy configuration, preserving its independent endpoint and replay restrictions.
 
 ### What artifactweave serves
 

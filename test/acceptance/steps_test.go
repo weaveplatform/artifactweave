@@ -58,6 +58,7 @@ type world struct {
 	puppetUp          *httptest.Server
 	remote            *fakeupstream.Server
 	proxyRedirect     *proxyRedirectFixture
+	ntlmProxy         *fakeupstream.NTLMProxy
 	podSource         *fakeupstream.Server
 	aiEditor          *aiEditorFixture
 	p2Child           *fakeupstream.Server

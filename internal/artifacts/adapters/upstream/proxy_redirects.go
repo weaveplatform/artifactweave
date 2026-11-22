@@ -59,6 +59,21 @@ func proxyRedirectHost(host string) string {
 	return key
 }
 
+// proxyRedirectUsername is the Basic username a redirected host receives. With a
+// proxy domain, jfrog-http-client registers NTCredentials for the listed hosts
+// too, and Apache's BasicScheme sends NTUserPrincipal's name: the domain in
+// Java's root-locale upper case, a backslash, then the username. Sending the
+// bare username would authenticate a different account at the redirect host.
+func (s *sourceSecurity) proxyRedirectUsername() string {
+	username := s.proxy.User.Username()
+	if s.proxyDomain == "" {
+		return username
+	}
+	// Full casing matches String.toUpperCase (ß becomes SS); a fresh caser per
+	// call because casers may be stateful.
+	return cases.Upper(language.Und).String(s.proxyDomain) + `\` + username
+}
+
 func (s *sourceSecurity) redirectedProxyAuth(req *http.Request) bool {
 	if s.proxy == nil || s.proxy.User == nil || req.Response == nil ||
 		req.Header.Get("Authorization") != "" || req.Context().Value(noCrossOriginAuthKey{}) == true {

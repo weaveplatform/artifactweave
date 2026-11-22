@@ -32,7 +32,7 @@
   },
   "install": {
     "classes": "LRVF",
-    "note": "Reads use the selected repository; remote reads require an administrator-configured upstream.",
+    "note": "Reads use the selected repository; remote reads require an administrator-configured upstream. An administrator may configure an NTLMv2 outbound proxy with domain and ntHost (DNS-named HTTP and HTTPS origins require CONNECT support); the generic remote native acceptance verifies the proxy proof and exact downloaded bytes.",
     "steps": [
       {
         "language": "sh",
@@ -78,6 +78,21 @@
       "contains": [
         "proxy redirect qualification requires ARTIFACTWEAVE_JF_BIN",
         "proxyRedirectObservations"
+      ]
+    },
+    {
+      "path": "test/acceptance/features/ntlm_proxy.feature",
+      "contains": [
+        "JFrog CLI downloads cold upstream files through one NTLM connection",
+        "the NTLM proxy verified one domain and workstation exchange",
+        "first NTLM native bytes"
+      ]
+    },
+    {
+      "path": "test/acceptance/remote_steps_test.go",
+      "contains": [
+        "NTLM proxy acceptance requires ARTIFACTWEAVE_JF_BIN",
+        "remoteNTLMVerified"
       ]
     }
   ]

@@ -587,3 +587,68 @@ func TestUnitProxyRedirectSourceRevisionsAndPools(t *testing.T) {
 		})
 	}
 }
+
+// An NTLM proxy's redirectedToHosts grant carries jfrog-http-client's
+// NTCredentials, so a Basic challenge at the listed host receives Apache's
+// NTUserPrincipal name (upper-cased domain, backslash, username), while the
+// proxy itself still authenticates with NTLMv2 inside each CONNECT.
+func TestAccResolverProxyRedirectNTLMDomainIdentity(t *testing.T) {
+	target := fakeupstream.New(t, fakeupstream.Options{Auth: fakeupstream.Auth{Username: `CORPSS\proxy-user`, Password: "proxy-secret"}})
+	target.Set("/artifact", fakeupstream.Resource{Body: []byte("redirected NTLM artifact")})
+	source := fakeupstream.New(t, fakeupstream.Options{Auth: fakeupstream.Auth{Username: "repo-user", Password: "repo-secret"}})
+	targetURL, err := url.Parse(target.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logicalTarget := "http://" + net.JoinHostPort("download.private", targetURL.Port())
+	source.Set("/start", fakeupstream.Resource{Redirect: logicalTarget + "/artifact"})
+	listener, err := net.Listen("tcp6", net.JoinHostPort("::1", targetURL.Port()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := ntlmFixtureOptions()
+	options.Domain, options.Listener = "corpß", listener
+	proxy := fakeupstream.NewNTLMProxy(t, options, source, target)
+	st := inmem.New()
+	p := proxyConfig(t, proxy.URL)
+	p.Host = "http://[::1]"
+	// Java's String.toUpperCase(Locale.ROOT) expands ß; simple Go casing would not.
+	p.Domain, p.NTHost, p.RedirectedToHosts = "corpß", "ARTIFACTWEAVE", "download.private"
+	putProxy(t, st, "ntlm-redirect", p, "proxy-secret")
+	sourceURL, err := url.Parse(source.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := repo.Config{
+		Key: "ntlm-redirect", Class: repo.Remote, Proxy: "ntlm-redirect",
+		URL:      "http://" + net.JoinHostPort("registry.private", sourceURL.Port()),
+		Username: "repo-user", Password: "repo-secret",
+	}
+	saveRepo(t, st, c)
+	resolver := resolverFor(t, st, ResolverOptions{
+		AllowedPrivateOrigins: []string{logicalTarget},
+		LookupIP: func(context.Context, string) ([]net.IPAddr, error) {
+			return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
+		},
+	})
+	client := clientFor(t, c, resolveFor(t, resolver, c))
+	if got := body(t, getFor(t, client, "start")); got != "redirected NTLM artifact" {
+		t.Fatalf("unexpected body %q", got)
+	}
+	requests := target.Requests()
+	if len(requests) != 2 || requests[0].Header.Get("Authorization") != "" || !requests[1].Authorized {
+		t.Fatal("redirect target did not receive one challenged NT-principal Basic attempt")
+	}
+	verified := 0
+	for _, record := range proxy.Negotiations() {
+		if record.Message == 3 && record.Authorized {
+			verified++
+		}
+		if record.OriginAuthorization {
+			t.Fatal("origin credentials reached proxy authentication")
+		}
+	}
+	if verified == 0 {
+		t.Fatal("proxy did not verify an NTLMv2 exchange")
+	}
+}

@@ -79,12 +79,17 @@ with exact configured-private authority grants and unconditional known-metadata 
 Cross-origin credentials require `allowAnyHostAuth` and HTTPS. These deliberate security
 restrictions and the DNS-named HTTP proxy CONNECT requirement are recorded in the
 [transport contract](../../implementation/remote-http-transport.md#resolved-source-security-618);
-RC-6/#216 still owns observed Artifactory comparisons. P12 #1836 adds one challenged
-Basic proxy-credential retry at an explicitly listed redirected hostname and the
-configured proxy port, independently of repository Authorization, TLS client identity,
-cookies and destination grants. Source/bytecode registration and local restrictions are
-recorded in [research 06](../06-system-configuration-and-descriptor.md#proxy-redirect-credential-contract).
-NTLM/domain remains #1835; broader replication proxy configuration remains #1848.
+RC-6/#216 still owns observed Artifactory comparisons. P12/#1835 adds NTLMv2
+proxy domain/workstation authentication through the shared platform outbound CONNECT
+helper, preserving this source boundary and sealed revision rotation. Its explicit
+protocol/CONNECT limits and independent native proof are in the transport contract.
+P12 #1836 adds one challenged Basic proxy-credential retry at an explicitly listed
+redirected hostname and the configured proxy port, independently of repository
+Authorization, TLS client identity, cookies and destination grants; with a proxy
+domain the retry uses the NT principal name `DOMAIN\user`. Source/bytecode
+registration and local restrictions are recorded in
+[research 06](../06-system-configuration-and-descriptor.md#proxy-redirect-credential-contract).
+Replication's consumer and broader proxy configuration remain separate under #1848.
 Proxy service strings from the descriptor/provider and historical stored lists
 share one read decoder. String separators follow the pinned Artifactory source;
 explicit selection and platform-default `jfrt` filtering retain their existing
