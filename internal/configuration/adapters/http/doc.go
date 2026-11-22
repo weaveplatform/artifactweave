@@ -1,6 +1,6 @@
 // Package configurationhttp is the configuration module's HTTP adapter: the
 // artifactory spec's system operations (version, license, service id,
-// readiness, liveness and the reverse proxy configuration), the probes and
+// readiness, liveness, temporary logger levels and the reverse proxy configuration), the probes and
 // telemetry sinks the router mounts beside them, and the YAML descriptor
 // PATCH.
 //
@@ -44,6 +44,8 @@
 //     goes to the access log. The liveness probes probe no store.
 //   - The descriptor PATCH keeps its strict parse and answers 400 for an
 //     invalid descriptor (decision 0009).
+//   - Logger administration requires an administrator before reaching the
+//     configuration API, whose publication/read checks refresh current authority.
 //   - Statuses, envelopes and error and log text stay byte-identical,
 //     because JFrog's clients and the operators' logs read them.
 //
@@ -70,7 +72,8 @@
 // (P3), the reverse proxy configuration of the Docker access methods (pull
 // request 241) and the probes and router health (issue 403) added later.
 // P9d split them into the system partial (WEB-07) and moved them here
-// (WEB-11).
+// (WEB-11). P12 adds process-local logger POST/DELETE/GET over configuration/api;
+// P38 owns streaming, downloads and support bundles.
 //
 // # Testing
 //

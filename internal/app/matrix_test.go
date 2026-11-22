@@ -727,6 +727,9 @@ func systemMatrix() []matrixRow {
 		at("GET /artifactory/api/system/version", "", anyone, 200),
 		at("GET /artifactory/api/system/license", "", administrators, 200),
 		at("GET /artifactory/api/system/service_id", "", administrators, 200),
+		at("POST /artifactory/api/system/debug/loggers", `{"classes":{"artifactweave.http":"debug"},"timer":60}`, administrators, 200).alone(),
+		at("DELETE /artifactory/api/system/debug/loggers", "", administrators, 200),
+		row("GET /artifactory/api/system/debug/loggers/{className}", "/artifactory/api/system/debug/loggers/artifactweave.http", "", administrators, 200),
 		at("GET /artifactory/api/v1/system/readiness", "", noCredentials, 200),
 		at("GET /artifactory/api/v1/system/liveness", "", noCredentials, 200),
 		at("GET /access/api/v1/system/ping", "", noCredentials, 200),
@@ -1722,7 +1725,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	})
 	must(err)
 	cfg := RouterConfig{
-		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
+		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash, OnClose: t.Cleanup,
 		Keys:   support.TerraformBackendKeys(t),
 		Tokens: tokens,
 		Multipart: &multipart.Service{

@@ -88,7 +88,27 @@ authentication/authorization refusal retain their existing response classificati
 The [operator reference](../../operations/configuration-reference.md#request-cancellation-diagnostics)
 explains how to distinguish these records from server failures.
 
-P12 owns the configuration logger endpoints. P38 extends that baseline with
+P12 implements configuration logger POST/DELETE/GET over actual named slog handlers
+([#1827](https://github.com/weaveplatform/artifactweave/issues/1827)). Configuration
+core owns whole-request validation, current guarded administration, one bounded
+session and expiration; `platform/logging` owns only runtime handler decisions.
+The existing sink, structured attributes/groups and redaction stay in the record
+path at every level. Deletion and expiration reveal the original handler's current
+level, and runtime Close restores it and joins every timer callback. A conflicting
+POST is refused with 400; replace with DELETE followed by POST, as the primary
+[Set API](https://docs.jfrog.com/administration/reference/setloggerdebuglevels)
+instructs. Unknown classes have no effect and GET uses the root level. These
+process-local controls persist no configuration and are absent after restart.
+An internally owned standalone-router logger binding requires an `OnClose`
+registrar; without one its logger API remains unavailable and no internal control
+or session service is created. Callers drain HTTP, then invoke registered cleanup;
+injected logger APIs retain their external ownership, including partial APIs.
+All three module API operations require a standalone context: an enclosing
+metadata transaction is refused before the logger lock, avoiding a lock cycle
+with another call's current-authority transaction.
+Naming, effective-level aliases and source distinctions are recorded in
+[research 06](../06-system-configuration-and-descriptor.md). P35 owns cross-node
+propagation. P38 extends that baseline with
 application/Distribution metrics, live log and debug controls, lock and background-task
 visibility, system information, support bundles and cloud log collection. P35 supplies
 the HA state those operators inspect. P41 qualifies

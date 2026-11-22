@@ -32,6 +32,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/mirror"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/session"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/internal/platform/logging"
 	"github.com/weaveplatform/artifactweave/internal/platform/mail"
 	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
@@ -54,6 +55,8 @@ var registerDebianSnapshotWork = debianhttp.RegisterDebianSnapshotWork
 type Runtime struct {
 	// Keys is the master key's keyring, nil without a master key.
 	Keys *crypt.Keyring
+	// Logging owns this runtime's named loggers.
+	Logging *logging.Control
 	// Store is the metadata store, with its pending migrations applied.
 	Store *appsql.Store
 	// Auth authenticates requests against Store's users and Tokens.
@@ -122,6 +125,8 @@ func OpenRuntime(
 	opts RuntimeOptions,
 ) (*Runtime, error) {
 	opts = opts.withDefaults()
+	logs := logging.New(log)
+	log = logs.Logger("artifactweave")
 	// The budget is the process's: every decode shares it, those of the
 	// work queue's workers included, so it is set before they start.
 	xzfile.SetBudget(int64(cfg.XZ.DictionaryBudget))
@@ -196,7 +201,7 @@ func OpenRuntime(
 		Workers:     cfg.Work.Workers,
 		Lease:       cfg.Work.Lease,
 		MaxAttempts: cfg.Work.MaxAttempts,
-		Log:         log,
+		Log:         logs.Logger("artifactweave.work"),
 	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
@@ -207,7 +212,7 @@ func OpenRuntime(
 	}
 	mods, err := buildModules(cfg, moduleDeps{
 		store: st, keys: keys, auth: authenticator, tokens: tokens,
-		blobs: hot.store, work: queue, events: eventBus, gc: collector, log: log,
+		blobs: hot.store, work: queue, events: eventBus, gc: collector, log: log, logging: logs,
 	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
@@ -245,6 +250,7 @@ func OpenRuntime(
 	lctx, stop := context.WithCancel(context.WithoutCancel(ctx))
 	rt := &Runtime{
 		Keys:       keys,
+		Logging:    logs,
 		Store:      st,
 		Auth:       authenticator,
 		Tokens:     tokens,
@@ -335,6 +341,7 @@ func formatSettings(cfg config.Config, keys *crypt.Keyring) ecosystem.Settings {
 // called once, after the HTTP server over the runtime has drained; the
 // error joins the mirrors' and the store's.
 func (rt *Runtime) Close(ctx context.Context) error {
+	rt.modules.configuration.Close()
 	rt.modules.artifacts.Close()
 	rt.stopLoops()
 	rt.loops.Wait()

@@ -1,7 +1,7 @@
 // Package configuration is the configuration module's constructor: New(Deps)
-// binds configuration/api over the descriptor core, which applies system
-// configuration and descriptors across the other modules through their api
-// packages.
+// binds configuration/api over the descriptor and system cores. Descriptors
+// apply configuration across module APIs; P12 Loggers administers process-local
+// levels when composition supplies a logging control and owns cleanup.
 //
 // # Role
 //
@@ -22,16 +22,17 @@
 //     writes commit or roll back together.
 //   - Settings, the configuration options from app/config's Configuration
 //     (docker.subdomain_match).
-//   - Log, for the services the module builds itself; it builds none yet,
-//     so New does not read it.
+//   - Log and Logging, the structured sink and shared process logging control.
+//     A logger API is bound only when an actual Logging mechanism is supplied.
 //
 // # Outputs
 //
 //   - Module, whose API returns configuration/api's Descriptor (parse and
 //     apply a descriptor: PATCH /api/system/configuration, config apply and
 //     the bootstrap descriptor) and System (the descriptor's settings that
-//     other modules read), and whose Settings returns the Settings from
-//     Deps.
+//     other modules read), the narrow Mail.Server reader, and conditional P12
+//     Loggers. Settings returns the Settings from Deps. Close restores temporary
+//     logger levels and joins timer callbacks.
 //   - Store, what the module needs of the metadata store.
 //
 // # Invariants
@@ -41,6 +42,10 @@
 //     before anything is read. It refuses only Deps without a store.
 //   - The bindings return the descriptor core's and the store's errors as
 //     they gave them, so every text an apply answers stays byte-identical.
+//   - All Loggers operations require a context outside this metadata store's
+//     transaction, before entering the logger lock. Composition owns Close:
+//     app's runtime calls it after draining; standalone routers require OnClose
+//     before binding their own logger service and preserve injected ownership.
 //
 // # References
 //
@@ -63,10 +68,13 @@
 //
 // # Status
 //
-// Implemented P9d: New and Module, the module constructor over the
-// descriptor binding. The module's routes stay in the server for now, and
-// config apply and the bootstrap descriptor bind the descriptor core over
-// the store alone, before any module exists.
+// Implemented P9d: New, Module and the descriptor/system bindings, with HTTP in
+// configuration/adapters/http. Config apply and bootstrap can bind the descriptor
+// core over the store before a module exists. P11 adds the narrow Mail.Server
+// read port used by notification delivery. P12 CFG-03 implements conditional
+// Loggers and owned timer cleanup: an actual Logging control binds the API, and
+// the caller owns Module.Close. app's runtime supplies both; standalone router
+// composition leaves its logger API unavailable without an OnClose registrar.
 //
 // # Testing
 //
@@ -76,4 +84,7 @@
 //     reads and writes are the store's, with its errors.
 //   - The descriptor's behaviour is tested in configuration/core/descriptor
 //     and configuration/adapters/http.
+//   - Logger tests cover current authority, transaction refusal, concurrent
+//     store/logger lock interleavings and commit failure. Core and app suites
+//     prove real levels, expiry, cleanup and generated-client answers.
 package configuration

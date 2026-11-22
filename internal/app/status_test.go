@@ -91,6 +91,7 @@ func checksumDeploy(headers map[string]string, body string) (map[string]string, 
 func statusTable() []statusCase {
 	return slices.Concat(
 		systemStatusRows(),
+		loggerStatusRows(),
 		sinkStatusRows(),
 		repositoryStatusRows(),
 		descriptorStatusRows(),
@@ -363,7 +364,7 @@ func newStatusFixture(
 		t.Fatal(err)
 	}
 	cfg := RouterConfig{
-		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
+		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash, OnClose: t.Cleanup,
 		Keys:   support.TerraformBackendKeys(t),
 		Tokens: tokens,
 		Multipart: &multipart.Service{

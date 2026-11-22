@@ -121,6 +121,8 @@
       "limits_cost_test.go",
       "limits_operations_test.go",
       "limits_test.go",
+      "loggers_status_test.go",
+      "loggers_test.go",
       "matrix_pkgtest_test.go",
       "matrix_reindex_test.go",
       "matrix_test.go",
@@ -228,6 +230,7 @@
     ],
     "internal/configuration/adapters/http": [
       "descriptor_test.go",
+      "loggers_test.go",
       "reverseproxy_test.go",
       "service_id_test.go",
       "system_health_test.go"
