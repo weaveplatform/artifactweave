@@ -308,12 +308,6 @@ func exportValue(name string, value any) exportField {
 	if value == nil {
 		return field
 	}
-	if fields, ok := value.(map[string]any); ok {
-		for _, key := range slices.Sorted(maps.Keys(fields)) {
-			field.Children = append(field.Children, exportValue(key, fields[key]))
-		}
-	} else {
-		field.Text = fmt.Sprint(value)
-	}
+	field.Text = fmt.Sprint(value)
 	return field
 }

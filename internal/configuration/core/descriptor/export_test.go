@@ -497,3 +497,19 @@ func TestUnitExportRepositoryPreservesAbsentDebianFlags(t *testing.T) {
 		t.Fatal("REST defaults replaced absent XML configuration", string(body))
 	}
 }
+
+func TestUnitExportDoesNotPromoteStoredValueKeysToXMLNames(t *testing.T) {
+	db := inmem.New()
+	// An unexpected structured value can exist in an older configuration
+	// document. Its keys must never become XML structure in the read model.
+	if err := db.Configs().Put(t.Context(), configdoc.ConfigDocument{
+		Kind: configdoc.ConfigPropertySet, Key: "old-set",
+		Document: []byte(`{"properties":{"release":{"multipleChoice":{"injected":"data <>&"}}}}`),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, body := exportXML(t, depsOf(t, db))
+	if strings.Contains(body, "<injected>") {
+		t.Fatal("stored value keys became XML names", body)
+	}
+}
