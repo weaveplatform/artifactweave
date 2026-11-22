@@ -47,7 +47,7 @@ func (p *Policy) fill(
 	if !state.OfflineUntil.IsZero() {
 		// Recovery is source-wide. Different paths share one probe; after a
 		// successful probe each path still resolves its own representation.
-		probeKey := p.probeKey(key, permit, state)
+		probeKey := p.probeKey(q, key, permit, state)
 		filled, probeErr := p.probes.Do(
 			ctx,
 			probeKey,
@@ -229,7 +229,7 @@ func (p *Policy) direct(
 	if !state.OfflineUntil.IsZero() {
 		probe, probeErr := p.probes.Do(
 			ctx,
-			p.probeKey(key, permit, state),
+			p.probeKey(q, key, permit, state),
 			func(shared context.Context) (fillResult, error) {
 				// Transient bodies have exactly one owner. A recovery probe validates and
 				// discards its body; callers then fetch their own response after recovery.
@@ -424,8 +424,10 @@ func (p *Policy) negative(
 		if currentErr := p.Check(tx, q, permit, revision); currentErr != nil {
 			return currentErr
 		}
-		return p.Store.RemoteCache().
-			Negative(tx, token, p.now().Add(time.Duration(seconds)*time.Second))
+		if err := p.Store.RemoteCache().Negative(tx, token, p.now().Add(time.Duration(seconds)*time.Second)); err != nil {
+			return fmt.Errorf("publish remote miss: %w", err)
+		}
+		return q.FencePublication(tx)
 	})
 	if err != nil {
 		return PolicyError(err)
@@ -435,11 +437,12 @@ func (p *Policy) negative(
 }
 
 func (p *Policy) probeKey(
+	q source.Request,
 	key model.RemoteCacheKey,
 	permit source.Permit,
 	state model.RemoteSourceState,
 ) string {
-	return p.FlightKey(
+	return p.selectedFlightKey(q,
 		model.RemoteCacheKey{
 			RepoKey:          key.RepoKey,
 			SettingsRevision: key.SettingsRevision,
@@ -469,18 +472,25 @@ func (p *Policy) upload(
 			return q.Resource.ValidateMetadata(ctx, r, size, metadata)
 		}
 	}
+	expected := q.Resource.Checksums
+	if selected := q.Resource.SelectedContent; selected != nil {
+		expected = mergeSelectedChecksums(expected, selected.Checksums)
+		validate = selectedValidator(*selected, validate)
+	}
 	return item.CacheUpload{
-		CachePolicy:          permit.CachePolicy(),
-		Expected:             q.Resource.Checksums,
-		ExpectedContentType:  q.Resource.ExpectedContentType,
-		ExpectedContentTypes: q.Resource.ExpectedContentTypes,
-		Validate:             validate,
-		RemoteURL:            responseBase(res),
-		Token:                token,
-		Repo:                 q.Repo,
-		Body:                 res.Body,
-		Kind:                 kind,
-		Length:               res.ContentLength,
+		SmartProperties:        kernel.Clone(q.SelectedProperties),
+		SmartPropertiesStarted: q.SelectedPropertiesStarted,
+		CachePolicy:            permit.CachePolicy(),
+		Expected:               expected,
+		ExpectedContentType:    q.Resource.ExpectedContentType,
+		ExpectedContentTypes:   q.Resource.ExpectedContentTypes,
+		Validate:               validate,
+		RemoteURL:              responseBase(res),
+		Token:                  token,
+		Repo:                   q.Repo,
+		Body:                   res.Body,
+		Kind:                   kind,
+		Length:                 res.ContentLength,
 		Declared: kernel.Checksums{
 			SHA256: res.Header.Get("X-Checksum-Sha256"),
 			SHA512: res.Header.Get("X-Checksum-Sha512"),
@@ -498,6 +508,7 @@ func (p *Policy) upload(
 		NoStore:      noStore,
 		MaxBytes:     limit,
 		CheckCurrent: func(ctx context.Context, _ item.Store) error { return p.Check(ctx, q, permit, revision) },
+		FinalFence:   q.FencePublication,
 		ClientAccept: clientAccept(q),
 		RequestURL:   requestURL(res),
 	}
@@ -617,7 +628,7 @@ func (p *Policy) unexpireEntry(
 		if putErr != nil {
 			return fmt.Errorf("unexpire remote cache: %w", putErr)
 		}
-		return nil
+		return q.FencePublication(tx)
 	})
 	if err != nil {
 		return model.RemoteCacheEntry{}, fmt.Errorf("unexpire remote cache transaction: %w", err)
@@ -677,14 +688,20 @@ func (p *Policy) Check(
 		return source.ErrSuperseded
 	}
 	if p.CheckCurrent != nil {
-		return p.CheckCurrent(ctx, p.Store, q, permit, revision)
+		if err := p.CheckCurrent(ctx, p.Store, q, permit, revision); err != nil {
+			return err
+		}
+	} else {
+		current, err := p.Store.RemoteCache().Source(ctx, q.Repo.Key)
+		if err != nil {
+			return fmt.Errorf("read current remote source: %w", err)
+		}
+		if current != permit.Identity {
+			return source.ErrSuperseded
+		}
 	}
-	current, err := p.Store.RemoteCache().Source(ctx, q.Repo.Key)
-	if err != nil {
-		return fmt.Errorf("read current remote source: %w", err)
-	}
-	if current != permit.Identity {
-		return source.ErrSuperseded
+	if err := q.CheckPublication(ctx); err != nil {
+		return fmt.Errorf("current execution authority: %w", err)
 	}
 	return nil
 }
@@ -807,7 +824,7 @@ func (p *Policy) revalidate(
 		if putErr != nil {
 			return fmt.Errorf("revalidate remote cache: %w", putErr)
 		}
-		return nil
+		return q.FencePublication(tx)
 	})
 	if err != nil {
 		return model.RemoteCacheEntry{}, clockError(ctx, err)

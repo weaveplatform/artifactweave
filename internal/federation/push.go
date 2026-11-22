@@ -62,7 +62,7 @@ func (m *Module) OpenPush(ctx context.Context, source artifactsapi.TransferSourc
 		return fmt.Errorf("open replication target connections: %w", err)
 	}
 	m.pushConnections = connections
-	m.push = &replication.Push{Store: store, Configurations: m.Configurations(), Source: source, Connections: connections, Restore: m.restorePushCaller}
+	m.push = &replication.Push{Store: store, Configurations: m.Configurations(), Source: source, Connections: connections, Restore: m.restoreTransferCaller}
 	return nil
 }
 
@@ -91,8 +91,8 @@ func (m *Module) Close() {
 	}
 }
 
-func (m *Module) restorePushCaller(ctx context.Context, reference kernel.CredentialReference) (context.Context, error) {
-	store, ok := m.deps.Store.(pushStore)
+func (m *Module) restoreTransferCaller(ctx context.Context, reference kernel.CredentialReference) (context.Context, error) {
+	store, ok := m.deps.Store.(interface{ InTx(context.Context) bool })
 	if !ok || store.InTx(ctx) {
 		return nil, fmt.Errorf("restore replication caller needs an external context: %w", kernel.ErrInvalid)
 	}

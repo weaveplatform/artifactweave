@@ -280,7 +280,9 @@ jobs:
     needs: [impact]
     if: (needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format') && needs.impact.outputs.has_acceptance == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Full coverage compilation and the growing SQL/server acceptance matrix
+    # need headroom; each Go test package still has its own 15-minute deadline.
+    timeout-minutes: 40
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4

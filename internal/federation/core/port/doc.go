@@ -31,6 +31,9 @@
 //   - PushProgressStore: immutable logical run/intent creation, exact-lifetime
 //     reads, monotonic version CAS and bounded pending-item recovery. Private
 //     execution evidence survives target deletion and queue completion.
+//   - PullProgressStore: exact owning-source/caller bindings, immutable selected
+//     intents, actual cache/removal receipts and bounded pending-item recovery.
+//     Progress survives interruption and target removal; it grants no authority.
 //   - PushConnections/PushConnection: local current connection resolution and
 //     authenticated destination inspection, upload, properties, bounded files
 //     and exact file deletion. Network calls never join a metadata transaction.
@@ -43,7 +46,7 @@
 //     DeleteAccessTarget; PutFederation, Federation, Federations and
 //     DeleteFederation; PutTopology, Topology, Topologies and DeleteTopology.
 //   - PeerFilter.
-//   - Store: shared transactions, Replications, PushProgress, Peers, Federation
+//   - Store: shared transactions, Replications, PushProgress, PullProgress, Peers, Federation
 //     and Platform. ConfigurationStore remains independent of execution.
 //
 // # Invariants

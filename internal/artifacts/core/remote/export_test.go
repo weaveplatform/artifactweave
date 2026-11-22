@@ -22,7 +22,7 @@ func (p *Policy) ProbeKey(
 	permit source.Permit,
 	state model.RemoteSourceState,
 ) string {
-	return p.probeKey(key, permit, state)
+	return p.probeKey(source.Request{}, key, permit, state)
 }
 
 // FlightWaiters and ProbeWaiters count the callers that share the fill or

@@ -68,6 +68,9 @@
 // and normalized property deltas in the same metadata transaction. Raw cache,
 // derived files, restore and maintenance deletion use those service boundaries.
 // Append failure rolls back metadata; blob bytes left unreferenced remain GC work.
+// A selected background cache fill may also supply a local FinalFence. It runs
+// after every item/index/property/cache/event effect and before commit, so a
+// failed worker-ownership check rolls all metadata effects back together.
 //
 //   - Content is written to the blob store before the transaction opens, so
 //     no blob write holds the write lock; the item and its blob reference

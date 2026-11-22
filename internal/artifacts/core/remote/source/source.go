@@ -55,6 +55,10 @@ type Resource struct {
 	// SmartAQL is a closed read-only items.find operation. It uses transient
 	// metadata and the discovered peer search endpoint, never a generic POST.
 	SmartAQL string
+	// PullStorage admits only the closed read-only Storage API queries used by
+	// replication discovery. Their transient documents must never become an
+	// artifact or a reusable authority-bearing management cache entry.
+	PullStorage bool
 	// Adapter targets never change Path, which remains the authorization and
 	// cache identity. UpstreamPath is escaped and repository-relative;
 	// ExternalURL is a metadata-selected absolute URL subject to the transport's
@@ -74,7 +78,11 @@ type Resource struct {
 	// Checksums pin the selected representation independently of the repository's
 	// policy for optional upstream checksum headers. Variant identifies the
 	// adapter validation schema; it must change if validation semantics change.
-	Checksums           kernel.Checksums
+	Checksums kernel.Checksums
+	// SelectedContent verifies one selected file transfer without changing
+	// its ordinary representation/cache identity. Replication discovery sets
+	// this from a complete peer file-info response, never from client headers.
+	SelectedContent     *ContentExpectation
 	ExpectedContentType string
 	// ExpectedContentTypes is an exact metadata MIME allowlist for negotiated APIs.
 	// It requires complete body validation and cannot accompany the singular hint.
@@ -253,6 +261,15 @@ type Request struct {
 	CacheOnly    bool
 	Project      string
 	Visited      []model.RepositoryIncarnation
+	// Publication is trusted execution authority for a selected file. It is
+	// never supplied by an HTTP adapter or retained in cache identity/state.
+	Publication *Publication
+	// SelectedProperties accompanies a verified selected file, never an HTTP
+	// caller's metadata. The owner checks current Annotate authority through
+	// Publication.Check. Initial properties join the ordinary cache transaction;
+	// a warm-cache owner refresh preserves locally owned annotations.
+	SelectedProperties        *model.Properties
+	SelectedPropertiesStarted time.Time
 }
 
 // Permit is request-scoped authority. A future project backend may narrow
@@ -327,6 +344,10 @@ type Stream struct {
 // Identity allows consumers and publication code to retain the source revision.
 type Result struct {
 	Metadata MetadataResponse `json:"-"`
+	// CacheEntry identifies a persisted P9 representation. Transient/no-store
+	// streams leave it nil. It is provenance, not a reusable permission grant;
+	// a local consumer must refresh current authority and check its token.
+	CacheEntry *model.RemoteCacheEntry `json:"-"`
 
 	// CheckRead checks a disclosed descendant against current authority. It is
 	// bounded by the originally authorized metadata folder and never fetches.
@@ -688,7 +709,7 @@ func authorize(q Request) error {
 		(r.Validate != nil || r.ValidateMetadata != nil) && r.Variant == "" {
 		return ErrInvalidRequest
 	}
-	if err := validateMetadataMethod(q); err != nil {
+	if err := validateRetrievalContract(q); err != nil {
 		return err
 	}
 	if err := validateAdapterContract(r); err != nil {
@@ -707,6 +728,9 @@ func validateMetadataMethod(q Request) error {
 		return ErrInvalidRequest
 	}
 	if r.Method != http.MethodPost {
+		if r.PullStorage {
+			return validatePullStorageGET(r)
+		}
 		if len(r.PostBody) != 0 || r.Transient &&
 			(q.Repo.PackageType != repo.GitLFS || validateGitLFSLocksGET(r) != nil) {
 			return ErrInvalidRequest
@@ -934,9 +958,11 @@ func ChecksumSubject(path string) (string, bool) {
 
 func (s *Service) revalidate(ctx context.Context, q Request, p Permit) error {
 	if s.Revalidate != nil {
-		return safeError(s.Revalidate(ctx, q, p))
+		if err := s.Revalidate(ctx, q, p); err != nil {
+			return safeError(err)
+		}
 	}
-	return nil
+	return safeError(q.CheckPublication(ctx))
 }
 
 func validateResult(q Request, r Result) error {
@@ -1090,6 +1116,9 @@ func safeError(err error) error {
 }
 
 func validateAdapterContract(r Resource) error {
+	if err := validatePullStorageContract(r); err != nil {
+		return err
+	}
 	if err := validateCocoaPodsGitContract(r); err != nil {
 		return err
 	}
@@ -1138,6 +1167,52 @@ func validateAdapterContract(r Resource) error {
 		}
 	}
 	return nil
+}
+
+func validatePullStorageContract(r Resource) error {
+	if !r.PullStorage {
+		return nil
+	}
+	return validatePullStorageGET(r)
+}
+
+func validPullStorageRepresentation(r Resource) bool {
+	return r.Kind == ResourceKindMetadata && r.Method == http.MethodGet && r.Transient && r.NoCacheFile &&
+		r.ExternalURL != "" && r.CheckURL != nil && r.UpstreamPath == "" && r.EscapedPath == "" &&
+		r.Variant == "replication-storage-v1" && r.ValidateMetadata != nil && r.Validate == nil &&
+		!r.RequireSmart && r.SmartAQL == "" && len(r.PostBody) == 0 && !r.ChecksumOnly && !r.RepositoryFile &&
+		r.SelectedContent == nil && r.Checksums == (kernel.Checksums{}) && r.Range == "" &&
+		r.IfRange == "" && r.IfNoneMatch == "" && r.IfModifiedSince == ""
+}
+
+func validatePullStorageGET(r Resource) error {
+	if !validPullStorageRepresentation(r) {
+		return ErrInvalidRequest
+	}
+	u, err := url.Parse(r.ExternalURL)
+	if err != nil || u.User != nil || u.Fragment != "" || !strings.Contains(u.Path, "/api/storage/") {
+		return ErrInvalidRequest
+	}
+	query, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return ErrInvalidRequest
+	}
+	if len(query) == 0 || len(query) == 1 && len(query["properties"]) == 1 && query.Get("properties") == "" || validPullStorageList(query) {
+		return nil
+	}
+	return ErrInvalidRequest
+}
+
+func validPullStorageList(query url.Values) bool {
+	if len(query) != 3 && len(query) != 4 {
+		return false
+	}
+	if len(query) == 4 && (len(query["mdTimestamps"]) != 1 || query.Get("mdTimestamps") != "1") {
+		return false
+	}
+	return len(query["list"]) == 1 && query.Get("list") == "" &&
+		len(query["deep"]) == 1 && (query.Get("deep") == "0" || query.Get("deep") == "1") &&
+		len(query["listFolders"]) == 1 && query.Get("listFolders") == "0"
 }
 
 func invalidAdapterURLGuard(r Resource) bool {

@@ -45,6 +45,14 @@
 //   - PackageIndex: bounded repository/package/version/file snapshots and
 //     comparator retention cutoffs. Callers hold current authority; snapshots
 //     disclose no credentials and never authorize deletion.
+//   - PullSource, PullRepository, PullSelection and PullItem: source-bound,
+//     bounded remote discovery in canonical paths. Fetch returns PullCached
+//     only for persisted verified cache state; PullPublication joins an owner's
+//     durable receipt with cache/property effects and the final execution fence.
+//     CachedItems/Remove reconcile exact local representations and companions
+//     without upstream deletion. ErrPull categories preserve owner causes while
+//     keeping other modules independent of artifact implementation errors.
+//     Bindings, selected facts and old receipts grant no enduring authority.
 //   - StorageUsage supplies canonical logical byte totals. StorageWatch
 //     prepares content/ownership accounting before mutation and records actual
 //     row deltas for whole-operation quota settlement, without credentials.

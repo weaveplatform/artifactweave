@@ -18,5 +18,6 @@ func Run(t *testing.T, newStore Factory) {
 	t.Helper()
 	runReplications(t, newStore)
 	runPushProgress(t, newStore)
+	runPullProgress(t, newStore)
 	runPeers(t, newStore)
 }

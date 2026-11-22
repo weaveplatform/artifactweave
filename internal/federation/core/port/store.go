@@ -17,6 +17,7 @@ type ConfigurationStore interface {
 // that unit of work rather than one of their own.
 type Store interface {
 	PushStore
+	PullStore
 	Peers() PeerStore
 	Federation() FederationStore
 	Platform() PlatformStore

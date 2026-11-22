@@ -170,7 +170,18 @@ func (s *Service) PropagateRemotePropertyState(
 			entry.Smart = &model.RemoteSmartState{}
 		}
 		copyRemoteOwnership(entry.Smart, current.Smart)
-		if _, err = s.Store.RemoteCache().Put(ctx, entry.Token, entry); err != nil {
+		token, err := s.Store.RemoteCache().Begin(ctx, entry.Token.Key)
+		if err != nil {
+			return fmt.Errorf("current shared property token: %w", err)
+		}
+		// A policy edit can retain the bytes and source while retiring the
+		// sibling's old mutation token. Renew only under the current entry's
+		// exact authority and the unchanged sibling representation version.
+		if token.Source != current.Token.Source || token.PolicyRevision != current.Token.PolicyRevision ||
+			token.Epoch != entry.Token.Epoch || token.Revision != entry.Token.Revision {
+			return kernel.ErrConflict
+		}
+		if _, err = s.Store.RemoteCache().Put(ctx, token, entry); err != nil {
 			return fmt.Errorf("cache shared property ownership: %w", err)
 		}
 	}

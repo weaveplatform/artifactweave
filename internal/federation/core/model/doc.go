@@ -34,6 +34,10 @@
 //     source/target intent and monotonic verification independently of the
 //     queue and public replication status. Their validation grants no current
 //     content or transport authority.
+//   - PullRun/PullBinding and PullItem preserve selected upstream/cache facts,
+//     immutable caller/source bindings and actual artifact-owner receipts.
+//     They distinguish pending/failed/skipped work from successful cache and
+//     deletion effects; persistence and dispatch belong to the owning services.
 //   - Peer with Has and DeriveStatus, PeerStatus, UseCase with
 //     KnownUseCase, PairingNonce with Usable, and PairingTokenTTL.
 //   - Stamp with After; StreamKind with RepositoryStream, AccessStream,

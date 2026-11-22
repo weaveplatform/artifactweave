@@ -115,7 +115,8 @@ func pushRuntimeRouter(runtime *app.Runtime) http.Handler {
 		Store: runtime.Store, Blobs: runtime.Blobs, Auth: runtime.Auth, Tokens: runtime.Tokens, Keys: runtime.Keys,
 		Federation: runtime.Federation, Work: runtime.Work,
 		PasswordHash:  support.TestHash,
-		RemoteSources: runtime.Artifacts.RemoteSources(), RemoteHTTP: runtime.Artifacts.RemoteHTTP(), VirtualCache: runtime.Artifacts.VirtualCache(),
+		RemoteSources: runtime.Artifacts.RemoteSources(), RegistrySources: runtime.Artifacts.RegistrySources(),
+		RemoteHTTP: runtime.Artifacts.RemoteHTTP(), VirtualCache: runtime.Artifacts.VirtualCache(),
 		Logger: slog.New(slog.DiscardHandler),
 	})
 }

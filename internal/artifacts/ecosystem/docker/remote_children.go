@@ -4,10 +4,12 @@ import (
 	"context"
 	"io"
 	"sync/atomic"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/item"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 type (
@@ -40,12 +42,11 @@ func (c *RegistryContent) children(
 		if budget.Add(1) > 256 {
 			return Config{}, remote.ErrRequest
 		}
-		child := q
 		resource, err := RegistryResource(image, "manifests", d.Digest)
 		if err != nil {
 			return Config{}, err
 		}
-		child.Resource = resource
+		child := registryChild(q, resource, d)
 		if err = c.Policy.Check(ctx, child, permit, opts.Revision); err != nil {
 			//nolint:wrapcheck // preserves upstream error identity
 			return Config{}, err
@@ -84,12 +85,11 @@ func (c *RegistryContent) children(
 	if m.Config.Size > MaxManifestSize {
 		return Config{}, remote.ErrRequest
 	}
-	child := q
 	resource, err := RegistryResource(image, "blobs", m.Config.Digest)
 	if err != nil {
 		return Config{}, err
 	}
-	child.Resource = resource
+	child := registryChild(q, resource, *m.Config)
 	if err = c.Policy.Check(ctx, child, permit, opts.Revision); err != nil {
 		//nolint:wrapcheck // preserves upstream error identity
 		return Config{}, err
@@ -116,4 +116,16 @@ func (c *RegistryContent) children(
 		return Config{}, item.ErrRemoteLength
 	}
 	return ReadConfig(m.ConfigType(), reader), nil
+}
+
+func registryChild(parent source.Request, resource source.Resource, descriptor Descriptor) source.Request {
+	if parent.Resource.SelectedContent != nil {
+		hex, _ := SHA256Hex(descriptor.Digest)
+		resource.SelectedContent = &source.ContentExpectation{Size: descriptor.Size, Checksums: kernel.Checksums{SHA256: hex}}
+	}
+	parent.Resource = resource
+	// The original execution restrictions follow dependent native cache work;
+	// the selected parent file's user properties do not belong to its children.
+	parent.SelectedProperties, parent.SelectedPropertiesStarted = nil, time.Time{}
+	return parent
 }

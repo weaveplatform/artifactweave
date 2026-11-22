@@ -368,6 +368,9 @@
       "system_health_test.go"
     ],
     "test/server/federation": [
+      "pull_catalog_test.go",
+      "pull_failures_test.go",
+      "pull_registry_test.go",
       "push_bridge_test.go",
       "push_failures_test.go",
       "push_fences_test.go",

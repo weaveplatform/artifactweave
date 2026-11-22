@@ -33,6 +33,9 @@
 //   - Service and its Read; Backend; Request, Resource, Permit,
 //     RetrievalIntent and ResourceKind; Result, Stream, Representation and
 //     MetadataResponse.
+//   - Publication narrows a selected complete file to current execution checks
+//     and a final transactional worker-ownership fence; nil retains ordinary
+//     demand-read behavior. It is never accepted from HTTP input.
 //   - The closed adapter contracts: CocoaPodsGitSource and
 //     ValidGitLFSActionHeaders.
 //   - The safe failures (ErrDenied, ErrInvalidRequest, ErrUnsupported,

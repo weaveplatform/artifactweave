@@ -254,6 +254,9 @@ func (s *Store) Replications() fedport.ReplicationStore { return s.federation.Re
 // PushProgress is the federation module's private durable execution evidence.
 func (s *Store) PushProgress() fedport.PushProgressStore { return s.federation.PushProgress() }
 
+// PullProgress returns the federation module's durable owning-cache intents.
+func (s *Store) PullProgress() fedport.PullProgressStore { return s.federation.PullProgress() }
+
 // Peers is the federation module's peer store.
 func (s *Store) Peers() fedport.PeerStore { return s.federation.Peers() }
 
