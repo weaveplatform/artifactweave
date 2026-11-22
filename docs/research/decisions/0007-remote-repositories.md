@@ -81,6 +81,11 @@ restrictions and the DNS-named HTTP proxy CONNECT requirement are recorded in th
 [transport contract](../../implementation/remote-http-transport.md#resolved-source-security-618);
 RC-6/#216 still owns observed Artifactory comparisons. NTLM/domain and proxy credential
 redirect settings fail closed pending their P12 proxy/global-configuration implementation.
+Proxy service strings from the descriptor/provider and historical stored lists
+share one read decoder. String separators follow the pinned Artifactory source;
+explicit selection and platform-default `jfrt` filtering retain their existing
+rules. The [transport contract](../../implementation/remote-http-transport.md#resolved-source-security-618)
+records the accepted forms and unchanged storage boundary.
 This is a shared foundation, not evidence that the native adapters or cache policy are
 complete. Source HMAC revisions exclude retrieval policy, so TTL/offline changes do not
 invalidate immutable bytes; publication separately fences current policy and credentials.

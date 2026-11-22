@@ -92,6 +92,15 @@ closed with a redacted configuration error; P12 owns these proxy/global-configur
 behaviors and broader proxy compatibility, as recorded in the
 [capability ledger](capability-roadmap.md#work-already-owned-by-p9p19).
 
+Proxy `services` reads accept descriptor/provider strings split on newline, space,
+comma or semicolon, as Artifactory 7.161.26's `ProxyDescriptor.getServicesList`
+does, and historical string lists. Absent, null and empty services permit an
+enabled platform-default proxy; a nonempty selection must contain exact `jfrt`.
+Explicit references retain priority over service filtering, and `disableProxy`
+bypasses selection. Invalid service shapes fail with a redacted configuration
+error. Both the artifact resolver and federation push factory share this decoder;
+reads preserve stored JSON and sealed passwords.
+
 System roots plus explicit PEM trust verify server identities. The opaque revision is
 an HMAC under a derived master key over source settings and resolved proxy/certificate/
 trust material. Referenced-secret changes rotate the pool and cookie jar even if the

@@ -111,6 +111,7 @@ type world struct {
 	dockerConfig string
 	// goProxy is the GOPROXY the go command uses in this scenario, and
 	// tlsCA the certificate of the scenario's TLS front, if it has one.
+	goOutboundProxy *fakeupstream.Server
 	goProxy, tlsCA  string
 	p2Repo, p2Front string
 	// chefImage, nixImage, puppetImage, npmImage, mavenImage, pythonImage and dotnetImage

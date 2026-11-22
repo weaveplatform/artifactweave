@@ -84,6 +84,7 @@
 //     TestUnitWireFormsEvaluateAlike.
 //   - StorageSummaryMirrors: TestAccStorageInfoReportsMirrors.
 //   - MultipartUploadStatus: TestAccMultipartUploadProtocol.
-//   - ProxyConfiguration: TestAccResolverProxyConfiguration.
+//   - ProxyConfiguration: TestUnitProxyConfigurationServices, TestAccResolverProxyConfiguration,
+//     TestAccProxyServicesDescriptorSQL.
 //   - SmartStatistics: TestAccSmartStatisticsClaimedOnceAndUncertainty.
 package wire

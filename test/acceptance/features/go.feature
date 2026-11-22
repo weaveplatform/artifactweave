@@ -369,16 +369,18 @@ Feature: Go module repositories answer the GOPROXY protocol
     Then the response body contains "v1.0.0 20"
     And the response body does not contain "v1.1.0"
 
-  @go @go_virtual
+  @go @go_virtual @proxy_services
   Scenario: A cold Go build resolves local and private remote modules through one virtual
-    Given the Go toolchain is available
+    Given the Go toolchain is required
     And a Go module "example.com/acme/local" at "v1.0.0" laid out as a module proxy under "local-proxy"
     When I deploy the files under "local-proxy" to "/artifactory/go-local/" as admin
     Then the response status is 201
     Given a private Go upstream serves module "example.com/Team/Remote" at "v0.0.0-20261016120000-abcdefabcdef"
+    And a descriptor service-string proxy routes the private Go upstream
+    Then the response status is 200
     When I PUT "/artifactory/api/repositories/go-remote" as admin with body:
       """
-      {"rclass":"remote","packageType":"go","url":"{upstream}","username":"go-upstream","password":"upstream-pass"}
+      {"rclass":"remote","packageType":"go","url":"{upstream}","username":"go-upstream","password":"upstream-pass","proxy":"go-services"}
       """
     Then the response status is 200
     When I PUT "/artifactory/api/repositories/go-virtual" as admin with body:
@@ -416,6 +418,7 @@ Feature: Go module repositories answer the GOPROXY protocol
     When I run go "build -mod=mod ." in "app"
     Then the command succeeds
     And the generic upstream received 1 GET requests for "/example.com/!team/!remote/@v/v0.0.0-20261016120000-abcdefabcdef.zip"
+    And the private Go module was retrieved through its descriptor proxy
     When the generic upstream stops
     And I run go "clean -modcache"
     Then the command succeeds

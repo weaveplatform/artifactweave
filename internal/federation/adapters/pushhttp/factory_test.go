@@ -3,6 +3,7 @@ package pushhttp
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -19,6 +21,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -359,5 +362,126 @@ func TestUnitTargetConfigurationFailuresRefuseWithoutSecretDisclosure(t *testing
 	err = store.Tx(t.Context(), func(ctx context.Context) error { _, err := factory.Connection(ctx, target); return err })
 	if !errors.Is(err, outbound.ErrConfiguration) {
 		t.Fatal("malformed proxy document admitted", err)
+	}
+}
+
+func TestUnitTargetProxyServicesDocuments(t *testing.T) {
+	for _, tc := range []struct {
+		name, services    string
+		selected, invalid bool
+	}{
+		{name: "provider string", services: `"jfrt,jfxr"`, selected: true},
+		{name: "source separators", services: `"jfxr; jfrt\njfxr"`, selected: true},
+		{name: "empty string", services: `""`, selected: true},
+		{name: "null", services: `null`, selected: true},
+		{name: "historical list", services: `["jfrt"]`, selected: true},
+		{name: "empty list", services: `[]`, selected: true},
+		{name: "unrelated string", services: `"jfxr"`},
+		{name: "unrelated list", services: `["jfxr"]`},
+		{name: "case preserved", services: `"JFRT"`},
+		{name: "invalid scalar", services: `true`, invalid: true},
+		{name: "invalid object", services: `{"secret":"private-value"}`, invalid: true},
+		{name: "mixed list", services: `["private-value",42]`, invalid: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, explicit := range []bool{false, true} {
+				store := platforminmem.New(memtx.New())
+				document := []byte(`{"host":"localhost","port":3128,"platformDefault":true,"services":` + tc.services + `}`)
+				if err := store.Configs().Put(t.Context(), configdoc.ConfigDocument{
+					Kind: configdoc.ConfigProxy, Key: "services", Enabled: true, Document: document,
+				}); err != nil {
+					t.Fatal(err)
+				}
+				factory, err := New(store, Options{RevisionKey: bytes.Repeat([]byte{3}, 32)})
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(factory.Close)
+				target := fixtureTarget("https://target.invalid")
+				if explicit {
+					target.Proxy = "services"
+				}
+				u, err := factory.proxy(t.Context(), target)
+				if tc.invalid {
+					if !errors.Is(err, outbound.ErrConfiguration) || strings.Contains(err.Error(), "private-value") {
+						t.Fatal("invalid services admitted or disclosed", err)
+					}
+				} else if err != nil || (u != nil) != (explicit || tc.selected) {
+					t.Fatal("proxy services selection changed", err)
+				}
+			}
+		})
+	}
+}
+
+func TestAccTargetProxyServicesExchange(t *testing.T) {
+	for _, secure := range []bool{false, true} {
+		t.Run(strconv.FormatBool(secure), func(t *testing.T) {
+			opts := fakeupstream.Options{Auth: fakeupstream.Auth{Username: "worker", Password: "fixture-secret"}}
+			if secure {
+				opts.TLS = &tls.Config{MinVersion: tls.VersionTLS12}
+			}
+			origin := fakeupstream.New(t, opts)
+			content := []byte(
+				`{"repo":"repo","path":"/file","size":"5","lastModified":"2026-11-22T00:00:00Z","lastUpdated":"2026-11-22T00:00:00Z","checksums":{"sha256":"` + sums(
+					[]byte("proof"),
+				).SHA256 + `"},"properties":{"proof":["services-string"]}}`,
+			)
+			origin.Set(deployment+"/api/storage/repo/file", fakeupstream.Resource{Body: content})
+			proxy := fakeupstream.NewProxy(t, fakeupstream.Auth{Username: "proxy-user", Password: "proxy-private"}, origin)
+			address, err := url.Parse(proxy.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			store := platforminmem.New(memtx.New())
+			document := []byte(`{"host":"` + address.Hostname() + `","port":` + address.Port() + `,"username":"proxy-user","platformDefault":true,"services":"jfrt,jfxr"}`)
+			if err := store.Configs().Put(t.Context(), configdoc.ConfigDocument{
+				Kind: configdoc.ConfigProxy, Key: "services", Enabled: true, Document: document,
+				Secrets: map[string]string{"password": "proxy-private"},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			factoryOptions := Options{RevisionKey: bytes.Repeat([]byte{3}, 32), AllowedPrivateOrigins: []string{origin.URL, proxy.URL}}
+			if secure {
+				factoryOptions.RootCAsPEM = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: origin.Certificate().Raw})
+			}
+			factory, err := New(store, factoryOptions)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(factory.Close)
+			for _, explicit := range []bool{false, true} {
+				target := fixtureTarget(origin.URL)
+				if explicit {
+					target.Proxy = "services"
+				}
+				var connection port.PushConnection
+				if err := store.Tx(t.Context(), func(ctx context.Context) error {
+					var err error
+					connection, err = factory.Connection(ctx, target)
+					return err
+				}); err != nil {
+					t.Fatal(err)
+				}
+				item, err := connection.Inspect(t.Context(), "file")
+				if err != nil || item.Snapshot.Actual.SHA256 != sums([]byte("proof")).SHA256 ||
+					!slices.Equal(item.Properties["proof"], []string{"services-string"}) {
+					t.Fatal("string proxy failed target exchange", err)
+				}
+			}
+			if proxy.Count(http.MethodConnect, "") == 0 {
+				t.Fatal("target exchange bypassed its string-form proxy")
+			}
+			for _, request := range proxy.Requests() {
+				if !request.Authorized || request.Header.Get("Authorization") != "" {
+					t.Fatal("CONNECT target/proxy credential separation failed")
+				}
+			}
+			for _, request := range origin.Requests() {
+				if !request.Authorized || request.Header.Get("Proxy-Authorization") != "" {
+					t.Fatal("target received incorrect credentials")
+				}
+			}
+		})
 	}
 }

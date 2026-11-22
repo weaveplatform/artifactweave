@@ -334,6 +334,7 @@ proxies:
     host: proxy.example.com
     port: 3128
     platformDefault: true
+    services: jfrt,jfxr
 security:
   anonAccessEnabled: true
   userLockPolicy:
