@@ -365,10 +365,12 @@ func planConfigs(
 				enabled = flag
 			}
 			sameEnabled = cur.Enabled == enabled
-			// ConfigStore omits empty secrets. Normalize before comparison so
-			// reapplying an empty mail password is a real no-op.
-			if secrets["password"] == "" {
-				delete(secrets, "password")
+		}
+		// ConfigStore omits empty secrets. Compare the state it will retain so
+		// reapplying an explicit password clear does not rewrite the document.
+		for field, value := range secrets {
+			if value == "" {
+				delete(secrets, field)
 			}
 		}
 		encoded, err := json.Marshal(doc)

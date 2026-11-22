@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/configuration/core/descriptor"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
@@ -73,6 +74,44 @@ func TestAccApplyDescriptorCommand(t *testing.T) {
 	if err := ApplyDescriptor(ctx, cfg, file, false, &out); err != nil ||
 		!strings.Contains(out.String(), "Unchanged: localRepositories.cli-local") {
 		t.Fatalf("second apply: %v\n%s", err, out.String())
+	}
+}
+
+func TestAccApplyDescriptorCommandReportsEmptyProxyPasswordUnchanged(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.MasterKey = keyOne
+	file := writeFile(t, "proxies:\n  corp:\n    host: proxy.invalid\n    port: 3128\n    password: ''\n")
+	read := func() configdoc.ConfigDocument {
+		t.Helper()
+		keys, err := Keyring(cfg)
+		if err != nil {
+			t.Fatal("cannot build fixture keyring")
+		}
+		db, err := OpenStore(t.Context(), cfg, appsql.Options{Keyring: keys})
+		if err != nil {
+			t.Fatal("cannot open fixture store")
+		}
+		defer func() { _ = db.Close() }()
+		document, err := db.Configs().Get(t.Context(), configdoc.ConfigProxy, "corp")
+		if err != nil {
+			t.Fatal("cannot read configured proxy")
+		}
+		return document
+	}
+	var out bytes.Buffer
+	if err := ApplyDescriptor(t.Context(), cfg, file, false, &out); err != nil ||
+		out.String() != "Applied the configuration descriptor.\nCreated: proxies.corp\n" {
+		t.Fatal("config apply did not report the initial proxy creation")
+	}
+	before := read()
+	out.Reset()
+	if err := ApplyDescriptor(t.Context(), cfg, file, false, &out); err != nil ||
+		out.String() != "Applied the configuration descriptor.\nUnchanged: proxies.corp\n" {
+		t.Fatal("config apply did not report the repeated empty password as unchanged")
+	}
+	after := read()
+	if !before.Updated.Equal(after.Updated) || len(before.Secrets) != 0 || len(after.Secrets) != 0 {
+		t.Fatal("repeated config apply changed the timestamp or persisted an empty password")
 	}
 }
 

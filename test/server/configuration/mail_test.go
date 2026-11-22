@@ -10,36 +10,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
-	configuration "github.com/weaveplatform/artifactweave/internal/configuration"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/storekit"
-	"github.com/weaveplatform/artifactweave/test/server/support"
 	"github.com/weaveplatform/artifactweave/test/server/support/harness"
 )
-
-func configuredMailAPI(t *testing.T, db harness.Store) configapi.API {
-	t.Helper()
-	m, err := configuration.New(configuration.Deps{
-		Store: db, Repositories: support.Repositories(db), Layouts: support.Layouts(), Access: accesstest.Over(t, db).API(),
-	})
-	storekit.Must(t, err)
-	return m.API()
-}
-
-func applyMail(t *testing.T, api configapi.API, ctx context.Context, yaml string) configapi.Result {
-	t.Helper()
-	plan, err := api.Descriptor.Parse([]byte(yaml), nil)
-	storekit.Must(t, err)
-	result, err := api.Descriptor.Apply(ctx, plan, time.Now(), false)
-	storekit.Must(t, err)
-	return result
-}
 
 func TestAccMailServerDescriptorUsesExistingPublicAuthorization(t *testing.T) {
 	w := newRepoWorld(t)
@@ -47,7 +26,7 @@ func TestAccMailServerDescriptorUsesExistingPublicAuthorization(t *testing.T) {
 	if rec := w.do(http.MethodPatch, configPath, "reader", yaml, "Content-Type", "application/yaml"); rec.Code != http.StatusForbidden {
 		t.Fatal("non-administrator changed mail configuration", rec.Code)
 	}
-	api := configuredMailAPI(t, w.db)
+	api := configurationAPI(t, w.db)
 	if _, err := api.Mail.Server(t.Context()); err == nil {
 		t.Fatal("denied patch left mail configuration")
 	}
@@ -73,10 +52,10 @@ func TestAccMailConfigurationSealedSQLAndCoherentReplacement(t *testing.T) {
 
 func mailSQLSecrets(t *testing.T, db *appsql.Store, keys *crypt.Keyring) {
 	t.Helper()
-	ctx, api := t.Context(), configuredMailAPI(t, db)
+	ctx, api := t.Context(), configurationAPI(t, db)
 	const secret = "mail-private-fixture"
 	const yaml = "mailServer:\n  host: smtp.invalid\n  password: mail-private-fixture\n"
-	applyMail(t, api, ctx, yaml)
+	applyConfiguration(t, api, ctx, yaml)
 	var sealed []byte
 	storekit.Must(t, db.DB().QueryRowContext(ctx, db.Dialect().Rebind(
 		"SELECT value FROM config_secrets WHERE kind = ? AND key = ? AND name = ?"),
@@ -94,19 +73,19 @@ func mailSQLSecrets(t *testing.T, db *appsql.Store, keys *crypt.Keyring) {
 	if strings.Contains(document, "password") || strings.Contains(document, secret) {
 		t.Fatal("mail password was written into public document JSON")
 	}
-	withoutKeys := configuredMailAPI(t, appsql.New(db.DB(), db.Dialect(), nil))
+	withoutKeys := configurationAPI(t, appsql.New(db.DB(), db.Dialect(), nil))
 	if _, err := withoutKeys.Mail.Server(ctx); !errors.Is(err, dialect.ErrNoKeyring) {
 		t.Fatal("sealed mail password was readable without its keyring", err)
 	}
 	for _, clear := range []string{"null", "''"} {
-		applyMail(t, api, ctx, "mailServer:\n  password: "+clear+"\n")
+		applyConfiguration(t, api, ctx, "mailServer:\n  password: "+clear+"\n")
 		var rows int
 		storekit.Must(t, db.DB().QueryRowContext(ctx, db.Dialect().Rebind(
 			"SELECT COUNT(*) FROM config_secrets WHERE kind = ? AND key = ? AND name = ?"), "mail_server", "mailserver", "password").Scan(&rows))
 		if rows != 0 {
 			t.Fatal("cleared mail password retained a secret row")
 		}
-		if result := applyMail(t, api, ctx, "mailServer:\n  password: "+clear+"\n"); len(result.Unchanged) != 1 || len(result.Updated) != 0 {
+		if result := applyConfiguration(t, api, ctx, "mailServer:\n  password: "+clear+"\n"); len(result.Unchanged) != 1 || len(result.Updated) != 0 {
 			t.Fatal("reapplying cleared mail credentials rewrote the document")
 		}
 	}
@@ -154,10 +133,10 @@ func mailSQLReplacement(t *testing.T, db *appsql.Store) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	api := configuredMailAPI(t, db)
-	applyMail(t, api, ctx, "mailServer:\n  host: original.invalid\n  password: original-private\n")
+	api := configurationAPI(t, db)
+	applyConfiguration(t, api, ctx, "mailServer:\n  host: original.invalid\n  password: original-private\n")
 	documents := &splitMailDocuments{ConfigStore: db.Configs(), entered: make(chan struct{}), release: make(chan struct{})}
-	reader := configuredMailAPI(t, mailDocumentStore{Store: db, documents: documents})
+	reader := configurationAPI(t, mailDocumentStore{Store: db, documents: documents})
 	release := sync.OnceFunc(func() { close(documents.release) })
 	type result struct {
 		value configapi.MailServer
