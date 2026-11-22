@@ -294,7 +294,11 @@ func (w *world) replicationProviderEvidence(work string, secrets []string) error
 	if err != nil {
 		return fmt.Errorf("read provider command evidence: %w", err)
 	}
-	for kind, content := range map[string]string{"terraform": string(commands), "source": w.stderr.String(), "peer": w.replicationPeer.stderr.String()} {
+	application, err := replicationApplicationEvidence()
+	if err != nil {
+		return err
+	}
+	for kind, content := range map[string]string{"terraform": string(commands), "source": w.stderr.String(), "peer": w.replicationPeer.stderr.String(), "application": application} {
 		path := filepath.Join(destination, "replication-"+backend+"-"+kind+".log")
 		if err := os.WriteFile(path, []byte(replicationSanitized(content, secrets)), 0o600); err != nil {
 			return fmt.Errorf("retain sanitized replication evidence: %w", err)

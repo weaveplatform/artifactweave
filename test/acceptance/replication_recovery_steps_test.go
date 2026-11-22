@@ -1,6 +1,7 @@
 package acceptance
 
 import (
+	"debug/buildinfo"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -92,7 +93,7 @@ func (w *world) qualifyReplicationRecovery(direction string) (result error) {
 		"ARTIFACTWEAVE_WORK_WORKERS=1", "ARTIFACTWEAVE_WORK_MAX_ATTEMPTS=2"); err != nil {
 		return err
 	}
-	defer func() { result = errors.Join(result, w.replicationRecoveryEvidence(direction)) }()
+	defer func() { result = errors.Join(result, w.replicationScenarioEvidence(direction, "recovery", nil)) }()
 	fixture, err := w.configureReplicationPair(direction, "generic")
 	if err != nil {
 		return err
@@ -341,7 +342,7 @@ func (w *world) waitReplicationState(repository, expected string) error {
 	}
 }
 
-func (w *world) replicationRecoveryEvidence(direction string) error {
+func (w *world) replicationScenarioEvidence(direction, kind string, extra map[string]string) error {
 	destination := os.Getenv("ARTIFACTWEAVE_REPLICATION_EVIDENCE_DIR")
 	if destination == "" {
 		return nil
@@ -361,11 +362,37 @@ func (w *world) replicationRecoveryEvidence(direction string) error {
 	if err := os.MkdirAll(destination, 0o700); err != nil {
 		return fmt.Errorf("create recovery evidence directory: %w", err)
 	}
-	for kind, content := range map[string]string{"source": w.stderr.String(), "peer": w.replicationPeer.stderr.String()} {
-		path := filepath.Join(destination, "replication-"+backend+"-"+direction+"-recovery-"+kind+".log")
+	application, err := replicationApplicationEvidence()
+	if err != nil {
+		return err
+	}
+	logs := map[string]string{"source": w.stderr.String(), "peer": w.replicationPeer.stderr.String(), "application": application}
+	for key, value := range extra {
+		logs[key] = value
+	}
+	for name, content := range logs {
+		path := filepath.Join(destination, "replication-"+backend+"-"+direction+"-"+kind+"-"+name+".log")
 		if err := os.WriteFile(path, []byte(replicationSanitized(content, secrets)), 0o600); err != nil {
 			return fmt.Errorf("retain sanitized recovery evidence: %w", err)
 		}
 	}
 	return nil
+}
+
+func replicationApplicationEvidence() (string, error) {
+	info, err := buildinfo.ReadFile(binary)
+	if err != nil {
+		return "", fmt.Errorf("read qualified application build identity: %w", err)
+	}
+	identity := map[string]string{"go_version": info.GoVersion, "module": info.Main.Path, "version": info.Main.Version}
+	for _, setting := range info.Settings {
+		if setting.Key == "vcs.revision" || setting.Key == "vcs.modified" {
+			identity[setting.Key] = setting.Value
+		}
+	}
+	data, err := json.Marshal(identity)
+	if err != nil {
+		return "", fmt.Errorf("encode qualified application build identity: %w", err)
+	}
+	return string(data), nil
 }

@@ -4,19 +4,25 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
-func (w *world) qualifyNativeReplication(direction string) error {
+func (w *world) qualifyNativeReplication(direction string) (result error) {
 	image := os.Getenv("ARTIFACTWEAVE_MAVEN_IMAGE")
 	if image == "" {
 		return fmt.Errorf("required native replication qualification needs ARTIFACTWEAVE_MAVEN_IMAGE")
 	}
+	var clientEvidence string
+	defer func() {
+		result = errors.Join(result, w.replicationScenarioEvidence(direction, "native", map[string]string{"client": clientEvidence}))
+	}()
 	fixture, err := w.configureReplicationPair(direction, "maven")
 	if err != nil {
 		return err
@@ -96,6 +102,14 @@ func (w *world) qualifyNativeReplication(direction string) error {
 		return fmt.Errorf("write owned native replication settings: %w", err)
 	}
 	w.mavenImage = image
+	if err := w.runJVMRecipe([]string{"--pull", "never", "--entrypoint", "java"}, []string{"-jar", "/opt/ivy.jar", "-version"}); err != nil {
+		return fmt.Errorf("read pinned native replication client version: %w", err)
+	}
+	clientEvidence = strings.TrimSpace(string(w.body))
+	if w.lastRC != 0 || !strings.Contains(clientEvidence, "2.6.0") {
+		return fmt.Errorf("native replication qualification requires pinned Ivy2.6.0")
+	}
+	w.t.Log(clientEvidence)
 	if err := w.runJVMRecipe([]string{"--pull", "never", "--entrypoint", "java"}, []string{
 		"-Duser.home=/work", "-jar", "/opt/ivy.jar", "-settings", "/work/replication-ivy.xml",
 		"-dependency", "selected.replication", "widget", "1.0", "-confs", "default",
@@ -106,6 +120,7 @@ func (w *world) qualifyNativeReplication(direction string) error {
 	if w.lastRC != 0 {
 		return fmt.Errorf("fresh native replication consumer failed with exit%d", w.lastRC)
 	}
+	clientEvidence += "\n" + string(w.body)
 	downloaded, err := os.ReadFile(filepath.Join(dir, "replication-resolved", "widget-1.0.jar"))
 	if err != nil || !bytes.Equal(downloaded, jar) {
 		return fmt.Errorf("native replication consumer did not resolve the exact replicated JAR")

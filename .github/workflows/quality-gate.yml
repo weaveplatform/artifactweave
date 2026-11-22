@@ -712,6 +712,7 @@ jobs:
           ARTIFACTWEAVE_ANSIBLE_IMAGE: artifactweave-accept-ansible
           ARTIFACTWEAVE_R_IMAGE: artifactweave-accept-r
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
+          ARTIFACTWEAVE_REPLICATION_EVIDENCE_DIR: ${{ github.workspace }}/cover/replication-evidence
           # Full runs split NuGet and JVM recipes into required partitions.
           # Narrow Maven runs retain the JVM recipes in this job.
           # The JFrog Gradle wrapper remains informational in its own job.
@@ -860,6 +861,15 @@ jobs:
           path: cover/accept
           if-no-files-found: error
           include-hidden-files: true
+          retention-days: 7
+
+      - name: Upload sanitized replication process and native evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: replication-evidence
+          path: cover/replication-evidence
+          if-no-files-found: ignore
           retention-days: 7
 
   acceptance-conan:
