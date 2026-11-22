@@ -9576,7 +9576,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: One-shot execution overrides or advanced replication are unsupported.
+          description: Binary-existence or statistics synchronization is unsupported.
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       tags:
@@ -9586,6 +9586,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/executepullpushreplication.md
       x-tier: native
       x-idempotency: none
+      x-idempotency-reason: external-effect
       x-cost: expensive
   /api/replication/{repoPath}:
     get:

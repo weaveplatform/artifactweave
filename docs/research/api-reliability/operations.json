@@ -17917,7 +17917,7 @@
     "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
     "review_family": "single-replication-execution",
     "effects": "atomic direction progress, immutable execution linkage, separately sealed one-shot options and reference-only queue admission; no peer I/O during enqueue; explicit push destinations require no saved row and never inherit saved credentials",
-    "retry": "none: no retry protection; reconcile before retrying",
+    "retry": "none (external-effect): no retry protection; the effect reaches another service, peer, upstream or the file system and cannot roll back; reconcile before repeating",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
     "pagination_execution": "not a collection",
     "evidence": [

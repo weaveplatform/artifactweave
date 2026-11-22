@@ -415,7 +415,15 @@ func TestAccSingleReplicationValidationControlsAndDeferredOwners(t *testing.T) {
 	w.request("POST", global+"/unblock?pull=false", "", 200)
 	w.request("POST", global+"/block?push=invalid", "", 400)
 	w.request("PUT", "/artifactory/api/replications/multiple/local", `{}`, 501)
-	w.request("GET", "/artifactory/api/replication/local", "", 501)
+	var status struct {
+		Targets []struct {
+			Status model.ReplicationStatus `json:"status"`
+		} `json:"targets"`
+	}
+	if err := json.Unmarshal(w.request("GET", "/artifactory/api/replication/local", "", 200).Body.Bytes(), &status); err != nil ||
+		len(status.Targets) != 1 || status.Targets[0].Status != model.ReplicationNeverRun {
+		t.Fatal("configured target without execution did not report never_run", err)
+	}
 	w.request("POST", "/artifactory/api/replication/execute/local", `{}`, 501)
 	if strings.Contains(w.logs.String(), "inline-private-credential") {
 		t.Fatal("validation logs echoed an embedded credential")
