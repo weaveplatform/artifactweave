@@ -1208,7 +1208,7 @@ Decisions: [0009](../research/decisions/0009-configuration-as-code.md),
 [0019](../research/decisions/0019-human-authentication-tiers.md).
 
 **Tasks**
-1. XML descriptor `GET`, `baseUrl`, `webServer` with both `sslPort` and `httpsPort`, the nginx snippet, loggers.
+1. XML descriptor `GET`, `baseUrl`, `webServer` with both `sslPort` and `httpsPort`, the nginx snippet, loggers. Temporary logger POST/DELETE/GET now change real process-local handlers with bounded expiry, guarded current authority and shutdown cleanup (#1827); cross-node propagation remains P35 and log collection/streaming remains P38.
 2. Full YAML descriptor coverage: `backups`, `mailServer`, `security.*`, `gcConfig`, `trashcanConfig`, `quotaConfig`, `systemMessageConfig`.
 3. LDAP bind and group sync through the Access LDAP API.
 

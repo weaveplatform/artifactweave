@@ -96,3 +96,20 @@ allowing the descriptor's looser, JFrog-defined schema.
 - [06-system-configuration-and-descriptor](../06-system-configuration-and-descriptor.md)
 - <https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration>
 - <https://docs.jfrog.com/installation/docs/artifactory-bootstrap-yaml-file>
+
+P12 temporary logger controls ([#1827](https://github.com/weaveplatform/artifactweave/issues/1827))
+are deliberately outside descriptor persistence. Configuration core validates all
+1–100 classes and the positive representable timer before publishing one bounded
+session to the platform logging mechanism. Current credential and administrator
+authority are rechecked under the access administration guard; failed authority
+transactions publish no level change. DELETE, timer expiry and runtime shutdown
+restore the original handler's current baseline. See [decision 0016](0016-observability-and-health.md)
+for lifecycle ownership and [research 06](../06-system-configuration-and-descriptor.md)
+for the primary contract and explicit local choices.
+
+Every logger API operation rejects a context already inside this metadata
+store's transaction before entering the logger lock or changing decisions/timers.
+This prevents a transaction-scoped read waiting on a mutation that needs the
+same store guard. Volatile changes do not join descriptor transactions or defer
+an acknowledged success until an outer commit; only their own completed authority
+transaction can permit publication.

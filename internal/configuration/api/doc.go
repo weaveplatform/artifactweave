@@ -1,23 +1,25 @@
 // Package api is the configuration module's published surface: the
 // configuration descriptor's parse and apply behind an opaque plan, the
-// system value that other modules read, and the configuration settings.
+// system value that other modules read, the narrow mail reader, temporary logger
+// administration and the configuration settings.
 //
 // # Role
 //
 // configuration module, api layer. Other modules and the composition reach
 // configuration only through this package, which imports only the standard
 // library (decision 0044, dependency rules 5 and 6), so it declares its own
-// result and sentinel. Its contracts are today's calls into the
+// results and sentinels. Its contracts are today's calls into the
 // configuration module: `config apply` and the bootstrap descriptor in the
 // composition, the PATCH /api/system/configuration handler, and the item
-// routes' minimum download redirect size.
+// routes' minimum download redirect size, the mail delivery settings reader and
+// P12 process-local logger administration.
 //
 // # Inputs
 //
-// None: the package holds interfaces, a result, the settings and a
-// sentinel. The descriptor core, configuration/core/descriptor, implements
-// Descriptor and System, and its NewAPI binds them into an API over the
-// other modules' api contracts and the platform's ports.
+// None: the package holds interfaces, results, settings and sentinels. The
+// configuration module binds Descriptor, System and Mail over the descriptor
+// core and conditionally binds Loggers over the system core and a logging
+// control; composition owns that binding's cleanup.
 //
 // # Outputs
 //
@@ -32,8 +34,12 @@
 //   - System: the minimum download redirect size the descriptor set.
 //   - Mail: the current mail-server settings, with a guarded local snapshot
 //     and password excluded from JSON. Only delivery opens that secret.
+//   - Loggers: a temporary process-local level session and effective-level
+//     reader. ErrInvalidLoggerSettings reports refused logger requests without
+//     changing the descriptor's existing ErrInvalid answer.
 //   - Settings: the configuration options the module's code reads.
-//   - API: one implementation of Descriptor, System and Mail.
+//   - API: one implementation of Descriptor, System, Mail and, when an actual
+//     runtime logging mechanism is supplied, temporary Loggers.
 //
 // # Invariants
 //
@@ -43,6 +49,9 @@
 //   - Parse reads no store and no key, so a caller checks a descriptor
 //     before it builds a keyring or opens a store, and a descriptor error
 //     is reported first.
+//   - Every Loggers operation refuses a context inside its metadata store's
+//     transaction before taking a logger lock. Its owning lifecycle closes the
+//     session and joins timers; standalone router-owned bindings need OnClose.
 //   - Texts reach clients and logs, so they stay byte-identical:
 //     ErrInvalid's "descriptor: invalid configuration descriptor", and
 //     Merged's "<n> changes to config merged successfully", which counts
@@ -68,11 +77,12 @@
 //
 // # Status
 //
-// Added in P9d: Descriptor with Parse and Apply, Plan, Result, ErrInvalid,
-// System with DownloadRedirectMinSize, Settings and API. The target layout's
-// System Get and Patch, Descriptor Export (P12) and events.go with
-// ConfigurationChanged are not created, because no other module calls them
-// yet.
+// Added in P9d: Descriptor with Parse and Apply, Plan, Result, ErrInvalid, System
+// with DownloadRedirectMinSize, Settings and API. P11 supplies the narrow
+// Mail.Server reader used by notification delivery. P12 CFG-03 adds Loggers and
+// ErrInvalidLoggerSettings. The module supplies that optional API when Logging
+// is present, and the caller owns Module.Close. app's runtime owns it, while
+// standalone routers require a cleanup registrar for internal bindings.
 //
 // # Testing
 //

@@ -30,6 +30,9 @@ var implemented = routeUnion(append(
 // generatedRoutes are the generated operations with real handlers outside
 // the formats' parts.
 var generatedRoutes = map[string]bool{
+	"POST /artifactory/api/system/debug/loggers":                                        true,
+	"DELETE /artifactory/api/system/debug/loggers":                                      true,
+	"GET /artifactory/api/system/debug/loggers/{className}":                             true,
 	"GET /artifactory/api/replications/{repoKey}":                                       true,
 	"PUT /artifactory/api/replications/{repoKey}":                                       true,
 	"POST /artifactory/api/replications/{repoKey}":                                      true,
