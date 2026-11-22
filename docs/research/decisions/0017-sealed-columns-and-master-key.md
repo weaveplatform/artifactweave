@@ -35,8 +35,11 @@ migration and recovery, and P38 owns operational key and certificate integration
 assigned in the [capability roadmap](../../implementation/capability-roadmap.md).
 
 On read, each endpoint applies the masking rule the research records for it: repository
-configuration returns the password field masked, the XML descriptor returns an encrypted
-token the way Artifactory does, webhook secrets are redacted, key pair reads omit the
+configuration returns the password field masked. Artifactory XML returns encrypted
+password tokens; CFG-01 deliberately omits credentials instead of inventing portable
+vendor ciphertext. The pinned proxy and mail provider readers retain the configured
+Terraform password without reading it back (research 06). Sensitive repository headers
+retain their identity and sensitivity with no value. Webhook secrets are redacted, key pair reads omit the
 private key, the peer private key and the bundle signing keys are never returned by any
 endpoint, and worker secrets are listed by name only. Pairing tokens are not stored: only
 the hash of an unused token's nonce is kept until it is redeemed or expires.

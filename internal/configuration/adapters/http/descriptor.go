@@ -12,6 +12,31 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
+// GetConfiguration exports one committed, protected view of the sections the
+// descriptor currently owns. It writes no successful headers until the complete
+// read and XML encoding have succeeded.
+func (s SystemAPI) GetConfiguration(w http.ResponseWriter, r *http.Request) {
+	if err := httpkit.AdminOnly(r.Context()); err != nil {
+		httpkit.WriteErr(w, r, err)
+		return
+	}
+	if _, err := s.content(); err != nil {
+		httpkit.WriteErr(w, r, err)
+		return
+	}
+	if s.deps.Configuration.Export == nil {
+		httpkit.WriteErr(w, r, apierror.ErrNotImplemented)
+		return
+	}
+	body, err := s.deps.Configuration.Export.XML(r.Context())
+	if err != nil {
+		httpkit.WriteErr(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/xml")
+	_, _ = w.Write(body)
+}
+
 // PatchConfiguration is PATCH /api/system/configuration: the YAML descriptor
 // as a patch (decision 0009). It is hand-written because the body is YAML,
 // which the generated strict servers do not decode.

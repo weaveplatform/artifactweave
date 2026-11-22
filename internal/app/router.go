@@ -207,10 +207,10 @@ type RouterConfig struct {
 	// repository bindings when this is nil.
 	Notifications *notifications.Module
 	// Configuration is the configuration module's API, through which PATCH
-	// /api/system/configuration applies the descriptor and the item routes
-	// read its minimum redirect size. When both its contracts are nil and
+	// /api/system/configuration applies and GET exports the descriptor; item routes
+	// read its minimum redirect size. When its descriptor, export and system contracts are nil and
 	// Store is set, NewRouter binds one over Store and Access with the
-	// descriptor core, as it binds Access. Without a store it stays zero.
+	// configuration module, as it binds Access. Without a store it stays zero.
 	Configuration configapi.API
 	// Retention owns package policy administration; a router with only Store
 	// binds the same module after Access, as runtime module assembly does.
@@ -377,12 +377,12 @@ func accessUnset(a accessapi.API) bool {
 }
 
 // withConfiguration returns cfg with Configuration bound over its store by
-// the configuration module when cfg sets a store and neither descriptor nor
+// the configuration module when cfg sets a store and no descriptor, export or
 // system contract. It runs after withAccess: the descriptor checks the key
 // pairs and environments that repository entries name, and writes the
 // anonymous access setting, through cfg.Access.
 func withConfiguration(cfg RouterConfig) RouterConfig {
-	if cfg.Store == nil || cfg.Configuration.Descriptor != nil ||
+	if cfg.Store == nil || cfg.Configuration.Descriptor != nil || cfg.Configuration.Export != nil ||
 		cfg.Configuration.System != nil {
 		return cfg
 	}
@@ -712,6 +712,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artAPI.SmartStatus)
 	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
 		Patch("/artifactory/api/system/configuration", sysAPI.PatchConfiguration)
+	r.Get("/artifactory/api/system/configuration", sysAPI.GetConfiguration)
 	// The item routes and the handwritten routes beside them keep their
 	// original order (item paths, AQL, agent marketplace, CRAN uploads,
 	// transfer, Debian snapshots), and all run before

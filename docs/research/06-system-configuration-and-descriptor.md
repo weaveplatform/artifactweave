@@ -52,7 +52,7 @@ contracts and provider access.
 | GET | `/artifactory/api/tasks` | admin | 200 | background tasks; currently 501, P38 |
 | GET | `/artifactory/api/v1/metrics` | admin | 200 | OpenMetrics text; self-managed only in Artifactory; currently 501. P18 baseline, P38 operational extensions |
 | GET | `/artifactory/api/v1/metrics/application` | admin | 200 | Cloud only in Artifactory; currently 501, P38 |
-| GET | `/artifactory/api/system/configuration` | admin | 200 | `application/xml`, the full descriptor; currently 501, P12 |
+| GET | `/artifactory/api/system/configuration` | admin | 200 | `application/xml`, current delivered descriptor sections (P12 CFG-01) |
 | POST | `/artifactory/api/system/configuration` | admin | 200 | full XML replace; currently 501, P36 |
 | PATCH | `/artifactory/api/system/configuration` | admin | 200 | `application/yaml`, partial; `null` deletes an element; an empty document deletes every repository |
 | PUT | `/artifactory/api/system/configuration/baseUrl` | admin | 200 | `text/plain` URL; currently 501, P12 |
@@ -367,8 +367,8 @@ security:
   delivery. Its password is separated into the existing sealed secret store; omitted
   fields are retained and null clears strings. Whole-section null is refused; disable
   notifications with `enabled: false`. Delivery reads settings and credentials under one
-  guarded local transaction before network I/O. Full XML `GET`, mail testing endpoints
-  and the provider mail-resource read workflow remain P12.
+  guarded local transaction before network I/O. CFG-01 exports the public mail fields;
+  mail testing endpoints and provider-wide qualification retain their P12 owners.
 - A successful patch answers `<n> changes to config merged successfully` as `text/plain`,
   with no newline after it, `<n>` counted as "Semantics" describes ([J] RTFACT-31174,
   RTFACT-17040; [S] `MapToDiffConverter`). `artifactweave config apply` prints its own
@@ -391,14 +391,49 @@ security:
   a `name` that differs from the key: no source shows it, and refusing it keeps the key as
   the one identity of a layout.
 - `GET` returns an XML descriptor generated from current state, so that the
-  `artifactory_*` configuration resources can read back what they wrote. It lands in P12
-  and answers 501 until then. The `artifactory_repository_layout` resource finds its layout
+  `artifactory_*` configuration resources can read back what they wrote. CFG-01 serves
+  the currently delivered sections as `application/xml`, with the XSD names and nesting,
+  including explicit false/zero/empty values. The `artifactory_repository_layout` resource finds its layout
   by the `name` element of `repoLayouts/repoLayout`, both to read it and before deleting it
   ([S] provider 12.11.14
   [`resource_artifactory_repository_layout.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_repository_layout.go)),
   so the XML gives each layout its key as `name`.
-- Secrets inside a descriptor may be given as `${ENV_VAR}` references, resolved at apply
-  time and never written back.
+- CFG-01 collects repositories, proxies, property sets, layouts, anonymous access, mail
+  and download redirect configuration in one metadata transaction under the shared
+  `Projects.Guard`, before returning bytes after commit. Export refuses an existing
+  transaction on that store before any read; section readers join the transaction
+  export creates, while descriptor Apply keeps its nested atomic semantics.
+  Current administrator authority
+  and token ceilings are checked under that guard. The `configuration/api.Export`
+  contract and the ordered core document define the extension seam for subsequent
+  sections; section readers join the same transaction and perform no network I/O.
+- The XML projection follows `base/config/src/main/resources/artifactory.xsd` and the
+  JAXB descriptors from the [official 7.161.26 source archive](https://releases.jfrog.io/artifactory/bintray-artifactory/org/artifactory/oss/jfrog-artifactory-oss/7.161.26/jfrog-artifactory-oss-7.161.26-sources.tar.gz)
+  (SHA-256 `b867422f3137c542b402c38a2ca2584396ef431b691ca70f038ff5cc3768802c`).
+  This version uses namespace `http://artifactory.jfrog.org/xsd/3.5.11`. JFrog's
+  [online XSD page](https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd)
+  currently publishes an older namespace; its claim to be the latest does not replace
+  the pinned archive evidence. Repository-only REST fields without an XML descriptor
+  representation are omitted; this export does not claim new runtime capabilities.
+  The CFG-01 review inventories all 141 JSON fields of the current repository model:
+  111 have class-specific XML projections and 30 are class identity, API-only bindings
+  or trust settings, legacy type-selection flags, credentials or JAXB-transient fields.
+  `HttpRepoDescriptor.retrieveSha256FromServer` and remote
+  `HuggingFaceMLRemoteConfiguration.mlRepoLayout` are visible even though the XSD lacks
+  them; the local `mlRepoLayout` field is transient. The JAXB enum annotations also
+  matter: XML uses `generic`, `yum` and `helmOci`, and lowercase VCS type/provider values,
+  while the shared remote JSON endpoint keeps its distinct Jackson enum spellings.
+  Checksum, snapshot, POM cleanup, Docker API and Terraform enum values already match
+  their stored representations. This audit preserves API-only and transient exclusions.
+- **Local engineering choice:** credentials are omitted from XML. Artifactory's encrypted
+  password tokens are vendor-specific; returning sealed storage bytes or fabricated
+  ciphertext would not be a portable credential. The pinned proxy reader copies the
+  planned password, and the mail reader leaves its password unchanged ([S] provider
+  12.11.14 [proxy](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_proxy.go),
+  [mail](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_mail_server.go)).
+  Sensitive custom HTTP headers retain their names and sensitivity without their values.
+  Secret columns are excluded from the XML projection. Secrets inside a descriptor may be given
+  as `${ENV_VAR}` references, resolved at apply time and never written back.
 - The security descriptor (`GET/POST /api/system/security`, the security configuration as
   raw XML) is not served. JFrog deprecated it as of 1 July 2026 in favour of the security
   REST APIs and the Access bootstrap YAML ([7.146.7 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed)).

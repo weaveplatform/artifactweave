@@ -146,7 +146,7 @@ Feature: Configuration descriptor
   # The bodies are what the artifactory_repository_layout resource (provider
   # 12.11.14) marshals with yaml.v3 on create and update, and its delete body
   # verbatim. The resource's read and its delete's lookup go through the XML
-  # descriptor GET, which is not served yet.
+  # descriptor GET.
   Scenario: The Terraform repository layout resource creates, updates and deletes a layout
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
       """
@@ -193,3 +193,77 @@ Feature: Configuration descriptor
       """
     Then the response status is 400
     And the response body contains "repoLayouts.tf-layout: name other-layout does not match the entry key"
+
+  Scenario: Mixed PATCH and config apply share one protected XML read model
+    Given a file "mixed-descriptor.yaml" with content:
+      """
+      localRepositories:
+        xml-local:
+          type: generic
+          description: 'data <>&'
+      remoteRepositories:
+        xml-remote:
+          type: generic
+          url: https://upstream.invalid/repository
+          password: remote-private-fixture
+      virtualRepositories:
+        xml-virtual:
+          type: generic
+          repositories: [xml-local, xml-remote]
+      proxies:
+        xml-proxy:
+          host: proxy.invalid
+          port: 3128
+          password: proxy-private-fixture
+      propertySets:
+        xml-set:
+          visible: false
+          properties:
+            release:
+              multipleChoice: false
+              closedPredefinedValues: true
+              predefinedValues:
+                - value: 'value <>&'
+                  defaultValue: true
+      repoLayouts:
+        xml-layout:
+          name: xml-layout
+          artifactPathPattern: '[module]/[baseRev]/[module]-[baseRev].[ext]'
+          descriptorPathPattern: ''
+          distinctiveDescriptorPathPattern: false
+      mailServer:
+        enabled: false
+        host: smtp.invalid
+        password: mail-private-fixture
+      security:
+        anonAccessEnabled: true
+      downloadRedirectConfig:
+        fileMinimumSize: 0
+      """
+    When I PATCH descriptor file "mixed-descriptor.yaml" as admin
+    Then the response status is 200
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the response status is 200
+    And the response header "Content-Type" contains "application/xml"
+    And the XML field "localRepositories/localRepository[key=xml-local]/description" equals "data <>&"
+    And the XML field "proxies/proxy[key=xml-proxy]/key" equals "xml-proxy"
+    And the XML field "propertySets/propertySet[name=xml-set]/properties/property/predefinedValues/predefinedValue/value" equals "value <>&"
+    And the XML field "repoLayouts/repoLayout[name=xml-layout]/name" equals "xml-layout"
+    And the XML field "mailServer/port" equals "25"
+    And the response body does not contain "private-fixture"
+    And the response body does not contain "<password>"
+    When I apply descriptor file "mixed-descriptor.yaml" to the server store
+    Then the output contains "Unchanged:"
+    And the output does not contain "Created:"
+    And the output does not contain "Updated:"
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the response status is 200
+    And the XML field "localRepositories/localRepository[key=xml-local]/description" equals "data <>&"
+    And the XML field "proxies/proxy[key=xml-proxy]/host" equals "proxy.invalid"
+    And the XML field "propertySets/propertySet[name=xml-set]/name" equals "xml-set"
+    And the XML field "repoLayouts/repoLayout[name=xml-layout]/name" equals "xml-layout"
+    And the XML field "security/anonAccessEnabled" equals "true"
+    And the XML field "downloadRedirectConfig/fileMinimumSize" equals "0"
+    And the response body does not contain "private-fixture"
+    When I GET "/artifactory/api/system/configuration"
+    Then the response status is 401

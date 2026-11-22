@@ -990,8 +990,11 @@ var legacyTokenRoutes = map[string]bool{
 	"POST /artifactory/api/security/token/revoke": true,
 }
 
-// descriptorRoutes is the YAML configuration patch.
-var descriptorRoutes = map[string]bool{"PATCH /artifactory/api/system/configuration": true}
+// descriptorRoutes are the YAML patch and current-state XML export.
+var descriptorRoutes = map[string]bool{
+	"PATCH /artifactory/api/system/configuration": true,
+	"GET /artifactory/api/system/configuration":   true,
+}
 
 // routeUnion is every route in maps.
 func routeUnion(maps ...map[string]bool) map[string]bool {
@@ -1008,6 +1011,10 @@ func descriptorStatusRows() []statusCase {
 	const patch = "PATCH /artifactory/api/system/configuration"
 	const path = "/artifactory/api/system/configuration"
 	return []statusCase{
+		{"GET /artifactory/api/system/configuration", path, "admin", "", 200},
+		{"GET /artifactory/api/system/configuration", path, "user", "", 403},
+		{"GET /artifactory/api/system/configuration", path, "anonymous", "", 401},
+		{"GET /artifactory/api/system/configuration", path, "", "", 401},
 		{patch, path, "admin", "localRepositories:\n  patch-local:\n    type: generic\n", 200},
 		{patch, path, "admin", "localRepositories:\n  patch-bad:\n    nonsense: 1\n", 400},
 		{patch, path, "admin", "backups:\n  daily:\n    enabled: true\n", 400},

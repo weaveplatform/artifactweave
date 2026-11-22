@@ -1,5 +1,5 @@
 // Package api is the configuration module's published surface: the
-// configuration descriptor's parse and apply behind an opaque plan, the
+// configuration descriptor's parse and apply behind an opaque plan, its XML export, the
 // system value that other modules read, the narrow mail reader, temporary logger
 // administration and the configuration settings.
 //
@@ -10,14 +10,14 @@
 // library (decision 0044, dependency rules 5 and 6), so it declares its own
 // results and sentinels. Its contracts are today's calls into the
 // configuration module: `config apply` and the bootstrap descriptor in the
-// composition, the PATCH /api/system/configuration handler, and the item
+// composition, the GET/PATCH /api/system/configuration handlers, and the item
 // routes' minimum download redirect size, the mail delivery settings reader and
 // P12 process-local logger administration.
 //
 // # Inputs
 //
 // None: the package holds interfaces, results, settings and sentinels. The
-// configuration module binds Descriptor, System and Mail over the descriptor
+// configuration module binds Descriptor, Export, System and Mail over the descriptor
 // core and conditionally binds Loggers over the system core and a logging
 // control; composition owns that binding's cleanup.
 //
@@ -27,6 +27,8 @@
 //     nothing else; Apply checks a plan against the current state and
 //     writes it in one transaction, or with dryRun only checks it.
 //   - Plan: a parsed descriptor, which callers hold without looking inside.
+//   - Export: current delivered descriptor sections as protected XML from one
+//     guarded metadata snapshot, published after commit.
 //   - Result: what an apply created, updated, deleted and left alone, with
 //     Merged, the PATCH endpoint's answer, and String, the summary `config
 //     apply` prints.
@@ -38,7 +40,7 @@
 //     reader. ErrInvalidLoggerSettings reports refused logger requests without
 //     changing the descriptor's existing ErrInvalid answer.
 //   - Settings: the configuration options the module's code reads.
-//   - API: one implementation of Descriptor, System, Mail and, when an actual
+//   - API: one implementation of Descriptor, Export, System, Mail and, when an actual
 //     runtime logging mechanism is supplied, temporary Loggers.
 //
 // # Invariants
@@ -83,6 +85,10 @@
 // ErrInvalidLoggerSettings. The module supplies that optional API when Logging
 // is present, and the caller owns Module.Close. app's runtime owns it, while
 // standalone routers require a cleanup registrar for internal bindings.
+//
+// P12 CFG-01 adds Export for the administrator-only XML GET; the configuration
+// HTTP adapter calls it through the composition's binding. The target layout's
+// System Get and Patch and events.go with ConfigurationChanged are not created.
 //
 // # Testing
 //

@@ -29,9 +29,11 @@ var errNotParsed = errors.New("descriptor: the plan was not returned by Parse")
 // other port must take part in the store transaction its context carries, as
 // the modules' bindings over that store do: a port that opened its own would
 // leave half a descriptor applied when a later write fails (decision 0009).
-// Apply needs every field; Parse reads none of them.
+// Apply and Export need the store and owning read contracts; Parse reads none of them.
 type Deps struct {
-	// Tx runs Apply's writes as one transaction.
+	// Tx runs descriptor writes or the export snapshot as one transaction.
+	// Export additionally requires InTx(context.Context) bool to refuse an
+	// existing transaction on this store; Apply still joins one as Runner does.
 	Tx tx.Runner
 	// Repositories reads, checks and writes the repositories of the four
 	// repository sections, with the key pairs and environments their
@@ -48,6 +50,13 @@ type Deps struct {
 	// Projects serializes planning and publication before repository locks,
 	// including a descriptor that also changes anonymous credential policy.
 	Projects accessapi.Projects
+	// Authentication and authorization are rechecked under Projects.Guard before
+	// exporting protected configuration. Both must be set for HTTP callers; both
+	// may be nil only for trusted embeddings that establish global administrator
+	// authority before XML. A one-sided binding is refused. Parse and CLI Apply
+	// do not use these read-authority contracts.
+	Authenticator accessapi.Authenticator
+	Authorizer    accessapi.Authorizer
 }
 
 // NewAPI binds the configuration module's API over d. Its Descriptor parses
@@ -64,6 +73,7 @@ func NewAPI(d Deps) configapi.API {
 	}
 	return configapi.API{
 		Descriptor: descriptorAPI{d: d},
+		Export:     exportAPI{d: d},
 		System:     systemAPI{configs: d.Configs},
 		Mail:       system.Mail{Configs: d.Configs, Tx: d.Tx, Guard: guard},
 	}

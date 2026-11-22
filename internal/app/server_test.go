@@ -622,7 +622,7 @@ func TestAccNativeComposerRoutesAvoidHandwrittenStubs(t *testing.T) {
 			t.Errorf("native route %s %s: %d %s", tc.method, tc.path, rec.Code, rec.Body)
 		}
 	}
-	rec := do(t, h, http.MethodGet, "/artifactory/api/system/configuration", nil, "")
+	rec := do(t, h, http.MethodPost, "/artifactory/api/system/configuration", nil, "")
 	if rec.Code != http.StatusNotImplemented ||
 		!strings.Contains(rec.Body.String(), "specified but not implemented yet") {
 		t.Fatalf("untagged handwritten stub: %d %s", rec.Code, rec.Body)

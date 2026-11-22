@@ -64,7 +64,7 @@ type Module struct {
 	loggers  *system.Loggers
 }
 
-// New binds Descriptor, System and the narrow Mail reader over d. Supplying
+// New binds Descriptor, Export, System and the narrow Mail reader over d. Supplying
 // Logging also binds P12 Loggers; the caller owns Module.Close after draining
 // those calls. It does no I/O or timer work until an API method is called and
 // refuses only Deps without a store.
@@ -79,6 +79,8 @@ func New(d Deps) (*Module, error) {
 		Configs:         configs{st: d.Store},
 		AnonymousAccess: d.Access.AnonymousAccess,
 		Projects:        d.Access.Projects,
+		Authenticator:   d.Access.Authenticator,
+		Authorizer:      d.Access.Authorizer,
 	})
 	var loggers *system.Loggers
 	if d.Logging != nil {
@@ -118,7 +120,7 @@ func (b loggerBinding) Level(ctx context.Context, name string) (string, error) {
 	return b.Loggers.Level(ctx, name) //nolint:wrapcheck // preserve the configuration service's error classification
 }
 
-// API returns Descriptor, System, the narrow Mail reader and, when Logging was
+// API returns Descriptor, Export, System, the narrow Mail reader and, when Logging was
 // supplied to New, the lifecycle-owned P12 Loggers binding.
 func (m *Module) API() configapi.API { return m.api }
 

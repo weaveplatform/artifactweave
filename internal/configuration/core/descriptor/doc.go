@@ -8,7 +8,7 @@
 // # Role
 //
 // configuration module, core layer: the implementation of
-// configuration/api's Descriptor and System. It reaches the artifacts and
+// configuration/api's Descriptor, Export and System. It reaches the artifacts and
 // access modules only through their api packages, and the configuration
 // documents through platform/configdoc (decision 0044), so applying a
 // descriptor is the one transaction that spans modules.
@@ -32,7 +32,9 @@
 //     and left alone.
 //   - DownloadRedirectMinSize: the minimum redirect size that
 //     downloadRedirectConfig.fileMinimumSize set, in bytes.
-//   - NewAPI: configapi.API, with Descriptor, System and Mail bound over Deps.
+//   - NewAPI: configapi.API, with Descriptor, Export, System and Mail bound over Deps.
+//   - Export.XML: one committed, protected XML descriptor of delivered sections;
+//     its typed section document is the extension seam for future sections.
 //   - The section names (SectionLocal and the rest) and Lookup.
 //
 // # Invariants
@@ -42,6 +44,9 @@
 //     through its context. A patch with one bad entry, or one whose last
 //     write fails, changes nothing; a port that opened its own transaction
 //     would leave half a descriptor applied.
+//   - Export owns its transaction and refuses a same-store ambient transaction
+//     before reading state, so bytes are returned only after its own commit.
+//     Descriptor Apply retains its nested transaction semantics.
 //   - Parse before key or store: Parse reads none of Deps, so config apply
 //     refuses a broken descriptor before it builds the keyring or opens the
 //     store, and that error is reported ahead of a key or database error.
@@ -80,7 +85,8 @@
 // `config apply`. Later phases added the downloadRedirectConfig section
 // (decision 0029), the security section's anonymous access switch and the
 // bootstrap descriptor. Moved here in P9d behind configuration/api. Planned
-// for P12: the XML descriptor and the remaining YAML sections.
+// for P12: the remaining YAML sections. CFG-01 adds the administrator-only XML
+// export with current authority rechecks and a guarded transaction snapshot.
 // PRJ-04 adds the documented singleton mailServer settings for quota delivery,
 // with its password separated before persistence and guarded configuration reads.
 //
@@ -97,6 +103,9 @@
 //     after it all roll back whole.
 //   - layout_name_test.go: the bodies of the artifactory_repository_layout
 //     Terraform resource, whose layouts repeat their own name.
+//   - export_test.go and export_consistency_test.go: protected XML, provider
+//     names/list and map shapes, optional values, failures, current authority
+//     and snapshot consistency against SQLite and PostgreSQL.
 //   - redirect_test.go: downloadRedirectConfig and DownloadRedirectMinSize.
 //   - mail_test.go: singleton mail settings, secret retention/clearing, no-op
 //     enablement, validation, dry-run and enclosing transaction rollback.

@@ -1,13 +1,20 @@
 package configuration
 
 import (
+	"context"
 	"errors"
+	"io"
+	"log/slog"
+	"slices"
 	"testing"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/internal/platform/logging"
 )
 
 // New refuses Deps without a store and otherwise binds the API without
@@ -63,5 +70,58 @@ func TestUnitConfigsReachTheStore(t *testing.T) {
 	}
 	if err := c.Delete(ctx, kind, key); !errors.Is(err, kernel.ErrNotFound) {
 		t.Errorf("Delete twice = %v, want ErrNotFound", err)
+	}
+}
+
+func TestUnitExportRechecksModuleAuthorityWithLoggers(t *testing.T) {
+	for _, stage := range []string{"credential revoked", "administrator demoted"} {
+		t.Run(stage, func(t *testing.T) {
+			st := inmem.New()
+			var order []string
+			record := func(ctx context.Context, label string) {
+				t.Helper()
+				if !st.InTx(ctx) {
+					t.Fatal("export authority checked outside transaction")
+				}
+				order = append(order, label)
+			}
+			access := accessapi.API{
+				Projects: &accessapitest.Projects{GuardFunc: func(ctx context.Context) error {
+					record(ctx, "guard")
+					return st.Projects().Guard(ctx)
+				}},
+				Authenticator: &accessapitest.Authenticator{CurrentFunc: func(ctx context.Context, p kernel.Principal) (kernel.Principal, error) {
+					record(ctx, "credential")
+					if stage == "credential revoked" {
+						return kernel.Principal{}, kernel.ErrBadCredentials
+					}
+					return p, nil
+				}},
+				Authorizer: &accessapitest.Authorizer{DecideFunc: func(ctx context.Context, _ accessapi.Subject, _ bool) (accessapi.Decider, error) {
+					record(ctx, "permissions")
+					return &accessapitest.Decider{Admin: false}, nil
+				}},
+			}
+			control := logging.New(slog.New(slog.NewJSONHandler(io.Discard, nil)))
+			module, err := New(Deps{Store: st, Access: access, Logging: control})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer module.Close()
+			ctx := kernel.WithPrincipal(t.Context(), kernel.Principal{Name: "admin", Admin: true})
+			body, err := module.API().Export.XML(ctx)
+			wantErr := kernel.ErrForbidden
+			wantOrder := []string{"guard", "credential", "permissions"}
+			if stage == "credential revoked" {
+				wantErr = kernel.ErrBadCredentials
+				wantOrder = wantOrder[:2]
+			}
+			if body != nil || !errors.Is(err, wantErr) || !slices.Equal(order, wantOrder) {
+				t.Fatalf("export after authority change = %q, %v, %v; want no XML, %v, %v", body, err, order, wantErr, wantOrder)
+			}
+			if module.API().Loggers == nil {
+				t.Fatal("export binding displaced the runtime logger binding")
+			}
+		})
 	}
 }

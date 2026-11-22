@@ -174,6 +174,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 		}
 		return ctx, err
 	})
+	w.registerDescriptor(sc)
 	w.registerCDN(sc)
 	w.registerCache(sc)
 	w.registerRemote(sc)

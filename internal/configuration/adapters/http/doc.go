@@ -2,7 +2,7 @@
 // artifactory spec's system operations (version, license, service id,
 // readiness, liveness, temporary logger levels and the reverse proxy configuration), the probes and
 // telemetry sinks the router mounts beside them, and the YAML descriptor
-// PATCH.
+// PATCH and protected XML GET.
 //
 // # Role
 //
@@ -26,7 +26,7 @@
 //
 //   - SystemAPI, built by New over Deps: the system operations; the probe
 //     handlers ArtifactoryPing, AccessPing, AccessReadiness, RouterReadiness
-//     and RouterHealth; and PatchConfiguration.
+//     and RouterHealth; and GetConfiguration and PatchConfiguration.
 //   - Liveness, SinkHandler, and SinkBodyLimit, the bound of the sinks'
 //     bodies.
 //   - The router's contributions: PublicRoutes, the system half of the

@@ -74,7 +74,7 @@ the work.
     vocabulary, with Keypair, Certificate, Repo and Subject. This is wider than the target
     document. `Decider` is an interface with the methods artifacts calls.
   - `artifacts/api`: `repo`, Repositories and Layouts. It has no Settings.
-  - `configuration/api`: Descriptor, System and Settings.
+  - `configuration/api`: Descriptor, Export, System and Settings.
   - An `api` package imports only `kernel`, `platform/outbox`, the standard library and its
     own module's `api` subpackages, and declares its own data types.
   - Interfaces the target document lists without a current cross-module consumer (Items,
