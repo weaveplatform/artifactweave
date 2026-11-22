@@ -169,6 +169,7 @@ func TestUnitTerraformPathsSelectOnlyTheirAffectedLane(t *testing.T) {
 		provider, deployment bool
 	}{
 		{"deploy/artifactweave/terraform/repositories/main.tf", true, false},
+		{"deploy/artifactweave/terraform/configuration/main.tf", true, false},
 		{"test/terraform/run.sh", true, false},
 		{"deploy/platform/terraform/modules/aws/cdn/main.tf", false, true},
 		{"deploy/ci/terraform/aws/backend.tf", false, true},
