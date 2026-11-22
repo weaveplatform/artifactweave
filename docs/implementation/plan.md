@@ -40,8 +40,8 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P9c Native package catalog coverage | Done (2026-11-04) | All 28 format tasks and #789/#791/#843/#844/#852/#853 follow-ups are merged. The [class/client matrix](package-format-matrix.md), [CI evidence](../testing/phase9c-ci-signoff.md) and [combined qualification ledger](../testing/phase9c-signoff.md) retain #810/#792's passing final merged-main and current-release gates. P29 to P33 must not count these implementations again |
 | P9d Modular-monolith migration | Done (2026-11-11) | Behaviour-preserving move to the layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md); code was staged under `migration/` and promoted to `internal/`, and [p9d-path-map.json](p9d-path-map.json) maps each legacy path to its final one. The [Phase 9d qualification record](../testing/phase9d-signoff.md) holds [PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104)'s merged-main, real-cloud and release evidence. |
 | P10 Virtual repositories | Implementation delivered; qualification in progress | **M3**; [qualification and epic closeout](../testing/phase10-signoff.md), final completion record in [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528) |
-| P11 Projects, events, cleanup and single replication | Final replication and combined-main qualification pending | Project APIs/authorization/sharing/quotas, typed events and durable consumers, 24 webhook subscription resources, package cleanup and single push and pull are merged. Execute/status (#1763) and native/provider qualification (#1764) remain in the final PR chain; #1765 owns the exact merged-main exit |
-| P12 Descriptor export, system configuration, LDAP | Not started | |
+| P11 Projects, events, cleanup and single replication | Implemented; merged-main qualification pending | Project APIs/authorization/sharing/quotas, typed events and durable consumers, 24 webhook subscription resources, package cleanup, single push/pull execution/status (#1763) and native/provider qualification (#1764) are merged. #1765 retains the exact merged-main full workflow, coverage floors and `make gate` exit |
+| P12 Descriptor export, system configuration, LDAP | In progress | The anonymous-access descriptor switch is implemented; #303 qualifies native reads with explicit grants. #1800 tracks empty proxy-password idempotence. Full descriptor export, system configuration, provider round-trips and LDAP retain this phase's exit requirements |
 | P13 Peer trust and federated repositories | Not started | |
 | P14 Platform federation and topology | Not started | |
 | P15 Release bundles v1 and Distribution | Not started | |
@@ -85,7 +85,7 @@ of 2026-10-21, separate from the dated exit evidence above.
 | [#487: project-scoped remotes](https://github.com/weaveplatform/artifactweave/issues/487) | P9 source design and merged P11 authority/role foundations are delivered; P11 owns documented project administration and standard sharing, while P19a owns observed project-aware connection/discovery/retrieval completion |
 | [#362: npm package signatures](https://github.com/weaveplatform/artifactweave/issues/362) | P28 owns local ECDSA signing, key discovery and native `npm audit signatures` acceptance; it can be pulled forward independently of P9 |
 | [#262: browser approval login](https://github.com/weaveplatform/artifactweave/issues/262) | P21 owns shared npm web login and Terraform `login.v1` with PKCE. P7 legacy npm login and P8 Terraform pasted-token login are implemented |
-| [#303: anonymous registry acceptance](https://github.com/weaveplatform/artifactweave/issues/303) | Explicitly blocked on P12 applying `security.anonAccessEnabled`; the scenario must grant anonymous Read rather than relying on the seed permission |
+| [#303: anonymous registry acceptance](https://github.com/weaveplatform/artifactweave/issues/303) | The `security.anonAccessEnabled` prerequisite is implemented. Native Docker/crane acceptance uses fresh credentials and explicit anonymous Read, including push refusal and grant revocation; required Linux CI qualifies the scenarios. Shared request cancellation #1816 is a separate actionable fix, not a dependency on completing the P18 wave |
 | [#523: JFrog Maven 3.10 acceptance](https://github.com/weaveplatform/artifactweave/issues/523) | Delivered: `jf mvn` runs on the runner's Maven 3.10 with the JFrog Maven extractor 2.44.1 that `jf` 2.131.0 downloads, the first release that starts there |
 | [#216: live Artifactory captures](https://github.com/weaveplatform/artifactweave/issues/216) | Deliberately scheduled for P19 after P1 to P18. The P8 inference checklists have been added; successful native-client tests do not replace captures from Artifactory |
 
@@ -1158,8 +1158,8 @@ synchronous repository attachment and standard sharing, and storage quotas are
 implemented on the #1730/#1731 authority foundations. Typed service events and
 recoverable consumers, all 24 planned webhook subscription resources, package cleanup
 execution/reports and single push and pull are merged. Scheduled/manual execute/status
-(#1763) and two-instance native/provider qualification (#1764) remain in the final PR
-chain. #1765 retains the exact combined-main full-gate requirement;
+(#1763) and two-instance native/provider qualification (#1764) are also merged.
+#1765 retains the exact combined-main full-gate requirement;
 P11 remains open until that exit is demonstrated. Observed project-aware source
 sharing remains P19a #487.
 

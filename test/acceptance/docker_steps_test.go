@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,6 +41,9 @@ var registryTools = map[string]string{
 func (w *world) registerDocker(sc *godog.ScenarioContext) {
 	sc.Step(`^the Docker daemon can reach the registry$`, w.dockerReachable)
 	sc.Step(`^I run docker login as "([^"]*)" with password "([^"]*)"$`, w.dockerLogin)
+	sc.Step(`^I run crane login as "([^"]*)" with password "([^"]*)"$`, w.craneLogin)
+	sc.Step(`^I use fresh anonymous registry credentials$`, w.anonymousRegistryCredentials)
+	sc.Step(`^the registry served the pull as anonymous$`, w.anonymousRegistryPull)
 	sc.Step(`^I run docker "([^"]*)"$`, w.runDocker)
 	sc.Step(`^a buildx builder that pushes to the registry$`, w.buildxBuilder)
 	sc.Step(`^(crane|oras|cosign) is available$`, w.toolAvailable)
@@ -223,6 +227,60 @@ func (w *world) dockerLogin(user, password string) error {
 	return w.runClient(cmd)
 }
 
+func (w *world) craneLogin(user, password string) error {
+	dir, err := w.dockerConfigDir()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(os.Getenv(registryTools["crane"]), "auth", "login", w.expand("{host}"),
+		"-u", user, "--password-stdin")
+	cmd.Env = append(os.Environ(), "DOCKER_CONFIG="+dir)
+	cmd.Stdin = strings.NewReader(w.expand(password))
+	return w.runClient(cmd)
+}
+
+func (w *world) anonymousRegistryCredentials() error {
+	// Keep the publisher's credentials in their original directory. Neither
+	// client may borrow that login to satisfy the anonymous pull assertions.
+	w.dockerConfig = ""
+	dir, err := w.dockerConfigDir()
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{"auths":{}}`), 0o600)
+}
+
+func (w *world) anonymousRegistryPull() error {
+	if err := w.awaitLoggedSoFar(); err != nil {
+		return err
+	}
+	var token, manifest, blob bool
+	for line := range strings.Lines(w.stderr.String()[w.commandLog:]) {
+		var rec struct {
+			Msg, Method, Path, User string
+			Status                  int
+		}
+		if json.Unmarshal([]byte(line), &rec) != nil || rec.Msg != "request" ||
+			rec.Method != http.MethodGet || rec.Status != http.StatusOK {
+			continue
+		}
+		if strings.HasSuffix(rec.Path, "/v2/token") {
+			token = true
+		}
+		if strings.HasPrefix(rec.Path, "/v2/docker-local/team/public/") {
+			if rec.User != "anonymous" {
+				return fmt.Errorf("native pull used a principal other than anonymous")
+			}
+			manifest = manifest || strings.Contains(rec.Path, "/manifests/")
+			blob = blob || strings.Contains(rec.Path, "/blobs/")
+		}
+	}
+	if !token || !manifest || !blob {
+		return fmt.Errorf("native anonymous pull lacks successful token, manifest or blob request evidence")
+	}
+	return nil
+}
+
 // runDocker runs the docker client against the scenario's configuration,
 // in the scenario's file directory, so a build context can be a relative
 // path.
@@ -366,6 +424,7 @@ func (w *world) dockerConfigDir() (string, error) {
 // writeLayer writes a gzipped tar holding one file, a layer crane can
 // append to build an image without pulling a base from the network.
 func (w *world) writeLayer(name, entry, content string) error {
+	content = w.expand(content)
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gz)

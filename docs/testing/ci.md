@@ -973,6 +973,24 @@ opkg, Nix, Vagrant, oras, cosign and the Docker daemon on the CI runner exit
 non-zero when the server answers 500, so "the command succeeds" already covers
 them.
 
+## Anonymous registry clients
+
+The `@clients @registry_anonymous` scenarios in
+[`registry_anonymous.feature`](../../test/acceptance/features/registry_anonymous.feature)
+qualify #303 with pinned crane and the Linux Docker daemon. Both start with a fresh
+empty client configuration after an administrator publishes the image through crane;
+the daemon never receives that administrator login. The layer includes the fixture's
+host identity so an earlier run's daemon cache cannot replace the native blob read.
+
+Pulls fail with anonymous access disabled, and with the descriptor switch enabled
+without a grant. An explicit repository-specific anonymous Read grant permits the
+pull through a registry token. Access logs must identify the manifest and blob reader
+as `anonymous`. The image digest stays intact, anonymous pushes and reads of a
+populated private repository fail, and revoking Read prevents another pull.
+Expected failures also reject server errors. The existing anonymous `/v2/` Bearer
+challenge is retained. These cases run in the required native-client partition;
+the Docker scenario needs Linux, while crane can also run on an opted-in local host.
+
 ## Transient infrastructure failures
 
 Two failures came from the runners rather than the code, and each needed a manual rerun
