@@ -80,15 +80,49 @@ func (w *world) qualifyOrdinaryReplication(direction string) error {
 	if err := replicationBytes(consumer, consumerKey, "private/untouched.bin", control); err != nil {
 		return err
 	}
-	properties, err := replicationFixtureRequest(consumer, http.MethodGet, "/artifactory/api/storage/"+consumerKey+"/selected/current.bin?properties", "", http.StatusOK)
+	if err := replicationQualificationProperty(consumer, consumerKey, "updated"); err != nil {
+		return err
+	}
+	if _, err := replicationFixtureRequest(w, http.MethodPost, "/artifactory/api/replications/"+owningRepo,
+		`{"syncProperties":false,"syncDeletes":false}`, http.StatusOK); err != nil {
+		return err
+	}
+	// Keep the digest unchanged: replacing bytes has its own clearOldFileData
+	// baseline. This control isolates property synchronization from replacement.
+	if err := put(upstream, "/artifactory/api/storage/"+sourceKey+"/selected/current.bin?properties=qualification=must-not-apply", "", http.StatusNoContent); err != nil {
+		return err
+	}
+	if err := w.executeAndWaitReplication(owningRepo); err != nil {
+		return err
+	}
+	if err := replicationBytes(consumer, consumerKey, "selected/current.bin", "updated replicated bytes"); err != nil {
+		return err
+	}
+	if err := replicationQualificationProperty(consumer, consumerKey, "updated"); err != nil {
+		return err
+	}
+	if _, err := replicationFixtureRequest(upstream, http.MethodDelete, "/artifactory/"+sourceKey+"/selected/current.bin", "", http.StatusNoContent); err != nil {
+		return err
+	}
+	if err := w.executeAndWaitReplication(owningRepo); err != nil {
+		return err
+	}
+	if err := replicationBytes(consumer, consumerKey, "selected/current.bin", "updated replicated bytes"); err != nil {
+		return err
+	}
+	return replicationBytes(consumer, consumerKey, "private/untouched.bin", control)
+}
+
+func replicationQualificationProperty(instance *world, repository, expected string) error {
+	properties, err := replicationFixtureRequest(instance, http.MethodGet, "/artifactory/api/storage/"+repository+"/selected/current.bin?properties", "", http.StatusOK)
 	if err != nil {
 		return err
 	}
 	var propertyView struct {
 		Properties map[string][]string `json:"properties"`
 	}
-	if json.Unmarshal(properties, &propertyView) != nil || len(propertyView.Properties["qualification"]) != 1 || propertyView.Properties["qualification"][0] != "updated" {
-		return fmt.Errorf("ordinary replication did not publish the actual updated properties")
+	if json.Unmarshal(properties, &propertyView) != nil || len(propertyView.Properties["qualification"]) != 1 || propertyView.Properties["qualification"][0] != expected {
+		return fmt.Errorf("ordinary replication property state disagrees with its synchronization option")
 	}
 	return nil
 }
