@@ -30,7 +30,10 @@ Implementation sequence, governed by the
   permission and token consequences. SCIM is an identity lifecycle API, independent of
   the full web console.
 
-LDAP, SAML, Crowd, HTTP-SSO and SCIM currently answer `501`. That response describes
+LDAP group settings and the connection test, SAML, Crowd, HTTP-SSO and SCIM currently
+answer `501`; LDAP connections are managed since LDAP-01
+([#1832](https://github.com/weaveplatform/artifactweave/issues/1832)), administrators only,
+their manager passwords sealed and never returned. That response describes
 unfinished work, not an exclusion; their Terraform resource names remain inventoried in
 [10-scope-and-tiers](../10-scope-and-tiers.md).
 

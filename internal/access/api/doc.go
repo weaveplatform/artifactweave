@@ -94,6 +94,10 @@
 //   - Grants, with PathPair and ErrScanLimit: who holds what on an item,
 //     and whether moving content changes who may reach it.
 //   - AnonymousAccess: reading and switching the anonymous access setting.
+//   - LDAPSettings, with LDAPConnection, LDAPChange, LDAPResult and its
+//     LDAPOutcome, and the refusal LDAPInvalid: the LDAP connections the
+//     configuration descriptor plans, applies and exports, never their
+//     manager passwords.
 //   - Settings: the access options other modules read.
 //   - API: one implementation of each contract, as the module publishes
 //     them, with the Settings.
@@ -173,7 +177,8 @@
 // rule that access/core/model applies. Added by #1408: RepoSet,
 // RepoVisibility and Decider.VisibleRepos. P11 events.go publishes the typed
 // user.locked transition with public identity and sanitized actor facts. The
-// target layout's hooks.go token gate remains P17.
+// target layout's hooks.go token gate remains P17. P12 LDAP-01 adds
+// LDAPSettings and its values.
 //
 // # Testing
 //

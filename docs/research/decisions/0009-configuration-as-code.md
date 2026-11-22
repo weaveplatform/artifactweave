@@ -65,6 +65,14 @@ password. Configuration storage is unchanged. The [transport contract](../../imp
 records the supported exchange and explicit limits; P12/#1836 gives `redirectedToHosts`
 its scoped redirect-credential effect, and replication's separate consumer is tracked by #1848.
 
+LDAP-01 ([#1832](https://github.com/weaveplatform/artifactweave/issues/1832)) applies
+`security.ldapSettings` through PATCH, config apply and the bootstrap descriptor, writing through the access module's
+LDAP service rather than its own copy of the rules, so the descriptor and
+`/access/api/v1/ldap/settings` read back one connection. Its entries change field by field
+and are validated with the rest of the document before any write; an entry set to null
+deletes a connection; the whole-section null is refused as for `mailServer`. The XML export
+lists the connections without their manager passwords.
+
 ## Rationale
 
 The Artifactory descriptor is the format Artifactory users already have in version

@@ -2,8 +2,9 @@ package descriptor
 
 import "fmt"
 
-// parseSecurity accepts only Artifactory's anonymous access switch. Other
-// security settings remain unsupported and fail closed.
+// parseSecurity accepts Artifactory's anonymous access switch and the LDAP
+// connections (parseLDAP). Other security settings remain unsupported and
+// fail closed.
 func parseSecurity(top map[string]any, p *Patch) error {
 	v, present := top[SectionSecurity]
 	if !present {
@@ -13,7 +14,7 @@ func parseSecurity(top map[string]any, p *Patch) error {
 	if !ok {
 		return fmt.Errorf("%w: security must be a mapping", ErrInvalid)
 	}
-	if bad := unknown(m, []string{"anonAccessEnabled"}); bad != "" {
+	if bad := unknown(m, []string{"anonAccessEnabled", ldapSection}); bad != "" {
 		return fmt.Errorf("%w: security: unknown field %s", ErrInvalid, bad)
 	}
 	if value, present := m["anonAccessEnabled"]; present {
@@ -23,5 +24,5 @@ func parseSecurity(top map[string]any, p *Patch) error {
 		}
 		p.AnonymousAccess = &enabled
 	}
-	return nil
+	return parseLDAP(m, p)
 }

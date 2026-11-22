@@ -8,7 +8,8 @@
 // # Inputs
 //
 // None yet. Planned: the directory servers that the LDAP settings name (plan
-// P12, task 3).
+// P12, task 3), read through access/core/ldap's Source, whose revisions tell
+// the client when a cached connection or credential is stale.
 //
 // # Outputs
 //
@@ -33,5 +34,6 @@
 //
 // # Status
 //
-// Placeholder: implemented by P12.
+// Placeholder: implemented by P12. LDAP-02 (#1833) adds the client;
+// LDAP-01 delivered the settings and the Source it reads.
 package ldap

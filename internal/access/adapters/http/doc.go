@@ -58,7 +58,8 @@
 //   - Every principal it lets through is authorised once, and handlers ask
 //     that decider (decision 0006). Project administration additionally
 //     rechecks credentials and authority under the project guard before
-//     publishing its response or mutation.
+//     publishing its response or mutation, and so do the LDAP connection
+//     operations, which never return a manager password.
 //   - A key pair delete clears the repositories' references to the pair and
 //     deletes it in one store transaction: a failure at any step leaves
 //     both as they were.
@@ -95,6 +96,9 @@
 // P11 PRJ-01 adds project lifecycle, environments, roles, direct memberships
 // and global-role project discovery with current transactional management
 // authority. Effective content grants and role-token policy remain PRJ-02.
+// P12 LDAP-01 serves the LDAP connections (/access/api/v1/ldap/settings, with
+// the provider's trailing-slash collection) through access/core/ldap; the
+// connection test stays 501 until LDAP-02.
 //
 // # Testing
 //

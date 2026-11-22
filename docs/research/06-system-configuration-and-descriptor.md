@@ -243,6 +243,21 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
   ([D] https://docs.jfrog.com/installation/docs/delete-an-existing-element-in-artifactory-yaml.md).
 - An empty document deletes every local, remote and virtual repository. artifactweave
   rejects an empty patch with 400 instead.
+- `security.ldapSettings` (LDAP-01, [#1832](https://github.com/weaveplatform/artifactweave/issues/1832))
+  writes through the access module's LDAP service, the one behind
+  `/access/api/v1/ldap/settings` ([research 05](05-platform-identity-and-security-apis.md#ldap-connections)),
+  so the descriptor and the Access API read back one connection. Each entry is a change
+  field by field: an omitted field keeps its stored value (or its default on create), a
+  `null` string clears it, an omitted `managerPassword` keeps the sealed one and a `null`
+  or `''` one clears it, and an entry set to `null` deletes the connection. A `key` field,
+  when present, must equal the entry key. A `null` flag or `search` block, an unknown
+  field (including the Access API's snake_case names) and every connection the Access API
+  would refuse answer 400 naming `security.ldapSettings.<key>` and the field, before anything
+  in the document is written. **[I]** A whole-section `ldapSettings: null` is refused, as
+  for `mailServer`; the deprecated `artifactory_ldap_setting` resource deletes with it,
+  and `artifactory_ldap_setting_v2` deletes through the Access API instead. Reapplying a
+  document changes nothing and keeps each connection's revision. `ldapGroupSettings`
+  arrives with LDAP-03.
 - A successful patch answers `<n> changes to config merged successfully` ([J]
   [RTFACT-31174](https://jfrog.atlassian.net/browse/RTFACT-31174) quotes "14 changes to
   config merged successfully" from 7.84; [RTFACT-17040](https://jfrog.atlassian.net/browse/RTFACT-17040)).
@@ -303,7 +318,7 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
 | `replicationsConfig` | `blockPullReplications, blockPushReplications` |
 | `systemMessageConfig` | `enabled, message, title, titleColor` |
 | `repoLayouts.<name>` | `artifactPathPattern, distinctiveDescriptorPathPattern, descriptorPathPattern, folderIntegrationRevisionRegExp, fileIntegrationRevisionRegExp` (field names from the XSD; the YAML page does not list them). The `artifactory_repository_layout` resource also sends `name`, repeating the entry key ([S] provider 12.11.14 [`resource_artifactory_repository_layout.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_repository_layout.go)) |
-| `security` | `anonAccessEnabled, anonAccessToBuildInfosDisabled (deprecated), userLockPolicy{enabled, loginAttempts}, passwordSettings{encryptionPolicy: REQUIRED\|SUPPORTED\|UNSUPPORTED, expirationPolicy{enabled, passwordMaxAge, notifyByEmail}}, ldapSettings.<key>{ldapUrl, emailAttribute, ldapPoisoningProtection, search{managerDn, managerPassword, searchBase, searchFilter, searchSubTree}, userDnPattern, autoCreateUser, enabled, pagingSupportEnabled}, ldapGroupSettings.<name>{enabledLdap, filter, groupBaseDn, groupMemberAttribute, groupNameAttribute, strategy: STATIC\|DYNAMIC\|HIERARCHY, subTree}, crowdSettings{...}, samlSettings{...}, oauthSettings{enableIntegration, persistUsers, allowUserToAccessProfile, oauthProvidersSettings.<name>{providerType: github\|openId\|google\|cloudfoundry, ...}}, httpSsoSettings{httpSsoProxied, remoteUserRequestVariable, allowUserToAccessProfile, noAutoUserCreation, syncLdapGroups}` |
+| `security` | `anonAccessEnabled, anonAccessToBuildInfosDisabled (deprecated), userLockPolicy{enabled, loginAttempts}, passwordSettings{encryptionPolicy: REQUIRED\|SUPPORTED\|UNSUPPORTED, expirationPolicy{enabled, passwordMaxAge, notifyByEmail}}, ldapSettings.<key>{key, ldapUrl, emailAttribute, ldapPoisoningProtection, allowUserToAccessProfile, search{managerDn, managerPassword, searchBase, searchFilter, searchSubTree}, userDnPattern, autoCreateUser, enabled, pagingSupportEnabled}, ldapGroupSettings.<name>{enabledLdap, filter, groupBaseDn, groupMemberAttribute, groupNameAttribute, strategy: STATIC\|DYNAMIC\|HIERARCHY, subTree}, crowdSettings{...}, samlSettings{...}, oauthSettings{enableIntegration, persistUsers, allowUserToAccessProfile, oauthProvidersSettings.<name>{providerType: github\|openId\|google\|cloudfoundry, ...}}, httpSsoSettings{httpSsoProxied, remoteUserRequestVariable, allowUserToAccessProfile, noAutoUserCreation, syncLdapGroups}` |
 | `localRepositories.<key>` | `type, checksumPolicyType, repoLayout, snapshotVersionBehavior, xray{enabled}, downloadRedirect{enabled}, blackedOut, handleReleases, handleSnapshots, includesPattern, excludesPattern, propertySets, yumGroupFileNames, primaryKeyPairDescriptor, secondaryKeyPairRef, ...`; `type` includes `terraformbe` for Terraform backend repositories |
 | `remoteRepositories.<key>` | the local keys plus `url, username, password, proxy, socketTimeoutMillis, assumedOfflinePeriodSecs, retrievalCachePeriodSecs, missedRetrievalCachePeriodSecs, bower, cocoaPods{cocoaPodsSpecsRepoUrl}, nuget, helm, composer, vcs, externalDependencies, contentSynchronisation`; `remoteRepoLayout` in JFrog support's YAML ([research 03](03-repository-configuration-model.md#json-and-yaml-name-differences)) |
 | `virtualRepositories.<key>` | `repositories[], includesPattern, excludesPattern, p2{urls[]}, keyPair, virtualCacheConfig{virtualRetrievalCachePeriodSecs}, forceMavenAuthentication` |
@@ -425,8 +440,8 @@ replication proxy configuration, preserving its independent endpoint and replay 
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
   `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`,
-  `downloadRedirectConfig`, `mailServer` and the `security.anonAccessEnabled` setting
-  (`internal/configuration/core/descriptor`). Download redirect configuration applies
+  `downloadRedirectConfig`, `mailServer`, the `security.anonAccessEnabled` setting and
+  the `security.ldapSettings` connections (`internal/configuration/core/descriptor`). Download redirect configuration applies
   the whole-MB `fileMinimumSize` setting used by CDN/storage redirects
   ([research 19](19-cdn-and-download-redirect.md#5-artifactweave-today)). Artifactory
   applies every section its YAML pages document ([D]
@@ -478,6 +493,11 @@ replication proxy configuration, preserving its independent endpoint and replay 
   ([S] provider 12.11.14
   [`resource_artifactory_repository_layout.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_repository_layout.go)),
   so the XML gives each layout its key as `name`.
+- The export's `security` element carries `ldapSettings/ldapSetting` in XSD order
+  (`key, enabled, ldapUrl, userDnPattern, search{searchFilter, searchBase, searchSubTree,
+  managerDn}, autoCreateUser, emailAttribute, ldapPoisoningProtection,
+  allowUserToAccessProfile, pagingSupportEnabled`), leaving out empty strings and always
+  leaving out `managerPassword`.
 - CFG-01 collects repositories, proxies, property sets, layouts, anonymous access, mail
   and download redirect configuration in one metadata transaction under the shared
   `Projects.Guard`, before returning bytes after commit. Export refuses an existing

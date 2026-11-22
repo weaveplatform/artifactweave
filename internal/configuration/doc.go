@@ -17,8 +17,8 @@
 //     configuration documents. App passes its composite store, which
 //     satisfies it.
 //   - Repositories and Layouts, from the artifacts module's API, and Access,
-//     the access module's API, whose AnonymousAccess the security section
-//     writes. All of them are bound over the same store, so a descriptor's
+//     the access module's API, whose AnonymousAccess and LDAP the security
+//     section writes. All of them are bound over the same store, so a descriptor's
 //     writes commit or roll back together.
 //   - Settings, the configuration options from app/config's Configuration
 //     (docker.subdomain_match).
