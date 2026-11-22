@@ -61,6 +61,11 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 						!strings.Contains(step.Run, "./test/acceptance") {
 						t.Error("provider partition must execute the real acceptance suite with coverage")
 					}
+					// make cover passes immediate artifact directories to covdata;
+					// covdata ignores nested directories rather than recursing.
+					if step.Env["ARTIFACTWEAVE_GOCOVERDIR"] != "${{ github.workspace }}/cover/terraform" {
+						t.Error("provider counters must join the Terraform artifact's direct coverage directory")
+					}
 				}
 				if got := step.Env["ARTIFACTWEAVE_ACCEPT_TAGS"]; got != "" {
 					if got != want.expression {

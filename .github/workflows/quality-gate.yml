@@ -1194,7 +1194,7 @@ jobs:
         env:
           ARTIFACTWEAVE_ACCEPT_TAGS: '@replication_provider'
           ARTIFACTWEAVE_REPLICATION_EVIDENCE_DIR: ${{ github.workspace }}/cover/terraform/replication-evidence
-          ARTIFACTWEAVE_GOCOVERDIR: ${{ github.workspace }}/cover/terraform/replication
+          ARTIFACTWEAVE_GOCOVERDIR: ${{ github.workspace }}/cover/terraform
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
         run: |
           export ARTIFACTWEAVE_TERRAFORM_BIN="$(command -v terraform)"

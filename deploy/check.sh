@@ -204,7 +204,7 @@ echo "== tflint"
 export TFLINT_PLUGIN_DIR=$tools/tflint-plugins
 # The rulesets .tflint.hcl pins come from their GitHub releases, their only
 # source (#1341).
-tflint --init --config "$root/.tflint.hcl" >/dev/null
+"$root/deploy/ci/tflint-init.sh" --config "$root/.tflint.hcl" >/dev/null
 for r in $roots; do
 	echo "-- $r"
 	tflint --chdir="$r" --config "$root/.tflint.hcl" --format compact || fail "tflint in $r"
