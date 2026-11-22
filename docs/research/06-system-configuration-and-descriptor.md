@@ -342,6 +342,85 @@ security:
     loginAttempts: 5
 ```
 
+Proxy `domain` and `ntHost` are runtime NTLMv2 settings for artifact remote sources
+(#1835), using the configured username and sealed proxy password. This follows the
+7.161.26 `ProxyDescriptor` / `artifactory.xsd` field meanings: domain/realm and the
+computer name of this client. [MS-NTHT](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-ntht/f8064832-931f-4516-9557-01630745732f)
+supplies the HTTP proxy handshake, while the [remote transport contract](../implementation/remote-http-transport.md)
+distinguishes local pinning, CONNECT and supported NTLMv2 capability restrictions.
+The separate replication consumer remains #1848.
+No Windows administration or LDAP NTLM login is implied.
+
+### Proxy redirect credential contract
+
+The [official proxy guide](https://jfrog.com/help/r/jfrog-platform-administration-documentation/define-proxies)
+and pinned 7.161.26 XSD describe reuse of proxy credentials for listed redirect hosts.
+`ProxyDescriptor.getRedirectedToHostsList` and the shared client's `ProxyConfig` split
+newline, comma, semicolon and ASCII space. The [12.11.14 provider](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_proxy.go)
+serializes its set as a comma-separated string and splits commas on read.
+The actual 13.21.0 `ProxyConfig.setRedirectedToHosts` bytecode calls
+`StringUtils.trim`; [Apache Commons Lang 3.20.0](https://github.com/apache/commons-lang/blob/rel/commons-lang-3.20.0/src/main/java/org/apache/commons/lang3/StringUtils.java#L8722)
+delegates to `String.trim`, removing only edge characters through U+0020.
+artifactweave preserves that boundary: Unicode edge whitespace is invalid, while
+ASCII edge controls are trimmed and embedded tabs/CR remain invalid host tokens.
+
+The [7.161.26 sources](https://releases.jfrog.io/artifactory/bintray-artifactory/org/artifactory/oss/jfrog-artifactory-oss/7.161.26/jfrog-artifactory-oss-7.161.26-sources.tar.gz)
+name `artifactory-service-core-parent:7.161.15`, whose [public POM](https://releases.jfrog.io/artifactory/jfrog-jars/org/artifactory/artifactory-service-core-parent/7.161.15/artifactory-service-core-parent-7.161.15.pom)
+inherits [artifactory-parent-pom:7.161.15](https://releases.jfrog.io/artifactory/jfrog-jars/org/artifactory/artifactory-parent-pom/7.161.15/artifactory-parent-pom-7.161.15.pom).
+That parent sets `jfrog.commons.version=13.21.0`. `HttpRepo.createHttpClient` calls
+`HttpClientConfigurator.proxy(ProxyDescriptor)`, which delegates to inherited
+`HttpBuilderBase.proxy(ProxyConfig)`. The official
+[jfrog-http-client:13.21.0 JAR](https://releases.jfrog.io/artifactory/jfrog-jars/org/jfrog/common/jfrog-http-client/13.21.0/jfrog-http-client-13.21.0.jar)
+(SHA-256 `434cd89d56efc5b6e78c6ba7b5d45aa612db550f4b1266902908fb4c10b30511`)
+has no published sources classifier. Its `javap -c -p` output directly establishes that
+`ProxyConfigBuilder.redirectToHostProxies` registers each host with **proxyPort** and
+`ANY_REALM` in the credentials provider. The older [7.86.2 source archive](https://releases.jfrog.io/artifactory/jfrog-jars/org/jfrog/common/jfrog-http-client/7.86.2/jfrog-http-client-7.86.2-sources.jar)
+has the same method sequence. The deprecated static server `configureProxy` uses
+`ANY_PORT`; using that helper to define the ordinary remote's behavior would select
+the wrong call path.
+
+The shared provider supplies credentials to target as well as proxy authentication.
+The JAR's `PreemptiveAuthInterceptor` looks up target hostname/port. Apache's primary
+[TargetAuthenticationStrategy](https://github.com/apache/httpcomponents-client/blob/4.5.x/httpclient/src/main/java/org/apache/http/impl/client/TargetAuthenticationStrategy.java)
+uses 401/WWW-Authenticate; its [MainClientExec](https://github.com/apache/httpcomponents-client/blob/4.5.x/httpclient/src/main/java/org/apache/http/impl/execchain/MainClientExec.java)
+keeps target Authorization and proxy Proxy-Authorization separate. These are source and
+bytecode facts, not observed vendor responses or a claim about every configured scheme.
+Apache's [AuthScope](https://github.com/apache/httpcomponents-client/blob/4.5.x/httpclient/src/main/java/org/apache/http/auth/AuthScope.java)
+lowercases host keys and compares their strings literally; [HttpHost](https://github.com/apache/httpcomponents-core/blob/4.4.x/httpcore/src/main/java/org/apache/http/HttpHost.java)
+preserves the hostname. Credential matching therefore preserves terminal dots and IP
+text rather than adding DNS/IP aliases. The local URL syntax contract uses Go's
+`URL.Hostname`: IPv6 brackets delimit the authority and are removed for matching;
+configured host tokens remain unbracketed IP literals.
+DNS label validation follows full root-locale lowercasing. OpenJDK's
+[ConditionalSpecialCasing](https://github.com/openjdk/jdk21u/blob/master/src/java.base/share/classes/java/lang/ConditionalSpecialCasing.java#L61)
+expands `İ` into `i` plus U+0307; Go's simple `strings.ToLower` would incorrectly
+grant ASCII `i`. The existing pinned
+[`x/text` Lower](https://github.com/golang/text/blob/v0.44.0/cases/cases.go)
+with `language.Und` preserves that expansion and Kelvin-to-`k`. Each invocation owns
+its caser because the API permits stateful instances. Unicode 15/17
+[`UnicodeData`](https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt) and
+[`SpecialCasing`](https://www.unicode.org/Public/17.0.0/ucd/SpecialCasing.txt)
+have the same ASCII-label boundary: Kelvin is the only non-ASCII rune whose full root
+lowercase becomes an ASCII label. Root-context sigma stays non-ASCII. The exhaustive
+mapping regression preserves this boundary without Unicode case folding or IDNA conversion.
+
+P12 #1836 implements a single Basic target-challenge retry at that exact host/port,
+including permitted HTTP-to-HTTP redirects. **Local choices [I]:** actual redirects
+only, bodyless GET/HEAD only, strict host validation without wildcards/URLs/port
+tokens, configured repository Authorization precedence and `NoCrossOriginAuth`
+restriction. No credential rule adds reachability or forwards repository headers,
+TLS identity or cookies beyond their independent rules. DNS is checked and pinned for
+both attempts; HTTPS downgrade remains refused. The sealed proxy document/secret
+already participates in the source HMAC and transactional publication fence.
+Controlled native and SQLite/PostgreSQL proofs cover content and failed publication.
+With an NTLM `domain`, `HttpBuilderBase.proxy` registers `NTCredentials` (7.86.2 source;
+the 13.21.0 class retains the `NTCredentials`/`redirectToHostProxies` references) for
+the same listed hosts, so Apache's `BasicScheme` sends the
+[NTUserPrincipal](https://github.com/apache/httpcomponents-client/blob/4.5.x/httpclient/src/main/java/org/apache/http/auth/NTUserPrincipal.java)
+name: root-locale upper-case domain, a backslash and the username. artifactweave sends that
+name in the redirected Basic retry. P19/#216 retains live comparison; #1848 owns broader
+replication proxy configuration, preserving its independent endpoint and replay restrictions.
+
 ### What artifactweave serves
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,

@@ -30,7 +30,8 @@ type Options struct {
 	Auth Auth
 	// Secrets also redacts fixture-specific secrets embedded in paths or safe headers.
 	// Query values, credentials, cookies and unrecognized headers are always redacted.
-	Secrets []string
+	Secrets  []string
+	listener net.Listener
 }
 
 // Auth requires either a bearer Token or a basic Username/Password. An empty policy
@@ -73,6 +74,9 @@ func (a Auth) challenge(w http.ResponseWriter, proxy bool) {
 // with HEAD, Range and HTTP validators. Other statuses serve Body verbatim.
 // Redirect uses Status or defaults to 302.
 type Resource struct {
+	// ExpectedBody, when non-nil, refuses a different request body with 400.
+	// Actual request bodies are never retained in records.
+	ExpectedBody []byte
 	// Method optionally permits one explicit request method instead of GET/HEAD.
 	Method   string
 	Body     []byte
@@ -135,6 +139,10 @@ func start(t testing.TB, options Options, handler func(*Server) http.Handler) *S
 	r := chi.NewRouter()
 	r.Handle("/*", handler(s))
 	s.srv = httptest.NewUnstartedServer(r)
+	if options.listener != nil {
+		_ = s.srv.Listener.Close()
+		s.srv.Listener = options.listener
+	}
 	s.srv.Config.BaseContext = func(net.Listener) context.Context { return ctx }
 	// HTTP parser/handshake errors may contain caller-controlled strings. Assertions
 	// use the sanitized recorder rather than writing those errors to test artifacts.
@@ -183,6 +191,7 @@ func (s *Server) Close() {
 // held request, wait for its barrier's Reached first.
 func (s *Server) Set(path string, resource Resource) {
 	resource.Body = bytes.Clone(resource.Body)
+	resource.ExpectedBody = bytes.Clone(resource.ExpectedBody)
 	resource.Header = resource.Header.Clone()
 	if resource.Modified.IsZero() {
 		resource.Modified = s.options.Now().UTC()
@@ -229,6 +238,13 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
+	}
+	if resource.ExpectedBody != nil {
+		actual, err := io.ReadAll(io.LimitReader(r.Body, int64(len(resource.ExpectedBody))+1))
+		if err != nil || !bytes.Equal(actual, resource.ExpectedBody) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 	}
 	if resource.Fault.BeforeHeaders != nil &&
 		resource.Fault.BeforeHeaders.Wait(r.Context()) != nil {
