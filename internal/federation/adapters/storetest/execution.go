@@ -30,6 +30,7 @@ func runExecutions(t *testing.T, newStore Factory) {
 		t.Run("immutable identity and occurrence", func(t *testing.T) { executionIdentity(t, newStore(t)) })
 		t.Run("immutable one-shot options", func(t *testing.T) { executionOptions(t, newStore(t)) })
 		t.Run("explicit destination history", func(t *testing.T) { executionDestinations(t, newStore(t)) })
+		t.Run("distinct selection counts", func(t *testing.T) { executionSelectionCount(t, newStore(t)) })
 		t.Run("transactional recovery", func(t *testing.T) { executionRecovery(t, newStore(t)) })
 		t.Run("closed failure recovery", func(t *testing.T) { executionFailureRecovery(t, newStore(t)) })
 		t.Run("selected effects and replay", func(t *testing.T) { executionEffects(t, newStore(t)) })

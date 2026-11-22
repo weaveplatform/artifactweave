@@ -33,7 +33,12 @@ func (p Push) ExecutionStep(ctx context.Context, execution model.ExecutionRun, p
 	if run.Phase.Terminal() {
 		return fmt.Errorf("push completion has no atomic execution projection: %w", kernel.ErrStore)
 	}
-	p.Store = observedPushStore{PushStore: p.Store, progress: progress, execution: execution.Reference}
+	p.Store = observedPushStore{
+		PushStore: p.Store, progress: progress, execution: execution.Reference,
+		selectPath: func(ctx context.Context, path string) error {
+			return p.Configurations.allowExecutionSelection(ctx, execution, progress, path)
+		},
+	}
 	options, err := executionOptions(ctx, execution, progress)
 	if err != nil {
 		return err
@@ -45,18 +50,20 @@ func (p Push) ExecutionStep(ctx context.Context, execution model.ExecutionRun, p
 
 type observedPushStore struct {
 	port.PushStore
-	progress  port.ExecutionProgressStore
-	execution model.ExecutionReference
+	progress   port.ExecutionProgressStore
+	execution  model.ExecutionReference
+	selectPath func(context.Context, string) error
 }
 
 func (s observedPushStore) PushProgress() port.PushProgressStore {
-	return observedPushProgress{s.PushStore.PushProgress(), s.progress, s.execution}
+	return observedPushProgress{s.PushStore.PushProgress(), s.progress, s.execution, s.selectPath}
 }
 
 type observedPushProgress struct {
 	port.PushProgressStore
-	progress  port.ExecutionProgressStore
-	execution model.ExecutionReference
+	progress   port.ExecutionProgressStore
+	execution  model.ExecutionReference
+	selectPath func(context.Context, string) error
 }
 
 func (p observedPushProgress) observe(ctx context.Context, item model.PushItem) error {
@@ -86,6 +93,11 @@ func (p observedPushProgress) observe(ctx context.Context, item model.PushItem) 
 }
 
 func (p observedPushProgress) CreateItem(ctx context.Context, input model.PushItem) (model.PushItem, error) {
+	if p.selectPath != nil {
+		if err := p.selectPath(ctx, input.Path); err != nil {
+			return model.PushItem{}, err
+		}
+	}
 	item, err := p.PushProgressStore.CreateItem(ctx, input)
 	if err != nil {
 		return model.PushItem{}, fmt.Errorf("create observed push intent: %w", err)
@@ -131,7 +143,12 @@ func (p Pull) ExecutionStep(ctx context.Context, execution model.ExecutionRun, p
 	if run.Phase.Terminal() {
 		return fmt.Errorf("pull completion has no atomic execution projection: %w", kernel.ErrStore)
 	}
-	p.Store = observedPullStore{PullStore: p.Store, progress: progress, execution: execution.Reference}
+	p.Store = observedPullStore{
+		PullStore: p.Store, progress: progress, execution: execution.Reference,
+		selectPath: func(ctx context.Context, path string) error {
+			return p.Configurations.allowExecutionSelection(ctx, execution, progress, path)
+		},
+	}
 	options, err := executionOptions(ctx, execution, progress)
 	if err != nil {
 		return err
@@ -143,18 +160,20 @@ func (p Pull) ExecutionStep(ctx context.Context, execution model.ExecutionRun, p
 
 type observedPullStore struct {
 	port.PullStore
-	progress  port.ExecutionProgressStore
-	execution model.ExecutionReference
+	progress   port.ExecutionProgressStore
+	execution  model.ExecutionReference
+	selectPath func(context.Context, string) error
 }
 
 func (s observedPullStore) PullProgress() port.PullProgressStore {
-	return observedPullProgress{s.PullStore.PullProgress(), s.progress, s.execution}
+	return observedPullProgress{s.PullStore.PullProgress(), s.progress, s.execution, s.selectPath}
 }
 
 type observedPullProgress struct {
 	port.PullProgressStore
-	progress  port.ExecutionProgressStore
-	execution model.ExecutionReference
+	progress   port.ExecutionProgressStore
+	execution  model.ExecutionReference
+	selectPath func(context.Context, string) error
 }
 
 func (p observedPullProgress) observe(ctx context.Context, item model.PullItem) error {
@@ -191,6 +210,11 @@ func (p observedPullProgress) observe(ctx context.Context, item model.PullItem) 
 }
 
 func (p observedPullProgress) CreateItem(ctx context.Context, input model.PullItem) (model.PullItem, error) {
+	if p.selectPath != nil {
+		if err := p.selectPath(ctx, input.Path); err != nil {
+			return model.PullItem{}, err
+		}
+	}
 	item, err := p.PullProgressStore.CreateItem(ctx, input)
 	if err != nil {
 		return model.PullItem{}, fmt.Errorf("create observed pull intent: %w", err)

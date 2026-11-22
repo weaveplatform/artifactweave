@@ -13,6 +13,17 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 )
 
+func (p executions) SelectedPaths(ctx context.Context, ref model.ExecutionReference, path string) (int64, bool, error) {
+	if _, err := p.Run(ctx, ref); err != nil {
+		return 0, false, err
+	}
+	var count, present int64
+	err := p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
+		"SELECT COUNT(DISTINCT path),COALESCE(MAX(CASE WHEN path=? THEN 1 ELSE 0 END),0) FROM replication_execution_effects WHERE run_id=? AND run_incarnation=?"),
+		path, ref.ID, ref.Incarnation).Scan(&count, &present)
+	return count, present != 0, p.s.Wrap("count selected replication paths", err)
+}
+
 const executionEffectColumns = "run_id, run_incarnation, operation_key, transfer_id, transfer_incarnation, intent_fingerprint, " +
 	"transfer_version, path, outcome, reason, effect_paths_json, updated_at"
 

@@ -127,6 +127,9 @@ func (c Coordinator) admit(ctx context.Context, repository, root, id, occurrence
 				OneShot:        options != nil,
 				TargetLeaseKey: ownershipHash([]string{transfer.Repository.Incarnation, leaseIdentity}),
 			}
+			if !policy.Platform() {
+				binding.SelectionLimit = int64(c.Configurations.UserQueryLimit)
+			}
 			out, err = c.Store.Executions().Create(ctx, id, binding, c.now())
 			if err != nil {
 				return fmt.Errorf("admit logical replication execution: %w", err)

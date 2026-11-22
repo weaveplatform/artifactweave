@@ -77,12 +77,13 @@ type Service struct {
 	Repositories interface {
 		Get(context.Context, string) (repo.Config, error)
 	}
-	Settings    settings.SettingsStore
-	ProxyExists func(context.Context, string) error
-	Authorize   func(context.Context) (Policy, error)
-	Guard       func(context.Context) error
-	Zone        string
-	Schedules   schedule.Store
+	Settings       settings.SettingsStore
+	ProxyExists    func(context.Context, string) error
+	Authorize      func(context.Context) (Policy, error)
+	Guard          func(context.Context) error
+	Zone           string
+	Schedules      schedule.Store
+	UserQueryLimit int
 	// ScheduleAuthor supplies a verified reference in tests/composition. Nil
 	// uses the authenticated request principal already checked by Authorize.
 	ScheduleAuthor   func(context.Context) (kernel.CredentialReference, error)

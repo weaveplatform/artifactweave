@@ -10,6 +10,25 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/tx/memtx"
 )
 
+func (p executions) SelectedPaths(ctx context.Context, ref model.ExecutionReference, path string) (int64, bool, error) {
+	var count int64
+	var selected bool
+	err := p.s.Do(ctx, func() error {
+		if _, err := p.read(ref); err != nil {
+			return err
+		}
+		paths := map[string]bool{}
+		for key, effect := range p.effects().Rows {
+			if key.run == ref {
+				paths[effect.Path] = true
+			}
+		}
+		count, selected = int64(len(paths)), paths[path]
+		return nil
+	})
+	return count, selected, err //nolint:wrapcheck // store operations supply context
+}
+
 type executionEffectKey struct {
 	run model.ExecutionReference
 	key string

@@ -100,6 +100,9 @@ func (w Worker) Execute(ctx context.Context, item work.WorkItem) error {
 			return nil
 		}
 		if err := w.run(ctx, ref, fence); err != nil {
+			if errors.Is(err, ErrSelectionLimit) {
+				return w.abort(ctx, ref, model.ExecutionSelectionLimited, fence)
+			}
 			if !item.FinalAttempt || ctx.Err() != nil {
 				return err
 			}

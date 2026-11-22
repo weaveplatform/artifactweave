@@ -379,7 +379,10 @@ paths:
         credentials/proxy values are immutable and never change the saved configuration. An explicit push URL uses
         only its supplied connection values and needs no saved configuration. Runs to the same canonical endpoint
         share target exclusion; status includes secret-free explicit destination history under the current repository
-        lifetime. Binary-existence optimization remains unsupported and answers 501. Multiple targets and null options answer 400.
+        lifetime. Nonadministrators may select at most search.user_query_limit distinct files; zero disables the cap.
+        Reaching the cap with more files to select stops the run before the next intent and reports incomplete selection
+        as an error or partial failure. Reconciliation never follows a truncated source walk. Binary-existence
+        optimization remains unsupported and answers 501. Multiple targets and null options answer 400.
       operationId: executePullPushReplication
       parameters:
       - description: Required path parameter. Repository key, optionally followed by a folder path, for example

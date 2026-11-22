@@ -24,6 +24,9 @@ type ExecutionProgressStore interface {
 	// ExplicitTargets pages secret-free manual destinations under the current
 	// repository incarnation. It must not open options or credentials.
 	ExplicitTargets(context.Context, string, string, kernel.Page) ([]model.ReplicationTargetState, string, error)
+	// SelectedPaths counts distinct selected canonical paths, so reconciliation
+	// of a previously fetched file does not consume the nonadministrator cap twice.
+	SelectedPaths(context.Context, model.ExecutionReference, string) (int64, bool, error)
 	// Create is idempotent only for the same immutable binding. A Quartz
 	// occurrence may identify only one logical execution, across all retries.
 	Create(context.Context, string, model.ExecutionBinding, time.Time) (model.ExecutionRun, error)

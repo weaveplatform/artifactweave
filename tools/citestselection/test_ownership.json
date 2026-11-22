@@ -370,6 +370,7 @@
     ],
     "test/server/federation": [
       "execution_destination_test.go",
+      "execution_limit_test.go",
       "execution_options_test.go",
       "execution_restart_test.go",
       "execution_runtime_test.go",

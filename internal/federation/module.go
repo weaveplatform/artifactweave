@@ -30,12 +30,13 @@ type Store interface {
 // Deps supplies current authority and canonical repository configuration over
 // the same guarded transaction. Zone is the server's schedule timezone.
 type Deps struct {
-	Store        Store
-	Access       accessapi.API
-	Ownership    artifactsapi.ProjectRepositoryLookup
-	Lifetimes    artifactsapi.RepositoryLifetimes
-	Repositories artifactsapi.Repositories
-	Zone         string
+	Store          Store
+	Access         accessapi.API
+	Ownership      artifactsapi.ProjectRepositoryLookup
+	Lifetimes      artifactsapi.RepositoryLifetimes
+	Repositories   artifactsapi.Repositories
+	Zone           string
+	UserQueryLimit int
 }
 
 var errNoStore = errors.New("federation: Deps.Store is required")
@@ -69,7 +70,8 @@ func (d Deps) configurations() replication.Service {
 	s := replication.Service{
 		Store: d.Store, Settings: d.Store.Settings(), Ownership: d.Ownership,
 		Repositories: d.Repositories, Authorize: d.currentPolicy, Zone: d.Zone,
-		Schedules: d.Store.Schedules(),
+		Schedules:      d.Store.Schedules(),
+		UserQueryLimit: d.UserQueryLimit,
 		ProxyExists: func(ctx context.Context, key string) error {
 			_, err := d.Store.Configs().Get(ctx, configdoc.ConfigProxy, key)
 			if err != nil {

@@ -34,6 +34,7 @@ type ExecutionBinding struct {
 	TransferIncarnation string                          `json:"transfer_incarnation"`
 	OneShot             bool                            `json:"one_shot,omitempty"`
 	TargetLeaseKey      string                          `json:"target_lease_key,omitempty"`
+	SelectionLimit      int64                           `json:"selection_limit,omitempty"`
 }
 
 // ExecutionPhase is dispatch lifecycle state. Transfer progress remains owned
@@ -54,12 +55,13 @@ const (
 	ExecutionNotStored            ExecutionFailure = "source_not_stored"
 	ExecutionIntegrityFailed      ExecutionFailure = "integrity_failed"
 	ExecutionUnsupported          ExecutionFailure = "unsupported"
+	ExecutionSelectionLimited     ExecutionFailure = "selection_limit"
 )
 
 func (f ExecutionFailure) valid() bool {
 	switch f {
 	case ExecutionRetryExhausted, ExecutionTransferFailed, ExecutionAuthorityDenied, ExecutionConfigurationChanged,
-		ExecutionSourceOffline, ExecutionNotStored, ExecutionIntegrityFailed, ExecutionUnsupported:
+		ExecutionSourceOffline, ExecutionNotStored, ExecutionIntegrityFailed, ExecutionUnsupported, ExecutionSelectionLimited:
 		return true
 	default:
 		return false
@@ -109,7 +111,7 @@ func (r ExecutionReference) Validate() error {
 
 // Validate requires complete immutable provenance and a restorable credential.
 func (b ExecutionBinding) Validate() error {
-	if b.TargetLeaseKey != "" && !pushDigest(b.TargetLeaseKey) {
+	if b.SelectionLimit < 0 || b.TargetLeaseKey != "" && !pushDigest(b.TargetLeaseKey) {
 		return fmt.Errorf("invalid execution target exclusion: %w", kernel.ErrInvalid)
 	}
 	for _, value := range []string{
