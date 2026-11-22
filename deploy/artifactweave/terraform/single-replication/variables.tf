@@ -52,3 +52,9 @@ variable "revision" {
     error_message = "Use revision 1 or 2."
   }
 }
+
+variable "sync_statistics" {
+  type        = bool
+  default     = true
+  description = "Exercise the stored statistics flag; set false before ordinary P11 transfer qualification."
+}

@@ -50,6 +50,7 @@ var aqlCapture = os.Getenv("ARTIFACTWEAVE_AQL_CAPTURE")
 
 // world is one scenario's state.
 type world struct {
+	replicationPeer   *world
 	quotaMail         *quotaMailReceiver
 	quotaMailID       string
 	chefMetadataReads *atomic.Int64
@@ -178,6 +179,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerRemote(sc)
 	w.registerMavenRemote(sc)
 	w.registerMavenVirtual(sc)
+	w.registerSingleReplication(sc)
 	w.registerDocker(sc)
 	w.registerClients(sc)
 	w.registerDebian(sc)

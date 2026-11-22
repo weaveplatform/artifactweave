@@ -712,10 +712,11 @@ jobs:
           ARTIFACTWEAVE_ANSIBLE_IMAGE: artifactweave-accept-ansible
           ARTIFACTWEAVE_R_IMAGE: artifactweave-accept-r
           ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
+          ARTIFACTWEAVE_REPLICATION_EVIDENCE_DIR: ${{ github.workspace }}/cover/replication-evidence
           # Full runs split NuGet and JVM recipes into required partitions.
           # Narrow Maven runs retain the JVM recipes in this job.
           # The JFrog Gradle wrapper remains informational in its own job.
-          ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes' || needs.impact.outputs.tags }}
+          ARTIFACTWEAVE_ACCEPT_TAGS: ${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes' || needs.impact.outputs.tags }}&&~@replication_provider
         run: |
           accept_pid=
           accept_done=0
@@ -860,6 +861,15 @@ jobs:
           path: cover/accept
           if-no-files-found: error
           include-hidden-files: true
+          retention-days: 7
+
+      - name: Upload sanitized replication process and native evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: replication-evidence
+          path: cover/replication-evidence
+          if-no-files-found: ignore
           retention-days: 7
 
   acceptance-conan:
@@ -1180,12 +1190,24 @@ jobs:
       - name: Apply, plan and destroy the scenarios against artifactweave
         run: make terraform TERRAFORM_MODE=apply
 
+      - name: Two-instance single replication through the pinned provider
+        env:
+          ARTIFACTWEAVE_ACCEPT_TAGS: '@replication_provider'
+          ARTIFACTWEAVE_REPLICATION_EVIDENCE_DIR: ${{ github.workspace }}/cover/terraform/replication-evidence
+          ARTIFACTWEAVE_GOCOVERDIR: ${{ github.workspace }}/cover/terraform
+          ARTIFACTWEAVE_ACCEPT_COVERPKG: ${{ needs.impact.outputs.coverpkg }}
+        run: |
+          export ARTIFACTWEAVE_TERRAFORM_BIN="$(command -v terraform)"
+          mkdir -p "$ARTIFACTWEAVE_GOCOVERDIR"
+          GOWORK=off GOFLAGS=-p=2 GOMAXPROCS=2 go test -count=1 -timeout=20m -run '^TestAccFeatures$' ./test/acceptance
+
       - name: Upload Terraform coverage
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cover-terraform
           path: cover/terraform
+          if-no-files-found: error
           include-hidden-files: true
           retention-days: 7
 

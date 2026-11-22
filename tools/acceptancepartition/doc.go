@@ -1,13 +1,14 @@
 // Package acceptancepartition checks that the godog tag filters of the native
-// acceptance jobs in .github/workflows/quality-gate.yml split the compiled
-// Gherkin scenarios between them.
+// acceptance and pinned-provider jobs in .github/workflows/quality-gate.yml
+// split the compiled Gherkin scenarios between them.
 //
 // # Role
 //
 // Repository tooling under tools/, outside the modules, like the commands
 // beside it, but a package of tests only that guards the CI workflow. Native
-// acceptance runs as several jobs to stay within the 15-minute budget, and a
-// filter that dropped a scenario would pass without a sign.
+// acceptance runs in separately prepared jobs, including the required Terraform
+// provider partition; a filter that dropped a scenario would otherwise pass
+// without a sign.
 //
 // # Inputs
 //

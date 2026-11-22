@@ -20,12 +20,16 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 	}
 	var parsed struct {
 		Jobs map[string]struct {
-			Needs []string `yaml:"needs"`
-			If    string   `yaml:"if"`
-			Steps []struct {
-				Name string            `yaml:"name"`
-				Env  map[string]string `yaml:"env"`
-				With map[string]string `yaml:"with"`
+			Needs           []string `yaml:"needs"`
+			If              string   `yaml:"if"`
+			ContinueOnError bool     `yaml:"continue-on-error"`
+			Steps           []struct {
+				Name            string            `yaml:"name"`
+				If              string            `yaml:"if"`
+				Run             string            `yaml:"run"`
+				ContinueOnError bool              `yaml:"continue-on-error"`
+				Env             map[string]string `yaml:"env"`
+				With            map[string]string `yaml:"with"`
 			} `yaml:"steps"`
 		} `yaml:"jobs"`
 	}
@@ -35,7 +39,7 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 	filters := map[string]struct{ step, expression string }{
 		"acceptance": {
 			"Acceptance features (coverage-instrumented binary)",
-			"${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes' || needs.impact.outputs.tags }}",
+			"${{ needs.impact.outputs.profile == 'full' && '~@nuget&&~@gradle&&~@bowerlive&&~@jvmrecipes' || needs.impact.outputs.tags }}&&~@replication_provider",
 		},
 		"acceptance-nuget": {
 			"NuGet acceptance features (coverage-instrumented binary)",
@@ -43,11 +47,26 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 		},
 		"acceptance-jvm":    {"JVM recipe features (coverage-instrumented binary)", "@jvmrecipes"},
 		"acceptance-gradle": {"Gradle features (informational)", "@gradle"},
+		"terraform":         {"Two-instance single replication through the pinned provider", "@replication_provider"},
 	}
 	for job, want := range filters {
 		found := false
 		for _, step := range parsed.Jobs[job].Steps {
 			if step.Name == want.step {
+				if job == "terraform" {
+					if parsed.Jobs[job].ContinueOnError || step.ContinueOnError || step.If != "" {
+						t.Error("provider scenarios must run and fail their required Terraform job")
+					}
+					if step.Env["ARTIFACTWEAVE_GOCOVERDIR"] == "" || !strings.Contains(step.Run, "go test") ||
+						!strings.Contains(step.Run, "./test/acceptance") {
+						t.Error("provider partition must execute the real acceptance suite with coverage")
+					}
+					// make cover passes immediate artifact directories to covdata;
+					// covdata ignores nested directories rather than recursing.
+					if step.Env["ARTIFACTWEAVE_GOCOVERDIR"] != "${{ github.workspace }}/cover/terraform" {
+						t.Error("provider counters must join the Terraform artifact's direct coverage directory")
+					}
+				}
 				if got := step.Env["ARTIFACTWEAVE_ACCEPT_TAGS"]; got != "" {
 					if got != want.expression {
 						t.Errorf("%s: filter = %q, want %q", job, got, want.expression)
@@ -68,7 +87,7 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 		}
 		return false
 	}
-	for _, required := range []string{"acceptance", "acceptance-nuget", "acceptance-jvm"} {
+	for _, required := range []string{"acceptance", "acceptance-nuget", "acceptance-jvm", "terraform"} {
 		for _, dependent := range []string{"coverage", "gate"} {
 			if !contains(parsed.Jobs[dependent].Needs, required) {
 				t.Errorf("%s does not require %s", dependent, required)
@@ -83,11 +102,15 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 	if contains(parsed.Jobs["gate"].Needs, "acceptance-gradle") {
 		t.Error("informational Gradle must not be a Quality gate dependency")
 	}
-	for _, job := range []string{"acceptance", "acceptance-nuget", "acceptance-jvm"} {
+	for job, upload := range map[string]string{
+		"acceptance":       "Upload acceptance coverage",
+		"acceptance-nuget": "Upload NuGet acceptance coverage",
+		"acceptance-jvm":   "Upload JVM acceptance coverage",
+		"terraform":        "Upload Terraform coverage",
+	} {
 		found := false
 		for _, step := range parsed.Jobs[job].Steps {
-			if strings.HasPrefix(step.Name, "Upload ") &&
-				strings.Contains(step.Name, "acceptance coverage") {
+			if step.Name == upload {
 				found = true
 				if step.With["if-no-files-found"] != "error" {
 					t.Errorf("%s must fail when its coverage artifact is empty", job)
@@ -133,6 +156,21 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 				!tags["@jvmrecipes"] {
 				t.Errorf("%s: JVM scenario %q lacks @jvmrecipes", path, pickle.Name)
 			}
+			if filepath.Base(path) == "single_replication_provider.feature" && !tags["@replication_provider"] {
+				t.Errorf("%s: provider scenario %q lacks @replication_provider", path, pickle.Name)
+			}
+			if tags["@replication_provider"] {
+				for _, required := range []string{"@replication", "@terraform", "@clients"} {
+					if !tags[required] {
+						t.Errorf("%s: provider scenario %q lacks %s", path, pickle.Name, required)
+					}
+				}
+				for _, other := range []string{"@nuget", "@gradle", "@bowerlive", "@jvmrecipes"} {
+					if tags[other] {
+						t.Errorf("%s: provider scenario %q crosses the %s partition", path, pickle.Name, other)
+					}
+				}
+			}
 			if tags["@jvmrecipes"] {
 				if !tags["@maven"] || tags["@nuget"] || tags["@gradle"] || tags["@bowerlive"] {
 					t.Errorf(
@@ -143,7 +181,9 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 				}
 			}
 			selected := "acceptance"
-			if tags["@bowerlive"] {
+			if tags["@replication_provider"] {
+				selected = "terraform"
+			} else if tags["@bowerlive"] {
 				selected = "external"
 			} else if tags["@gradle"] {
 				selected = "acceptance-gradle"
@@ -173,10 +213,11 @@ func TestUnitWorkflowAcceptancePartitions(t *testing.T) {
 		}
 	}
 	t.Logf(
-		"compiled scenarios by partition: core=%d NuGet=%d JVM=%d Gradle=%d",
+		"compiled scenarios by partition: core=%d NuGet=%d JVM=%d Gradle=%d provider=%d",
 		counts["acceptance"],
 		counts["acceptance-nuget"],
 		counts["acceptance-jvm"],
 		counts["acceptance-gradle"],
+		counts["terraform"],
 	)
 }
