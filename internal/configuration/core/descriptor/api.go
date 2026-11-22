@@ -32,6 +32,8 @@ var errNotParsed = errors.New("descriptor: the plan was not returned by Parse")
 // Apply and Export need the store and owning read contracts; Parse reads none of them.
 type Deps struct {
 	// Tx runs descriptor writes or the export snapshot as one transaction.
+	// Export additionally requires InTx(context.Context) bool to refuse an
+	// existing transaction on this store; Apply still joins one as Runner does.
 	Tx tx.Runner
 	// Repositories reads, checks and writes the repositories of the four
 	// repository sections, with the key pairs and environments their

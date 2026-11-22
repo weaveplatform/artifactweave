@@ -44,6 +44,9 @@
 //     through its context. A patch with one bad entry, or one whose last
 //     write fails, changes nothing; a port that opened its own transaction
 //     would leave half a descriptor applied.
+//   - Export owns its transaction and refuses a same-store ambient transaction
+//     before reading state, so bytes are returned only after its own commit.
+//     Descriptor Apply retains its nested transaction semantics.
 //   - Parse before key or store: Parse reads none of Deps, so config apply
 //     refuses a broken descriptor before it builds the keyring or opens the
 //     store, and that error is reported ahead of a key or database error.

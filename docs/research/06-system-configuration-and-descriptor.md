@@ -400,7 +400,10 @@ security:
   so the XML gives each layout its key as `name`.
 - CFG-01 collects repositories, proxies, property sets, layouts, anonymous access, mail
   and download redirect configuration in one metadata transaction under the shared
-  `Projects.Guard`, before returning bytes after commit. Current administrator authority
+  `Projects.Guard`, before returning bytes after commit. Export refuses an existing
+  transaction on that store before any read; section readers join the transaction
+  export creates, while descriptor Apply keeps its nested atomic semantics.
+  Current administrator authority
   and token ceilings are checked under that guard. The `configuration/api.Export`
   contract and the ordered core document define the extension seam for subsequent
   sections; section readers join the same transaction and perform no network I/O.

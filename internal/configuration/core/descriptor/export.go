@@ -18,11 +18,19 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
+	"github.com/weaveplatform/artifactweave/internal/platform/tx"
 )
 
 var _ configapi.Export = exportAPI{}
 
 type exportAPI struct{ d Deps }
+
+// Export must own its unit of work: a plain Runner joins an ambient transaction
+// and could return XML before that transaction commits or rolls back.
+type exportTransactions interface {
+	tx.Runner
+	InTx(context.Context) bool
+}
 
 // exportDocument is the section extension point. Add a typed field in XSD order
 // and collect it inside readExport's guarded transaction; never append raw XML.
@@ -72,8 +80,15 @@ func (a exportAPI) XML(ctx context.Context) ([]byte, error) {
 	if err := httpkit.AdminOnly(ctx); err != nil {
 		return nil, err
 	}
+	transactions, ok := a.d.Tx.(exportTransactions)
+	if !ok {
+		return nil, fmt.Errorf("export transaction state unavailable: %w", kernel.ErrStore)
+	}
+	if transactions.InTx(ctx) {
+		return nil, fmt.Errorf("export cannot join an existing transaction: %w", kernel.ErrStore)
+	}
 	var document exportDocument
-	err := a.d.Tx.Tx(ctx, func(ctx context.Context) error {
+	err := transactions.Tx(ctx, func(ctx context.Context) error {
 		if a.d.Projects != nil {
 			if err := a.d.Projects.Guard(ctx); err != nil {
 				return fmt.Errorf("guard configuration export: %w", err)
@@ -191,7 +206,7 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 		fields []string
 		target **exportFields
 	}{
-		{configdoc.ConfigMailServer, system.MailServerKey, []string{"enabled", "artifactoryUrl", "from", "host", "port", "username", "subjectPrefix", "ssl", "tls"}, &out.Mail},
+		{configdoc.ConfigMailServer, system.MailServerKey, []string{"enabled", "host", "port", "username", "from", "subjectPrefix", "tls", "ssl", "artifactoryUrl"}, &out.Mail},
 		{downloadRedirectKind, downloadRedirectKey, []string{fileMinimumSize}, &out.DownloadRedirect},
 	} {
 		doc, err := d.Configs.Get(ctx, section.kind, section.key)

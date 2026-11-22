@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -252,7 +253,7 @@ func (exportFaultRepos) List(context.Context, artifactsapi.RepoFilter) ([]repo.C
 }
 
 type exportCommitFailure struct {
-	tx.Runner
+	exportTransactions
 	begin bool
 }
 
@@ -260,7 +261,7 @@ func (s exportCommitFailure) Tx(ctx context.Context, fn func(context.Context) er
 	if s.begin {
 		return errExportFailure
 	}
-	if err := s.Runner.Tx(ctx, fn); err != nil {
+	if err := s.exportTransactions.Tx(ctx, fn); err != nil {
 		return err
 	}
 	return errExportFailure
@@ -273,9 +274,9 @@ func TestUnitExportFailuresNeverReturnPartialXML(t *testing.T) {
 			d := depsOf(t, db)
 			switch name {
 			case "begin":
-				d.Tx = exportCommitFailure{Runner: db, begin: true}
+				d.Tx = exportCommitFailure{exportTransactions: db, begin: true}
 			case "commit":
-				d.Tx = exportCommitFailure{Runner: db}
+				d.Tx = exportCommitFailure{exportTransactions: db}
 			case "guard":
 				d.Projects = &accessapitest.Projects{Err: errExportFailure}
 			case "repositories":
@@ -686,5 +687,74 @@ func TestUnitExportVCSUsesXMLEnumValues(t *testing.T) {
 				t.Fatal("Jackson enum spelling reached XML", string(body))
 			}
 		})
+	}
+}
+
+func TestUnitExportRefusesAmbientTransaction(t *testing.T) {
+	for _, outcome := range []string{"commit", "rollback"} {
+		t.Run(outcome, func(t *testing.T) { testExportAmbientTransaction(t, inmem.New(), outcome) })
+	}
+}
+
+type exportRunnerWithoutState struct{ tx.Runner }
+
+func TestUnitExportRequiresTransactionStateProbe(t *testing.T) {
+	d := depsOf(t, inmem.New())
+	d.Tx = exportRunnerWithoutState{Runner: d.Tx}
+	ctx := kernel.WithPrincipal(t.Context(), kernel.Principal{Name: "admin", Admin: true})
+	body, err := NewAPI(d).Export.XML(ctx)
+	if !errors.Is(err, kernel.ErrStore) || body != nil {
+		t.Fatalf("unverifiable transaction published XML: %q %v", body, err)
+	}
+}
+
+func TestUnitExportOwnsSnapshotInsideAnotherStoreTransaction(t *testing.T) {
+	d := depsOf(t, inmem.New())
+	other := inmem.New()
+	ctx := kernel.WithPrincipal(t.Context(), kernel.Principal{Name: "admin", Admin: true})
+	err := other.Tx(ctx, func(ctx context.Context) error {
+		body, err := NewAPI(d).Export.XML(ctx)
+		if err != nil || len(body) == 0 {
+			t.Fatalf("independent committed snapshot failed: %q %v", body, err)
+		}
+		return errExportFailure
+	})
+	if !errors.Is(err, errExportFailure) {
+		t.Fatal("other store's rollback changed", err)
+	}
+}
+
+func TestUnitExportMailUsesJAXBElementOrder(t *testing.T) {
+	d := depsOf(t, inmem.New())
+	patch, err := Parse([]byte(`mailServer:
+  enabled: false
+  host: smtp.invalid
+  port: 2525
+  username: mail-user
+  password: private-mail-fixture
+  from: sender@example.invalid
+  subjectPrefix: prefix
+  tls: false
+  ssl: false
+  artifactoryUrl: https://registry.invalid
+`), noEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Apply(t.Context(), d, patch, now, false); err != nil {
+		t.Fatal(err)
+	}
+	node, _ := exportXML(t, d)
+	var got []string
+	for _, section := range node.Children {
+		if section.Name.Local == "mailServer" {
+			for _, field := range section.Children {
+				got = append(got, field.Name.Local)
+			}
+		}
+	}
+	want := []string{"enabled", "host", "port", "username", "from", "subjectPrefix", "tls", "ssl", "artifactoryUrl"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("mail elements = %v, want JAXB sequence %v with credentials omitted", got, want)
 	}
 }

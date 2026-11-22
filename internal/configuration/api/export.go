@@ -7,6 +7,9 @@ import "context"
 // recheck the caller's current administrator authority there, and return bytes
 // only after commit. An error returns no document. Credentials, sensitive header
 // values and environment references are never included.
+// XML refuses a context already inside the export store's transaction before
+// reading state, so callers never receive provisional bytes. Section readers
+// join the new transaction that export owns.
 // HTTP bindings supply both current authentication and effective authorization;
 // one-sided bindings fail. A trusted store embedding may omit both only when its
 // caller establishes global administrator authority before invoking XML.
