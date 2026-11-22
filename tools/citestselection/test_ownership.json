@@ -233,6 +233,7 @@
       "system_health_test.go"
     ],
     "internal/federation/adapters/http": [
+      "execute_boundaries_test.go",
       "replication_test.go",
       "status_test.go"
     ],
