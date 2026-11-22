@@ -169,7 +169,7 @@ func (p executions) PathStatus(ctx context.Context, target, incarnation, path st
 
 func (p executions) pathCounts(ctx context.Context, ref model.ExecutionReference, path string) (model.ExecutionOutcomes, error) {
 	predicate, args := effectPathPredicate(path)
-	query := `SELECT COALESCE(SUM(CASE WHEN selected.outcome='succeeded' THEN 1 ELSE 0 END),0),
+	query := `SELECT COALESCE(SUM(CASE WHEN selected.outcome IN ('succeeded','retained') THEN 1 ELSE 0 END),0),
 		COALESCE(SUM(CASE WHEN selected.outcome='failed' THEN 1 ELSE 0 END),0),
 		COALESCE(SUM(CASE WHEN selected.outcome='skipped' THEN 1 ELSE 0 END),0),
 		COALESCE(SUM(CASE WHEN selected.outcome='pending' THEN 1 ELSE 0 END),0)

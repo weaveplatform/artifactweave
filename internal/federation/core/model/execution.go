@@ -73,7 +73,8 @@ const (
 	ExecutionAborted  ExecutionPhase = "aborted"
 )
 
-// ExecutionOutcomes counts actual selected intents. Pending includes uncertain
+// ExecutionOutcomes counts actual selected intents, including verified benign
+// retention during reconciliation. Pending includes uncertain
 // or unfinished effects until the direction driver resolves them; an incomplete
 // traversal or an uncertain transfer cannot be counted as successful.
 type ExecutionOutcomes struct {

@@ -38,7 +38,7 @@ func TestAccSingleReplicationOneShotSelectionPropertiesAndDeletes(t *testing.T) 
 				if err != nil || len(saved) != 1 {
 					t.Fatal("saved configuration fixture unavailable", err)
 				}
-				body := `[{"properties":true,"includePathPrefixPattern":"**/*.txt","excludePathPrefixPattern":"**/excluded.txt"}]`
+				body := `[{"properties":true,"delete":true,"includePathPrefixPattern":"**/*.txt","excludePathPrefixPattern":"**/excluded.txt"}]`
 				publicExecute(t, w, repository+"/selected", "admin", body, http.StatusAccepted)
 				settlePublicExecution(t, w, repository)
 				actual, _ := w.request(consumer, http.MethodGet, itemRoute(destination, selected), "", http.StatusOK)

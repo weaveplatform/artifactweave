@@ -173,6 +173,11 @@ func (p observedPullProgress) observe(ctx context.Context, item model.PullItem) 
 	}
 	if item.Phase == model.PullItemComplete {
 		effect.Outcome, effect.Reason = model.EffectOutcome(item.Outcome), item.Reason
+		if item.Outcome == model.PullRetained {
+			// A verified non-removal completes reconciliation. Empty Paths
+			// preserves the distinction from an acknowledged cache deletion.
+			effect.Outcome = model.EffectRetained
+		}
 		if item.Cache != nil {
 			effect.Paths = []string{item.Path}
 		} else {

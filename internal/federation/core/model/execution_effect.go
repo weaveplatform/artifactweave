@@ -20,6 +20,7 @@ type EffectOutcome string
 const (
 	EffectPending   EffectOutcome = "pending"
 	EffectSucceeded EffectOutcome = "succeeded"
+	EffectRetained  EffectOutcome = "retained"
 	EffectFailed    EffectOutcome = "failed"
 	EffectSkipped   EffectOutcome = "skipped"
 )
@@ -65,6 +66,10 @@ func (e ExecutionEffect) Validate(run ExecutionRun) error {
 		if e.Reason != "" || !slices.Contains(e.Paths, e.Path) {
 			return fmt.Errorf("replication success has no actual path evidence: %w", kernel.ErrInvalid)
 		}
+	case EffectRetained:
+		if e.Reason != "" || len(e.Paths) != 0 {
+			return fmt.Errorf("replication retention carries mutation evidence: %w", kernel.ErrInvalid)
+		}
 	case EffectFailed, EffectSkipped:
 		if !pushReason(e.Reason) {
 			return fmt.Errorf("replication effect reason is not sanitized: %w", kernel.ErrInvalid)
@@ -82,7 +87,7 @@ func effectWithin(root, path string) bool {
 // Count contributes exactly one selected intent, regardless of companion paths.
 func (e ExecutionEffect) Count() ExecutionOutcomes {
 	switch e.Outcome {
-	case EffectSucceeded:
+	case EffectSucceeded, EffectRetained:
 		return ExecutionOutcomes{Succeeded: 1}
 	case EffectFailed:
 		return ExecutionOutcomes{Failed: 1}

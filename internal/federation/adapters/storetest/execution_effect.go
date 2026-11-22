@@ -84,12 +84,13 @@ func executionScopedStatus(t *testing.T, db port.Store) {
 	for path, outcome := range map[string]model.EffectOutcome{
 		"a/file": model.EffectSucceeded, "A/file": model.EffectFailed, "ab/file": model.EffectSkipped,
 		"percent%_name/file": model.EffectSucceeded, "percentXXname/file": model.EffectFailed, "é/file": model.EffectSucceeded,
+		"retained/file": model.EffectRetained,
 	} {
 		effect := effectFor(run, path)
 		effect.Outcome = outcome
 		if outcome == model.EffectSucceeded {
 			effect.Paths = []string{path, path + ".sha256"}
-		} else {
+		} else if outcome != model.EffectRetained {
 			effect.Reason = "qualified_failure"
 		}
 		recordEffect(t, db, effect)
@@ -109,6 +110,7 @@ func executionScopedStatus(t *testing.T, db port.Store) {
 		{"ab", model.ReplicationWarn},
 		{"percent%_name", model.ReplicationOK},
 		{"é", model.ReplicationOK},
+		{"retained", model.ReplicationOK},
 		{"a/file.sha256", model.ReplicationOK},
 	} {
 		state := storekit.Get[model.ExecutionPathState](t)(progress.PathStatus(ctx, target.Key, "repository-lifetime", test.path))
