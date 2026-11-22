@@ -22,6 +22,7 @@ func (w *world) registerSingleReplication(sc *godog.ScenarioContext) {
 	sc.Step(`^ordinary "(push|pull)" replication transfers scoped bytes, properties and deletes between the instances$`, w.qualifyOrdinaryReplication)
 	sc.Step(`^a fresh native Maven consumer resolves the "(push|pull)" replicated package while its source is stopped$`, w.qualifyNativeReplication)
 	sc.Step(`^the pinned provider applies, updates, executes and destroys both single replication resources$`, w.qualifyProviderReplication)
+	sc.Step(`^ordinary "(push|pull)" replication recovers after process interruption and refuses revoked pending work$`, w.qualifyReplicationRecovery)
 }
 
 func (w *world) startSingleReplication(backend string) error {
