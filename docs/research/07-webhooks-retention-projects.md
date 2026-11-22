@@ -8,13 +8,15 @@ allocates between P11 administration/documented execution and P19a observed comp
 the exact names, shapes and status codes the `jfrog/artifactory` and `jfrog/project`
 providers depend on.
 
-At the historical P8 closeout P11 had not started. By 2026-11-19 private project
-authority and role/membership foundations have merged (#1730/#1731); this does not
-activate the remaining public workflows. The schemas and storage contracts were built
-earlier; they do not make event delivery, cleanup-policy execution or project
-management available. Global environments and repository `projectKey` persistence
-already exist, but are not the full project lifecycle described below. See the
-[build status](../implementation/plan.md#build-status).
+Project lifecycle and effective authorization, repository attachment and standard
+sharing, quota accounting, typed service events and durable consumers, webhook
+subscription administration and package cleanup execution/reports are implemented.
+The project workflows use the durable authority foundations from #1730/#1731 rather
+than treating repository `projectKey` persistence as sufficient. Webhook outbound
+delivery, subscription test execution and troubleshooting remain P19a capabilities.
+The remaining replication PRs and exact merged-main P11 qualification are tracked in
+the [build status](../implementation/plan.md#build-status); these delivered contracts
+do not claim complete phase sign-off.
 
 Research baseline: **2026-10-12**. Sources: the per-endpoint pages under
 https://docs.jfrog.com/integrations/reference/jfrog-platform-webhooks-api/llms.txt,
@@ -145,7 +147,8 @@ Auth: Basic, API key or Bearer; platform admin, or project admin with `projectKe
 
 The same shape exists for `/artifactory/api/cleanup/builds/policies` (7.125+, `itemType`
 `build`) and `/artifactory/api/cleanup/bundles/policies` (7.104.2+, `itemType`
-`releaseBundle`); both are stubbed in v1.
+`releaseBundle`). Build and release-bundle cleanup remain P24 capabilities; their
+routes retain 501 in P11. Archive/cold-storage policy execution remains P16.
 
 Policy shape:
 
@@ -299,8 +302,9 @@ Publication owners take the shared authority guard before identity, source, work
 or item locks, refresh credentials and policy, then retain that guard through the
 metadata commit. Client and upstream streams are staged first. Batched trash and
 repository deletion retain their native partial-progress boundaries and recheck
-authority for each independent commit. These checks do not deliver the separate
-attachment/sharing, quota, cleanup or replication tickets.
+authority for each independent commit. The implemented attachment/sharing, quota
+and cleanup owners consume this current authority. Observed project-aware source
+sharing remains separately owned by P19a #487.
 
 Primary URLs: https://docs.jfrog.com/integrations/reference/jfrog-platform-webhooks-api/llms.txt,
 https://docs.jfrog.com/integrations/docs/webhook-event-types,
