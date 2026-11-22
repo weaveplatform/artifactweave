@@ -107,7 +107,9 @@ restore the original handler's current baseline. See [decision 0016](0016-observ
 for lifecycle ownership and [research 06](../06-system-configuration-and-descriptor.md)
 for the primary contract and explicit local choices.
 
-Logger Set/Delete reject a context already inside this metadata store's
-transaction, before changing runtime decisions or timers. Volatile changes do not
-join descriptor transactions or defer an acknowledged success until an outer
-commit; only their own completed authority transaction can permit publication.
+Every logger API operation rejects a context already inside this metadata
+store's transaction before entering the logger lock or changing decisions/timers.
+This prevents a transaction-scoped read waiting on a mutation that needs the
+same store guard. Volatile changes do not join descriptor transactions or defer
+an acknowledged success until an outer commit; only their own completed authority
+transaction can permit publication.

@@ -147,12 +147,14 @@ documents, are not exported, and do not survive restart. This P12 implementation
 process-local; vendor HA propagation remains P35, while P38 owns live log streaming,
 downloads, support bundles and operational collection.
 
-Set and Delete are standalone module API operations: a context carrying an
-enclosing transaction on the configuration metadata store is rejected before any
-runtime decision or timer changes. This volatile API cannot acknowledge that
-outer transaction's future commit or rollback. Its own current-authority
-transaction must finish successfully before publication; Level may join an
-existing read transaction. Descriptor transaction composition is unchanged.
+All three logger module API operations require a standalone context. A context
+carrying an enclosing transaction on the configuration metadata store is rejected
+before entering the logger lock or changing a decision/timer. In particular, a
+transaction-scoped Level must not wait behind a mutation whose authority check
+needs that same store/administration guard. Volatile changes also cannot
+acknowledge the outer transaction's future outcome. Each accepted call finishes
+its own current-authority transaction before reading or publishing. Descriptor
+transaction composition is unchanged.
 
 A standalone `app.NewRouter` binds an internally owned logger API only when its
 caller supplies `OnClose` and runs those registered callbacks after draining the

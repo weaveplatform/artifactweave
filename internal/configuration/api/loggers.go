@@ -11,9 +11,9 @@ var ErrInvalidLoggerSettings = errors.New("invalid logger settings")
 // Loggers administers one temporary, process-local logger session. Replacing a
 // session requires Delete before Set. Names unknown to the process have no
 // effect and read back the current root level. No setting is persisted.
-// Set and Delete must not join an enclosing transaction on the module's
-// metadata store; such calls return ErrInvalidLoggerSettings before changing
-// a runtime decision or timer. Level may read within an existing transaction.
+// Every operation requires a standalone call: a context inside a transaction
+// on the module's metadata store returns ErrInvalidLoggerSettings before taking
+// a logger lock or changing a runtime decision or timer.
 type Loggers interface {
 	Set(ctx context.Context, classes map[string]string, seconds int) error
 	Delete(ctx context.Context) error

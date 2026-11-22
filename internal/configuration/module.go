@@ -64,9 +64,10 @@ type Module struct {
 	loggers  *system.Loggers
 }
 
-// New binds configuration/api's Descriptor, System and Mail over d with the
-// descriptor core. It does no I/O, and calls nothing on the store until a
-// method of the API is called; it refuses only Deps without a store.
+// New binds Descriptor, System and the narrow Mail reader over d. Supplying
+// Logging also binds P12 Loggers; the caller owns Module.Close after draining
+// those calls. It does no I/O or timer work until an API method is called and
+// refuses only Deps without a store.
 func New(d Deps) (*Module, error) {
 	if d.Store == nil {
 		return nil, errNoStore
@@ -87,8 +88,10 @@ func New(d Deps) (*Module, error) {
 	return &Module{api: api, settings: d.Settings, loggers: loggers}, nil
 }
 
-// Volatile changes cannot acknowledge an enclosing transaction's future
-// outcome. Refuse the join before core can change a decision or a timer.
+// Reject every enclosing metadata transaction before the logger lock: a read
+// could otherwise wait on a mutation whose authority check needs that same
+// transaction's store/administration guard. Mutations also cannot acknowledge
+// an enclosing transaction's future outcome.
 type loggerBinding struct {
 	*system.Loggers
 	store Store
@@ -96,19 +99,27 @@ type loggerBinding struct {
 
 func (b loggerBinding) Set(ctx context.Context, classes map[string]string, seconds int) error {
 	if b.store.InTx(ctx) {
-		return fmt.Errorf("%w: logger mutations require a standalone call", configapi.ErrInvalidLoggerSettings)
+		return fmt.Errorf("%w: logger operations require a standalone call", configapi.ErrInvalidLoggerSettings)
 	}
 	return b.Loggers.Set(ctx, classes, seconds) //nolint:wrapcheck // preserve the configuration service's error classification
 }
 
 func (b loggerBinding) Delete(ctx context.Context) error {
 	if b.store.InTx(ctx) {
-		return fmt.Errorf("%w: logger mutations require a standalone call", configapi.ErrInvalidLoggerSettings)
+		return fmt.Errorf("%w: logger operations require a standalone call", configapi.ErrInvalidLoggerSettings)
 	}
 	return b.Loggers.Delete(ctx) //nolint:wrapcheck // preserve the configuration service's error classification
 }
 
-// API returns the descriptor and the current system/mail settings readers.
+func (b loggerBinding) Level(ctx context.Context, name string) (string, error) {
+	if b.store.InTx(ctx) {
+		return "", fmt.Errorf("%w: logger operations require a standalone call", configapi.ErrInvalidLoggerSettings)
+	}
+	return b.Loggers.Level(ctx, name) //nolint:wrapcheck // preserve the configuration service's error classification
+}
+
+// API returns Descriptor, System, the narrow Mail reader and, when Logging was
+// supplied to New, the lifecycle-owned P12 Loggers binding.
 func (m *Module) API() configapi.API { return m.api }
 
 // Settings returns the Settings from Deps.

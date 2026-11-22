@@ -103,6 +103,9 @@ An internally owned standalone-router logger binding requires an `OnClose`
 registrar; without one its logger API remains unavailable and no internal control
 or session service is created. Callers drain HTTP, then invoke registered cleanup;
 injected logger APIs retain their external ownership, including partial APIs.
+All three module API operations require a standalone context: an enclosing
+metadata transaction is refused before the logger lock, avoiding a lock cycle
+with another call's current-authority transaction.
 Naming, effective-level aliases and source distinctions are recorded in
 [research 06](../06-system-configuration-and-descriptor.md). P35 owns cross-node
 propagation. P38 extends that baseline with

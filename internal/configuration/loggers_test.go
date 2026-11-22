@@ -38,6 +38,106 @@ func (s *loggerOuterStore) Tx(ctx context.Context, fn func(context.Context) erro
 	return err
 }
 
+type loggerAuthorityWaitKey struct{}
+
+type loggerWaitStore struct{ *inmem.Store }
+
+func (s loggerWaitStore) Tx(ctx context.Context, fn func(context.Context) error) error {
+	if entered, ok := ctx.Value(loggerAuthorityWaitKey{}).(chan struct{}); ok && !s.InTx(ctx) {
+		close(entered)
+	}
+	return s.Store.Tx(ctx, fn)
+}
+
+func TestUnitLoggerTransactionReadCannotDeadlockMutation(t *testing.T) {
+	for _, operation := range []string{"set", "delete"} {
+		t.Run(operation, func(t *testing.T) {
+			st := loggerWaitStore{Store: inmem.New()}
+			control := logging.New(slog.New(slog.NewJSONHandler(io.Discard, nil)))
+			logger := control.Logger("artifactweave.http")
+			access := accessapi.API{
+				Projects: &accessapitest.Projects{GuardFunc: st.Projects().Guard},
+				Authenticator: &accessapitest.Authenticator{CurrentFunc: func(_ context.Context, p kernel.Principal) (kernel.Principal, error) {
+					return p, nil
+				}},
+				Authorizer: &accessapitest.Authorizer{DecideFunc: func(context.Context, accessapi.Subject, bool) (accessapi.Decider, error) {
+					return &accessapitest.Decider{Admin: true}, nil
+				}},
+			}
+			module, err := New(Deps{Store: st, Access: access, Logging: control})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer module.Close()
+			ctx := kernel.WithPrincipal(t.Context(), kernel.Principal{Name: "admin", Admin: true})
+			classes := map[string]string{"artifactweave.http": "debug"}
+			if operation == "delete" {
+				if err := module.API().Loggers.Set(ctx, classes, 60); err != nil {
+					t.Fatal(err)
+				}
+			}
+			entered := make(chan struct{})
+			mutationCtx, cancel := context.WithCancel(context.WithValue(ctx, loggerAuthorityWaitKey{}, entered))
+			defer cancel()
+			mutationDone := make(chan error, 1)
+			if err := st.Tx(ctx, func(txctx context.Context) error {
+				if err := st.Projects().Guard(txctx); err != nil {
+					return err
+				}
+				go func() {
+					if operation == "set" {
+						mutationDone <- module.API().Loggers.Set(mutationCtx, classes, 1)
+					} else {
+						mutationDone <- module.API().Loggers.Delete(mutationCtx)
+					}
+				}()
+				// The mutation owns the logger lock before entering its
+				// authority Tx, whose store/project guard this caller holds.
+				<-entered
+				readDone := make(chan error, 1)
+				go func() {
+					_, err := module.API().Loggers.Level(txctx, "artifactweave.http")
+					readDone <- err
+				}()
+				// A mutex wait is not durably blocked in synctest. Use a
+				// real watchdog while channels fix the lock interleaving.
+				deadline := time.NewTimer(5 * time.Second)
+				var readErr error
+				select {
+				case readErr = <-readDone:
+				case <-deadline.C:
+					// Cancellation releases the old implementation's cycle,
+					// so this regression fails without leaving blocked workers.
+					cancel()
+					readErr = <-readDone
+					t.Error("transaction-scoped read blocked behind a waiting logger mutation")
+				}
+				deadline.Stop()
+				if !errors.Is(readErr, configapi.ErrInvalidLoggerSettings) {
+					t.Errorf("transaction-scoped read = %v; want standalone-only refusal", readErr)
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if err := <-mutationDone; err != nil {
+				t.Fatal("standalone mutation did not complete", err)
+			}
+			if logger.Enabled(ctx, slog.LevelDebug) != (operation == "set") {
+				t.Error("standalone mutation did not publish its actual log decision")
+			}
+			deadline := time.Now().Add(5 * time.Second)
+			for logger.Enabled(ctx, slog.LevelDebug) {
+				if time.Now().After(deadline) {
+					t.Fatal("expiration remained blocked after transaction-scoped read")
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			module.Close()
+		})
+	}
+}
+
 func TestUnitLoggerMutationsRespectTransactionOutcomes(t *testing.T) {
 	for _, operation := range []string{"set", "delete"} {
 		for _, outcome := range []string{"rollback", "commit failure", "standalone commit failure"} {
@@ -88,12 +188,8 @@ func TestUnitLoggerMutationsRespectTransactionOutcomes(t *testing.T) {
 								t.Error("transaction-scoped mutation changed a real logger before the outer outcome")
 							}
 							level, err := module.API().Loggers.Level(ctx, "artifactweave.http")
-							wantLevel := "info"
-							if wantDebug {
-								wantLevel = "debug"
-							}
-							if err != nil || level != wantLevel {
-								t.Errorf("transaction-scoped read = %q, %v; want %q", level, err, wantLevel)
+							if !errors.Is(err, configapi.ErrInvalidLoggerSettings) || level != "" {
+								t.Errorf("transaction-scoped read = %q, %v; want standalone-only refusal", level, err)
 							}
 							if outcome == "rollback" {
 								return marker

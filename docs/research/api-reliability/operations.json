@@ -1918,7 +1918,7 @@
     "review_family": "content-and-configuration",
     "effects": "clear the process-local temporary logger session, restore current original handler decisions and join its timer callback; no-op when idle",
     "retry": "natural on route: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
-    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; module mutation refuses an enclosing metadata transaction before runtime effects; current credential and administrator refreshed under the project guard before logger publication/read",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; module operation refuses an enclosing metadata transaction before logger locks or runtime effects; current credential and administrator refreshed under the project guard before logger publication/read",
     "pagination_execution": "not a collection",
     "evidence": [
       "internal/configuration/adapters/http/loggers.go",
@@ -9389,7 +9389,7 @@
     "review_family": "content-and-configuration",
     "effects": "read the effective process-local logger level; unknown names return the root level; no logger registration or persistent state",
     "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
-    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; current credential and administrator refreshed under the project guard before logger publication/read",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; module operation refuses an enclosing metadata transaction before logger locks or runtime effects; current credential and administrator refreshed under the project guard before logger publication/read",
     "pagination_execution": "not a collection",
     "evidence": [
       "internal/configuration/adapters/http/loggers.go",
@@ -18902,7 +18902,7 @@
     "review_family": "content-and-configuration",
     "effects": "one process-local 1-100-name temporary level session over actual structured loggers; no persistence; expiry and shutdown restore the current original baseline",
     "retry": "natural on route: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key; inspect the current level after ambiguous completion; an active session refuses POST with 400, so replace using DELETE then POST",
-    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; module mutation refuses an enclosing metadata transaction before runtime effects; current credential and administrator refreshed under the project guard before logger publication/read",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; module operation refuses an enclosing metadata transaction before logger locks or runtime effects; current credential and administrator refreshed under the project guard before logger publication/read",
     "pagination_execution": "not a collection",
     "evidence": [
       "internal/configuration/adapters/http/loggers.go",
