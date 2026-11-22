@@ -17,6 +17,8 @@ import (
 func (w *world) registerSingleReplication(sc *godog.ScenarioContext) {
 	sc.Step(`^two fixture-owned replication instances are running on "(sqlite|postgres)"$`, w.startSingleReplication)
 	sc.Step(`^the replication instances retain independent repository bytes$`, w.replicationStoresIndependent)
+	sc.Step(`^ordinary "(push|pull)" replication transfers scoped bytes, properties and deletes between the instances$`, w.qualifyOrdinaryReplication)
+	sc.Step(`^a fresh native Maven consumer resolves the "(push|pull)" replicated package while its source is stopped$`, w.qualifyNativeReplication)
 }
 
 func (w *world) startSingleReplication(backend string) error {

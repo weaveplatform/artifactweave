@@ -12,3 +12,14 @@ Feature: Ordinary single replication between independently owned instances
       | backend  |
       | sqlite   |
       | postgres |
+
+  Scenario Outline: Ordinary single replication publishes real selected effects
+    Given two fixture-owned replication instances are running on "<backend>"
+    Then ordinary "<direction>" replication transfers scoped bytes, properties and deletes between the instances
+
+    Examples:
+      | backend  | direction |
+      | sqlite   | push      |
+      | sqlite   | pull      |
+      | postgres | push      |
+      | postgres | pull      |
