@@ -45,10 +45,12 @@ and reports its address in its fresh JSON startup log. An owned TCP forwarder bi
 it proves the connected backend peer socket belongs to the child: Linux uses the child's
 `/proc` socket inode/endpoint records; macOS uses `/usr/sbin/lsof` established endpoints.
 Missing ownership evidence fails closed. Each verified connection stays pinned to that
-peer; it never reconnects or retries against a replacement listener. A failed forwarder
-quarantines its still-bound frontend, refuses new connections and records a private failure
+peer; it never reconnects or retries against a replacement listener. A connect or
+ownership-proof failure quarantines its still-bound frontend, refuses new connections and records a private failure
 marker until the parent's active client command finishes and cleanup reaps it. Provider
-retries cannot race a released frontend. This also protects
+retries cannot race a released frontend.
+Normal EOF/reset/broken pipe after peer verification closes only that fixed connection;
+any subsequent connection still requires independent ownership proof. This also protects
 native provider and Python checker reconnects while the child drains after shutdown.
 Startup failure, an occupied frontend, missing listener/socket evidence or the ten-second
 readiness deadline stops the run before token creation or provider effects. Fixture HTTP
@@ -58,7 +60,7 @@ bypasses host proxy settings. Cleanup reaps the owned forwarder before the child
 `run.*` child, prints its path, and keeps it on success or failure. This preserves earlier
 evidence and prevents a later instance from inheriting an earlier run's state, configuration
 or listening event. Without that option, successful temporary workspaces are removed and
-failed ones retained. Cleanup signals and reaps only the child started by this run.
+failed ones retained. Cleanup signals and reaps only the forwarder and child it started.
 
 `python3 -I test/terraform/driver_test.py` exercises the shell entry point with owned
 ephemeral listeners, a Go/chi HTTP fixture built once, and stub Go/Terraform clients. The

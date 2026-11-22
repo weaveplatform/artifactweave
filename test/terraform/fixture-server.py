@@ -80,6 +80,7 @@ def forward(pid, address, port, marker):
         def handle(self):
             if failed.is_set():
                 return
+            proven = False
             try:
                 upstream = socket.create_connection((host, int(backend_port)), timeout=1)
                 with upstream:
@@ -88,6 +89,7 @@ def forward(pid, address, port, marker):
                         if time.monotonic() >= deadline:
                             raise OSError("connected backend socket is not owned by fixture child")
                         time.sleep(.01)
+                    proven = True
                     # Do not read or forward client bytes before ownership is
                     # proved. No reconnect or HTTP retry can change this peer.
                     upstream.settimeout(5)
@@ -100,9 +102,17 @@ def forward(pid, address, port, marker):
                                 return
                             target = upstream if source is self.request else self.request
                             target.sendall(data)
-            except (OSError, subprocess.SubprocessError):
+            except (OSError, subprocess.SubprocessError) as error:
                 # Never include client bytes, headers or credentials in logs.
-                print("fixture connection refused or lost; quarantining owned frontend", file=sys.stderr, flush=True)
+                phase = "transfer" if proven else "connect-or-proof"
+                action = "closing verified connection" if proven else "quarantining owned frontend"
+                print(f"fixture {phase} failure: {type(error).__name__}, errno={getattr(error, 'errno', None)}; {action}",
+                      file=sys.stderr, flush=True)
+                if proven:
+                    # EOF/reset/broken pipe cannot change this fixed peer.
+                    # Native clients routinely discard pooled connections;
+                    # close only this one and prove any new connection anew.
+                    return
                 failed.set()
                 Path(marker).with_suffix(".failed").write_text("fixture connection ownership or transport failed\n")
                 # Keep the frontend bound until the parent has waited for

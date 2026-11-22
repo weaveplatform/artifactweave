@@ -48,6 +48,21 @@ import json, os, pathlib, sys
 if sys.argv[1] == "version":
     print('{"terraform_version":"1.17.1"}' if "-json" in sys.argv else "Terraform v1.17.1")
 else:
+    if os.environ["DRIVER_TEST_BEHAVIOR"] == "client-reset" and sys.argv[2] == "apply":
+        import socket, struct, time, urllib.request
+        from urllib.parse import urlsplit
+        url = urlsplit(os.environ["TF_VAR_url"])
+        client = socket.create_connection((url.hostname, url.port), timeout=2)
+        client.sendall(b"GET /artifactory/api/v1/system/readiness HTTP/1.1\r\nHost: fixture\r\n\r\n")
+        response = b""
+        while b"ready" not in response:
+            piece = client.recv(4096)
+            assert piece, "fixture closed before verified response"
+            response += piece
+        client.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+        client.close()
+        time.sleep(.2)
+        urllib.request.urlopen(os.environ["TF_VAR_url"] + "/artifactory/api/v1/system/readiness", timeout=2).read()
     if os.environ["DRIVER_TEST_BEHAVIOR"] in ("draining-provider", "draining-frontend") and sys.argv[2] == "apply":
         import signal, socket, time, urllib.request
         from urllib.parse import urlsplit
@@ -263,6 +278,16 @@ class DriverTest(unittest.TestCase):
             with socket.socket() as released:
                 released.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 released.bind(("127.0.0.1", port))
+
+    def test_normal_client_reset_closes_only_its_verified_connection(self):
+        with socket.socket() as reservation:
+            reservation.bind(("127.0.0.1", 0))
+            port = reservation.getsockname()[1]
+        result = self.run_driver("client-reset", port)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        log = next(self.retained.glob("run.*/forwarder.log")).read_text()
+        self.assertIn("fixture transfer failure: ConnectionResetError", log)
+        self.assertFalse(list(self.retained.glob("run.*/forwarder.failed")))
 
     def test_occupied_port_does_not_authenticate_or_stop_occupant(self):
         with spy(self.work) as (port, requests):
