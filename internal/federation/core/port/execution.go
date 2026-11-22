@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 // ExecutionStore publishes durable dispatch independently of configuration and
@@ -20,6 +21,9 @@ type ExecutionProgressStore interface {
 	// execution lifetime. An enclosing admission transaction is required.
 	PutOptions(context.Context, model.ExecutionReference, model.ExecutionOptions) error
 	Options(context.Context, model.ExecutionReference) (model.ExecutionOptions, error)
+	// ExplicitTargets pages secret-free manual destinations under the current
+	// repository incarnation. It must not open options or credentials.
+	ExplicitTargets(context.Context, string, string, kernel.Page) ([]model.ReplicationTargetState, string, error)
 	// Create is idempotent only for the same immutable binding. A Quartz
 	// occurrence may identify only one logical execution, across all retries.
 	Create(context.Context, string, model.ExecutionBinding, time.Time) (model.ExecutionRun, error)

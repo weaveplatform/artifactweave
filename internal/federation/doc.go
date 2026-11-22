@@ -57,7 +57,7 @@
 // REP-04 binds durable manual/Quartz admission and generation-fenced workers to
 // actual transfer checkpoints and path evidence. Public stored-config execute
 // answers 202 after durable admission; status uses current read authority and
-// scoped evidence. Manual selection/transport overrides are sealed per run; distinct
-// destination admission and remaining qualification are open. Advanced
+// scoped evidence. Manual selection/transport overrides are sealed per run; explicit destinations need no saved row and retain independent history. Remaining
+// qualification is open. Advanced
 // federation remains P13/P14/P37. Both drivers open before the queue starts.
 package federation

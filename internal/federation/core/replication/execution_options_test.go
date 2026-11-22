@@ -62,10 +62,10 @@ func TestUnitReplicationOneShotChangedAccountCannotInheritPassword(t *testing.T)
 	}
 }
 
-func TestUnitReplicationOneShotInvalidScopeAndDifferentDestinationDoNotEnqueue(t *testing.T) {
+func TestUnitReplicationOneShotInvalidScopeAndUnsupportedCapabilityDoNotEnqueue(t *testing.T) {
 	_, db, coordinator, ctx := coordinatorFixture(t, "local", false)
 	for _, input := range []replication.ExecutionInput{
-		{URL: ptr("https://different.example/artifactory/target")},
+		{URL: ptr("https://embedded:secret@different.example/artifactory/target")},
 		{CheckBinaryExistence: ptr(true)},
 	} {
 		if _, err := coordinator.ExecuteWithOptions(ctx, "local", "", input); err == nil {
@@ -82,5 +82,41 @@ func TestUnitReplicationOneShotInvalidScopeAndDifferentDestinationDoNotEnqueue(t
 	must(t, err)
 	if len(items) != 0 {
 		t.Fatal("refused one-shot options admitted durable work")
+	}
+}
+
+func TestUnitReplicationExplicitPushNeedsNoConfigurationAndCannotInheritCredentials(t *testing.T) {
+	w, db, coordinator, ctx := coordinatorFixture(t, "local", false)
+	must(t, w.service.Update(ctx, "local", replication.Input{Username: ptr("saved-user"), Password: ptr("saved-lab-password")}))
+	saved := stored(t, w, "local")
+	configured, err := coordinator.Execute(ctx, "local", "")
+	must(t, err)
+	for _, url := range []string{saved.URL, "https://different.example/artifactory/destination"} {
+		run, err := coordinator.ExecuteWithOptions(ctx, "local", "selected", replication.ExecutionInput{URL: &url})
+		must(t, err)
+		options, err := db.Executions().Options(ctx, run.Reference)
+		must(t, err)
+		if !options.Independent || options.Username != "" || options.Password != "" || options.RepositoryKey != "local" || options.TargetKey != run.Binding.TargetKey {
+			t.Fatal("explicit connection inherited a saved identity or lost its immutable binding")
+		}
+		if url == saved.URL && run.Binding.TargetLeaseKey != configured.Binding.TargetLeaseKey {
+			t.Fatal("manual and configured connections to the same endpoint have different exclusion identities")
+		}
+	}
+	if !reflect.DeepEqual(saved, stored(t, w, "local")) {
+		t.Fatal("explicit connection changed the saved configuration")
+	}
+	must(t, w.service.Delete(ctx, "local", ""))
+	run, err := coordinator.ExecuteWithOptions(ctx, "local", "selected", replication.ExecutionInput{URL: ptr("https://different.example/artifactory/destination")})
+	must(t, err)
+	options, err := db.Executions().Options(ctx, run.Reference)
+	must(t, err)
+	if !options.Independent {
+		t.Fatal("explicit push depended on a saved configuration")
+	}
+	rows, err := db.Replications().ForRepo(ctx, "local")
+	must(t, err)
+	if len(rows) != 0 {
+		t.Fatal("explicit push invented a configuration row")
 	}
 }

@@ -854,10 +854,13 @@ table replication_execution_options
 column replication_execution_options.run_id text NOT NULL
 column replication_execution_options.run_incarnation text NOT NULL
 column replication_execution_options.options_json text NOT NULL
+column replication_execution_options.independent boolean NOT NULL DEFAULT false
+column replication_execution_options.target_url text NOT NULL
 column replication_execution_options.password bytea
 constraint replication_execution_options.replication_execution_options_pkey PRIMARY KEY (run_id, run_incarnation)
 constraint replication_execution_options.replication_execution_options_run_id_run_incarnation_fkey FOREIGN KEY (run_id, run_incarnation) REFERENCES replication_executions(run_id, incarnation) ON DELETE CASCADE
 index replication_execution_options.replication_execution_options_pkey CREATE UNIQUE INDEX replication_execution_options_pkey ON replication_execution_options USING btree (run_id, run_incarnation)
+index replication_execution_options.replication_execution_options_target CREATE INDEX replication_execution_options_target ON replication_execution_options USING btree (independent, run_id, run_incarnation)
 table replication_executions
 column replication_executions.run_id text NOT NULL
 column replication_executions.incarnation text NOT NULL
@@ -885,6 +888,7 @@ constraint replication_executions.replication_executions_run_id_incarnation_key 
 constraint replication_executions.replication_executions_skipped_check CHECK ((skipped >= 0))
 constraint replication_executions.replication_executions_succeeded_check CHECK ((succeeded >= 0))
 constraint replication_executions.replication_executions_version_check CHECK ((version > 0))
+index replication_executions.replication_executions_destination CREATE INDEX replication_executions_destination ON replication_executions USING btree (repo_key, repo_incarnation, target_key, run_id, incarnation)
 index replication_executions.replication_executions_occurrence_key CREATE UNIQUE INDEX replication_executions_occurrence_key ON replication_executions USING btree (occurrence)
 index replication_executions.replication_executions_pkey CREATE UNIQUE INDEX replication_executions_pkey ON replication_executions USING btree (run_id)
 index replication_executions.replication_executions_repository CREATE INDEX replication_executions_repository ON replication_executions USING btree (repo_key, repo_incarnation, started_at, run_id)

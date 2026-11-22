@@ -33,6 +33,7 @@ type ExecutionBinding struct {
 	TransferID          string                          `json:"transfer_id"`
 	TransferIncarnation string                          `json:"transfer_incarnation"`
 	OneShot             bool                            `json:"one_shot,omitempty"`
+	TargetLeaseKey      string                          `json:"target_lease_key,omitempty"`
 }
 
 // ExecutionPhase is dispatch lifecycle state. Transfer progress remains owned
@@ -108,6 +109,9 @@ func (r ExecutionReference) Validate() error {
 
 // Validate requires complete immutable provenance and a restorable credential.
 func (b ExecutionBinding) Validate() error {
+	if b.TargetLeaseKey != "" && !pushDigest(b.TargetLeaseKey) {
+		return fmt.Errorf("invalid execution target exclusion: %w", kernel.ErrInvalid)
+	}
 	for _, value := range []string{
 		b.TargetKey, b.TargetRevision, b.Repository.Key, b.Repository.Incarnation,
 		b.Repository.Generation, string(b.Repository.PackageType), b.TransferID, b.TransferIncarnation, b.Credential.Name,

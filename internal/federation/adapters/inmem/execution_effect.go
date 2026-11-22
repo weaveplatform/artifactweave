@@ -99,11 +99,10 @@ func (p executions) scopedOutcomes(run model.ExecutionRun, path string) (model.E
 func (p executions) PathStatus(ctx context.Context, target, incarnation, path string) (model.ExecutionPathState, error) {
 	var out model.ExecutionPathState
 	err := p.s.Do(ctx, func() error {
-		if _, exists := replicationStore(p).replications().Get(target); !exists {
-			return nil
-		}
+		_, configured := replicationStore(p).replications().Get(target)
 		runs := p.runs().All(func(_ string, run model.ExecutionRun) bool {
-			return run.Binding.TargetKey == target && run.Binding.Repository.Incarnation == incarnation
+			options, explicit := p.options().Get(run.Reference)
+			return (configured || explicit && options.Independent) && run.Binding.TargetKey == target && run.Binding.Repository.Incarnation == incarnation
 		}, func(a, b model.ExecutionRun) int {
 			if order := b.Started.Compare(a.Started); order != 0 {
 				return order

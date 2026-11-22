@@ -244,6 +244,9 @@ func (s Service) WithTarget(ctx context.Context, key, revision string, fn func(c
 	if s.Store == nil || s.Guard == nil || s.Ownership == nil {
 		return fmt.Errorf("replication worker contracts are unavailable: %w", kernel.ErrStore)
 	}
+	if s.executionOptions != nil && s.executionOptions.Independent {
+		return s.withExplicitTarget(ctx, key, revision, fn)
+	}
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
 		if err := s.Guard(ctx); err != nil {
 			return fmt.Errorf("guard replication configuration: %w", err)

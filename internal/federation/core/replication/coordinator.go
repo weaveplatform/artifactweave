@@ -94,22 +94,14 @@ func (c Coordinator) admit(ctx context.Context, repository, root, id, occurrence
 		if !supported || start == nil {
 			return fmt.Errorf("replication direction is unavailable: %w", kernel.ErrInvalid)
 		}
-		target, err := c.Configurations.target(ctx, repository)
+		target, options, err := c.executionTarget(ctx, owner, input)
 		if err != nil {
 			return err
 		}
 		if expectedTarget != "" && (target.Key != expectedTarget || target.Revision != expectedRevision) {
 			return kernel.ErrConflict
 		}
-		return c.Configurations.WithTarget(ctx, target.Key, target.Revision, func(ctx context.Context, target model.Replication) error {
-			var options *model.ExecutionOptions
-			if input != nil {
-				resolved, err := c.Configurations.resolveExecutionOptions(ctx, owner, target, *input)
-				if err != nil {
-					return err
-				}
-				options = &resolved
-			}
+		return c.Configurations.WithExecutionOptions(options).WithTarget(ctx, target.Key, target.Revision, func(ctx context.Context, target model.Replication) error {
 			caller, err := kernel.RequireAuthenticated(ctx)
 			if err != nil {
 				return fmt.Errorf("replication execution author: %w", err)
@@ -121,11 +113,19 @@ func (c Coordinator) admit(ctx context.Context, repository, root, id, occurrence
 			if transfer.Repository.Key != repository {
 				return fmt.Errorf("replication transfer escaped repository: %w", kernel.ErrStore)
 			}
+			leaseIdentity := string(direction)
+			if direction == model.ReplicationPush {
+				leaseIdentity, err = canonicalExecutionURL(target.URL)
+				if err != nil {
+					return err
+				}
+			}
 			binding := model.ExecutionBinding{
 				TargetKey: target.Key, TargetRevision: target.Revision,
 				Repository: transfer.Repository, Direction: direction, Root: root, Credential: caller.CredentialReference(),
 				Occurrence: occurrence, TransferID: transfer.ID, TransferIncarnation: transfer.Incarnation,
-				OneShot: options != nil,
+				OneShot:        options != nil,
+				TargetLeaseKey: ownershipHash([]string{transfer.Repository.Incarnation, leaseIdentity}),
 			}
 			out, err = c.Store.Executions().Create(ctx, id, binding, c.now())
 			if err != nil {

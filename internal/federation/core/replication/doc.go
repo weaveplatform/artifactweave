@@ -71,8 +71,8 @@
 // target/repository lifetime history without opening credentials. Its HTTP route
 // requires current Read covering the selected subtree. Public execute admits
 // saved-config and per-run selection options with 202 after durable enqueue. Per-run
-// credentials are separately sealed; distinct destinations and remaining runtime
-// qualification are still integration work. Multi-push,
+// credentials are separately sealed; explicit destinations need no saved configuration and
+// share endpoint exclusion with stored runs. Remaining runtime qualification is open. Multi-push,
 // event-triggered and binary-existence optimization remain P37.
 //
 // # Testing

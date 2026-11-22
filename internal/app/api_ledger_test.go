@@ -441,7 +441,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		e.Admission += "; current credential and Read covering the requested subtree refreshed under the shared project guard"
 	}
 	if method == http.MethodPost && (path == "/artifactory/api/replication/execute/{repoPath}" || path == "/artifactory/api/replication/execute/*") {
-		e.Effects = "atomic direction progress, immutable execution linkage, separately sealed one-shot options and reference-only queue admission; no peer I/O during enqueue; unsupported destination changes are refused"
+		e.Effects = "atomic direction progress, immutable execution linkage, separately sealed one-shot options and reference-only queue admission; no peer I/O during enqueue; explicit push destinations require no saved row and never inherit saved credentials"
 		e.Retry = "no Idempotency-Key; each accepted request creates a distinct logical execution; inspect durable status before retrying ambiguous admission"
 		e.Admission += "; current repository management and original caller transfer authority before transactionally admitting work"
 	}
@@ -873,7 +873,7 @@ func (c *apiReviewClasses) pagingText() string {
 
 func apiReviewPersistence(path string) (string, string, []string) {
 	if path == "/artifactory/api/replication/execute/{repoPath}" || path == "/artifactory/api/replication/execute/*" {
-		return "single-replication-execution", "one current stored configuration and canonical path; resolved one-shot options, transfer progress, execution and queue reference commit together; bounded direction steps and dual-generation ownership run outside HTTP admission", []string{
+		return "single-replication-execution", "one saved or explicit single target and canonical path; resolved one-shot options, transfer progress, execution and queue reference commit together; bounded direction steps and dual-generation ownership run outside HTTP admission", []string{
 			"internal/federation/adapters/http/execute.go",
 			"internal/federation/core/replication/coordinator.go",
 			"internal/federation/core/replication/worker.go",

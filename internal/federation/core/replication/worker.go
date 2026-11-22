@@ -82,7 +82,11 @@ func (w Worker) Execute(ctx context.Context, item work.WorkItem) error {
 	if ownership.Now == nil {
 		ownership.Now = w.Now
 	}
-	err = ownership.Run(ctx, item, run.Binding.TargetKey, func(ctx context.Context, owner Owner) error {
+	leaseKey := run.Binding.TargetLeaseKey
+	if leaseKey == "" {
+		leaseKey = run.Binding.TargetKey
+	}
+	err = ownership.Run(ctx, item, leaseKey, func(ctx context.Context, owner Owner) error {
 		fence := func(ctx context.Context) error {
 			if err := tx.CheckPublication(ctx); err != nil {
 				return fmt.Errorf("settle replication publication: %w", err)
@@ -155,10 +159,12 @@ func (w Worker) run(ctx context.Context, ref model.ExecutionReference, fence Pus
 }
 
 func (w Worker) enter(ctx context.Context, run model.ExecutionRun, fence PushFence) error {
-	return w.Configurations.run(ctx, func(ctx context.Context, policy Policy) error {
-		if _, err := executionOptions(ctx, run, w.Store.Executions()); err != nil {
-			return err
-		}
+	options, err := executionOptions(ctx, run, w.Store.Executions())
+	if err != nil {
+		return err
+	}
+	configuration := w.Configurations.WithExecutionOptions(options)
+	return configuration.run(ctx, func(ctx context.Context, policy Policy) error {
 		repository, err := w.Configurations.repository(ctx, run.Binding.Repository.Key, policy)
 		if err != nil {
 			return err
@@ -166,7 +172,7 @@ func (w Worker) enter(ctx context.Context, run model.ExecutionRun, fence PushFen
 		if direction, ok := model.DirectionFor(repository.Class); !ok || direction != run.Binding.Direction {
 			return kernel.ErrConflict
 		}
-		return w.Configurations.WithTarget(ctx, run.Binding.TargetKey, run.Binding.TargetRevision, func(ctx context.Context, _ model.Replication) error {
+		return configuration.WithTarget(ctx, run.Binding.TargetKey, run.Binding.TargetRevision, func(ctx context.Context, _ model.Replication) error {
 			current, err := w.Store.Executions().Run(ctx, run.Reference)
 			if err != nil {
 				return fmt.Errorf("lock replication dispatch: %w", err)

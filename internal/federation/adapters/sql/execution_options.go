@@ -25,8 +25,11 @@ func (p executions) Options(ctx context.Context, ref model.ExecutionReference) (
 	}
 	var document sql.NullString
 	var password []byte
+	var independent bool
+	var url string
 	err := p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
-		"SELECT options_json,password FROM replication_execution_options WHERE run_id=? AND run_incarnation=?"), ref.ID, ref.Incarnation).Scan(&document, &password)
+		"SELECT options_json,password,independent,target_url FROM replication_execution_options WHERE run_id=? AND run_incarnation=?"),
+		ref.ID, ref.Incarnation).Scan(&document, &password, &independent, &url)
 	if err != nil {
 		return model.ExecutionOptions{}, p.s.Wrap("read execution options", err)
 	}
@@ -38,8 +41,15 @@ func (p executions) Options(ctx context.Context, ref model.ExecutionReference) (
 	if err != nil {
 		return model.ExecutionOptions{}, fmt.Errorf("open execution password: %w", err)
 	}
-	if out.Validate() != nil {
+	if out.Validate() != nil || out.Independent != independent || out.URL != url {
 		return model.ExecutionOptions{}, fmt.Errorf("stored execution options invalid: %w", kernel.ErrStore)
+	}
+	run, err := p.Run(ctx, ref)
+	if err != nil {
+		return model.ExecutionOptions{}, err
+	}
+	if out.ValidateBinding(run) != nil {
+		return model.ExecutionOptions{}, fmt.Errorf("stored execution options binding invalid: %w", kernel.ErrStore)
 	}
 	return out, nil
 }
@@ -59,6 +69,9 @@ func (p executions) PutOptions(ctx context.Context, ref model.ExecutionReference
 	}
 	if !run.Binding.OneShot {
 		return kernel.ErrConflict
+	}
+	if err := options.ValidateBinding(run); err != nil {
+		return fmt.Errorf("bind execution options: %w", err)
 	}
 	options = kernel.Normalise(options)
 	current, err := p.Options(ctx, ref)
@@ -83,7 +96,36 @@ func (p executions) PutOptions(ctx context.Context, ref model.ExecutionReference
 		return fmt.Errorf("seal execution password: %w", err)
 	}
 	_, err = p.s.Exec(ctx, "create execution options",
-		"INSERT INTO replication_execution_options (run_id,run_incarnation,options_json,password) VALUES (?,?,?,?)",
-		ref.ID, ref.Incarnation, document, password)
+		"INSERT INTO replication_execution_options (run_id,run_incarnation,options_json,password,independent,target_url) VALUES (?,?,?,?,?,?)",
+		ref.ID, ref.Incarnation, document, password, options.Independent, options.URL)
 	return err
+}
+
+func (p executions) ExplicitTargets(ctx context.Context, repository, incarnation string, page kernel.Page) ([]model.ReplicationTargetState, string, error) {
+	page, err := page.Normalize()
+	if err != nil {
+		return nil, "", fmt.Errorf("explicit target page: %w", err)
+	}
+	condition, args, err := dialect.Keyset(page, []string{"e.target_key"}, nil, false)
+	if err != nil {
+		return nil, "", fmt.Errorf("explicit target cursor: %w", err)
+	}
+	query := `SELECT DISTINCT e.target_key,o.target_url FROM replication_executions e
+		JOIN replication_execution_options o ON o.run_id=e.run_id AND o.run_incarnation=e.incarnation
+		WHERE e.repo_key=? AND e.repo_incarnation=? AND o.independent=TRUE AND ` + condition + ` ORDER BY e.target_key LIMIT ?`
+	var out []model.ReplicationTargetState
+	values := append(append([]any{repository, incarnation}, args...), page.Limit+1)
+	err = p.s.Rows(ctx, "explicit replication status targets", query, values, func(rows *sql.Rows) error {
+		var target model.ReplicationTargetState
+		if err := rows.Scan(&target.Key, &target.URL); err != nil {
+			return fmt.Errorf("scan explicit replication target: %w", err)
+		}
+		out = append(out, target)
+		return nil
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	out, next := kernel.Trim(out, page.Limit, func(target model.ReplicationTargetState) []string { return []string{target.Key} })
+	return out, next, nil
 }

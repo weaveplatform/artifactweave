@@ -370,14 +370,16 @@ paths:
       x-cost: expensive
   /api/replication/execute/{repoPath}:
     post:
-      description: Starts one durable execution using the repository's stored single-target configuration. A local
+      description: Starts one durable single-target execution using saved configuration or an explicit push destination. A local
         repository pushes; a remote repository pulls into its owning cache. The optional folder path limits selection.
         Returns 202 with an empty body after transfer progress, execution linkage and queue admission commit atomically.
         Current repository management and transfer permissions apply. Repeated requests create distinct logical runs.
         An omitted body or empty array uses saved options. One object supplies per-run selection defaults of properties
         true, delete false, and no include/exclude restriction beyond the requested path. Per-run selection and push
-        credentials/proxy values are immutable and never change the saved configuration. A different push URL and
-        binary-existence optimization remain unsupported and answer 501. Multiple targets and null options answer 400.
+        credentials/proxy values are immutable and never change the saved configuration. An explicit push URL uses
+        only its supplied connection values and needs no saved configuration. Runs to the same canonical endpoint
+        share target exclusion; status includes secret-free explicit destination history under the current repository
+        lifetime. Binary-existence optimization remains unsupported and answers 501. Multiple targets and null options answer 400.
       operationId: executePullPushReplication
       parameters:
       - description: Required path parameter. Repository key, optionally followed by a folder path, for example

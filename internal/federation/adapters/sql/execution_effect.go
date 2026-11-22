@@ -136,7 +136,9 @@ func (p executions) PathStatus(ctx context.Context, target, incarnation, path st
 		where += " AND " + matched
 		args = append(args, values...)
 	}
-	from := " FROM replication_executions e JOIN replications target ON target.replication_key=e.target_key WHERE " + where
+	from := " FROM replication_executions e LEFT JOIN replications target ON target.replication_key=e.target_key " +
+		"LEFT JOIN replication_execution_options options ON options.run_id=e.run_id AND options.run_incarnation=e.incarnation " +
+		"WHERE (target.replication_key IS NOT NULL OR options.independent=TRUE) AND " + where
 	var ref model.ExecutionReference
 	var phase model.ExecutionPhase
 	var started, completed sql.NullInt64
