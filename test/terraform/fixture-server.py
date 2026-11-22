@@ -78,6 +78,8 @@ def forward(pid, address, port, marker):
 
     class Handler(socketserver.BaseRequestHandler):
         def handle(self):
+            if failed.is_set():
+                return
             try:
                 upstream = socket.create_connection((host, int(backend_port)), timeout=1)
                 with upstream:
@@ -90,7 +92,7 @@ def forward(pid, address, port, marker):
                     # proved. No reconnect or HTTP retry can change this peer.
                     upstream.settimeout(5)
                     self.request.settimeout(5)
-                    while not stop.is_set():
+                    while not stop.is_set() and not failed.is_set():
                         readable, _, _ = select.select([self.request, upstream], [], [], .2)
                         for source in readable:
                             data = source.recv(65536)
@@ -100,9 +102,12 @@ def forward(pid, address, port, marker):
                             target.sendall(data)
             except (OSError, subprocess.SubprocessError):
                 # Never include client bytes, headers or credentials in logs.
-                print("fixture connection refused or lost; stopping owned forwarder", file=sys.stderr, flush=True)
+                print("fixture connection refused or lost; quarantining owned frontend", file=sys.stderr, flush=True)
                 failed.set()
-                stop.set()
+                Path(marker).with_suffix(".failed").write_text("fixture connection ownership or transport failed\n")
+                # Keep the frontend bound until the parent has waited for
+                # its active client command. Releasing it here would let a
+                # concurrent provider retry reach a replacement frontend.
 
     class Server(socketserver.ThreadingTCPServer):
         allow_reuse_address = True

@@ -45,7 +45,10 @@ and reports its address in its fresh JSON startup log. An owned TCP forwarder bi
 it proves the connected backend peer socket belongs to the child: Linux uses the child's
 `/proc` socket inode/endpoint records; macOS uses `/usr/sbin/lsof` established endpoints.
 Missing ownership evidence fails closed. Each verified connection stays pinned to that
-peer; it never reconnects or retries against a replacement listener. This also protects
+peer; it never reconnects or retries against a replacement listener. A failed forwarder
+quarantines its still-bound frontend, refuses new connections and records a private failure
+marker until the parent's active client command finishes and cleanup reaps it. Provider
+retries cannot race a released frontend. This also protects
 native provider and Python checker reconnects while the child drains after shutdown.
 Startup failure, an occupied frontend, missing listener/socket evidence or the ten-second
 readiness deadline stops the run before token creation or provider effects. Fixture HTTP

@@ -1304,6 +1304,10 @@ frontend and checks Linux `/proc` or macOS `/usr/sbin/lsof` evidence that each c
 peer socket belongs to the child before forwarding client bytes. Verified connections
 stay pinned without reconnecting; replacement listeners during shutdown drain cannot
 receive authentication or provider traffic. Missing socket evidence fails closed.
+On failure the frontend stays bound in quarantine, refusing further connections,
+until active client commands finish and parent cleanup reaps it; a private failure
+marker also rejects subsequent commands. Provider retries cannot reach a replacement
+frontend during that interval.
 Failure or the ten-second startup deadline prevents authentication
 and provider effects; direct fixture HTTP bypasses ambient proxies. `TERRAFORM_PORT`
 retains its default 18081. `TERRAFORM_WORK` retains a parent directory containing a new

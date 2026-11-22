@@ -82,13 +82,20 @@ require_server() {
 		echo "Terraform fixture connection owner proof failed" >&2
 		exit 1
 	fi
+	if [ -f "$work/forwarder.failed" ]; then
+		echo "Terraform fixture frontend is quarantined after connection ownership failure" >&2
+		exit 1
+	fi
 }
 # Direct fixture HTTP must neither use an ambient proxy nor proceed after
 # the owned server has stopped. Mirror downloads run before server is set.
 curl() {
 	if [ -n "$server_ready" ]; then
 		require_server
-		command curl --noproxy '*' "$@"
+		local status=0
+		command curl --noproxy '*' "$@" || status=$?
+		require_server
+		return "$status"
 	else
 		command curl "$@"
 	fi
@@ -99,6 +106,7 @@ cleanup() {
 		kill -TERM "$forwarder" 2>/dev/null || true
 		wait "$forwarder" 2>/dev/null || true
 	fi
+	if [ -f "$work/forwarder.failed" ]; then rc=1; fi
 	if [ -n "$server" ]; then
 		kill -TERM "$server" 2>/dev/null || true
 		wait "$server" 2>/dev/null || true
@@ -119,6 +127,7 @@ cleanup() {
 			echo "run.sh: retained private failure evidence in $work" >&2
 		fi
 	fi
+	exit "$rc"
 }
 trap cleanup EXIT
 
@@ -171,7 +180,10 @@ export TF_CLI_CONFIG_FILE="$work/terraformrc" TF_IN_AUTOMATION=1 TF_INPUT=0
 dir=
 tf() {
 	if [ -n "$server_ready" ]; then require_server; fi
-	TF_DATA_DIR="$dir/.terraform" terraform -chdir="$dir" "$@"
+	local status=0
+	TF_DATA_DIR="$dir/.terraform" terraform -chdir="$dir" "$@" || status=$?
+	if [ -n "$server_ready" ]; then require_server; fi
+	return "$status"
 }
 
 for scenario in "${scenarios[@]}"; do

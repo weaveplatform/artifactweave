@@ -122,7 +122,10 @@ connected peer socket belongs to that child before forwarding any client bytes,
 using Linux `/proc` or macOS `lsof`. A connection stays pinned to that peer without
 reconnecting, so a replacement listener cannot receive credentials while the child
 drains. Missing socket evidence fails closed. Failed startup, an occupied port,
-missing listener evidence or readiness timeout aborts before authentication or
+or a failed/quarantined forwarder aborts the run. The frontend remains bound in
+quarantine until active client commands finish and parent cleanup reaps it, so
+provider retries cannot reach a replacement frontend. Missing listener evidence
+or readiness timeout aborts before authentication or
 provider effects. A retained workspace contains a fresh subdirectory per run so
 state and startup evidence cannot carry over. Owned loopback spies and child
 Go/chi fixtures exercise these failures in the existing deployment checks (#1845).

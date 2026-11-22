@@ -83,15 +83,22 @@ func recorder(path string) func(http.ResponseWriter, *http.Request, int, string)
 func spy(args []string) {
 	record, work, port := args[0], args[1], args[2]
 	replacement := len(args) > 3
+	frontend := replacement && args[3] == "front"
 	if replacement {
-		if !waitFile(filepath.Join(work, "listener-closed")) {
+		trigger := "listener-closed"
+		if frontend {
+			trigger = "front-attempt"
+		}
+		if !waitFile(filepath.Join(work, trigger)) {
 			return
 		}
-		data, err := os.ReadFile(filepath.Join(work, "backend-port"))
-		if err != nil {
-			panic(err)
+		if !frontend {
+			data, err := os.ReadFile(filepath.Join(work, "backend-port"))
+			if err != nil {
+				panic(err)
+			}
+			port = string(data)
 		}
-		port = string(data)
 	}
 	reply := recorder(filepath.Join(record, "requests.jsonl"))
 	router := chi.NewRouter()
@@ -114,11 +121,26 @@ func spy(args []string) {
 	router.Post("/access/api/v1/tokens", post)
 	router.Post("/provider-fixture", post)
 	ln, err := net.Listen("tcp", "127.0.0.1:"+port)
+	if frontend {
+		if exists(filepath.Join(work, "provider-active")) && !exists(filepath.Join(work, "provider-completed")) {
+			write(filepath.Join(work, "front-attempt-while-provider-active"), "")
+		}
+		deadline := time.Now().Add(time.Second)
+		for err != nil && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+			ln, err = net.Listen("tcp", "127.0.0.1:"+port)
+		}
+		if err != nil {
+			write(filepath.Join(work, "front-bind-refused"), "")
+			return
+		}
+		write(filepath.Join(work, "front-replacement-bound"), "")
+	}
 	if err != nil {
 		panic(err)
 	}
 	write(filepath.Join(record, "ready"), strconv.Itoa(ln.Addr().(*net.TCPAddr).Port))
-	if replacement {
+	if replacement && !frontend {
 		write(filepath.Join(work, "replacement-ready"), "")
 	}
 	server := &http.Server{Handler: router, ReadHeaderTimeout: time.Second}

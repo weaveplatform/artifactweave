@@ -327,6 +327,8 @@ owned TCP forwarder verifies the child's accepted socket for every connection
 before forwarding bytes, then pins that peer without reconnecting. Linux `/proc`
 and macOS `lsof` provide endpoint/inode ownership evidence; missing proof fails
 closed, including during shutdown drain or provider reconnects.
+Failure quarantines the still-bound frontend until the active client command
+finishes and parent cleanup reaps it; retries cannot reach a replacement frontend.
 Inherited application variables cannot select an operator's metadata/blob stores.
 `TERRAFORM_WORK` retains a parent containing a new private `run.*` directory per
 invocation; the driver prints that path and preserves earlier evidence and state.

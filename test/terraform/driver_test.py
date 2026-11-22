@@ -48,10 +48,11 @@ import json, os, pathlib, sys
 if sys.argv[1] == "version":
     print('{"terraform_version":"1.17.1"}' if "-json" in sys.argv else "Terraform v1.17.1")
 else:
-    if os.environ["DRIVER_TEST_BEHAVIOR"] == "draining-provider" and sys.argv[2] == "apply":
+    if os.environ["DRIVER_TEST_BEHAVIOR"] in ("draining-provider", "draining-frontend") and sys.argv[2] == "apply":
         import signal, socket, time, urllib.request
         from urllib.parse import urlsplit
         work = pathlib.Path(os.environ["DRIVER_TEST_ROOT"])
+        (work / "provider-active").touch()
         url = urlsplit(os.environ["TF_VAR_url"])
         held = socket.create_connection((url.hostname, url.port), timeout=2)
         held.sendall(b"GET /held HTTP/1.1\r\nHost: fixture\r\n\r\n")
@@ -64,7 +65,17 @@ else:
         request = urllib.request.Request(os.environ["TF_VAR_url"] + "/provider-fixture", data=b"fixture",
                                          headers={"Authorization": "Bearer owned-provider-fixture-token"})
         try: urllib.request.urlopen(request, timeout=2).read()
-        except OSError: sys.exit(1)
+        except OSError:
+            if os.environ["DRIVER_TEST_BEHAVIOR"] != "draining-frontend": sys.exit(1)
+            (work / "front-attempt").touch()
+            while not any((work / name).exists() for name in ("front-replacement-bound", "front-bind-refused")) and time.monotonic() < deadline:
+                time.sleep(.01)
+            assert any((work / name).exists() for name in ("front-replacement-bound", "front-bind-refused"))
+            try: urllib.request.urlopen(request, timeout=2).read()
+            except OSError:
+                (work / "provider-completed").touch()
+                sys.exit(1)
+        (work / "provider-completed").touch()
     if os.environ.get("DRIVER_TEST_PROBE_CLIENT") and sys.argv[2] in ("apply", "plan", "destroy"):
         import urllib.request
         urllib.request.urlopen(os.environ["TF_VAR_url"] + "/artifactory/api/v1/system/readiness", timeout=2).read()
@@ -89,7 +100,7 @@ class Requests:
 def owned_spy(work, port=0, replacement=False):
     record = Path(tempfile.mkdtemp(prefix="spy-", dir=work))
     args = [str(FIXTURE), "spy", str(record), str(work), str(port)]
-    if replacement: args.append("replace")
+    if replacement: args.append("front" if replacement == "front" else "replace")
     with (record / "process.log").open("w") as log:
         process = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
     try:
@@ -227,6 +238,31 @@ class DriverTest(unittest.TestCase):
             result = self.run_driver("foreign-event", front, {"DRIVER_TEST_FOREIGN_PORT": str(foreign)})
             self.assert_no_effects(result, requests)
             self.assertEqual(requests, [])
+
+    def test_failed_forwarder_reserves_frontend_until_provider_finishes(self):
+        with socket.socket() as reservation:
+            reservation.bind(("127.0.0.1", 0))
+            port = reservation.getsockname()[1]
+        with replacement_spy(self.work, port) as backend, owned_spy(self.work, port, replacement="front") as (_, frontend):
+            result = self.run_driver("draining-frontend", port)
+            if os.environ.get("DRIVER_TEST_FRONTEND_EVIDENCE"):
+                Path(os.environ["DRIVER_TEST_FRONTEND_EVIDENCE"]).write_text(json.dumps({
+                    "baseline": "955b537df5e7bb54f3c119561b77e608260b4307",
+                    "parent_exit": result.returncode, "backend_requests": list(backend),
+                    "frontend_requests": list(frontend),
+                    "frontend_replacement_bound": (self.work / "front-replacement-bound").exists(),
+                    "frontend_bind_refused": (self.work / "front-bind-refused").exists(),
+                    "attempted_while_provider_active": (self.work / "front-attempt-while-provider-active").exists(),
+                    "provider_completed": (self.work / "provider-completed").exists(),
+                }, indent=2) + "\n")
+            self.assertTrue((self.work / "front-attempt-while-provider-active").exists())
+            self.assertTrue((self.work / "provider-completed").exists())
+            self.assertTrue((self.work / "front-bind-refused").exists())
+            self.assert_no_effects(result, backend)
+            self.assertEqual(frontend, [])
+            with socket.socket() as released:
+                released.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                released.bind(("127.0.0.1", port))
 
     def test_occupied_port_does_not_authenticate_or_stop_occupant(self):
         with spy(self.work) as (port, requests):
