@@ -63,7 +63,13 @@ and applies the same DNS/IP policy to origin, redirect, metadata URL and token-r
 requests. Explicit private origins are supported; metadata cannot grant itself an
 internal destination. Known metadata services and link-local addresses remain denied.
 Validated addresses are pinned across direct/proxy connections. Proxy credentials and
-TLS identity are separate from repository credentials and client certificates.
+TLS identity are separate from repository credentials and client certificates. The
+explicit proxy `redirectedToHosts` list permits one challenged Basic target-auth retry
+for an actual redirected GET/HEAD at the listed hostname and configured proxy port.
+It grants no network reachability, cookies, repository headers or client certificate.
+Repository Authorization and `NoCrossOriginAuth` retain precedence. The retry repeats
+DNS checks and address pinning; malformed hosts/challenges and HTTPS downgrade fail
+without protected credentials reaching the refused target.
 
 Credentials and sensitive custom headers come from sealed store reads, never masked
 API output. Pool/cookie replacement follows source-setting and referenced-secret HMAC
@@ -89,8 +95,11 @@ binding, and never falls back to Basic for a configured NTLM identity. NTLM itse
 provides no proxy server authentication or transport encryption; HTTPS proxy TLS is
 verified separately. A configured HTTP proxy remains a trusted network boundary.
 Domain/workstation/password changes rotate the pool; stale publication still needs
-the fences described above. `redirectedToHosts` remains refused under #1836;
-replication's separate NTLM consumer is tracked by #1848. Cookie
+the fences described above. Redirected Basic credentials are implemented for artifacts
+upstream (#1836): they answer only a target challenge at an explicitly listed host and
+the proxy port, never proxy authentication, so they are not a Basic fallback for an
+NTLM proxy. Replication's separately bound endpoint, write-replay restrictions and
+NTLM consumer remain independent under #1848. Cookie
 domain/path/secure semantics permit eligible cookies across ports within one source;
 jars are isolated between repositories and source revisions. Response-body integrity,
 authenticated cache partitioning and format metadata rewriting have separate adapter

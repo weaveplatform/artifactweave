@@ -18,13 +18,15 @@ import (
 )
 
 type sourceSecurity struct {
-	base        *url.URL
-	config      repo.Config
-	policy      *destinationPolicy
-	proxy       *url.URL
-	ntlm        *outbound.NTLMProxy
-	roots       *x509.CertPool
-	certificate tls.Certificate
+	base               *url.URL
+	config             repo.Config
+	policy             *destinationPolicy
+	proxy              *url.URL
+	ntlm               *outbound.NTLMProxy
+	roots              *x509.CertPool
+	certificate        tls.Certificate
+	proxyRedirectHosts map[string]bool
+	proxyDomain        string
 }
 
 func (s *sourceSecurity) checkURL(ctx context.Context, u *url.URL) error {
@@ -104,6 +106,23 @@ func (t *secureTransport) close() {
 }
 
 func (t *secureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	res, err := t.roundTrip(req)
+	if err != nil || !t.source.redirectedProxyAuth(req) ||
+		res.StatusCode != http.StatusUnauthorized || !basicProxyRedirectChallenge(res.Header.Values("WWW-Authenticate")) {
+		return res, err
+	}
+	// Do not drain an untrusted challenge body or replay a write. The retry is
+	// one GET/HEAD, over newly checked/pinned addresses, with target auth only.
+	if err := res.Body.Close(); err != nil {
+		return nil, safeError(err)
+	}
+	retry := req.Clone(req.Context())
+	password, _ := t.source.proxy.User.Password()
+	retry.SetBasicAuth(t.source.proxyRedirectUsername(), password)
+	return t.roundTrip(retry)
+}
+
+func (t *secureTransport) roundTrip(req *http.Request) (*http.Response, error) {
 	addresses, err := t.source.policy.addresses(req.Context(), req.URL)
 	if err != nil {
 		return nil, err

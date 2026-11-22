@@ -16,6 +16,7 @@ import (
 )
 
 func (w *world) registerRemote(sc *godog.ScenarioContext) {
+	w.registerProxyRedirect(sc)
 	sc.Step(`^the NTLM proxy native client is available$`, w.ntlmNativeClient)
 	sc.Step(`^I PATCH "([^"]*)" as admin with expanded YAML:$`, func(path string, body *godog.DocString) error {
 		return w.patchYAMLAsAdmin(path, &godog.DocString{Content: w.expand(body.Content)})

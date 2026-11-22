@@ -16,7 +16,16 @@ import (
 // accidentally turn a fault test into a public-registry fetch. CONNECT can tunnel
 // either scheme; the client still verifies the destination's certificate.
 func NewProxy(t testing.TB, auth Auth, targets ...*Server) *Server {
+	t.Helper()
 	return newProxy(t, Options{Auth: auth}, nil, targets...)
+}
+
+// NewProxyOn starts NewProxy's controlled HTTP proxy on listener, transferring
+// ownership to the returned server. This lets a proxy and a destination use
+// the same port on different loopback addresses when testing credential scopes.
+func NewProxyOn(t testing.TB, listener net.Listener, auth Auth, targets ...*Server) *Server {
+	t.Helper()
+	return newProxy(t, Options{Auth: auth, listener: listener}, nil, targets...)
 }
 
 func newProxy(t testing.TB, options Options, ntlm *NTLMProxy, targets ...*Server) *Server {

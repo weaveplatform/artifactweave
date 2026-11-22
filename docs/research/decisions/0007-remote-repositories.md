@@ -83,8 +83,13 @@ RC-6/#216 still owns observed Artifactory comparisons. P12/#1835 adds NTLMv2
 proxy domain/workstation authentication through the shared platform outbound CONNECT
 helper, preserving this source boundary and sealed revision rotation. Its explicit
 protocol/CONNECT limits and independent native proof are in the transport contract.
-Proxy credential redirects remain refused under #1836; replication's consumer remains
-separate under #1848.
+P12 #1836 adds one challenged Basic proxy-credential retry at an explicitly listed
+redirected hostname and the configured proxy port, independently of repository
+Authorization, TLS client identity, cookies and destination grants; with a proxy
+domain the retry uses the NT principal name `DOMAIN\user`. Source/bytecode
+registration and local restrictions are recorded in
+[research 06](../06-system-configuration-and-descriptor.md#proxy-redirect-credential-contract).
+Replication's consumer and broader proxy configuration remain separate under #1848.
 Proxy service strings from the descriptor/provider and historical stored lists
 share one read decoder. String separators follow the pinned Artifactory source;
 explicit selection and platform-default `jfrt` filtering retain their existing

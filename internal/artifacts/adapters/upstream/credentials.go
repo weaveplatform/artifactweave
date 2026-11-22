@@ -150,6 +150,14 @@ func (r *Resolver) Options(ctx context.Context, c repo.Config) (remote.Options, 
 		return remote.Options{}, err
 	}
 	proxy, proxyDoc := selected.url, selected.document
+	var proxyConfig wire.ProxyConfiguration
+	if proxy != nil && json.Unmarshal(proxyDoc.Document, &proxyConfig) != nil {
+		return remote.Options{}, remote.ErrConfiguration
+	}
+	redirectHosts, err := proxyRedirectHosts(proxyConfig.RedirectedToHosts)
+	if err != nil {
+		return remote.Options{}, err
+	}
 	policy := &destinationPolicy{
 		private: map[string]bool{remote.Origin(base): true},
 		lookup:  r.options.LookupIP,
@@ -177,13 +185,15 @@ func (r *Resolver) Options(ctx context.Context, c repo.Config) (remote.Options, 
 		}
 	}
 	secure := &sourceSecurity{
-		base:        base,
-		config:      stored,
-		policy:      policy,
-		proxy:       proxy,
-		ntlm:        selected.ntlm,
-		roots:       r.roots,
-		certificate: certificate,
+		base:               base,
+		config:             stored,
+		policy:             policy,
+		proxy:              proxy,
+		ntlm:               selected.ntlm,
+		roots:              r.roots,
+		certificate:        certificate,
+		proxyRedirectHosts: redirectHosts,
+		proxyDomain:        proxyConfig.Domain,
 	}
 	projection := sourceSettings(stored)
 	inputs := []any{
@@ -303,8 +313,7 @@ func (r *Resolver) proxy(
 		}
 	}
 	var p wire.ProxyConfiguration
-	if !doc.Enabled || json.Unmarshal(doc.Document, &p) != nil || p.Port < 1 || p.Port > 65535 ||
-		p.RedirectedToHosts != "" {
+	if !doc.Enabled || json.Unmarshal(doc.Document, &p) != nil || p.Port < 1 || p.Port > 65535 {
 		return proxySelection{}, remote.ErrConfiguration
 	}
 	host := p.Host

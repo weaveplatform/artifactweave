@@ -75,3 +75,5 @@ protocol's MD4/HMAC-MD5 primitives, without the production NTLM dependency. The 
 no password, proof, hash or packet is retained. Fault options cover malformed
 challenges, oversized bodies, interruption, closed connections and cancellation.
 Only explicitly supplied target fixtures can be tunneled.
+`NTLMOptions.Listener`, like `NewProxyOn`, lets the proxy share a port with a
+destination on another loopback address for redirected-credential scope tests.

@@ -35,6 +35,8 @@ type NTLMOptions struct {
 	InitialAuthenticate                     string
 	Forward                                 bool
 	ForwardOnly                             bool
+	// Listener, when set, is owned by the proxy, as with NewProxyOn.
+	Listener net.Listener
 }
 
 // NTLMRequest is a safe protocol record. It retains no packet, password, proof
@@ -66,7 +68,7 @@ type ntlmChallengeState struct{ nonce, info []byte }
 func NewNTLMProxy(t testing.TB, options NTLMOptions, targets ...*Server) *NTLMProxy {
 	t.Helper()
 	p := &NTLMProxy{options: options, challenges: make(map[string]ntlmChallengeState), closed: make(map[string]chan struct{}), authenticated: make(map[string]bool)}
-	p.Server = newProxy(t, Options{TLS: options.TLS, Secrets: []string{options.Password}}, p, targets...)
+	p.Server = newProxy(t, Options{TLS: options.TLS, Secrets: []string{options.Password}, listener: options.Listener}, p, targets...)
 	return p
 }
 

@@ -46,9 +46,15 @@
 //     address for a private one.
 //   - Private networks are reachable only for authorities the operator
 //     configured, and known cloud metadata endpoints are always denied.
-//   - Credentials go to another origin only with allowAnyHostAuth and
+//   - Repository credentials go to another origin only with allowAnyHostAuth and
 //     HTTPS; a caller's own Authorization, API keys and cookies are never
 //     forwarded.
+//   - An actual redirected bodyless GET/HEAD can answer one target Basic
+//     challenge with proxy credentials at an exact redirectedToHosts hostname
+//     and configured proxy port; with an NTLM proxy domain the Basic username
+//     is the NT principal name, DOMAIN\user. It grants no destination
+//     reachability, repository identity or headers, and NoCrossOriginAuth
+//     forbids it.
 //   - The caller owns every response body that a successful Fetch, Do or
 //     Send returns, and closes it.
 //   - Registry tokens are isolated by source identity, credential revision,
@@ -89,6 +95,7 @@
 // Implemented P9 and P12 NTLMv2 proxy authentication. Moved here in P9d,
 // which narrowed the resolver's store to
 // ResolverStore (https://github.com/weaveplatform/artifactweave/issues/1091).
+// P12 adds scoped redirected Basic proxy credentials (#1836).
 //
 // # Testing
 //
@@ -101,6 +108,11 @@
 //     pinning, over the in-memory and SQLite stores.
 //   - destination_test.go: the destination policy, mixed DNS answers,
 //     rebinding and the security transport's pools.
+//   - proxy_redirects_test.go: host/port scopes, HTTP/HTTPS credential
+//     challenges, independent repository/cookie/client-certificate boundaries
+//     and DNS changes before retries. Generic server tests cover real
+//     SQLite/PostgreSQL publication races; the required native acceptance
+//     proxy_redirects.feature exercises actual JFrog CLI downloads.
 //   - outbound_test.go: the outbound hooks on requests and redirects.
 //   - p2_child_auth_test.go: P2 child repositories and credentials.
 //   - store_fault_test.go: a statement the store fails to run as the

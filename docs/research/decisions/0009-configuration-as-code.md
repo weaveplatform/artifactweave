@@ -62,8 +62,8 @@ remaining system administration retain their P12 owners.
 P12/#1835 gives remote-source proxy `domain` and `ntHost` runtime effects: NTLMv2
 proxy-account domain and client workstation, through the existing resolver and sealed
 password. Configuration storage is unchanged. The [transport contract](../../implementation/remote-http-transport.md)
-records the supported exchange and explicit limits; `redirectedToHosts` stays refused
-under #1836, and replication's separate consumer is tracked by #1848.
+records the supported exchange and explicit limits; P12/#1836 gives `redirectedToHosts`
+its scoped redirect-credential effect, and replication's separate consumer is tracked by #1848.
 
 ## Rationale
 
