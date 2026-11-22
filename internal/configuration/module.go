@@ -3,13 +3,17 @@ package configuration
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/configuration/core/descriptor"
+	"github.com/weaveplatform/artifactweave/internal/configuration/core/system"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/internal/platform/logging"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx"
 )
 
@@ -44,16 +48,18 @@ type Deps struct {
 	// app/config's Configuration, which Settings returns.
 	Settings configapi.Settings
 	// Log receives the logs of the services the module builds itself; nil
-	// means slog.Default(). New builds none, and the descriptor binding logs
-	// nothing, so New does not read it.
+	// means slog.Default(). The descriptor and logger policy emit no records.
 	Log *slog.Logger
+	// Logging is the process logging mechanism shared with app and the other modules.
+	Logging *logging.Control
 }
 
 // Module is the configuration module as app holds it. It is safe for
-// concurrent use: it holds only its bindings and settings.
+// concurrent use: its bindings serialize temporary logger session changes.
 type Module struct {
 	api      configapi.API
 	settings configapi.Settings
+	loggers  *system.Loggers
 }
 
 // New binds configuration/api's Descriptor, System and Mail over d with the
@@ -63,17 +69,20 @@ func New(d Deps) (*Module, error) {
 	if d.Store == nil {
 		return nil, errNoStore
 	}
-	return &Module{
-		api: descriptor.NewAPI(descriptor.Deps{
-			Tx:              d.Store,
-			Repositories:    d.Repositories,
-			Layouts:         d.Layouts,
-			Configs:         configs{st: d.Store},
-			AnonymousAccess: d.Access.AnonymousAccess,
-			Projects:        d.Access.Projects,
-		}),
-		settings: d.Settings,
-	}, nil
+	api := descriptor.NewAPI(descriptor.Deps{
+		Tx:              d.Store,
+		Repositories:    d.Repositories,
+		Layouts:         d.Layouts,
+		Configs:         configs{st: d.Store},
+		AnonymousAccess: d.Access.AnonymousAccess,
+		Projects:        d.Access.Projects,
+	})
+	var loggers *system.Loggers
+	if d.Logging != nil {
+		loggers = system.NewLoggers(system.LoggerDeps{Control: d.Logging, Authorize: d.loggerAdministrator})
+		api.Loggers = loggers
+	}
+	return &Module{api: api, settings: d.Settings, loggers: loggers}, nil
 }
 
 // API returns the descriptor and the current system/mail settings readers.
@@ -112,4 +121,46 @@ func (c configs) List(
 func (c configs) Delete(ctx context.Context, kind configdoc.ConfigKind, key string) error {
 	//nolint:wrapcheck // the store's errors pass through
 	return c.st.Configs().Delete(ctx, kind, key)
+}
+
+// Close restores logger levels and joins the temporary session's timer. A nil
+// Module is safe during cleanup of a partially constructed runtime.
+func (m *Module) Close() {
+	if m != nil && m.loggers != nil {
+		m.loggers.Close()
+	}
+}
+
+func (d Deps) loggerAdministrator(ctx context.Context) error {
+	if _, err := kernel.RequireAdmin(ctx); err != nil {
+		return fmt.Errorf("logger administrator: %w", err)
+	}
+	if d.Access.Projects == nil || d.Access.Authenticator == nil || d.Access.Authorizer == nil {
+		return fmt.Errorf("logger authority unavailable: %w", kernel.ErrStore)
+	}
+	err := d.Store.Tx(ctx, func(ctx context.Context) error {
+		if err := d.Access.Projects.Guard(ctx); err != nil {
+			return fmt.Errorf("guard logger administration: %w", err)
+		}
+		p, _ := kernel.FromContext(ctx)
+		p, err := d.Access.Authenticator.Current(ctx, p)
+		if errors.Is(err, kernel.ErrNotFound) {
+			return kernel.ErrBadCredentials
+		}
+		if err != nil {
+			return fmt.Errorf("current logger credential: %w", err)
+		}
+		decider, err := d.Access.Authorizer.For(ctx, p)
+		if err != nil {
+			return fmt.Errorf("current logger permissions: %w", err)
+		}
+		if decider == nil || !decider.IsAdmin() {
+			return kernel.ErrForbidden
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("authorize logger administration: %w", err)
+	}
+	return nil
 }

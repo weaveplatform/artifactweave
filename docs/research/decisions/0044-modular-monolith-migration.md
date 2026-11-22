@@ -620,3 +620,14 @@ Nothing in this decision departs from Artifactory's behaviour, so it has no entr
   [0043](0043-api-reliability.md) (API retry safety and bounded execution).
 - Go's gradual code repair with type aliases:
   <https://go.dev/talks/2016/refactor.article>.
+
+P12 logger administration ([#1827](https://github.com/weaveplatform/artifactweave/issues/1827))
+adds `configuration/api.Loggers` (Set, Delete, Level). Configuration's module root
+binds the system core service to the access API's guard, current credential and
+current permission contracts. The core owns request validation and the bounded
+session timer; `platform/logging.Control` owns only named slog level decisions and
+preserves the supplied sink. App passes the same control to real runtime/module
+and HTTP producers, and calls configuration Module.Close after draining requests.
+No logger override is stored as configuration, and a module without an actual
+logging mechanism does not advertise a logger API. The constructor remains free
+of I/O and starts no timer until an authorized Set succeeds.

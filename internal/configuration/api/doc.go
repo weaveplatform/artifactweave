@@ -32,8 +32,12 @@
 //   - System: the minimum download redirect size the descriptor set.
 //   - Mail: the current mail-server settings, with a guarded local snapshot
 //     and password excluded from JSON. Only delivery opens that secret.
+//   - Loggers: a temporary process-local level session and effective-level
+//     reader. ErrInvalidLoggerSettings reports refused logger requests without
+//     changing the descriptor's existing ErrInvalid answer.
 //   - Settings: the configuration options the module's code reads.
-//   - API: one implementation of Descriptor, System and Mail.
+//   - API: one implementation of Descriptor, System, Mail and, when an actual
+//     runtime logging mechanism is supplied, temporary Loggers.
 //
 // # Invariants
 //

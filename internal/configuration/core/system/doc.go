@@ -1,5 +1,5 @@
 // Package system validates and reads the mail-server settings needed by quota
-// delivery. The remaining system administration belongs to P12.
+// delivery and administers bounded temporary logger sessions.
 //
 // # Role
 //
@@ -9,12 +9,16 @@
 //
 // The mailServer descriptor mapping and the shared configuration store, runner
 // and authority guard. Secret values live separately in ConfigDocument.Secrets.
+// LoggerDeps supplies real logging decisions, guarded current administration and
+// an optional timer scheduler for deterministic expiration checks.
 //
 // # Outputs
 //
 // Validated mail settings behind configuration/api.Mail. Every read captures
 // public settings and the password under one guarded metadata transaction,
 // completed before SMTP starts. No function here opens a network connection.
+// Loggers validates temporary level requests, applies one in-memory session,
+// restores current baseline decisions on expiry/delete and joins timers on Close.
 //
 // # References
 //
@@ -34,5 +38,6 @@
 // # Status
 //
 // PRJ-04 supplies the narrow documented mailServer dependency for quota warnings.
-// Full system and mail administration remain P12.
+// P12 CFG-03 supplies actual process-local logger controls. Remaining system and
+// mail administration stay P12; log collection and streaming stay P38.
 package system

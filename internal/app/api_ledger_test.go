@@ -550,6 +550,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		}
 	}
 	apiReviewDerive(e)
+	apiReviewLoggers(e)
 	if cleanupPolicy {
 		e.Admission += "; current platform/project administration refreshed under the project guard before disclosure/publication; project administrators require own-project collection filter"
 	}
@@ -558,6 +559,33 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		if e.OperationID == "runPackageCleanupPolicy" {
 			e.Retry += "; optional key replays the committed integer trigger under current policy/project authority; dryRun participates in the fingerprint; unkeyed admissions remain distinct"
 		}
+	}
+}
+
+func apiReviewLoggers(e *apiReviewOperation) {
+	if e.State != "implemented" {
+		return
+	}
+	switch e.OperationID {
+	case "setLoggerDebugLevels":
+		e.Effects = "one process-local 1-100-name temporary level session over actual structured loggers; no persistence; expiry and shutdown restore the current original baseline"
+		e.Retry += "; inspect the current level after ambiguous completion; an active session refuses POST with 400, so replace using DELETE then POST"
+	case "deleteLoggerDebugLevels":
+		e.Effects = "clear the process-local temporary logger session, restore current original handler decisions and join its timer callback; no-op when idle"
+	case "getLoggerDebugLevel":
+		e.Effects = "read the effective process-local logger level; unknown names return the root level; no logger registration or persistent state"
+	default:
+		return
+	}
+	e.Admission += "; current credential and administrator refreshed under the project guard before logger publication/read"
+	e.Evidence = []string{
+		"internal/configuration/adapters/http/loggers.go",
+		"internal/configuration/core/system/loggers.go",
+		"internal/configuration/module.go",
+		"internal/platform/logging/levels.go",
+		"internal/app/loggers_test.go",
+		"docs/research/decisions/0043-api-reliability.md",
+		"internal/app/limits.go",
 	}
 }
 

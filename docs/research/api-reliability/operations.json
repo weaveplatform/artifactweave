@@ -1906,17 +1906,28 @@
     "route": "DELETE /artifactory/api/system/debug/loggers",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "deleteLoggerDebugLevels",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Ends a temporary logger override set with POST before its timer expires and returns every affected logger to the level it had before. Calling it when no override is active succeeds and changes nothing. Requires an administrator.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/configuration/adapters/http/loggers.go: SystemAPI.DeleteLoggerDebugLevels",
+    "direct_calls": [
+      "artgen.DeleteLoggerDebugLevels200JSONResponse",
+      "httpkit.AdminOnly",
+      "s.deps.Configuration.Loggers.Delete",
+      "s.loggerError"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on route",
-    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "effects": "clear the process-local temporary logger session, restore current original handler decisions and join its timer callback; no-op when idle",
+    "retry": "natural on route: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; current credential and administrator refreshed under the project guard before logger publication/read",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/configuration/adapters/http/loggers.go",
+      "internal/configuration/core/system/loggers.go",
+      "internal/configuration/module.go",
+      "internal/platform/logging/levels.go",
+      "internal/app/loggers_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -9366,17 +9377,28 @@
     "route": "GET /artifactory/api/system/debug/loggers/{className}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getLoggerDebugLevel",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns the level a named logger currently logs at, including any active temporary override. A name that matches no logger returns the root level rather than 404. Requires an administrator.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/configuration/adapters/http/loggers.go: SystemAPI.GetLoggerDebugLevel",
+    "direct_calls": [
+      "artgen.GetLoggerDebugLevel200JSONResponse",
+      "httpkit.AdminOnly",
+      "s.deps.Configuration.Loggers.Level",
+      "s.loggerError"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
-    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "effects": "read the effective process-local logger level; unknown names return the root level; no logger registration or persistent state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; current credential and administrator refreshed under the project guard before logger publication/read",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/configuration/adapters/http/loggers.go",
+      "internal/configuration/core/system/loggers.go",
+      "internal/configuration/module.go",
+      "internal/platform/logging/levels.go",
+      "internal/app/loggers_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -18867,17 +18889,29 @@
     "route": "POST /artifactory/api/system/debug/loggers",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "setLoggerDebugLevels",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Raises or lowers the log level of named loggers for a limited time, without changing configuration or restarting, so an operator can collect detailed logs while reproducing a problem. When the timer expires the previous levels return. Only one override is active at a time: a POST while one is active is rejected with 400, so send DELETE first to change it. Requires an administrator.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "handler": "internal/configuration/adapters/http/loggers.go: SystemAPI.SetLoggerDebugLevels",
+    "direct_calls": [
+      "artgen.SetLoggerDebugLevels200JSONResponse",
+      "httpkit.AdminOnly",
+      "httpkit.BadRequestf",
+      "s.deps.Configuration.Loggers.Set",
+      "s.loggerError"
+    ],
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on route",
-    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "effects": "one process-local 1-100-name temporary level session over actual structured loggers; no persistence; expiry and shutdown restore the current original baseline",
+    "retry": "natural on route: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key; inspect the current level after ambiguous completion; an active session refuses POST with 400, so replace using DELETE then POST",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; current credential and administrator refreshed under the project guard before logger publication/read",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/configuration/adapters/http/loggers.go",
+      "internal/configuration/core/system/loggers.go",
+      "internal/configuration/module.go",
+      "internal/platform/logging/levels.go",
+      "internal/app/loggers_test.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

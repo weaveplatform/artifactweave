@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	"github.com/weaveplatform/artifactweave/internal/platform/events"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/logging"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 	"github.com/weaveplatform/artifactweave/internal/retention"
 )
@@ -67,8 +68,9 @@ type moduleDeps struct {
 	events *events.Bus
 	// gc is the garbage collector over app's multipart and registry upload
 	// services, whose loop the artifacts module runs.
-	gc  *gc.Collector
-	log *slog.Logger
+	gc      *gc.Collector
+	log     *slog.Logger
+	logging *logging.Control
 }
 
 // buildModules builds the access, artifacts, configuration, notifications and retention modules over
@@ -77,11 +79,14 @@ type moduleDeps struct {
 // queue is open moves none of OpenRuntime's I/O; a constructor's refusal is
 // returned wrapped with its module's name.
 func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
+	if d.logging == nil {
+		d.logging = logging.New(d.log)
+	}
 	acc, err := access.New(access.Deps{
 		Store: d.store, Authenticator: d.auth, Tokens: d.tokens,
 		ProjectRepositories: repos.NewProjectRepositoryReader(d.store),
 		Settings:            cfg.Access(),
-		Log:                 d.log,
+		Log:                 d.logging.Logger("artifactweave.access"),
 	})
 	if err != nil {
 		return modules{}, fmt.Errorf("access: %w", err)
@@ -99,7 +104,7 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	art, err := artifacts.New(artifacts.Deps{
 		Store: d.store, Blobs: d.blobs, Keys: d.keys, Access: accessAPI,
 		RepositoryLifecycle: fed.RepositoryLifecycle(),
-		Work:                d.work, GC: d.gc, Settings: cfg.Artifacts(), Log: d.log,
+		Work:                d.work, GC: d.gc, Settings: cfg.Artifacts(), Log: d.logging.Logger("artifactweave.artifacts"),
 		// The artifacts module root may not import an ecosystem's http
 		// package, where NIM's upload preparation lives; app may.
 		PrepareNIMModelUpload: nimmodelhttp.PrepareUpload,
@@ -114,7 +119,8 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 		Layouts:      artifactsAPI.Layouts,
 		Access:       accessAPI,
 		Settings:     cfg.Configuration(),
-		Log:          d.log,
+		Log:          d.logging.Logger("artifactweave.configuration"),
+		Logging:      d.logging,
 	})
 	if err != nil {
 		return modules{}, fmt.Errorf("configuration: %w", err)

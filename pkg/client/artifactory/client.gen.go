@@ -5023,7 +5023,7 @@ type LoggerLevel string
 
 // LoggerLevelsRequest A temporary override of log levels for named loggers. The override lives only in memory and is never written to configuration.
 type LoggerLevelsRequest struct {
-	// Classes Required within this object. Map from logger name to the level it should log at while the override lasts. Logger names are the dotted package or component names the server logs under, such as `artifactweave.remote`. At most 100 entries; a larger map is rejected with 400. Names that match no logger are accepted and have no effect.
+	// Classes Required within this object. Map from logger name to the level it should log at while the override lasts. Logger names are the dotted package or component names the server logs under, such as `artifactweave.http`. At most 100 entries; a larger map is rejected with 400. Names that match no logger are accepted and have no effect.
 	Classes map[string]LoggerLevel `json:"classes"`
 
 	// Timer Required within this object. How long the override lasts, in seconds. When it expires every listed logger returns to the level it had before the request. Must be positive.

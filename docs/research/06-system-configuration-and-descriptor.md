@@ -58,7 +58,7 @@ contracts and provider access.
 | PUT | `/artifactory/api/system/configuration/baseUrl` | admin | 200 | `text/plain` URL; currently 501, P12 |
 | GET / POST | `/artifactory/api/system/configuration/webServer` | GET: any signed-in user; POST: admin | 200 | reverse proxy settings, shape below. "Non-admin users will get the proxy method and ports and the list of repositories based on their user permissions" ([Get Reverse Proxy Configuration](https://docs.jfrog.com/administration/reference/getreverseproxyconfiguration.md)); the schema has no field for the list, so its name is **[I]** |
 | GET | `/artifactory/api/system/configuration/reverseProxy/nginx` | admin | 200 | `text/plain` snippet; currently 501, P12 |
-| POST / DELETE / GET | `/artifactory/api/system/debug/loggers[/{class}]` | admin | 200 | `{"classes":{"<logger>":"debug"},"timer":<int>}`, at most 100 loggers; currently 501, P12 with P38 operational integration |
+| POST / DELETE / GET | `/artifactory/api/system/debug/loggers[/{class}]` | admin | 200 | `{"classes":{"<logger>":"debug"},"timer":<int>}`, 1–100 loggers; implemented P12 process-local controls; P38 owns operational extensions |
 | GET | `/artifactory/api/system/locks[?category=]`, `/locks/local` | admin | 200 | PostgreSQL advisory locks; currently 501, P38 with P35 HA state |
 | POST | `/artifactory/api/system/migration/sha2/start`, `/stop` | admin | 200 | currently 501, P36 |
 | POST | `/artifactory/api/metadata_server/reindex?async&delete_first` | admin | 200 | `{"paths":[]}`; currently 501, P38. Implemented package-format reindex routes are separate |
@@ -111,6 +111,41 @@ lines 146-147). artifactweave serves the stored instance id, the one its token i
 `jfac@<uuid>` is derived from ([decision 0005](decisions/0005-authentication-and-tokens.md)),
 so the scope the CLI builds names this instance. Anonymous callers get 401 and other users
 403, as for the licence; that anonymous gets 401 while anonymous access is on is **[I]**.
+
+Temporary logger administration (P12, [#1827](https://github.com/weaveplatform/artifactweave/issues/1827))
+uses the primary [Set](https://docs.jfrog.com/administration/reference/setloggerdebuglevels),
+[Delete](https://docs.jfrog.com/administration/reference/deleteloggerdebuglevels) and
+[Get](https://docs.jfrog.com/administration/reference/getloggerdebuglevel) contracts,
+rechecked 2026-11-22. Set requires 1–100 classes and resets previous settings after
+its timer; changing an active session requires DELETE first. Unknown classes are
+accepted without creating a logger, and GET falls back to the root level.
+The primary pages do not show exact success-message bodies or the active-POST
+refusal status: retaining JSON confirmation strings and 400 for a conflicting POST
+are explicit local engineering choices in the existing served spec. The primary
+400 description says a timer below zero is invalid; the existing positive-timer
+contract is retained to keep every accepted session bounded. Durations that would
+overflow Go's timer (more than 9,223,372,036 seconds) are rejected before publication.
+
+artifactweave names its actual structured log producers `artifactweave` (root),
+`artifactweave.http` (access and panic records), `artifactweave.access`,
+`artifactweave.artifacts`, `artifactweave.configuration` and `artifactweave.work`.
+These are local component names, not captured JFrog Java classes. A registered
+child inherits a root override unless a more specific registered name is listed;
+unknown override keys do not change existing loggers. `trace`/`debug` map to slog
+Debug, `fatal`/`error` to Error, with `info` and `warn` unchanged, as the pre-existing
+schema states. GET reports that effective slog level as a lowercase JSON string.
+
+Configuration core validates the whole request and owns one session/timer; the
+platform logging mechanism changes real handler decisions while retaining the
+original structured sink, attributes, groups and redaction. A failed guarded
+current-credential/current-admin check or failed authority transaction changes no
+runtime setting. DELETE, expiry and module/runtime Close discard the temporary
+override and restore the original handler's current baseline, including baseline
+changes made during the session. Cancelled old callbacks cannot clear replacement
+sessions; Close joins callbacks already running. Overrides are never configuration
+documents, are not exported, and do not survive restart. This P12 implementation is
+process-local; vendor HA propagation remains P35, while P38 owns live log streaming,
+downloads, support bundles and operational collection.
 
 Reverse proxy (`webServer`) shape:
 

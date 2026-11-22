@@ -61,9 +61,9 @@ import (
 	terraformhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform/http"
 	terraformbackendhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraformbackend/http"
 	vcshttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/vcs/http"
+	"github.com/weaveplatform/artifactweave/internal/configuration"
 	configurationhttp "github.com/weaveplatform/artifactweave/internal/configuration/adapters/http"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
-	"github.com/weaveplatform/artifactweave/internal/configuration/core/descriptor"
 	"github.com/weaveplatform/artifactweave/internal/federation"
 	federationhttp "github.com/weaveplatform/artifactweave/internal/federation/adapters/http"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -86,6 +86,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/internal/platform/idempotency"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
+	"github.com/weaveplatform/artifactweave/internal/platform/logging"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 	"github.com/weaveplatform/artifactweave/internal/retention"
 	retentionhttp "github.com/weaveplatform/artifactweave/internal/retention/adapters/http"
@@ -153,6 +154,11 @@ type RouterConfig struct {
 	// Logger receives access and panic logs; nil falls back to slog.Default so
 	// tests and library users need not wire one.
 	Logger *slog.Logger
+	// Logging shares actual level decisions with the owning runtime.
+	Logging *logging.Control
+	// OnClose registers cleanup for modules built by this router. Embedders
+	// supply their lifecycle registrar; production passes runtime-owned APIs.
+	OnClose func(func())
 	// RemoteSources is the direct remote read boundary. Nil preserves cache-only
 	// behavior; production activation belongs to the adapter tickets. Native
 	// protocols opt in separately through their pkgroute.Source map.
@@ -367,8 +373,8 @@ func accessUnset(a accessapi.API) bool {
 }
 
 // withConfiguration returns cfg with Configuration bound over its store by
-// the descriptor core when cfg sets a store and neither contract of
-// Configuration. It runs after withAccess: the descriptor checks the key
+// the configuration module when cfg sets a store and neither descriptor nor
+// system contract. It runs after withAccess: the descriptor checks the key
 // pairs and environments that repository entries name, and writes the
 // anonymous access setting, through cfg.Access.
 func withConfiguration(cfg RouterConfig) RouterConfig {
@@ -376,14 +382,18 @@ func withConfiguration(cfg RouterConfig) RouterConfig {
 		cfg.Configuration.System != nil {
 		return cfg
 	}
-	cfg.Configuration = descriptor.NewAPI(descriptor.Deps{
-		Tx:              cfg.Store,
-		Repositories:    repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects, repositoryLifecycle(cfg)),
-		Layouts:         layout.Checker{},
-		Configs:         cfg.Store.Configs(),
-		AnonymousAccess: cfg.Access.AnonymousAccess,
-		Projects:        cfg.Access.Projects,
+	m, err := configuration.New(configuration.Deps{
+		Store:        cfg.Store,
+		Repositories: repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects, repositoryLifecycle(cfg)),
+		Layouts:      layout.Checker{}, Access: cfg.Access, Logging: cfg.Logging, Log: cfg.Logger,
 	})
+	if err == nil {
+		cfg.Configuration = m.API()
+		if cfg.OnClose != nil {
+			cfg.OnClose(m.Close)
+		}
+	}
+
 	return cfg
 }
 
@@ -499,6 +509,10 @@ func newArtifactoryAPI(cfg RouterConfig) artifactshttp.ArtifactoryAPI {
 // Access or Configuration contract, NewRouter binds them over it first, as
 // RouterConfig.Access and RouterConfig.Configuration describe.
 func NewRouter(cfg RouterConfig) http.Handler {
+	if cfg.Logging == nil {
+		cfg.Logging = logging.New(cfg.Logger)
+	}
+	cfg.Logger = cfg.Logging.Logger("artifactweave")
 	cfg = withConfiguration(withFederation(withAccess(cfg)))
 	if cfg.Notifications == nil && cfg.Store != nil {
 		// New refuses only a nil store and performs no I/O.
@@ -574,7 +588,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		BaseURL:       cfg.BaseURL,
 		Settings:      configapi.Settings{DockerSubdomainMatch: cfg.DockerSubdomainMatch},
 		Configuration: cfg.Configuration,
-		Logger:        cfg.Logger,
+		Logger:        cfg.Logging.Logger("artifactweave.configuration"),
 	})
 	accessHTTP := accesshttp.New(accesshttp.Deps{
 		API:           cfg.Access,
@@ -587,7 +601,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		},
 		PasswordHash:  cfg.PasswordHash,
 		CompatVersion: cfg.CompatVersion,
-		Log:           cfg.Logger,
+		Log:           cfg.Logging.Logger("artifactweave.access"),
 		Repositories:  repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
 	})
 	// The artifacts repositories collection, and access's key pairs.
@@ -600,8 +614,8 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	r.Use(
 		httpkit.ErrorProfiles(errorProfileRules),
 		middleware.RequestID,
-		middleware.RecoverPanic(logger, redactLoggedPath),
-		middleware.AccessLog(logger, redactLoggedPath),
+		middleware.RecoverPanic(cfg.Logging.Logger("artifactweave.http"), redactLoggedPath),
+		middleware.AccessLog(cfg.Logging.Logger("artifactweave.http"), redactLoggedPath),
 		baseurl.Middleware(cfg.BaseURL),
 		remote.OriginTrace,
 		smart.SmartTrace,

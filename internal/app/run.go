@@ -54,7 +54,7 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, ready chan<- 
 	if err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
-	err = serve(ctx, cfg, log, rt, ready)
+	err = serve(ctx, cfg, rt, ready)
 	// Mirror commits still running after the drain get as long again to be
 	// recorded.
 	closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), drain)
@@ -65,10 +65,10 @@ func run(ctx context.Context, cfg config.Config, log *slog.Logger, ready chan<- 
 func serve(
 	ctx context.Context,
 	cfg config.Config,
-	log *slog.Logger,
 	rt *Runtime,
 	ready chan<- string,
 ) error {
+	log := rt.Logging.Logger("artifactweave")
 	limits, err := apilimit.New(rt.Store, cfg.API, nil)
 	if err != nil {
 		return fmt.Errorf("configure API limits: %w", err)
@@ -95,6 +95,7 @@ func serve(
 			CompatVersion: cfg.Compat.ArtifactoryVersion,
 			Revision:      buildinfo.Version(),
 			Logger:        log,
+			Logging:       rt.Logging,
 			Store:         rt.Store,
 			Blobs:         rt.Blobs,
 			ColdBlobs:     rt.coldBlobs,
