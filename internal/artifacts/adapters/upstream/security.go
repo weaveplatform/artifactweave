@@ -131,10 +131,9 @@ func (t *secureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		physical.Host = req.URL.Host
 		noAuth := req.Context().Value(noCrossOriginAuthKey{}) == true &&
 			remote.Origin(req.URL) != remote.Origin(t.source.base)
-		tr := t.forAuthority(req.URL, proxy, noAuth)
-		t.mu.Lock()
-		forward := t.forwarders[tr]
-		t.mu.Unlock()
+		// Eviction or credential rotation may close the pool after selection.
+		// Keep its authentication wrapper with the selected transport in flight.
+		tr, forward := t.forAuthority(req.URL, proxy, noAuth)
 		var res *http.Response
 		var roundErr error
 		if forward != nil {
@@ -162,7 +161,7 @@ func (t *secureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return nil, err
 }
 
-func (t *secureTransport) forAuthority(logical, proxy *url.URL, noAuth bool) *http.Transport {
+func (t *secureTransport) forAuthority(logical, proxy *url.URL, noAuth bool) (*http.Transport, http.RoundTripper) {
 	key := remote.Origin(logical)
 	if noAuth {
 		key += "|no-auth"
@@ -173,7 +172,7 @@ func (t *secureTransport) forAuthority(logical, proxy *url.URL, noAuth bool) *ht
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if tr := t.clients[key]; tr != nil {
-		return tr
+		return tr, t.forwarders[tr]
 	}
 	tr := t.base.Clone()
 	tr.TLSClientConfig = &tls.Config{
@@ -222,7 +221,7 @@ func (t *secureTransport) forAuthority(logical, proxy *url.URL, noAuth bool) *ht
 		}
 	}
 	t.clients[key] = tr
-	return tr
+	return tr, t.forwarders[tr]
 }
 
 // The proxy and destination use separate TLS identities. Repository client

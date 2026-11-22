@@ -517,11 +517,13 @@ func TestAccResolverTLSClientIdentityAndRotation(t *testing.T) {
 		body(t, getFor(t, cl, "redirect"))
 		secure := cl.http.Transport.(*secureTransport)
 		targetURL, _ := url.Parse(target.URL)
-		certs := secure.forAuthority(targetURL, nil, false).TLSClientConfig.Certificates
+		trusted, _ := secure.forAuthority(targetURL, nil, false)
+		certs := trusted.TLSClientConfig.Certificates
 		if (len(certs) > 0) != allow {
 			t.Fatal("client certificate crossed origin unexpectedly")
 		}
-		if len(secure.forAuthority(targetURL, nil, true).TLSClientConfig.Certificates) != 0 {
+		untrusted, _ := secure.forAuthority(targetURL, nil, true)
+		if len(untrusted.TLSClientConfig.Certificates) != 0 {
 			t.Fatal("format-selected external child received a client certificate")
 		}
 	}
