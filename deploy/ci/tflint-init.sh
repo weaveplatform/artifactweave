@@ -8,6 +8,7 @@ trap 'rm -f "$retry_log"' EXIT
 
 for retry_attempt in 1 2 3; do
 	if tflint --init "$@" 2>"$retry_log"; then
+		cat "$retry_log" >&2
 		exit 0
 	else
 		retry_status=$?
