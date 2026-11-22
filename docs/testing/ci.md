@@ -1296,6 +1296,20 @@ the driver.
 Each scenario's committed `.terraform.lock.hcl` holds its providers' hashes for linux and
 darwin on amd64 and arm64.
 
+In apply mode the driver starts an owned atomic-coverage server with explicit private
+SQLite/filesystem configuration. It removes inherited `ARTIFACTWEAVE_*` settings only
+for that child, leaving caller and client options intact. The fresh JSON log must name
+the requested bound loopback address, and the child must remain live before and after
+bounded readiness. Failure or the ten-second startup deadline prevents authentication
+and provider effects; direct fixture HTTP bypasses ambient proxies. `TERRAFORM_PORT`
+retains its default 18081. `TERRAFORM_WORK` retains a parent directory containing a new
+private `run.*` per invocation; the printed path locates its configuration, state and
+startup evidence. Automatic workspaces are removed on success and retained on failure.
+`python3 -I test/terraform/driver_test.py`, also run by `make deploy-check`, checks
+failed/occupied/missing-listener/racing-exit/timeout startup with only owned ephemeral
+listeners and stub clients. Real provider effects remain the existing provider lane's
+responsibility (#1845).
+
 The providers move automatically. Dependabot cannot move them, because `run.sh` pins their
 release zips by SHA-256, so `deps-refresh.yml`'s `jfrog-providers` job runs
 `deploy/ci/jfrog-providers.sh update` every day. It:

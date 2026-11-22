@@ -49,13 +49,43 @@ python3 -I "$here/check-projects.py" --inventory "$root"
 python3 -I "$here/check-cleanup.py" --inventory "$root"
 scenarios=("$@")
 [ ${#scenarios[@]} -gt 0 ] || scenarios=(deploy/artifactweave/terraform/repositories)
-work=${TERRAFORM_WORK:-}
-if [ -z "$work" ]; then
+if [ -n "${TERRAFORM_WORK:-}" ]; then
+	mkdir -p "$TERRAFORM_WORK"
+	work=$(mktemp -d "$TERRAFORM_WORK/run.XXXXXX")
+else
 	work=$(mktemp -d)
 	owned=1
 fi
-mkdir -p "$work"
+# Copies, configuration, state and the startup log all belong to this run,
+# including when the caller retains several runs in TERRAFORM_WORK.
+work=$(cd "$work" && pwd)
+echo "Terraform provider workspace: $work"
+# Python effect checkers and native providers also contact the fixture.
+# Preserve proxy routing for release downloads, but every fixture client
+# must bypass it for the private loopback origin.
+fixture_no_proxy="127.0.0.1,localhost${NO_PROXY:+,$NO_PROXY}${no_proxy:+,$no_proxy}"
+export NO_PROXY="$fixture_no_proxy" no_proxy="$fixture_no_proxy"
 server=
+server_ready=
+require_server() {
+	if ! kill -0 "$server" 2>/dev/null; then
+		local status=0
+		wait "$server" || status=$?
+		server=
+		echo "Terraform fixture server exited (status $status)" >&2
+		exit 1
+	fi
+}
+# Direct fixture HTTP must neither use an ambient proxy nor proceed after
+# the owned server has stopped. Mirror downloads run before server is set.
+curl() {
+	if [ -n "$server_ready" ]; then
+		require_server
+		command curl --noproxy '*' "$@"
+	else
+		command curl "$@"
+	fi
+}
 cleanup() {
 	rc=$?
 	if [ -n "$server" ]; then
@@ -125,7 +155,10 @@ export TF_CLI_CONFIG_FILE="$work/terraformrc" TF_IN_AUTOMATION=1 TF_INPUT=0
 # main.tf, never lands in the source tree, where a failed run's state would
 # point the next run at resources on a server that no longer exists.
 dir=
-tf() { TF_DATA_DIR="$dir/.terraform" terraform -chdir="$dir" "$@"; }
+tf() {
+	if [ -n "$server_ready" ]; then require_server; fi
+	TF_DATA_DIR="$dir/.terraform" terraform -chdir="$dir" "$@"
+}
 
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
@@ -162,18 +195,24 @@ mkdir -p "${GOCOVERDIR:-$work/cover}"
 # resource it creates, reads, updates or deletes. Those are ordinary
 # requests (decision 0043, "Classes moved since"), so the default budgets
 # hold the virtual-repositories scenario's 102 resources (#1597).
-GOCOVERDIR=${GOCOVERDIR:-$work/cover} \
-	ARTIFACTWEAVE_API_BUDGET_TIMEOUT=5s \
-	ARTIFACTWEAVE_MASTER_KEY=terraform-master-key-0123456789abcdef0123456789abcdef \
-	ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD=$password \
-	ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH=true \
-	"$work/artifactweave" serve --listen "127.0.0.1:$port" --data-dir "$work/data" \
-	--base-url "$url" >"$work/server.log" 2>&1 &
+python3 -I "$here/fixture-server.py" launch "$work" "$port" "${GOCOVERDIR:-$work/cover}" \
+	>"$work/server.log" 2>&1 &
 server=$!
-for _ in $(seq 100); do
-	curl -fs "$url/artifactory/api/v1/system/readiness" >/dev/null && break
+startup_deadline=$((SECONDS + 10))
+while [ "$SECONDS" -lt "$startup_deadline" ]; do
+	require_server
+	if python3 -I "$here/fixture-server.py" listening "$work/server.log" "127.0.0.1:$port"; then
+		require_server
+		if command curl --noproxy '*' --max-time 1 -fs "$url/artifactory/api/v1/system/readiness" >/dev/null; then
+			require_server
+			server_ready=1
+			break
+		fi
+	fi
 	sleep 0.1
 done
+[ -n "$server_ready" ] || { echo "Terraform fixture server did not become ready with owned listener evidence" >&2; exit 1; }
+require_server
 
 token=${TERRAFORM_ACCESS_TOKEN:-}
 if [ -z "$token" ]; then

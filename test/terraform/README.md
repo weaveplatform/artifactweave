@@ -37,6 +37,25 @@ up to ten resources at once, and on SQLite the default 500ms admission deadline 
 of those requests with a 503 that the provider does not retry (#1147). A failed run prints the
 end of the server log and retains its private work directory, including Terraform state.
 
+The server receives an explicit private configuration for SQLite and filesystem storage;
+inherited `ARTIFACTWEAVE_*` variables are removed only from that child. The caller's
+environment and `HOME` remain intact. Its fresh JSON startup log must report the exact
+bound loopback address before the driver polls readiness, and the child must remain live
+through that check. Startup failure, an occupied port, missing listener evidence or the
+ten-second readiness deadline stops the run before token creation or provider effects.
+Fixture HTTP bypasses host proxy settings. `TERRAFORM_PORT` still selects the loopback
+port (default 18081).
+
+`TERRAFORM_WORK` names a retained parent directory. Each invocation creates a private
+`run.*` child, prints its path, and keeps it on success or failure. This preserves earlier
+evidence and prevents a later instance from inheriting an earlier run's state, configuration
+or listening event. Without that option, successful temporary workspaces are removed and
+failed ones retained. Cleanup signals and reaps only the child started by this run.
+
+`python3 -I test/terraform/driver_test.py` exercises the shell entry point with owned
+ephemeral listeners and stub Go/Terraform clients. `make deploy-check` runs the same
+regressions; the pinned provider lane supplies real apply/plan/destroy evidence.
+
 The remote-repositories scenario covers all fourteen P9 provider resource types. It applies
 two revisions, requires an empty refreshed plan after each, checks API configuration and
 secret redaction, checks that persistent data contains no plaintext fixture credentials,
