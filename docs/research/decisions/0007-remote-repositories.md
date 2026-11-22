@@ -79,8 +79,12 @@ with exact configured-private authority grants and unconditional known-metadata 
 Cross-origin credentials require `allowAnyHostAuth` and HTTPS. These deliberate security
 restrictions and the DNS-named HTTP proxy CONNECT requirement are recorded in the
 [transport contract](../../implementation/remote-http-transport.md#resolved-source-security-618);
-RC-6/#216 still owns observed Artifactory comparisons. NTLM/domain and proxy credential
-redirect settings fail closed pending their P12 proxy/global-configuration implementation.
+RC-6/#216 still owns observed Artifactory comparisons. P12 #1836 adds one challenged
+Basic proxy-credential retry at an explicitly listed redirected hostname and the
+configured proxy port, independently of repository Authorization, TLS client identity,
+cookies and destination grants. Source/bytecode registration and local restrictions are
+recorded in [research 06](../06-system-configuration-and-descriptor.md#proxy-redirect-credential-contract).
+NTLM/domain remains #1835; broader replication proxy configuration remains #1848.
 This is a shared foundation, not evidence that the native adapters or cache policy are
 complete. Source HMAC revisions exclude retrieval policy, so TTL/offline changes do not
 invalidate immutable bytes; publication separately fences current policy and credentials.

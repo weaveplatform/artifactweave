@@ -14,6 +14,7 @@ import (
 )
 
 func (w *world) registerRemote(sc *godog.ScenarioContext) {
+	w.registerProxyRedirect(sc)
 	sc.Step(`^the generic upstream received a GET for "([^"]*)" with origin headers$`, w.remoteOriginHeaders)
 	w.registerSmartRemote(sc)
 	w.registerRemoteNPM(sc)

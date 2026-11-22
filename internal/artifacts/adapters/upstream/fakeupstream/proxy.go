@@ -16,6 +16,19 @@ import (
 // either scheme; the client still verifies the destination's certificate.
 func NewProxy(t testing.TB, auth Auth, targets ...*Server) *Server {
 	t.Helper()
+	return newProxy(t, Options{Auth: auth}, targets...)
+}
+
+// NewProxyOn starts NewProxy's controlled HTTP proxy on listener, transferring
+// ownership to the returned server. This lets a proxy and a destination use
+// the same port on different loopback addresses when testing credential scopes.
+func NewProxyOn(t testing.TB, listener net.Listener, auth Auth, targets ...*Server) *Server {
+	t.Helper()
+	return newProxy(t, Options{Auth: auth, listener: listener}, targets...)
+}
+
+func newProxy(t testing.TB, options Options, targets ...*Server) *Server {
+	t.Helper()
 	p := &proxy{allowed: make(map[string]string), connections: make(map[net.Conn]struct{})}
 	for _, target := range targets {
 		u, err := url.Parse(target.URL)
@@ -28,7 +41,7 @@ func NewProxy(t testing.TB, auth Auth, targets ...*Server) *Server {
 	p.transport.Proxy = nil
 	s := start(
 		t,
-		Options{Auth: auth},
+		options,
 		func(s *Server) http.Handler { p.server = s; return http.HandlerFunc(p.serve) },
 	)
 	s.beforeClose = p.close

@@ -1675,6 +1675,17 @@ locally; the Linux CI runner needs neither override.
 
 ## Generic remote native evidence
 
+`proxy_redirects.feature` uses the existing required core native partition with
+`@jf @generic_remote @proxy_redirects`. Pinned JFrog CLI direct downloads prove a
+permitted challenged proxy-credential redirect, same-origin bytes, refused and removed
+hosts, secret rotation and malformed configuration. Independent sanitized proxy/origin
+records distinguish target Authorization from CONNECT/forward Proxy-Authorization and
+assert no false cached result. The generic client recipe retains this scenario's
+evidence fingerprint. HTTP/HTTPS host/port, DNS-rebinding, cookie and mTLS boundaries
+run in upstream's ordinary acceptance suite; the generic server suite runs the actual
+application publication race on SQLite and PostgreSQL. Shared transport changes still
+select the full gate and unchanged 95% total/90% package coverage floors.
+
 `@remote_listing` runs real curl against controlled HTML indexes. It proves the
 default-off flag, uncached child discovery without binary fetch, escaped local links,
 repository pattern filtering, cache-only Storage API/aliases and warm offline browsing.

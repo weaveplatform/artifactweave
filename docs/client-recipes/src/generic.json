@@ -64,6 +64,21 @@
         "JFROG_CLI_HOME_DIR=",
         "JFROG_CLI_TEMP_DIR="
       ]
+    },
+    {
+      "path": "test/acceptance/features/proxy_redirects.feature",
+      "contains": [
+        "@jf @generic_remote @proxy_redirects",
+        "rt direct-download redirect-remote/allowed.bin allowed/",
+        "the proxy redirect credential observations are correct"
+      ]
+    },
+    {
+      "path": "test/acceptance/proxy_redirect_steps_test.go",
+      "contains": [
+        "proxy redirect qualification requires ARTIFACTWEAVE_JF_BIN",
+        "proxyRedirectObservations"
+      ]
     }
   ]
 }

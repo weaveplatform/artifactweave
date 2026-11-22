@@ -59,3 +59,5 @@ These are the pinned client definitions and executable evidence from which this 
 - Evidence: [test/acceptance/features/round_trip.feature](../../test/acceptance/features/round_trip.feature).
 - Evidence: [test/acceptance/features/tokens.feature](../../test/acceptance/features/tokens.feature).
 - Evidence: [test/acceptance/steps_test.go](../../test/acceptance/steps_test.go).
+- Evidence: [test/acceptance/features/proxy_redirects.feature](../../test/acceptance/features/proxy_redirects.feature).
+- Evidence: [test/acceptance/proxy_redirect_steps_test.go](../../test/acceptance/proxy_redirect_steps_test.go).

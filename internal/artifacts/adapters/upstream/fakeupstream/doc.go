@@ -27,8 +27,8 @@
 //   - The Options fixed at New: a TLS configuration, which turns on HTTPS
 //     and can require a client certificate; the clock, often Clock.Now; a
 //     Basic or Bearer Auth policy; and the fixture secrets to redact.
-//   - For NewProxy, the proxy's Auth policy and the running fixtures it may
-//     reach.
+//   - For NewProxy and NewProxyOn, the proxy's Auth policy and the running
+//     fixtures it may reach. NewProxyOn also takes ownership of a listener.
 //
 // # Outputs
 //
@@ -38,7 +38,7 @@
 //   - Recorded requests: Requests returns redacted snapshots in arrival
 //     order, Count counts them by method and path, and Request.HeaderMatches
 //     checks a header value the test knows without the record holding it.
-//   - NewProxy: a forward proxy that forwards plain HTTP and tunnels CONNECT
+//   - NewProxy and NewProxyOn: a forward proxy that forwards plain HTTP and tunnels CONNECT
 //     to the listed fixtures only. ClientIdentity: a test CA and client
 //     certificate for mutual TLS.
 //
@@ -54,7 +54,7 @@
 //   - Recorded requests never hold a body, URL userinfo, query values, or
 //     credential and cookie header values, so they are safe to print in a
 //     failed assertion.
-//   - New and NewProxy register Close with the test's cleanup, and Close
+//   - New, NewProxy and NewProxyOn register Close with the test's cleanup, and Close
 //     cancels the requests in flight, so a handler held at a barrier that
 //     was never released cannot hang the end of the test.
 //

@@ -30,7 +30,8 @@ type Options struct {
 	Auth Auth
 	// Secrets also redacts fixture-specific secrets embedded in paths or safe headers.
 	// Query values, credentials, cookies and unrecognized headers are always redacted.
-	Secrets []string
+	Secrets  []string
+	listener net.Listener
 }
 
 // Auth requires either a bearer Token or a basic Username/Password. An empty policy
@@ -135,6 +136,10 @@ func start(t testing.TB, options Options, handler func(*Server) http.Handler) *S
 	r := chi.NewRouter()
 	r.Handle("/*", handler(s))
 	s.srv = httptest.NewUnstartedServer(r)
+	if options.listener != nil {
+		_ = s.srv.Listener.Close()
+		s.srv.Listener = options.listener
+	}
 	s.srv.Config.BaseContext = func(net.Listener) context.Context { return ctx }
 	// HTTP parser/handshake errors may contain caller-controlled strings. Assertions
 	// use the sanitized recorder rather than writing those errors to test artifacts.
