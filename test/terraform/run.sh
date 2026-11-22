@@ -375,12 +375,12 @@ apply_webhooks() {
 	tf apply -auto-approve
 	tf plan -detailed-exitcode
 	tf output -json webhook_keys >"$work/webhook-keys.json"
-	python3 -I "$here/check-webhooks.py" --check "$root" "$work/webhook-keys.json" "$dir/terraform.tfstate" "$work/data"
+	python3 -I "$here/check-webhooks.py" --check "$root" "$work/webhook-keys.json" "$dir/terraform.tfstate" "$work/data" "$work/server.log"
 	export TF_VAR_revision=2 TF_VAR_handler_secret=Terraform-webhook-secret-2
 	tf apply -auto-approve
 	tf plan -detailed-exitcode
-	python3 -I "$here/check-webhooks.py" --check "$root" "$work/webhook-keys.json" "$dir/terraform.tfstate" "$work/data"
-	python3 -I "$here/check-webhooks.py" --controls
+	python3 -I "$here/check-webhooks.py" --check "$root" "$work/webhook-keys.json" "$dir/terraform.tfstate" "$work/data" "$work/server.log"
+	python3 -I "$here/check-webhooks.py" --controls "$work/server.log"
 }
 
 # Configuration only. Both URLs point at unused paths on this fixture server;
@@ -460,7 +460,7 @@ for scenario in "${scenarios[@]}"; do
 		python3 -I "$here/check-remotes.py" --remove-proxy
 	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/webhooks ]; then
-		python3 -I "$here/check-webhooks.py" --deleted "$work/webhook-keys.json"
+		python3 -I "$here/check-webhooks.py" --deleted "$work/webhook-keys.json" "$work/server.log"
 	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/single-replication ]; then
 		python3 -I "$here/check-replications.py" --deleted "$work/replication-repositories.json"

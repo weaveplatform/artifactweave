@@ -66,7 +66,12 @@ def fields(actual, expected, context):
         assert actual.get(name) == value, context + ": field mismatch: " + name
 
 
-def check(root, keys_file, state_file, data_dir):
+def check_log(log_file):
+    content = log_file.read_bytes()
+    assert all(value.encode() not in content for value in SECRETS), "server log disclosed a webhook fixture secret"
+
+
+def check(root, keys_file, state_file, data_dir, log_file):
     rows = inventory(root)
     keys = json.loads(keys_file.read_text())
     assert set(keys) == {r["type"] for r in rows} and len(set(keys.values())) == 24, "native output omitted a resource or reused a key"
@@ -118,10 +123,11 @@ def check(root, keys_file, state_file, data_dir):
         if path.is_file():
             content = path.read_bytes()
             assert all(value.encode() not in content for value in SECRETS), "fixture secret persisted without sealing"
-    print("24 webhook resources: revision", revision, "administration and sealed storage PASS")
+    check_log(log_file)
+    print("24 webhook resources: revision", revision, "administration, sealed storage and log redaction PASS")
 
 
-def controls():
+def controls(log_file):
     projects = ("tfwebalpha", "tfwebbeta")
     user = "tf-webhook-project-admin"
     for project in projects:
@@ -161,10 +167,11 @@ def controls():
     request("/access/api/v2/users/" + user, "DELETE", want=204)
     for project in projects:
         request("/access/api/v1/projects/" + project, "DELETE", want=204)
-    print("Project isolation, immutable scope, malformed URL/template rollback: PASS (no delivery assertion)")
+    check_log(log_file)
+    print("Project isolation, immutable scope, malformed URL/template rollback and log redaction: PASS (no delivery assertion)")
 
 
-def deleted(keys_file):
+def deleted(keys_file, log_file):
     keys = json.loads(keys_file.read_text())
     listed = {s["key"] for s in request(COLLECTION)}
     for kind, key in keys.items():
@@ -172,6 +179,7 @@ def deleted(keys_file):
         assert key not in listed, kind + ": deleted subscription remains listed"
         print(kind + ": destroy GET 404/list absent PASS")
     assert not any(key.startswith("tf-webhook-") for key in listed), "fixture subscriptions remain"
+    check_log(log_file)
 
 
 if __name__ == "__main__":
@@ -182,8 +190,8 @@ if __name__ == "__main__":
     elif mode == "--check":
         check(*(Path(value) for value in sys.argv[2:]))
     elif mode == "--controls":
-        controls()
+        controls(Path(sys.argv[2]))
     elif mode == "--deleted":
-        deleted(Path(sys.argv[2]))
+        deleted(Path(sys.argv[2]), Path(sys.argv[3]))
     else:
         raise SystemExit("unknown webhook conformance mode")

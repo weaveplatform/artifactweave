@@ -3,10 +3,10 @@ package notifications_test
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -30,12 +30,15 @@ const (
 	subscriptions = "/event/api/v1/subscriptions"
 	platformURL   = "https://platform.example"
 	privateValue  = "web02-server-private-value"
+	rotatedValue  = "web02-server-rotated-value"
+	deniedValue   = "web02-server-denied-value"
 )
 
 type subscriptionWorld struct {
 	t     *testing.T
 	store app.RouterStore
 	h     http.Handler
+	logs  *bytes.Buffer
 }
 
 func newSubscriptionWorld(t *testing.T, st app.RouterStore) subscriptionWorld {
@@ -63,9 +66,10 @@ func newSubscriptionWorld(t *testing.T, st app.RouterStore) subscriptionWorld {
 	if err := st.Settings().Put(ctx, settings.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
-	w := subscriptionWorld{t: t, store: st, h: harness.Router(harness.Config{
+	logs := new(bytes.Buffer)
+	w := subscriptionWorld{t: t, store: st, logs: logs, h: harness.Router(harness.Config{
 		Store: st, Auth: auth, Tokens: tokens, AllowBasicAuthTokens: true, BaseURL: platformURL,
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Logger: slog.New(slog.NewTextHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug})),
 	})}
 	for _, key := range []string{"alpha", "beta"} {
 		w.request(http.MethodPost, "/access/api/v1/projects", "admin", `{"project_key":"`+key+`","display_name":"`+key+`"}`, http.StatusCreated)
@@ -85,11 +89,13 @@ func (w subscriptionWorld) request(method, path, actor, body string, want int) *
 		}
 	}
 	r := support.Do(w.t, w.h, method, path, headers, body)
+	for _, secret := range []string{privateValue, rotatedValue, deniedValue} {
+		if strings.Contains(r.Body.String(), secret) || strings.Contains(w.logs.String(), secret) {
+			w.t.Fatal("subscription response, error or log disclosed a fixture secret")
+		}
+	}
 	if r.Code != want {
 		w.t.Fatalf("%s %s as %s: status=%d want=%d body=%s", method, path, strings.Split(actor, " ")[0], r.Code, want, r.Body.String())
-	}
-	if strings.Contains(r.Body.String(), privateValue) {
-		w.t.Fatal("subscription response disclosed a stored secret")
 	}
 	return r
 }
@@ -123,7 +129,7 @@ func subscriptionRouteContract(t *testing.T, store app.RouterStore) {
 		http.MethodPut,
 		subscriptions+"/plain",
 		"admin",
-		strings.ReplaceAll(update, `"url":"`+receiver.URL+`"`, `"url":"not-an-absolute-url","secret":"rotated"`),
+		strings.ReplaceAll(update, `"url":"`+receiver.URL+`"`, `"url":"not-an-absolute-url","secret":"`+rotatedValue+`"`),
 		http.StatusBadRequest,
 	)
 	stored, err = store.Webhooks().Get(t.Context(), "plain")
@@ -243,7 +249,17 @@ func subscriptionPrincipalMatrix(t *testing.T, store app.RouterStore) {
 	read := w.scopedToken("system:webhooks@alpha/" + platformURL + ":r")
 	w.request(http.MethodGet, subscriptions+"/alpha-future", read, "", http.StatusOK)
 	w.request(http.MethodGet, subscriptions+"/beta-artifact", read, "", http.StatusForbidden)
+	before, err := w.store.Webhooks().Get(t.Context(), "alpha-artifact")
+	if err != nil {
+		t.Fatal(err)
+	}
+	denied := strings.ReplaceAll(subscriptionBody("alpha-artifact", "alpha", "artifact", "deployed", "https://receiver.example"), privateValue, deniedValue)
+	w.request(http.MethodPut, subscriptions+"/alpha-artifact", read, denied, http.StatusForbidden)
 	w.request(http.MethodDelete, subscriptions+"/alpha-artifact", read, "", http.StatusForbidden)
+	after, err := w.store.Webhooks().Get(t.Context(), "alpha-artifact")
+	if err != nil || !reflect.DeepEqual(before, after) || after.Handlers[0].Secret != privateValue {
+		t.Fatal("action-scoped denial changed the stored subscription or protected secret", err)
+	}
 	wrongURL := w.scopedToken("system:webhooks@alpha/https://receiver.example:r")
 	w.request(http.MethodGet, subscriptions, wrongURL, "", http.StatusForbidden)
 	resource := w.scopedToken("applied-permissions/user artifact:*:r")
