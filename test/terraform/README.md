@@ -62,6 +62,12 @@ evidence and prevents a later instance from inheriting an earlier run's state, c
 or listening event. Without that option, successful temporary workspaces are removed and
 failed ones retained. Cleanup signals and reaps only the forwarder and child it started.
 
+Callers continuing after validation consume the single `Terraform provider workspace: `
+output line and use that fresh child for both `scenarios/<scenario>` and `terraformrc`.
+The two-instance replication acceptance caller verifies it is a new private direct `run.*`
+child with contained configuration/scenario paths. Its `provider.log` and sanitized evidence
+remain in the caller-selected parent; earlier child state is preserved rather than resumed.
+
 `python3 -I test/terraform/driver_test.py` exercises the shell entry point with owned
 ephemeral listeners, a Go/chi HTTP fixture built once, and stub Go/Terraform clients. The
 draining-child cases hold an active request, signal shutdown and bind an owned replacement
