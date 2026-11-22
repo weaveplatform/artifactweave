@@ -18,7 +18,8 @@ import (
 )
 
 // ReplicationAPI serves single-target configuration and its enablement/global
-// controls, stored-config execution and durable status. One-shot, multi-push and advanced replication
+// controls, saved-config/per-run execution and durable status. Distinct push destinations,
+// multi-push and advanced replication
 // retain their separate owners and generated responses.
 type ReplicationAPI struct {
 	Configurations *replication.Service

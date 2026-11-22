@@ -16,6 +16,10 @@ type ExecutionStore interface {
 // ExecutionProgressStore retains logical identity after queue/target removal.
 // A stored record grants no current source, caller or transfer authority.
 type ExecutionProgressStore interface {
+	// PutOptions creates immutable, resolved one-shot options under the exact
+	// execution lifetime. An enclosing admission transaction is required.
+	PutOptions(context.Context, model.ExecutionReference, model.ExecutionOptions) error
+	Options(context.Context, model.ExecutionReference) (model.ExecutionOptions, error)
 	// Create is idempotent only for the same immutable binding. A Quartz
 	// occurrence may identify only one logical execution, across all retries.
 	Create(context.Context, string, model.ExecutionBinding, time.Time) (model.ExecutionRun, error)

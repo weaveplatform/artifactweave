@@ -201,8 +201,7 @@ components:
         element and url may be omitted; for a push each element names a target.
       properties:
         checkBinaryExistenceInFilestore:
-          description: Optional within this object. Skip transferring content the target already holds. Accepted
-            and ignored.
+          description: Optional within this object. Binary-existence optimization is unsupported; true answers 501.
           type: boolean
         delete:
           default: false
@@ -375,8 +374,10 @@ paths:
         repository pushes; a remote repository pulls into its owning cache. The optional folder path limits selection.
         Returns 202 with an empty body after transfer progress, execution linkage and queue admission commit atomically.
         Current repository management and transfer permissions apply. Repeated requests create distinct logical runs.
-        The body may be omitted or contain an empty array or one empty object. One-shot option/connection overrides
-        remain unsupported and answer 501; supplied options are never silently discarded. Multiple targets answer 400.
+        An omitted body or empty array uses saved options. One object supplies per-run selection defaults of properties
+        true, delete false, and no include/exclude restriction beyond the requested path. Per-run selection and push
+        credentials/proxy values are immutable and never change the saved configuration. A different push URL and
+        binary-existence optimization remain unsupported and answer 501. Multiple targets and null options answer 400.
       operationId: executePullPushReplication
       parameters:
       - description: Required path parameter. Repository key, optionally followed by a folder path, for example
@@ -404,7 +405,7 @@ paths:
               items:
                 $ref: '#/components/schemas/ReplicationRequest'
               type: array
-        description: Optional single-target options. Omitted or empty uses stored configuration; one-shot overrides answer 501.
+        description: Optional single-target options. Omitted or an empty array uses the saved configuration; one object supplies per-run options.
         required: false
       responses:
         '202':

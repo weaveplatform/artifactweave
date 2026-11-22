@@ -67,23 +67,26 @@ func TestUnitReplicationStatusWirePreservesDirectionAndLastCompletion(t *testing
 	}
 }
 
-func TestUnitReplicationExecuteRejectsAmbiguousBodiesAndUndeliveredOptions(t *testing.T) {
+func TestUnitReplicationExecutePreservesOptionsAndRejectsAmbiguousBodies(t *testing.T) {
 	for _, raw := range []string{"", "[]", "[{}]"} {
-		if err := executionBody(strings.NewReader(raw)); err != nil {
+		if _, err := executionBody(strings.NewReader(raw)); err != nil {
 			t.Fatal("stored execution body refused", err)
 		}
 	}
 	for _, raw := range []string{"null", "{}", "[{},{}]", "[null,null]", "[null]", `[{"unknown":true}]`, "[]{}", "[{broken]", "[{\"unknown\":true}]"} {
 		var answer *apierror.Error
-		if err := executionBody(strings.NewReader(raw)); !errors.As(err, &answer) || answer.Status != http.StatusBadRequest {
+		if _, err := executionBody(strings.NewReader(raw)); !errors.As(err, &answer) || answer.Status != http.StatusBadRequest {
 			t.Fatal("ambiguous execution body accepted", raw, err)
 		}
 	}
-	if err := executionBody(strings.NewReader(`[{"password":null}]`)); !errors.Is(err, apierror.ErrNotImplemented) {
+	var answer *apierror.Error
+	if _, err := executionBody(strings.NewReader(`[{"password":null}]`)); !errors.As(err, &answer) || answer.Status != http.StatusBadRequest {
 		t.Fatal("explicit null override was silently discarded", err)
 	}
-	if err := executionBody(strings.NewReader(`[{"password":"private-must-not-be-ignored"}]`)); !errors.Is(err, apierror.ErrNotImplemented) {
-		t.Fatal("one-shot options silently discarded", err)
+	input, err := executionBody(strings.NewReader(`[{"password":"private-must-not-be-ignored","properties":false,"delete":true,"includePathPrefixPattern":"selected/**"}]`))
+	if err != nil || input == nil || input.Password == nil || *input.Password != "private-must-not-be-ignored" ||
+		input.SyncProperties == nil || *input.SyncProperties || input.SyncDeletes == nil || !*input.SyncDeletes || input.Include == nil || *input.Include != "selected/**" {
+		t.Fatal("one-shot options silently discarded")
 	}
 }
 

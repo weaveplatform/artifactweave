@@ -850,6 +850,14 @@ constraint replication_execution_effects.replication_execution_effects_pkey PRIM
 constraint replication_execution_effects.replication_execution_effects_run_id_run_incarnation_fkey FOREIGN KEY (run_id, run_incarnation) REFERENCES replication_executions(run_id, incarnation) ON DELETE CASCADE
 constraint replication_execution_effects.replication_execution_effects_transfer_version_check CHECK ((transfer_version > 0))
 index replication_execution_effects.replication_execution_effects_pkey CREATE UNIQUE INDEX replication_execution_effects_pkey ON replication_execution_effects USING btree (run_id, run_incarnation, operation_key)
+table replication_execution_options
+column replication_execution_options.run_id text NOT NULL
+column replication_execution_options.run_incarnation text NOT NULL
+column replication_execution_options.options_json text NOT NULL
+column replication_execution_options.password bytea
+constraint replication_execution_options.replication_execution_options_pkey PRIMARY KEY (run_id, run_incarnation)
+constraint replication_execution_options.replication_execution_options_run_id_run_incarnation_fkey FOREIGN KEY (run_id, run_incarnation) REFERENCES replication_executions(run_id, incarnation) ON DELETE CASCADE
+index replication_execution_options.replication_execution_options_pkey CREATE UNIQUE INDEX replication_execution_options_pkey ON replication_execution_options USING btree (run_id, run_incarnation)
 table replication_executions
 column replication_executions.run_id text NOT NULL
 column replication_executions.incarnation text NOT NULL

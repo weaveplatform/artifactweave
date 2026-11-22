@@ -30,6 +30,10 @@ var Module = dialect.Module{
 	},
 	Sealed: []dialect.SealedColumn{
 		{
+			Table: "replication_execution_options", Column: "password", Purpose: purposeExecutionPassword,
+			Keys: []string{"run_id", "run_incarnation"}, RowID: executionOptionsRowID,
+		},
+		{
 			Table: "replications", Column: "password", Purpose: purposeReplicationPassword,
 			Keys: []string{"replication_key"}, RowID: dialect.FirstKey,
 		},

@@ -20,7 +20,8 @@
 // passwords while keeping private worker revisions out of responses. Two
 // handwritten greedy-path routes admit stored-config execution with 202 and
 // return read-authorized durable status with 200. Admission makes no peer call;
-// unsupported one-shot options are refused rather than silently ignored.
+// per-run options are immutable and credentials are separately sealed. Distinct
+// destination overrides remain explicitly unsupported.
 //
 // # References
 //

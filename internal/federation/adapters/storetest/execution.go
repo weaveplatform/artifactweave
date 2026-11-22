@@ -28,6 +28,7 @@ func executionBinding(occurrence string) model.ExecutionBinding {
 func runExecutions(t *testing.T, newStore Factory) {
 	t.Run("Executions", func(t *testing.T) {
 		t.Run("immutable identity and occurrence", func(t *testing.T) { executionIdentity(t, newStore(t)) })
+		t.Run("immutable one-shot options", func(t *testing.T) { executionOptions(t, newStore(t)) })
 		t.Run("transactional recovery", func(t *testing.T) { executionRecovery(t, newStore(t)) })
 		t.Run("closed failure recovery", func(t *testing.T) { executionFailureRecovery(t, newStore(t)) })
 		t.Run("selected effects and replay", func(t *testing.T) { executionEffects(t, newStore(t)) })

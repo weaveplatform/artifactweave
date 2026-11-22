@@ -32,6 +32,7 @@ type ExecutionBinding struct {
 	Occurrence          string                          `json:"occurrence"`
 	TransferID          string                          `json:"transfer_id"`
 	TransferIncarnation string                          `json:"transfer_incarnation"`
+	OneShot             bool                            `json:"one_shot,omitempty"`
 }
 
 // ExecutionPhase is dispatch lifecycle state. Transfer progress remains owned
@@ -114,7 +115,7 @@ func (b ExecutionBinding) Validate() error {
 			return fmt.Errorf("incomplete execution binding: %w", kernel.ErrInvalid)
 		}
 	}
-	if len(b.TransferID) > 256 || len(b.TransferIncarnation) > 256 || !privateText(b.Root) || !privateText(b.Occurrence) ||
+	if b.OneShot && b.Occurrence != "" || len(b.TransferID) > 256 || len(b.TransferIncarnation) > 256 || !privateText(b.Root) || !privateText(b.Occurrence) ||
 		b.Credential.Anonymous || b.Credential.Registry != nil || !privateText(b.Credential.TokenID) ||
 		!b.Credential.Password && b.Credential.TokenID == "" ||
 		b.Direction != ReplicationPush && b.Direction != ReplicationPull {

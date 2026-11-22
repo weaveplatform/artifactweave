@@ -85,8 +85,9 @@ type Service struct {
 	Schedules   schedule.Store
 	// ScheduleAuthor supplies a verified reference in tests/composition. Nil
 	// uses the authenticated request principal already checked by Authorize.
-	ScheduleAuthor func(context.Context) (kernel.CredentialReference, error)
-	Now            func() time.Time
+	ScheduleAuthor   func(context.Context) (kernel.CredentialReference, error)
+	Now              func() time.Time
+	executionOptions *model.ExecutionOptions
 }
 
 func (s Service) run(ctx context.Context, fn func(context.Context, Policy) error) error {
@@ -278,6 +279,9 @@ func (s Service) WithTarget(ctx context.Context, key, revision string, fn func(c
 		}
 		if direction == model.ReplicationPush && blocks.Push || direction == model.ReplicationPull && blocks.Pull {
 			return kernel.ErrConflict
+		}
+		if s.executionOptions != nil {
+			r = s.executionOptions.Apply(r)
 		}
 		return fn(ctx, r)
 	})

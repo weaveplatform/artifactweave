@@ -156,6 +156,9 @@ func (w Worker) run(ctx context.Context, ref model.ExecutionReference, fence Pus
 
 func (w Worker) enter(ctx context.Context, run model.ExecutionRun, fence PushFence) error {
 	return w.Configurations.run(ctx, func(ctx context.Context, policy Policy) error {
+		if _, err := executionOptions(ctx, run, w.Store.Executions()); err != nil {
+			return err
+		}
 		repository, err := w.Configurations.repository(ctx, run.Binding.Repository.Key, policy)
 		if err != nil {
 			return err

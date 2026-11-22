@@ -5924,7 +5924,7 @@ type ReplicationRepositoryStatusStatus string
 
 // ReplicationRequest Per-target options for a replication started on demand. For a pull the array holds at most one element and url may be omitted; for a push each element names a target.
 type ReplicationRequest struct {
-	// CheckBinaryExistenceInFilestore Optional within this object. Skip transferring content the target already holds. Accepted and ignored.
+	// CheckBinaryExistenceInFilestore Optional within this object. Binary-existence optimization is unsupported; true answers 501.
 	CheckBinaryExistenceInFilestore *bool `json:"checkBinaryExistenceInFilestore,omitempty"`
 
 	// Delete Optional within this object. True also deletes items at the destination that are absent at the source. Defaults to false.

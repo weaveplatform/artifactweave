@@ -40,14 +40,26 @@ func (m *Module) Coordinator() (replication.Coordinator, error) {
 		Store: store, Configurations: m.Configurations(), Restore: m.restoreTransferCaller,
 		Drivers: map[model.ReplicationDirection]replication.TransferStart{
 			model.ReplicationPush: func(ctx context.Context, request replication.TransferRequest) (replication.TransferAdmission, error) {
-				run, err := push.Start(ctx, replication.PushRequest(request), nil)
+				driver := push
+				driver.Configurations = driver.Configurations.WithExecutionOptions(request.Options)
+				run, err := driver.Start(
+					ctx,
+					replication.PushRequest{ID: request.ID, TargetKey: request.TargetKey, TargetRevision: request.TargetRevision, Root: request.Root},
+					nil,
+				)
 				if err != nil {
 					return replication.TransferAdmission{}, fmt.Errorf("admit execution push: %w", err)
 				}
 				return replication.TransferAdmission{ID: run.Reference.ID, Incarnation: run.Reference.Incarnation, Repository: run.Binding.Source}, nil
 			},
 			model.ReplicationPull: func(ctx context.Context, request replication.TransferRequest) (replication.TransferAdmission, error) {
-				run, err := pull.Start(ctx, replication.PullRequest(request), nil)
+				driver := pull
+				driver.Configurations = driver.Configurations.WithExecutionOptions(request.Options)
+				run, err := driver.Start(
+					ctx,
+					replication.PullRequest{ID: request.ID, TargetKey: request.TargetKey, TargetRevision: request.TargetRevision, Root: request.Root},
+					nil,
+				)
 				if err != nil {
 					return replication.TransferAdmission{}, fmt.Errorf("admit execution pull: %w", err)
 				}

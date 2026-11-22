@@ -34,7 +34,11 @@ func (p Push) ExecutionStep(ctx context.Context, execution model.ExecutionRun, p
 		return fmt.Errorf("push completion has no atomic execution projection: %w", kernel.ErrStore)
 	}
 	p.Store = observedPushStore{PushStore: p.Store, progress: progress, execution: execution.Reference}
-	p.Configurations = executionConfiguration(p.Configurations, execution)
+	options, err := executionOptions(ctx, execution, progress)
+	if err != nil {
+		return err
+	}
+	p.Configurations = executionConfiguration(p.Configurations.WithExecutionOptions(options), execution)
 	_, err = p.Step(ctx, ref, fence)
 	return err
 }
@@ -128,7 +132,11 @@ func (p Pull) ExecutionStep(ctx context.Context, execution model.ExecutionRun, p
 		return fmt.Errorf("pull completion has no atomic execution projection: %w", kernel.ErrStore)
 	}
 	p.Store = observedPullStore{PullStore: p.Store, progress: progress, execution: execution.Reference}
-	p.Configurations = executionConfiguration(p.Configurations, execution)
+	options, err := executionOptions(ctx, execution, progress)
+	if err != nil {
+		return err
+	}
+	p.Configurations = executionConfiguration(p.Configurations.WithExecutionOptions(options), execution)
 	_, err = p.Step(ctx, ref, fence)
 	return err
 }

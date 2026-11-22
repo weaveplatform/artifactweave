@@ -70,8 +70,9 @@
 // checkpoints with idempotent selected-path evidence. StatusReader returns current
 // target/repository lifetime history without opening credentials. Its HTTP route
 // requires current Read covering the selected subtree. Public execute admits
-// stored-config runs with 202 after durable enqueue; one-shot overrides and
-// remaining runtime qualification are still integration work. Multi-push,
+// saved-config and per-run selection options with 202 after durable enqueue. Per-run
+// credentials are separately sealed; distinct destinations and remaining runtime
+// qualification are still integration work. Multi-push,
 // event-triggered and binary-existence optimization remain P37.
 //
 // # Testing

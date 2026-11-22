@@ -28,7 +28,10 @@ type CoordinatorStore interface {
 
 // TransferRequest selects a direction driver's immutable logical transfer.
 // Start must make no network request and must join the supplied transaction.
-type TransferRequest struct{ ID, TargetKey, TargetRevision, Root string }
+type TransferRequest struct {
+	ID, TargetKey, TargetRevision, Root string
+	Options                             *model.ExecutionOptions
+}
 
 // TransferAdmission identifies actual retained direction-specific progress.
 // It carries no copied credentials, permission decision or target connection.
@@ -61,11 +64,18 @@ func (c Coordinator) now() time.Time {
 // Execute validates a canonical repository/path and records one manual run.
 // Repeated user requests are distinct logical runs, even at the same instant.
 func (c Coordinator) Execute(ctx context.Context, repository, root string) (model.ExecutionRun, error) {
-	return c.admit(ctx, repository, root, rand.Text(), "", "", "", nil)
+	return c.admit(ctx, repository, root, rand.Text(), "", "", "", nil, nil)
+}
+
+// ExecuteWithOptions records resolved one-shot values in the same transaction
+// as direction progress, logical dispatch and queue admission.
+func (c Coordinator) ExecuteWithOptions(ctx context.Context, repository, root string, input ExecutionInput) (model.ExecutionRun, error) {
+	return c.admit(ctx, repository, root, rand.Text(), "", "", "", nil, &input)
 }
 
 func (c Coordinator) admit(ctx context.Context, repository, root, id, occurrence, expectedTarget, expectedRevision string,
 	finalFence func(context.Context) error,
+	input *ExecutionInput,
 ) (model.ExecutionRun, error) {
 	if c.Store == nil || c.Configurations.Guard == nil {
 		return model.ExecutionRun{}, fmt.Errorf("replication dispatch contracts unavailable: %w", kernel.ErrStore)
@@ -92,11 +102,19 @@ func (c Coordinator) admit(ctx context.Context, repository, root, id, occurrence
 			return kernel.ErrConflict
 		}
 		return c.Configurations.WithTarget(ctx, target.Key, target.Revision, func(ctx context.Context, target model.Replication) error {
+			var options *model.ExecutionOptions
+			if input != nil {
+				resolved, err := c.Configurations.resolveExecutionOptions(ctx, owner, target, *input)
+				if err != nil {
+					return err
+				}
+				options = &resolved
+			}
 			caller, err := kernel.RequireAuthenticated(ctx)
 			if err != nil {
 				return fmt.Errorf("replication execution author: %w", err)
 			}
-			transfer, err := start(ctx, TransferRequest{ID: id, TargetKey: target.Key, TargetRevision: target.Revision, Root: root})
+			transfer, err := start(ctx, TransferRequest{ID: id, TargetKey: target.Key, TargetRevision: target.Revision, Root: root, Options: options})
 			if err != nil {
 				return fmt.Errorf("admit replication transfer: %w", err)
 			}
@@ -107,10 +125,16 @@ func (c Coordinator) admit(ctx context.Context, repository, root, id, occurrence
 				TargetKey: target.Key, TargetRevision: target.Revision,
 				Repository: transfer.Repository, Direction: direction, Root: root, Credential: caller.CredentialReference(),
 				Occurrence: occurrence, TransferID: transfer.ID, TransferIncarnation: transfer.Incarnation,
+				OneShot: options != nil,
 			}
 			out, err = c.Store.Executions().Create(ctx, id, binding, c.now())
 			if err != nil {
 				return fmt.Errorf("admit logical replication execution: %w", err)
+			}
+			if options != nil {
+				if err := c.Store.Executions().PutOptions(ctx, out.Reference, *options); err != nil {
+					return fmt.Errorf("admit immutable execution options: %w", err)
+				}
 			}
 			if err := c.enqueue(ctx, out); err != nil {
 				return err
@@ -187,5 +211,5 @@ func (c Coordinator) Scheduled(ctx context.Context, trigger schedule.Trigger) (m
 	if ctx == nil || c.Store.InTx(ctx) {
 		return model.ExecutionRun{}, fmt.Errorf("replication author restoration leaked a transaction: %w", kernel.ErrStore)
 	}
-	return c.admit(ctx, target.RepoKey, "", trigger.ID, trigger.ID, target.Key, trigger.Revision, trigger.Fence)
+	return c.admit(ctx, target.RepoKey, "", trigger.ID, trigger.ID, target.Key, trigger.Revision, trigger.Fence, nil)
 }
