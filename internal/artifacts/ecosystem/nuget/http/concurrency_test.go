@@ -145,16 +145,28 @@ func TestAccNuGetWriteTransactionsOnPostgres(t *testing.T) {
 					)
 					r.Header.Set("Content-Type", ct)
 					rec := httptest.NewRecorder()
-					f.h.ServeHTTP(rec, r)
+					rec.Code = 0
+					// This test owns the goroutine net/http would normally abort.
+					aborted := func() (caught any) {
+						defer func() { caught = recover() }()
+						f.h.ServeHTTP(rec, r)
+						return nil
+					}()
 					want := http.StatusConflict
 					if mode == "rollback" || mode == "cancel owner" {
 						want = http.StatusCreated
 					}
-					if mode == "cancel waiter" {
-						want = http.StatusInternalServerError
-					}
 					var err error
-					if rec.Code != want {
+					switch {
+					case mode == "cancel waiter":
+						if aborted != http.ErrAbortHandler { //nolint:errorlint // net/http requires this exact sentinel
+							err = fmt.Errorf("cancelled push did not abort: %v", aborted)
+						} else if rec.Code != 0 || rec.Body.Len() != 0 || len(rec.Header()) != 0 {
+							err = fmt.Errorf("cancelled push published a response: %d %s", rec.Code, rec.Body)
+						}
+					case aborted != nil:
+						err = fmt.Errorf("push panicked: %v", aborted)
+					case rec.Code != want:
 						err = fmt.Errorf("push status %d, want %d: %s", rec.Code, want, rec.Body)
 					}
 					waitDone <- err
