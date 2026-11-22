@@ -50,9 +50,11 @@ func TestUnitReplicationPullOwnerRefusalDoesNotReserveAdmissionOrAuthorizeResume
 					t.Fatal("offline owner admitted a private transfer or was not consulted", err)
 				}
 				owner.failure = nil
+				healthyAt := time.Unix(200, 0)
+				w.pull.driver.Now = func() time.Time { return healthyAt }
 				run, err = w.pull.driver.Start(ctx, request, nil)
 				must(t, err)
-				if run.Version != 1 || run.Reference.ID != request.ID {
+				if run.Version != 1 || run.Reference.ID != request.ID || !run.Started.Equal(healthyAt) || !run.Updated.Equal(healthyAt) {
 					t.Fatal("refused owner admission retained an earlier transfer")
 				}
 			} else {
