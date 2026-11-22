@@ -29,7 +29,7 @@
 //
 //   - Module, whose API returns configuration/api's Descriptor (parse and
 //     apply a descriptor: PATCH /api/system/configuration, config apply and
-//     the bootstrap descriptor) and System (the descriptor's settings that
+//     the bootstrap descriptor), Export (the protected XML GET), and System (the descriptor's settings that
 //     other modules read), the narrow Mail.Server reader, and conditional P12
 //     Loggers. Settings returns the Settings from Deps. Close restores temporary
 //     logger levels and joins timer callbacks.

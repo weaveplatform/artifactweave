@@ -103,6 +103,7 @@ type System interface {
 // of each contract, as the module binds them.
 type API struct {
 	Descriptor Descriptor
+	Export     Export
 	System     System
 	Mail       Mail
 	Loggers    Loggers

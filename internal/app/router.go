@@ -207,8 +207,8 @@ type RouterConfig struct {
 	// repository bindings when this is nil.
 	Notifications *notifications.Module
 	// Configuration is the configuration module's API, through which PATCH
-	// /api/system/configuration applies the descriptor and the item routes
-	// read its minimum redirect size. When both its contracts are nil and
+	// /api/system/configuration applies and GET exports the descriptor; item routes
+	// read its minimum redirect size. When its descriptor, export and system contracts are nil and
 	// Store is set, NewRouter binds one over Store and Access with the
 	// descriptor core, as it binds Access. Without a store it stays zero.
 	Configuration configapi.API
@@ -382,7 +382,7 @@ func accessUnset(a accessapi.API) bool {
 // pairs and environments that repository entries name, and writes the
 // anonymous access setting, through cfg.Access.
 func withConfiguration(cfg RouterConfig) RouterConfig {
-	if cfg.Store == nil || cfg.Configuration.Descriptor != nil ||
+	if cfg.Store == nil || cfg.Configuration.Descriptor != nil || cfg.Configuration.Export != nil ||
 		cfg.Configuration.System != nil {
 		return cfg
 	}
@@ -712,6 +712,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	r.Get("/artifactory/api/artifactweave/remote-status/{repoKey}", artAPI.SmartStatus)
 	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
 		Patch("/artifactory/api/system/configuration", sysAPI.PatchConfiguration)
+	r.Get("/artifactory/api/system/configuration", sysAPI.GetConfiguration)
 	// The item routes and the handwritten routes beside them keep their
 	// original order (item paths, AQL, agent marketplace, CRAN uploads,
 	// transfer, Debian snapshots), and all run before

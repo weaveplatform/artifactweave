@@ -38,10 +38,13 @@ Three layers feed one internal configuration:
 3. **The REST and Terraform APIs**, which are the same service layer the descriptor
    calls.
 
-P12 owns `GET /artifactory/api/system/configuration` rendering the XML descriptor from
-the current state and completion of the baseline YAML descriptor. The GET currently
-answers `501`; current PATCH support is limited to the sections listed in
+P12 CFG-01 implements administrator-only `GET /artifactory/api/system/configuration`
+from current state for the delivered sections listed in
 [research 06](../06-system-configuration-and-descriptor.md#what-artifactweave-serves).
+The export joins the owning APIs to one metadata transaction and shared authority
+guard, rechecks current administrator authority there, and publishes XML only after
+commit. Later descriptor sections extend this same read contract. P12 also owns
+completion of the baseline YAML descriptor.
 Full XML replacement by `POST`, Artifactory bootstrap-file compatibility and Access
 bootstrap migration belong to P36. The separate deprecated raw security XML interface
 has Security REST and Access bootstrap replacements; that does not remove general system
@@ -53,8 +56,8 @@ the same PATCH, config-apply and bootstrap path. Its documented singleton fields
 merge into the existing mail configuration document; the password is separated
 and sealed with the configured keyring. Settings and password are read together
 under the shared guard before delivery starts. Disabled mail and string clearing
-are explicit; whole-section null is refused. This does not supply P12 XML rendering,
-mail testing endpoints or the remaining system administration.
+are explicit; whole-section null is refused. CFG-01 includes these public mail settings in XML; mail testing endpoints and the
+remaining system administration retain their P12 owners.
 
 ## Rationale
 

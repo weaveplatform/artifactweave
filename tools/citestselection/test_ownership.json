@@ -230,6 +230,7 @@
     ],
     "internal/configuration/adapters/http": [
       "descriptor_test.go",
+      "export_test.go",
       "loggers_test.go",
       "reverseproxy_test.go",
       "service_id_test.go",

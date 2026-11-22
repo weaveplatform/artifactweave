@@ -355,7 +355,7 @@ paths:
       x-cost: ordinary
   /api/system/configuration:
     get:
-      description: Not implemented; answers 501.
+      description: 'Admin only. Returns the currently delivered descriptor sections as application/xml from one committed metadata and current-authority snapshot: local, remote, virtual and federated repositories, proxies, property sets, repository layouts, mailServer, security.anonAccessEnabled and downloadRedirectConfig. Repository XML uses descriptor names and nesting rather than JSON API field names. Resource identities are preserved; absent optional configuration remains absent. Passwords and sensitive custom HTTP header values are omitted or empty. The pinned Terraform provider preserves mail and proxy passwords from its prior state. No public YAML read endpoint is supplied. Unsupported sections and full XML replacement remain owned by their future phases.'
       operationId: getSystemConfiguration
       responses:
         '200':
@@ -364,17 +364,18 @@ paths:
               schema:
                 description: The XML descriptor document.
                 type: string
-          description: Not returned.
+          description: The current protected XML descriptor.
         '401':
           description: Rejected credentials.
         '403':
-          description: Not returned.
+          description: Caller is not a current administrator.
+        '500':
+          description: The complete snapshot could not be read or committed; no successful XML is returned.
       summary: Read the configuration descriptor
       tags:
       - system
       - handwritten
       x-handwritten: true
-      x-tier: stub
       x-idempotency: safe
       x-cost: ordinary
     patch:
