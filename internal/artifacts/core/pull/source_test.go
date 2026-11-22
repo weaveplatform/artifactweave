@@ -40,11 +40,17 @@ type peer struct {
 	filesCalls      int
 	propertyCalls   int
 	afterProperties func()
+	afterAbsence    func()
 }
 
-func (p *peer) Binding() string                              { return p.binding }
-func (p *peer) Absent(context.Context, string) (bool, error) { return p.absent, p.absentErr }
-func (p *peer) Revalidate(context.Context) error             { return p.currentErr }
+func (p *peer) Binding() string { return p.binding }
+func (p *peer) Absent(context.Context, string) (bool, error) {
+	if p.afterAbsence != nil {
+		p.afterAbsence()
+	}
+	return p.absent, p.absentErr
+}
+func (p *peer) Revalidate(context.Context) error { return p.currentErr }
 func (p *peer) CheckRead(_ context.Context, path string) error {
 	if p.denied[path] {
 		return source.ErrDenied

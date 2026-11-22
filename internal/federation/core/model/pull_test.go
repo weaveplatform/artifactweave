@@ -2,6 +2,7 @@ package model_test
 
 import (
 	"errors"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +26,200 @@ func pullRun(t *testing.T) model.PullRun {
 		t.Fatal(err)
 	}
 	return run
+}
+
+func TestUnitPullProvenanceRejectsIncompleteOrUnusableBindings(t *testing.T) {
+	for _, ref := range []model.PullReference{{}, {ID: "a"}, {ID: strings.Repeat("a", 257), Incarnation: "b"}} {
+		if err := ref.Validate(); !errors.Is(err, kernel.ErrInvalid) {
+			t.Fatal("invalid logical lifetime accepted", err)
+		}
+	}
+	for _, tc := range []struct {
+		name string
+		edit func(*model.PullBinding)
+	}{
+		{"missing source", func(b *model.PullBinding) { b.Source.Repository.Incarnation = "" }},
+		{"anonymous", func(b *model.PullBinding) { b.Credential.Anonymous = true }},
+		{"registry credential", func(b *model.PullBinding) { b.Credential.Registry = &kernel.RegistryReference{} }},
+		{"missing credential", func(b *model.PullBinding) { b.Credential.TokenID = "" }},
+		{"source fingerprint", func(b *model.PullBinding) { b.Source.Revision = "unhashed-source" }},
+		{"scope traversal", func(b *model.PullBinding) { b.Root = "selected/../other" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			binding := pullRun(t).Binding
+			tc.edit(&binding)
+			if err := binding.Validate(); !errors.Is(err, kernel.ErrInvalid) {
+				t.Fatal("unusable durable pull provenance accepted", err)
+			}
+		})
+	}
+}
+
+func TestUnitPullTraversalValidationRejectsFalseCompletionAndRewind(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*model.PullRun)
+	}{
+		{"invalid lifetime", func(r *model.PullRun) { r.Reference.ID = "" }},
+		{"invalid binding", func(r *model.PullRun) { r.Binding.TargetKey = "" }},
+		{"clock before admission", func(r *model.PullRun) { r.Updated = r.Started.Add(-time.Second) }},
+		{"target before source", func(r *model.PullRun) { r.TargetDone = true }},
+		{"reconcile incomplete source", func(r *model.PullRun) { r.Phase = model.PullReconcile }},
+		{"complete incomplete traversal", func(r *model.PullRun) { r.Phase, r.Completed = model.PullComplete, r.Updated }},
+		{"unknown phase", func(r *model.PullRun) { r.Phase = "future" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			run := pullRun(t)
+			tc.edit(&run)
+			if err := run.Validate(); !errors.Is(err, kernel.ErrInvalid) {
+				t.Fatal("invalid durable traversal accepted", err)
+			}
+			if err := model.ValidatePullAdvance(pullRun(t), run); !errors.Is(err, kernel.ErrInvalid) {
+				t.Fatal("invalid traversal admitted by advance", err)
+			}
+		})
+	}
+	run := pullRun(t)
+	failed := run
+	failed.Version++
+	failed.Phase, failed.Completed = model.PullFailed, failed.Updated
+	if err := model.ValidatePullAdvance(run, failed); err != nil {
+		t.Fatal("failed work must retain a terminal record", err)
+	}
+	for _, current := range []model.PullRun{failed, {}} {
+		if err := model.ValidatePullAdvance(current, failed); !errors.Is(err, kernel.ErrConflict) {
+			t.Fatal("invalid or settled lifetime advanced", err)
+		}
+	}
+	run.Version = math.MaxInt64
+	if err := model.ValidatePullAdvance(run, failed); !errors.Is(err, kernel.ErrConflict) {
+		t.Fatal("version overflow advanced", err)
+	}
+}
+
+func TestUnitPullEvidenceRejectsUnsafeResultsAndReboundIntents(t *testing.T) {
+	run := pullRun(t)
+	for _, tc := range []struct {
+		name string
+		edit func(*model.PullItem)
+	}{
+		{"invalid reference", func(i *model.PullItem) { i.Run.ID = "" }},
+		{"foreign lifetime", func(i *model.PullItem) { i.Run.Incarnation = "new-lifetime" }},
+		{"source absent", func(i *model.PullItem) { i.Source = nil }},
+		{"delete lacks target", func(i *model.PullItem) { i.Action, i.Source = model.PullDelete, nil }},
+		{"unknown action", func(i *model.PullItem) { i.Action = "future" }},
+		{"unknown phase", func(i *model.PullItem) { i.Phase = "future" }},
+		{"pending terminal evidence", func(i *model.PullItem) { i.Reason = "source_changed" }},
+		{"unsafe failure reason", func(i *model.PullItem) {
+			i.Phase, i.Outcome, i.Reason = model.PullItemComplete, model.PullItemFailed, "https://peer.invalid/secret"
+		}},
+		{"unknown outcome", func(i *model.PullItem) { i.Phase, i.Outcome = model.PullItemComplete, "future" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			intent := pullIntent(run)
+			tc.edit(&intent)
+			if err := intent.Validate(run); !errors.Is(err, kernel.ErrInvalid) {
+				t.Fatal("unsafe or unbound evidence accepted", err)
+			}
+			if err := model.ValidatePullItemCreation(run, intent); !errors.Is(err, kernel.ErrInvalid) {
+				t.Fatal("invalid intent persisted", err)
+			}
+			if err := model.ValidatePullItemAdvance(run, intent, intent); !errors.Is(err, kernel.ErrInvalid) {
+				t.Fatal("invalid current evidence advanced", err)
+			}
+		})
+	}
+	intent := pullIntent(run)
+	settled := kernel.Clone(intent)
+	settled.Version++
+	settled.Phase, settled.Outcome, settled.Reason = model.PullItemComplete, model.PullSkipped, "source_changed"
+	if err := model.ValidatePullItemAdvance(run, intent, model.PullItem{}); !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal("empty next evidence accepted", err)
+	}
+	changed := kernel.Clone(settled)
+	changed.Source.Size++
+	if err := model.ValidatePullItemAdvance(run, intent, changed); !errors.Is(err, kernel.ErrConflict) {
+		t.Fatal("changed immutable source accepted", err)
+	}
+	run.SourceDone = true
+	if err := model.ValidatePullItemCreation(run, intent); !errors.Is(err, kernel.ErrConflict) {
+		t.Fatal("new fetch admitted after source traversal ended", err)
+	}
+	for _, invalid := range []struct {
+		action model.PullAction
+		path   string
+	}{{"future", "selected/a"}, {model.PullFetch, "../outside"}} {
+		if _, err := model.PullItemKey(invalid.action, invalid.path); !errors.Is(err, kernel.ErrInvalid) {
+			t.Fatal("invalid recovery key accepted", err)
+		}
+	}
+	bad := kernel.Clone(intent)
+	bad.Source.Modified = time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)
+	if _, err := model.PullIntentFingerprint(bad); !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal("unencodable upstream facts received a fingerprint", err)
+	}
+	if err := model.ValidatePullItemAdvance(run, bad, settled); !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal("unencodable current facts advanced", err)
+	}
+	badNext := kernel.Clone(settled)
+	badNext.Source.Modified = bad.Source.Modified
+	if err := model.ValidatePullItemAdvance(run, intent, badNext); !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal("unencodable next facts advanced", err)
+	}
+}
+
+func TestUnitPullDeletionEvidenceRequiresExactBoundedRemovalProof(t *testing.T) {
+	run := pullRun(t)
+	run.SourceDone, run.Phase = true, model.PullReconcile
+	intent := model.PullItem{
+		Run: run.Reference, Action: model.PullDelete, Path: "selected/a", Version: 1, Phase: model.PullIntent, Updated: run.Started,
+		Target: &artifactsapi.PullCacheCandidate{Repository: run.Binding.Source, Selection: run.Binding.Selection(), Path: "selected/a", Version: strings.Repeat("f", 64)},
+	}
+	for _, paths := range [][]string{nil, {"selected/other"}, {"selected/a", "selected/a"}, {"selected/a", "../escape"}} {
+		settled := kernel.Clone(intent)
+		settled.Version++
+		settled.Phase, settled.Outcome, settled.Removed = model.PullItemComplete, model.PullSucceeded, paths
+		if err := model.ValidatePullItemAdvance(run, intent, settled); !errors.Is(err, kernel.ErrInvalid) {
+			t.Fatal("unproved/duplicate removal acknowledged", paths, err)
+		}
+	}
+}
+
+func TestUnitPullRetainedEvidenceIsBenignOnlyForUnchangedDeletionIntents(t *testing.T) {
+	run := pullRun(t)
+	run.SourceDone, run.Phase = true, model.PullReconcile
+	intent := model.PullItem{
+		Run: run.Reference, Action: model.PullDelete, Path: "selected/a", Version: 1, Phase: model.PullIntent, Updated: run.Started,
+		Target: &artifactsapi.PullCacheCandidate{Repository: run.Binding.Source, Selection: run.Binding.Selection(), Path: "selected/a", Version: strings.Repeat("f", 64)},
+	}
+	retained := kernel.Clone(intent)
+	retained.Version++
+	retained.Phase, retained.Outcome = model.PullItemComplete, model.PullRetained
+	if err := model.ValidatePullItemAdvance(run, intent, retained); err != nil {
+		t.Fatal("fenced retention was refused", err)
+	}
+	for _, tc := range []struct {
+		name string
+		edit func(*model.PullItem)
+	}{
+		{"fabricated deletion", func(i *model.PullItem) { i.Removed = []string{i.Path} }},
+		{"refusal reason", func(i *model.PullItem) { i.Reason = "source_changed" }},
+		{"fabricated cache receipt", func(i *model.PullItem) { i.Cache = &artifactsapi.PullCached{} }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bad := kernel.Clone(retained)
+			tc.edit(&bad)
+			if err := model.ValidatePullItemAdvance(run, intent, bad); !errors.Is(err, kernel.ErrInvalid) {
+				t.Fatal("retention carried effect or refusal evidence", err)
+			}
+		})
+	}
+	fetch := pullIntent(run)
+	fetch.Version++
+	fetch.Phase, fetch.Outcome = model.PullItemComplete, model.PullRetained
+	if err := fetch.Validate(run); !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal("fetch used retention instead of a byte receipt", err)
+	}
 }
 
 func pullIntent(run model.PullRun) model.PullItem {

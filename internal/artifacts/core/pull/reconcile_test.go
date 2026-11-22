@@ -29,12 +29,10 @@ func removalFixture(t *testing.T) (*world, model.RemoteCacheEntry, api.PullCache
 }
 
 func TestUnitPullCacheRemovalNeedsExactAbsenceAndCurrentRepresentation(t *testing.T) {
-	for _, mode := range []string{"present", "filtered-virtual-omission", "assumed-offline", "revoked", "replaced", "new-representation", "changed-options"} {
+	for _, mode := range []string{"filtered-virtual-omission", "assumed-offline", "revoked", "replaced", "new-representation", "changed-options"} {
 		t.Run(mode, func(t *testing.T) {
 			w, entry, candidate := removalFixture(t)
 			switch mode {
-			case "present":
-				w.peer.absent = false
 			case "filtered-virtual-omission":
 				w.peer.absentErr = source.ErrUnsupported
 			case "assumed-offline":
@@ -65,6 +63,61 @@ func TestUnitPullCacheRemovalNeedsExactAbsenceAndCurrentRepresentation(t *testin
 			}
 			if _, err := w.db.Items().Get(t.Context(), "remote", true, "a"); err != nil {
 				t.Fatal("refused reconciliation changed the cache item", err)
+			}
+		})
+	}
+}
+
+func TestUnitPullPresentSourceSettlesRetentionWithCurrentAuthorityAndFinalFence(t *testing.T) {
+	for _, mode := range []string{"commit", "lost-lease", "changed-cache", "revoked"} {
+		t.Run(mode, func(t *testing.T) {
+			w, entry, candidate := removalFixture(t)
+			w.peer.absent = false
+			w.peer.afterAbsence = func() {
+				if w.db.InTx(t.Context()) {
+					t.Fatal("upstream observation occurred in a metadata transaction")
+				}
+				if mode == "revoked" {
+					w.openErr = kernel.ErrForbidden
+				}
+				if mode == "changed-cache" {
+					if _, err := w.db.RemoteCache().Put(t.Context(), entry.Token, entry); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			grant := publication()
+			fences := 0
+			grant.Fence = func(ctx context.Context) error {
+				if !w.db.InTx(ctx) {
+					t.Fatal("retained observation escaped its final transaction")
+				}
+				fences++
+				if mode == "lost-lease" {
+					return kernel.ErrConflict
+				}
+				return nil
+			}
+			paths, err := w.source.Remove(t.Context(), candidate, grant, func(ctx context.Context, paths []string) error {
+				if !w.db.InTx(ctx) || len(paths) != 0 {
+					t.Fatal("retention was claimed as an actual deletion")
+				}
+				return w.db.Settings().Put(ctx, "retained-cache-checkpoint", true)
+			})
+			var retained bool
+			checkpointErr := w.db.Settings().Get(t.Context(), "retained-cache-checkpoint", &retained)
+			if mode == "commit" {
+				if err != nil || len(paths) != 0 || fences != 1 || checkpointErr != nil || !retained {
+					t.Fatal("healthy upstream presence became a warning or fake removal", err, checkpointErr)
+				}
+			} else if err == nil || len(paths) != 0 || !errors.Is(checkpointErr, kernel.ErrNotFound) {
+				t.Fatal("stale or unfenced retention committed evidence", err, checkpointErr)
+			}
+			if _, err := w.db.Items().Get(t.Context(), "remote", true, candidate.Path); err != nil {
+				t.Fatal("retention removed cache bytes", err)
+			}
+			if _, err := w.db.RemoteCache().Read(t.Context(), entry.Token.Key); err != nil {
+				t.Fatal("retention invalidated the cache representation", err)
 			}
 		})
 	}

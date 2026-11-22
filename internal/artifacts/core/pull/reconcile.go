@@ -224,9 +224,6 @@ func (s Source) Remove(ctx context.Context, candidate api.PullCacheCandidate, pu
 	if err != nil {
 		return nil, fmt.Errorf("verify exact pull source absence: %w", err)
 	}
-	if !absent {
-		return nil, kernel.ErrConflict
-	}
 	var removed []string
 	err = s.Content.Store.Tx(ctx, func(ctx context.Context) error {
 		if err := publication.Check(ctx); err != nil {
@@ -242,6 +239,17 @@ func (s Source) Remove(ctx context.Context, candidate api.PullCacheCandidate, pu
 		}
 		if snapshot.version != candidate.Version {
 			return source.ErrSuperseded
+		}
+		if !absent {
+			// Presence is ordinary reconciliation, not changed source evidence.
+			// Acknowledge only retention, after checking the selected cache is
+			// still current; no item, index, blob or property is mutated.
+			if record != nil {
+				if err := record(ctx, nil); err != nil {
+					return fmt.Errorf("record selected cache retention: %w", err)
+				}
+			}
+			return publication.Fence(ctx) //nolint:wrapcheck // retained observations need the same final ownership fence
 		}
 		if err := deleteAuthority(ctx, state, candidate.Selection, snapshot.paths); err != nil {
 			return err

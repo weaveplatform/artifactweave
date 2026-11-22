@@ -28,6 +28,7 @@ type pullWorld struct {
 	fetchError        error
 	beforeFetch       func()
 	omitRecord        bool
+	retained          map[string]bool
 	pages, fetches    int
 	deletes, restores int
 }
@@ -133,9 +134,13 @@ func (s pullSource) CachedItems(
 	if s.w.db.InTx(ctx) || page.Limit != 1 {
 		return nil, "", kernel.ErrInvalid
 	}
-	for _, candidate := range s.w.targets {
+	for index, candidate := range s.w.targets {
 		if candidate.Path > page.After {
-			return []artifactsapi.PullCacheCandidate{candidate}, "", nil
+			next := ""
+			if index+1 < len(s.w.targets) {
+				next = candidate.Path
+			}
+			return []artifactsapi.PullCacheCandidate{candidate}, next, nil
 		}
 	}
 	return nil, "", nil
@@ -149,6 +154,9 @@ func (s pullSource) Remove(ctx context.Context, candidate artifactsapi.PullCache
 	}
 	s.w.deletes++
 	paths := []string{candidate.Path, candidate.Path + ".sha256"}
+	if s.w.retained[candidate.Path] {
+		paths = nil
+	}
 	err := s.w.db.Tx(ctx, func(ctx context.Context) error {
 		if err := publication.Check(ctx); err != nil {
 			return err
@@ -288,6 +296,32 @@ func TestUnitPullReconciliationRecordsExactOwnerRemovalPaths(t *testing.T) {
 	must(t, err)
 	if w.fetches != 0 || w.deletes != 1 || item.Outcome != model.PullSucceeded || !slices.Equal(item.Removed, []string{"selected/gone", "selected/gone.sha256"}) {
 		t.Fatal("reconciliation lost actual cache removal/companion evidence")
+	}
+}
+
+func TestUnitPullMultiFileReconciliationSeparatesRetentionFromRemovalAndRefusal(t *testing.T) {
+	w, _, run := newPullWorld(t, true)
+	w.add(run, "selected/a")
+	w.add(run, "selected/b")
+	w.retained = map[string]bool{"selected/a": true, "selected/b": true}
+	for _, path := range []string{"selected/a", "selected/b", "selected/gone"} {
+		w.targets = append(w.targets, artifactsapi.PullCacheCandidate{Repository: w.source, Selection: run.Binding.Selection(), Path: path, Version: strings.Repeat("f", 64)})
+	}
+	run = finishPull(t, w, run)
+	if w.fetches != 2 || w.deletes != 3 {
+		t.Fatal("multi-item reconciliation omitted selected work")
+	}
+	for _, path := range []string{"selected/a", "selected/b"} {
+		i, err := w.db.PullProgress().Item(t.Context(), run.Reference, model.PullDelete, path)
+		must(t, err)
+		if i.Outcome != model.PullOutcome("retained") || i.Reason != "" || len(i.Removed) != 0 || i.Cache != nil || i.Validate(run) != nil {
+			t.Fatal("normal upstream presence became a refusal or removal success", i.Outcome, i.Reason)
+		}
+	}
+	removed, err := w.db.PullProgress().Item(t.Context(), run.Reference, model.PullDelete, "selected/gone")
+	must(t, err)
+	if removed.Outcome != model.PullSucceeded || len(removed.Removed) != 2 {
+		t.Fatal("real absence lost exact removal evidence")
 	}
 }
 

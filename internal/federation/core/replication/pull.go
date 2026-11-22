@@ -290,7 +290,12 @@ func (p Pull) item(ctx context.Context, run model.PullRun, intent model.PullItem
 		_, err = p.Source.Fetch(ctx, *intent.Source, publication)
 	} else {
 		_, err = p.Source.Remove(ctx, *intent.Target, publication, func(ctx context.Context, paths []string) error {
-			return record(ctx, func(next *model.PullItem) { next.Removed = paths })
+			return record(ctx, func(next *model.PullItem) {
+				next.Removed = paths
+				if len(paths) == 0 {
+					next.Outcome = model.PullRetained
+				}
+			})
 		})
 	}
 	if err == nil {

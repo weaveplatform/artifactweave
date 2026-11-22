@@ -173,6 +173,7 @@ const (
 	PullIntent       PullItemPhase = "intent"
 	PullItemComplete PullItemPhase = "complete"
 	PullSucceeded    PullOutcome   = "succeeded"
+	PullRetained     PullOutcome   = "retained"
 	PullSkipped      PullOutcome   = "skipped"
 	PullItemFailed   PullOutcome   = "failed"
 )
@@ -230,6 +231,12 @@ func (i PullItem) evidence(root string) error {
 	}
 	if i.Phase != PullItemComplete {
 		return fmt.Errorf("invalid pull intent phase: %w", kernel.ErrInvalid)
+	}
+	if i.Outcome == PullRetained {
+		if i.Action == PullDelete && i.Reason == "" && i.Cache == nil && len(i.Removed) == 0 {
+			return nil
+		}
+		return fmt.Errorf("pull retention carries removal or fetch evidence: %w", kernel.ErrInvalid)
 	}
 	if i.Outcome == PullSkipped || i.Outcome == PullItemFailed {
 		if pushReason(i.Reason) && i.Cache == nil && len(i.Removed) == 0 {
