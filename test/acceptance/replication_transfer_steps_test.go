@@ -1,7 +1,9 @@
 package acceptance
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,7 +12,8 @@ import (
 
 const replicationTransportPassword = "Replication-fixture-only-123"
 
-func (w *world) qualifyOrdinaryReplication(direction string) error {
+func (w *world) qualifyOrdinaryReplication(direction string) (result error) {
+	defer func() { result = errors.Join(result, w.replicationScenarioEvidence(direction, "generic", nil)) }()
 	fixture, err := w.configureReplicationPair(direction, "generic")
 	if err != nil {
 		return err
@@ -134,6 +137,18 @@ func replicationBytes(instance *world, repository, path, expected string) error 
 	}
 	if string(actual) != expected {
 		return fmt.Errorf("ordinary replication destination bytes differ from the selected source")
+	}
+	metadata, err := replicationFixtureRequest(instance, http.MethodGet, "/artifactory/api/storage/"+repository+"/"+path, "", http.StatusOK)
+	if err != nil {
+		return err
+	}
+	var info struct {
+		Checksums struct {
+			SHA256 string `json:"sha256"`
+		} `json:"checksums"`
+	}
+	if json.Unmarshal(metadata, &info) != nil || info.Checksums.SHA256 != fmt.Sprintf("%x", sha256.Sum256([]byte(expected))) {
+		return fmt.Errorf("ordinary replication destination checksum disagrees with its verified bytes")
 	}
 	return nil
 }
