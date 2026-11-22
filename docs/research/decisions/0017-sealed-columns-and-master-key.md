@@ -44,6 +44,13 @@ private key, the peer private key and the bundle signing keys are never returned
 endpoint, and worker secrets are listed by name only. Pairing tokens are not stored: only
 the hash of an unused token's nonce is kept until it is redeemed or expires.
 
+NTLMv2 proxy authentication (#1835) consumes the same sealed proxy password and
+HMAC source revision. It stores no additional password/hash/session columns and
+retains no authentication packet in evidence. Domain/workstation or password changes
+replace authenticated idle connections; active retrieval publication retains the
+existing source-revision fence. SQLite and PostgreSQL tests verify sealed storage,
+rotation, denial with stale credentials and a newly configured proxy identity.
+
 ## Sensitive repository header checkpoint (#652)
 
 [Sensitive header storage](../../implementation/repository-header-sealing.md) now keeps

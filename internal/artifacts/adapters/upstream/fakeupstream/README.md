@@ -65,3 +65,15 @@ wiring; `TestAccMutableArtifactAndMetadata` checks expiry, mutation, interruptio
 retry for both fixture kinds. Actual ecosystem/native remote acceptance belongs to
 the adapter tickets, after their production handlers exist. This harness is not a
 claim about a live Artifactory response.
+
+`NewNTLMProxy` supports normal HTTP forwarding and owns a connection from its
+chi CONNECT entry through all 407
+exchanges (Go's ordinary server closes rejected CONNECT sockets). It independently
+checks NTLMv2 proof, server nonce, target info, domain and workstation with the
+protocol's MD4/HMAC-MD5 primitives, without the production NTLM dependency. The safe
+`Negotiations` records retain only message kinds, connection IDs, names and outcomes;
+no password, proof, hash or packet is retained. Fault options cover malformed
+challenges, oversized bodies, interruption, closed connections and cancellation.
+Only explicitly supplied target fixtures can be tunneled.
+`NTLMOptions.Listener`, like `NewProxyOn`, lets the proxy share a port with a
+destination on another loopback address for redirected-credential scope tests.

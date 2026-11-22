@@ -179,6 +179,13 @@ the work.
     since core is barred only from `adapters/*` and `ecosystem/*/http`, and it forms no
     cycle.
 
+P12/#1835 keeps account/configuration policy in the artifacts resolver and adds
+`NTLMProxy.Connect` and its HTTP forward decorator in `platform/outbound` for the actual remote transport consumer.
+That helper owns only bounded connection-scoped NTLMv2 proxy negotiation using the
+pinned protocol library; it imports no module and owns no repository or pool policy.
+Replication's separate consumer (#1848) can use that seam without importing an
+artifacts adapter or duplicating cryptography.
+
 ### Package placement and names
 
 - **Placement that differs from the target document.** Pattern helpers go to

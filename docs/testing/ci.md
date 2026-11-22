@@ -1687,6 +1687,17 @@ locally; the Linux CI runner needs neither override.
 
 ## Generic remote native evidence
 
+`proxy_redirects.feature` uses the existing required core native partition with
+`@jf @generic_remote @proxy_redirects`. Pinned JFrog CLI direct downloads prove a
+permitted challenged proxy-credential redirect, same-origin bytes, refused and removed
+hosts, secret rotation and malformed configuration. Independent sanitized proxy/origin
+records distinguish target Authorization from CONNECT/forward Proxy-Authorization and
+assert no false cached result. The generic client recipe retains this scenario's
+evidence fingerprint. HTTP/HTTPS host/port, DNS-rebinding, cookie and mTLS boundaries
+run in upstream's ordinary acceptance suite; the generic server suite runs the actual
+application publication race on SQLite and PostgreSQL. Shared transport changes still
+select the full gate and unchanged 95% total/90% package coverage floors.
+
 `@remote_listing` runs real curl against controlled HTML indexes. It proves the
 default-off flag, uncached child discovery without binary fetch, escaped local links,
 repository pattern filtering, cache-only Storage API/aliases and warm offline browsing.
@@ -1699,7 +1710,11 @@ also cover upstream version searches and permission-safe differing-layout discov
 application and controlled upstream. It proves cold `jf rt direct-download` and curl
 GETs, warm reuse during an upstream outage, cache-alias `jf rt dl`/AQL search, a reader
 with Read and Deploy/Cache filling the cache (#1587), exact downloaded bytes, upstream
-request counts and repository deletion. Client configuration and output directories are isolated per scenario.
+request counts and repository deletion. `@ntlm_proxy` shares the required core
+native lane and requires the pinned JFrog CLI even locally: two cold files pass
+through one independently verified NTLMv2 proxy handshake. Proxy/origin request
+records assert domain/workstation, connection reuse and credential separation.
+Client configuration and output directories are isolated per scenario.
 The local macOS run passed 1 scenario/44 steps in 2.12 seconds (7.10 seconds reported
 by Go including startup); this is not a Linux full-suite timing estimate. No timeout
 or matrix change is needed. Runtime race tests additionally cover HEAD/ranges/304,
