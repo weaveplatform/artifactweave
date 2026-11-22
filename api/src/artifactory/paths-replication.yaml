@@ -413,6 +413,8 @@ paths:
         description: Optional single-target options. Omitted or an empty array uses the saved configuration; one object supplies per-run options.
         required: false
       responses:
+        '200':
+          description: Not returned. Successful admission answers 202; transfer completion is reported through replication status.
         '202':
           description: The replication was durably accepted and queued; there is no body.
         '400':
