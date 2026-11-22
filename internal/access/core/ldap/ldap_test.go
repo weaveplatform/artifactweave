@@ -232,10 +232,10 @@ func TestUnitPlanAndApply(t *testing.T) {
 		{Key: "new", URL: ptr("ldap://ldap.example.com"), UserDNPattern: ptr("uid={0}")},
 	}
 	want := []accessapi.LDAPResult{
-		{"kept", accessapi.LDAPUpdated},
-		{"gone", accessapi.LDAPDeleted},
-		{"never", accessapi.LDAPUnchanged},
-		{"new", accessapi.LDAPCreated},
+		{Key: "kept", Outcome: accessapi.LDAPUpdated},
+		{Key: "gone", Outcome: accessapi.LDAPDeleted},
+		{Key: "never", Outcome: accessapi.LDAPUnchanged},
+		{Key: "new", Outcome: accessapi.LDAPCreated},
 	}
 	planned := must[[]accessapi.LDAPResult](t)(svc.Plan(ctx, changes))
 	if fmt.Sprint(planned) != fmt.Sprint(want) {
