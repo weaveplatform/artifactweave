@@ -623,15 +623,9 @@ jobs:
       - name: Download Go modules
         uses: ./.github/actions/go-mod-download
 
-      # Maven's plugins for the Maven scenarios, which mount this directory
-      # and never install their own artifacts into it. The key is the
-      # fixture POMs, which pin every plugin version.
-      - name: Maven plugin cache
+      - name: Maven build tools (pinned)
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',maven,')
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.m2/repository
-          key: maven-plugins-${{ hashFiles('test/acceptance/testdata/maven/**/pom.xml') }}
+        uses: ./.github/actions/maven-tools
 
       - name: JFrog CLI (pinned)
         if: needs.impact.outputs.profile == 'full' || contains(format(',{0},', needs.impact.outputs.clients), ',jf,')
@@ -1072,6 +1066,9 @@ jobs:
 
       - name: Download Go modules
         uses: ./.github/actions/go-mod-download
+
+      - name: Maven build tools (pinned)
+        uses: ./.github/actions/maven-tools
 
       - name: Pinned JVM client images
         run: |

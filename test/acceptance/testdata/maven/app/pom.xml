@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- The consumer maven.feature builds against what lib and snap deployed: one
-     release and one snapshot dependency, resolved from the repository that
-     -Daw.url names. It pins the same plugins as lib and snap, so the job's
-     ~/.m2 cache, keyed on the testdata POMs, holds what a build needs. -->
+<!-- Build-tool versions are qualified by clients/maven-tools.lock.json.
+     Product dependencies remain in each scenario's private repository. -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -48,6 +46,11 @@
   <build>
     <pluginManagement>
       <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-install-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-resources-plugin</artifactId>
