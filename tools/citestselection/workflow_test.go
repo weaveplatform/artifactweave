@@ -23,6 +23,112 @@ import (
 // unitJobs are the quality gate's Go unit test jobs, one per runner OS.
 var unitJobs = []string{"unit-linux", "unit-macos", "unit-windows"}
 
+func TestUnitTerraformModuleNativeAcceptanceIsRequired(t *testing.T) {
+	const pkg, testName = "./test/server/artifacts/terraform", "TestAccTerraformModuleInit"
+	candidate := proposeAffected([]change{{
+		status: "M", path: "test/server/artifacts/terraform/terraform_registry_test.go",
+	}})
+	if candidate.profile != "format" || candidate.owner != "terraform" ||
+		!slices.Contains(candidate.clients, "terraform") {
+		t.Fatalf("module regression must select its native client: %+v", candidate)
+	}
+	for _, plan := range []plan{{profile: "full"}, {profile: "format", candidate: candidate}} {
+		selected, err := selectKinds(plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.ContainsFunc(selected.Selected, func(entry selectedGo) bool {
+			return entry.Package == pkg && entry.Name == testName && entry.Kind == "acceptance"
+		}) {
+			t.Fatalf("%s plan lost the native module regression", plan.profile)
+		}
+	}
+	data, err := os.ReadFile("../../.github/workflows/quality-gate.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Name string `yaml:"name"`
+				Uses string `yaml:"uses"`
+				Run  string `yaml:"run"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	var run string
+	installed := false
+	for _, step := range workflow.Jobs["acceptance"].Steps {
+		if step.Uses == "./.github/actions/registry-clients" {
+			installed = true
+		}
+		if step.Name == "Terraform module init and signed download native acceptance" && installed {
+			run = step.Run
+		}
+	}
+	if run == "" {
+		t.Fatal("native module regression must run after the pinned registry client installation")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("the native Actions Bash step uses POSIX executable fixtures")
+	}
+	bin := t.TempDir()
+	for name, script := range map[string]string{
+		"terraform": "#!/bin/sh\nexit 0\n",
+		"go": "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$GO_CALLS\"\n" +
+			"if [ \"$1\" = test ] && [ \"$2\" = -list ]; then printf '%s\\n' \"$LISTED_TEST\"; fi\n",
+	} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(script), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct {
+		name, binary, listed string
+		wantCalls            int
+		wantSuccess          bool
+	}{
+		{"installed pinned client", "terraform", testName, 2, true},
+		{"missing client blocks", "missing", testName, 0, false},
+		{"absent regression blocks", "terraform", "TestAccOther", 1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir, err := filepath.EvalSymlinks(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			calls := filepath.Join(dir, "go-calls")
+			cmd := exec.CommandContext(t.Context(), "bash", "-ec", run)
+			cmd.Dir = dir
+			cmd.Env = append(os.Environ(), "RUNNER_TEMP="+dir, "GO_CALLS="+calls,
+				"ARTIFACTWEAVE_TERRAFORM_BIN="+filepath.Join(bin, tc.binary), "LISTED_TEST="+tc.listed,
+				"TERRAFORM_COVERPKG="+candidate.coverpkg, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			output, err := cmd.CombinedOutput()
+			if (err == nil) != tc.wantSuccess {
+				t.Fatalf("native module step success=%t, want %t: %v\n%s", err == nil, tc.wantSuccess, err, output)
+			}
+			data, err := os.ReadFile(calls)
+			if err != nil && !os.IsNotExist(err) {
+				t.Fatal(err)
+			}
+			commands := strings.Split(strings.TrimSpace(string(data)), "\n")
+			if len(data) == 0 {
+				commands = nil
+			}
+			if len(commands) != tc.wantCalls {
+				t.Fatalf("go commands=%q, want %d calls", commands, tc.wantCalls)
+			}
+			if tc.wantSuccess && (!strings.Contains(commands[1], pkg+" -run ^"+testName+"$") ||
+				!strings.Contains(commands[1], "-covermode=atomic") ||
+				!strings.Contains(commands[1], "-test.gocoverdir="+filepath.Join(dir, "cover/accept"))) {
+				t.Fatalf("native step did not run the owned regression with merged atomic coverage: %q", commands)
+			}
+		})
+	}
+}
+
 func TestUnitAzureWorkflowUsesDeployerLoginAfterMetadataUnauthorized(t *testing.T) {
 	// A hosted runner can answer IMDS with 401. The default chain then stops
 	// before azure/login's CLI session, rather than treating IMDS as absent.
