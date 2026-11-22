@@ -92,6 +92,15 @@ configuration error; #1835 owns that implementation. Redirected Basic proxy cred
 are described below. P12 retains broader consumer compatibility (#1848), as recorded in the
 [capability ledger](capability-roadmap.md#work-already-owned-by-p9p19).
 
+Proxy `services` reads accept descriptor/provider strings split on newline, space,
+comma or semicolon, as Artifactory 7.161.26's `ProxyDescriptor.getServicesList`
+does, and historical string lists. Absent, null and empty services permit an
+enabled platform-default proxy; a nonempty selection must contain exact `jfrt`.
+Explicit references retain priority over service filtering, and `disableProxy`
+bypasses selection. Invalid service shapes fail with a redacted configuration
+error. Both the artifact resolver and federation push factory share this decoder;
+reads preserve stored JSON and sealed passwords.
+
 ### Redirected proxy credentials (#1836)
 
 `redirectedToHosts` authorizes reuse of the **proxy** username/password at an exact

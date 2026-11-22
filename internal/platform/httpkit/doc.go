@@ -34,7 +34,7 @@
 //     RawSearchQuery.
 //   - Error profiles: ProfileRule, ProfileFor, ErrorProfiles, ErrorProfile
 //     and WithProfileRules.
-//   - Writing: WriteErr, WriteJSON, EscapePath and FormatTime.
+//   - Writing: WriteErr, WriteErrProfile, WriteJSON, EscapePath and FormatTime.
 //   - File names: EncodeQuery, EncodeUnreserved, EscapeQuoted and
 //     PrintableASCII, the encodings 7.x writes a downloaded file's name in
 //     (X-Artifactory-Filename, Content-Disposition).
@@ -55,9 +55,9 @@
 //     before a broader one with the same prefix; with no match, or no rules
 //     on the context, the profile is apierror.ProfileArtifactory, the same
 //     for unclaimed paths as for handled ones.
-//   - WriteErr sends the cause of an error that is not an *apierror.Error to
-//     the access log through NoteCause, because the client sees only a bare
-//     500. An error caused by cancellation of the HTTP request itself is
+//   - WriteErr and WriteErrProfile send the cause of an error that is not an
+//     *apierror.Error to the access log through NoteCause, because the client
+//     sees only a bare 500. An error caused by cancellation of the HTTP request itself is
 //     noted and aborts through net/http instead; independent backend errors
 //     and server deadlines keep their existing error profiles.
 //   - NoteCause and NoteUser do nothing on a context that never passed the

@@ -185,6 +185,13 @@ operation's, such as an `Idempotency-Key` refusal, is `BAD_REQUEST`, and a serve
 specification constrains only a 4xx's body, and Docker's registry client reports a 5xx by
 its status alone.
 
+Registry handler and v1/v2 config lookup errors pass through the shared request-aware
+error boundary ([#1851](https://github.com/weaveplatform/artifactweave/issues/1851)).
+An error wrapping cancellation of that same HTTP request aborts without publishing
+a replacement 500, with the cause retained in an aborted access record (decision
+0016). Independent backend cancellation still returns 500 in the endpoint's existing
+profile; registry errors and format policy refusals keep their codes and envelopes.
+
 ### Authentication on the registry
 
 - A request with no credentials to any registry path answers 401 `UNAUTHORIZED` with the

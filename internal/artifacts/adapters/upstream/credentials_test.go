@@ -677,6 +677,9 @@ func TestAccResolverProxyConfiguration(t *testing.T) {
 		expected bool
 	}{
 		{"explicit", `{"host":"localhost","port":8080}`, true, true, true},
+		{"explicit-services-string", `{"host":"localhost","port":8080,"services":"jfrt,jfxr"}`, true, true, true},
+		{"default-services-string", `{"host":"localhost","port":8080,"platformDefault":true,"services":"jfrt,jfxr"}`, true, false, true},
+		{"default-services-empty-string", `{"host":"localhost","port":8080,"platformDefault":true,"services":""}`, true, false, true},
 		{"ipv6", `{"host":"http://[::1]","port":8080}`, true, true, true},
 		{"disabled", `{"host":"localhost","port":8080}`, false, true, false},
 		{"bad-json", `{`, true, true, false},
@@ -689,6 +692,10 @@ func TestAccResolverProxyConfiguration(t *testing.T) {
 		{"query", `{"host":"http://localhost?secret=1","port":8080}`, true, true, false},
 		{"embedded-port", `{"host":"http://localhost:8080","port":8080}`, true, true, false},
 		{"default", `{"host":"localhost","port":8080,"platformDefault":true,"services":["jfrt"]}`, true, false, true},
+		{"default-services-null", `{"host":"localhost","port":8080,"platformDefault":true,"services":null}`, true, false, true},
+		{"default-services-absent", `{"host":"localhost","port":8080,"platformDefault":true}`, true, false, true},
+		{"explicit-invalid-services", `{"host":"localhost","port":8080,"services":{"private-value":42}}`, true, true, false},
+		{"default-invalid-services", `{"host":"localhost","port":8080,"platformDefault":true,"services":["private-value",42]}`, true, false, false},
 		{"bad-default", `{`, true, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -706,8 +713,8 @@ func TestAccResolverProxyConfiguration(t *testing.T) {
 				if err != nil || opts.ProxyURL == nil {
 					t.Fatalf("proxy = %v, %v", opts.ProxyURL, err)
 				}
-			} else if !errors.Is(err, remote.ErrConfiguration) {
-				t.Fatal(err)
+			} else if !errors.Is(err, remote.ErrConfiguration) || strings.Contains(err.Error(), "private-value") {
+				t.Fatal("invalid proxy admitted or disclosed", err)
 			}
 		})
 	}
@@ -1062,5 +1069,42 @@ func TestAccResolverRejectsIntermediateTLSDowngrade(t *testing.T) {
 	}
 	if secure.Count("GET", "/redirect") != 1 || target.Count("", "") != 0 {
 		t.Fatal("intermediate downgrade was not stopped")
+	}
+}
+
+func TestAccResolverProxyServicesFiltering(t *testing.T) {
+	for _, tc := range []struct {
+		name, services string
+		selected       bool
+	}{
+		{name: "unrelated string", services: `"jfxr"`},
+		{name: "unrelated list", services: `["jfxr"]`},
+		{name: "case preserved", services: `"JFRT"`},
+		{name: "historical entries unchanged", services: `[" jfrt ","jfrt,jfxr"]`},
+		{name: "source separators", services: `" ;jfxr,jfrt\njfxr "`, selected: true},
+		{name: "only separators", services: `" ;,\n "`, selected: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			st := inmem.New()
+			document := []byte(`{"host":"localhost","port":3128,"platformDefault":true,"services":` + tc.services + `}`)
+			if err := st.Configs().Put(t.Context(), configdoc.ConfigDocument{
+				Kind: configdoc.ConfigProxy, Key: "services", Enabled: true, Document: document,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			c := repo.Config{Key: "services", Class: repo.Remote, URL: "https://example.com"}
+			saveRepo(t, st, c)
+			resolver := resolverFor(t, st, ResolverOptions{})
+			if (resolveFor(t, resolver, c).ProxyURL != nil) != tc.selected {
+				t.Fatal("default service selection changed")
+			}
+			c.Proxy = "services"
+			if err := st.Repos().Update(t.Context(), c); err != nil {
+				t.Fatal(err)
+			}
+			if resolveFor(t, resolver, c).ProxyURL == nil {
+				t.Fatal("explicit reference was filtered by services")
+			}
+		})
 	}
 }

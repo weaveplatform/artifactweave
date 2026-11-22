@@ -85,6 +85,11 @@ configured proxy port, independently of repository Authorization, TLS client ide
 cookies and destination grants. Source/bytecode registration and local restrictions are
 recorded in [research 06](../06-system-configuration-and-descriptor.md#proxy-redirect-credential-contract).
 NTLM/domain remains #1835; broader replication proxy configuration remains #1848.
+Proxy service strings from the descriptor/provider and historical stored lists
+share one read decoder. String separators follow the pinned Artifactory source;
+explicit selection and platform-default `jfrt` filtering retain their existing
+rules. The [transport contract](../../implementation/remote-http-transport.md#resolved-source-security-618)
+records the accepted forms and unchanged storage boundary.
 This is a shared foundation, not evidence that the native adapters or cache policy are
 complete. Source HMAC revisions exclude retrieval policy, so TTL/offline changes do not
 invalidate immutable bytes; publication separately fences current policy and credentials.

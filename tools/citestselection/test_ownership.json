@@ -191,6 +191,7 @@
       "public_key_test.go",
       "publication_test.go",
       "redirect_test.go",
+      "reindex_cancellation_test.go",
       "remote_fill_test.go",
       "remote_matrix_test.go",
       "remote_member_test.go",
@@ -214,6 +215,7 @@
       "merged_test.go",
       "merged_wait_test.go",
       "path_test.go",
+      "pkgroute_error_test.go",
       "pkgroute_test.go",
       "publication_test.go",
       "resolve_test.go",
@@ -442,6 +444,7 @@
     ],
     "chef": [
       "internal/app/status_chef_test.go",
+      "internal/artifacts/adapters/http/itemkit/reindex_cancellation_test.go",
       "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "cocoapods": [
@@ -527,6 +530,7 @@
     ],
     "puppet": [
       "internal/app/status_puppet_test.go",
+      "internal/artifacts/adapters/http/itemkit/reindex_cancellation_test.go",
       "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "pypi": [
