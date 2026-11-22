@@ -3,12 +3,14 @@ package pull_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/api/accessapitest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/pull"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -28,6 +30,117 @@ func removalFixture(t *testing.T) (*world, model.RemoteCacheEntry, api.PullCache
 	}
 	w.peer.absent = true
 	return w, entry, items[0]
+}
+
+func TestUnitPullCacheSnapshotFailuresNeverAuthorizeRemovalOrExhaustedPages(t *testing.T) {
+	for _, mode := range []string{"cache listing", "snapshot source", "foreign snapshot", "snapshot item", "snapshot folder", "representations"} {
+		t.Run(mode, func(t *testing.T) {
+			w, _, candidate := removalFixture(t)
+			w.source.Content.Store = pullFaultStore{
+				Store: w.db,
+				items: pullFaultItems{ItemStore: w.db.Items(), mode: mode},
+				cache: &pullFaultCache{RemoteCacheStore: w.db.RemoteCache(), mode: mode},
+			}
+			rows, next, err := w.source.CachedItems(t.Context(), candidate.Repository, candidate.Selection, kernel.Page{})
+			if err == nil || len(rows) != 0 || next != "" {
+				t.Fatal("failed cache snapshot became eligible or exhausted reconciliation", mode, err)
+			}
+			if _, err := w.db.Items().Get(t.Context(), "remote", true, candidate.Path); err != nil {
+				t.Fatal("read failure changed cached bytes", err)
+			}
+		})
+	}
+	if _, _, err := (pull.Source{}).CachedItems(t.Context(), api.PullRepository{}, api.PullSelection{}, kernel.Page{}); !errors.Is(err, kernel.ErrStore) {
+		t.Fatal("missing owner store accepted", err)
+	}
+}
+
+func TestUnitPullReconciliationRefusalsAndRecordFailuresPreserveCache(t *testing.T) {
+	for _, mode := range []string{"invalid path", "missing fence", "execution revoked", "delete denied", "publication revoked", "delete failed", "deletion record failed", "retention record failed"} {
+		t.Run(mode, func(t *testing.T) {
+			w, entry, candidate := removalFixture(t)
+			grant := publication()
+			want := error(kernel.ErrStore)
+			switch mode {
+			case "invalid path":
+				candidate.Path, want = "../outside", kernel.ErrInvalid
+			case "missing fence":
+				grant.Fence, want = nil, kernel.ErrInvalid
+			case "execution revoked":
+				grant.Check = func(context.Context) error { return kernel.ErrForbidden }
+				want = kernel.ErrForbidden
+			case "publication revoked":
+				checks := 0
+				grant.Check = func(context.Context) error {
+					checks++
+					if checks > 1 {
+						return kernel.ErrForbidden
+					}
+					return nil
+				}
+				want = kernel.ErrForbidden
+			case "delete denied":
+				open := w.source.Open
+				w.source.Open = func(ctx context.Context, key, root string) (*source.Service, source.Request, error) {
+					svc, q, err := open(ctx, key, root)
+					q.Access = &accessapitest.Decider{AllowsFunc: func(_ accessapi.ResourceType, _ accessapi.Repo, _ string, want accessapi.Actions) bool {
+						return want == accessapi.ActionRead
+					}}
+					return svc, q, err
+				}
+				want = kernel.ErrForbidden
+			case "delete failed":
+				w.source.Content.Store = pullFaultStore{Store: w.db, items: pullFaultItems{ItemStore: w.db.Items(), mode: "delete"}, cache: w.db.RemoteCache()}
+			case "retention record failed":
+				w.peer.absent = false
+			}
+			paths, err := w.source.Remove(t.Context(), candidate, grant, func(ctx context.Context, _ []string) error {
+				if err := w.db.Settings().Put(ctx, "failed-removal-record", true); err != nil {
+					return err
+				}
+				return kernel.ErrStore
+			})
+			if !errors.Is(err, want) || len(paths) != 0 {
+				t.Fatal("failed removal or record returned success", mode, err)
+			}
+			if _, err := w.db.Items().Get(t.Context(), "remote", true, "a"); err != nil {
+				t.Fatal("failed removal lost item", err)
+			}
+			current, err := w.db.RemoteCache().Read(t.Context(), entry.Token.Key)
+			if err != nil || current.Token != entry.Token {
+				t.Fatal("failed removal invalidated representation", mode, err)
+			}
+			var saved bool
+			if err := w.db.Settings().Get(t.Context(), "failed-removal-record", &saved); !errors.Is(err, kernel.ErrNotFound) {
+				t.Fatal("failed record survived rollback", err)
+			}
+		})
+	}
+}
+
+func TestUnitPullCacheCandidatesHonorCurrentScopeBeforeReturningAReceipt(t *testing.T) {
+	w, _, candidate := removalFixture(t)
+	for _, after := range []string{"%%%", strings.Repeat("a", 128<<10+1)} {
+		if _, _, err := w.source.CachedItems(t.Context(), candidate.Repository, candidate.Selection, kernel.Page{After: after}); !errors.Is(err, kernel.ErrInvalidCursor) {
+			t.Fatal("malformed cache continuation accepted", err)
+		}
+	}
+	stale := candidate.Repository
+	stale.Revision = strings.Repeat("b", 64)
+	if _, _, err := w.source.CachedItems(t.Context(), stale, candidate.Selection, kernel.Page{}); !errors.Is(err, source.ErrSuperseded) {
+		t.Fatal("foreign cache binding returned candidates", err)
+	}
+	w.peer.denied[candidate.Path] = true
+	rows, _, err := w.source.CachedItems(t.Context(), candidate.Repository, candidate.Selection, kernel.Page{})
+	if err != nil || len(rows) != 0 {
+		t.Fatal("unreadable cache path disclosed a candidate", err)
+	}
+	w.peer.denied[candidate.Path] = false
+	candidate.Selection = api.PullSelection{Root: "selected"}
+	candidate.Repository = binding(t, w, candidate.Selection)
+	if _, err := w.source.Remove(t.Context(), candidate, publication(), nil); !errors.Is(err, kernel.ErrForbidden) {
+		t.Fatal("cache path escaped its immutable scope", err)
+	}
 }
 
 func TestUnitPullCacheRemovalNeedsExactAbsenceAndCurrentRepresentation(t *testing.T) {

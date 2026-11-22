@@ -2,6 +2,7 @@ package pull_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -20,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 )
 
@@ -41,14 +43,51 @@ type peer struct {
 	propertyCalls   int
 	afterProperties func()
 	afterAbsence    func()
+	afterFiles      func()
+	seenAbsent      string
 }
 
 func (p *peer) Binding() string { return p.binding }
-func (p *peer) Absent(context.Context, string) (bool, error) {
+func (p *peer) Absent(_ context.Context, path string) (bool, error) {
+	p.seenAbsent = path
 	if p.afterAbsence != nil {
 		p.afterAbsence()
 	}
 	return p.absent, p.absentErr
+}
+
+func TestUnitPullDifferentLayoutsKeepCanonicalSelectionAndExactUpstreamAbsence(t *testing.T) {
+	w := fixture(t)
+	w.config.PackageType, w.config.RepoLayoutRef, w.config.RemoteRepoLayoutRef = repo.Maven, "gradle-default", "maven-2-default"
+	if err := w.db.Repos().Update(t.Context(), w.config); err != nil {
+		t.Fatal(err)
+	}
+	selection := api.PullSelection{Root: "org.acme/lib"}
+	upstream := "org/acme/lib/1.0/lib-1.0.jar"
+	canonical := "org.acme/lib/1.0/lib-1.0.jar"
+	w.peer.entries = []pull.Entry{file(upstream)}
+	repository := binding(t, w, selection)
+	items, _, err := w.source.Items(t.Context(), repository, selection, kernel.Page{})
+	if err != nil || len(items) != 1 || items[0].Path != canonical || items[0].UpstreamPath != upstream || !w.scope.Root || w.root != "" {
+		t.Fatal("different layouts lost canonical selection or borrowed folder authority", err, items)
+	}
+	retainedFile(t, w, items[0])
+	if _, err := w.db.Blobs().Ref(t.Context(), blob.Blob{Size: items[0].Size, Checksums: items[0].Actual}, 1); err != nil {
+		t.Fatal(err)
+	}
+	candidates, _, err := w.source.CachedItems(t.Context(), repository, selection, kernel.Page{})
+	if err != nil || len(candidates) != 1 {
+		t.Fatal("mapped cache selection", err)
+	}
+	w.peer.absent = true
+	removed, err := w.source.Remove(t.Context(), candidates[0], publication(), nil)
+	if err != nil || len(removed) != 1 || removed[0] != canonical || w.peer.seenAbsent != upstream {
+		t.Fatal("cache deletion used canonical path as an upstream spelling", removed, w.peer.seenAbsent, err)
+	}
+	w.peer.entries = []pull.Entry{file("org/acme/lib/maven-metadata.xml")}
+	if items, next, err := w.source.Items(t.Context(), repository, selection, kernel.Page{}); !errors.Is(err, source.ErrUnsupported) || len(items) != 0 || next != "" {
+		t.Fatal("lossy metadata mapping was silently skipped", err)
+	}
 }
 func (p *peer) Revalidate(context.Context) error { return p.currentErr }
 func (p *peer) CheckRead(_ context.Context, path string) error {
@@ -60,7 +99,131 @@ func (p *peer) CheckRead(_ context.Context, path string) error {
 
 func (p *peer) Files(_ context.Context, page kernel.Page) ([]pull.Entry, string, error) {
 	p.seenPage, p.filesCalls = page, p.filesCalls+1
+	if p.afterFiles != nil {
+		p.afterFiles()
+	}
 	return p.entries, p.next, p.filesErr
+}
+
+func TestUnitPullCatalogRefusesUnavailableOrUnboundOwnerContracts(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*world)
+		want error
+	}{
+		{"missing content", func(w *world) { w.source.Content = nil }, kernel.ErrStore},
+		{"missing peer factory", func(w *world) { w.source.Peer = nil }, kernel.ErrStore},
+		{"current caller refused", func(w *world) { w.openErr = kernel.ErrForbidden }, kernel.ErrForbidden},
+		{"wrong repository kind", func(w *world) { w.config.Class = repo.Local }, source.ErrInvalidRequest},
+		{"peer factory refused", func(w *world) {
+			w.source.Peer = func(context.Context, *source.Service, source.Request, string, remote.DiscoveryScope) (pull.Peer, error) {
+				return nil, kernel.ErrStore
+			}
+		}, kernel.ErrStore},
+		{"nil peer", func(w *world) {
+			w.source.Peer = func(context.Context, *source.Service, source.Request, string, remote.DiscoveryScope) (pull.Peer, error) {
+				return nil, nil
+			}
+		}, source.ErrUnavailable},
+		{"missing peer binding", func(w *world) { w.peer.binding = "" }, source.ErrUnavailable},
+		{"unpersisted layout configuration", func(w *world) { w.config.PackageType, w.config.RepoLayoutRef = repo.Maven, "not-a-layout" }, source.ErrSuperseded},
+		{"missing source resolver", func(w *world) {
+			open := w.source.Open
+			w.source.Open = func(ctx context.Context, key, root string) (*source.Service, source.Request, error) {
+				svc, q, err := open(ctx, key, root)
+				svc.Resolve = nil
+				return svc, q, err
+			}
+		}, source.ErrUnavailable},
+		{"source resolution failed", func(w *world) {
+			open := w.source.Open
+			w.source.Open = func(ctx context.Context, key, root string) (*source.Service, source.Request, error) {
+				svc, q, err := open(ctx, key, root)
+				svc.Resolve = func(context.Context, repo.Config) (model.SourceIdentity, error) {
+					return model.SourceIdentity{}, kernel.ErrStore
+				}
+				return svc, q, err
+			}
+		}, kernel.ErrStore},
+		{"foreign source lifetime", func(w *world) {
+			open := w.source.Open
+			w.source.Open = func(ctx context.Context, key, root string) (*source.Service, source.Request, error) {
+				svc, q, err := open(ctx, key, root)
+				svc.Resolve = func(ctx context.Context, c repo.Config) (model.SourceIdentity, error) {
+					identity, err := w.db.RemoteCache().Source(ctx, c.Key)
+					identity.Generation = "foreign-generation"
+					return identity, err
+				}
+				return svc, q, err
+			}
+		}, source.ErrSuperseded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := fixture(t)
+			tc.edit(w)
+			result, err := w.source.Repository(t.Context(), "remote", api.PullSelection{})
+			if !errors.Is(err, tc.want) || result.Revision != "" || w.peer.filesCalls != 0 {
+				t.Fatal("unbound owner minted usable pull provenance", err, result)
+			}
+		})
+	}
+	for _, root := range []string{"../outside", "/leading", "trailing/", "bad\x00root", string([]byte{0xff})} {
+		w := fixture(t)
+		if _, err := w.source.Repository(t.Context(), "remote", api.PullSelection{Root: root}); !errors.Is(err, kernel.ErrInvalid) {
+			t.Fatal("invalid selection reached the source", err)
+		}
+	}
+}
+
+func TestUnitPullCatalogCannotReturnPartialResultsAfterPeerOrAuthorityFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*world)
+		want error
+	}{
+		{"list failure", func(w *world) { w.peer.filesErr = kernel.ErrStore }, kernel.ErrStore},
+		{"folder in file page", func(w *world) { w.peer.entries[0].Folder = true }, source.ErrInvalidResult},
+		{"property failure", func(w *world) { w.peer.propertyErr = kernel.ErrStore }, kernel.ErrStore},
+		{"changed inspection", func(w *world) { w.peer.inspectErr = kernel.ErrNotFound }, source.ErrSuperseded},
+		{"unencodable source time", func(w *world) { w.peer.entries[0].Modified = time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC) }, kernel.ErrInvalid},
+		{"current file check failed", func(w *world) { w.peer.afterFiles = func() { w.peer.currentErr = kernel.ErrStore } }, kernel.ErrStore},
+		{"empty page revoked", func(w *world) {
+			w.peer.entries = nil
+			w.peer.afterFiles = func() { w.peer.currentErr = source.ErrDenied }
+		}, source.ErrDenied},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := fixture(t)
+			selection := api.PullSelection{Properties: true}
+			repository := binding(t, w, selection)
+			w.peer.entries = []pull.Entry{file("a")}
+			tc.edit(w)
+			items, next, err := w.source.Items(t.Context(), repository, selection, kernel.Page{})
+			if !errors.Is(err, tc.want) || len(items) != 0 || next != "" {
+				t.Fatal("peer/authority failure became an exhausted or partial successful page", items, next, err)
+			}
+		})
+	}
+}
+
+func TestUnitPullSelectionCursorCannotSmuggleMalformedPeerContinuation(t *testing.T) {
+	w := fixture(t)
+	repository := binding(t, w, api.PullSelection{})
+	raw, err := json.Marshal(map[string]string{"binding": repository.Revision, "peer": "%%%"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, after := range []string{strings.Repeat("a", 128<<10+1), "%%%", base64.RawURLEncoding.EncodeToString([]byte("not-json")), base64.RawURLEncoding.EncodeToString(raw)} {
+		if _, _, err := w.source.Items(
+			t.Context(),
+			repository,
+			api.PullSelection{},
+			kernel.Page{After: after},
+		); !errors.Is(err, kernel.ErrInvalidCursor) ||
+			w.peer.filesCalls != 0 {
+			t.Fatal("invalid continuation reached upstream discovery", err)
+		}
+	}
 }
 
 func (p *peer) Inspect(_ context.Context, path string) (pull.Entry, error) {

@@ -757,3 +757,63 @@ func TestAccPullVirtualStorageRefusesIncompleteComputedFactsAndAuthFailures(t *t
 		})
 	}
 }
+
+func TestAccPullVirtualLiteralFileSelectionUsesOnlyAnExactBoundedParentLookup(t *testing.T) {
+	for _, mode := range []string{"present", "missing", "incomplete", "denied"} {
+		t.Run(mode, func(t *testing.T) {
+			w := fixture(t)
+			virtualInfo(w, "/folder/a", "/folder/a"+listQuery)
+			body := listFacts("sibling", "a")
+			if mode == "missing" {
+				body = listFacts("sibling")
+			}
+			if mode == "incomplete" {
+				body = `{"files":[{"uri":"/a","folder":false}]}`
+			}
+			key := "/folder?deep=0&list=&listFolders=0&mdTimestamps=1"
+			w.set(key, body)
+			if mode == "denied" {
+				w.documents[key] = response{status: http.StatusForbidden}
+			}
+			r := w.reader("folder/a")
+			items, next, err := r.Files(t.Context(), kernel.Page{Limit: 1})
+			if mode != "present" {
+				if err == nil || len(items) != 0 || next != "" {
+					t.Fatal("unverified parent metadata became an exact file", items, err)
+				}
+				return
+			}
+			if err != nil || len(items) != 1 || items[0].Path != "folder/a" || next != "" {
+				t.Fatal("literal virtual file could not be selected safely", items, err)
+			}
+			raw, err := json.Marshal(map[string]string{"binding": r.Binding(), "last": "folder/a"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			items, next, err = r.Files(t.Context(), kernel.Page{Limit: 1, After: base64.RawURLEncoding.EncodeToString(raw)})
+			if err != nil || len(items) != 0 || next != "" {
+				t.Fatal("completed literal selection repeated a file", items, err)
+			}
+		})
+	}
+}
+
+func TestAccPullNamespaceAndMappingRefusalsCannotAuthorizeAbsence(t *testing.T) {
+	w := fixture(t)
+	r := w.reader("selected")
+	if absent, err := r.Absent(t.Context(), ""); absent || !errors.Is(err, source.ErrInvalidRequest) || w.count() != 0 {
+		t.Fatal("empty absence probe reached upstream", err)
+	}
+	w.set("", fileInfo(""))
+	if absent, err := r.Absent(t.Context(), "selected/a"); absent || err == nil {
+		t.Fatal("non-folder namespace authorized absence", err)
+	}
+	if items, next, err := r.Files(t.Context(), kernel.Page{}); err == nil || len(items) != 0 || next != "" {
+		t.Fatal("non-folder namespace became exhausted selection", err)
+	}
+	for _, revision := range []string{"", "mapping-v1"} {
+		if _, err := peerstorage.NewMappedFiles(t.Context(), w.service, w.request, "", remote.DiscoveryScope{}, "", revision, nil); !errors.Is(err, source.ErrInvalidRequest) {
+			t.Fatal("missing mapping contract accepted", err)
+		}
+	}
+}
