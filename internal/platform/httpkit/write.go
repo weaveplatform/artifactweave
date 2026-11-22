@@ -1,6 +1,7 @@
 package httpkit
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -13,8 +14,15 @@ import (
 
 // WriteErr renders err with the error response profile ErrorProfile gives
 // r. An error that is not an *apierror.Error reaches the client as a bare
-// 500, so its cause goes to the access log (NoteCause).
+// 500, so its cause goes to the access log (NoteCause). Cancellation of the
+// request itself aborts through net/http without publishing a response.
 func WriteErr(w http.ResponseWriter, r *http.Request, err error) {
+	// A disconnected client can cancel a concurrent lookup after another
+	// request was refused. Preserve the cause without inventing a server 500.
+	if errors.Is(err, context.Canceled) && errors.Is(r.Context().Err(), context.Canceled) {
+		NoteCause(r.Context(), err)
+		panic(http.ErrAbortHandler)
+	}
 	var typed *apierror.Error
 	if !errors.As(err, &typed) {
 		NoteCause(r.Context(), err)

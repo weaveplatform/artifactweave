@@ -1,12 +1,18 @@
 package accesshttp
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
@@ -16,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
+	httpmiddleware "github.com/weaveplatform/artifactweave/internal/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
@@ -174,6 +181,104 @@ func TestAccAuthenticateStoreFailures(t *testing.T) {
 		if rec.Code != http.StatusInternalServerError {
 			t.Errorf("%s: %d %s", name, rec.Code, rec.Body)
 		}
+	}
+}
+
+type cancellationUsers struct {
+	port.UserStore
+	entered chan struct{}
+	once    sync.Once
+}
+
+func (u *cancellationUsers) Get(ctx context.Context, _ string) (model.User, error) {
+	u.once.Do(func() { close(u.entered) })
+	<-ctx.Done()
+	return model.User{}, fmt.Errorf("fixture user lookup: %w", ctx.Err())
+}
+
+func TestAccAuthenticateClientCancellationAbortsAcrossArtifactRoutes(t *testing.T) {
+	for _, tc := range []struct{ name, path string }{
+		{"docker", "/v2/docker-local/team/public/manifests/v1"},
+		{"maven", "/artifactory/maven-local/org/example/1/example-1.jar"},
+		{"npm", "/artifactory/api/npm/npm-local/example"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := inmem.New()
+			users := &cancellationUsers{UserStore: db.Users(), entered: make(chan struct{})}
+			a, err := authn.NewAuthenticator(users, db.Settings(), authn.Options{Hash: testHash})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var logs bytes.Buffer
+			logger := slog.New(slog.NewJSONHandler(&logs, nil))
+			var reached bool
+			h := httpmiddleware.RecoverPanic(logger, func(path string) string { return path })(
+				httpmiddleware.AccessLog(logger, func(path string) string { return path })(
+					Authenticate(testAuthnOptions(a, nil))(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+						reached = true
+					})),
+				),
+			)
+			finished := make(chan struct{})
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer close(finished)
+				h.ServeHTTP(w, r)
+			}))
+			defer server.Close()
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			r, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+tc.path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.SetBasicAuth("admin", "cancellation-private-fixture")
+			client := &http.Client{Timeout: 5 * time.Second}
+			clientDone := make(chan error, 1)
+			go func() {
+				response, err := client.Do(r)
+				if response != nil {
+					_ = response.Body.Close()
+				}
+				clientDone <- err
+			}()
+			select {
+			case <-users.entered:
+			case <-time.After(5 * time.Second):
+				t.Fatal("authentication did not reach the cancellable lookup")
+			}
+			cancel()
+			select {
+			case err := <-clientDone:
+				if !errors.Is(err, context.Canceled) {
+					t.Fatal("client did not observe its cancellation")
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("client cancellation did not finish")
+			}
+			select {
+			case <-finished:
+			case <-time.After(5 * time.Second):
+				t.Fatal("authentication did not release its cancelled lookup")
+			}
+			if reached {
+				t.Fatal("cancelled authentication reached the artifact handler")
+			}
+			var record struct {
+				Msg, Path, Error string
+				Status           int
+				Aborted          bool
+			}
+			if err := json.Unmarshal(logs.Bytes(), &record); err != nil {
+				t.Fatal("cancellation did not produce one access record")
+			}
+			if record.Msg != "request" || record.Path != tc.path || record.Status != 0 || !record.Aborted ||
+				!strings.Contains(record.Error, "context canceled") {
+				t.Fatal("cancelled authentication was not recorded as an unpublished abort")
+			}
+			if strings.Contains(logs.String(), "cancellation-private-fixture") {
+				t.Fatal("cancellation diagnostics disclosed a credential")
+			}
+		})
 	}
 }
 

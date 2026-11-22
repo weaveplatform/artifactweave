@@ -57,7 +57,9 @@
 //     for unclaimed paths as for handled ones.
 //   - WriteErr sends the cause of an error that is not an *apierror.Error to
 //     the access log through NoteCause, because the client sees only a bare
-//     500.
+//     500. An error caused by cancellation of the HTTP request itself is
+//     noted and aborts through net/http instead; independent backend errors
+//     and server deadlines keep their existing error profiles.
 //   - NoteCause and NoteUser do nothing on a context that never passed the
 //     access log, so a handler called on its own neither panics nor logs.
 //   - The caller checks answer with the kernel's typed errors

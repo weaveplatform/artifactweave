@@ -162,6 +162,22 @@ Check and back up the existing database before deciding how to recover that data
 no automatic move or copy is performed, because multiple configured names may
 have shared one file. Normal schema migrations are unchanged.
 
+## Request cancellation diagnostics
+
+An HTTP request failure caused by cancellation of that same request aborts without
+sending a replacement error response. Its structured access record has
+`aborted: true` and preserves the cancellation cause. When no response had started,
+`status: 0` and `bytes: 0` mean nothing was published; zero is not a wire status.
+For an interrupted response that had already started, the record retains the
+status and bytes actually written.
+
+An independent backend cancellation while the request remains live still follows
+normal error handling. Unrelated database failures retain their 500 responses;
+server deadlines and typed refusals retain their existing status and envelope,
+including the configured AQL timeout's 408. The cancellation rule adds no setting
+and does not relax authentication or authorization. See
+[decision 0016](../research/decisions/0016-observability-and-health.md#decision).
+
 ## Planned application settings
 
 The following design settings are not implemented and are rejected as unknown YAML keys.
