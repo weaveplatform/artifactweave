@@ -40,7 +40,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P9c Native package catalog coverage | Done (2026-11-04) | All 28 format tasks and #789/#791/#843/#844/#852/#853 follow-ups are merged. The [class/client matrix](package-format-matrix.md), [CI evidence](../testing/phase9c-ci-signoff.md) and [combined qualification ledger](../testing/phase9c-signoff.md) retain #810/#792's passing final merged-main and current-release gates. P29 to P33 must not count these implementations again |
 | P9d Modular-monolith migration | Done (2026-11-11) | Behaviour-preserving move to the layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md); code was staged under `migration/` and promoted to `internal/`, and [p9d-path-map.json](p9d-path-map.json) maps each legacy path to its final one. The [Phase 9d qualification record](../testing/phase9d-signoff.md) holds [PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104)'s merged-main, real-cloud and release evidence. |
 | P10 Virtual repositories | Implementation delivered; qualification in progress | **M3**; [qualification and epic closeout](../testing/phase10-signoff.md), final completion record in [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528) |
-| P11 Projects, events, cleanup and single replication | Final replication and combined-main qualification pending | Project APIs/authorization/sharing/quotas, typed events and durable consumers, 24 webhook subscription resources, package cleanup and single push are merged. Pull, execute/status and native/provider qualification remain in the final PR chain; #1765 owns the exact merged-main exit |
+| P11 Projects, events, cleanup and single replication | Final replication and combined-main qualification pending | Project APIs/authorization/sharing/quotas, typed events and durable consumers, 24 webhook subscription resources, package cleanup and single push and pull are merged. Execute/status (#1763) and native/provider qualification (#1764) remain in the final PR chain; #1765 owns the exact merged-main exit |
 | P12 Descriptor export, system configuration, LDAP | Not started | |
 | P13 Peer trust and federated repositories | Not started | |
 | P14 Platform federation and topology | Not started | |
@@ -1157,9 +1157,9 @@ refactor, not a P11a/P11b split or a P11 sign-off waiting for P19.
 synchronous repository attachment and standard sharing, and storage quotas are
 implemented on the #1730/#1731 authority foundations. Typed service events and
 recoverable consumers, all 24 planned webhook subscription resources, package cleanup
-execution/reports and single push are merged. Single pull and scheduled/manual
-execute/status are completing through #1762/#1763, with two-instance native/provider
-qualification in #1764. #1765 retains the exact combined-main full-gate requirement;
+execution/reports and single push and pull are merged. Scheduled/manual execute/status
+(#1763) and two-instance native/provider qualification (#1764) remain in the final PR
+chain. #1765 retains the exact combined-main full-gate requirement;
 P11 remains open until that exit is demonstrated. Observed project-aware source
 sharing remains P19a #487.
 
