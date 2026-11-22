@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
@@ -58,8 +59,8 @@ type Options struct {
 	// set: its host is the parent the repository subdomains sit under.
 	SubdomainMatch bool
 	BaseURL        string
-	// Fault records an unexpected error for the access log, as the server's
-	// handlers do; nil drops it.
+	// Fault records an unexpected error for the embedding caller; nil adds
+	// no callback to the shared request cause recording.
 	Fault func(*http.Request, error)
 	// Blobs is the blob store behind Store. Nil leaves blobs and uploads
 	// unimplemented, for tests of the router alone.
@@ -494,7 +495,7 @@ func (g *Registry) writeErr(w http.ResponseWriter, r *http.Request, err error) {
 	if !errors.As(err, &typed) && g.fault != nil {
 		g.fault(r, err)
 	}
-	Write(w, err)
+	httpkit.WriteErrProfile(w, r, apierror.ProfileOCI, err)
 }
 
 // APIVersion sets the version header on every registry response, before

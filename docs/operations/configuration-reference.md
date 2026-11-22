@@ -171,6 +171,10 @@ sending a replacement error response. Its structured access record has
 For an interrupted response that had already started, the record retains the
 status and bytes actually written.
 
+This boundary also covers Docker handler lookups and v1/v2 config lookup, package
+protocol error responses, Terraform backend error responses and Chef/Puppet reindex.
+Each retains its own error envelope for responses that are published.
+
 An independent backend cancellation while the request remains live still follows
 normal error handling. Unrelated database failures retain their 500 responses;
 server deadlines and typed refusals retain their existing status and envelope,

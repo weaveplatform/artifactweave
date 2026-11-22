@@ -88,6 +88,14 @@ authentication/authorization refusal retain their existing response classificati
 The [operator reference](../../operations/configuration-reference.md#request-cancellation-diagnostics)
 explains how to distinguish these records from server failures.
 
+Handlers that select their own error profile use the same request-aware boundary
+through `httpkit.WriteErrProfile` ([#1851](https://github.com/weaveplatform/artifactweave/issues/1851)).
+Docker's registry and config lookup, package protocol routes, Terraform backend
+errors and Chef/Puppet reindex retain their explicit envelopes and fault callbacks.
+Matching request cancellation aborts before rendering; a live request's backend cancellation still
+renders its genuine server failure. Format policy refusals retain their existing
+status, message and registry code.
+
 P12 implements configuration logger POST/DELETE/GET over actual named slog handlers
 ([#1827](https://github.com/weaveplatform/artifactweave/issues/1827)). Configuration
 core owns whole-request validation, current guarded administration, one bounded
