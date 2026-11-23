@@ -350,12 +350,16 @@ Feature: Configuration descriptor
     And the XML field "proxies/proxy[key=xml-proxy]/host" equals "proxy.invalid"
     And the XML field "propertySets/propertySet[name=xml-set]/name" equals "xml-set"
     And the XML field "repoLayouts/repoLayout[name=xml-layout]/name" equals "xml-layout"
-    And the XML field "security/anonAccessEnabled" equals "true"
+    And the XML field "security/hideUnauthorizedResources" equals "false"
+    And the response body does not contain "anonAccessEnabled"
     And the XML field "downloadRedirectConfig/fileMinimumSize" equals "0"
     And the XML field "gcConfig/cronExp" equals "0 0 /6 * * ?"
     And the XML field "trashcanConfig/enabled" equals "true"
     And the XML field "trashcanConfig/retentionPeriodDays" equals "7"
     And the response body does not contain "private-fixture"
+    When I GET "/artifactory/api/securityconfig" as admin
+    Then the response status is 200
+    And the JSON field "anonAccessEnabled" equals "true"
     When I GET "/artifactory/api/repositories/xml-local" as admin
     Then the response status is 200
     And the JSON field "description" equals "data <>&"

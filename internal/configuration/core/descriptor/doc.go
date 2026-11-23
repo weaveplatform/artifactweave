@@ -65,7 +65,8 @@
 //     access's LDAPGroupSettings, the service behind
 //     /access/api/v1/ldap/groups; the whole section set to null deletes
 //     every group setting, which the artifactory_ldap_group_setting
-//     resource's delete sends [I], and the export writes 7.x's element order.
+//     resource's delete sends [I]. The export carries none (issue 1905):
+//     7.161.26's SecurityDescriptor has no ldapGroupSettings either.
 //   - gcConfig and trashcanConfig are planned and written through artifacts'
 //     StoragePolicies, which owns the trash can and the collector's Quartz
 //     schedule (decision 0010), so configuration never bypasses deletion or
@@ -154,7 +155,11 @@
 // security.hideUnauthorizedResources beside CFG-04's policies (access's
 // SecurityPolicies), first in the export's security element as in
 // SecurityType, and reported by GET /api/securityconfig; httpkit applies it
-// to every download refusal at run time. Issue 1902 binds config apply and
+// to every download refusal at run time. Issue 1905 makes the export's
+// security element 7.161.26's SecurityType: hideUnauthorizedResources and
+// passwordSettings' expirationPolicy, without the anonymous access switch,
+// the lock and encryption policies or the LDAP group settings, which
+// 7.x keeps in Access. Issue 1902 binds config apply and
 // the bootstrap descriptor with the installation's Settings, so they refuse
 // a urlBase at or above a CDN host as PATCH does.
 //
@@ -199,7 +204,8 @@
 //     reasons, outcomes through access's binding with a dry run and a second
 //     apply, locks cleared by turning locking off, refused policies and
 //     failed writes that write nothing of their document, the export with
-//     the defaults, and the authenticator's cache dropped after a commit.
+//     the defaults and only SecurityType's elements, and the authenticator's
+//     cache dropped after a commit.
 //   - storage_test.go: gcConfig and trashcanConfig parsing and refusals,
 //     dry run, apply and reapply through the owner's binding, the owner's
 //     refusals in the descriptor's names, rollback with a failing later

@@ -1368,9 +1368,11 @@ uploads with the coverage. `trashcan` qualifies
 descriptor GET is required for these pinned provider controls, so a missing implementation
 fails the required conformance lane. `general-security` reads back through
 `GET /artifactory/api/securityconfig`, so a server without it fails the lane the same way.
-`ldap-groups` qualifies `artifactory_ldap_group_setting_v2` and `artifactory_ldap_group_setting`
-over a disabled `artifactory_ldap_setting_v2` connection (#1834), reading both settings back
-through the Access API and the XML descriptor.
+`ldap-groups` qualifies two `artifactory_ldap_group_setting_v2` settings over a disabled
+`artifactory_ldap_setting_v2` connection (#1834), reading both back through the Access API
+and requiring the XML descriptor to carry no `ldapGroupSettings`, as 7.161.26's
+`SecurityType` does not (#1905); the deprecated `artifactory_ldap_group_setting`, which
+reads them from the XML, cannot read back there, as on 7.x from 7.57.1.
 - It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` and
   `terraform-provider-platform_<version>_<os>_<arch>.zip` and
   `terraform-provider-project_<version>_<os>_<arch>.zip` once into a filesystem mirror,

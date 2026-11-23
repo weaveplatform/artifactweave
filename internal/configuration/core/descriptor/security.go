@@ -310,17 +310,14 @@ func applySecurity(ctx context.Context, d Deps, p *Patch) error {
 	return nil
 }
 
-// exportPolicies renders hideUnauthorizedResources, userLockPolicy and
-// passwordSettings. hideUnauthorizedResources is SecurityType's first
-// element in 7.161.26's artifactory.xsd, so it opens the security element
-// (exportSecurity). 7.161.26's artifactory.xsd keeps only passwordSettings' expirationPolicy (enabled,
-// passwordMaxAge, notifyByEmail, in that order) and resetPolicy: the lock
-// policy and the encryption policy moved to Access with anonAccessEnabled
-// and ldapSettings, which this export already carries beside them for the
-// providers that read the security element. Their names, the lower-case
-// EncryptionPolicy values and their places, after anonAccessEnabled and
-// before ldapSettings, follow the descriptor classes that 7.161.26 still
-// ships (UserLockPolicy, EncryptionPolicy) [I].
+// exportPolicies renders the descriptor's part of the policies:
+// hideUnauthorizedResources and passwordSettings' expirationPolicy (enabled,
+// passwordMaxAge, notifyByEmail, in PasswordExpirationPolicy's propOrder),
+// which 7.161.26's PUT passwordExpirationPolicy stores in the descriptor.
+// The lock policy and the encryption policy are Access's there, so they are
+// read through GET /api/securityconfig, not the export (#1905).
+// PasswordSettingsType's resetPolicy is left out: artifactweave has no
+// password reset.
 func exportPolicies(ctx context.Context, d Deps, out *exportSecurity) error {
 	if d.Security == nil {
 		return nil
@@ -330,11 +327,7 @@ func exportPolicies(ctx context.Context, d Deps, out *exportSecurity) error {
 		return fmt.Errorf("read export security policies: %w", err)
 	}
 	out.HideUnauthorized = &p.HideUnauthorizedResources
-	out.UserLockPolicy = &exportFields{Fields: []exportField{
-		exportValue("enabled", p.LockEnabled), exportValue("loginAttempts", p.LoginAttempts),
-	}}
 	out.PasswordSettings = &exportFields{Fields: []exportField{
-		exportValue("encryptionPolicy", string(p.Encryption)),
 		{Name: expirySection, Children: []exportField{
 			exportValue("enabled", p.ExpirationEnabled),
 			exportValue("passwordMaxAge", p.PasswordMaxAge),

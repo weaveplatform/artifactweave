@@ -41,7 +41,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P9d Modular-monolith migration | Done (2026-11-11) | Behaviour-preserving move to the layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md); code was staged under `migration/` and promoted to `internal/`, and [p9d-path-map.json](p9d-path-map.json) maps each legacy path to its final one. The [Phase 9d qualification record](../testing/phase9d-signoff.md) holds [PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104)'s merged-main, real-cloud and release evidence. |
 | P10 Virtual repositories | Implementation delivered; qualification in progress | **M3**; [qualification and epic closeout](../testing/phase10-signoff.md), final completion record in [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528) |
 | P11 Projects, events, cleanup and single replication | Done (2026-11-23) | Project APIs/authorization/sharing/quotas, typed events and durable consumers, 24 webhook subscription resources, package cleanup, single push/pull execution/status (#1763) and native/provider qualification (#1764) are merged. #1765 qualified merged main `425ce4de9a68`: the no-input [full workflow 45191301585](https://github.com/weaveplatform/artifactweave/actions/runs/45191301585) passed at 95.2% total coverage and literal `make gate` passed at 95.1%. Epic #1742 closure is the maintainer's; P19a owns observation-dependent completion |
-| P12 Descriptor export, system configuration, LDAP | Done (2026-11-23) | XML export, base URL/reverse proxy/nginx, temporary loggers, baseline security and global hiding, GC/trash can, global quota, backups/mail/system message, LDAP connections/bind/group synchronization, NTLM and redirected proxy credentials and the seven provider resources are merged (#1825 to #1837, #1848, #1902, #1903). #1838 qualified merged main `b910ea869b65`: the no-input [full workflow 45277781762](https://github.com/weaveplatform/artifactweave/actions/runs/45277781762) passed at 95.2% total coverage and literal `make gate` passed at 95.1%, two load timeouts rerun once. Epic closure is the maintainer's; #1905, #1908, #1873 and #1901 are open follow-ups; P36 owns XML POST and backup execution |
+| P12 Descriptor export, system configuration, LDAP | Done (2026-11-23) | XML export, base URL/reverse proxy/nginx, temporary loggers, baseline security and global hiding, GC/trash can, global quota, backups/mail/system message, LDAP connections/bind/group synchronization, NTLM and redirected proxy credentials and the seven provider resources are merged (#1825 to #1837, #1848, #1902, #1903). #1838 qualified merged main `b910ea869b65`: the no-input [full workflow 45277781762](https://github.com/weaveplatform/artifactweave/actions/runs/45277781762) passed at 95.2% total coverage and literal `make gate` passed at 95.1%, two load timeouts rerun once. #1905 (#1912) then made the XML `security` element follow 7.161.26's `SecurityType`, so the deprecated `artifactory_ldap_group_setting` no longer reads back, as on 7.x from 7.57.1; `artifactory_ldap_group_setting_v2` remains qualified. Epic closure is the maintainer's; #1908, #1873 and #1901 are open follow-ups; P36 owns XML POST and backup execution |
 | P13 Peer trust and federated repositories | Not started | |
 | P14 Platform federation and topology | Not started | |
 | P15 Release bundles v1 and Distribution | Not started | |
@@ -1309,8 +1309,15 @@ each stream's latest version from its files), and, under load, the NuGet
 PostgreSQL start-up. No P12 assertion failed in any attempt. P12 has met its exit;
 closing the epics is left to the maintainer.
 
-**Open follow-ups, outside the phase exit.** #1905 (the XML `security` element
-to follow 7.161.26's `SecurityType`), #1908 (the global hiding setting on the REST
+**After the qualified revision.** #1905 merged as #1912 (`ac9c17180`) with every
+check of its own full CI run green, including Terraform provider conformance and
+the coverage gate. The XML `security` element now follows 7.161.26's
+`SecurityType`: it carries only `hideUnauthorizedResources` and
+`passwordSettings.expirationPolicy`. The deprecated `artifactory_ldap_group_setting`
+therefore no longer reads back, as on 7.x from 7.57.1. `artifactory_ldap_group_setting_v2`
+and the seven exit-criteria resources are unaffected.
+
+**Open follow-ups, outside the phase exit.** #1908 (the global hiding setting on the REST
 surfaces 7.x also hides), #1873 (the P39 system message banner) and #1901 (the
 weave provider's LDAP manager-password limitation). XML POST, vendor bootstrap
 import and backup execution remain P36; other human identity P21/P22; later

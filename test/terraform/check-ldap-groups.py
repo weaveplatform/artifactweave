@@ -1,13 +1,15 @@
-"""Qualify the pinned LDAP group setting resources through the server's answers.
+"""Qualify the pinned LDAP group setting resource through the server's answers.
 
-artifactory_ldap_group_setting_v2 writes and reads the Access API, and
-artifactory_ldap_group_setting writes the descriptor by YAML PATCH and reads
-the XML descriptor, so an empty plan alone would accept a server that echoed
-each back from its own store. Each check therefore reads both settings
-through both surfaces, which must agree, and asks for the effect: a refresh
-of each setting reaches the group sync, which refuses it because the
-connection they read through is disabled. Only the isolated runner's
-loopback application is contacted.
+artifactory_ldap_group_setting_v2 writes and reads the Access API, so an
+empty plan alone would accept a server that echoed each setting back from
+its own store. Each check therefore reads both settings through the Access
+API list, requires the XML descriptor to carry no ldapGroupSettings (7.161.26's
+SecurityType has none; its PATCH moves them to Access), and asks for the
+effect: a refresh of each setting reaches the group sync, which refuses it
+because the connection they read through is disabled. The deprecated
+artifactory_ldap_group_setting reads the XML descriptor back, which therefore
+finds nothing, here as on 7.x from 7.57.1, so the fixture does not use it.
+Only the isolated runner's loopback application is contacted.
 """
 
 import json
@@ -22,17 +24,14 @@ import xml.etree.ElementTree as ET
 
 
 SCENARIO = "deploy/artifactweave/terraform/ldap-groups"
-RESOURCES = ["artifactory_ldap_setting_v2", "artifactory_ldap_group_setting_v2", "artifactory_ldap_group_setting"]
+RESOURCES = ["artifactory_ldap_setting_v2", "artifactory_ldap_group_setting_v2", "artifactory_ldap_group_setting_v2"]
 GROUPS = "/access/api/v1/ldap/groups"
-# 7.x's LdapGroupSetting element order, which the XML descriptor keeps.
-ORDER = ["name", "groupBaseDn", "groupNameAttribute", "groupMemberAttribute", "subTree", "filter",
-         "descriptionAttribute", "strategy", "enabledLdap", "forceAttributeSearch"]
 
 
 def inventory(root):
     fixture = root / SCENARIO
     declarations = re.findall(r'^resource "([^"]+)"', (fixture / "main.tf").read_text(), re.M)
-    assert declarations == RESOURCES, "LDAP group fixture must manage the connection and both group setting resources"
+    assert declarations == RESOURCES, "LDAP group fixture must manage the connection and two v2 group settings"
     versions = (fixture / "versions.tf").read_text()
     provider = re.search(r'artifactory\s*=\s*\{([^}]+)\}', versions)
     assert provider and '"jfrog/artifactory"' in provider.group(), "artifactory provider missing"
@@ -50,7 +49,7 @@ def inventory(root):
         assert 'python3 -I "$here/check-ldap-groups.py" ' + mode in runner, "LDAP groups runner omits required effect or deletion checks"
     release = re.search(r'^ARTIFACTORY_VERSION=([0-9.]+)$', runner, re.M)
     assert release and release.group(1) == version, "artifactory release pin missing from provider mirror"
-    print("LDAP groups provider inventory: three pinned resources and required native lane PASS")
+    print("LDAP groups provider inventory: the connection, two v2 group settings and required native lane PASS")
 
 
 class NoRedirects(HTTPRedirectHandler):
@@ -85,18 +84,14 @@ def local(tag):
     return tag.rsplit("}", 1)[-1]
 
 
-def descriptor_settings():
+def no_descriptor_settings():
     status, body = request("GET", "/artifactory/api/system/configuration")
     assert status == 200, f"XML descriptor: status {status}"
-    out = {}
-    for element in ET.fromstring(body).iter():
-        if local(element.tag) != "ldapGroupSetting":
-            continue
-        fields = [(local(child.tag), child.text or "") for child in element]
-        order = [name for name, _ in fields]
-        assert order == [name for name in ORDER if name in order], f"ldapGroupSetting element order {order}"
-        out[dict(fields)["name"]] = dict(fields)
-    return out
+    security = [e for e in ET.fromstring(body) if local(e.tag) == "security"]
+    assert len(security) == 1, "XML descriptor has no security element"
+    names = [local(e.tag) for e in security[0].iter()]
+    assert "ldapGroupSettings" not in names and "ldapGroupSetting" not in names, \
+        f"the XML descriptor carries group settings, which 7.161.26's SecurityType does not: {names}"
 
 
 def refused_refresh(name):
@@ -110,30 +105,29 @@ def check(strategy, sub_tree):
     teams, units = names()
     key = os.environ["TF_VAR_connection_key"]
     member = "uniqueMember" if strategy == "STATIC" else "memberOf"
-    access, xml = access_settings(), descriptor_settings()
+    access = access_settings()
+    no_descriptor_settings()
     for name in (teams, units):
-        assert name in access and name in xml, f"{name} missing from the Access API or the XML descriptor"
+        assert name in access, f"{name} missing from the Access API"
     t = access[teams]
     assert (t["strategy"], t["group_member_attribute"], t["sub_tree"], t["enabled_ldap"]) == \
         (strategy, member, sub_tree == "true", key), f"{teams} read back {t}"
-    assert (xml[teams]["strategy"], xml[teams]["subTree"]) == (strategy, sub_tree), f"{teams} in the descriptor {xml[teams]}"
-    u = xml[units]
-    assert (u["strategy"], u["groupMemberAttribute"], u["subTree"], u["enabledLdap"], u["groupBaseDn"]) == \
-        ("HIERARCHICAL", "ou", "false" if sub_tree == "true" else "true", key, ""), f"{units} in the descriptor {u}"
-    a = access[units]
-    assert (a["strategy"], a["sub_tree"]) == ("HIERARCHICAL", sub_tree != "true"), f"{units} through the Access API {a}"
+    u = access[units]
+    assert (u["strategy"], u["group_member_attribute"], u["sub_tree"], u["enabled_ldap"], u["group_base_dn"]) == \
+        ("HIERARCHICAL", "ou", False, key, ""), f"{units} read back {u}"
     status, body = request("GET", "/access/api/v1/ldap/settings/" + quote(key, safe=""))
     assert status == 200 and json.loads(body)["enabled"] is False, f"connection {key}: status {status}"
     for name in (teams, units):
         refused_refresh(name)
-    print(f"LDAP groups: {strategy} teams with sub_tree {sub_tree} and HIERARCHICAL units read back through both surfaces and synced PASS")
+    print(f"LDAP groups: {strategy} teams with sub_tree {sub_tree} and HIERARCHICAL units read back through the Access API, absent from the XML descriptor, and synced PASS")
 
 
 def deleted():
     teams, units = names()
-    access, xml = access_settings(), descriptor_settings()
+    access = access_settings()
+    no_descriptor_settings()
     for name in (teams, units):
-        assert name not in access and name not in xml, f"{name} survived destroy"
+        assert name not in access, f"{name} survived destroy"
         status, _ = request("GET", GROUPS + "/" + quote(name, safe=""))
         assert status == 404, f"{name} after destroy: status {status}"
     status, _ = request("GET", "/access/api/v1/ldap/settings/" + quote(os.environ["TF_VAR_connection_key"], safe=""))

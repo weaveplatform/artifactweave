@@ -692,11 +692,11 @@ ldap_proof() {
 		"$work/configurationproof" "$work/data/artifactweave.db" "ldap/$TF_VAR_connection_key" "$1" "$work/ldap-secret-proof.json"
 }
 
-# Each revision changes the v2 setting's strategy and both settings'
-# sub_tree, reads them back through the Access API and the XML descriptor
-# and refreshes each through the group sync. The connection stays disabled,
-# so the provider's refresh after a v2 write answers 400, which it reports
-# as a warning, and no directory is needed. Its own fields change with the
+# Each revision changes the teams setting's strategy and sub_tree, reads
+# both settings back through the Access API, requires the XML descriptor to
+# carry none (as 7.x's does not) and refreshes each through the group sync.
+# The connection stays disabled, so the provider's refresh after each write
+# answers 400, which it reports as a warning, and no directory is needed. Its own fields change with the
 # revisions too, and check-p12.py reads it back through the Access API.
 #
 #   ldap_groups_revision STRATEGY SUB_TREE LABEL PROOF_PHASE EXPECTED_PASSWORD

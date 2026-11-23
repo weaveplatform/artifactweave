@@ -232,10 +232,11 @@ func ldapGroupSync(t *testing.T, ep containertest.LDAPEndpoint, backend string) 
 	ldapCall(t, h, http.MethodPost, ldapGroups+"/corp-groups/refresh?operation=SOMETIMES", admin, "",
 		http.StatusBadRequest)
 
-	// The descriptor exports the setting in 7.x's element order and writes
-	// it as the legacy provider does.
-	if body := ldapCall(t, h, http.MethodGet, "/artifactory/api/system/configuration", admin, "", http.StatusOK); !strings.Contains(
-		body, "<ldapGroupSettings><ldapGroupSetting><name>corp-groups</name><groupBaseDn>ou=groups</groupBaseDn>") {
+	// The descriptor writes the setting as the legacy provider does, and its
+	// export carries none: 7.161.26's SecurityType has no ldapGroupSettings,
+	// its PATCH moving them to Access (#1905).
+	if body := ldapCall(t, h, http.MethodGet, "/artifactory/api/system/configuration", admin, "", http.StatusOK); strings.Contains(
+		body, "ldapGroupSetting") || strings.Contains(body, "corp-groups") {
 		t.Fatalf("export: %s", body)
 	}
 	yaml := map[string]string{"Content-Type": "application/yaml"}
