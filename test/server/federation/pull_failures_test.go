@@ -100,10 +100,12 @@ func assertNoPullCache(t *testing.T, w *pushWorld) {
 }
 
 func TestAccSinglePullBlockedPublicationSQLite(t *testing.T) {
+	t.Parallel()
 	qualifyPullBlockedPublication(t, "sqlite")
 }
 
 func TestAccSinglePullBlockedPublicationPostgres(t *testing.T) {
+	t.Parallel()
 	qualifyPullBlockedPublication(t, "postgres")
 }
 
@@ -206,8 +208,15 @@ func qualifyPullBlockedPublication(t *testing.T, backend string) {
 	}
 }
 
-func TestAccSinglePullInvalidBytesSQLite(t *testing.T)   { qualifyPullInvalidBytes(t, "sqlite") }
-func TestAccSinglePullInvalidBytesPostgres(t *testing.T) { qualifyPullInvalidBytes(t, "postgres") }
+func TestAccSinglePullInvalidBytesSQLite(t *testing.T) {
+	t.Parallel()
+	qualifyPullInvalidBytes(t, "sqlite")
+}
+
+func TestAccSinglePullInvalidBytesPostgres(t *testing.T) {
+	t.Parallel()
+	qualifyPullInvalidBytes(t, "postgres")
+}
 
 func qualifyPullInvalidBytes(t *testing.T, backend string) {
 	t.Helper()
@@ -245,8 +254,15 @@ func qualifyPullInvalidBytes(t *testing.T, backend string) {
 	}
 }
 
-func TestAccSinglePullOfflineSQLite(t *testing.T)   { qualifyPullOffline(t, "sqlite") }
-func TestAccSinglePullOfflinePostgres(t *testing.T) { qualifyPullOffline(t, "postgres") }
+func TestAccSinglePullOfflineSQLite(t *testing.T) {
+	t.Parallel()
+	qualifyPullOffline(t, "sqlite")
+}
+
+func TestAccSinglePullOfflinePostgres(t *testing.T) {
+	t.Parallel()
+	qualifyPullOffline(t, "postgres")
+}
 
 func qualifyPullOffline(t *testing.T, backend string) {
 	t.Helper()
@@ -262,8 +278,15 @@ func qualifyPullOffline(t *testing.T, backend string) {
 	assertNoPullCache(t, w)
 }
 
-func TestAccSinglePullRestartSQLite(t *testing.T)   { qualifyPullRestart(t, "sqlite") }
-func TestAccSinglePullRestartPostgres(t *testing.T) { qualifyPullRestart(t, "postgres") }
+func TestAccSinglePullRestartSQLite(t *testing.T) {
+	t.Parallel()
+	qualifyPullRestart(t, "sqlite")
+}
+
+func TestAccSinglePullRestartPostgres(t *testing.T) {
+	t.Parallel()
+	qualifyPullRestart(t, "postgres")
+}
 
 func qualifyPullRestart(t *testing.T, backend string) {
 	t.Helper()
@@ -302,9 +325,15 @@ func qualifyPullRestart(t *testing.T, backend string) {
 	}
 }
 
-func TestAccSinglePullPolicyRecoverySQLite(t *testing.T) { qualifyPullPolicyRecovery(t, "sqlite") }
+func TestAccSinglePullPolicyRecoverySQLite(t *testing.T) {
+	t.Parallel()
+	qualifyPullPolicyRecovery(t, "sqlite")
+}
 
-func TestAccSinglePullPolicyRecoveryPostgres(t *testing.T) { qualifyPullPolicyRecovery(t, "postgres") }
+func TestAccSinglePullPolicyRecoveryPostgres(t *testing.T) {
+	t.Parallel()
+	qualifyPullPolicyRecovery(t, "postgres")
+}
 
 func qualifyPullPolicyRecovery(t *testing.T, backend string) {
 	t.Helper()
@@ -383,10 +412,12 @@ func qualifyPullPolicyRecovery(t *testing.T, backend string) {
 }
 
 func TestAccSinglePullPropertyPolicyVariantsSQLite(t *testing.T) {
+	t.Parallel()
 	qualifyPullPropertyPolicyVariants(t, "sqlite")
 }
 
 func TestAccSinglePullPropertyPolicyVariantsPostgres(t *testing.T) {
+	t.Parallel()
 	qualifyPullPropertyPolicyVariants(t, "postgres")
 }
 
