@@ -178,7 +178,7 @@ Data sources: `artifactory_file`, `artifactory_fileinfo`, `artifactory_file_list
 | `platform_crowd_settings`, `platform_http_sso_settings` | `PUT/GET /access/api/v1/crowd`, `/access/api/v1/httpsso`; generated 501s; P21 | 7.64.0 / 7.57.1 |
 | `platform_aws_iam_role` | `PUT /access/api/v1/aws/iam_role`, `GET/DELETE .../{username}`; generated 501s; P38 | 7.90.10 |
 | `platform_license` | `POST /artifactory/api/system/licenses`, `GET /artifactory/api/system/license` | |
-| `platform_reverse_proxy` | `GET/POST /artifactory/api/system/configuration/webServer` 200; reads and writes `httpsPort` (docs say `sslPort`: both are emitted), never sends `serverNameExpression` or `artifactoryPort`, allows `dockerReverseProxyMethod: DIRECT` | |
+| `platform_reverse_proxy` | `GET/POST /artifactory/api/system/configuration/webServer` 200; reads and writes `httpsPort` (docs say `sslPort`: both are emitted), never sends `serverNameExpression` or `artifactoryPort`; its `server_provider` (`DIRECT`, `NGINX`, `APACHE`) is sent as `webServerType`, and `dockerReverseProxyMethod` is one of `SUBDOMAIN`, `REPOPATHPREFIX`, `PORTPERREPO` (an earlier revision listed `DIRECT` as a method) | |
 | `platform_workers_service` | `POST/PUT /worker/api/v1/workers`, `GET/DELETE .../{key}`; stubbed with 501 until P17 | 7.94 |
 | `platform_lifecycle_stage`, `platform_lifecycle` | `POST /access/api/v2/stages`, `GET/PATCH/DELETE .../{name}[?project_key]`; `GET/PATCH /access/api/v2/lifecycle`; routes absent (404); P24 | Access 7.155.0 |
 | `platform_myjfrog_ip_allowlist` | deprecated provider resource; replaced by the `jfrog/myjfrog` provider resource. IP allowlisting remains in P40, with explicit account/hosting contracts | |

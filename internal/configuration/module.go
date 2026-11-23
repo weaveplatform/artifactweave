@@ -83,6 +83,7 @@ func New(d Deps) (*Module, error) {
 		Projects:        d.Access.Projects,
 		Authenticator:   d.Access.Authenticator,
 		Authorizer:      d.Access.Authorizer,
+		Settings:        d.Settings,
 	})
 	var loggers *system.Loggers
 	if d.Logging != nil {

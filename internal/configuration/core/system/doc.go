@@ -1,5 +1,7 @@
 // Package system validates and reads the mail-server settings needed by quota
-// delivery and administers bounded temporary logger sessions.
+// delivery, administers bounded temporary logger sessions, and validates,
+// stores in document form and renders the web server settings: urlBase and
+// the reverse proxy with its nginx snippet.
 //
 // # Role
 //
@@ -10,7 +12,9 @@
 // The mailServer descriptor mapping and the shared configuration store, runner
 // and authority guard. Secret values live separately in ConfigDocument.Secrets.
 // LoggerDeps supplies real logging decisions, guarded current administration and
-// an optional timer scheduler for deterministic expiration checks.
+// an optional timer scheduler for deterministic expiration checks. The web
+// server functions take configuration/api.ReverseProxy values, stored
+// documents, and the CDN hosts a urlBase may not sit above.
 //
 // # Outputs
 //
@@ -19,6 +23,11 @@
 // completed before SMTP starts. No function here opens a network connection.
 // Loggers validates temporary level requests, applies one in-memory session,
 // restores current baseline decisions on expiry/delete and joins timers on Close.
+// CheckReverseProxy and CheckURLBase refuse with configuration/api.ErrInvalid;
+// NginxSnippet renders only values those checks admit, so nothing stored can
+// change the snippet's nginx syntax. PublicURL caches the effective base URL
+// for every request, dropped after a local write and refreshed every
+// PublicURLRefresh for writes from another process.
 //
 // # References
 //
@@ -38,6 +47,13 @@
 // # Status
 //
 // PRJ-04 supplies the narrow documented mailServer dependency for quota warnings.
-// P12 CFG-03 supplies actual process-local logger controls. Remaining system and
-// mail administration stay P12; log collection and streaming stay P38.
+// P12 CFG-03 supplies actual process-local logger controls. P12 CFG-02 (#1826)
+// supplies the base URL and reverse proxy settings. Remaining system and mail
+// administration stay P12; log collection and streaming stay P38.
+//
+// # Testing
+//
+//   - webserver_test.go: every reverse proxy refusal, the stored document's
+//     round trip, urlBase refusals, the snippet's shapes and the PublicURL
+//     cache.
 package system

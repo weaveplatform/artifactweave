@@ -72,7 +72,9 @@
 // (P3), the reverse proxy configuration of the Docker access methods (pull
 // request 241) and the probes and router health (issue 403) added later.
 // P9d split them into the system partial (WEB-07) and moved them here
-// (WEB-11). P12 adds process-local logger POST/DELETE/GET over configuration/api;
+// (WEB-11). P12 adds process-local logger POST/DELETE/GET over configuration/api,
+// and CFG-02 (#1826) the stored reverse proxy (GET and POST webServer), its
+// nginx snippet and the plain-text PUT baseUrl over configuration/api.WebServer;
 // P38 owns streaming, downloads and support bundles.
 //
 // # Testing
