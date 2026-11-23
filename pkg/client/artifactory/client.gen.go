@@ -11619,7 +11619,7 @@ type ClientInterface interface {
 
 	// GetKeyPairPublicKeyPerRepository Get the public key assigned to a repository
 	//
-	// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+	// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine, Debian, RPM and Opkg virtual repositories use their keyPair; other repositories use the primary key pair. A Debian, RPM or Opkg repository that names no pair answers the instance-wide GPG key (default-gpg-key) once it signs with it. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or signs with no pair.
 	//
 	// Corresponds with GET /api/security/keypair/public/repositories/{repoKey} (the `GetKeyPairPublicKeyPerRepository` operationId).
 	GetKeyPairPublicKeyPerRepository(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -17692,7 +17692,7 @@ func (c *Client) UpdateKeyPair(ctx context.Context, body UpdateKeyPairJSONReques
 
 // GetKeyPairPublicKeyPerRepository Get the public key assigned to a repository
 //
-// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine, Debian, RPM and Opkg virtual repositories use their keyPair; other repositories use the primary key pair. A Debian, RPM or Opkg repository that names no pair answers the instance-wide GPG key (default-gpg-key) once it signs with it. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or signs with no pair.
 //
 // Corresponds with GET /api/security/keypair/public/repositories/{repoKey} (the `GetKeyPairPublicKeyPerRepository` operationId).
 func (c *Client) GetKeyPairPublicKeyPerRepository(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -39354,7 +39354,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetKeyPairPublicKeyPerRepositoryWithResponse Get the public key assigned to a repository
 	//
-	// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+	// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine, Debian, RPM and Opkg virtual repositories use their keyPair; other repositories use the primary key pair. A Debian, RPM or Opkg repository that names no pair answers the instance-wide GPG key (default-gpg-key) once it signs with it. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or signs with no pair.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -78079,7 +78079,7 @@ func (c *ClientWithResponses) UpdateKeyPairWithResponse(ctx context.Context, bod
 
 // GetKeyPairPublicKeyPerRepositoryWithResponse Get the public key assigned to a repository
 //
-// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine, Debian, RPM and Opkg virtual repositories use their keyPair; other repositories use the primary key pair. A Debian, RPM or Opkg repository that names no pair answers the instance-wide GPG key (default-gpg-key) once it signs with it. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or signs with no pair.
 //
 // Returns a wrapper object for the known response body format(s).
 //
