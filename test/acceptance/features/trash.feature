@@ -114,6 +114,73 @@ Feature: Trash can and garbage collection
     When I GET "/artifactory/api/storageinfo" as admin
     Then the JSON field "binariesSummary.binariesCount" equals "0"
 
+  # CFG-05 (#1829): the descriptor's trashcanConfig and gcConfig are the
+  # trash can and collector's own policy, so deletion, expiry, the XML
+  # export and config apply all see the same effective values.
+  Scenario: The descriptor's trash can policy governs deletion, expiry and the export
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the response status is 200
+    And the XML field "gcConfig/cronExp" equals "0 0 /4 * * ?"
+    And the XML field "trashcanConfig/enabled" equals "true"
+    And the XML field "trashcanConfig/retentionPeriodDays" equals "14"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      trashcanConfig:
+        enabled: false
+      """
+    Then the response status is 200
+    And the response body is "1 changes to config merged successfully"
+    When I PUT "/artifactory/trash-local/policy/off.txt" as admin with body:
+      """
+      gone for good
+      """
+    And I DELETE "/artifactory/trash-local/policy/off.txt" as admin
+    Then the response status is 204
+    When I GET "/artifactory/api/storage/auto-trashcan/trash-local/policy/off.txt" as admin
+    Then the response status is 404
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the XML field "trashcanConfig/enabled" equals "false"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      gcConfig:
+        cronExp: '0 0 /6 * * ?'
+      trashcanConfig:
+        enabled: true
+        retentionPeriodDays: 0
+      """
+    Then the response status is 200
+    And the response body is "3 changes to config merged successfully"
+    When I PUT "/artifactory/trash-local/policy/expire.txt" as admin with body:
+      """
+      expire me
+      """
+    And I DELETE "/artifactory/trash-local/policy/expire.txt" as admin
+    And I GET "/artifactory/api/storage/auto-trashcan/trash-local/policy/expire.txt" as admin
+    Then the response status is 200
+    When I POST "/artifactory/api/system/storage/gc" as admin with body:
+      """
+      {}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/storage/auto-trashcan/trash-local/policy/expire.txt" as admin
+    Then the response status is 404
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      localRepositories:
+        policy-refused:
+          type: generic
+      trashcanConfig:
+        retentionPeriodDays: -1
+      """
+    Then the response status is 400
+    And the response body contains "trashcanConfig.retentionPeriodDays must not be negative"
+    When I GET "/artifactory/api/repositories/policy-refused" as admin
+    Then the response status is 404
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the XML field "gcConfig/cronExp" equals "0 0 /6 * * ?"
+    And the XML field "trashcanConfig/enabled" equals "true"
+    And the XML field "trashcanConfig/retentionPeriodDays" equals "0"
+
   # The fields jf transfer-files and jfrog-client-go read (#390). A run of
   # transfer-files itself needs a source Artifactory with JFrog's
   # data-transfer plugin; internal/artifacts/adapters/http/storageinfo_test.go decodes

@@ -17,9 +17,9 @@
 //
 //   - Parse: a YAML document and a lookup for its ${NAME} references.
 //   - Deps, which Apply and NewAPI take: the unit of work (platform/tx), the
-//     artifacts module's Repositories and Layouts, the configuration
-//     document port (platform/configdoc) and access's AnonymousAccess,
-//     SecurityPolicies and LDAPSettings, all over one store.
+//     artifacts module's Repositories, Layouts and StoragePolicies, the
+//     configuration document port (platform/configdoc) and access's
+//     AnonymousAccess, SecurityPolicies and LDAPSettings, all over one store.
 //   - DownloadRedirectMinSize: the configuration document port.
 //
 // # Outputs
@@ -56,6 +56,12 @@
 //     two surfaces share one connection; access's refusals are reported with
 //     the descriptor's field names, and the export never carries a manager
 //     password.
+//   - gcConfig and trashcanConfig are planned and written through artifacts'
+//     StoragePolicies, which owns the trash can and the collector's Quartz
+//     schedule (decision 0010), so configuration never bypasses deletion or
+//     collection. Both are required singletons: neither a section nor one
+//     of its fields can be null, and the export always carries both, with
+//     Artifactory's defaults when nothing set them.
 //   - Parsing is strict: an unset ${NAME}, a section artifactweave does not
 //     apply, an unknown field and a null on a field that is not a string are
 //     refused, so a pipeline never takes a 200 for settings that changed
@@ -106,6 +112,9 @@
 // access serves the same values, with anonAccessEnabled, as
 // GET /api/securityconfig, which artifactory_general_security refreshes
 // from after writing through this PATCH.
+// CFG-05 (https://github.com/weaveplatform/artifactweave/issues/1829) adds
+// gcConfig and trashcanConfig through artifacts' StoragePolicies, exported
+// in XSD order.
 //
 // # Testing
 //
@@ -134,6 +143,10 @@
 //     apply, locks cleared by turning locking off, refused policies and
 //     failed writes that write nothing of their document, the export with
 //     the defaults, and the authenticator's cache dropped after a commit.
+//   - storage_test.go: gcConfig and trashcanConfig parsing and refusals,
+//     dry run, apply and reapply through the owner's binding, the owner's
+//     refusals in the descriptor's names, rollback with a failing later
+//     write, and the export's defaults, values, order and provider read.
 //   - webserver_test.go: urlBase through Parse, PUT and PATCH with the CDN
 //     rule and the cached effective value; reverse proxy writes, reads with
 //     current authority, the snippet, refusals that store nothing, rollback,

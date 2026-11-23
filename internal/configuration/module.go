@@ -43,6 +43,9 @@ type Deps struct {
 	Repositories artifactsapi.Repositories
 	// Layouts checks each repoLayouts entry before it is stored.
 	Layouts artifactsapi.Layouts
+	// StoragePolicies applies and reads the gcConfig and trashcanConfig
+	// sections; the artifacts module's API binds it over the same store.
+	StoragePolicies artifactsapi.StoragePolicies
 	// Access is the access module's API, through whose AnonymousAccess and
 	// LDAP the descriptor writes the security section's anonymous access
 	// switch and LDAP connections.
@@ -81,6 +84,7 @@ func New(d Deps) (*Module, error) {
 		AnonymousAccess: d.Access.AnonymousAccess,
 		LDAP:            d.Access.LDAP,
 		Security:        d.Access.Security,
+		StoragePolicies: d.StoragePolicies,
 		Projects:        d.Access.Projects,
 		Authenticator:   d.Access.Authenticator,
 		Authorizer:      d.Access.Authorizer,

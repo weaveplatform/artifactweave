@@ -38,7 +38,7 @@ func TestUnitGeneralSecurityProviderScenarioIsRequired(t *testing.T) {
 	for _, tc := range []struct {
 		name, file, before, after string
 	}{
-		{"omitted native scenario", "Makefile", "\t" + scenario + "\n", "\n"},
+		{"omitted native scenario", "Makefile", scenario, "omitted-general-security-scenario"},
 		{"omitted apply handler", "test/terraform/run.sh", scenario + ") apply_general_security ;;", "omitted-general-security-handler"},
 		{"omitted effect checks", "test/terraform/run.sh", `python3 -I "$here/check-general-security.py" --check`, "omitted-general-security-effect-checks"},
 		{"omitted default checks", "test/terraform/run.sh", `python3 -I "$here/check-general-security.py" --deleted`, "omitted-general-security-default-checks"},

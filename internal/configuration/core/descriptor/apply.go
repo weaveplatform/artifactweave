@@ -98,6 +98,9 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 	if err := planLDAP(ctx, d, p, &res); err != nil {
 		return res, err
 	}
+	if err := planStorage(ctx, d, p, now, &res); err != nil {
+		return res, err
+	}
 	if dryRun {
 		return res, nil
 	}
@@ -144,6 +147,9 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 			return err
 		}
 		if err := applyLDAP(ctx, d, p); err != nil {
+			return err
+		}
+		if err := applyStorage(ctx, d, p, now); err != nil {
 			return err
 		}
 		// Write whenever requested: another admin may have changed the setting

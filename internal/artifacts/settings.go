@@ -77,9 +77,6 @@ type Settings struct {
 	// GCGrace is gc.grace_period: how long unreferenced content is kept
 	// before garbage collection deletes it; zero means the default.
 	GCGrace time.Duration
-	// GCInterval is gc.interval: the time between scheduled garbage
-	// collection passes; zero means the default.
-	GCInterval time.Duration
 	// VirtualCacheEntries is virtual.metadata_cache.max_entries: the most
 	// merged virtual metadata documents a node keeps.
 	VirtualCacheEntries int

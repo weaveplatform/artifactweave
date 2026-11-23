@@ -55,6 +55,12 @@ type Deps struct {
 	// passwordSettings and reads them for the export. A descriptor that names
 	// them is refused without it; an export without it leaves them out.
 	Security accessapi.SecurityPolicies
+	// StoragePolicies checks and writes the gcConfig and trashcanConfig
+	// sections through the artifacts module, which owns collection and the
+	// trash can, and reads them for the export. A descriptor that names
+	// either section is refused without it; an export without it has
+	// neither section.
+	StoragePolicies artifactsapi.StoragePolicies
 	// Projects serializes planning and publication before repository locks,
 	// including a descriptor that also changes anonymous credential policy.
 	Projects accessapi.Projects

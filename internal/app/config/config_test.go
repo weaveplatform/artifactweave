@@ -218,7 +218,7 @@ func TestUnitEnvCoversEveryKey(t *testing.T) {
 	}
 	if !cfg.Docker.SubdomainMatch || !cfg.Blob.S3.PathStyle || cfg.Blob.S3.Bucket != "true" ||
 		cfg.Blob.GCS.PartSize != 8<<20 || cfg.ColdBlob.Azure.Concurrency != 3 ||
-		cfg.ColdBlob.Azure.AccountKey != "true" || cfg.GC.Interval != 45*time.Second ||
+		cfg.ColdBlob.Azure.AccountKey != "true" ||
 		cfg.GC.GracePeriod != 45*time.Second || cfg.Download.Redirect.MinSize != 8<<20 ||
 		cfg.Download.Redirect.TTL != 45*time.Second ||
 		cfg.Download.Folder.MaxConcurrentRequests != 3 ||
@@ -707,14 +707,19 @@ func TestUnitGCConfig(t *testing.T) {
 	if err := set(&cfg, "gc.grace_period", "an hour"); !errors.Is(err, ErrInvalidValue) {
 		t.Fatalf("bad duration: %v", err)
 	}
-	cfg.GC.Interval = -time.Second
+	cfg.GC.GracePeriod = -time.Second
 	if err := cfg.Validate(); !errors.Is(err, ErrInvalidValue) {
-		t.Fatalf("negative interval: %v", err)
+		t.Fatalf("negative grace period: %v", err)
 	}
-	file := writeFile(t, "gc:\n  interval: 30m\n  grace_period: 5m\n")
+	file := writeFile(t, "gc:\n  grace_period: 5m\n")
 	got, err := Load(LoadOptions{File: file})
-	if err != nil || got.GC.Interval != 30*time.Minute || got.GC.GracePeriod != 5*time.Minute {
+	if err != nil || got.GC.GracePeriod != 5*time.Minute {
 		t.Fatalf("gc from file: %+v, %v", got.GC, err)
+	}
+	// The schedule is the descriptor's gcConfig.cronExp; the strict file
+	// refuses the retired key rather than ignoring a second schedule.
+	if _, err := Load(LoadOptions{File: writeFile(t, "gc:\n  interval: 30m\n")}); err == nil {
+		t.Fatal("gc.interval must be refused")
 	}
 }
 

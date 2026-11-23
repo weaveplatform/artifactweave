@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/internal/app/config"
+	"github.com/weaveplatform/artifactweave/internal/artifacts"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
@@ -82,6 +83,7 @@ func configurationOver(st *appsql.Store) configapi.API {
 		AnonymousAccess: access.AnonymousAccessOf(st),
 		LDAP:            access.LDAPSettingsOf(st),
 		Security:        access.SecurityPoliciesOf(st),
+		StoragePolicies: artifacts.StoragePoliciesOf(st),
 		Projects:        access.ProjectsOf(st),
 	})
 }

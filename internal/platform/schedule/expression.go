@@ -141,7 +141,11 @@ func parseField(raw string, lo, hi int, names []string) ([]int, bool) {
 			}
 		}
 		start, end := lo, hi
-		if base[0] != "*" {
+		// Quartz reads a bare "/n" as "*/n", starting at the field's first
+		// value (CronExpression.storeExpressionVals). Artifactory's own
+		// default garbage collection schedule is "0 0 /4 * * ?", so refusing
+		// it would refuse the shipped configuration.
+		if base[0] != "*" && (base[0] != "" || len(base) != 2) {
 			r := strings.Split(base[0], "-")
 			if len(r) > 2 {
 				return nil, false

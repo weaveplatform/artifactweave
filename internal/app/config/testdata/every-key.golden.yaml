@@ -127,7 +127,6 @@ log:
     level: warn
     format: text
 gc:
-    interval: 0s
     grace_period: 0s
 download:
     redirect:
