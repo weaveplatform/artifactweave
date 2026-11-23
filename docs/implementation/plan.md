@@ -40,7 +40,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P9c Native package catalog coverage | Done (2026-11-04) | All 28 format tasks and #789/#791/#843/#844/#852/#853 follow-ups are merged. The [class/client matrix](package-format-matrix.md), [CI evidence](../testing/phase9c-ci-signoff.md) and [combined qualification ledger](../testing/phase9c-signoff.md) retain #810/#792's passing final merged-main and current-release gates. P29 to P33 must not count these implementations again |
 | P9d Modular-monolith migration | Done (2026-11-11) | Behaviour-preserving move to the layout of [decision 0044](../research/decisions/0044-modular-monolith-migration.md); code was staged under `migration/` and promoted to `internal/`, and [p9d-path-map.json](p9d-path-map.json) maps each legacy path to its final one. The [Phase 9d qualification record](../testing/phase9d-signoff.md) holds [PRO-05](https://github.com/weaveplatform/artifactweave/issues/1104)'s merged-main, real-cloud and release evidence. |
 | P10 Virtual repositories | Implementation delivered; qualification in progress | **M3**; [qualification and epic closeout](../testing/phase10-signoff.md), final completion record in [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528) |
-| P11 Projects, events, cleanup and single replication | Implemented; merged-main qualification pending | Project APIs/authorization/sharing/quotas, typed events and durable consumers, 24 webhook subscription resources, package cleanup, single push/pull execution/status (#1763) and native/provider qualification (#1764) are merged. #1765 retains the exact merged-main full workflow, coverage floors and `make gate` exit |
+| P11 Projects, events, cleanup and single replication | Implemented; merged-main qualification pending | Project APIs/authorization/sharing/quotas, typed events and durable consumers, 24 webhook subscription resources, package cleanup, single push/pull execution/status (#1763) and native/provider qualification (#1764) are merged. On main `4bacb69d5fa4` the no-input [full workflow 45074906425](https://github.com/weaveplatform/artifactweave/actions/runs/45074906425) passed, but literal `make gate` stopped at 94.9% total coverage; #1765 retains a rerun of both after the added P11 failure-path tests |
 | P12 Descriptor export, system configuration, LDAP | In progress | The anonymous-access descriptor switch is implemented; #303 qualifies native reads with explicit grants. #1800 tracks empty proxy-password idempotence. LDAP-01 (#1832) manages LDAP connections through the Access API and `security.ldapSettings`. Full descriptor export, system configuration, provider round-trips and LDAP retain this phase's exit requirements |
 | P13 Peer trust and federated repositories | Not started | |
 | P14 Platform federation and topology | Not started | |
@@ -1162,6 +1162,24 @@ execution/reports and single push and pull are merged. Scheduled/manual execute/
 #1765 retains the exact combined-main full-gate requirement;
 P11 remains open until that exit is demonstrated. Observed project-aware source
 sharing remains P19a #487.
+
+**Qualification status (2026-11-22).** On merged main
+`4bacb69d5fa4651fe314c25f7cffc54ecdb51b23`, which includes the #1840 repair (#1844),
+the no-input [full workflow 45074906425](https://github.com/weaveplatform/artifactweave/actions/runs/45074906425)
+passed all 20 required jobs; only `Documentation checks` and the format-only
+`Affected-package coverage` lane skipped, as the full profile intends.
+[Its coverage gate](https://github.com/weaveplatform/artifactweave/actions/runs/45074906425/job/137383187616)
+measured 95.0% (105,682/111,219) with every package at or above 90%. Literal `make gate`
+on the same revision passed vet, lint, unit/race/fuzz and Go acceptance (a first attempt
+failed one P9 Maven remote timing test, reported separately in #1765) but failed
+`make cover` at 94.9% (105,559/111,180), 62 statements under the floor. `make gate`
+merges only the unit and Go acceptance lanes. Merging that run's own `cover-unit-linux`
+or `cover-unit-macos` with `cover-accept-go` gives the same 94.9%, so the shortfall does
+not depend on the workstation; the hosted gate reaches 95% only with its feature,
+native-client and conformance lanes. Deterministic project service and handler,
+cleanup-report, replication-status and retention composition failure-path tests were
+added in response.
+#1765 retains a rerun of the full workflow and `make gate` on the resulting main.
 
 **Tracking.** [P11/P19a implementation baseline #1736](https://github.com/weaveplatform/artifactweave/issues/1736)
 
