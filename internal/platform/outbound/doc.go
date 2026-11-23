@@ -23,6 +23,9 @@
 // connection and transfers the authenticated tunnel to its caller; a Client
 // with an NTLM identity calls it for every new CONNECT tunnel. ProxyRedirectHosts
 // returns canonical redirectedToHosts keys, which grant no reachability.
+// SocketTimeoutConn and IdleConnTimeout carry the socket inactivity timeout
+// for Client and for the remote repository client, which builds its own
+// transport.
 // Errors retain safe classifications and context cancellation,
 // never URLs, headers, bodies or credentials.
 //
@@ -32,7 +35,9 @@
 // cannot perform a second unchecked destination resolution; its authentication
 // and TLS identity stay separate from the destination's. Mutating requests never
 // follow redirects or replay a body after a failed exchange; GET/HEAD may follow
-// only same-origin redirects. Business adapters must build scoped request URLs.
+// only same-origin redirects. A request on a reused connection is timed from
+// its own write, never from when the connection went idle, so net/http never
+// sees a stale timeout it would replay (#1866). Business adapters must build scoped request URLs.
 //
 // # References
 //

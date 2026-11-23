@@ -124,9 +124,12 @@ transport's read loop waits on every pooled connection under the deadline set
 when the connection went idle, so a request sent on a connection idle for part
 of the socket timeout failed early and was replayed on a fresh connection. One
 policy fetch then reached the origin twice, for a 404 or a 500 under load as
-well as for a timeout (#1866). A write now moves that pending read deadline past
-`ResponseHeaderTimeout`, which times the header wait and fails without a replay,
-and the pool retires a connection idle for half the socket timeout. The test
+well as for a timeout (#1866). The replication push client shared the wrapper
+and the defect, replaying GET/HEAD and failing writes the target had received.
+Both now use `outbound.SocketTimeoutConn`: a write moves that pending read
+deadline past `ResponseHeaderTimeout`, which times the header wait and fails
+without a replay, and `outbound.IdleConnTimeout` retires a pooled connection
+idle for half the socket timeout. The test
 requires one logical policy fetch and one physical exchange for every answer,
 while retaining real socket-timeout, returned-byte and unchanged-clock checks.
 

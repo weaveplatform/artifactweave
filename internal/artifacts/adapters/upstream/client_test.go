@@ -772,20 +772,3 @@ func TestUnitPooledConnectionsRetireAtHalfTheSocketTimeout(t *testing.T) {
 		}
 	}
 }
-
-type deadlineConn struct {
-	net.Conn
-	read, write error
-}
-
-func (c deadlineConn) SetReadDeadline(time.Time) error  { return c.read }
-func (c deadlineConn) SetWriteDeadline(time.Time) error { return c.write }
-
-func TestUnitIdleConnWriteNeedsBothDeadlines(t *testing.T) {
-	refused := errors.New("refused")
-	for _, conn := range []deadlineConn{{write: refused}, {read: refused}} {
-		if _, err := (&idleConn{Conn: conn, timeout: time.Second}).Write([]byte("x")); !errors.Is(err, refused) {
-			t.Fatal(conn, err)
-		}
-	}
-}

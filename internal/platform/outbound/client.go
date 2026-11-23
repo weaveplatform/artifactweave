@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -69,7 +68,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 	}
 	c.transport = &http.Transport{
 		DialContext: c.dial, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: c.roots},
-		MaxIdleConns: 32, MaxIdleConnsPerHost: 10, MaxConnsPerHost: 32, IdleConnTimeout: 90 * time.Second,
+		MaxIdleConns: 32, MaxIdleConnsPerHost: 10, MaxConnsPerHost: 32, IdleConnTimeout: IdleConnTimeout(c.timeout),
 		TLSHandshakeTimeout: c.timeout, ResponseHeaderTimeout: c.timeout, ExpectContinueTimeout: time.Second,
 		DisableCompression: true, MaxResponseHeaderBytes: 1 << 20,
 		// Per-socket inactivity deadlines cannot safely multiplex HTTP/2 streams.
@@ -247,41 +246,7 @@ func (c *Client) direct(ctx context.Context, network, address string) (net.Conn,
 	if err != nil {
 		return nil, SafeError(err)
 	}
-	return idleConn{Conn: conn, timeout: c.timeout}, nil
-}
-
-type idleConn struct {
-	net.Conn
-	timeout time.Duration
-}
-
-func (c idleConn) Read(body []byte) (int, error) {
-	if c.timeout > 0 {
-		if err := c.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
-			return 0, SafeError(err)
-		}
-	}
-	n, err := c.Conn.Read(body)
-	if err == nil {
-		return n, nil
-	}
-	if errors.Is(err, io.EOF) {
-		return n, io.EOF
-	}
-	return n, fmt.Errorf("read outbound socket: %w", err)
-}
-
-func (c idleConn) Write(body []byte) (int, error) {
-	if c.timeout > 0 {
-		if err := c.SetWriteDeadline(time.Now().Add(c.timeout)); err != nil {
-			return 0, SafeError(err)
-		}
-	}
-	n, err := c.Conn.Write(body)
-	if err != nil {
-		return n, fmt.Errorf("write outbound socket: %w", err)
-	}
-	return n, nil
+	return SocketTimeoutConn(conn, c.timeout), nil
 }
 
 // SafeError discards network endpoint text while preserving actionable causes.
