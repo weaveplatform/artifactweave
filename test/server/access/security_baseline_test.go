@@ -23,7 +23,9 @@ const (
 	internalSwitch = "/access/api/v1/config/security/authentication/basic_authentication_enabled"
 	accessLockPath = "/access/api/v1/config/security/user_lock_policy"
 	encryptedPath  = "/artifactory/api/security/encryptedPassword"
-	devPassword    = "Dev-pass1"
+	// securityConfigPath is the general security read.
+	securityConfigPath = "/artifactory/api/securityconfig"
+	devPassword        = "Dev-pass1"
 )
 
 // baselineWorld is a runtime on one backend behind the router, with login
@@ -209,6 +211,16 @@ func securityBaseline(t *testing.T, backend string) {
 	if got := w.exported(); !strings.Contains(got, "<encryptionPolicy>unsupported</encryptionPolicy>") {
 		t.Fatalf("export %s", got)
 	}
+	// The general security read artifactory_general_security refreshes from
+	// reports the same state, administrators only.
+	if got := strings.TrimSpace(w.get(securityConfigPath)); got != `{"anonAccessEnabled":false,"basicAuthEnabled":true,`+
+		`"passwordSettings":{"encryptionEnabled":false,"encryptionPolicy":"UNSUPPORTED","encryptionRequired":false,`+
+		`"expirationPolicy":{"enabled":false,"notifyByEmail":false,"passwordMaxAge":1}},`+
+		`"userLockPolicy":{"enabled":false,"loginAttempts":3}}` {
+		t.Fatalf("security configuration %s", got)
+	}
+	ldapCall(t, w.h, http.MethodGet, securityConfigPath, dev, "", http.StatusForbidden)
+	ldapCall(t, w.h, http.MethodGet, securityConfigPath, nil, "", http.StatusUnauthorized)
 
 	// A refused policy refuses its whole document: neither the repository
 	// nor the mail server and its password are written.

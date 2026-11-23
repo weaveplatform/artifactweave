@@ -128,7 +128,8 @@ TERRAFORM_SCENARIOS ?= deploy/artifactweave/terraform/repositories \
 	deploy/artifactweave/terraform/single-replication \
 	deploy/artifactweave/terraform/projects \
 	deploy/artifactweave/terraform/package-cleanup \
-	deploy/artifactweave/terraform/configuration
+	deploy/artifactweave/terraform/configuration \
+	deploy/artifactweave/terraform/general-security
 
 ## terraform: validate the Terraform scenarios against the pinned providers from a filesystem mirror (TERRAFORM_MODE=apply also applies, plans and destroys each against one -cover server)
 # Apply writes the server's coverage to cover/terraform for make cover; CI

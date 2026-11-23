@@ -103,6 +103,9 @@
 // security.userLockPolicy and security.passwordSettings through access's
 // SecurityPolicies, with the REST APIs' rules and both blocks in the export,
 // and refuses the other documented security fields with their reasons.
+// access serves the same values, with anonAccessEnabled, as
+// GET /api/securityconfig, which artifactory_general_security refreshes
+// from after writing through this PATCH.
 //
 // # Testing
 //

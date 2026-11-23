@@ -662,6 +662,9 @@ lower case in the descriptor classes 7.161.26 still ships). Implemented by CFG-0
   Access tokens are unaffected.
 - `unsupported` refuses the encrypted password, as a Basic password, in
   `X-JFrog-Art-Api` and in the rechecks of work that outlives the request.
+- `GET /artifactory/api/securityconfig` reports the policy in upper case with
+  `encryptionRequired` and `encryptionEnabled`
+  ([research 06](06-system-configuration-and-descriptor.md#general-security-read)).
 
 ## Authentication accepted on every endpoint
 

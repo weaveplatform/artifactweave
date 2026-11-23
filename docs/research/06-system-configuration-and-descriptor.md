@@ -532,6 +532,36 @@ name in the redirected Basic retry. P19/#216 retains live comparison. Push repli
 redirect, so a valid list only stops disabling proxy use; the push client itself is
 closed source, so its use of the shared builder is inferred [I].
 
+### General security read
+
+`GET /artifactory/api/securityconfig` is the read `artifactory_general_security` refreshes
+from; JFrog documents no REST page for it. [S] 7.161.26's
+`GeneralSecurityConfigResource` (`@Path("securityconfig")`, `@RolesAllowed(admin)`) sits in
+the UI's Jersey application, which `web.xml` also maps to `/api/*`, and
+`GetSecurityConfigService` fills its `SecurityConfig` model: `anonAccessEnabled`,
+`buildGlobalBasicReadAllowed`, `buildGlobalBasicReadForAnonymous`,
+`hideUnauthorizedResources`, `passwordSettings{encryptionPolicy, encryptionRequired,
+encryptionEnabled, expirationPolicy, resetPolicy}`, `userLockPolicy{enabled,
+loginAttempts}`, `basicAuthEnabled`, `centralOAuthProviders`, `curationEntitled` and
+`allowDownloadWhenUnavailable`, serialized without nulls. `EncryptionPolicy`'s JSON names
+are `SUPPORTED`, `REQUIRED` and `UNSUPPORTED`, and provider 12.11.14 compares the value
+with its plan as read. 7.x takes `userLockPolicy.enabled` from Access as `loginAttempts > 0`.
+
+artifactweave serves it to administrators (401 without credentials, 403 otherwise) from
+the access module's settings (CFG-04,
+[#1828](https://github.com/weaveplatform/artifactweave/issues/1828)):
+`anonAccessEnabled`, `basicAuthEnabled` (the internal password switch),
+`passwordSettings{encryptionPolicy, encryptionRequired, encryptionEnabled,
+expirationPolicy{enabled, passwordMaxAge, notifyByEmail}}` and
+`userLockPolicy{enabled, loginAttempts}`, each the value the descriptor PATCH and the
+REST APIs write and the descriptor export reports. **[I]** The other fields name features
+artifactweave does not have (build-info global read, hidden resources, password reset,
+central OAuth providers, curation) and are left out rather than reported as off;
+`encryptionEnabled` is taken as "the policy is not `UNSUPPORTED`" and the lock policy's
+`enabled` as the stored switch, since artifactweave keeps it apart from the attempt count.
+The provider's delete sends no request and only warns that the security configuration
+cannot be deleted, so the settings stay as last applied.
+
 ### What artifactweave serves
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,

@@ -8981,6 +8981,34 @@
     ]
   },
   {
+    "route": "GET /artifactory/api/securityconfig",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getSecurityConfig",
+    "state": "implemented",
+    "contract": "Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.",
+    "handler": "internal/access/adapters/http/securityconfig.go: SecurityAPI.GetSecurityConfig",
+    "direct_calls": [
+      "artgen.GetSecurityConfig200JSONResponse",
+      "s.adminStore",
+      "s.internalError",
+      "st.Settings"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
     "route": "GET /artifactory/api/skills/{repoKey}/.well-known/clawhub.json",
     "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
     "handler": "internal/app/router.go: internal/artifacts/ecosystem/skills/http.handler.discovery-fm",

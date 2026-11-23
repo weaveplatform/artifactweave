@@ -1349,6 +1349,7 @@ func securityMatrix() []matrixRow {
 		at("GET "+secLockPol, "", administrators, 200),
 		at("PUT "+secLockPol, `{"enabled":"false","loginAttempts":"3"}`, administrators, 200),
 		at("GET "+secExpiry, "", administrators, 200),
+		at("GET "+secConfig, "", administrators, 200),
 		at("PUT "+secExpiry, `{"enabled":"false","passwordMaxAge":"30"}`, administrators, 200),
 		at("POST "+secExpire, `["v-{p}"]`, administrators, 200),
 		row("POST "+secUnexpire+"{userName}", secUnexpire+"v-{p}", "", administrators, 200),

@@ -99,6 +99,7 @@
       "project_repositories_test.go",
       "project_wire_test.go",
       "roles_internal_test.go",
+      "securityconfig_internal_test.go",
       "tokens_internal_test.go"
     ],
     "internal/app": [

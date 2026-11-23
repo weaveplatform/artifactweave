@@ -47,6 +47,7 @@ root=$(cd "$here/../.." && pwd)
 python3 -I "$here/check-webhooks.py" --inventory "$root"
 python3 -I "$here/check-projects.py" --inventory "$root"
 python3 -I "$here/check-cleanup.py" --inventory "$root"
+python3 -I "$here/check-general-security.py" --inventory "$root"
 scenarios=("$@")
 [ ${#scenarios[@]} -gt 0 ] || scenarios=(deploy/artifactweave/terraform/repositories)
 if [ -n "${TERRAFORM_WORK:-}" ]; then
@@ -560,6 +561,30 @@ PYTHON
 	configuration_proof cleared
 }
 
+# The two settings change one at a time, so a provider that sent or read
+# back only one of them cannot pass; each revision is read back, refreshed
+# and planned, and the checker asks the server for the effect as well.
+# The provider's delete sends nothing, so the last revision restores the
+# defaults before the destroy that follows.
+general_security_revision() {
+	export TF_VAR_enable_anonymous_access=$1 TF_VAR_encryption_policy=$2
+	tf apply -auto-approve
+	python3 -I "$here/check-general-security.py" --check "$1" "$2" "$work/general-security-encrypted"
+	tf apply -refresh-only -auto-approve
+	python3 -I "$here/check-general-security.py" --check "$1" "$2" "$work/general-security-encrypted"
+	tf plan -detailed-exitcode
+}
+
+apply_general_security() {
+	export GENERAL_SECURITY_ADMIN_PASSWORD=$password
+	general_security_revision false SUPPORTED
+	general_security_revision true SUPPORTED
+	general_security_revision true REQUIRED
+	general_security_revision false REQUIRED
+	general_security_revision false UNSUPPORTED
+	general_security_revision false SUPPORTED
+}
+
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
 	case $scenario in
@@ -574,6 +599,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/projects) apply_projects ;;
 	deploy/artifactweave/terraform/package-cleanup) apply_package_cleanup ;;
 	deploy/artifactweave/terraform/configuration) apply_configuration ;;
+	deploy/artifactweave/terraform/general-security) apply_general_security ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1
@@ -587,6 +613,11 @@ for scenario in "${scenarios[@]}"; do
 		configuration_proof deleted
 		tf state list >"$work/descriptor-remaining-resources.txt"
 		test ! -s "$work/descriptor-remaining-resources.txt"
+	fi
+	if [ "$scenario" = deploy/artifactweave/terraform/general-security ]; then
+		python3 -I "$here/check-general-security.py" --deleted "$work/general-security-encrypted"
+		tf state list >"$work/general-security-remaining-resources.txt"
+		test ! -s "$work/general-security-remaining-resources.txt"
 	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/remote-repositories ]; then
 		python3 -I "$here/check-remotes.py" --remove-proxy
