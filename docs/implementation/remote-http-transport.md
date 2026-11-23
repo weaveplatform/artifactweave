@@ -137,9 +137,9 @@ library. [MS-NLMP recommends MIC with a server timestamp](https://learn.microsof
 this implementation therefore does not claim NTLM message-tampering protection or
 Extended Protection for Authentication. TLS still authenticates HTTPS proxies and origins.
 `redirectedToHosts` grants described below apply to NTLM proxies too: they answer a
-target Basic challenge, never proxy authentication. Replication's separate outbound
-factory still refuses NTLM, tracked by [#1848](https://github.com/weaveplatform/artifactweave/issues/1848);
-this remote-source contract does not claim replication support.
+target Basic challenge, never proxy authentication. Single-replication push uses the
+same `NTLMProxy.Connect` seam under its own destination rules, described in
+[Single-replication push proxies](#single-replication-push-proxies-p12-1848).
 
 Proxy `services` reads accept descriptor/provider strings split on newline, space,
 comma or semicolon, as Artifactory 7.161.26's `ProxyDescriptor.getServicesList`
@@ -219,6 +219,51 @@ The NTLM fixture independently verifies the NTLMv2 proof and domain/workstation,
 records proxy and origin requests separately without retaining proof material.
 `@ntlm_proxy` in the required core native lane downloads exact cold bytes with the
 pinned JFrog CLI and requires its binary rather than skipping that scenario.
+
+## Single-replication push proxies (P12, #1848)
+
+The federation push factory (`internal/federation/adapters/pushhttp`) selects the
+explicit or platform-default proxy, applies `services` and `disableProxy` as above,
+and reads the sealed password inside the metadata transaction that builds the
+connection. A `domain` or `ntHost` selects NTLMv2 with the same identity rules as
+remote sources: the configured username, `domain` qualifying it, `ntHost` as the
+workstation, and invalid or ambiguous names refused with a redacted configuration
+error. No DNS, socket or NTLM exchange happens in that transaction.
+
+`platform/outbound.Client` already tunnels every push exchange, HTTP or HTTPS, with
+CONNECT to the checked IP, so the push client calls `NTLMProxy.Connect` for each new
+tunnel after dialing and verifying the proxy. Proxy TLS uses the proxy's logical
+name; the target keeps its logical Host/SNI, trust and repository Basic credentials
+inside the tunnel. The NTLM identity never becomes `Proxy-Authorization: Basic` and
+never the target's `Authorization`. Authentication happens before the first request
+byte, so a refused, malformed, interrupted, cancelled or timed-out negotiation fails
+before any PUT, PATCH or DELETE reaches the target; the existing write rules still
+forbid replaying a request body. Wrong credentials and refused destinations are
+security failures; cancellation and socket inactivity keep their context errors.
+
+The private connection revision adds the NTLM domain and workstation; the proxy URL
+digest already holds the username and sealed password. Changing any of them, or
+switching between Basic, NTLM, another proxy and direct, retires the pooled client
+and its authenticated tunnels. A run bound to the old transport revision is fenced
+and publishes nothing. Basic and direct revisions are unchanged by this addition.
+
+`redirectedToHosts` is validated with the remote resolver's parser
+(`outbound.ProxyRedirectHosts`): a malformed list fails truthfully, and a valid one
+no longer disables proxy use. It has no other push effect. The outbound client
+follows only same-origin GET/HEAD redirects, which keep the target's own credentials,
+and refuses cross-origin and write redirects, so a listed host is never contacted
+and proxy credentials never substitute for target credentials. The list is therefore
+not part of the transport revision. **[I]** Artifactory's push replication client is
+closed source; applying the descriptor's NTLM fields to it follows the shared
+`ProxyDescriptor` builder that remote repositories use (research 06) and remains a
+P19/#216 comparison item.
+
+Evidence: `pushhttp` effect tests over HTTP and HTTPS proxies and origins, explicit and
+default selection, Put/Inspect/Delete bytes and failure/cancellation/timeout/
+reconfiguration cases; `test/server/federation` SQLite/PostgreSQL push through a
+descriptor-configured NTLM proxy to a separate target process; and the two-process
+`@replication_ntlm_proxy` acceptance on SQLite and PostgreSQL. An independent fixture
+verifies NTLMv2 proof, domain and workstation in every case.
 
 ## Virtual origin requests (P10, #1542)
 

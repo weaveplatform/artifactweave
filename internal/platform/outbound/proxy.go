@@ -39,6 +39,17 @@ func (c *Client) tunnel(ctx context.Context, network, target string, proxies []s
 	if err != nil {
 		return nil, err
 	}
+	if c.ntlm != nil {
+		// Connect owns conn from here, including close on failure/cancellation.
+		// It CONNECTs to the same checked IP, so the proxy never resolves DNS.
+		tunnel, err := c.ntlm.Connect(ctx, conn, target, c.transport.MaxResponseHeaderBytes)
+		if err != nil {
+			// Cancellation closes the socket, which would otherwise surface as a
+			// retryable connection failure against the next checked address.
+			return nil, SafeError(errors.Join(ctx.Err(), err))
+		}
+		return tunnel, nil
+	}
 	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	defer stop()
 	success := false

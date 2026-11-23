@@ -52,10 +52,20 @@ func pushConfig(t *testing.T, driver, dsn string) config.Config {
 
 func newPushWorld(t *testing.T, driver, sourceDSN, targetDSN, packageType string) *pushWorld {
 	t.Helper()
+	return newPushWorldVia(t, driver, sourceDSN, targetDSN, packageType, nil)
+}
+
+// newPushWorldVia lets via start owned intermediaries, such as a proxy, that
+// must reach the bridge; their origins join the source's private allowlist.
+func newPushWorldVia(t *testing.T, driver, sourceDSN, targetDSN, packageType string, via func(*pushBridge) []string) *pushWorld {
+	t.Helper()
 	target := startPushTarget(t, pushConfig(t, driver, targetDSN))
 	bridge := newPushBridge(t, target)
 	cfg := pushConfig(t, driver, sourceDSN)
 	cfg.Remote.AllowedPrivateOrigins = []string{bridge.URL}
+	if via != nil {
+		cfg.Remote.AllowedPrivateOrigins = append(cfg.Remote.AllowedPrivateOrigins, via(bridge)...)
+	}
 	runtime, err := app.OpenRuntime(t.Context(), cfg, slog.New(slog.DiscardHandler), harness.AppOptions())
 	if err != nil {
 		t.Fatal("open source runtime", err)

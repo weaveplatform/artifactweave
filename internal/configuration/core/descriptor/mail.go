@@ -23,7 +23,7 @@ func parseMailServer(top map[string]any, p *Patch) error {
 	if value == nil {
 		p.Configs = append(p.Configs, ConfigChange{
 			Section: SectionMailServer, Kind: configdoc.ConfigMailServer, Key: system.MailServerKey,
-			Delete: true, singleton: true,
+			Delete: true,
 		})
 		return nil
 	}
@@ -36,7 +36,7 @@ func parseMailServer(top map[string]any, p *Patch) error {
 	}
 	p.Configs = append(p.Configs, ConfigChange{
 		Section: SectionMailServer, Kind: configdoc.ConfigMailServer, Key: system.MailServerKey,
-		Fields: fields, secrets: []string{"password"}, singleton: true,
+		Fields: fields, secrets: []string{"password"},
 	})
 	return nil
 }

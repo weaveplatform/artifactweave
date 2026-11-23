@@ -154,9 +154,9 @@ func (r *Resolver) Options(ctx context.Context, c repo.Config) (remote.Options, 
 	if proxy != nil && json.Unmarshal(proxyDoc.Document, &proxyConfig) != nil {
 		return remote.Options{}, remote.ErrConfiguration
 	}
-	redirectHosts, err := proxyRedirectHosts(proxyConfig.RedirectedToHosts)
+	redirectHosts, err := outbound.ProxyRedirectHosts(proxyConfig.RedirectedToHosts)
 	if err != nil {
-		return remote.Options{}, err
+		return remote.Options{}, remote.ErrConfiguration
 	}
 	policy := &destinationPolicy{
 		private: map[string]bool{remote.Origin(base): true},

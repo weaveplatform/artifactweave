@@ -72,7 +72,8 @@ P12/#1835 gives remote-source proxy `domain` and `ntHost` runtime effects: NTLMv
 proxy-account domain and client workstation, through the existing resolver and sealed
 password. Configuration storage is unchanged. The [transport contract](../../implementation/remote-http-transport.md)
 records the supported exchange and explicit limits; P12/#1836 gives `redirectedToHosts`
-its scoped redirect-credential effect, and replication's separate consumer is tracked by #1848.
+its scoped redirect-credential effect, and P12/#1848 applies `domain`/`ntHost` to
+single-replication push, where a valid `redirectedToHosts` is accepted without effect.
 
 LDAP-01 ([#1832](https://github.com/weaveplatform/artifactweave/issues/1832)) applies
 `security.ldapSettings` through PATCH, config apply and the bootstrap descriptor, writing through the access module's
@@ -81,6 +82,17 @@ LDAP service rather than its own copy of the rules, so the descriptor and
 and are validated with the rest of the document before any write; an entry set to null
 deletes a connection; the whole-section null is refused. The XML export
 lists the connections without their manager passwords.
+
+CFG-02 ([#1826](https://github.com/weaveplatform/artifactweave/issues/1826)) adds the
+descriptor's `urlBase`, through PATCH, config apply, the bootstrap descriptor and
+`PUT /api/system/configuration/baseUrl`, and its single reverse proxy, through
+`POST /api/system/configuration/webServer`; each REST write builds a descriptor patch
+and applies it, so it is validated whole and written in one transaction. The two layers
+stay apart: `base_url` in `artifactweave.yaml` keeps its flag > environment > file
+precedence and is never written at run time, and a stored `urlBase` is tenant state that
+takes precedence over it while set and is exported with the descriptor. Clearing
+`urlBase` brings `base_url` back. The application layer also supplies the rules the
+descriptor cannot see, such as the CDN hosts a `urlBase` may not sit above.
 
 ## Rationale
 

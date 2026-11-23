@@ -459,12 +459,12 @@ security:
         managerPassword: ${NOT_SET}
 mailServer:
   host: smtp.example
-urlBase: https://example.test
+offlineMode: false
 `
 	_, err := Parse([]byte(doc), noEnv)
-	want := "sections not supported: urlBase; " +
+	want := "sections not supported: offlineMode; " +
 		"the supported sections are localRepositories, remoteRepositories, virtualRepositories, federatedRepositories, " +
-		"proxies, propertySets, repoLayouts, downloadRedirectConfig, mailServer, security, backups, systemMessageConfig"
+		"proxies, propertySets, repoLayouts, downloadRedirectConfig, mailServer, security, urlBase, backups, systemMessageConfig"
 	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), want) {
 		t.Fatalf("%v", err)
 	}

@@ -140,8 +140,11 @@ var generatedRoutes = map[string]bool{
 	"GET /artifactory/api/vcs/refs/{repoKey}/{userOrg}/{repo}":                                         true,
 	"GET /artifactory/api/vcs/tags/{repoKey}/{userOrg}/{repo}":                                         true,
 
-	// The reverse proxy read, for the Docker access method (#220).
-	"GET /artifactory/api/system/configuration/webServer": true,
+	// The reverse proxy read, for the Docker access method (#220), and its
+	// administration and nginx snippet (#1826).
+	"GET /artifactory/api/system/configuration/webServer":          true,
+	"POST /artifactory/api/system/configuration/webServer":         true,
+	"GET /artifactory/api/system/configuration/reverseProxy/nginx": true,
 
 	// The GET searches (#169).
 	"GET /artifactory/api/search/artifact":    true,

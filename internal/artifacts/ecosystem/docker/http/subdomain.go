@@ -21,14 +21,30 @@ import (
 // repository, even one whose first segment is another repository's key.
 // The parent itself never matches, so the two methods share no host.
 func (g *Registry) subdomain(r *http.Request) (repo.Config, bool, error) {
-	if g.parent == "" {
+	parent := g.parentHost(r)
+	if parent == "" {
 		return repo.Config{}, false, nil
 	}
-	label, ok := strings.CutSuffix(addressedHost(r), "."+g.parent)
+	label, ok := strings.CutSuffix(addressedHost(r), "."+parent)
 	if !ok {
 		return repo.Config{}, false, nil
 	}
 	return g.lookup(r.Context(), label)
+}
+
+// parentHost is the host repository subdomains sit under, "" when
+// subdomain matching is off. It follows the configured base URL the
+// request's base URL middleware read, so a urlBase an administrator stores
+// moves the parent with every link; without that middleware it is the
+// BaseURL the registry was built with.
+func (g *Registry) parentHost(r *http.Request) string {
+	if !g.subdomains {
+		return ""
+	}
+	if configured, ok := baseurl.Configured(r.Context()); ok && configured != "" {
+		return baseHost(configured)
+	}
+	return g.parent
 }
 
 // addressedHost is the host the client named, lower-cased and without its

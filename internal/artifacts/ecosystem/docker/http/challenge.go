@@ -137,10 +137,11 @@ func (g *Registry) challengeTarget(r *http.Request) (realm, scope string) {
 // subdomainLabel is the repository label of a host under the subdomain
 // method, without looking the repository up: a challenge only names it.
 func (g *Registry) subdomainLabel(r *http.Request) (string, bool) {
-	if g.parent == "" {
+	parent := g.parentHost(r)
+	if parent == "" {
 		return "", false
 	}
-	label, ok := strings.CutSuffix(addressedHost(r), "."+g.parent)
+	label, ok := strings.CutSuffix(addressedHost(r), "."+parent)
 	return label, ok && label != ""
 }
 

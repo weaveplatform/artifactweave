@@ -46,7 +46,9 @@ type exportDocument struct {
 	Virtual          []exportFields `xml:"virtualRepositories>virtualRepository"`
 	Federated        []exportFields `xml:"federatedRepositories>federatedRepository"`
 	Proxies          []exportFields `xml:"proxies>proxy"`
+	ReverseProxies   []exportFields `xml:"reverseProxies>reverseProxy"`
 	PropertySets     []exportFields `xml:"propertySets>propertySet"`
+	URLBase          *string        `xml:"urlBase,omitempty"`
 	Layouts          []exportFields `xml:"repoLayouts>repoLayout"`
 	DownloadRedirect *exportFields  `xml:"downloadRedirectConfig,omitempty"`
 }
@@ -252,6 +254,9 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 			}
 		}
 		*section.target = entry
+	}
+	if err := readWebServerExport(ctx, d, &out); err != nil {
+		return out, err
 	}
 	return out, nil
 }

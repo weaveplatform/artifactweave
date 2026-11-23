@@ -346,7 +346,7 @@ func planConfigs(
 	var ops []configOp
 	for _, c := range changes {
 		name := c.Section + "." + c.Key
-		if c.singleton {
+		if singleton(c) {
 			name = c.Section
 		}
 		cur, err := d.Configs.Get(ctx, c.Kind, c.Key)
@@ -368,6 +368,9 @@ func planConfigs(
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		if err := validateConfig(d.Layouts, c.Kind, c.Key, doc); err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
+		if err := validateWebServer(d, c.Kind, doc); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
 		if c.Kind == configdoc.ConfigBackup {

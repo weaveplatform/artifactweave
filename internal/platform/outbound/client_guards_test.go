@@ -29,7 +29,13 @@ func TestUnitFixedOriginClientRefusesMissingPolicyAndUnsafeRequests(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	identity, err := NewNTLMProxy("user", "secret", "CORP", "NODE")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, options := range []ClientOptions{
+		// An NTLM identity without a proxy would have nothing to authenticate.
+		{Base: base, Policy: policy, NTLM: identity},
 		{},
 		{Base: base},
 		{Base: base, Policy: policy, SocketTimeout: -time.Second},

@@ -991,10 +991,12 @@ var legacyTokenRoutes = map[string]bool{
 	"POST /artifactory/api/security/token/revoke": true,
 }
 
-// descriptorRoutes are the YAML patch and current-state XML export.
+// descriptorRoutes are the YAML patch, current-state XML export and the
+// plain-text base URL write.
 var descriptorRoutes = map[string]bool{
-	"PATCH /artifactory/api/system/configuration": true,
-	"GET /artifactory/api/system/configuration":   true,
+	"PATCH /artifactory/api/system/configuration":       true,
+	"GET /artifactory/api/system/configuration":         true,
+	"PUT /artifactory/api/system/configuration/baseUrl": true,
 }
 
 // routeUnion is every route in maps.

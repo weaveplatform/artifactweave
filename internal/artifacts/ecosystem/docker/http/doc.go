@@ -5,7 +5,8 @@
 //   - the repository path, /v2/<repo>/<image>/..., the native default, which
 //     needs no reverse proxy;
 //   - Artifactory's own prefix, /artifactory/api/docker/<repo>/v2/<image>/...;
-//   - the subdomain, <repo>.<base_url host>/v2/<image>/..., when
+//   - the subdomain, <repo>.<configured base host>/v2/<image>/..., the base
+//     being the stored urlBase, else base_url, when
 //     docker.subdomain_match is on.
 //
 // The router is hand-written and mounted before the generated servers

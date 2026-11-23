@@ -13,7 +13,12 @@ import (
 const replicationTransportPassword = "Replication-fixture-only-123"
 
 func (w *world) qualifyOrdinaryReplication(direction string) (result error) {
-	defer func() { result = errors.Join(result, w.replicationScenarioEvidence(direction, "generic", nil)) }()
+	kind := "generic"
+	if w.replicationNTLM != "" {
+		// Keep NTLM evidence beside, not over, the plain scenario's logs.
+		kind += "-ntlm-" + w.replicationNTLM
+	}
+	defer func() { result = errors.Join(result, w.replicationScenarioEvidence(direction, kind, nil)) }()
 	fixture, err := w.configureReplicationPair(direction, "generic")
 	if err != nil {
 		return err

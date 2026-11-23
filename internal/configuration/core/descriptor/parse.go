@@ -116,8 +116,6 @@ type ConfigChange struct {
 	// or with keepNulls stores it as null.
 	Fields  map[string]any
 	secrets []string
-	// singleton names the change by its section alone (mailServer).
-	singleton bool
 	// keepNulls stores a cleared field as null, for a section whose reader
 	// tells a cleared field from one never written.
 	keepNulls bool
@@ -214,6 +212,9 @@ func Parse(doc []byte, env Lookup) (*Patch, error) {
 	if err := parseSecurity(top, p); err != nil {
 		return nil, err
 	}
+	if err := parseURLBase(top, p); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 
@@ -281,6 +282,7 @@ var applied = []string{
 	SectionDownloadRedirect,
 	SectionMailServer,
 	SectionSecurity,
+	SectionURLBase,
 	SectionBackups,
 	SectionSystemMessage,
 }

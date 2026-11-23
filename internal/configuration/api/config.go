@@ -118,4 +118,5 @@ type API struct {
 	System     System
 	Mail       Mail
 	Loggers    Loggers
+	WebServer  WebServer
 }

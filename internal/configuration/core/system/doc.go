@@ -1,6 +1,7 @@
 // Package system validates and reads the mail-server settings, sends the
-// administrator's test mail and administers bounded temporary logger
-// sessions.
+// administrator's test mail, administers bounded temporary logger sessions,
+// and validates, stores in document form and renders the web server
+// settings: urlBase and the reverse proxy with its nginx snippet.
 //
 // # Role
 //
@@ -11,7 +12,9 @@
 // The mailServer descriptor mapping and the shared configuration store, runner
 // and authority guard. Secret values live separately in ConfigDocument.Secrets.
 // LoggerDeps supplies real logging decisions, guarded current administration and
-// an optional timer scheduler for deterministic expiration checks.
+// an optional timer scheduler for deterministic expiration checks. The web
+// server functions take configuration/api.ReverseProxy values, stored
+// documents, and the CDN hosts a urlBase may not sit above.
 //
 // # Outputs
 //
@@ -23,6 +26,11 @@
 // connection itself.
 // Loggers validates temporary level requests, applies one in-memory session,
 // restores current baseline decisions on expiry/delete and joins timers on Close.
+// CheckReverseProxy and CheckURLBase refuse with configuration/api.ErrInvalid;
+// NginxSnippet renders only values those checks admit, so nothing stored can
+// change the snippet's nginx syntax. PublicURL caches the effective base URL
+// for every request, dropped after a local write and refreshed every
+// PublicURLRefresh for writes from another process.
 //
 // # References
 //
@@ -42,7 +50,16 @@
 // # Status
 //
 // PRJ-04 supplies the narrow documented mailServer dependency for quota warnings.
-// P12 CFG-03 supplies actual process-local logger controls. P12 CFG-07 (issue
-// 1831) adds MailTest behind `artifactweave mail test`. Log collection and
+// P12 CFG-03 supplies actual process-local logger controls. P12 CFG-02 (#1826)
+// supplies the base URL and reverse proxy settings. P12 CFG-07 (issue 1831)
+// adds MailTest behind `artifactweave mail test`. Log collection and
 // streaming stay P38.
+//
+// # Testing
+//
+//   - webserver_test.go: every reverse proxy refusal, the stored document's
+//     round trip, urlBase refusals, the snippet's shapes and the PublicURL
+//     cache.
+//   - mailtest_test.go: the test message's subject, body, sender fallback
+//     and Message-ID, and every refusal, none of which opens SMTP.
 package system

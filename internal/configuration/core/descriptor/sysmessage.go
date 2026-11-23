@@ -59,7 +59,7 @@ func parseSystemMessage(top map[string]any, p *Patch) error {
 	}
 	p.Configs = append(p.Configs, ConfigChange{
 		Section: SectionSystemMessage, Kind: systemMessageKind, Key: systemMessageKey,
-		Fields: fields, singleton: true, keepNulls: true,
+		Fields: fields, keepNulls: true,
 	})
 	return nil
 }
