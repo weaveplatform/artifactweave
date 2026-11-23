@@ -98,7 +98,26 @@ and `deploy/ci`'s script tests. Those provider fixtures, their
 `test/terraform/` harness and the other deploy tooling also select provider
 conformance. Deployment roots under `deploy/platform/` and
 `deploy/ci/terraform/`, and the READMEs under `deploy/`, do not, because no
-provider apply reads them. Shared Go code, fixtures, generated API, workflow, unknown status/path
+provider apply reads them.
+
+Neither Terraform lane runs Go tests, but the `TestUnit` guards in
+`tools/citestselection` read these same inputs as files: they require
+`test/terraform/run.sh` to keep each scenario's apply handler and its
+`check-*.py --check`/`--deleted` calls, run `check-webhooks.py --inventory`
+against `webhook-cases.json`, check the provider roots' resources and lock
+files and the `deploy/platform` scenario Makefiles' pinned test commands, and
+walk every committed file's lane. A dropped handler would still apply cleanly,
+so every `deployment` run also selects that package's unit tests on the three
+OS unit jobs, vets it, and runs the blocking lint job (#1861). The whole
+package runs, so a guard added for a new provider root needs no selector rule.
+Its `TestAcc` entry points are not selected. A changed Go package under
+`deploy/` or `test/terraform/` outside `testdata/` joins the scoped vet, lint
+and test set. The provider harness's fixture server,
+`test/terraform/testdata/server`, lies under `testdata/`, which `./...` skips,
+and uses Unix-only `syscall.Kill`, so the Linux lint job vets and lints it by
+name on every run that selects lint: full, format and deployment.
+
+Shared Go code, fixtures, generated API, workflow, unknown status/path
 or failed diff resolution select `full`.
 The same-repository `release-please--branches--main` PR always selects `full`
 even if it changes only release metadata; an arbitrary title does not affect
@@ -132,7 +151,9 @@ conformance (pinned JFrog apply, plan, destroy)`, and `Terraform deployment
 checks (fmt, validate, tflint, trivy, mocked tests, docs)`. A format PR with
 no selected `TestUnit` entry point or fuzz seed skips the three unit jobs.
 A format PR with no selected package `TestAcc` entry point skips the package
-acceptance job while still running its native feature partition. Narrow native
+acceptance job while still running its native feature partition. A deployment
+PR runs the three unit jobs for the Terraform harness guard tests and the lint
+job, and skips package acceptance. Narrow native
 partitions run only `TestAccFeatures`, so unrelated tests in the shared
 acceptance harness do not join a format PR. Each selected Go
 job verifies that its anchored prefix finds runnable tests on that runner.
@@ -218,7 +239,7 @@ head is tracked in the probe PR before #673 closes.
 
 | Workflow | Checks |
 |---|---|
-| `quality-gate.yml` | Selects docs, format, deployment or full. Format runs affected race/shuffled unit tests on three OSes, matching native acceptance and same-run changed-package coverage. Deployment runs Terraform checks. Full retains vet, lint, generated-code verification, vulnerability checks, cross-compile, every native acceptance partition and merged coverage (95% total, 90% per package) |
+| `quality-gate.yml` | Selects docs, format, deployment or full. Format runs affected race/shuffled unit tests on three OSes, matching native acceptance and same-run changed-package coverage. Deployment runs the selected Terraform checks, the Terraform harness guard tests on three OSes, vet and lint. Full retains vet, lint, generated-code verification, vulnerability checks, cross-compile, every native acceptance partition and merged coverage (95% total, 90% per package) |
 | `pr-title-validation.yml` | Conventional PR title |
 | `dependency-review.yml` | GitHub Dependency Review |
 | `deps-refresh.yml`, `auto-merge.yml`, `dependency-references.yml`, `release-please.yml` | Dependency currency, automatic PR and merged-main reference repair, Terraform README refresh, auto-merge once the current head passes the gate, releases |

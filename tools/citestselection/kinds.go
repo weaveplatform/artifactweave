@@ -46,7 +46,7 @@ func (s kindSelection) hasUnit() bool {
 
 func selectKinds(p plan) (kindSelection, error) {
 	var selected kindSelection
-	if p.profile != "full" && p.profile != "format" {
+	if p.profile != "full" && p.profile != "format" && p.profile != "deployment" {
 		return selected, nil
 	}
 	root, err := moduleRoot()
@@ -106,7 +106,7 @@ func scanKinds(root string, p plan) (kindSelection, error) {
 				}
 				pkg := "./" + dir
 				source := filepath.ToSlash(filepath.Join(dir, entry.Name()))
-				if p.profile == "format" && !withinUnits(pkg, p.candidate.units) {
+				if p.profile != "full" && !withinUnits(pkg, p.candidate.units) {
 					return nil
 				}
 				if _, shared := sharedDirs[dir]; shared && !ownedShared[source] {
@@ -126,7 +126,10 @@ func scanKinds(root string, p plan) (kindSelection, error) {
 					switch {
 					case testKindName(name, "TestUnit"):
 						unit[pkg], kind = true, "unit"
-					case testKindName(name, "TestAcc"):
+					// A deployment run takes only the harness guards: its
+					// package acceptance job never runs, so a selected TestAcc
+					// would report a lane the gate then requires skipped.
+					case testKindName(name, "TestAcc") && p.profile != "deployment":
 						acc[pkg], kind = true, "acceptance"
 					case testKindName(name, "Fuzz"):
 						fuzz[pkg], kind = true, "fuzz seed"
@@ -174,6 +177,11 @@ func scanKinds(root string, p plan) (kindSelection, error) {
 	if p.profile == "full" && len(selected.Acc) == 0 {
 		return kindSelection{}, fmt.Errorf(
 			"full impact plan selected no package TestAcc entry points",
+		)
+	}
+	if p.profile == "deployment" && len(selected.Unit) == 0 {
+		return kindSelection{}, fmt.Errorf(
+			"deployment impact plan selected no Terraform harness guard tests",
 		)
 	}
 	if p.profile == "format" && len(selected.Unit)+len(selected.Acc)+len(selected.Fuzz) == 0 {

@@ -141,10 +141,14 @@ jobs:
   # the pull request. The macOS and Windows jobs reuse this job's condition
   # and steps through YAML aliases; Actions has no merge key, so each job
   # sets its own name and runner.
+  #
+  # A deployment run selects them too: tools/citestselection's TestUnit
+  # guards read run.sh, the check-*.py inventories and the provider roots,
+  # which neither Terraform lane runs Go against (#1861).
   unit-linux:
     name: 'Go unit tests (ubuntu-latest)'
     needs: [impact]
-    if: &unit-selected (needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format') && needs.impact.outputs.has_unit == 'true'
+    if: &unit-selected (needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format' || needs.impact.outputs.profile == 'deployment') && needs.impact.outputs.has_unit == 'true'
     runs-on: ubuntu-latest
     steps: &unit-steps
       - name: Harden Runner
@@ -340,7 +344,7 @@ jobs:
   lint:
     name: 'Lint (blocking)'
     needs: [impact]
-    if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format'
+    if: needs.impact.outputs.profile == 'full' || needs.impact.outputs.profile == 'format' || needs.impact.outputs.profile == 'deployment'
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -367,11 +371,18 @@ jobs:
         id: lintver
         run: echo "version=$(tr -d '[:space:]' < .github/golangci-lint-version)" >> "$GITHUB_OUTPUT"
 
+      # The Terraform provider harness's fixture server lives under
+      # test/terraform/testdata/, which ./... and so every other vet and lint
+      # leave out. It is Unix-only (syscall.Kill), so this Linux job, which
+      # runs for every profile but docs, vets and lints it each time (#1861).
+      - name: Vet the Terraform fixture server
+        run: go vet ./test/terraform/testdata/server
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: ${{ steps.lintver.outputs.version }}
-          args: --config=.golangci.yml --new=false --fix=false ${{ needs.impact.outputs.profile == 'format' && needs.impact.outputs.units || './...' }}
+          args: --config=.golangci.yml --new=false --fix=false ${{ needs.impact.outputs.profile == 'full' && './...' || needs.impact.outputs.units }} ./test/terraform/testdata/server
 
       # golangci-lint run does not report golines, so formatting is checked
       # on its own: fmt --diff prints each change it would make and exits 1.
@@ -1595,6 +1606,12 @@ jobs:
               ;;
             deployment)
               require docs "$DOCS" skipped
+              unit=skipped
+              if [ "$HAS_UNIT" = true ]; then unit=success; fi
+              require unit-linux "$UNIT_LINUX" "$unit"
+              require unit-macos "$UNIT_MACOS" "$unit"
+              require unit-windows "$UNIT_WINDOWS" "$unit"
+              require lint "$LINT" success
               if [ "$PROVIDER_SELECTED" = true ]; then
                 require terraform-provider "$TERRAFORM" success
               else
@@ -1605,7 +1622,7 @@ jobs:
               else
                 require terraform-deployment "$DEPLOY" skipped
               fi
-              for result in "$UNIT_LINUX" "$UNIT_MACOS" "$UNIT_WINDOWS" "$SQLITE_WINDOWS" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" \
+              for result in "$SQLITE_WINDOWS" "$GO_ACCEPTANCE" "$VULN" "$BUILD" \
                 "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" "$COVERAGE" "$AFFECTED_COVERAGE" "$PARITY" "$OCI"; do
                 require unselected "$result" skipped
               done

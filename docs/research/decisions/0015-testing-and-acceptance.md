@@ -39,7 +39,10 @@ empty plan and destroys. The deployment lane checks Terraform formatting,
 validation, lint, Trivy, mocked tests and docs. Deployment roots and the
 READMEs under `deploy/` select the second. Provider fixtures, their harness and
 shared Terraform tooling select both, because the deployment lane also
-validates, lints and drift-checks the provider roots (#1858).
+validates, lints and drift-checks the provider roots (#1858). Every
+deployment run also takes the three-OS unit lane for `tools/citestselection`,
+whose `TestUnit` guards read `test/terraform/run.sh`, the `check-*.py`
+inventories and the provider roots, and blocking lint (#1861).
 Full release/manual runs require all four kinds and same-run merged coverage;
 the stable `Quality gate` rejects missing, failed or canceled selected lanes.
 Acceptance-only format owners explicitly skip the unit matrix while retaining
