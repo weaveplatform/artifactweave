@@ -243,7 +243,8 @@ components:
           type: string
         strategy:
           description: 'Optional within this object. How memberships are resolved: STATIC (groups list their members),
-            DYNAMIC (users list their groups) or HIERARCHY (the user''s DN encodes the groups).'
+            DYNAMIC (users list their groups) or HIERARCHICAL (the user''s DN encodes the groups). Defaults
+            to STATIC.'
           type: string
         sub_tree:
           description: Optional within this object. Whether the group search descends into sub-trees of group_base_dn.
@@ -280,7 +281,8 @@ components:
           type: string
         strategy:
           description: 'Optional within this object. How memberships are resolved: STATIC (groups list their members),
-            DYNAMIC (users list their groups) or HIERARCHY (the user''s DN encodes the groups).'
+            DYNAMIC (users list their groups) or HIERARCHICAL (the user''s DN encodes the groups). Defaults
+            to STATIC.'
           type: string
         sub_tree:
           description: Optional within this object. Whether the group search descends into sub-trees of group_base_dn.
@@ -1968,6 +1970,13 @@ paths:
                   $ref: '#/components/schemas/LdapGroup'
                 type: array
           description: The groups found.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid, enabled_ldap names no enabled connection, no connection
+            finds username, or the directory refused or failed the search.
         '401':
           content:
             application/json:
@@ -1994,7 +2003,9 @@ paths:
         for a new group setting. Requires a platform admin.
       operationId: getLdapGroupMappingStrategy
       parameters:
-      - description: 'Optional query parameter. Strategy to describe: STATIC, DYNAMIC or HIERARCHY.'
+      - description: 'Optional query parameter. Strategy to describe: STATIC, DYNAMIC or HIERARCHICAL, in any
+          case; HIERARCHY, the spelling the web UI sends, is read as HIERARCHICAL. Any other value, or none, describes
+          STATIC.'
         in: query
         name: strategy
         required: false

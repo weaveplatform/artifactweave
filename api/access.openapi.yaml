@@ -1161,6 +1161,12 @@ paths:
                   $ref: '#/components/schemas/LdapGroup'
                 type: array
           description: The groups found.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid, enabled_ldap names no enabled connection, no connection finds username, or the directory refused or failed the search.
         '401':
           content:
             application/json:
@@ -1190,7 +1196,7 @@ paths:
       description: Returns the default filter and attribute names of one group mapping strategy, as a starting point for a new group setting. Requires a platform admin.
       operationId: getLdapGroupMappingStrategy
       parameters:
-        - description: 'Optional query parameter. Strategy to describe: STATIC, DYNAMIC or HIERARCHY.'
+        - description: 'Optional query parameter. Strategy to describe: STATIC, DYNAMIC or HIERARCHICAL, in any case; HIERARCHY, the spelling the web UI sends, is read as HIERARCHICAL. Any other value, or none, describes STATIC.'
           in: query
           name: strategy
           required: false
@@ -6417,7 +6423,7 @@ paths:
         size: limit
       x-pagination-next: body:/cursor
     post:
-      description: 'Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.'
+      description: 'Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or is imported from an LDAP group setting, in the ldap realm under the directory group''s name in lower case, without members until LDAP login or a refresh gives it them. Admin only. An existing name answers 409.'
       operationId: createGroup
       requestBody:
         content:
@@ -6456,7 +6462,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: A referenced user or LDAP setting does not exist.
+          description: A user in members does not exist, or, for an import, the LDAP group setting or the group in its directory.
         '409':
           content:
             application/json:
@@ -6612,7 +6618,7 @@ paths:
         - path:name
       x-cost: expensive
     put:
-      description: 'Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.'
+      description: 'Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive. An import creates the group as Create a Group does; it replaces only a group imported from the same LDAP group (the same realm and realm_attributes), whose members it keeps, and answers 400 for any other. Admin only.'
       operationId: replaceGroup
       parameters:
         - $ref: '#/components/parameters/groupName'
@@ -6641,7 +6647,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: 'Validation failed: a name that differs from the path or is not valid, both members and import_from_ldap_group_setting given, or import_from_ldap_group_setting given.'
+          description: 'Validation failed: a name that differs from the path or is not valid, both members and import_from_ldap_group_setting given, or an import over a group not imported from the same LDAP group.'
         '401':
           content:
             application/json:
@@ -6659,7 +6665,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: A user in members does not exist.
+          description: A user in members does not exist, or, for an import, the LDAP group setting or the group in its directory.
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
@@ -8398,7 +8404,7 @@ components:
           description: Optional within this object. Identifier of the group in an external identity provider; stored and echoed.
           type: string
         import_from_ldap_group_setting:
-          description: Optional within this object. Name of an LDAP group setting to take members from. Mutually exclusive with members. Not supported; a value answers 400.
+          description: Optional within this object. Name of an LDAP group setting to import the group from. The group whose name attribute equals name is looked up in that setting's directory, by the directory's own comparison rule for the attribute, and stored in the ldap realm under the directory's name in lower case, which the response carries. The name must identify a single group. Mutually exclusive with members; LDAP login and refresh manage the members.
           type: string
         manage_resources:
           default: false
@@ -8720,7 +8726,7 @@ components:
           description: Optional within this object. Unique name of the group setting.
           type: string
         strategy:
-          description: 'Optional within this object. How memberships are resolved: STATIC (groups list their members), DYNAMIC (users list their groups) or HIERARCHY (the user''s DN encodes the groups).'
+          description: 'Optional within this object. How memberships are resolved: STATIC (groups list their members), DYNAMIC (users list their groups) or HIERARCHICAL (the user''s DN encodes the groups). Defaults to STATIC.'
           type: string
         sub_tree:
           description: Optional within this object. Whether the group search descends into sub-trees of group_base_dn.
@@ -8754,7 +8760,7 @@ components:
           description: Required within this object. Unique name of the group setting.
           type: string
         strategy:
-          description: 'Optional within this object. How memberships are resolved: STATIC (groups list their members), DYNAMIC (users list their groups) or HIERARCHY (the user''s DN encodes the groups).'
+          description: 'Optional within this object. How memberships are resolved: STATIC (groups list their members), DYNAMIC (users list their groups) or HIERARCHICAL (the user''s DN encodes the groups). Defaults to STATIC.'
           type: string
         sub_tree:
           description: Optional within this object. Whether the group search descends into sub-trees of group_base_dn.

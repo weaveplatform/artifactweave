@@ -552,6 +552,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	apiReviewDerive(e)
 	apiReviewLoggers(e)
 	apiReviewLDAPTest(e)
+	apiReviewLDAPGroups(e)
 	if cleanupPolicy {
 		e.Admission += "; current platform/project administration refreshed under the project guard before disclosure/publication; project administrators require own-project collection filter"
 	}
@@ -575,6 +576,32 @@ func apiReviewLDAPTest(e *apiReviewOperation) {
 		"internal/access/core/ldap/testconn.go",
 		"internal/access/adapters/ldap/client.go",
 		"test/server/access/ldap_login_test.go",
+	)
+}
+
+// apiReviewLDAPGroups: the group search, refresh and Create a Group's
+// import (#1834) ask the directory between guarded transactions, so the
+// generic POST rows would misdescribe them.
+func apiReviewLDAPGroups(e *apiReviewOperation) {
+	if e.State != "implemented" {
+		return
+	}
+	const directory = "; directory I/O outside any metadata transaction, bounded by 10s connect and 15s per-operation deadlines and the request context"
+	switch e.OperationID {
+	case "searchLdapGroups":
+		e.Effects = "no persisted effect: the settings are read in one guarded transaction, the directory is searched outside it, and each group's status is read in a second"
+	case "refreshLdapGroupSettings":
+		e.Effects = "groups imported or refreshed and ldap-realm memberships replaced, all in one guarded transaction that first rechecks every connection's and group setting's revision against those the directory was asked through; a change in between publishes nothing"
+	case "createGroup", "replaceGroup":
+		e.Effects += "; with import_from_ldap_group_setting the directory is asked first and the group stored only while the setting's snapshot revision is unchanged"
+	default:
+		return
+	}
+	e.Admission += directory
+	e.Evidence = append(e.Evidence,
+		"internal/access/core/ldap/sync.go",
+		"internal/access/adapters/ldap/groups.go",
+		"test/server/access/ldap_groups_test.go",
 	)
 }
 
@@ -759,6 +786,8 @@ var apiReviewCollected = map[string]string{
 	"GET /access/api/v1/oidc":                                                          "administrator OIDC configurations, which the store reads whole",
 	"GET /access/api/v1/oidc/{provider_name}/identity_mappings":                        "one provider's identity mappings, administrator configuration the store reads whole",
 	"GET /access/api/v1/ldap/settings":                                                 "administrator LDAP connections, read whole after the authority recheck in one guarded transaction",
+	"GET /access/api/v1/ldap/groups":                                                   "administrator LDAP group settings, read whole after the authority recheck in one guarded transaction",
+	"POST /access/api/v1/ldap/groups/search":                                           "the directory's answer, at most 10000 groups, each given its status in a later guarded transaction before any byte is written",
 	"GET /access/api/v1/roles":                                                         "administrator-defined roles, which the store reads whole",
 	"GET /access/api/v1/projects":                                                      "administrator-defined projects, filtered against current project administration under one guarded metadata snapshot",
 	"GET /access/api/v1/projects/{projectKey}/environments":                            "one project's configured environments, bounded by its environment limit and read whole",

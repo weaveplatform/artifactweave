@@ -314,6 +314,18 @@ var generatedRoutes = map[string]bool{
 	"DELETE /access/api/v1/ldap/settings/{key}": true,
 	"POST /access/api/v1/ldap/settings/test":    true,
 
+	// The LDAP group settings and their sync (#1834); test/server/access
+	// ldap_groups_test.go holds their rows.
+	"GET /access/api/v1/ldap/groups":                 true,
+	"POST /access/api/v1/ldap/groups":                true,
+	"PUT /access/api/v1/ldap/groups":                 true,
+	"GET /access/api/v1/ldap/groups/{name}":          true,
+	"DELETE /access/api/v1/ldap/groups/{name}":       true,
+	"GET /access/api/v1/ldap/groups/strategy":        true,
+	"POST /access/api/v1/ldap/groups/search":         true,
+	"POST /access/api/v1/ldap/groups/import":         true,
+	"POST /access/api/v1/ldap/groups/{name}/refresh": true,
+
 	// The multi-architecture tag delete (#226), the promotion and the parent
 	// manifest lookup. test/server/artifacts/docker holds their rows
 	// (support.DockerRoutes).

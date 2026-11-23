@@ -60,6 +60,7 @@ type exportSecurity struct {
 	UserLockPolicy   *exportFields  `xml:"userLockPolicy,omitempty"`
 	PasswordSettings *exportFields  `xml:"passwordSettings,omitempty"`
 	LDAP             []exportFields `xml:"ldapSettings>ldapSetting"`
+	LDAPGroups       []exportFields `xml:"ldapGroupSettings>ldapGroupSetting"`
 }
 
 type exportFields struct {

@@ -278,8 +278,11 @@ components:
             and echoed.
           type: string
         import_from_ldap_group_setting:
-          description: Optional within this object. Name of an LDAP group setting to take members from. Mutually
-            exclusive with members. Not supported; a value answers 400.
+          description: Optional within this object. Name of an LDAP group setting to import the group from. The
+            group whose name attribute equals name is looked up in that setting's directory, by the directory's
+            own comparison rule for the attribute, and stored in the ldap realm under the directory's name in lower
+            case, which the response carries. The name must identify a single group. Mutually exclusive with
+            members; LDAP login and refresh manage the members.
           type: string
         manage_resources:
           default: false
@@ -1963,8 +1966,9 @@ paths:
       x-pagination-next: body:/cursor
     post:
       description: 'Creates a group and returns its details with status 201. members and import_from_ldap_group_setting
-        are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import
-        is not supported and answers 400). Admin only. An existing name answers 409.'
+        are mutually exclusive: a group either lists its members or is imported from an LDAP group setting, in the
+        ldap realm under the directory group''s name in lower case, without members until LDAP login or a refresh
+        gives it them. Admin only. An existing name answers 409.'
       operationId: createGroup
       requestBody:
         content:
@@ -2004,7 +2008,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: A referenced user or LDAP setting does not exist.
+          description: A user in members does not exist, or, for an import, the LDAP group setting or the group
+            in its directory.
         '409':
           content:
             application/json:
@@ -2153,8 +2158,10 @@ paths:
         200. The body is the create body, whose name may be empty or left out, which takes the name in the path;
         a name that differs from the path answers 400. A replacement sets every field the body sends, resets every
         field it leaves out to its create default, replaces the members (a body without members removes them all)
-        and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive,
-        and LDAP import is not supported and answers 400. Admin only.'
+        and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive.
+        An import creates the group as Create a Group does; it replaces only a group imported from the same LDAP
+        group (the same realm and realm_attributes), whose members it keeps, and answers 400 for any other. Admin
+        only.'
       operationId: replaceGroup
       parameters:
       - $ref: '#/components/parameters/groupName'
@@ -2184,7 +2191,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Validation failed: a name that differs from the path or is not valid, both members and
-            import_from_ldap_group_setting given, or import_from_ldap_group_setting given.'
+            import_from_ldap_group_setting given, or an import over a group not imported from the same LDAP group.'
         '401':
           content:
             application/json:
@@ -2202,7 +2209,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: A user in members does not exist.
+          description: A user in members does not exist, or, for an import, the LDAP group setting or the group
+            in its directory.
       summary: Create or replace a group
       tags:
       - groups

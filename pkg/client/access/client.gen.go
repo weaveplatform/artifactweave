@@ -750,7 +750,7 @@ type GroupCreateRequest struct {
 	// ExternalId Optional within this object. Identifier of the group in an external identity provider; stored and echoed.
 	ExternalId *string `json:"external_id,omitempty"`
 
-	// ImportFromLdapGroupSetting Optional within this object. Name of an LDAP group setting to take members from. Mutually exclusive with members. Not supported; a value answers 400.
+	// ImportFromLdapGroupSetting Optional within this object. Name of an LDAP group setting to import the group from. The group whose name attribute equals name is looked up in that setting's directory, by the directory's own comparison rule for the attribute, and stored in the ldap realm under the directory's name in lower case, which the response carries. The name must identify a single group. Mutually exclusive with members; LDAP login and refresh manage the members.
 	ImportFromLdapGroupSetting *string `json:"import_from_ldap_group_setting,omitempty"`
 
 	// ManageResources Optional within this object. Manage Resources role for the group's members, who may list, read, create, replace and delete every permission through the permission APIs, under a token only while its scope acts through this group. It grants nothing else. Defaults to false.
@@ -1019,7 +1019,7 @@ type LdapGroupSettings struct {
 	// Name Optional within this object. Unique name of the group setting.
 	Name *string `json:"name,omitempty"`
 
-	// Strategy Optional within this object. How memberships are resolved: STATIC (groups list their members), DYNAMIC (users list their groups) or HIERARCHY (the user's DN encodes the groups).
+	// Strategy Optional within this object. How memberships are resolved: STATIC (groups list their members), DYNAMIC (users list their groups) or HIERARCHICAL (the user's DN encodes the groups). Defaults to STATIC.
 	Strategy *string `json:"strategy,omitempty"`
 
 	// SubTree Optional within this object. Whether the group search descends into sub-trees of group_base_dn.
@@ -1052,7 +1052,7 @@ type LdapGroupSettingsCreate struct {
 	// Name Required within this object. Unique name of the group setting.
 	Name string `json:"name"`
 
-	// Strategy Optional within this object. How memberships are resolved: STATIC (groups list their members), DYNAMIC (users list their groups) or HIERARCHY (the user's DN encodes the groups).
+	// Strategy Optional within this object. How memberships are resolved: STATIC (groups list their members), DYNAMIC (users list their groups) or HIERARCHICAL (the user's DN encodes the groups). Defaults to STATIC.
 	Strategy *string `json:"strategy,omitempty"`
 
 	// SubTree Optional within this object. Whether the group search descends into sub-trees of group_base_dn.
@@ -2290,7 +2290,7 @@ type SearchLdapGroupsParams struct {
 
 // GetLdapGroupMappingStrategyParams defines parameters for GetLdapGroupMappingStrategy.
 type GetLdapGroupMappingStrategyParams struct {
-	// Strategy Optional query parameter. Strategy to describe: STATIC, DYNAMIC or HIERARCHY.
+	// Strategy Optional query parameter. Strategy to describe: STATIC, DYNAMIC or HIERARCHICAL, in any case; HIERARCHY, the spelling the web UI sends, is read as HIERARCHICAL. Any other value, or none, describes STATIC.
 	Strategy *string `form:"strategy,omitempty" json:"strategy,omitempty"`
 }
 
@@ -4439,7 +4439,7 @@ type ClientInterface interface {
 
 	// CreateGroupWithBody Create a group
 	//
-	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
+	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or is imported from an LDAP group setting, in the ldap realm under the directory group's name in lower case, without members until LDAP login or a refresh gives it them. Admin only. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4448,7 +4448,7 @@ type ClientInterface interface {
 
 	// CreateGroup Create a group
 	//
-	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
+	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or is imported from an LDAP group setting, in the ldap realm under the directory group's name in lower case, without members until LDAP login or a refresh gives it them. Admin only. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4489,7 +4489,7 @@ type ClientInterface interface {
 
 	// ReplaceGroupWithBody Create or replace a group
 	//
-	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive. An import creates the group as Create a Group does; it replaces only a group imported from the same LDAP group (the same realm and realm_attributes), whose members it keeps, and answers 400 for any other. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4498,7 +4498,7 @@ type ClientInterface interface {
 
 	// ReplaceGroup Create or replace a group
 	//
-	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive. An import creates the group as Create a Group does; it replaces only a group imported from the same LDAP group (the same realm and realm_attributes), whose members it keeps, and answers 400 for any other. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -7952,7 +7952,7 @@ func (c *Client) GetGroupList(ctx context.Context, params *GetGroupListParams, r
 
 // CreateGroupWithBody Create a group
 //
-// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
+// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or is imported from an LDAP group setting, in the ldap realm under the directory group's name in lower case, without members until LDAP login or a refresh gives it them. Admin only. An existing name answers 409.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7971,7 +7971,7 @@ func (c *Client) CreateGroupWithBody(ctx context.Context, contentType string, bo
 
 // CreateGroup Create a group
 //
-// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
+// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or is imported from an LDAP group setting, in the ldap realm under the directory group's name in lower case, without members until LDAP login or a refresh gives it them. Admin only. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8062,7 +8062,7 @@ func (c *Client) UpdateGroup(ctx context.Context, name GroupName, body UpdateGro
 
 // ReplaceGroupWithBody Create or replace a group
 //
-// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive. An import creates the group as Create a Group does; it replaces only a group imported from the same LDAP group (the same realm and realm_attributes), whose members it keeps, and answers 400 for any other. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8081,7 +8081,7 @@ func (c *Client) ReplaceGroupWithBody(ctx context.Context, name GroupName, conte
 
 // ReplaceGroup Create or replace a group
 //
-// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive. An import creates the group as Create a Group does; it replaces only a group imported from the same LDAP group (the same realm and realm_attributes), whose members it keeps, and answers 400 for any other. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16744,7 +16744,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGroupWithBodyWithResponse Create a group
 	//
-	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
+	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or is imported from an LDAP group setting, in the ldap realm under the directory group's name in lower case, without members until LDAP login or a refresh gives it them. Admin only. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16753,7 +16753,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGroupWithResponse Create a group
 	//
-	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
+	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or is imported from an LDAP group setting, in the ldap realm under the directory group's name in lower case, without members until LDAP login or a refresh gives it them. Admin only. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16798,7 +16798,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReplaceGroupWithBodyWithResponse Create or replace a group
 	//
-	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive. An import creates the group as Create a Group does; it replaces only a group imported from the same LDAP group (the same realm and realm_attributes), whose members it keeps, and answers 400 for any other. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16807,7 +16807,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReplaceGroupWithResponse Create or replace a group
 	//
-	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+	// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive. An import creates the group as Create a Group does; it replaces only a group imported from the same LDAP group (the same realm and realm_attributes), whose members it keeps, and answers 400 for any other. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -19387,6 +19387,8 @@ type SearchLdapGroupsResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *[]LdapGroup
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -19404,6 +19406,11 @@ type SearchLdapGroupsResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r SearchLdapGroupsResponse) GetJSON200() *[]LdapGroup {
 	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r SearchLdapGroupsResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -34038,7 +34045,7 @@ func (c *ClientWithResponses) GetGroupListWithResponse(ctx context.Context, para
 
 // CreateGroupWithBodyWithResponse Create a group
 //
-// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
+// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or is imported from an LDAP group setting, in the ldap realm under the directory group's name in lower case, without members until LDAP login or a refresh gives it them. Admin only. An existing name answers 409.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -34053,7 +34060,7 @@ func (c *ClientWithResponses) CreateGroupWithBodyWithResponse(ctx context.Contex
 
 // CreateGroupWithResponse Create a group
 //
-// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
+// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or is imported from an LDAP group setting, in the ldap realm under the directory group's name in lower case, without members until LDAP login or a refresh gives it them. Admin only. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -34128,7 +34135,7 @@ func (c *ClientWithResponses) UpdateGroupWithResponse(ctx context.Context, name 
 
 // ReplaceGroupWithBodyWithResponse Create or replace a group
 //
-// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive. An import creates the group as Create a Group does; it replaces only a group imported from the same LDAP group (the same realm and realm_attributes), whose members it keeps, and answers 400 for any other. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -34143,7 +34150,7 @@ func (c *ClientWithResponses) ReplaceGroupWithBodyWithResponse(ctx context.Conte
 
 // ReplaceGroupWithResponse Create or replace a group
 //
-// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.
+// Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive. An import creates the group as Create a Group does; it replaces only a group imported from the same LDAP group (the same realm and realm_attributes), whose members it keeps, and answers 400 for any other. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -37371,6 +37378,13 @@ func ParseSearchLdapGroupsResponse(rsp *http.Response) (*SearchLdapGroupsRespons
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse

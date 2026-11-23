@@ -121,12 +121,15 @@ func PublicRoutes() map[string]bool { return maps.Clone(accessPublicRoutes) }
 // creates key pairs with POST /api/security/keypair/ (its KeypairEndPoint)
 // and creates and replaces LDAP connections with POST and PUT
 // access/api/v1/ldap/settings/ (artifactory_ldap_setting_v2's
-// LdapEndpoint), which chi would otherwise read as an item with an empty
-// name.
+// LdapEndpoint) and LDAP group settings with POST and PUT
+// access/api/v1/ldap/groups/ (artifactory_ldap_group_setting_v2's
+// LdapGroupEndpoint), which chi would otherwise read as an item with an
+// empty name.
 func SlashCollections() map[string]string {
 	return map[string]string{
 		"/artifactory/api/security/keypair/": "/artifactory/api/security/keypair",
 		"/access/api/v1/ldap/settings/":      "/access/api/v1/ldap/settings",
+		"/access/api/v1/ldap/groups/":        "/access/api/v1/ldap/groups",
 	}
 }
 

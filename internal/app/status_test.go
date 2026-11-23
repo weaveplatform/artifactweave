@@ -114,6 +114,7 @@ func statusTable() []statusCase {
 		accessIdentityStatusRows(),
 		oidcStatusRows(),
 		ldapStatusRows(),
+		ldapGroupStatusRows(),
 		buildStatusRows(),
 		searchStatusRows(),
 		webServerStatusRows(),

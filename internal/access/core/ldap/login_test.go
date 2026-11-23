@@ -21,6 +21,74 @@ type scripted struct {
 	answers map[string]func(c Connection, name, password string) (Entry, error)
 	calls   []string
 	tested  []Connection
+	// users are the DNs Lookup finds by name; groups are each group
+	// setting's directory groups by setting name, and members each
+	// setting's groups by user name. groupErr fails every group call.
+	users    map[string]string
+	groups   map[string][]DirectoryGroup
+	members  map[string]map[string][]DirectoryGroup
+	groupErr error
+	// during runs inside each group call, the window in which settings can
+	// change while the directory answers.
+	during func()
+}
+
+func (d *scripted) Lookup(_ context.Context, _ Connection, name string) (Entry, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.groupErr != nil {
+		return Entry{}, d.groupErr
+	}
+	dn, ok := d.users[name]
+	if !ok {
+		return Entry{}, ErrUnknownUser
+	}
+	return Entry{DN: dn}, nil
+}
+
+func (d *scripted) Groups(_ context.Context, _ Connection, g accessapi.LDAPGroupSetting) ([]DirectoryGroup, error) {
+	if d.during != nil {
+		d.during()
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.groupErr != nil {
+		return nil, d.groupErr
+	}
+	return d.groups[g.Name], nil
+}
+
+func (d *scripted) GroupsNamed(
+	ctx context.Context,
+	c Connection,
+	g accessapi.LDAPGroupSetting,
+	name string,
+) ([]DirectoryGroup, error) {
+	all, err := d.Groups(ctx, c, g)
+	var out []DirectoryGroup
+	for _, f := range all {
+		if strings.EqualFold(f.Name, name) {
+			out = append(out, f)
+		}
+	}
+	return out, err
+}
+
+func (d *scripted) UserGroups(
+	_ context.Context,
+	_ Connection,
+	g accessapi.LDAPGroupSetting,
+	name, _ string,
+) ([]DirectoryGroup, error) {
+	if d.during != nil {
+		d.during()
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.groupErr != nil {
+		return nil, d.groupErr
+	}
+	return d.members[g.Name][name], nil
 }
 
 func (d *scripted) Authenticate(_ context.Context, c Connection, name, password string) (Entry, error) {

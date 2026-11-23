@@ -596,6 +596,7 @@ func matrixTable() []matrixRow {
 		accessIdentityMatrix(),
 		oidcMatrix(),
 		ldapMatrix(),
+		ldapGroupMatrix(),
 		buildMatrix(),
 		searchMatrix(),
 		webServerMatrixRows(),
@@ -740,6 +741,27 @@ func ldapMatrix() []matrixRow {
 		// directory and reports the connect failure.
 		at("POST "+cfg+"/test", `{"key":"lt-{p}","ldap_url":"ldap://127.0.0.1:1","user_dn_pattern":"uid={0}"}`,
 			administrators, 400),
+	}
+}
+
+// ldapGroupMatrix covers the LDAP group settings (#1834), administrators'
+// alone. The fixture seeded each principal's group setting lg-{p}, which
+// reads through lx-{p}, a connection to a closed port.
+func ldapGroupMatrix() []matrixRow {
+	const groups = "/access/api/v1/ldap/groups"
+	return []matrixRow{
+		at("GET "+groups, "", administrators, 200),
+		at("POST "+groups, `{"name":"gn-{p}","enabled_ldap":"lx-{p}"}`, administrators, 201),
+		at("PUT "+groups, `{"name":"lg-{p}","enabled_ldap":"lx-{p}","sub_tree":true}`, administrators, 200),
+		row("GET "+groups+"/{name}", groups+"/lg-{p}", "", administrators, 200),
+		row("DELETE "+groups+"/{name}", groups+"/lg-{p}", "", administrators, 204),
+		at("GET "+groups+"/strategy", "", administrators, 200),
+		// A search through no connection is refused before any directory.
+		at("POST "+groups+"/search", `{"name":"s-{p}","enabled_ldap":"none"}`, administrators, 400),
+		at("POST "+groups+"/import", `{"import_groups":[{"group_name":"ig-{p}","group_dn":"cn=ig-{p},ou=groups"}]}`,
+			administrators, 204),
+		// The refresh reaches the directory, which nothing answers.
+		row("POST "+groups+"/{name}/refresh", groups+"/lg-{p}/refresh", "", administrators, 400),
 	}
 }
 
@@ -1749,11 +1771,21 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	}
 
 	url, pattern := "ldap://ldap.example.com", "uid={0}"
+	// Nothing listens on port 1, so a refresh through lx-{p} reaches the
+	// directory client and fails at once rather than waiting on a name.
+	closed := "ldap://127.0.0.1:1"
 	var connections []api.LDAPChange
+	var groupSettings []api.LDAPGroupChange
 	for _, p := range names {
-		connections = append(connections, api.LDAPChange{Key: "lc-" + p, URL: &url, UserDNPattern: &pattern})
+		connections = append(connections,
+			api.LDAPChange{Key: "lc-" + p, URL: &url, UserDNPattern: &pattern},
+			api.LDAPChange{Key: "lx-" + p, URL: &closed, UserDNPattern: &pattern})
+		key := "lx-" + p
+		groupSettings = append(groupSettings, api.LDAPGroupChange{Name: "lg-" + p, EnabledLDAP: &key})
 	}
 	_, err = accessmodule.LDAPSettingsOf(db).Apply(ctx, connections)
+	must(err)
+	_, err = accessmodule.LDAPGroupSettingsOf(db).ApplyGroups(ctx, groupSettings)
 	must(err)
 
 	tokens, secrets := seedMatrixTokens(t, db)

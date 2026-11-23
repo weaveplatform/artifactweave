@@ -371,17 +371,28 @@
     "route": "DELETE /access/api/v1/ldap/groups/{name}",
     "spec": "access.openapi.yaml",
     "operation_id": "deleteLdapGroupSettings",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Removes the group setting. Groups already imported through it remain as local groups. Returns 204. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap_groups.go: AccessService.DeleteLdapGroupSettings",
+    "direct_calls": [
+      "s.groupError",
+      "s.ldapTx",
+      "svc.DeleteGroupSetting"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:name",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:name: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -2858,54 +2869,88 @@
     "route": "GET /access/api/v1/ldap/groups",
     "spec": "access.openapi.yaml",
     "operation_id": "getAllLdapGroupSettings",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns every LDAP group synchronisation setting. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap_groups.go: AccessService.GetAllLdapGroupSettings",
+    "direct_calls": [
+      "s.groupError",
+      "s.ldapTx",
+      "svc.GroupSettings"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: administrator LDAP group settings, read whole after the authority recheck in one guarded transaction; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /access/api/v1/ldap/groups/strategy",
     "spec": "access.openapi.yaml",
     "operation_id": "getLdapGroupMappingStrategy",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns the default filter and attribute names of one group mapping strategy, as a starting point for a new group setting. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap_groups.go: AccessService.GetLdapGroupMappingStrategy",
+    "direct_calls": [
+      "ldap.DefaultsOf",
+      "s.groupError",
+      "s.ldapTx"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /access/api/v1/ldap/groups/{name}",
     "spec": "access.openapi.yaml",
     "operation_id": "getLdapGroupSettingsByName",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns one LDAP group setting. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap_groups.go: AccessService.GetLdapGroupSettingsByName",
+    "direct_calls": [
+      "accessgen.GetLdapGroupSettingsByName200JSONResponse",
+      "s.groupError",
+      "s.ldapTx",
+      "svc.GroupSetting"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -14827,71 +14872,134 @@
     "route": "POST /access/api/v1/ldap/groups",
     "spec": "access.openapi.yaml",
     "operation_id": "createLdapGroupSettings",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Defines how groups are read from the LDAP connection named in enabled_ldap and mapped to local groups. Answers 201 with the stored setting. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap_groups.go: AccessService.CreateLdapGroupSettings",
+    "direct_calls": [
+      "accessgen.CreateLdapGroupSettings201JSONResponse",
+      "httpkit.BadRequestf",
+      "s.groupError",
+      "s.ldapTx",
+      "svc.CreateGroupSetting"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on body:/name",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on body:/name: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /access/api/v1/ldap/groups/import",
     "spec": "access.openapi.yaml",
     "operation_id": "importLdapGroups",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Creates local groups, or updates existing ones, for the listed LDAP groups through the given group setting, so that permissions can be granted to them. Returns 204. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap_groups.go: AccessService.ImportLdapGroups",
+    "direct_calls": [
+      "httpkit.BadRequestf",
+      "ldap.GroupStatus",
+      "ldap.ValidateGroup",
+      "s.groupError",
+      "s.sync",
+      "sync.ImportIn",
+      "sync.Tx"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on body:/import_groups",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on body:/import_groups: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /access/api/v1/ldap/groups/search",
     "spec": "access.openapi.yaml",
     "operation_id": "searchLdapGroups",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Runs the group search described by the body against its LDAP connection and returns the groups found, each with its distinguished name and local status. With username, returns only that user's groups. Nothing is stored. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap_groups.go: AccessService.SearchLdapGroups",
+    "direct_calls": [
+      "accessgen.LdapGroupRequiredUpdate",
+      "httpkit.BadRequestf",
+      "s.directoryReady",
+      "s.groupError",
+      "s.sync",
+      "sync.Search"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
-    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "effects": "no persisted effect: the settings are read in one guarded transaction, the directory is searched outside it, and each group's status is read in a second",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; directory I/O outside any metadata transaction, bounded by 10s connect and 15s per-operation deadlines and the request context",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the directory's answer, at most 10000 groups, each given its status in a later guarded transaction before any byte is written; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go",
+      "internal/access/core/ldap/sync.go",
+      "internal/access/adapters/ldap/groups.go",
+      "test/server/access/ldap_groups_test.go"
     ]
   },
   {
     "route": "POST /access/api/v1/ldap/groups/{name}/refresh",
     "spec": "access.openapi.yaml",
     "operation_id": "refreshLdapGroupSettings",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Re-reads the LDAP groups of the named setting. operation chooses whether to update the memberships of groups already imported, import the groups not yet present, or both. With username, only that user's memberships are refreshed. Returns a plain-text summary that includes the number of groups imported. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap_groups.go: AccessService.RefreshLdapGroupSettings",
+    "direct_calls": [
+      "accessgen.RefreshLdapGroupSettings200TextResponse",
+      "ldap.Operation",
+      "s.directoryReady",
+      "s.groupError",
+      "s.sync",
+      "sum.String",
+      "sync.Refresh"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:name, query:username",
-    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "effects": "groups imported or refreshed and ldap-realm memberships replaced, all in one guarded transaction that first rechecks every connection's and group setting's revision against those the directory was asked through; a change in between publishes nothing",
+    "retry": "natural on path:name, query:username: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; directory I/O outside any metadata transaction, bounded by 10s connect and 15s per-operation deadlines and the request context",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go",
+      "internal/access/core/ldap/sync.go",
+      "internal/access/adapters/ldap/groups.go",
+      "test/server/access/ldap_groups_test.go"
     ]
   },
   {
@@ -15424,8 +15532,8 @@
     "route": "POST /access/api/v2/groups",
     "spec": "access.openapi.yaml",
     "operation_id": "createGroup",
-    "state": "partial: handler enforces the contract's limitations",
-    "contract": "Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.",
+    "state": "implemented",
+    "contract": "Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or is imported from an LDAP group setting, in the ldap realm under the directory group's name in lower case, without members until LDAP login or a refresh gives it them. Admin only. An existing name answers 409.",
     "handler": "internal/access/adapters/http/access_identity.go: AccessService.CreateGroup",
     "direct_calls": [
       "accessgen.CreateGroup201JSONResponse",
@@ -15435,12 +15543,13 @@
       "s.adminIdentity",
       "s.groupDetails",
       "s.identityErr",
+      "s.importGroup",
       "svc.CreateGroup"
     ],
     "review_family": "identity-pages",
-    "effects": "resource mutation/action; see served contract and handler calls",
+    "effects": "resource mutation/action; see served contract and handler calls; with import_from_ldap_group_setting the directory is asked first and the group stored only while the setting's snapshot revision is unchanged",
     "retry": "natural on body:/name: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
-    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; directory I/O outside any metadata transaction, bounded by 10s connect and 15s per-operation deadlines and the request context",
     "response_collections": [
       "201 application/json.members[]"
     ],
@@ -15450,7 +15559,10 @@
       "internal/access/adapters/sql/identity_query.go",
       "internal/access/adapters/storetest/identity_query.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/access/core/ldap/sync.go",
+      "internal/access/adapters/ldap/groups.go",
+      "test/server/access/ldap_groups_test.go"
     ]
   },
   {
@@ -21008,17 +21120,30 @@
     "route": "PUT /access/api/v1/ldap/groups",
     "spec": "access.openapi.yaml",
     "operation_id": "updateLdapGroupSettings",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Replaces the group setting whose name matches the body's name. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap_groups.go: AccessService.UpdateLdapGroupSettings",
+    "direct_calls": [
+      "accessgen.UpdateLdapGroupSettings200JSONResponse",
+      "httpkit.BadRequestf",
+      "s.groupError",
+      "s.ldapTx",
+      "svc.ReplaceGroupSetting"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on body:/name",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on body:/name: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -21474,8 +21599,8 @@
     "route": "PUT /access/api/v2/groups/{name}",
     "spec": "access.openapi.yaml",
     "operation_id": "replaceGroup",
-    "state": "partial: handler enforces the contract's limitations",
-    "contract": "Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive, and LDAP import is not supported and answers 400. Admin only.",
+    "state": "implemented",
+    "contract": "Creates the group when no group has this name, and answers 201; otherwise replaces it and answers 200. The body is the create body, whose name may be empty or left out, which takes the name in the path; a name that differs from the path answers 400. A replacement sets every field the body sends, resets every field it leaves out to its create default, replaces the members (a body without members removes them all) and keeps the realm and realm_attributes. members and import_from_ldap_group_setting are mutually exclusive. An import creates the group as Create a Group does; it replaces only a group imported from the same LDAP group (the same realm and realm_attributes), whose members it keeps, and answers 400 for any other. Admin only.",
     "handler": "internal/access/adapters/http/access_identity.go: AccessService.ReplaceGroup",
     "direct_calls": [
       "accessgen.ReplaceGroup200JSONResponse",
@@ -21487,12 +21612,13 @@
       "s.adminIdentity",
       "s.groupDetails",
       "s.identityErr",
+      "s.importGroup",
       "svc.ReplaceGroup"
     ],
     "review_family": "identity",
-    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible; with import_from_ldap_group_setting the directory is asked first and the group stored only while the setting's snapshot revision is unchanged",
     "retry": "natural on path:name: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
-    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline; directory I/O outside any metadata transaction, bounded by 10s connect and 15s per-operation deadlines and the request context",
     "response_collections": [
       "200 application/json.members[]",
       "201 application/json.members[]"
@@ -21506,7 +21632,10 @@
       "internal/access/adapters/sql/identity.go",
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
-      "internal/app/limits.go"
+      "internal/app/limits.go",
+      "internal/access/core/ldap/sync.go",
+      "internal/access/adapters/ldap/groups.go",
+      "test/server/access/ldap_groups_test.go"
     ]
   },
   {

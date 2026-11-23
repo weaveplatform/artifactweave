@@ -287,5 +287,8 @@ func readExportSecurity(ctx context.Context, d Deps) (exportSecurity, error) {
 	if out.LDAP, err = exportLDAP(ctx, d); err != nil {
 		return out, err
 	}
+	if out.LDAPGroups, err = exportLDAPGroups(ctx, d); err != nil {
+		return out, err
+	}
 	return out, nil
 }

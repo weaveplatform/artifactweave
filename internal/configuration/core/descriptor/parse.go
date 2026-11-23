@@ -87,6 +87,11 @@ type Patch struct {
 	// LDAP are the security.ldapSettings connections, written through
 	// access's LDAPSettings.
 	LDAP []accessapi.LDAPChange
+	// LDAPGroups are the security.ldapGroupSettings entries, written through
+	// access's LDAPGroupSettings; LDAPGroupsCleared is the whole section set
+	// to null, which deletes every group setting.
+	LDAPGroups        []accessapi.LDAPGroupChange
+	LDAPGroupsCleared bool
 	// Security is the userLockPolicy and passwordSettings blocks, written
 	// through access's SecurityPolicies.
 	Security *SecurityChange

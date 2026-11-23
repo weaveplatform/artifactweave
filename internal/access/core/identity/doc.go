@@ -84,7 +84,7 @@
 // password endpoints (pull request 466) and login suspension, filters and
 // limits (pull request 470). Moved here in P9d, where Service takes Store.
 // Access v2's create or replace of a group (ReplaceGroup) came with issue
-// 1200, and the user name rule and the service's wording of an unknown group
+// 1200, its LDAP import (ImportGroup) with LDAP-03 (#1834), and the user name rule and the service's wording of an unknown group
 // or member with issues 1432 and 1433.
 //
 // # Testing
@@ -103,6 +103,8 @@
 //   - replace_group_test.go: TestUnitReplaceGroupCreates,
 //     TestUnitReplaceGroupResetsEachField, TestUnitReplaceGroupSetsEachField,
 //     TestUnitReplaceGroupRefusals and TestUnitReplaceGroupOneTransaction.
+//   - import_group_test.go: TestUnitImportGroup and
+//     TestUnitImportGroupStoreFailures (Create a Group's LDAP import).
 //   - username_test.go: TestUnitUsernamesFold, TestUnitUsernameTokensRevoked,
 //     TestUnitUnknownGroupOrMember and TestUnitUnknownGroupStoreFailures
 //     (user names in any case, and the service's wording of an unknown group

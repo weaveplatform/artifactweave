@@ -41,6 +41,18 @@ type DirectoryLogin struct {
 	// directory client remembered: only a fresh login writes the last login
 	// time and the email.
 	Fresh bool
+	// Groups are the directory groups a fresh login read for the user, which
+	// its publication makes the user's LDAP memberships; nil when the login
+	// was remembered or the groups could not be read, which leaves them as
+	// they are.
+	Groups *DirectoryGroups
+}
+
+// DirectoryGroups are the local names of the directory groups a login read,
+// under the revision of the group settings it read them through.
+type DirectoryGroups struct {
+	Names    []string
+	Revision [32]byte
 }
 
 // Directory checks passwords against the external directories.
@@ -59,6 +71,12 @@ type Directory interface {
 	// Enabled reports whether any directory is enabled. It reads local
 	// state only.
 	Enabled(ctx context.Context) (bool, error)
+	// PublishGroups makes groups the stored user name's memberships in the
+	// directory's groups, in the transaction ctx carries, when the group
+	// settings they were read under are still current; otherwise it changes
+	// nothing, and the next fresh login reads them again. It reads local
+	// state only.
+	PublishGroups(ctx context.Context, name string, groups DirectoryGroups) error
 }
 
 // directoryEnabled reports whether a directory could accept a password. A
@@ -151,6 +169,11 @@ func (a *Authenticator) publish(
 				return err
 			}
 		}
+		if login.Groups != nil && !transient {
+			if u, err = a.publishGroups(ctx, u, *login.Groups); err != nil {
+				return err
+			}
+		}
 		if err := a.apiAllowed(ctx, u.Name); err != nil {
 			return err
 		}
@@ -162,6 +185,21 @@ func (a *Authenticator) publish(
 	}
 	a.suspended.forget(name)
 	return p, nil
+}
+
+// publishGroups publishes a fresh login's directory groups and returns the
+// user as it now stands, so the request the login authenticates already
+// acts through the memberships it published.
+func (a *Authenticator) publishGroups(ctx context.Context, u model.User, groups DirectoryGroups) (model.User, error) {
+	name := u.Name
+	if err := a.directory.PublishGroups(ctx, name, groups); err != nil {
+		return model.User{}, err //nolint:wrapcheck // the store's errors, named by the directory
+	}
+	u, err := a.users.Get(ctx, name)
+	if err != nil {
+		return model.User{}, fmt.Errorf("auth: user %s: %w", name, err)
+	}
+	return u, nil
 }
 
 // directoryUser is the user a first directory login introduces: stored in
