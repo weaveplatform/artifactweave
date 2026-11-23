@@ -63,8 +63,10 @@ CFG-07 ([#1831](https://github.com/weaveplatform/artifactweave/issues/1831)) com
 rest of the document and written in its one transaction. `mailServer: null` deletes the
 settings and their sealed password, as the pinned `artifactory_mail_server` resource
 deletes them. Backup definitions are stored and exported in XSD `BackupType` order, with
-schedules and repository exclusions checked against the document's final repositories;
-running them stays with P36. The system message is a singleton outside the XSD, so it is
+schedules and repository exclusions checked against the document's final repositories.
+Deleting a repository by any path drops it from every backup's exclusions in that
+transaction, through the artifacts module's repository lifecycle; running backups stays
+with P36. The system message is a singleton outside the XSD, so it is
 not exported. `artifactweave mail test` sends Artifactory's test message from the stored
 settings without holding a metadata transaction across SMTP.
 

@@ -123,6 +123,15 @@ func (b loggerBinding) Level(ctx context.Context, name string) (string, error) {
 	return b.Loggers.Level(ctx, name) //nolint:wrapcheck // preserve the configuration service's error classification
 }
 
+// RepositoryLifecycle is the configuration module's share of the artifacts
+// module's repository lifecycle over st: it drops a repository's key from
+// every backup's excludedRepositories when the repository is created or
+// deleted. It needs only st, so app can hand it to the artifacts module,
+// which is built before this one.
+func RepositoryLifecycle(st Store) artifactsapi.RepositoryLifecycle {
+	return descriptor.BackupExclusions{Configs: configs{st: st}}
+}
+
 // API returns Descriptor, Export, System, the narrow Mail reader and, when Logging was
 // supplied to New, the lifecycle-owned P12 Loggers binding.
 func (m *Module) API() configapi.API { return m.api }

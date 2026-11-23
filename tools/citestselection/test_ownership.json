@@ -377,6 +377,7 @@
       "virtual_write_test.go"
     ],
     "test/server/configuration": [
+      "backup_test.go",
       "descriptor_test.go",
       "fixture_test.go",
       "forwarded_test.go",

@@ -566,8 +566,10 @@ closed source, so its use of the shared builder is inferred [I].
   (`enabled: true`, `retentionPeriodHours: 168`, `sendMailOnError: true`, the other flags
   false) fill a new entry, and `null` on the entry deletes it. `cronExp` is required and
   must be a Quartz expression. Every `excludedRepositories` entry must name a repository
-  that exists once the document is applied; one removed later disappears from the
-  export. `key`, when sent, must equal the entry key; `excludeBuilds`, deprecated in the
+  that exists once the document is applied. An entry is a `repositoryRef`, an IDREF to
+  the repository (XSD `BackupType`), so deleting the repository by any path (the
+  descriptor, the REST API) removes its key from every backup in the same transaction,
+  and a repository created again under that key is not excluded. `key`, when sent, must equal the entry key; `excludeBuilds`, deprecated in the
   XSD, is accepted and dropped. `dir` is refused: **[I]** a backup target on the server's
   filesystem is P36's decision, and accepting it unused would claim a location is in force.
   The export states every field, with `excludedRepositories` always present so the

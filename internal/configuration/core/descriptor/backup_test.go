@@ -275,3 +275,56 @@ security:
 		}
 	}
 }
+
+type listFaultConfigs struct {
+	configdoc.ConfigStore
+	err error
+}
+
+func (f listFaultConfigs) List(context.Context, configdoc.ConfigKind) ([]configdoc.ConfigDocument, error) {
+	return nil, f.err
+}
+
+func TestUnitBackupExclusionsFollowRepositoryLifetimes(t *testing.T) {
+	db := inmem.New()
+	for _, key := range []string{"backup-a", "backup-b"} {
+		seedRepo(t, db, repo.Config{Key: key, Class: repo.Local, PackageType: repo.Generic})
+	}
+	mustApply(t, db, providerBackup+"  weekly:\n    cronExp: \"0 0 3 ? * SUN\"\n    excludedRepositories: [backup-b]\n")
+	lifecycle := BackupExclusions{Configs: db.Configs()}
+	if err := lifecycle.ResetRepository(t.Context(), "backup-b"); err != nil {
+		t.Fatal(err)
+	}
+	_, nightly := backupDocument(t, db, "nightly")
+	_, weekly := backupDocument(t, db, "weekly")
+	if refs, _ := nightly["excludedRepositories"].([]any); len(refs) != 1 || refs[0] != "backup-a" ||
+		nightly["retentionPeriodHours"] != float64(336) {
+		t.Fatal("reset did not drop only the repository's key", nightly)
+	}
+	if refs, _ := weekly["excludedRepositories"].([]any); refs == nil || len(refs) != 0 {
+		t.Fatal("the last exclusion was not dropped to an empty list", weekly)
+	}
+	before, _ := backupDocument(t, db, "nightly")
+	if err := lifecycle.ResetRepository(t.Context(), "never-excluded"); err != nil {
+		t.Fatal(err)
+	}
+	if after, _ := backupDocument(t, db, "nightly"); !after.Updated.Equal(before.Updated) || string(after.Document) != string(before.Document) {
+		t.Fatal("a key no backup excludes rewrote a backup")
+	}
+	if err := lifecycle.RefreshRepository(t.Context(), "backup-a"); err != nil {
+		t.Fatal(err)
+	}
+	if err := (BackupExclusions{Configs: listFaultConfigs{db.Configs(), errBoom}}).ResetRepository(t.Context(), "backup-a"); !errors.Is(err, errBoom) {
+		t.Fatal("list failure not reported", err)
+	}
+	if err := (BackupExclusions{Configs: faultyConfigs{db.Configs(), "config put"}}).ResetRepository(t.Context(), "backup-a"); !errors.Is(err, errBoom) {
+		t.Fatal("write failure not reported", err)
+	}
+	broken := configdoc.ConfigDocument{Kind: configdoc.ConfigBackup, Key: "broken", Enabled: true, Document: []byte("null")}
+	if err := db.Configs().Put(t.Context(), broken); err != nil {
+		t.Fatal(err)
+	}
+	if err := lifecycle.ResetRepository(t.Context(), "backup-a"); !errors.Is(err, kernel.ErrStore) {
+		t.Fatal("a corrupt backup was not reported", err)
+	}
+}

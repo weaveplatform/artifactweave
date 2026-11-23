@@ -347,6 +347,16 @@ Feature: Configuration descriptor
     Then the XML field "backups/backup[key=nightly]/enabled" equals "false"
     And the XML field "backups/backup[key=nightly]/excludedRepositories/repositoryRef" equals "backup-skip-a"
     And the XML field "backups/backup[key=nightly]/retentionPeriodHours" equals "336"
+    When I DELETE "/artifactory/api/repositories/backup-skip-a" as admin
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/backup-skip-a" as admin with body:
+      """
+      {"rclass":"local","packageType":"generic"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the response body does not contain "<repositoryRef>backup-skip-a</repositoryRef>"
+    And the XML field "backups/backup[key=nightly]/retentionPeriodHours" equals "336"
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
       """
       localRepositories:

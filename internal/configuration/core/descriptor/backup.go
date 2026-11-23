@@ -1,6 +1,8 @@
 package descriptor
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -215,3 +217,49 @@ func exportBackup(key string, fields map[string]any, repositories map[string]boo
 	}
 	return entry
 }
+
+// BackupExclusions is the artifacts module's RepositoryLifecycle for backup
+// definitions: an excludedRepositories entry is a repositoryRef, an IDREF to
+// the repository (XSD BackupType), so it goes with the repository. Deleting
+// a repository outside the descriptor (the REST API) would otherwise leave
+// its key stored, and a repository created again under that key would come
+// back excluded without anyone asking.
+//
+// Artifacts calls ResetRepository in the repository change's transaction,
+// which Configs joins through ctx, so a failure rolls the change back too.
+// It runs on creation as well as deletion; a descriptor patch creates its
+// repositories before it writes its backups, so an exclusion the same patch
+// names is kept.
+type BackupExclusions struct {
+	Configs configdoc.ConfigStore
+}
+
+// ResetRepository removes key from every backup's stored exclusions.
+func (b BackupExclusions) ResetRepository(ctx context.Context, key string) error {
+	docs, err := b.Configs.List(ctx, configdoc.ConfigBackup)
+	if err != nil {
+		return fmt.Errorf("list backups: %w", err)
+	}
+	for _, doc := range docs {
+		fields, err := publicDocument(doc)
+		if err != nil {
+			return err
+		}
+		list, _ := fields["excludedRepositories"].([]any)
+		kept := slices.DeleteFunc(slices.Clone(list), func(item any) bool { return item == key })
+		if len(kept) == len(list) {
+			continue
+		}
+		fields["excludedRepositories"] = kept
+		if doc.Document, err = json.Marshal(fields); err != nil {
+			return fmt.Errorf("backups.%s: %w", doc.Key, err)
+		}
+		if err := b.Configs.Put(ctx, doc); err != nil {
+			return fmt.Errorf("backups.%s: %w", doc.Key, err)
+		}
+	}
+	return nil
+}
+
+// RefreshRepository changes nothing: an update keeps the repository's key.
+func (BackupExclusions) RefreshRepository(context.Context, string) error { return nil }

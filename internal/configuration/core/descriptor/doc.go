@@ -68,7 +68,9 @@
 //   - A backup is a definition only: no field names a directory, and its
 //     excludedRepositories are checked against the repositories the whole
 //     patch leaves, so a repository created or deleted in the same document
-//     counts. Exclusions of repositories removed later are not exported.
+//     counts. BackupExclusions, the artifacts module's RepositoryLifecycle
+//     for backups, drops a repository's key from every backup when the
+//     repository is created or deleted outside the descriptor too.
 //   - Error texts reach clients and logs, so they stay byte-identical.
 //
 // # References
@@ -129,6 +131,7 @@
 //   - mail_test.go: singleton mail settings, secret retention/clearing, no-op
 //     enablement, validation, dry-run and enclosing transaction rollback.
 //   - backup_test.go: the artifactory_backup bodies through create, update,
+//     the exclusions BackupExclusions drops (and its failures),
 //     reapply and delete, defaults, repository references that follow the
 //     patch, refusals that write nothing, and a final-write fault that rolls
 //     back repositories, backups, mail and the system message together.
