@@ -18,13 +18,14 @@
 // Directory, and the composition root hands it to NewLogins and to the HTTP
 // adapter's connection test. Logins implements core/authn's Directory. The
 // package imports the standard library, the kernel, access/api,
-// access/core/authn, platform/configdoc and platform/tx.
+// access/core/authn, platform/configdoc, platform/settings and platform/tx.
 //
 // # Inputs
 //
 //   - Service: the configuration document port, and for Snapshot the
-//     transaction runner and the administration guard; optionally the clock
-//     and the source of random revisions.
+//     transaction runner and the administration guard; optionally the clock,
+//     the source of random revisions and the settings store whose internal
+//     password switch an enabled connection's write turns off.
 //   - NewLogins: the Service, a Directory and LoginOptions (how long and
 //     how many accepted logins are remembered, the clock and the logger).
 //   - TestConnection: an accessapi.LDAPChange to test, which may leave out
@@ -70,6 +71,12 @@
 //     and the write. Snapshot opens its own guarded transaction, so it never
 //     pairs one write's settings with another's password. No directory I/O
 //     runs inside any of them.
+//   - Writing an enabled connection turns internal password login off, in
+//     the same transaction, while that switch was never written: 7.x
+//     documents that enabling LDAP does so by default. A value an
+//     administrator wrote is never overwritten, and nothing writes it back
+//     on [I]. Logins.Enabled tells the authenticator whether any connection
+//     is enabled, so the switch spares directory passwords.
 //   - Validation is complete before anything is stored, so a refused
 //     connection, or a descriptor with one, writes nothing.
 //   - Logins asks each enabled connection in key order and accepts the

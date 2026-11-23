@@ -13,6 +13,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/internal/platform/tx"
 )
 
@@ -122,6 +123,10 @@ func Merge(c accessapi.LDAPConnection, ch accessapi.LDAPChange) accessapi.LDAPCo
 type Service struct {
 	// Configs holds the connections.
 	Configs configdoc.ConfigStore
+	// Settings holds the internal password switch, which writing an enabled
+	// connection turns off while it was never written (put). Nil leaves the
+	// switch alone, which only tests that are not about it should do.
+	Settings settings.SettingsStore
 	// Tx and Guard give Snapshot its own guarded transaction.
 	Tx    tx.Runner
 	Guard func(context.Context) error
@@ -296,6 +301,35 @@ func (s Service) put(ctx context.Context, conn accessapi.LDAPConnection, passwor
 		Document: body, Secrets: secrets, Updated: s.now(),
 	}); err != nil {
 		return fmt.Errorf("ldap: write connection %s: %w", conn.Key, err)
+	}
+	if conn.Enabled {
+		return s.defaultInternalPasswordsOff(ctx)
+	}
+	return nil
+}
+
+// defaultInternalPasswordsOff writes the internal password switch off when
+// an enabled connection is written and the switch was never written: "Enabling
+// LDAP disables internal password authentication by default" (JFrog's LDAP
+// page; security configuration, "Disable Basic Authentication Method", from
+// 7.104.0). An administrator's own choice, on or off, is never overwritten,
+// and a later disable or delete of the connection does not turn it back on,
+// as the stored Access setting it is in 7.x stays as written [I]. It joins
+// the connection's transaction, so the two commit or roll back together.
+func (s Service) defaultInternalPasswordsOff(ctx context.Context) error {
+	if s.Settings == nil {
+		return nil
+	}
+	var on bool
+	err := s.Settings.Get(ctx, settings.SettingBasicAuthEnabled, &on)
+	switch {
+	case err == nil:
+		return nil
+	case !errors.Is(err, kernel.ErrNotFound):
+		return fmt.Errorf("ldap: read the internal password switch: %w", err)
+	}
+	if err := s.Settings.Put(ctx, settings.SettingBasicAuthEnabled, false); err != nil {
+		return fmt.Errorf("ldap: turn internal password login off: %w", err)
 	}
 	return nil
 }

@@ -99,6 +99,7 @@
       "project_repositories_test.go",
       "project_wire_test.go",
       "roles_internal_test.go",
+      "securityconfig_internal_test.go",
       "tokens_internal_test.go"
     ],
     "internal/app": [
@@ -289,6 +290,7 @@
       "projects_test.go",
       "roles_status_test.go",
       "roles_test.go",
+      "security_baseline_test.go",
       "security_test.go",
       "streamed_lists_test.go",
       "streamed_memory_test.go",

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -132,8 +133,12 @@ func NewAuthenticator(
 
 // Basic verifies a user name and password. Wrong credentials, an unknown or
 // disabled user, and a user without an internal password all answer
-// kernel.ErrBadCredentials alike; while basic authentication is switched
-// off, every password answers ErrBasicAuthDisabled. A locked account
+// kernel.ErrBadCredentials alike. While internal password login is switched
+// off (BasicAuthEnabled), internal passwords verify nothing and only an
+// enabled directory can accept the password; with none enabled, every
+// password answers ErrBasicAuthDisabled. While the password encryption
+// policy is required, a clear-text password outside a UI request
+// (WithUIRequest) answers ErrClearTextPassword. A locked account
 // answers kernel.ErrAccountLocked whatever the password. A correct but
 // expired password answers kernel.ErrPasswordExpired with the principal,
 // marked PasswordExpired.
@@ -159,8 +164,21 @@ func (a *Authenticator) Basic(
 	// A switch that cannot be read does not stop the check here: a correct
 	// password then fails in accept, which needs the same settings, and a
 	// wrong one still answers as a wrong password.
+	internal := true
 	if enabled, err := a.basicEnabled(ctx); err == nil && !enabled {
-		return kernel.Principal{}, ErrBasicAuthDisabled
+		// The switch turns internal passwords off, not a directory's: 7.x
+		// turns it off by default when LDAP is enabled, and LDAP users go on
+		// logging in. With no directory enabled no password can verify, and
+		// the answer is the one the switch always gave.
+		if !a.directoryEnabled(ctx) {
+			return kernel.Principal{}, ErrBasicAuthDisabled
+		}
+		internal = false
+	}
+	if p, err := a.encryption(ctx); err == nil && p == accessapi.EncryptionRequired && !uiRequest(ctx) {
+		// Refused before the user is read: nothing about the name or the
+		// password is learned, and nothing is counted.
+		return kernel.Principal{}, ErrClearTextPassword
 	}
 	now := a.now()
 	u, err := a.users.Get(ctx, name)
@@ -188,7 +206,7 @@ func (a *Authenticator) Basic(
 	if u.Status != "" && u.Status != model.UserEnabled {
 		return a.refuse(ctx, name, now)
 	}
-	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled {
+	if !internal || len(u.PasswordHash) == 0 || u.InternalPasswordDisabled {
 		return a.external(ctx, name, password, now, &u)
 	}
 	key := cacheKey(u.PasswordHash, password)

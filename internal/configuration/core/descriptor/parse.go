@@ -87,6 +87,9 @@ type Patch struct {
 	// LDAP are the security.ldapSettings connections, written through
 	// access's LDAPSettings.
 	LDAP []accessapi.LDAPChange
+	// Security is the userLockPolicy and passwordSettings blocks, written
+	// through access's SecurityPolicies.
+	Security *SecurityChange
 	// Storage is the gcConfig and trashcanConfig sections, written through
 	// artifacts' StoragePolicies; nil when the document has neither.
 	Storage *StorageChange

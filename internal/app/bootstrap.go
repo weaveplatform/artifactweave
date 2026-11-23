@@ -83,6 +83,7 @@ func configurationOver(st *appsql.Store) configapi.API {
 		Configs:         st.Configs(),
 		AnonymousAccess: access.AnonymousAccessOf(st),
 		LDAP:            access.LDAPSettingsOf(st),
+		Security:        access.SecurityPoliciesOf(st),
 		StoragePolicies: artifacts.StoragePoliciesOf(st),
 		Projects:        access.ProjectsOf(st),
 	})

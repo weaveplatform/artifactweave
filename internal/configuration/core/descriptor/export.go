@@ -56,8 +56,10 @@ type exportDocument struct {
 }
 
 type exportSecurity struct {
-	Anonymous bool           `xml:"anonAccessEnabled"`
-	LDAP      []exportFields `xml:"ldapSettings>ldapSetting"`
+	Anonymous        bool           `xml:"anonAccessEnabled"`
+	UserLockPolicy   *exportFields  `xml:"userLockPolicy,omitempty"`
+	PasswordSettings *exportFields  `xml:"passwordSettings,omitempty"`
+	LDAP             []exportFields `xml:"ldapSettings>ldapSetting"`
 }
 
 type exportFields struct {

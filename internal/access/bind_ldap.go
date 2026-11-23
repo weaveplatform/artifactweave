@@ -17,7 +17,9 @@ type ldapSettings struct {
 	st Store
 }
 
-func (b ldapSettings) svc() ldap.Service { return ldap.Service{Configs: b.st.Configs()} }
+func (b ldapSettings) svc() ldap.Service {
+	return ldap.Service{Configs: b.st.Configs(), Settings: b.st.Settings()}
+}
 
 func (b ldapSettings) Connections(ctx context.Context) ([]accessapi.LDAPConnection, error) {
 	return b.svc().List(ctx) //nolint:wrapcheck // the service's errors are the contract's

@@ -720,6 +720,7 @@ const (
 	secGroups   = "/artifactory/api/security/groups"
 	secLockPol  = "/artifactory/api/security/userLockPolicy"
 	secExpiry   = "/artifactory/api/security/configuration/passwordExpirationPolicy"
+	secConfig   = "/artifactory/api/securityconfig"
 	secExpire   = "/artifactory/api/security/users/authorization/expirePassword"
 	secUnexpire = "/artifactory/api/security/users/authorization/unexpirePassword/"
 	secChangePw = "/artifactory/api/security/users/authorization/changePassword"
@@ -847,6 +848,9 @@ func securityStatusRows() []statusCase {
 		{putLock, secLockPol, "user", `{"enabled":false}`, 403},
 		{getExpiry, secExpiry, "admin", "", 200},
 		{getExpiry, secExpiry, "user", "", 403},
+		{"GET " + secConfig, secConfig, "admin", "", 200},
+		{"GET " + secConfig, secConfig, "user", "", 403},
+		{"GET " + secConfig, secConfig, "", "", 401},
 		{putExpiry, secExpiry, "admin", `{"enabled":"false","passwordMaxAge":"30"}`, 200},
 		{putExpiry, secExpiry, "admin", `{"passwordMaxAge":0}`, 400},
 		{putExpiry, secExpiry, "user", `{"enabled":false}`, 403},

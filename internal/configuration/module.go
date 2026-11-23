@@ -83,6 +83,7 @@ func New(d Deps) (*Module, error) {
 		Configs:         configs{st: d.Store},
 		AnonymousAccess: d.Access.AnonymousAccess,
 		LDAP:            d.Access.LDAP,
+		Security:        d.Access.Security,
 		StoragePolicies: d.StoragePolicies,
 		Projects:        d.Access.Projects,
 		Authenticator:   d.Access.Authenticator,

@@ -97,6 +97,17 @@ state alone cannot prove password preservation or clearing. XML descriptor GET
 is a required dependency; missing XML fails conformance. The full seven-resource
 P12 qualification remains #1837.
 
+The required `general-security` reference manages the one pinned
+`artifactory_general_security` resource. The driver creates it at the defaults, then
+changes anonymous access and the encryption policy one at a time (anonymous on, REQUIRED,
+anonymous off, UNSUPPORTED, back to SUPPORTED), applying, refreshing and requiring an empty
+plan at each step. `check-general-security.py` reads `/artifactory/api/securityconfig` and
+asks the server for the effect: a request without credentials is refused or served as the
+anonymous user, and the bootstrap administrator's clear-text and encrypted passwords log in
+over HTTP Basic or are refused as the policy says. The provider's delete sends no request,
+so the last step restores the defaults, and after `terraform destroy` the checker requires
+them to remain in force and the state to be empty.
+
 The required `trashcan` reference applies pinned `artifactory_trashcan_config` in two
 revisions (off with 3 days, on with 0 days), and after each requires an empty refreshed plan
 and runs `check-trashcan.py`. That script reads the XML descriptor back and checks what a

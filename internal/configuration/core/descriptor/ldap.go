@@ -281,6 +281,9 @@ func readExportSecurity(ctx context.Context, d Deps) (exportSecurity, error) {
 	if err != nil {
 		return out, fmt.Errorf("read export anonymous access: %w", err)
 	}
+	if err := exportPolicies(ctx, d, &out); err != nil {
+		return out, err
+	}
 	if out.LDAP, err = exportLDAP(ctx, d); err != nil {
 		return out, err
 	}

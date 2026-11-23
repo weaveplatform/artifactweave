@@ -19,7 +19,7 @@
 //   - Deps, which Apply and NewAPI take: the unit of work (platform/tx), the
 //     artifacts module's Repositories, Layouts and StoragePolicies, the
 //     configuration document port (platform/configdoc) and access's
-//     AnonymousAccess and LDAPSettings, all over one store.
+//     AnonymousAccess, SecurityPolicies and LDAPSettings, all over one store.
 //   - DownloadRedirectMinSize: the configuration document port.
 //
 // # Outputs
@@ -113,10 +113,16 @@
 // connections in the XML export's security element. CFG-02 adds urlBase and
 // the reverse proxy behind configuration/api.WebServer: its writes build a
 // Patch and Apply it under the guard after a current administrator recheck,
-// and the export writes both in artifactory.xsd's order. CFG-05
-// (https://github.com/weaveplatform/artifactweave/issues/1829) adds gcConfig
-// and trashcanConfig through artifacts' StoragePolicies, exported in XSD
-// order. CFG-07 (issue 1831) adds backups (exported in XSD BackupType
+// and the export writes both in artifactory.xsd's order. CFG-04 adds
+// security.userLockPolicy and security.passwordSettings through access's
+// SecurityPolicies, with the REST APIs' rules and both blocks in the export,
+// and refuses the other documented security fields with their reasons.
+// access serves the same values, with anonAccessEnabled, as
+// GET /api/securityconfig, which artifactory_general_security refreshes
+// from after writing through this PATCH.
+// CFG-05 (https://github.com/weaveplatform/artifactweave/issues/1829) adds
+// gcConfig and trashcanConfig through artifacts' StoragePolicies, exported
+// in XSD order. CFG-07 (issue 1831) adds backups (exported in XSD BackupType
 // order), systemMessageConfig and mailServer deletion by null, as the
 // artifactory_mail_server resource sends.
 //
@@ -149,6 +155,11 @@
 //   - ldap_test.go: every ldapSettings field mapped, outcomes through
 //     access's binding with a dry run and a second apply, a missing binding,
 //     planning and write failures, and the export's element order.
+//   - security_test.go: every policy field mapped, the refusals and their
+//     reasons, outcomes through access's binding with a dry run and a second
+//     apply, locks cleared by turning locking off, refused policies and
+//     failed writes that write nothing of their document, the export with
+//     the defaults, and the authenticator's cache dropped after a commit.
 //   - storage_test.go: gcConfig and trashcanConfig parsing and refusals,
 //     dry run, apply and reapply through the owner's binding, the owner's
 //     refusals in the descriptor's names, rollback with a failing later

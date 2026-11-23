@@ -5,10 +5,17 @@ const (
 	SettingUserLockPolicy           = "security.user_lock_policy"
 	SettingPasswordExpirationPolicy = "security.password_expiration_policy"
 	SettingPasswordPolicy           = "security.password_policy"
-	SettingBasicAuthEnabled         = "security.basic_auth_enabled"
-	SettingDefaultTokenExpiry       = "token.default_expiry"
-	SettingAnonymousAccess          = "security.anonymous_access"
-	SettingTrashcan                 = "trashcan"
+	// SettingBasicAuthEnabled is Access's
+	// security.authentication.basic-authentication-enabled, the "Disable
+	// Internal Password Login" switch: internal passwords only, never a
+	// directory's.
+	SettingBasicAuthEnabled = "security.basic_auth_enabled"
+	// SettingPasswordEncryption holds the password encryption policy
+	// (supported, required or unsupported).
+	SettingPasswordEncryption = "security.password_encryption"
+	SettingDefaultTokenExpiry = "token.default_expiry"
+	SettingAnonymousAccess    = "security.anonymous_access"
+	SettingTrashcan           = "trashcan"
 	// SettingFolderDownload holds the shared types' FolderDownloadSettings
 	// (folderDownloadConfig in the descriptor).
 	SettingFolderDownload  = "folder_download"

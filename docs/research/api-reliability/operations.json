@@ -2704,7 +2704,7 @@
     "spec": "access.openapi.yaml",
     "operation_id": "getBasicAuthenticationStatus",
     "state": "implemented",
-    "contract": "Returns whether usernames and passwords are accepted over HTTP Basic. When the switch is off, only access tokens and reference tokens authenticate (decision 0005). Requires a platform admin.",
+    "contract": "Returns whether internal passwords are accepted over HTTP Basic (the UI's \"Disable Internal Password Login\" unchecked). When the switch is off, internal passwords and their encrypted passwords are refused, while an enabled LDAP connection's passwords and access and reference tokens go on authenticating. Unset reads true; enabling the first LDAP connection writes it false unless it was ever written. Requires a platform admin.",
     "handler": "internal/access/adapters/http/access_identity.go: AccessService.GetBasicAuthenticationStatus",
     "direct_calls": [
       "authn.BasicAuthEnabled",
@@ -8975,6 +8975,34 @@
       "internal/access/core/identity/identity.go",
       "internal/access/core/token/token.go",
       "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/securityconfig",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "getSecurityConfig",
+    "state": "implemented",
+    "contract": "Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.",
+    "handler": "internal/access/adapters/http/securityconfig.go: SecurityAPI.GetSecurityConfig",
+    "direct_calls": [
+      "artgen.GetSecurityConfig200JSONResponse",
+      "s.adminStore",
+      "s.internalError",
+      "st.Settings"
+    ],
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
       "internal/access/adapters/sql/projects.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
@@ -20820,7 +20848,7 @@
     "spec": "access.openapi.yaml",
     "operation_id": "setBasicAuthenticationStatus",
     "state": "implemented",
-    "contract": "Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.",
+    "contract": "Turns acceptance of internal passwords over HTTP Basic on or off for the whole instance, from the next request on. A value written here is never overwritten by enabling an LDAP connection. Returns 200 with no body. Requires a platform admin.",
     "handler": "internal/access/adapters/http/access_identity.go: AccessService.SetBasicAuthenticationStatus",
     "direct_calls": [
       "fmt.Errorf",

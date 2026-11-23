@@ -92,6 +92,9 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 			res.Unchanged = append(res.Unchanged, "security.anonAccessEnabled")
 		}
 	}
+	if err := planSecurity(ctx, d, p, &res); err != nil {
+		return res, err
+	}
 	if err := planLDAP(ctx, d, p, &res); err != nil {
 		return res, err
 	}
@@ -139,6 +142,9 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 			if err != nil {
 				return fmt.Errorf("%s: %w", op.name, err)
 			}
+		}
+		if err := applySecurity(ctx, d, p); err != nil {
+			return err
 		}
 		if err := applyLDAP(ctx, d, p); err != nil {
 			return err

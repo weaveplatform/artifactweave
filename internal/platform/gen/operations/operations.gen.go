@@ -416,6 +416,7 @@ var Table = []Operation{
 	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/security/users/{userName}", OperationID: "getUserDetails", Cost: "ordinary", Idempotency: "safe"},
 	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/security/users/{userName}", OperationID: "updateUser", Cost: "expensive", Idempotency: "natural"},
 	{Service: "artifactory", Method: "PUT", Pattern: "/artifactory/api/security/users/{userName}", OperationID: "createOrReplaceUser", Cost: "expensive", Idempotency: "natural"},
+	{Service: "artifactory", Method: "GET", Pattern: "/artifactory/api/securityconfig", OperationID: "getSecurityConfig", Cost: "ordinary", Idempotency: "safe"},
 	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/signed/url", OperationID: "createSignedUrl", Cost: "expensive", Idempotency: "safe"},
 	{Service: "artifactory", Method: "POST", Pattern: "/artifactory/api/signed/url/key", OperationID: "replaceSignedUrlKey", Cost: "expensive", Idempotency: "key"},
 	{Service: "artifactory", Method: "DELETE", Pattern: "/artifactory/api/storage/{repoKey}/{itemPath}", OperationID: "deleteItemProperties", Handwritten: true, Cost: "expensive", Idempotency: "natural"},

@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/accesstest"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
+	platformsettings "github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
 const (
@@ -69,6 +70,12 @@ func ldapWorld(t *testing.T) identityWorld {
 	if err := w.db.Users().Create(t.Context(), accesstest.User{
 		Name: "reader", PasswordHash: cheapHash, Groups: []string{authn.ReadersGroup},
 	}); err != nil {
+		t.Fatal(err)
+	}
+	// These tests manage connections with passwords: internal password login
+	// set on explicitly stays on when a connection is enabled
+	// (TestAccInternalPasswordLogin covers the default turning it off).
+	if err := w.db.Settings().Put(t.Context(), platformsettings.SettingBasicAuthEnabled, true); err != nil {
 		t.Fatal(err)
 	}
 	return w

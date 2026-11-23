@@ -910,6 +910,10 @@ func (UnimplementedStrict) CreateOrReplaceUser(context.Context, CreateOrReplaceU
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetSecurityConfig(context.Context, GetSecurityConfigRequestObject) (GetSecurityConfigResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) CreateSignedUrl(context.Context, CreateSignedUrlRequestObject) (CreateSignedUrlResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }

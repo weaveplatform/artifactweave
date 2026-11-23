@@ -14105,6 +14105,32 @@ paths:
       x-idempotency: natural
       x-idempotency-natural:
         - path:userName
+  /api/securityconfig:
+    get:
+      description: Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.
+      operationId: getSecurityConfig
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecurityConfig'
+          description: The current settings.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get the general security settings
+      tags:
+        - security
+      x-cost: ordinary
+      x-idempotency: safe
   /api/signed/url:
     post:
       description: Not implemented; answers 501. It would return a time-limited URL that downloads one artifact without credentials.
@@ -28426,6 +28452,53 @@ components:
         summary:
           description: Optional within this object. One-line gem summary from the gemspec.
           type: string
+      type: object
+    SecurityConfig:
+      description: The general security settings, as one read. Admin only. Fields for features this server does not have are left out rather than reported as off.
+      properties:
+        anonAccessEnabled:
+          description: Required within this object. Whether requests without credentials act as the anonymous user.
+          type: boolean
+        basicAuthEnabled:
+          description: Required within this object. Whether internal passwords are accepted over HTTP Basic, the switch `/access/api/v1/config/security/authentication/basic_authentication_enabled` sets.
+          type: boolean
+        passwordSettings:
+          $ref: '#/components/schemas/SecurityConfigPasswordSettings'
+        userLockPolicy:
+          allOf:
+            - $ref: '#/components/schemas/UserLockPolicy'
+          description: Required within this object. The user lock policy `/api/security/userLockPolicy` reads.
+      required:
+        - anonAccessEnabled
+        - basicAuthEnabled
+        - passwordSettings
+        - userLockPolicy
+      type: object
+    SecurityConfigPasswordSettings:
+      description: Required within this object. The password encryption and expiration policies.
+      properties:
+        encryptionEnabled:
+          description: Required within this object. Whether the encrypted password is accepted, that is encryptionPolicy is not `UNSUPPORTED`.
+          type: boolean
+        encryptionPolicy:
+          description: Required within this object. `SUPPORTED` accepts the clear-text and the encrypted password, `REQUIRED` only the encrypted one outside the web UI, `UNSUPPORTED` only the clear-text one.
+          enum:
+            - SUPPORTED
+            - REQUIRED
+            - UNSUPPORTED
+          type: string
+        encryptionRequired:
+          description: Required within this object. Whether encryptionPolicy is `REQUIRED`.
+          type: boolean
+        expirationPolicy:
+          allOf:
+            - $ref: '#/components/schemas/PasswordExpirationPolicy'
+          description: Required within this object. The password expiration policy `/api/security/configuration/passwordExpirationPolicy` reads.
+      required:
+        - encryptionPolicy
+        - encryptionRequired
+        - encryptionEnabled
+        - expirationPolicy
       type: object
     SecurityInfoMessage:
       description: A confirmation message returned by several mutating operations.

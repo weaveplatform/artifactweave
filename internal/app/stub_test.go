@@ -180,6 +180,7 @@ var generatedRoutes = map[string]bool{
 	"PUT /artifactory/api/security/userLockPolicy":                                   true,
 	"GET /artifactory/api/security/configuration/passwordExpirationPolicy":           true,
 	"PUT /artifactory/api/security/configuration/passwordExpirationPolicy":           true,
+	"GET /artifactory/api/securityconfig":                                            true,
 	"POST /artifactory/api/security/users/authorization/expirePassword":              true,
 	"POST /artifactory/api/security/users/authorization/unexpirePassword/{userName}": true,
 	"POST /artifactory/api/security/users/authorization/expirePassword/{userName}":   true,
