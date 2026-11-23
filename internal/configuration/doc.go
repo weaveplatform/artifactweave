@@ -35,6 +35,10 @@
 //     Loggers. Settings returns the Settings from Deps. Close restores temporary
 //     logger levels and joins timer callbacks.
 //   - Store, what the module needs of the metadata store.
+//   - RepositoryLifecycle, over a Store alone, for the artifacts module built
+//     before this one: it drops a created or deleted repository's key from
+//     every backup's excludedRepositories in the repository change's
+//     transaction.
 //
 // # Invariants
 //

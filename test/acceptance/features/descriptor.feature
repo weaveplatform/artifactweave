@@ -91,11 +91,11 @@ Feature: Configuration descriptor
       localRepositories:
         refused-local:
           type: generic
-      backups:
-        nightly: {}
+      sumoLogicConfig:
+        enabled: true
       """
     Then the response status is 400
-    And the response body contains "sections not supported: backups"
+    And the response body contains "sections not supported: sumoLogicConfig"
     When I GET "/artifactory/api/repositories/refused-local" as admin
     Then the response status is 404
 
@@ -304,3 +304,174 @@ Feature: Configuration descriptor
     And the response body does not contain "private-fixture"
     When I GET "/artifactory/api/system/configuration"
     Then the response status is 401
+
+  Scenario: Backup definitions apply, reapply, update and delete with matching XML and CLI summaries
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      localRepositories:
+        backup-skip-a: {type: generic}
+        backup-skip-b: {type: generic}
+      backups:
+        nightly:
+          key: nightly
+          cronExp: "0 0 2 ? * MON-FRI"
+          enabled: true
+          retentionPeriodHours: 336
+          excludedRepositories: [backup-skip-a, backup-skip-b]
+          createArchive: false
+          excludeNewRepositories: true
+          sendMailOnError: false
+          precalculate: true
+          exportMissionControl: false
+      """
+    Then the response status is 200
+    And the response body is "13 changes to config merged successfully"
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the XML field "backups/backup[key=nightly]/cronExp" equals "0 0 2 ? * MON-FRI"
+    And the XML field "backups/backup[key=nightly]/retentionPeriodHours" equals "336"
+    And the XML field "backups/backup[key=nightly]/sendMailOnError" equals "false"
+    And the XML field "backups/backup[key=nightly]/precalculate" equals "true"
+    And the response body contains "<repositoryRef>backup-skip-b</repositoryRef>"
+    And the response body does not contain "excludeBuilds"
+    Given a file "backup.yaml" with content:
+      """
+      backups:
+        nightly:
+          cronExp: "0 0 2 ? * MON-FRI"
+          retentionPeriodHours: 336
+      """
+    When I apply descriptor file "backup.yaml" to the server store
+    Then the output contains "Unchanged: backups.nightly"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      backups:
+        nightly:
+          enabled: false
+          excludedRepositories: [backup-skip-a]
+      """
+    Then the response status is 200
+    When the registry restarts on the same data
+    And I GET "/artifactory/api/system/configuration" as admin
+    Then the XML field "backups/backup[key=nightly]/enabled" equals "false"
+    And the XML field "backups/backup[key=nightly]/excludedRepositories/repositoryRef" equals "backup-skip-a"
+    And the XML field "backups/backup[key=nightly]/retentionPeriodHours" equals "336"
+    When I DELETE "/artifactory/api/repositories/backup-skip-a" as admin
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/backup-skip-a" as admin with body:
+      """
+      {"rclass":"local","packageType":"generic"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the response body does not contain "<repositoryRef>backup-skip-a</repositoryRef>"
+    And the XML field "backups/backup[key=nightly]/retentionPeriodHours" equals "336"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      localRepositories:
+        backup-skip-c: {type: generic}
+      backups:
+        nightly:
+          cronExp: "not a schedule"
+      """
+    Then the response status is 400
+    And the response body contains "backups.nightly: "
+    When I GET "/artifactory/api/repositories/backup-skip-c" as admin
+    Then the response status is 404
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      backups:
+        nightly:
+          excludedRepositories: [missing-repository]
+      """
+    Then the response status is 400
+    And the response body contains "repository missing-repository does not exist"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      backups:
+        nightly: ~
+      """
+    Then the response status is 200
+    And the response body is "1 changes to config merged successfully"
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the response body does not contain "nightly"
+
+  Scenario: The system message applies and reapplies through PATCH and config apply without an XML element
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      systemMessageConfig:
+        enabled: true
+        message: "Maintenance tonight [https://status.invalid, status]"
+        title: Notice
+        titleColor: 99c27c
+      """
+    Then the response status is 200
+    And the response body is "4 changes to config merged successfully"
+    When the registry restarts on the same data
+    Given a file "message.yaml" with content:
+      """
+      systemMessageConfig:
+        enabled: true
+        title: Notice
+      """
+    When I apply descriptor file "message.yaml" to the server store
+    Then the output contains "Unchanged: systemMessageConfig"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      systemMessageConfig: ~
+      """
+    Then the response status is 400
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the response status is 200
+    And the response body does not contain "systemMessage"
+    And the response body does not contain "Maintenance tonight"
+
+  Scenario: Mail settings deliver a test mail and a quota warning, and fail truthfully when disabled, wrong or deleted
+    Given an SMTP server receives mail
+    When I PATCH the SMTP server's mail settings as admin with password "fixture"
+    Then the response status is 200
+    When I send a test mail to "operator@example.invalid" from the server store
+    Then the SMTP server receives a message to "operator@example.invalid" with subject "[CFG-07] Test" containing "Your Artifactory base URL is: https://registry.invalid/artifactory/"
+    When I PUT "/artifactory/api/security/users/mail-quota-owner" as admin with body:
+      """
+      {"email":"quota-owner@example.invalid","password":"quota-owner-password","admin":false}
+      """
+    Then the response status is 201
+    When I POST "/access/api/v1/projects" as admin with body:
+      """
+      {"project_key":"mailq","display_name":"Mail quota","storage_quota_bytes":100,"storage_quota_email_notification":true}
+      """
+    Then the response status is 201
+    When I PUT "/access/api/v1/projects/mailq/users/mail-quota-owner" as admin with body:
+      """
+      {"roles":["Project Admin"]}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/mailq-generic" as admin with body:
+      """
+      {"rclass":"local","packageType":"generic","projectKey":"mailq"}
+      """
+    Then the response status is 200
+    When the registry restarts on the same data
+    And I upload 75 quota bytes to "/artifactory/mailq-generic/item.bin"
+    Then the SMTP server receives a message to "quota-owner@example.invalid" with subject "[CFG-07] Project storage quota warning: mailq" containing "Artifactory: https://registry.invalid/artifactory/"
+    When I PATCH the SMTP server's mail settings as admin with password "wrong-mail-password"
+    Then the response status is 200
+    And sending a test mail to "operator@example.invalid" from the server store fails with "mail authentication: mail delivery failed"
+    And the output does not contain "wrong-mail-password"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      mailServer:
+        enabled: false
+      """
+    Then the response status is 200
+    And sending a test mail to "operator@example.invalid" from the server store fails with "Mail server configuration must be enabled with a defined host and port."
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      mailServer: ~
+      """
+    Then the response status is 200
+    And the response body is "1 changes to config merged successfully"
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the response body does not contain "mailServer"
+    And sending a test mail to "operator@example.invalid" from the server store fails with "Mail server configuration must be enabled with a defined host and port."
+    And the SMTP server has received 2 messages

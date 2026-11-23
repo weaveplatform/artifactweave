@@ -196,6 +196,8 @@ func proposeAffected(changes []change) affectedPlan {
 			shouldTestTerraformProviders:  provider,
 			shouldTestTerraformDeployment: deployment,
 			reason:                        "Only mapped Terraform inputs and documentation changed.",
+			units:                         deploymentUnits(changes),
+			coverpkg:                      modulePath + strings.TrimPrefix(harnessGuardTests, "."),
 		}
 	}
 	if owner == "" {
@@ -316,6 +318,35 @@ func formatSourceOwner(file string) (string, bool) {
 		}
 	}
 	return owner, true
+}
+
+// harnessGuardTests holds the TestUnit guards that read the Terraform inputs
+// as files: run.sh's apply and check handlers, the check-*.py inventories,
+// webhook-cases.json, the JFrog provider roots and lock files
+// (webhooks_test.go, projects_test.go, cleanup_test.go, replication_test.go,
+// descriptor_test.go), the scenario Makefiles under deploy/platform
+// (couplings_test.go) and every committed file's lane (kinds_test.go). They
+// catch a dropped handler or check that a provider apply would still pass,
+// and neither Terraform lane runs Go tests, so without this a deployment PR
+// would first fail them on the next full run (#1861). The whole package runs,
+// not a list of names, so a guard added for a new root needs no rule here.
+const harnessGuardTests = "./tools/citestselection"
+
+// deploymentUnits names what the unit jobs test and vet and the lint job
+// lints for a deployment change: the guard tests, and each package that
+// holds a changed Go file. A package under testdata is left out: the
+// Terraform fixture server there is Unix-only, so the Windows unit job could
+// not vet it, and the Linux lint job vets and lints it on every run instead.
+func deploymentUnits(changes []change) []string {
+	units := []string{harnessGuardTests}
+	for _, c := range changes {
+		if isDeploymentPath(c.path) && strings.HasSuffix(c.path, ".go") &&
+			!strings.Contains("/"+c.path, "/testdata/") {
+			units = append(units, "./"+path.Dir(c.path))
+		}
+	}
+	slices.Sort(units)
+	return slices.Compact(units)
 }
 
 func isDeploymentPath(file string) bool {

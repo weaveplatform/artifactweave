@@ -292,13 +292,16 @@ The descriptor is a patch:
 | `downloadRedirectConfig` | One mapping, not entries by name: `fileMinimumSize`, the smallest file in whole MB that a repository with `downloadRedirect` or `cdnRedirect` redirects, Artifactory's "Minimum Direct Cloud Storage Download Size". It takes precedence over `download.redirect.min_size` from the next download on. It cannot be set to null; set it to the size wanted instead |
 | `gcConfig` | One mapping: `cronExp`, the Quartz expression (six or seven fields, evaluated in UTC) on which every node's shared scheduler runs garbage collection. Unset, it is Artifactory's `0 0 /4 * * ?`. An expression that does not parse or never fires again is refused. Fires missed while no node ran are coalesced into one pass |
 | `trashcanConfig` | One mapping: `enabled` (a delete with it off is final) and `retentionPeriodDays` (how long a trashed item waits before a collection pass purges it; `0` purges at the next pass). Unset, the trash can is on for 14 days. A negative period, or one reaching back before February 2003, is refused; `allowPermDeletes` is refused as unknown |
+| `mailServer` | One mapping: `enabled`, `host`, `port`, `username`, `password`, `from`, `subjectPrefix`, `artifactoryUrl`, `tls` (STARTTLS) and `ssl` (implicit TLS), used for every mail the server sends. Omitted fields are kept and `null` clears a string; `password` is sealed and never returned. `enabled: false` stops mail and keeps the settings; `mailServer: null` deletes them and the password |
+| `backups` | Backup definitions by key: `cronExp` (Quartz, required), `enabled`, `retentionPeriodHours`, `createArchive`, `excludedRepositories` (repositories that exist once the document is applied; deleting a repository, also through the REST API, removes it from every backup), `excludeNewRepositories`, `sendMailOnError`, `precalculate` and `exportMissionControl`. The definitions are stored and exported; running, retaining and restoring backups belongs to P36, so no backup is written yet. `dir` is refused |
+| `systemMessageConfig` | One mapping: `enabled`, `message`, `title`, `titleColor`; `null` clears a string. It is not part of the XML descriptor, as in Artifactory's XSD |
+| `security` | `anonAccessEnabled` and the `ldapSettings` connections |
 
 `gcConfig`, `trashcanConfig` and their fields cannot be null, and the XML export
 (`GET /artifactory/api/system/configuration`) always carries both with the effective values.
-Any other section, such as `backups` or `quotaConfig`, is refused (`400`),
-naming it, and nothing in the descriptor is applied. P12 owns completion of the
-baseline descriptor, including security, backup and mail settings; P13 owns federated
-peer convergence. Settings that activate other products
+Any other section, such as `quotaConfig`, is refused (`400`), naming it, and nothing in the
+descriptor is applied. P12 owns completion of the baseline descriptor, including the
+remaining security settings; P13 owns federated peer convergence. Settings that activate other products
 follow their owning phases, including P21/P22 identity, P24 Lifecycle and P26/P27 security.
 Acceptance must apply a setting's actual behavior rather than merely store it.
 Artifactory's own bootstrap file, `artifactory.config.import.yml`, is a different format
@@ -308,6 +311,14 @@ full XML replacement and import/export. P36 also owns complete scheduled backup 
 The PATCH answers Artifactory's `<n> changes to config merged successfully`, where `<n>`
 counts the values in the document (each scalar, null and list element), changed or not.
 `config apply` prints a summary naming the entries created, updated, deleted and unchanged.
+
+`artifactweave mail test <address>` sends a test message through the stored mail
+settings, Artifactory's "Send Test Email". Like `config apply`, it opens the store with
+the server's configuration and master key and needs no running server. It prints
+`A test message has been sent successfully to '<address>'`, or fails with
+`Mail server configuration must be enabled with a defined host and port.` when mail is
+not configured, or with the SMTP stage that failed (connect, TLS, STARTTLS,
+authentication, sender, recipient or data). The password is never printed.
 
 ## Schema migrations
 

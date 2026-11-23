@@ -81,9 +81,7 @@ func (d WarningDelivery) Handle(ctx context.Context, item work.WorkItem) error {
 	server := snapshot.server
 	from := server.From
 	if from == "" {
-		// The primary XSD permits an absent sender. This is a local fallback,
-		// not a claimed vendor-generated address or an administrator identity.
-		from = "artifactweave@localhost"
+		from = mail.FallbackFrom
 	}
 	err = d.Sender.Send(ctx, mail.Server{
 		Host: server.Host, Port: server.Port, Username: server.Username, Password: server.Password,

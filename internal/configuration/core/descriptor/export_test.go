@@ -41,10 +41,15 @@ func xmlText(t *testing.T, n exportNode, path string) string {
 	t.Helper()
 	nodes := []exportNode{n}
 	for _, part := range strings.Split(path, "/") {
+		// name[field=value] selects the named children whose field has value.
+		name, predicate, _ := strings.Cut(strings.TrimSuffix(part, "]"), "[")
+		field, value, _ := strings.Cut(predicate, "=")
 		var next []exportNode
 		for _, node := range nodes {
 			for _, child := range node.Children {
-				if child.Name.Local == part {
+				if child.Name.Local == name && (predicate == "" || slices.ContainsFunc(child.Children, func(c exportNode) bool {
+					return c.Name.Local == field && c.Text == value
+				})) {
 					next = append(next, child)
 				}
 			}

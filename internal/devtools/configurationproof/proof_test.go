@@ -47,7 +47,7 @@ func TestAccConfigurationProofReadsActualSealedSecretLifecycle(t *testing.T) {
 	evidence := filepath.Join(t.TempDir(), "proof.json")
 	check := func(phase, expected string, wantOK bool) {
 		t.Helper()
-		err := Run(t.Context(), path, "owned", phase, evidence, master, expected)
+		err := Run(t.Context(), path, "proxy/owned", phase, evidence, master, expected)
 		if (err == nil) != wantOK {
 			t.Fatalf("phase %s proof success=%t, expected %t", phase, err == nil, wantOK)
 		}
@@ -86,12 +86,45 @@ func TestAccConfigurationProofReadsActualSealedSecretLifecycle(t *testing.T) {
 
 func TestUnitConfigurationProofCannotCreateMissingDatabase(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "absent.db")
-	err := Run(context.Background(), path, "owned", "created", filepath.Join(t.TempDir(), "proof.json"),
+	err := Run(context.Background(), path, "proxy/owned", "created", filepath.Join(t.TempDir(), "proof.json"),
 		"configuration-proof-master-key-32-bytes", "private-fixture")
 	if err == nil {
 		t.Fatal("checker opened a missing application database")
 	}
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatal("checker created an application database")
+	}
+}
+
+func TestAccConfigurationProofReadsTheMailServerPassword(t *testing.T) {
+	f := newProofFixture(t)
+	material, err := crypt.ParseVersionedKey(fixtureMaster)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, err := crypt.NewKeyring(material)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := platformsql.New(dialect.New(f.db, sqlite.Dialect, keys))
+	mail := configdoc.ConfigDocument{
+		Kind: configdoc.ConfigMailServer, Key: "mailserver", Enabled: true,
+		Document: []byte(`{"host":"smtp.invalid"}`), Secrets: map[string]string{"password": "mail-proof-fixture"},
+	}
+	if err := store.Configs().Put(t.Context(), mail); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(t.Context(), f.database, "mail_server/mailserver", "created", f.evidence, fixtureMaster, "mail-proof-fixture"); err != nil {
+		t.Fatal(err)
+	}
+	// The proxy's password must not satisfy the mail target.
+	if err := Run(t.Context(), f.database, "mail_server/mailserver", "created", f.evidence, fixtureMaster, fixturePassword); err == nil {
+		t.Fatal("mail proof read another section's secret")
+	}
+	if err := store.Configs().Delete(t.Context(), mail.Kind, mail.Key); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(t.Context(), f.database, "mail_server/mailserver", "deleted", f.evidence, fixtureMaster, ""); err != nil {
+		t.Fatal(err)
 	}
 }

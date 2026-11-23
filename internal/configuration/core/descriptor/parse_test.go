@@ -459,13 +459,12 @@ security:
         managerPassword: ${NOT_SET}
 mailServer:
   host: smtp.example
-backups: null
 offlineMode: false
 `
 	_, err := Parse([]byte(doc), noEnv)
-	want := "sections not supported: backups, offlineMode; " +
+	want := "sections not supported: offlineMode; " +
 		"the supported sections are localRepositories, remoteRepositories, virtualRepositories, federatedRepositories, " +
-		"proxies, propertySets, repoLayouts, gcConfig, trashcanConfig, downloadRedirectConfig, mailServer, security, urlBase"
+		"proxies, propertySets, repoLayouts, gcConfig, trashcanConfig, downloadRedirectConfig, mailServer, security, urlBase, backups, systemMessageConfig"
 	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), want) {
 		t.Fatalf("%v", err)
 	}
@@ -508,7 +507,7 @@ func TestUnitParseErrors(t *testing.T) {
 		"unknown block field":  "localRepositories:\n  x:\n    xray:\n      enabled: true\n      depth: 2\n",
 		"block scalar":         "localRepositories:\n  x:\n    xray: yes-please\n",
 		"unknown in new block": "localRepositories:\n  x:\n    downloadRedirect:\n      enabled: true\n      ttl: 2\n",
-		"unapplied section":    "localRepositories: {}\nbackups: {}\n",
+		"unapplied section":    "localRepositories: {}\nsumoLogicConfig: {}\n",
 		"nested block":         "remoteRepositories:\n  x:\n    vcs:\n      git:\n        colour: blue\n",
 		"key mismatch":         "localRepositories:\n  x:\n    key: y\n",
 		"rclass mismatch":      "localRepositories:\n  x:\n    rclass: remote\n",
