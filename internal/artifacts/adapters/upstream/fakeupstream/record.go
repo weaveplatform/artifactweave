@@ -27,8 +27,11 @@ type Request struct {
 	At                        time.Time
 	Authorized                bool
 	VerifiedClientCertificate bool
-	matches                   func(string, string) bool
-	pathMatches               func(string) bool
+	// RemoteAddr is the client end of the connection the request arrived on,
+	// so a test can tell a reused connection from a replay on a new one.
+	RemoteAddr  string
+	matches     func(string, string) bool
+	pathMatches func(string) bool
 }
 
 // HeaderMatches reports whether the request's first value of header name equals
@@ -84,6 +87,7 @@ func (s *Server) record(r *http.Request, allowed bool) {
 		Method: r.Method, Path: s.redact(r.URL.Path), Host: s.redact(r.Host),
 		Header: header, Query: query, At: s.options.Now(), Authorized: allowed,
 		VerifiedClientCertificate: r.TLS != nil && len(r.TLS.VerifiedChains) != 0,
+		RemoteAddr:                r.RemoteAddr,
 		pathMatches: func(path string) bool {
 			mac := hmac.New(sha256.New, s.key[:])
 			_, _ = mac.Write([]byte(path))

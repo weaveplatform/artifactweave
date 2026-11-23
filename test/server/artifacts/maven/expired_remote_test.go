@@ -41,6 +41,19 @@ func expiredFetchCount(w *remoteWorld, path string) func() int64 {
 	return calls.Load
 }
 
+// originExchanges describes each request the origin recorded for path, in
+// arrival order, by method, connection and conditional validators.
+func originExchanges(w *remoteWorld, path string) []string {
+	var out []string
+	for _, r := range w.up.Requests() {
+		if r.Path == "/"+path {
+			out = append(out, fmt.Sprintf("%s from %s If-None-Match=%q If-Modified-Since=%q",
+				r.Method, r.RemoteAddr, r.Header.Get("If-None-Match"), r.Header.Get("If-Modified-Since")))
+		}
+	}
+	return out
+}
+
 func expiredReadAlone(t *testing.T, w *remoteWorld) {
 	t.Helper()
 	if err := w.rt.Store.Permissions().Update(t.Context(), accesstest.Permission{
@@ -65,7 +78,14 @@ func TestAccMavenExpiredRemoteRetainsFiles(t *testing.T) {
 						w := newMavenRemoteWorld(t)
 						w.c.RetrievalCachePeriodSecs = new(0)
 						w.c.AssumedOfflinePeriodSecs = new(0)
-						w.c.SocketTimeoutMillis = new(100)
+						if answer == "timeout" {
+							// Only the timeout answer gets a short socket timeout, set
+							// before priming because the cache key carries the settings
+							// revision. A loaded race build can take over 100 ms to
+							// relay a prompt 404 or 500, which would then be tested as
+							// a timeout the subtest did not ask for.
+							w.c.SocketTimeoutMillis = new(100)
+						}
 						w.update()
 						path, data, contentType := expiredSnapshot, sourceJAR(t, "retained bytes"), "application/java-archive"
 						if metadata {
@@ -96,7 +116,7 @@ func TestAccMavenExpiredRemoteRetainsFiles(t *testing.T) {
 							defer gate.Release()
 							w.up.Set("/"+path, fakeupstream.Resource{Fault: fakeupstream.Fault{BeforeHeaders: gate}})
 						}
-						requests := w.up.Count("", "/"+path)
+						requests := len(originExchanges(w, path))
 						beforeFetch := fetches()
 						got := w.request(method, "/artifactory/remote/"+path, "reader", "")
 						remoteStatus(t, got, http.StatusOK)
@@ -106,13 +126,13 @@ func TestAccMavenExpiredRemoteRetainsFiles(t *testing.T) {
 						if method == http.MethodHead && got.Body.Len() != 0 {
 							t.Fatal("HEAD returned a body")
 						}
-						// net/http may replay across more than one reused connection.
-						// The contract is one policy fetch, not a fixed physical cap.
-						delta := w.up.Count("", "/"+path) - requests
-						if fetches()-beforeFetch != 1 || delta < 1 || (answer != "timeout" && delta != 1) {
-							t.Fatal("origin policy/physical exchanges", fetches()-beforeFetch, delta)
+						// One policy fetch is one origin exchange for every answer: the
+						// remote client never leaves net/http a failed first read on a
+						// reused connection to replay (#1866). Each record names its
+						// connection, so a replay shows as a second one.
+						if exchanges := originExchanges(w, path)[requests:]; fetches()-beforeFetch != 1 || len(exchanges) != 1 {
+							t.Fatal("origin policy fetches and physical exchanges", fetches()-beforeFetch, exchanges)
 						}
-						t.Logf("revalidation: one logical fetch, %d physical exchanges", delta)
 						after, err := w.rt.Store.RemoteCache().Read(t.Context(), before.Token.Key)
 						if err != nil || !after.NegativeUntil.IsZero() {
 							t.Fatal("retained file became a negative", after, err)
