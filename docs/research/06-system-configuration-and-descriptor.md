@@ -648,6 +648,50 @@ cannot be deleted, so the settings stay as last applied.
   It is not in the XML descriptor (see "Top-level elements"). The banner is rendered by
   the P39 UI, which reads it through the configuration module's `SystemMessage` read
   contract.
+- **Keys shared across sections** ([#1872](https://github.com/weaveplatform/artifactweave/issues/1872)).
+  An XML document's IDs share one namespace. In 7.161.26's `artifactory.xsd` the
+  `xs:ID` keys are `RepoType.key` (every repository class), `ProxyType.key`,
+  `ReverseProxyType.key`, `BackupType.key`, `PropertySetType.name`,
+  `RepoLayoutType.name`, `KeyPairType.key`, `RetentionPolicyType.key` and
+  `SystemPropertyType.key`/`value`; the JAXB class `LdapSetting` marks its `key` `@XmlID`
+  too, as 6.20's XSD declared it. The `IDREF`s that point at them are `proxyRef`,
+  `propertySetRef`, `repoLayoutRef`, `remoteRepoLayoutRef`, `primaryKeyPairRef`,
+  `secondaryKeyPairRef`, `defaultDeploymentRepo`, `remoteRepo` and `repositoryRef`
+  (virtual members, backup exclusions). 7.x saves its descriptor only after validating it
+  against the XSD ([S] 7.161.26 `CentralConfigServiceImpl.validateDescriptor`,
+  `config.descriptor.xsd.validation.enabled` defaulting to true), so a PATCH that leaves
+  two equal IDs answers 400 and writes nothing. 7.x keeps repositories and LDAP connections
+  outside that descriptor (repositories in its repository configuration store,
+  `ConfigDescriptorRepoUtils.cleanupConfigDescriptorRepositories`; LDAP in Access), and
+  its `isKeyAvailable` checks only proxies, reverse proxies, backups, property sets,
+  layouts, key pairs and retention policies; 6.20's also checked repositories and LDAP
+  connections ([S] 6.20 `CentralConfigDescriptorImpl.isKeyAvailable`). artifactweave's
+  export writes repositories and LDAP connections in the same document, so the descriptor's
+  one write path (PATCH, `config apply`, the bootstrap descriptor and `POST
+  /api/system/configuration/webServer`) treats all of them as one namespace
+  ([DV-203](../implementation/deviations.md#api-behaviour)): a patch that
+  would leave a key in two of the repository sections, `proxies`, the reverse proxy,
+  `backups`, `propertySets`, `repoLayouts` and `security.ldapSettings` answers 400
+  `<section>.<key>: the ID '<key>' is already used by <section>.<key>` and writes nothing,
+  dry runs included. The check reads the state the whole patch leaves, so a key the patch
+  frees may be reused in it, and repositories or LDAP connections created through their
+  REST APIs count. **[I]** 7.x's own refusal is its XSD validator's: probably `Found
+  config violations: cvc-id-2: There are multiple occurrences of ID value '<key>'.`, the
+  JDK's message, which no capture shows; the text here extends 7.x's
+  `UniqueXmlIdValidator` wording ("The ID '%s' is already used.") with the holder. Keys
+  compare exactly, as XML IDs do. 7.x's reservation of `direct`, `apache` and `nginx`
+  for reverse proxies applies only to its UI's add paths, not to the PATCH, and is not
+  adopted. `ldapGroupSettings` names are not IDs: 6.20's XSD types `LdapGroupSettingType.name`
+  `xs:string`, and 7.161.26's `LdapGroupSetting` does not mark it `@XmlID`, so a group setting
+  may repeat any other section's key.
+- **Keys the REST APIs share with the descriptor.** The repositories API and access's
+  LDAP settings API check a key only against their own kind, as 7.161.26's do
+  (`RepositoryNameRestValidator` consults only the repository store), so they can store
+  a key a descriptor section holds. Such a clash does not block an unrelated patch;
+  only a patch that adds a holder is refused. The export stays one namespace: the
+  sections 7.x's descriptor holds keep the ID, a repository sharing it is left out, and
+  an LDAP connection sharing a key with either is left out, as 7.161.26's export carries
+  neither. References to a left-out repository keep its key.
 - A successful patch answers `<n> changes to config merged successfully` as `text/plain`,
   with no newline after it, `<n>` counted as "Semantics" describes ([J] RTFACT-31174,
   RTFACT-17040; [S] `MapToDiffConverter`). `artifactweave config apply` prints its own
