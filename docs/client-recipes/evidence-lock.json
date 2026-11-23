@@ -36,7 +36,7 @@
   "test/acceptance/clients/conda.Dockerfile": "f059c45ac5fcaec26f96c7a0e733ada6c60ff41700c9bc23d0b2e2effedcbeeb",
   "test/acceptance/clients/dart.Dockerfile": "f8086906362723fba038e5773f1674fe8a018412f8964dbae423fd011d68af85",
   "test/acceptance/clients/debian.Dockerfile": "fec9c9ee9a6a607a78fd6ecf0913b748bb7c92a737af0829a23dbcc9ec3d1671",
-  "test/acceptance/clients/dotnet-10/Dockerfile": "00243e93dc51bdbb02b1569b4e4feda3f4b271db49dfa59dce43ba0b51385ac5",
+  "test/acceptance/clients/dotnet-10/Dockerfile": "bf766c90d1719e6435323bec0116a0e95866e3d2eef1c08e32451c0f0b5a0098",
   "test/acceptance/clients/dotnet.Dockerfile": "d74cb57120a43d32f9c1298441df7aedc586772d6dd4cb9c094fb7dd44cc03d4",
   "test/acceptance/clients/fedora.Dockerfile": "306ae4f4df207ae4d4489ef7db74bbe127c400a1db989c355dba7775a29d30dc",
   "test/acceptance/clients/frogml/Dockerfile": "fb440729863ed394247d812b0cc2d319b2bff74c6edc55f4a1d5d13d7009e5ee",
