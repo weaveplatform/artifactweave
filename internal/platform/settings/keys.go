@@ -13,6 +13,12 @@ const (
 	// SettingPasswordEncryption holds the password encryption policy
 	// (supported, required or unsupported).
 	SettingPasswordEncryption = "security.password_encryption"
+
+	// SettingHideUnauthorizedResources holds the descriptor's
+	// security.hideUnauthorizedResources, which turns a download's 401 and
+	// 403 into 404 on every repository (decision 0008, R4).
+	SettingHideUnauthorizedResources = "security.hide_unauthorized_resources"
+
 	SettingDefaultTokenExpiry = "token.default_expiry"
 	SettingAnonymousAccess    = "security.anonymous_access"
 	SettingTrashcan           = "trashcan"

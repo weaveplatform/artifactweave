@@ -115,8 +115,8 @@ func unfound(
 	}
 	switch {
 	case req.Path != "" && !req.IsFolder:
-		// hideGlobal is false: artifactweave has no security-wide
-		// hideUnauthorizedResources yet.
+		// hideGlobal is false: the global setting chooses between the
+		// answers when it is written (virtual.Answer, httpkit.Hidden).
 		//nolint:wrapcheck // an apierror.Error is the answer
 		return virtual.Answer(c, resourcePath(req.Path), res, caller.Anonymous, false)
 	case res.Forbidden != nil:
@@ -235,26 +235,34 @@ func mismatched(c repo.Config, req ItemRequest) error {
 // the path suffix. An anonymous caller is answered by
 // HttpArtifactoryResponse.sendAuthorizationRequired instead
 // (shouldSendAuthRequired), which writes 401 "Unauthorized" in place of the
-// reason, and apierror adds its Basic challenge. Other requests keep
-// httpkit.Denied.
+// reason, and apierror adds its Basic challenge. Either is an
+// apierror.Hideable whose Hidden answer is the 404 "Resource not found",
+// with the path suffix, that respondResourceNotFound gives in their place
+// on every repository class while the global hideUnauthorizedResources is
+// on (shouldHideUnauthorisedResponse 1499-1518; #1903). Other requests
+// keep httpkit.Denied, as 7.x answers a folder through its directory
+// listing.
 func refused(c repo.Config, req ItemRequest, caller kernel.Principal) error {
 	if !fileRequest(c, req) {
 		return httpkit.Denied(caller)
 	}
-	if caller.Anonymous {
-		return apierror.New(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
-	}
 	p := resourcePath(req.Path)
-	checked := req.Key
-	if c.Class == repo.Remote {
-		checked = c.Key + model.CacheSuffix
+	var answer *apierror.Error
+	if caller.Anonymous {
+		answer = apierror.New(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+	} else {
+		checked := req.Key
+		if c.Class == repo.Remote {
+			checked = c.Key + model.CacheSuffix
+		}
+		answer = apierror.New(http.StatusForbidden, fmt.Sprintf(
+			"Download request for repo:path '%s:%s' is forbidden for user: '%s'.",
+			checked,
+			p,
+			caller.Name,
+		)+pathSuffix(req.Key, p))
 	}
-	return apierror.New(http.StatusForbidden, fmt.Sprintf(
-		"Download request for repo:path '%s:%s' is forbidden for user: '%s'.",
-		checked,
-		p,
-		caller.Name,
-	)+pathSuffix(req.Key, p))
+	return apierror.Hide(answer, apierror.New(http.StatusNotFound, "Resource not found"+pathSuffix(req.Key, p)))
 }
 
 // checksumRefused answers a checksum request for a file the caller may not

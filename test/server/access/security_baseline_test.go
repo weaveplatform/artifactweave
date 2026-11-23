@@ -133,7 +133,8 @@ func securityBaseline(t *testing.T, backend string) {
 	if got := w.get(secExpiry); got != "{\"enabled\":true,\"notifyByEmail\":false,\"passwordMaxAge\":30}\n" {
 		t.Fatalf("expiration policy through REST: %q", got)
 	}
-	want := "<security><anonAccessEnabled>false</anonAccessEnabled>" +
+	want := "<security><hideUnauthorizedResources>false</hideUnauthorizedResources>" +
+		"<anonAccessEnabled>false</anonAccessEnabled>" +
 		"<userLockPolicy><enabled>true</enabled><loginAttempts>2</loginAttempts></userLockPolicy>" +
 		"<passwordSettings><encryptionPolicy>supported</encryptionPolicy><expirationPolicy><enabled>true</enabled>" +
 		"<passwordMaxAge>30</passwordMaxAge><notifyByEmail>false</notifyByEmail></expirationPolicy></passwordSettings>" +
@@ -214,7 +215,7 @@ func securityBaseline(t *testing.T, backend string) {
 	// The general security read artifactory_general_security refreshes from
 	// reports the same state, administrators only.
 	if got := strings.TrimSpace(w.get(securityConfigPath)); got != `{"anonAccessEnabled":false,"basicAuthEnabled":true,`+
-		`"passwordSettings":{"encryptionEnabled":false,"encryptionPolicy":"UNSUPPORTED","encryptionRequired":false,`+
+		`"hideUnauthorizedResources":false,"passwordSettings":{"encryptionEnabled":false,"encryptionPolicy":"UNSUPPORTED","encryptionRequired":false,`+
 		`"expirationPolicy":{"enabled":false,"notifyByEmail":false,"passwordMaxAge":1}},`+
 		`"userLockPolicy":{"enabled":false,"loginAttempts":3}}` {
 		t.Fatalf("security configuration %s", got)

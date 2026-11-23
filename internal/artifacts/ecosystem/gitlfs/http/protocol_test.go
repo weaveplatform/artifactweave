@@ -25,6 +25,7 @@ import (
 	gitlfshttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/gitlfs/http"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
 )
 
@@ -79,6 +80,9 @@ func newFixture(t *testing.T, class repo.Class) *fixture {
 	}
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(""))
+	// The global hideUnauthorizedResources, read from db as the router
+	// reads it from the store.
+	r.Use(httpkit.HideUnauthorized(accesstest.Over(t, db).API().Security.HidesUnauthorized))
 	r.Use(accesstest.Over(t, db).Middleware(t, true, func(r *http.Request) kernel.Principal {
 		if r.Header.Get("X-User") == kernel.AnonymousUser {
 			return kernel.Principal{Name: kernel.AnonymousUser, Anonymous: true}

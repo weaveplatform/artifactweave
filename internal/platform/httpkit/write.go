@@ -24,6 +24,9 @@ func WriteErr(w http.ResponseWriter, r *http.Request, err error) {
 // envelope independently of the router. Like WriteErr, it records unexpected
 // causes and aborts matching request cancellation before publishing a response.
 func WriteErrProfile(w http.ResponseWriter, r *http.Request, profile apierror.Profile, err error) {
+	// A refusal that hideUnauthorizedResources conceals is decided here, the
+	// one place every handler's answer passes with its request.
+	err = Hidden(r.Context(), err)
 	// A disconnected client can cancel a concurrent lookup after another
 	// request was refused. Preserve the cause without inventing a server 500.
 	if errors.Is(err, context.Canceled) && errors.Is(r.Context().Err(), context.Canceled) {

@@ -42,7 +42,7 @@ func TestMail(
 		sender = mail.Sender{}
 	}
 	confirmation, err := system.MailTest{
-		Mail: configurationOver(st).Mail, Sender: sender, InTx: st.InTx, Now: time.Now,
+		Mail: configurationOver(st, cfg.Configuration()).Mail, Sender: sender, InTx: st.InTx, Now: time.Now,
 	}.Send(ctx, recipient)
 	if err != nil {
 		return fmt.Errorf("mail test: %w", err)

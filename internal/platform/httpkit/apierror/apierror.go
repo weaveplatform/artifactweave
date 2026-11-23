@@ -94,6 +94,26 @@ type Error struct {
 	ByProfile map[Profile]*Error
 }
 
+// Hideable is a refusal with the answer that hides it: 7.x answers a
+// download it refuses with 401 or 403 as 404 "Resource not found" while the
+// security configuration's hideUnauthorizedResources is on
+// (DownloadServiceImpl.respondResourceNotFound and
+// shouldHideUnauthorisedResponse, 7.161.26). It unwraps to Refusal, so
+// errors.Is and errors.As, Write among them, see the refusal alone: only
+// httpkit.Hidden, which reads the setting for the request, gives Hidden.
+type Hideable struct {
+	Refusal error
+	Hidden  *Error
+}
+
+// Hide returns refusal with hidden as the answer that hides it.
+func Hide(refusal error, hidden *Error) error { return &Hideable{Refusal: refusal, Hidden: hidden} }
+
+func (h *Hideable) Error() string { return h.Refusal.Error() }
+
+// Unwrap returns the refusal.
+func (h *Hideable) Unwrap() error { return h.Refusal }
+
 // Error returns Message alone, without Status or Code, so an Error that is
 // wrapped or logged reads as the text its envelope gives the client; Write
 // reads the other fields from the struct.

@@ -733,7 +733,8 @@ Notes:
   `propertySets` → `descriptor_property_sets`; `repoLayouts` → `descriptor_layouts`;
   `backups`, `mailServer`, `gcConfig`, `trashcanConfig`, `quotaConfig`,
   `systemMessageConfig`, `replicationsConfig` → `settings` or their own table;
-  `security.anonAccessEnabled`, `userLockPolicy`, `passwordSettings` → `settings`;
+  `security.anonAccessEnabled`, `hideUnauthorizedResources`, `userLockPolicy`,
+  `passwordSettings` → `settings`;
   `security.ldapSettings`, `ldapGroupSettings`, `samlSettings`, `oauthSettings`,
   `crowdSettings`, `httpSsoSettings` → the identity-provider tables. The XML descriptor is
   rendered from the same tables.

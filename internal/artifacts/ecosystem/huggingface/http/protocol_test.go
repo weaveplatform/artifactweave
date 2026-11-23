@@ -37,6 +37,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
 )
 
@@ -128,6 +129,9 @@ func newFixture(t *testing.T, class repo.Class, setup ...func(*fixture) *source.
 	api := accesstest.Over(t, f.db).API()
 	r := chi.NewRouter()
 	r.Use(baseurl.Middleware(""))
+	// The global hideUnauthorizedResources, read from f.db as the router
+	// reads it from the store.
+	r.Use(httpkit.HideUnauthorized(api.Security.HidesUnauthorized))
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			name := r.Header.Get("X-User")

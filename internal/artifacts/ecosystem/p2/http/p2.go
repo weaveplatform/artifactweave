@@ -261,7 +261,7 @@ func (s p2Items) serveP2Virtual(
 	switch {
 	case listed && members[i].Class != repo.Virtual:
 		if !acc.File(members[i], name, accessapi.ActionRead) {
-			httpkit.WriteErr(w, r, itemkit.VirtualRefused(c, req.Path, p))
+			httpkit.WriteErr(w, r, itemkit.VirtualReadRefused(c, req.Path, p))
 			return
 		}
 	case !listed:

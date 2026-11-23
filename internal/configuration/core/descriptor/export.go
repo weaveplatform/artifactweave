@@ -62,6 +62,10 @@ type exportDocument struct {
 }
 
 type exportSecurity struct {
+	// HideUnauthorized is SecurityType's first element in 7.161.26's
+	// artifactory.xsd (SecurityDescriptor propOrder), ahead of the elements
+	// below that left SecurityType for Access (#1905).
+	HideUnauthorized *bool          `xml:"hideUnauthorizedResources,omitempty"`
 	Anonymous        bool           `xml:"anonAccessEnabled"`
 	UserLockPolicy   *exportFields  `xml:"userLockPolicy,omitempty"`
 	PasswordSettings *exportFields  `xml:"passwordSettings,omitempty"`

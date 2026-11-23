@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
 // errNoPackageStore is a kit built without the router kit's store
@@ -84,9 +85,22 @@ func (s *Kit) VirtualGate(
 	case err != nil:
 		httpkit.WriteErr(w, r, s.ItemError(r.Context(), op, err))
 	case !ok:
-		httpkit.WriteErr(w, r, VirtualRefused(c, path, p))
+		httpkit.WriteErr(w, r, VirtualReadRefused(c, path, p))
 	}
 	return err == nil && ok
+}
+
+// VirtualReadRefused is VirtualRefused for a download: its 401 or 403 is an
+// apierror.Hideable whose Hidden answer is the 404 that the global
+// hideUnauthorizedResources gives in its place, as
+// shouldHideUnauthorisedResponse reads the global setting for every
+// download (1499-1518, 7.161.26; #1903).
+func VirtualReadRefused(c repo.Config, path string, caller kernel.Principal) error {
+	refusal := VirtualRefused(c, path, caller)
+	if c.HideUnauthorizedResources != nil && *c.HideUnauthorizedResources {
+		return refusal
+	}
+	return apierror.Hide(refusal, virtual.Hidden(c, path))
 }
 
 // VirtualRefused is the answer to a caller VirtualReads refuses path
@@ -94,6 +108,9 @@ func (s *Kit) VirtualGate(
 // always given, or, while c's hideUnauthorizedResources is on, 7.x's 404
 // "Resource not found" that hides the refusal (decision 0008, R4;
 // DownloadServiceImpl.shouldHideUnauthorisedResponse 1499-1518, 7.161.26).
+// A deployment through c answers so too; the global setting does not hide
+// it, since 7.x reads that setting for downloads [I: the deploy handlers
+// that would read it otherwise are closed code].
 func VirtualRefused(c repo.Config, path string, caller kernel.Principal) error {
 	if c.HideUnauthorizedResources != nil && *c.HideUnauthorizedResources {
 		return virtual.Answer(c, path, virtual.Resolution{Forbidden: &virtual.Denial{}}, //nolint:wrapcheck // the answer itself

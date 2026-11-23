@@ -461,6 +461,10 @@ components:
           description: Required within this object. Whether internal passwords are accepted over HTTP Basic, the
             switch `/access/api/v1/config/security/authentication/basic_authentication_enabled` sets.
           type: boolean
+        hideUnauthorizedResources:
+          description: Required within this object. Whether a download refused with 401 or 403 answers 404 instead,
+            on every repository, as the configuration descriptor's `security.hideUnauthorizedResources` sets.
+          type: boolean
         passwordSettings:
           $ref: '#/components/schemas/SecurityConfigPasswordSettings'
         userLockPolicy:
@@ -470,6 +474,7 @@ components:
       required:
       - anonAccessEnabled
       - basicAuthEnabled
+      - hideUnauthorizedResources
       - passwordSettings
       - userLockPolicy
       type: object
@@ -2495,8 +2500,9 @@ paths:
   /api/securityconfig:
     get:
       description: Returns the general security settings in one read, the read `artifactory_general_security`
-        refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration
-        descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.
+        refreshes from. Admin only. Its anonymous access, hiding and encryption policy are the values the
+        configuration descriptor's `security.anonAccessEnabled`, `security.hideUnauthorizedResources` and
+        `security.passwordSettings.encryptionPolicy` write.
       operationId: getSecurityConfig
       responses:
         '200':

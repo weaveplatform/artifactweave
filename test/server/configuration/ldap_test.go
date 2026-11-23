@@ -128,7 +128,8 @@ func TestAccLDAPDescriptorSharesAccessConnections(t *testing.T) {
 	rec := w.do(http.MethodGet, configPath, "admin", "")
 	xml := rec.Body.String()
 	if rec.Code != http.StatusOK || strings.Contains(xml, ldapSecret) || strings.Contains(xml, "managerPassword") ||
-		!strings.Contains(xml, "<security><anonAccessEnabled>false</anonAccessEnabled>"+
+		!strings.Contains(xml, "<security><hideUnauthorizedResources>false</hideUnauthorizedResources>"+
+			"<anonAccessEnabled>false</anonAccessEnabled>"+
 			"<userLockPolicy><enabled>false</enabled><loginAttempts>5</loginAttempts></userLockPolicy>"+
 			"<passwordSettings><encryptionPolicy>supported</encryptionPolicy><expirationPolicy><enabled>false</enabled>"+
 			"<passwordMaxAge>60</passwordMaxAge><notifyByEmail>true</notifyByEmail></expirationPolicy></passwordSettings>"+

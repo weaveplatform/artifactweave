@@ -46,7 +46,9 @@
 //   - resolve.go: Resolution and Denial, what a download's walk over the
 //     members found and the first member that refused the caller Read
 //     (R3), and Answer, the item route's 404, 403 or 401 for a walk that
-//     found nothing, under the virtual's hideUnauthorizedResources (R4).
+//     found nothing, under the virtual's hideUnauthorizedResources (R4);
+//     a refusal it does not hide is an apierror.Hideable whose Hidden
+//     answer the global setting gives (Hidden; #1903).
 //   - deploy.go: DeployTarget, the local or federated repository a deploy
 //     to a virtual repository lands in, or ErrNoDeployTarget, which the
 //     item routes answer with 7.x's 405 (decision 0008, R6).

@@ -96,7 +96,8 @@ records the boundary, strict HTTP-cache controls and modern-version limits.
 ## R4. Hiding unauthorized resources
 
 `hideUnauthorizedResources`, on the virtual or globally, turns a walk's 401/403
-into 404. Without hiding, anonymous denied requests challenge normally. Protocol
+into 404. The global setting (`security.hideUnauthorizedResources` in the
+descriptor) hides a direct local or remote download's refusal too. Without hiding, anonymous denied requests challenge normally. Protocol
 handlers retain their native envelopes and early authentication gates; NuGet's
 forced-auth virtual challenges before its resource routing. The challenge body
 and closed package-handler details remain [I] ([status entry](https://github.com/weaveplatform/artifactweave/issues/216#issuecomment-6927146188)).

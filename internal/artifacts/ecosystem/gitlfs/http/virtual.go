@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	format "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/gitlfs"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
@@ -73,13 +74,20 @@ func (h handler) virtualMember(r *http.Request, obj batchObject) (*http.Request,
 // none, since a package handler counts an unreadable member as not found
 // (decision 0008, R3). An anonymous caller who may read path in no member
 // gets errChallenge instead, as 7.x answers an anonymous caller its walk
-// refused (R4) [I]; a virtual repository that hides unauthorized resources
-// answers the 404 to it too. A virtual repository with no member to read
-// refused nobody, so it answers the 404.
+// refused (R4) [I]; a virtual repository that hides unauthorized
+// resources, or a security configuration that does (#1903), answers the
+// 404 to it too. A virtual repository with no member to read refused
+// nobody, so it answers the 404.
 func (h handler) unserved(r *http.Request, path string, readable bool) error {
 	v := pkgroute.RequestFrom(r).Repo
 	p, _ := kernel.FromContext(r.Context())
 	if readable || !p.Anonymous || v.HideUnauthorizedResources != nil && *v.HideUnauthorizedResources {
+		return kernel.ErrNotFound
+	}
+	switch hide, err := httpkit.Hides(r.Context()); {
+	case err != nil:
+		return err //nolint:wrapcheck // names the setting
+	case hide:
 		return kernel.ErrNotFound
 	}
 	members, err := h.walk(r, path)

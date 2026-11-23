@@ -26,7 +26,8 @@ const (
 
 // SecurityPolicy is the baseline security policy the descriptor's security
 // section sets beside anonymous access and LDAP: the user lock policy, the
-// password expiration policy and the password encryption policy. The
+// password expiration policy, the password encryption policy and whether
+// refusals are hidden. The
 // Artifactory and Access REST APIs write the same state, so one value
 // describes every surface.
 type SecurityPolicy struct {
@@ -41,6 +42,10 @@ type SecurityPolicy struct {
 	NotifyByEmail     bool
 	// Encryption is security.passwordSettings.encryptionPolicy.
 	Encryption PasswordEncryption
+	// HideUnauthorizedResources is security.hideUnauthorizedResources: a
+	// download refused with 401 or 403 answers 404 "Resource not found"
+	// instead, on every repository (decision 0008, R4).
+	HideUnauthorizedResources bool
 }
 
 // SecurityPolicyInvalid refuses a policy. Section is the descriptor's path
@@ -71,6 +76,10 @@ type SecurityPolicies interface {
 	// Set stores p, which Check accepted. Turning the lock policy off clears
 	// every lock, as the REST APIs do.
 	Set(ctx context.Context, p SecurityPolicy) error
+	// HidesUnauthorized returns HideUnauthorizedResources alone, read on
+	// each call: the download paths ask it only when they refuse, so a
+	// change applies to the next refusal on every instance without a cache.
+	HidesUnauthorized(ctx context.Context) (bool, error)
 	// Forget drops what this instance's authenticator caches of the policies
 	// and of the internal password switch, so a committed change applies to
 	// its next login rather than after the cache's lifetime.

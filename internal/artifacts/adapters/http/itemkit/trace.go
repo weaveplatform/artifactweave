@@ -129,6 +129,8 @@ func (s *Kit) traceItem(w http.ResponseWriter, r *http.Request) {
 	t := &resolutionTrace{}
 	t.stepf("Received request")
 	if err := s.traceDownload(ctx, st, r, req, p, acc, t); err != nil {
+		// The download's answer, hidden as the download would hide it.
+		err = httpkit.Hidden(ctx, err)
 		var e *apierror.Error
 		if !errors.As(err, &e) {
 			// A failure the download would answer with a bare 500: its

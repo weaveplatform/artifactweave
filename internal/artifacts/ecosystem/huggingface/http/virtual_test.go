@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
 func TestUnitVirtualKeepsOneRevisionMember(t *testing.T) {
@@ -417,4 +418,25 @@ func TestUnitVirtualPatternsComeBeforeTheMembers(t *testing.T) {
 		t.Fatalf("refusing member chosen: %s", got.body)
 	}
 	wantHub(t, hubGet(t, f, "acme/demo/resolve/main/two.txt", ""), http.StatusOK, "two.txt")
+}
+
+// TestUnitVirtualUnservedHidesUnderTheGlobalSetting (#1903): the security
+// configuration's hideUnauthorizedResources gives an anonymous caller the
+// 404 in place of the challenge, as the virtual's own setting does.
+func TestUnitVirtualUnservedHidesUnderTheGlobalSetting(t *testing.T) {
+	f := newFixture(t, repo.Virtual, func(f *fixture) *source.Service {
+		createHub(t, f, repo.Config{Key: "first", Class: repo.Local})
+		patchHub(t, f, "hf", func(c *repo.Config) { c.Repositories = []string{"first"} })
+		return nil
+	})
+	commitFile(t, f, "first", "one.txt")
+	const route = "acme/demo/resolve/main/one.txt"
+	if got := hubGet(t, f, route, kernel.AnonymousUser); got.status != http.StatusUnauthorized {
+		t.Fatalf("before: %d %s", got.status, got.body)
+	}
+	if err := f.db.Settings().Put(t.Context(), settings.SettingHideUnauthorizedResources, true); err != nil {
+		t.Fatal(err)
+	}
+	wantHub(t, hubGet(t, f, route, kernel.AnonymousUser), http.StatusNotFound,
+		"Hugging Face revision or file not found")
 }

@@ -6178,6 +6178,9 @@ type SecurityConfig struct {
 	// BasicAuthEnabled Required within this object. Whether internal passwords are accepted over HTTP Basic, the switch `/access/api/v1/config/security/authentication/basic_authentication_enabled` sets.
 	BasicAuthEnabled bool `json:"basicAuthEnabled"`
 
+	// HideUnauthorizedResources Required within this object. Whether a download refused with 401 or 403 answers 404 instead, on every repository, as the configuration descriptor's `security.hideUnauthorizedResources` sets.
+	HideUnauthorizedResources bool `json:"hideUnauthorizedResources"`
+
 	// PasswordSettings Required within this object. The password encryption and expiration policies.
 	PasswordSettings SecurityConfigPasswordSettings `json:"passwordSettings"`
 
@@ -11982,7 +11985,7 @@ type ClientInterface interface {
 
 	// GetSecurityConfig Get the general security settings
 	//
-	// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.
+	// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access, hiding and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled`, `security.hideUnauthorizedResources` and `security.passwordSettings.encryptionPolicy` write.
 	//
 	// Corresponds with GET /api/securityconfig (the `GetSecurityConfig` operationId).
 	GetSecurityConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -18433,7 +18436,7 @@ func (c *Client) CreateOrReplaceUserWithApplicationVndOrgJfrogArtifactorySecurit
 
 // GetSecurityConfig Get the general security settings
 //
-// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.
+// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access, hiding and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled`, `security.hideUnauthorizedResources` and `security.passwordSettings.encryptionPolicy` write.
 //
 // Corresponds with GET /api/securityconfig (the `GetSecurityConfig` operationId).
 func (c *Client) GetSecurityConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -39755,7 +39758,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetSecurityConfigWithResponse Get the general security settings
 	//
-	// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.
+	// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access, hiding and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled`, `security.hideUnauthorizedResources` and `security.passwordSettings.encryptionPolicy` write.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -78713,7 +78716,7 @@ func (c *ClientWithResponses) CreateOrReplaceUserWithApplicationVndOrgJfrogArtif
 
 // GetSecurityConfigWithResponse Get the general security settings
 //
-// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.
+// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access, hiding and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled`, `security.hideUnauthorizedResources` and `security.passwordSettings.encryptionPolicy` write.
 //
 // Returns a wrapper object for the known response body format(s).
 //

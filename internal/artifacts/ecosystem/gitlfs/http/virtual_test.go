@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
 // lfsAnswer is one answer under /artifactory/api/lfs/ with its headers,
@@ -313,4 +314,25 @@ func wantNoDeployTarget(t *testing.T, got lfsAnswer) {
 		t.Fatalf("no deployment target: status=%d allow=%q body=%s",
 			got.status, got.header.Get("Allow"), got.body)
 	}
+}
+
+// TestUnitVirtualUnservedHidesUnderTheGlobalSetting (#1903): the security
+// configuration's hideUnauthorizedResources gives an anonymous caller the
+// 404 in place of the challenge, as the virtual's own setting does.
+func TestUnitVirtualUnservedHidesUnderTheGlobalSetting(t *testing.T) {
+	f := newFixture(t, repo.Virtual)
+	body := []byte("globally hidden Git LFS bytes\n")
+	oid, _ := seedLFS(t, f.server, "lfs-local", body)
+	transfer := "lfs/objects/" + oid + "?size=" + strconv.Itoa(len(body))
+	if got := lfsAnswerOf(t, f.server, http.MethodGet, transfer, kernel.AnonymousUser, ""); got.status !=
+		http.StatusUnauthorized {
+		t.Fatalf("before: %d %s", got.status, got.body)
+	}
+	if err := f.db.Settings().Put(t.Context(), settings.SettingHideUnauthorizedResources, true); err != nil {
+		t.Fatal(err)
+	}
+	status, answer := lfsCall(t, f.server, http.MethodGet, transfer, kernel.AnonymousUser, "")
+	wantAnswer(t, status, answer, http.StatusNotFound, "Git LFS object unavailable")
+	wantObjectError(t, policyBatch(t, f.server, "lfs", kernel.AnonymousUser, "download", oid, len(body)),
+		http.StatusNotFound)
 }

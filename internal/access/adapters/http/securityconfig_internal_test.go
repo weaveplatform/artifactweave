@@ -10,18 +10,20 @@ import (
 )
 
 // securityConfig fails with the store's error whichever setting it cannot
-// read, and reads a never-written anonymous switch as off.
+// read, and reads a never-written anonymous or hiding switch as off.
 func TestUnitSecurityConfigStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	doc, err := securityConfig(ctx, db.Settings())
-	if err != nil || doc.AnonAccessEnabled || !doc.BasicAuthEnabled || doc.PasswordSettings.EncryptionPolicy != "SUPPORTED" {
+	if err != nil || doc.AnonAccessEnabled || !doc.BasicAuthEnabled || doc.HideUnauthorizedResources ||
+		doc.PasswordSettings.EncryptionPolicy != "SUPPORTED" {
 		t.Fatalf("defaults %+v %v", doc, err)
 	}
 	boom := errors.New("settings down")
 	for _, key := range []string{
 		settings.SettingAnonymousAccess, settings.SettingBasicAuthEnabled, settings.SettingUserLockPolicy,
 		settings.SettingPasswordExpirationPolicy, settings.SettingPasswordEncryption,
+		settings.SettingHideUnauthorizedResources,
 	} {
 		if _, err := securityConfig(ctx, keyedSettings{db.Settings(), key, boom}); !errors.Is(err, boom) {
 			t.Errorf("%s failing: %v", key, err)

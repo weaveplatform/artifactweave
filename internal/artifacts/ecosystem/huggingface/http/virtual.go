@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/generic"
 	format "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/huggingface"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
@@ -93,13 +94,19 @@ func (h handler) selectMember(r *http.Request, id format.Identity, rev string) (
 // as not found (decision 0008, R3), where the second got 403 at the first
 // such member. An anonymous caller who may read it in no member gets the
 // 401 challenge, as 7.x answers an anonymous caller its walk refused (R4)
-// [I], unless the virtual repository hides unauthorized resources or no
-// member of steps refused anyone: none of the type whose own policy admits
-// folder.
+// [I], unless the virtual repository or the security configuration hides
+// unauthorized resources (#1903) or no member of steps refused anyone: none
+// of the type whose own policy admits folder.
 func (h handler) unserved(r *http.Request, folder string, readable bool, steps []virtual.Member) error {
 	v := pkgroute.RequestFrom(r).Repo
 	p, _ := kernel.FromContext(r.Context())
 	if readable || !p.Anonymous || v.HideUnauthorizedResources != nil && *v.HideUnauthorizedResources {
+		return missing()
+	}
+	switch hide, err := httpkit.Hides(r.Context()); {
+	case err != nil:
+		return err //nolint:wrapcheck // names the setting
+	case hide:
 		return missing()
 	}
 	for _, m := range steps {
