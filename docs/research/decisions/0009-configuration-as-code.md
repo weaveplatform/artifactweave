@@ -103,7 +103,10 @@ stay apart: `base_url` in `artifactweave.yaml` keeps its flag > environment > fi
 precedence and is never written at run time, and a stored `urlBase` is tenant state that
 takes precedence over it while set and is exported with the descriptor. Clearing
 `urlBase` brings `base_url` back. The application layer also supplies the rules the
-descriptor cannot see, such as the CDN hosts a `urlBase` may not sit above.
+descriptor cannot see, such as the CDN hosts a `urlBase` may not sit above, to every
+entry point alike: the configuration module for PATCH and the REST writes, and the same
+installation settings for `config apply` and the bootstrap descriptor
+([#1902](https://github.com/weaveplatform/artifactweave/issues/1902)).
 
 ## Rationale
 

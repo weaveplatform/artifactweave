@@ -61,7 +61,7 @@ func ApplyDescriptor(
 		return fmt.Errorf("config apply: %w", err)
 	}
 	defer func() { _ = st.Close() }()
-	res, err := configurationOver(st).Descriptor.Apply(ctx, p, time.Now(), dryRun)
+	res, err := configurationOver(st, cfg.Configuration()).Descriptor.Apply(ctx, p, time.Now(), dryRun)
 	if err != nil {
 		return fmt.Errorf("config apply: %w", err)
 	}
@@ -75,7 +75,14 @@ func ApplyDescriptor(
 // OpenRuntime builds them. Every contract is bound over st, the store whose
 // unit of work Apply writes in, so the anonymous access setting and the
 // repositories are written in Apply's transaction.
-func configurationOver(st *appsql.Store) configapi.API {
+//
+// installation is cfg.Configuration(), the Settings the configuration
+// module is bound with: without its CDN hosts the urlBase check that PATCH
+// and PUT baseUrl apply would pass a CDN host here and store it (#1902).
+// The binding differs from the module's only in what Apply never reads: no
+// Authenticator or Authorizer, which only the export and the logger
+// administration recheck, and no loggers.
+func configurationOver(st *appsql.Store, installation configapi.Settings) configapi.API {
 	return descriptor.NewAPI(descriptor.Deps{
 		Tx:              st,
 		Repositories:    repos.NewRepositories(st, access.KeysOf(st), access.ProjectsOf(st), configuration.RepositoryLifecycle(st)),
@@ -88,6 +95,7 @@ func configurationOver(st *appsql.Store) configapi.API {
 		StoragePolicies: artifacts.StoragePoliciesOf(st),
 		Projects:        access.ProjectsOf(st),
 		Capacity:        st.StorageCapacity(),
+		Settings:        installation,
 	})
 }
 
@@ -138,7 +146,7 @@ func applyBootstrap(
 	if err != nil {
 		return fmt.Errorf("bootstrap descriptor: %w", err)
 	}
-	conf := configurationOver(st)
+	conf := configurationOver(st, cfg.Configuration())
 	p, err := conf.Descriptor.Parse(doc, os.LookupEnv)
 	if err != nil {
 		return fmt.Errorf("bootstrap descriptor %s: %w", file, err)
