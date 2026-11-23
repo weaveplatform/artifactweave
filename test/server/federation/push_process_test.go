@@ -42,6 +42,7 @@ type pushProcessOptions struct {
 // the production runtime/router in a different OS process, reading its owned
 // private configuration file and shutting down when its owner closes stdin.
 func TestAccSinglePushTargetProcess(t *testing.T) {
+	t.Parallel()
 	path := os.Getenv(pushProcessConfig)
 	if path == "" {
 		return

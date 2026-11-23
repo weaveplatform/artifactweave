@@ -11,8 +11,15 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
-func TestAccSinglePushCurrentFencesSQLite(t *testing.T)   { qualifyPushCurrentFences(t, "sqlite") }
-func TestAccSinglePushCurrentFencesPostgres(t *testing.T) { qualifyPushCurrentFences(t, "postgres") }
+func TestAccSinglePushCurrentFencesSQLite(t *testing.T) {
+	t.Parallel()
+	qualifyPushCurrentFences(t, "sqlite")
+}
+
+func TestAccSinglePushCurrentFencesPostgres(t *testing.T) {
+	t.Parallel()
+	qualifyPushCurrentFences(t, "postgres")
+}
 
 func qualifyPushCurrentFences(t *testing.T, backend string) {
 	t.Helper()

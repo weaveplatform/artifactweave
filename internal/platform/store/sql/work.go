@@ -121,6 +121,31 @@ func (w workQueue) Lease(ctx context.Context, req work.WorkLease) ([]work.WorkIt
 	if req.Limit <= 0 {
 		return nil, nil
 	}
+	// An idle worker asks once a poll interval, and a root transaction on the
+	// application store first takes the project authority guard row (and
+	// SQLite's write lock). Without this lock-free read every idle poll queued
+	// on that guard behind real work and delayed the work behind it: in the
+	// PostgreSQL replication suite idle leases spent most of the guard waits
+	// (#1882). An item that becomes due just after the read is taken by the
+	// next poll or wake-up, as it would be had this poll come a moment earlier.
+	if !w.s.InTx(ctx) {
+		now := req.Now.UnixMicro()
+		q := "SELECT 1 FROM work_items WHERE " + dueClause
+		args := []any{now, now}
+		if len(req.Kinds) > 0 {
+			q += " AND kind IN (" + dialect.Placeholders(len(req.Kinds)) + ")"
+			for _, k := range req.Kinds {
+				args = append(args, k)
+			}
+		}
+		due, err := w.s.Exists(ctx, "probe due work", q+" LIMIT 1", args...)
+		if err != nil {
+			return nil, err
+		}
+		if !due {
+			return nil, nil
+		}
+	}
 	var out []work.WorkItem
 	err := w.s.Tx(ctx, func(ctx context.Context) error {
 		out = nil

@@ -24,18 +24,22 @@ import (
 )
 
 func TestAccSinglePullRegistryProcessesSQLite(t *testing.T) {
+	t.Parallel()
 	qualifyPullRegistryProcesses(t, "sqlite", false)
 }
 
 func TestAccSinglePullRegistryProcessesPostgres(t *testing.T) {
+	t.Parallel()
 	qualifyPullRegistryProcesses(t, "postgres", false)
 }
 
 func TestAccSinglePullRegistryVirtualProcessesSQLite(t *testing.T) {
+	t.Parallel()
 	qualifyPullRegistryProcesses(t, "sqlite", true)
 }
 
 func TestAccSinglePullRegistryVirtualProcessesPostgres(t *testing.T) {
+	t.Parallel()
 	qualifyPullRegistryProcesses(t, "postgres", true)
 }
 

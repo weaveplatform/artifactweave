@@ -104,6 +104,7 @@ func (w *replicationWorld) configuration(key string) map[string]any {
 }
 
 func TestAccSingleReplicationConfigurationLifecycle(t *testing.T) {
+	t.Parallel()
 	w := newReplicationWorld(t)
 	replicationConfigurationLifecycle(t, w)
 	replicationRepositoryLifetime(t, w)
@@ -202,6 +203,7 @@ func replicationRepositoryLifetime(t *testing.T, w *replicationWorld) {
 }
 
 func TestAccSingleReplicationSQLConfigurationAndRepositoryLifetime(t *testing.T) {
+	t.Parallel()
 	keys, err := crypt.New(bytes.Repeat([]byte{11}, 32))
 	if err != nil {
 		t.Fatal(err)
@@ -244,6 +246,7 @@ func (s lifetimeFailureReplications) Put(ctx context.Context, target model.Repli
 }
 
 func TestAccSingleReplicationRemoteSourceUpdateIsAtomic(t *testing.T) {
+	t.Parallel()
 	replicationRemoteSourceUpdate(t, inmem.New())
 }
 
@@ -308,6 +311,7 @@ func (s lifetimeFailureReplications) DeleteForRepo(ctx context.Context, key stri
 }
 
 func TestAccSingleReplicationRepositoryLifetimeFailureIsAtomic(t *testing.T) {
+	t.Parallel()
 	replicationLifetimeFailure(t, inmem.New())
 }
 
@@ -354,6 +358,7 @@ func replicationLifetimeFailure(t *testing.T, db app.RouterStore) {
 }
 
 func TestAccSingleReplicationValidationControlsAndDeferredOwners(t *testing.T) {
+	t.Parallel()
 	w := newReplicationWorld(t)
 	w.request("PUT", replicationPath+"local", `[{"url":"https://target.example/selected","cronExp":"0 0/5 * * * ?","socketTimeoutMillis":2500}]`, 201)
 	w.request("PUT", replicationPath+"remote", `{}`, 201)
@@ -431,6 +436,7 @@ func TestAccSingleReplicationValidationControlsAndDeferredOwners(t *testing.T) {
 }
 
 func TestAccSingleReplicationCurrentPrincipalsAndTokenCeilings(t *testing.T) {
+	t.Parallel()
 	replicationCurrentPrincipals(t, inmem.New())
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
@@ -120,7 +121,7 @@ func TestUnitRemoteErrorEnvelopes(t *testing.T) {
 			}
 		})
 	}
-	if *kernel.ErrForbidden != forbidden || *kernel.ErrUnauthenticated != unauthenticated {
+	if !reflect.DeepEqual(*kernel.ErrForbidden, forbidden) || !reflect.DeepEqual(*kernel.ErrUnauthenticated, unauthenticated) {
 		t.Fatalf("a refusal changed kernel's shared errors: %+v, %+v",
 			*kernel.ErrForbidden, *kernel.ErrUnauthenticated)
 	}

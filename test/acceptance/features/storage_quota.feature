@@ -133,7 +133,8 @@ Feature: Global storage quota
       """
       0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789X
       """
-    Then the response status is 403
+    Then the response status is 413
+    And the response body contains "Project storage quota exceeded. If you require more storage, contact your Platform Admin."
     When I upload 100 quota bytes to "/artifactory/alpha-generic/project.bin"
 
   Scenario: Enabling the quota needs whole percentages

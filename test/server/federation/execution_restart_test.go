@@ -15,6 +15,7 @@ import (
 )
 
 func TestAccSingleReplicationOneShotAdmissionSurvivesRuntimeRestart(t *testing.T) {
+	t.Parallel()
 	for _, backend := range []string{"sqlite", "postgres"} {
 		for _, direction := range []model.ReplicationDirection{model.ReplicationPush, model.ReplicationPull} {
 			t.Run(backend+"/"+string(direction), func(t *testing.T) {
