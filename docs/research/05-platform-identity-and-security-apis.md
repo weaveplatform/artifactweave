@@ -474,7 +474,7 @@ padding (`cliSafe`, `internal/auth/token/jwt.go`; decision 0005, "As implemented
 | GET / POST | `/access/api/v1/scim/v2/Users`, `/Groups` | 200 / 201 | read needs admin or `system:identities:r`, write `system:identities:w`; currently 501, P22 ([ADR 0019](decisions/0019-human-authentication-tiers.md)) |
 | GET / PUT / PATCH / DELETE | `/access/api/v1/scim/v2/Users/{id}`, `/Groups/{id}` | 200 / 204 | currently 501, P22 |
 | GET / POST | `/access/api/v1/saml` | 200 | plus `/saml/{name}` and `/saml/general_settings` `{enable,certificateIsPresent}`; currently 501, P21 |
-| GET / POST / PUT | `/access/api/v1/ldap/settings` | 200 / **201** | plus `GET` and `DELETE /settings/{key}` (204); see [LDAP connections](#ldap-connections). `/settings/test` (LDAP-02) and `/ldap/groups[/{name}]`, `.../refresh` (LDAP-03) currently 501, P12 |
+| GET / POST / PUT | `/access/api/v1/ldap/settings` | 200 / **201** | plus `GET` and `DELETE /settings/{key}` (204); see [LDAP connections](#ldap-connections). `POST /settings/test` (LDAP-02) 204 or 400, see [LDAP login](#ldap-login); `/ldap/groups[/{name}]`, `.../refresh` (LDAP-03) currently 501, P12 |
 | GET / PUT | `/access/api/v1/httpsso`, `/access/api/v1/crowd` | 200 | currently 501, P21 |
 | GET / PUT | `/access/api/v1/config/security/authentication/basic_authentication_enabled` | 200 | `{"enabled":true}` |
 | PUT / PATCH | `/access/api/v1/config/security/password_policy` | **204** | `{uppercase,lowercase,digit,special_char,length,not_match_old}`; PUT overwrites all, PATCH is partial; no body |
@@ -536,6 +536,80 @@ Local rules, each **[I]** and listed on [#216](https://github.com/weaveplatform/
 
 The descriptor's `security.ldapSettings` writes the same connections
 ([research 06](06-system-configuration-and-descriptor.md#security)).
+
+### LDAP login
+
+Sources: [LDAP](https://docs.jfrog.com/administration/docs/ldap) ("Auto Create System
+Users", "Email Attribute", "Customize the LDAP Timeout / LDAP Referral Strategy", "Non-UI
+Authentication Cache for LDAP", "Prevent Authentication Fallback to the Local Artifactory
+Realm", "Using LDAPS"), [test LDAP connection](https://docs.jfrog.com/administration/reference/testldapconnection),
+[security configuration](https://docs.jfrog.com/administration/docs/security-configuration)
+("Disable Basic Authentication Method"), and Spring Security's `BindAuthenticator` and
+`FilterBasedLdapUserSearch`, on which the 7.161.26 open source LDAP login is built.
+Implemented by LDAP-02 ([#1833](https://github.com/weaveplatform/artifactweave/issues/1833)).
+
+- **Who logs in.** A Basic password is checked against every enabled connection. Each
+  tries `user_dn_pattern` first (relative to the URL's base DN), then `search_filter`
+  under each `|`-separated `search_base`, bound as `manager_dn` when one is set, over the
+  subtree or one level as `search_sub_tree` says; the user then binds with the password.
+  A search that finds several entries finds none, as `FilterBasedLdapUserSearch` refuses
+  them. A wrong, unknown or disabled directory user is refused with 401 like a wrong
+  internal password.
+- **Local identity.** With `auto_create_user` the first login creates the user "and
+  assign[s] them to the default groups": realm `ldap`, the `email_attribute`'s value as
+  email, `allow_user_to_access_profile` as `profile_updatable`, no internal password.
+  Without it the user acts in the default (auto-join) groups and nothing is stored.
+  Later logins refresh the email of an `ldap`-realm user.
+- **Timeouts.** Connect 10000 ms, each operation 15000 ms, the documented defaults of
+  `artifactory.security.ldap.connect.timeoutMillis` and `socket.timeoutMillis`.
+- **Cache.** "Once a user is authenticated, while the authentication data is cached,
+  Artifactory uses the cached data rather than querying the external system", for 300
+  seconds by default (`artifactory.security.authentication.cache.idleTimeSecs`).
+- **LDAPS** verifies the server's certificate against the system's trust; a self-signed
+  directory's CA is added to it (on Linux through `SSL_CERT_FILE` or `SSL_CERT_DIR`), as
+  JFrog's Java trust store is.
+- **Connection test.** `POST /access/api/v1/ldap/settings/test` takes a full `LdapSettings`
+  and answers 204 "Test successful", 400 "Test failed", 401 and 403, administrators only.
+  It stores nothing.
+
+Local rules, each **[I]** and listed on [#216](https://github.com/weaveplatform/artifactweave/issues/216):
+
+- The internal password is checked before the directories, where JFrog asks the
+  directory first and falls back to it. Both orders accept the same passwords as the same
+  user; this one keeps the local administrator's login off the directory's network path,
+  so it works and is not delayed while every directory is unreachable (decision
+  [0019](decisions/0019-human-authentication-tiers.md)). A user with
+  `internal_password_disabled` has no fallback, as the documented checkbox gives.
+- Connections are asked in key order; the first that accepts wins. A refusal from any
+  connection refuses the login even when another is unreachable. A login no directory
+  could answer is refused without counting toward the lock policy or the login
+  suspension, so an outage locks nobody out; a refusal counts as a wrong password.
+- An empty password is refused before any bind, since LDAP accepts a simple bind without
+  a password as unauthenticated.
+- Referrals are not followed (JFrog's `referralStrategy` defaults to `follow`); a
+  referral is a failure of that connection.
+- With `ldap_poisoning_protection`, an entry carrying a serialized Java object or JNDI
+  reference (RFC 2713 and 2714 object classes such as `javaSerializedObject` and
+  `javaNamingReference`, or attributes such as `javaSerializedData`, `javaFactory` and
+  `javaCodebase`) is no user; JFrog documents the setting only as filtering out "users
+  exposed to vulnerabilities".
+- A remembered login lasts only while its connection's revision is current, so a
+  disable, update or delete ends it at once rather than after 300 seconds. A principal
+  from a directory login, and the tokens and downloads that recheck it, end the same way.
+- The directory is asked outside any metadata transaction; one guarded transaction then
+  rechecks the connection's revision and the user's status before it creates or updates
+  the user, so a connection changed or a user disabled meanwhile leaves nothing stored.
+- The connection test answers 400 with `LDAP connection test failed: <step>: <reason>`,
+  the step being `connect`, `tls`, `manager bind` or `search`. It binds as the manager and
+  reads each search base when a search is configured, otherwise it only connects. A body
+  without `manager_password` uses the stored connection's only when its key, URL and
+  manager DN match, so a test cannot send a stored password to another server.
+
+Not followed yet: from 7.104.0, "when using all external authentication methods, for
+example, SAML or LDAP, basic authentication using internal passwords will be disabled by
+default". artifactweave keeps internal passwords working beside LDAP, and the local
+administrator's fallback that decision 0019 requires; the setting is reported as a
+follow-up to #1833.
 
 ## Authentication accepted on every endpoint
 

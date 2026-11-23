@@ -686,3 +686,89 @@ func TestUnitAIEditorGalleryPOSTTransportIsBoundedAndCannotRedirect(t *testing.T
 		t.Fatalf("gallery POST followed redirect: err=%v redirected=%t", err, redirected)
 	}
 }
+
+// exchanges returns the recorded requests for path and the connections they
+// arrived on.
+func exchanges(s *fakeupstream.Server, path string) []string {
+	var conns []string
+	for _, r := range s.Requests() {
+		if r.Path == path {
+			conns = append(conns, r.RemoteAddr)
+		}
+	}
+	return conns
+}
+
+// A reused connection times the origin's answer from the request, not from
+// when it went idle: before #1866 the stale idle deadline failed the first
+// read and net/http replayed the GET on a second connection.
+func TestAccReusedConnectionTimesTheAnswerFromTheRequest(t *testing.T) {
+	const timeout = 2 * time.Second
+	s := fakeupstream.New(t, fakeupstream.Options{})
+	s.Set("/warm", fakeupstream.Resource{Body: []byte("warm")})
+	gate := new(fakeupstream.Barrier)
+	s.Set("/slow", fakeupstream.Resource{Body: []byte("slow"), Fault: fakeupstream.Fault{BeforeHeaders: gate}})
+	c := clientFor(t, repo.Config{URL: s.URL, SocketTimeoutMillis: ptr(int(timeout.Milliseconds()))}, remote.Options{})
+	res, err := c.Do(t.Context(), remote.Request{Method: http.MethodGet, Path: "warm"})
+	if err != nil || body(t, res) != "warm" {
+		t.Fatal(res, err)
+	}
+	// Idle for less than the pool's limit of half the timeout, so the GET
+	// below reuses the connection, and answered within the timeout of the
+	// request but after the timeout of the idle connection.
+	time.Sleep(timeout * 3 / 10)
+	go func() {
+		<-gate.Reached()
+		time.Sleep(timeout * 85 / 100)
+		gate.Release()
+	}()
+	res, err = c.Do(t.Context(), remote.Request{Method: http.MethodGet, Path: "slow"})
+	if err != nil || body(t, res) != "slow" {
+		t.Fatal(res, err)
+	}
+	warm, slow := exchanges(s, "/warm"), exchanges(s, "/slow")
+	if len(slow) != 1 || slow[0] != warm[0] {
+		t.Fatal("slow answer on a reused connection was replayed", warm, slow)
+	}
+}
+
+// A socket timeout on a reused connection fails the one request rather than
+// letting net/http replay it on a fresh connection.
+func TestAccReusedConnectionTimeoutIsNotReplayed(t *testing.T) {
+	const timeout = 500 * time.Millisecond
+	s := fakeupstream.New(t, fakeupstream.Options{})
+	s.Set("/warm", fakeupstream.Resource{Body: []byte("warm")})
+	gate := new(fakeupstream.Barrier)
+	t.Cleanup(gate.Release)
+	s.Set("/slow", fakeupstream.Resource{Body: []byte("slow"), Fault: fakeupstream.Fault{BeforeHeaders: gate}})
+	c := clientFor(t, repo.Config{URL: s.URL, SocketTimeoutMillis: ptr(int(timeout.Milliseconds()))}, remote.Options{})
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		res, err := c.Do(t.Context(), remote.Request{Method: http.MethodGet, Path: "warm"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		body(t, res)
+		// Idle long enough that the connection's idle deadline would expire
+		// before the header timeout, but not so long that the pool retires it.
+		time.Sleep(timeout / 5)
+		before := len(exchanges(s, "/slow"))
+		_, err = c.Do(t.Context(), remote.Request{Method: method, Path: "slow"})
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatal(method, err)
+		}
+		if got := len(exchanges(s, "/slow")) - before; got != 1 {
+			t.Fatal(method, "timed-out request reached the origin", got, "times")
+		}
+	}
+}
+
+func TestUnitPooledConnectionsRetireAtHalfTheSocketTimeout(t *testing.T) {
+	for millis, want := range map[int]time.Duration{
+		0: 90 * time.Second, 100: 50 * time.Millisecond, 15000: 7500 * time.Millisecond, 1000000: 90 * time.Second,
+	} {
+		c := clientFor(t, repo.Config{URL: "http://example.test", SocketTimeoutMillis: ptr(millis)}, remote.Options{})
+		if got := c.transport.IdleConnTimeout; got != want {
+			t.Fatal(millis, got, want)
+		}
+	}
+}

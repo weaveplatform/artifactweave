@@ -53,3 +53,16 @@ func App(t *testing.T, mutate func(*config.Config)) *app.Runtime {
 	})
 	return rt
 }
+
+// OpenApp opens the application runtime over cfg with opts, as serve opens
+// it, with a logger that discards, for a test that restarts the runtime or
+// sets options App does not, such as the CA an LDAPS directory's certificate
+// chains to. The caller closes it.
+func OpenApp(t *testing.T, cfg config.Config, opts app.RuntimeOptions) *app.Runtime {
+	t.Helper()
+	rt, err := app.OpenRuntime(t.Context(), cfg, slog.New(slog.DiscardHandler), opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rt
+}

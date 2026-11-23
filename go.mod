@@ -25,9 +25,11 @@ require (
 	github.com/cucumber/messages/go/v34 v34.2.1
 	github.com/dsnet/compress v0.0.1
 	github.com/getkin/kin-openapi v0.153.0
+	github.com/go-asn1-ber/asn1-ber v1.5.8
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/go-jose/go-jose/v4 v4.1.9
+	github.com/go-ldap/ldap/v3 v3.4.15
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/hcl/v2 v2.25.0
 	github.com/jackc/pgx/v5 v5.13.0

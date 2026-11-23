@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -10,7 +11,9 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access"
+	accessldap "github.com/weaveplatform/artifactweave/internal/access/adapters/ldap"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/ldap"
 	"github.com/weaveplatform/artifactweave/internal/access/core/login"
 	"github.com/weaveplatform/artifactweave/internal/access/core/project"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
@@ -63,6 +66,9 @@ type Runtime struct {
 	Auth *authn.Authenticator
 	// Tokens issues and verifies access tokens.
 	Tokens *token.Service
+	// LDAP is the directory client Auth's LDAP logins and the connection
+	// test ask.
+	LDAP ldap.Directory
 	// Artifacts is the artifacts module, whose remote sources, remote
 	// HTTP pool and registry sources serve hands the server.
 	Artifacts *artifacts.Module
@@ -100,6 +106,10 @@ type RuntimeOptions struct {
 	// TokenKeyBits is the RSA size of the access-token signing key the
 	// first start creates.
 	TokenKeyBits int
+	// LDAPRootCAs verifies ldaps:// directories; nil is production's system
+	// trust, which SSL_CERT_FILE and SSL_CERT_DIR extend on Linux. Tests
+	// trust their directory container's own CA here.
+	LDAPRootCAs *x509.CertPool
 }
 
 // withDefaults returns o with each zero field set to the package default.
@@ -149,9 +159,19 @@ func OpenRuntime(
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
+	// Logins reads the LDAP connections on every login, so a restart or a
+	// settings change leaves no directory authority behind: nothing about
+	// them is kept but logins remembered under the revision that accepted
+	// them.
+	directory := accessldap.Client{RootCAs: opts.LDAPRootCAs}
+	logins := ldap.NewLogins(
+		ldap.Service{Configs: st.Configs(), Tx: st, Guard: st.Projects().Guard},
+		directory, ldap.LoginOptions{Log: logs.Logger("artifactweave.access")},
+	)
 	authenticator, err := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{
 		Hash: opts.PasswordHash, Tokens: tokens, Groups: st.Groups(), Failures: login.Failures{Store: st},
 		APIRestrictions: st.APIRestrictions(),
+		Directory:       logins, Tx: st, Guard: st.Projects().Guard,
 	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
@@ -253,6 +273,7 @@ func OpenRuntime(
 		Logging:    logs,
 		Store:      st,
 		Auth:       authenticator,
+		LDAP:       directory,
 		Tokens:     tokens,
 		Artifacts:  mods.artifacts,
 		Federation: mods.federation,

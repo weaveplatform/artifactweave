@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
+	"github.com/weaveplatform/artifactweave/internal/platform/tx"
 )
 
 // Defaults for the zero Options fields.
@@ -62,6 +63,14 @@ type Options struct {
 	// APIRestrictions gates newly authenticated calls and Current rechecks.
 	// Nil disables this policy for embedders; the application supplies it.
 	APIRestrictions port.APIRestrictionStore
+	// Directory checks passwords against the LDAP directories (directory.go);
+	// nil checks the internal password alone.
+	Directory Directory
+	// Tx and Guard are the transaction and administration guard a directory
+	// login is published in, the guard every LDAP connection write holds.
+	// Directory requires both.
+	Tx    tx.Runner
+	Guard func(context.Context) error
 }
 
 // Authenticator verifies credentials against the user store.
@@ -78,6 +87,9 @@ type Authenticator struct {
 	tokens       TokenVerifier
 	groups       port.GroupStore
 	restrictions port.APIRestrictionStore
+	directory    Directory
+	tx           tx.Runner
+	guard        func(context.Context) error
 	policy       policyCache
 	// suspended holds the temporary login suspensions (suspension.go).
 	suspended suspensions
@@ -89,6 +101,9 @@ func NewAuthenticator(
 	settings settings.SettingsStore,
 	o Options,
 ) (*Authenticator, error) {
+	if o.Directory != nil && (o.Tx == nil || o.Guard == nil) {
+		return nil, errNoPublication
+	}
 	var pw [16]byte
 	_, _ = rand.Read(pw[:])
 	dummy, err := HashPasswordWith(o.Hash, string(pw[:]))
@@ -109,7 +124,7 @@ func NewAuthenticator(
 	}
 	return &Authenticator{
 		users: users, settings: settings, failures: o.Failures, now: o.Now, dummy: dummy, tokens: o.Tokens,
-		groups: o.Groups, restrictions: o.APIRestrictions,
+		groups: o.Groups, restrictions: o.APIRestrictions, directory: o.Directory, tx: o.Tx, guard: o.Guard,
 		cache: &verified{max: o.CacheSize, ttl: o.CacheTTL, m: map[[32]byte]time.Time{}},
 		slots: make(chan struct{}, o.Concurrency),
 	}, nil
@@ -124,6 +139,12 @@ func NewAuthenticator(
 // marked PasswordExpired.
 // While the name is temporarily suspended after failed logins, every
 // password answers ErrLoginSuspended (suspension.go).
+//
+// With Options.Directory, a password the internal one does not verify, or
+// that a user without an internal password or an unknown name presents, is
+// checked against the enabled LDAP connections and a login they accept is
+// published (directory.go). A disabled or locked local user is refused
+// before any directory is asked.
 //
 // The name is folded (model.FoldUsername) before anything else, so BOB logs
 // in as bob, and a failed login as BOB counts toward bob's lock and
@@ -162,12 +183,13 @@ func (a *Authenticator) Basic(
 		}
 	}
 	if err != nil {
-		_, _ = a.check(ctx, a.dummy, password)
+		return a.external(ctx, name, password, now, nil)
+	}
+	if u.Status != "" && u.Status != model.UserEnabled {
 		return a.refuse(ctx, name, now)
 	}
-	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled ||
-		(u.Status != "" && u.Status != model.UserEnabled) {
-		return a.refuse(ctx, name, now)
+	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled {
+		return a.external(ctx, name, password, now, &u)
 	}
 	key := cacheKey(u.PasswordHash, password)
 	if a.cache.has(key, now) {
@@ -177,6 +199,19 @@ func (a *Authenticator) Basic(
 	ok, err := a.check(ctx, u.PasswordHash, password)
 	switch {
 	case errors.Is(err, ErrHashFormat), err == nil && !ok:
+		// The internal password is checked first: JFrog asks the directory
+		// first and falls back to it, and either order accepts the same
+		// passwords as the same user, but this one keeps a local
+		// administrator's login off the directory's network path, so an
+		// unreachable directory never delays it.
+		p, outcome, err := a.viaDirectory(ctx, name, password, now)
+		switch outcome {
+		case directoryAccepted:
+			return p, err
+		case directoryUnavailable:
+			// The password may be the directory's, so nothing is counted.
+			return kernel.Principal{}, kernel.ErrBadCredentials
+		}
 		a.recordFailure(ctx, u.Name)
 		return a.refuse(ctx, name, now)
 	case err != nil:
@@ -185,6 +220,36 @@ func (a *Authenticator) Basic(
 	a.cache.add(key, now)
 	a.suspended.forget(name)
 	return a.accept(ctx, u, now, true)
+}
+
+// external checks a password that no internal password can verify, for an
+// unknown name (u nil) or a user without a usable internal password, against
+// the directories. With none enabled, an unknown name costs the dummy hash,
+// so the time a refusal takes does not tell which names exist.
+func (a *Authenticator) external(
+	ctx context.Context,
+	name, password string,
+	now time.Time,
+	u *model.User,
+) (kernel.Principal, error) {
+	p, outcome, err := a.viaDirectory(ctx, name, password, now)
+	switch outcome {
+	case directoryAccepted:
+		return p, err
+	case noDirectory:
+		if u == nil {
+			_, _ = a.check(ctx, a.dummy, password)
+		}
+	case directoryRefused:
+		if u != nil {
+			a.recordFailure(ctx, u.Name)
+		}
+	case directoryUnavailable:
+		// Neither the lock policy nor the suspension counts a login no
+		// directory could answer, so an outage locks nobody out.
+		return kernel.Principal{}, kernel.ErrBadCredentials
+	}
+	return a.refuse(ctx, name, now)
 }
 
 // refuse answers credentials that did not verify, counting them toward the

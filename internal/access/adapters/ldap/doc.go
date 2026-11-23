@@ -1,39 +1,85 @@
-// Package ldap will be the access module's LDAP client: binding against a
-// directory and reading its users and groups.
+// Package ldap is the access module's LDAP client: it checks a user's
+// password against a directory, and tests a connection's settings for the
+// Access API, over github.com/go-ldap/ldap/v3.
 //
 // # Role
 //
-// access module, adapter layer (LDAP).
+// access module, adapter layer (LDAP). Client implements access/core/ldap's
+// Directory; the composition root (internal/app) gives it to core/ldap's
+// Logins, which the authenticator asks, and to the access HTTP adapter for
+// POST /access/api/v1/ldap/settings/test. No core package imports it
+// (decision 0044, dependency rules).
 //
 // # Inputs
 //
-// None yet. Planned: the directory servers that the LDAP settings name (plan
-// P12, task 3), read through access/core/ldap's Source, whose revisions tell
-// the client when a cached connection or credential is stale.
+//   - A core/ldap Connection: one connection's effective settings and its
+//     manager password, read from the revisioned snapshot outside any
+//     metadata transaction.
+//   - The user name and password a request presented.
+//   - Client's options: the CA pool LDAPS certificates must chain to (the
+//     system's when nil) and the timeouts and page size, whose zero values
+//     are JFrog's defaults.
 //
 // # Outputs
 //
-// None yet. Planned: bind results and directory entries for access/core/ldap,
-// tested against an LDAP test container (plan P12, exit criteria).
+//   - Authenticate: the user's Entry (DN and email), ErrRefused when the
+//     directory refused the password, ErrUnknownUser when the search found
+//     no single user, or a *DirectoryError naming the step (connect, tls,
+//     manager bind, search, bind) and what failed in it.
+//   - Test: nil, or the *DirectoryError of the first step that failed. The
+//     error never holds a password.
+//
+// # Invariants
+//
+//   - A user DN pattern is tried first, then the search, the order of
+//     Spring Security's BindAuthenticator on which Artifactory's LDAP login
+//     is built. The name is escaped for the DN (RFC 4514) and the filter (RFC
+//     4515), so a name cannot widen either; a search that finds more than one
+//     entry finds none.
+//   - An empty password is refused before any bind: LDAP treats a simple
+//     bind without a password as an unauthenticated bind, which succeeds.
+//   - Each call opens one connection and closes it; nothing is pooled
+//     across connection revisions. A cancelled context closes the
+//     connection at once, and every operation runs under the 15 s timeout
+//     after a 10 s connect.
+//   - With poisoning protection on, an entry carrying a serialized Java
+//     object or JNDI reference is no user [I].
+//   - Referrals are not followed [I].
 //
 // # References
 //
+//   - Research 05: docs/research/05-platform-identity-and-security-apis.md,
+//     "LDAP connections" and "LDAP login".
+//   - Decision 0019:
+//     docs/research/decisions/0019-human-authentication-tiers.md.
+//   - Decision 0044:
+//     docs/research/decisions/0044-modular-monolith-migration.md.
 //   - Target layout:
 //     docs/research/architecture-options/5-modular-monolith.md, "Full package
 //     tree", line 298, and "Access and identity", line 557.
 //   - Plan:
 //     docs/implementation/plan.md#p12-descriptor-export-system-configuration-ldap.
-//   - Context map: the access row, restated in the module root's doc.go;
-//     https://github.com/weaveplatform/artifactweave/issues/958 holds the
-//     map.
-//   - Decision 0019:
-//     docs/research/decisions/0019-human-authentication-tiers.md.
-//   - Decision 0044:
-//     docs/research/decisions/0044-modular-monolith-migration.md,
-//     "Placeholders".
+//   - https://github.com/weaveplatform/artifactweave/issues/1833
 //
 // # Status
 //
-// Placeholder: implemented by P12. LDAP-02 (#1833) adds the client;
-// LDAP-01 delivered the settings and the Source it reads.
+// Implemented P12 (LDAP-02, #1833): password checks and connection tests.
+// Group synchronisation is LDAP-03 (#1834).
+//
+// # Testing
+//
+//   - directory_test.go runs against a pinned OpenLDAP container
+//     (pkg/containertest.OpenLDAP) seeded by accesstest.SeedDirectory:
+//     TestAccDirectoryAuthenticate (DN pattern and search logins, wrong,
+//     unknown and disabled users, escaping, both bases, paging off),
+//     TestAccDirectoryTLS (LDAPS with the container's CA, an untrusted
+//     certificate, plain LDAP to the TLS port), TestAccDirectoryTest (the
+//     manager bind, a missing base and an unreachable server) and
+//     TestAccDirectoryCancellation.
+//   - fault_test.go runs against an in-process server that answers
+//     scripted BER: TestUnitDirectoryFaults (malformed answers, a silent
+//     server and TLS handshake, cancellation, referrals, refused filters and
+//     failures after each step), TestUnitDirectoryResults (paging, ambiguous
+//     and size-limited searches, poisoning protection, unreadable entries),
+//     TestUnitDirectoryURLs and TestUnitDirectoryTestFaults.
 package ldap

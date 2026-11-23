@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
+	"github.com/weaveplatform/artifactweave/internal/platform/outbound"
 )
 
 // Client is immutable and safe for concurrent use. Every successful Do or Fetch
@@ -70,7 +71,7 @@ func NewClient(c repo.Config, opts remote.Options) (*Client, error) {
 	}
 	tr := &http.Transport{
 		MaxIdleConns: 100, MaxIdleConnsPerHost: 10, MaxConnsPerHost: 32,
-		IdleConnTimeout: 90 * time.Second, TLSHandshakeTimeout: idle,
+		IdleConnTimeout: outbound.IdleConnTimeout(idle), TLSHandshakeTimeout: idle,
 		ResponseHeaderTimeout: idle, ExpectContinueTimeout: time.Second,
 		DisableCompression:     true,
 		MaxResponseHeaderBytes: 1 << 20,
@@ -96,7 +97,7 @@ func NewClient(c repo.Config, opts remote.Options) (*Client, error) {
 		if dialErr != nil {
 			return nil, fmt.Errorf("dial remote: %w", dialErr)
 		}
-		return &idleConn{Conn: conn, timeout: idle}, nil
+		return outbound.SocketTimeoutConn(conn, idle), nil
 	}
 	client := &Client{
 		config:    c,
@@ -429,40 +430,6 @@ func (b *cancelBody) Close() error {
 		return safeError(err)
 	}
 	return nil
-}
-
-type idleConn struct {
-	net.Conn
-	timeout time.Duration
-}
-
-func (c *idleConn) Read(p []byte) (int, error) {
-	if c.timeout > 0 {
-		if err := c.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
-			return 0, fmt.Errorf("set read deadline: %w", err)
-		}
-	}
-	n, err := c.Conn.Read(p)
-	if errors.Is(err, io.EOF) {
-		return n, io.EOF
-	}
-	if err != nil {
-		return n, fmt.Errorf("read remote: %w", err)
-	}
-	return n, nil
-}
-
-func (c *idleConn) Write(p []byte) (int, error) {
-	if c.timeout > 0 {
-		if err := c.SetWriteDeadline(time.Now().Add(c.timeout)); err != nil {
-			return 0, fmt.Errorf("set write deadline: %w", err)
-		}
-	}
-	n, err := c.Conn.Write(p)
-	if err != nil {
-		return n, fmt.Errorf("write remote: %w", err)
-	}
-	return n, nil
 }
 
 // Request restrictions share pooled connections but never another request's

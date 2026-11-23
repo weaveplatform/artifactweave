@@ -15,8 +15,8 @@ import (
 )
 
 // The Access LDAP connections (/access/api/v1/ldap/settings, LDAP-01,
-// research 05 "LDAP connections"). The connection test binds to a directory
-// and stays 501 until LDAP-02 brings the directory client.
+// research 05 "LDAP connections") and their test (LDAP-02), which asks the
+// directory through Deps.LDAP.
 
 // ldapTx runs fn for an administrator in one transaction under the
 // administration guard, rechecking inside it that the caller is still an
@@ -210,4 +210,38 @@ func (s AccessService) DeleteLdapSettings(
 		return nil, s.ldapError(ctx, "delete LDAP connection", err)
 	}
 	return accessgen.DeleteLdapSettings204Response{}, nil
+}
+
+// TestLdapConnection tests the connection the body describes without storing
+// it (POST /access/api/v1/ldap/settings/test): 204 when the directory
+// answered, 400 with what failed when it did not, so a test reports the
+// directory's answer and never the settings' validity alone. The authority
+// recheck and the stored password's read end their transaction before the
+// directory is asked: no metadata transaction waits on directory I/O.
+func (s AccessService) TestLdapConnection(
+	ctx context.Context,
+	req accessgen.TestLdapConnectionRequestObject,
+) (accessgen.TestLdapConnectionResponseObject, error) {
+	if s.deps.LDAP == nil {
+		return nil, apierror.New(http.StatusNotImplemented, "LDAP connection tests are not available")
+	}
+	if req.Body == nil {
+		return nil, httpkit.BadRequestf("a body with the LDAP connection is required")
+	}
+	var conn ldap.Connection
+	if err := s.ldapTx(ctx, func(ctx context.Context, svc ldap.Service) error {
+		var err error
+		conn, err = svc.TestConnection(ctx, ldapChange(*req.Body))
+		return err //nolint:wrapcheck // mapped by ldapError
+	}); err != nil {
+		return nil, s.ldapError(ctx, "prepare LDAP connection test", err)
+	}
+	if err := s.deps.LDAP.Test(ctx, conn); err != nil {
+		var failed *ldap.DirectoryError
+		if errors.As(err, &failed) {
+			return nil, httpkit.BadRequestf("LDAP connection test failed: %s", failed.Error())
+		}
+		return nil, s.internalError(ctx, "test LDAP connection", err)
+	}
+	return accessgen.TestLdapConnection204Response{}, nil
 }

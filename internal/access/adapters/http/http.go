@@ -10,6 +10,7 @@ import (
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/idtoken"
+	"github.com/weaveplatform/artifactweave/internal/access/core/ldap"
 	"github.com/weaveplatform/artifactweave/internal/access/core/login"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
@@ -69,6 +70,9 @@ type Deps struct {
 	CompatVersion string
 	// Log receives the handlers' internal errors; nil means slog.Default.
 	Log *slog.Logger
+	// LDAP is the directory client the LDAP connection test asks; nil
+	// answers that test 501.
+	LDAP ldap.Directory
 	// Repositories is the artifacts module's binding over Store. A key pair
 	// delete clears the repositories' references to the pair through it in
 	// the delete's own transaction, so it must take part in the transaction

@@ -63,6 +63,13 @@
 //     with nothing that would plan again, defaults, the manager password
 //     kept, cleared and never returned, refusals, and every operation
 //     refused to anonymous callers, non-administrators and their tokens.
+//   - ldap_login_test.go: LDAP logins (#1833) against an OpenLDAP container
+//     over LDAPS, on SQLite and PostgreSQL: the connection test's 204 and
+//     its bind, TLS and search failures, DN-pattern and search logins and
+//     refusals, auto_create_user on and off, email and profile_updatable,
+//     a token and artifact access after a directory login, a disabled and an
+//     unreachable connection beside the local administrator, and a
+//     restart.
 //   - api_restrictions_test.go: restriction, recovery, validation and the
 //     project quota.
 //   - username_case_test.go: user names in any case on every route that

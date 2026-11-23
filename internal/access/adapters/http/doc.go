@@ -97,14 +97,20 @@
 // and global-role project discovery with current transactional management
 // authority. Effective content grants and role-token policy remain PRJ-02.
 // P12 LDAP-01 serves the LDAP connections (/access/api/v1/ldap/settings, with
-// the provider's trailing-slash collection) through access/core/ldap; the
-// connection test stays 501 until LDAP-02.
+// the provider's trailing-slash collection) through access/core/ldap.
+// LDAP-02 (#1833) serves the connection test: the change is checked and
+// completed under the administrator recheck in one guarded transaction,
+// then Deps.LDAP binds to the directory outside it, and a failure answers
+// 400 naming the step that failed (connect, tls, manager bind, search).
+// Without Deps.LDAP the test answers 501.
 //
 // # Testing
 //
 // The unit tests here call the middleware and the partials directly over
 // in-memory stores, without the router; TestUnitDeleteKeyPairIsOneTransaction
-// checks the key pair transaction. The route suites under test/server/access
+// checks the key pair transaction, and TestUnitLDAPConnectionTestAnswers the
+// connection test without a directory client and with a failure that names
+// no LDAP step. The route suites under test/server/access
 // and the router's guards in app (its status, principal and ledger tables)
 // reach the handlers through the router.
 package accesshttp

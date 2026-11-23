@@ -51,7 +51,9 @@ Use an `http.CookieJar` to exercise the returned `Set-Cookie` headers.
 `Requests()` returns independent redacted snapshots. Query values, credentials,
 cookies and unknown header values are redacted; bodies and URL userinfo are never
 recorded. `HeaderMatches(name, value)` checks a known candidate using a keyed hash
-without putting its plaintext in assertion output. Register fixture secrets embedded
+without putting its plaintext in assertion output. `RemoteAddr` names the client
+connection a request arrived on, so a test can tell a reused connection from a
+replay on a new one. Register fixture secrets embedded
 in paths or ordinarily visible headers in `Options.Secrets`. Counts include denied,
 missing and interrupted requests. Empty method/path arguments mean all requests;
 counts never reset implicitly. Closing a server twice is safe, and closing a proxy

@@ -23,6 +23,10 @@ type Config = app.RouterConfig
 // name it here.
 type Store = app.RouterStore
 
+// Runtime is the application runtime App and OpenApp open: app.Runtime,
+// named here for test files that may not import app.
+type Runtime = app.Runtime
+
 // Tune adjusts a Config before the router is built from it, for a suite that
 // needs another blob store, a logger it can read or an option turned on. It is
 // an alias, so any func(*Config) is a Tune.
