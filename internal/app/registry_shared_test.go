@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	layout "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/docker"
+	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/middleware"
 	"github.com/weaveplatform/artifactweave/test/server/support"
 )
@@ -32,11 +34,56 @@ func webServerStatusRows() []statusCase {
 		{route, path, "user", "", 200},
 		{route, path, "anonymous", "", 401},
 		{route, path, "", "", 401},
+		{"POST " + path, path, "admin", webServerFixture, 200},
+		{"POST " + path, path, "admin", `{"webServerType":"NGINX","publicAppContext":"artifactory"}`, 400},
+		{"POST " + path, path, "user", webServerFixture, 403},
+		{"POST " + path, path, "anonymous", webServerFixture, 401},
+		{snippet, snippetPath, "admin", "", 200},
+		{snippet, snippetPath, "user", "", 403},
+		{snippet, snippetPath, "", "", 401},
+		{baseURL, baseURLPath, "admin", "https://reg.example.com", 200},
+		{baseURL, baseURLPath, "admin", "ftp://reg.example.com", 400},
+		{baseURL, baseURLPath, "admin", "", 200},
+		{baseURL, baseURLPath, "user", "https://reg.example.com", 403},
+		{baseURL, baseURLPath, "", "https://reg.example.com", 401},
 	}
 }
 
+// webServerFixture is a complete NGINX reverse proxy, as the
+// platform_reverse_proxy resource sends one.
+const webServerFixture = `{"key":"nginx","webServerType":"NGINX","artifactoryAppContext":"artifactory",` +
+	`"publicAppContext":"artifactory","serverName":"reg.example.com","artifactoryServerName":"localhost",` +
+	`"dockerReverseProxyMethod":"SUBDOMAIN","useHttp":true,"useHttps":false,"httpPort":80,"httpsPort":443}`
+
+const (
+	snippet     = "GET /artifactory/api/system/configuration/reverseProxy/nginx"
+	snippetPath = "/artifactory/api/system/configuration/reverseProxy/nginx"
+	baseURL     = "PUT /artifactory/api/system/configuration/baseUrl"
+	baseURLPath = "/artifactory/api/system/configuration/baseUrl"
+)
+
 func webServerMatrixRows() []matrixRow {
-	return []matrixRow{at("GET /artifactory/api/system/configuration/webServer", "", signedIn, 200)}
+	return []matrixRow{
+		at("GET /artifactory/api/system/configuration/webServer", "", signedIn, 200),
+		at("POST /artifactory/api/system/configuration/webServer", webServerFixture, administrators, 200),
+		// A blank body clears urlBase, which leaves the other rows' links as
+		// they were.
+		at(baseURL, "", administrators, 200),
+		at(snippet, "", administrators, 200).seeding(storedReverseProxy),
+	}
+}
+
+// storedReverseProxy stores the settings the snippet renders, as POST
+// webServer would.
+func storedReverseProxy(t *testing.T, f *matrixFixture, _ string) {
+	t.Helper()
+	if err := f.db.Configs().Put(context.Background(), configdoc.ConfigDocument{
+		Kind: configdoc.ConfigReverseProxy, Key: "current", Enabled: true,
+		Document: []byte(`{"key":"nginx","webServerType":"NGINX","publicAppContext":"artifactory",` +
+			`"serverName":"reg.example.com","artifactoryServerName":"localhost"}`),
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func allOf(rules ...rule) rule {

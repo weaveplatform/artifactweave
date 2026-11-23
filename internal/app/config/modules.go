@@ -77,7 +77,11 @@ func (c Config) Artifacts() artifacts.Settings {
 }
 
 // Configuration returns the configuration module's settings:
-// docker.subdomain_match.
+// docker.subdomain_match, base_url and the hot tier's CDN hosts.
 func (c Config) Configuration() configapi.Settings {
-	return configapi.Settings{DockerSubdomainMatch: c.Docker.SubdomainMatch}
+	return configapi.Settings{
+		DockerSubdomainMatch: c.Docker.SubdomainMatch,
+		BaseURL:              c.BaseURL,
+		CDNHosts:             c.cdnHosts(),
+	}
 }

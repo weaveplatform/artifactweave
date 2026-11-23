@@ -55,9 +55,9 @@ contracts and provider access.
 | GET | `/artifactory/api/system/configuration` | admin | 200 | `application/xml`, current delivered descriptor sections (P12 CFG-01) |
 | POST | `/artifactory/api/system/configuration` | admin | 200 | full XML replace; currently 501, P36 |
 | PATCH | `/artifactory/api/system/configuration` | admin | 200 | `application/yaml`, partial; `null` deletes an element; an empty document deletes every repository |
-| PUT | `/artifactory/api/system/configuration/baseUrl` | admin | 200 | `text/plain` URL; currently 501, P12 |
+| PUT | `/artifactory/api/system/configuration/baseUrl` | admin | 200 | `text/plain` URL, stored as the descriptor's `urlBase`; blank clears it. Answers `URL base has been successfully updated to "<url>".` (P12 CFG-02) |
 | GET / POST | `/artifactory/api/system/configuration/webServer` | GET: any signed-in user; POST: admin | 200 | reverse proxy settings, shape below. "Non-admin users will get the proxy method and ports and the list of repositories based on their user permissions" ([Get Reverse Proxy Configuration](https://docs.jfrog.com/administration/reference/getreverseproxyconfiguration.md)); the schema has no field for the list, so its name is **[I]** |
-| GET | `/artifactory/api/system/configuration/reverseProxy/nginx` | admin | 200 | `text/plain` snippet; currently 501, P12 |
+| GET | `/artifactory/api/system/configuration/reverseProxy/nginx` | admin | 200 | `text/plain` snippet rendered from the stored NGINX settings; 400 when none are stored or the type is not NGINX (P12 CFG-02) |
 | POST / DELETE / GET | `/artifactory/api/system/debug/loggers[/{class}]` | admin | 200 | `{"classes":{"<logger>":"debug"},"timer":<int>}`, 1–100 loggers; implemented P12 process-local controls; P38 owns operational extensions |
 | GET | `/artifactory/api/system/locks[?category=]`, `/locks/local` | admin | 200 | PostgreSQL advisory locks; currently 501, P38 with P35 HA state |
 | POST | `/artifactory/api/system/migration/sha2/start`, `/stop` | admin | 200 | currently 501, P36 |
@@ -87,7 +87,8 @@ the services `jfrt@<uuid>` and `jfac@<uuid>` by the stored instance id, gives ev
 the host name as its `node_id`, marks a failing service `UNHEALTHY` with the reason as its
 message and the router `UNHEALTHY_PEER`, and then answers 503. `GET .../webServer` gives a
 signed-in user who is not an administrator `dockerReverseProxyMethod` and the port fields,
-and nothing else. Writing `webServer` is currently `501` and remains P12. HA licence
+and nothing else. `POST .../webServer` stores the settings (see "Base URL and reverse
+proxy" below). HA licence
 list/install/delete routes are also `501`; their external entitlement contract belongs
 to P40. The single licence GET shim does not implement them.
 
@@ -173,11 +174,70 @@ Reverse proxy (`webServer`) shape:
  "useHttps":true,"useHttp":true,"sslPort":443,"httpsPort":443,"httpPort":80}
 ```
 
-`webServerType` is `NGINX | APACHE`. `dockerReverseProxyMethod` is documented as
-`SUBDOMAIN | REPOPATHPREFIX | PORTPERREPO`; the `platform_reverse_proxy` resource also
-sends `DIRECT`. The resource reads and writes `httpsPort` where the docs say `sslPort`, and
-never sends `serverNameExpression` or `artifactoryPort`, so both port keys are emitted and
-the two unsent fields are optional.
+`webServerType` is `NGINX | APACHE | DIRECT`: the `platform_reverse_proxy` resource
+(v2.2.11) sends its `server_provider`, one of those three, as `webServerType`, with
+`key` its lower-cased value. `dockerReverseProxyMethod` is
+`SUBDOMAIN | REPOPATHPREFIX | PORTPERREPO`, which is also the resource's validator; it
+never sends `DIRECT` there. An earlier revision of this page and of research 08 put
+`DIRECT` in the method enum. The resource reads and writes `httpsPort` where the docs say
+`sslPort`, and never sends `serverNameExpression` or `artifactoryPort`, so both port keys
+are emitted and the two unsent fields are optional.
+
+### Base URL and reverse proxy
+
+P12 CFG-02 ([#1826](https://github.com/weaveplatform/artifactweave/issues/1826)) stores
+both through the descriptor service, so `PUT baseUrl`, `POST webServer`, `PATCH` and
+`config apply` share one whole-patch validation and one transaction, after current
+administrator authority is rechecked under the configuration guard.
+
+- `urlBase` is a top-level YAML scalar ([D] General settings in the
+  [YAML configuration page](https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration.md)).
+  `PATCH` and `PUT baseUrl` accept an absolute `http` or `https` URL, or blank or null to
+  clear it, as 6.20's `ConfigResource.setUrlBase` does ("we allow removing custom
+  urlBase") [I: 6.20 fallback]. User information, a query or a fragment is refused,
+  because no link built on the base could carry it **[I]**, and so is a host that a
+  configured CDN domain is, or sits under, the rule `base_url` already follows
+  ([research 19](19-cdn-and-download-redirect.md)) **[I]**. Surrounding whitespace is
+  trimmed. The CFG-01 export writes `<urlBase>` after `<propertySets>`.
+- The effective configured base URL is the stored `urlBase`, else the installation's
+  `base_url` ([decision 0002](decisions/0002-api-compatibility-fidelity.md)). Every link
+  a request builds, the derived `webServer` answer and the Docker subdomain parent use it.
+  A write through this process applies from the next request; a write by another process
+  sharing the store (`config apply` against a live database) applies within 5 seconds
+  **[I]**. Token scope service URLs keep `base_url`.
+- `POST webServer` replaces the single reverse proxy whole, as
+  `CentralConfigDescriptorImpl.updateReverseProxy` does [S 7.161.26]. Omitted fields take
+  `ReverseProxyDescriptor`'s defaults (key `nginx`, `artifactoryPort` 8081, `useHttp`
+  true, `useHttps` false, `sslPort` 443, `httpPort` 80) and `ReverseProxyMethod`'s
+  default, `SUBDOMAIN`. It enforces the descriptor's annotations: `key`,
+  `publicAppContext` and, for NGINX and APACHE, `serverName` and `artifactoryServerName`
+  not blank; `webServerType` not null; ports positive. Local refusals, each **[I]**:
+  `HAPROXY` (in 7.161.26's enum, but neither the docs, the resource nor
+  `artifactory.xsd` names it); `PORTPERREPO` (no port per repository is offered,
+  DV-009); `sslPort` and `httpsPort` that disagree; a port above 65535; NGINX or APACHE
+  with no listener, with both listeners on one port, or with HTTPS but no certificate and
+  key paths (the resource requires them too); and any value that would change the
+  snippet's nginx syntax: host names must be DNS names or bracketed IPv6, contexts URL
+  path segments, certificate paths absolute and free of spaces, quotes, `;`, braces, `$`,
+  `#` and `\`.
+- `GET webServer` returns stored settings with every field and both port keys, so the
+  resource reads back what it sent without drift. A signed-in user who is not currently
+  an administrator gets the method and ports only; certificate and key paths, host names
+  and contexts stay administrator-only. Without stored settings it describes the server,
+  as before. The XML export writes the stored proxy in `ReverseProxyType` order with the
+  XSD's spellings (`nginx`, `subDomain`, `path`) and an empty `upStreamName`, which
+  artifactweave does not store.
+- The snippet follows the shape of the [Get Reverse Proxy Snippet](https://docs.jfrog.com/administration/reference/getreverseproxysnippet.md)
+  example: certificate settings, one `server` block with the enabled listeners, the
+  forwarded protocol, and one `location /` that proxies to
+  `artifactoryServerName:artifactoryPort` and sets `X-JFrog-Override-Base-Url`. Because
+  artifactweave serves every product from one listener, there is no separate router
+  upstream **[I]**. Under `SUBDOMAIN` it matches `<repo>.<parent>`, the parent being
+  `serverNameExpression` without `*.` or else `serverName`, and rewrites `/v1` and `/v2`
+  to `/artifactory/api/docker/<repo>/`. Returning a snippet installs nothing, and the
+  stored method does not change how artifactweave routes Docker requests, which
+  `docker.subdomain_match` still decides.
+- No YAML page documents a `reverseProxies` section, so `PATCH` still refuses one.
 
 ## Version-string inputs
 
@@ -377,7 +437,7 @@ Proxy `domain` and `ntHost` are runtime NTLMv2 settings for artifact remote sour
 computer name of this client. [MS-NTHT](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-ntht/f8064832-931f-4516-9557-01630745732f)
 supplies the HTTP proxy handshake, while the [remote transport contract](../implementation/remote-http-transport.md)
 distinguishes local pinning, CONNECT and supported NTLMv2 capability restrictions.
-The separate replication consumer remains #1848.
+Single-replication push applies the same settings to its target tunnels (#1848).
 No Windows administration or LDAP NTLM login is implied.
 
 ### Proxy redirect credential contract
@@ -447,14 +507,16 @@ the 13.21.0 class retains the `NTCredentials`/`redirectToHostProxies` references
 the same listed hosts, so Apache's `BasicScheme` sends the
 [NTUserPrincipal](https://github.com/apache/httpcomponents-client/blob/4.5.x/httpclient/src/main/java/org/apache/http/auth/NTUserPrincipal.java)
 name: root-locale upper-case domain, a backslash and the username. artifactweave sends that
-name in the redirected Basic retry. P19/#216 retains live comparison; #1848 owns broader
-replication proxy configuration, preserving its independent endpoint and replay restrictions.
+name in the redirected Basic retry. P19/#216 retains live comparison. Push replication
+(#1848) validates the list with the same parser but follows no cross-origin or write
+redirect, so a valid list only stops disabling proxy use; the push client itself is
+closed source, so its use of the shared builder is inferred [I].
 
 ### What artifactweave serves
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
   `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`, `gcConfig`,
-  `trashcanConfig`, `downloadRedirectConfig`, `mailServer`, the
+  `trashcanConfig`, `downloadRedirectConfig`, `mailServer`, `urlBase`, the
   `security.anonAccessEnabled` setting and the `security.ldapSettings` connections
   (`internal/configuration/core/descriptor`). Download redirect configuration applies
   the whole-MB `fileMinimumSize` setting used by CDN/storage redirects

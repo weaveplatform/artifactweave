@@ -36,8 +36,10 @@ with their godog tags. The full core native job also runs the other acceptance
 harness `TestAcc` entries once.
 The provider conformance lane applies the pinned JFrog providers, demands an
 empty plan and destroys. The deployment lane checks Terraform formatting,
-validation, lint, Trivy, mocked tests and docs. Provider fixture changes select
-the first, deployment roots the second, and shared Terraform tooling both.
+validation, lint, Trivy, mocked tests and docs. Deployment roots and the
+READMEs under `deploy/` select the second. Provider fixtures, their harness and
+shared Terraform tooling select both, because the deployment lane also
+validates, lints and drift-checks the provider roots (#1858).
 Full release/manual runs require all four kinds and same-run merged coverage;
 the stable `Quality gate` rejects missing, failed or canceled selected lanes.
 Acceptance-only format owners explicitly skip the unit matrix while retaining
@@ -120,7 +122,8 @@ includes `@ntlm_proxy`; its JFrog CLI step fails when the required binary is abs
 A controlled proxy independently verifies NTLMv2 proof, domain/workstation and the
 same socket, while separate origin records and downloaded files prove cold bytes.
 Transport suites additionally cover failure, rotation, SQLite and PostgreSQL.
-Replication's separate consumer is #1848, not an effect claimed by this scenario.
+Replication's consumer (#1848) has its own proof: `@replication_ntlm_proxy` pushes
+between two owned processes on SQLite and PostgreSQL through the same verifier.
 
 **Terraform scenarios.** `test/terraform/run.sh` applies the app-layer references in
 `deploy/artifactweave/terraform` (decision 0030), covering the implemented P0–P8 resources

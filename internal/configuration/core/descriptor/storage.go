@@ -45,7 +45,7 @@ var storageNames = map[string]string{
 // refused rather than stored for nothing.
 func parseStorage(top map[string]any, p *Patch) error {
 	var change StorageChange
-	gc, named, err := singleton(top, SectionGC, []string{"cronExp"})
+	gc, named, err := storageSection(top, SectionGC, []string{"cronExp"})
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func parseStorage(top map[string]any, p *Patch) error {
 			change.GCCron = &s
 		}
 	}
-	trash, named, err := singleton(top, SectionTrashcan, []string{"enabled", "retentionPeriodDays"})
+	trash, named, err := storageSection(top, SectionTrashcan, []string{"enabled", "retentionPeriodDays"})
 	if err != nil {
 		return err
 	}
@@ -97,8 +97,8 @@ func parseStorage(top map[string]any, p *Patch) error {
 	return nil
 }
 
-// singleton returns a section's fields and whether the document names it.
-func singleton(top map[string]any, name string, fields []string) (map[string]any, bool, error) {
+// storageSection returns a section's fields and whether the document names it.
+func storageSection(top map[string]any, name string, fields []string) (map[string]any, bool, error) {
 	v, present := top[name]
 	if !present {
 		return nil, false, nil

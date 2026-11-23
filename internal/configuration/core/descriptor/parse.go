@@ -208,6 +208,9 @@ func Parse(doc []byte, env Lookup) (*Patch, error) {
 	if err := parseStorage(top, p); err != nil {
 		return nil, err
 	}
+	if err := parseURLBase(top, p); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 
@@ -277,6 +280,7 @@ var applied = []string{
 	SectionDownloadRedirect,
 	SectionMailServer,
 	SectionSecurity,
+	SectionURLBase,
 }
 
 // unapplied refuses the sections artifactweave does not apply yet. They are

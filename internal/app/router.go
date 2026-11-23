@@ -396,6 +396,7 @@ func withConfiguration(cfg RouterConfig) RouterConfig {
 		Repositories: repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects, repositoryLifecycle(cfg)),
 		Layouts:      layout.Checker{}, Access: cfg.Access, Logging: ownedLogging, Log: cfg.Logger,
 		StoragePolicies: artifacts.StoragePoliciesOf(cfg.Store),
+		Settings:        configapi.Settings{DockerSubdomainMatch: cfg.DockerSubdomainMatch, BaseURL: cfg.BaseURL},
 	})
 	if err == nil {
 		bound := m.API()
@@ -409,6 +410,16 @@ func withConfiguration(cfg RouterConfig) RouterConfig {
 	}
 
 	return cfg
+}
+
+// configuredBaseURL is the configured base URL each request resolves its
+// own against: the configuration module's effective value, a stored urlBase
+// over base_url, when the module is bound, and base_url otherwise.
+func configuredBaseURL(cfg RouterConfig) func(context.Context) string {
+	if ws := cfg.Configuration.WebServer; ws != nil {
+		return ws.BaseURL
+	}
+	return func(context.Context) string { return cfg.BaseURL }
 }
 
 // withFederation runs after Access and before Configuration: descriptor
@@ -642,7 +653,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		middleware.RequestID,
 		middleware.RecoverPanic(routerLogger(cfg, "artifactweave.http"), redactLoggedPath),
 		middleware.AccessLog(routerLogger(cfg, "artifactweave.http"), redactLoggedPath),
-		baseurl.Middleware(cfg.BaseURL),
+		baseurl.Dynamic(configuredBaseURL(cfg)),
 		remote.OriginTrace,
 		smart.SmartTrace,
 		dockerhttp.APIVersion,
@@ -715,6 +726,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).
 		Patch("/artifactory/api/system/configuration", sysAPI.PatchConfiguration)
 	r.Get("/artifactory/api/system/configuration", sysAPI.GetConfiguration)
+	r.Put("/artifactory/api/system/configuration/baseUrl", sysAPI.PutBaseURL)
 	// The item routes and the handwritten routes beside them keep their
 	// original order (item paths, AQL, agent marketplace, CRAN uploads,
 	// transfer, Debian snapshots), and all run before

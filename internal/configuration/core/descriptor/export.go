@@ -45,7 +45,9 @@ type exportDocument struct {
 	Virtual          []exportFields `xml:"virtualRepositories>virtualRepository"`
 	Federated        []exportFields `xml:"federatedRepositories>federatedRepository"`
 	Proxies          []exportFields `xml:"proxies>proxy"`
+	ReverseProxies   []exportFields `xml:"reverseProxies>reverseProxy"`
 	PropertySets     []exportFields `xml:"propertySets>propertySet"`
+	URLBase          *string        `xml:"urlBase,omitempty"`
 	Layouts          []exportFields `xml:"repoLayouts>repoLayout"`
 	GC               *exportFields  `xml:"gcConfig,omitempty"`
 	Trashcan         *exportFields  `xml:"trashcanConfig,omitempty"`
@@ -200,9 +202,6 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 	if out.Security, err = readExportSecurity(ctx, d); err != nil {
 		return out, err
 	}
-	if err := readExportStorage(ctx, d, &out); err != nil {
-		return out, err
-	}
 	for _, section := range []struct {
 		kind   configdoc.ConfigKind
 		key    string
@@ -252,7 +251,17 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 		}
 		*section.target = entry
 	}
-	return out, nil
+	return out, readExportOwned(ctx, d, &out)
+}
+
+// readExportOwned reads the sections whose state another service owns: the
+// web server settings and the storage policy. Each joins the export's
+// transaction, so the document stays one snapshot.
+func readExportOwned(ctx context.Context, d Deps, out *exportDocument) error {
+	if err := readWebServerExport(ctx, d, out); err != nil {
+		return err
+	}
+	return readExportStorage(ctx, d, out)
 }
 
 func publicDocument(doc configdoc.ConfigDocument) (map[string]any, error) {

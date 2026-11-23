@@ -21,7 +21,11 @@
 //
 // # Invariants
 //
-// Credentials stay on the configured origin. Response errors use closed safe
+// Credentials stay on the configured origin. A proxy with domain or ntHost
+// authenticates each CONNECT tunnel with NTLMv2 before any target request; its
+// identity joins the private revision and never becomes target credentials. A
+// valid redirectedToHosts list is accepted without effect: push follows only
+// same-origin GET/HEAD redirects. Response errors use closed safe
 // classifications. File metadata requires computed SHA-256 and size; only the
 // documented no-properties 404 denotes an empty property set, followed by a
 // second item read. An observed folder never authorizes recursive deletion.
@@ -40,6 +44,8 @@
 // # References
 //
 //   - https://github.com/weaveplatform/artifactweave/issues/1761.
+//   - https://github.com/weaveplatform/artifactweave/issues/1848.
+//   - docs/implementation/remote-http-transport.md.
 //   - https://docs.jfrog.com/artifactory/docs/aql-query-output.
 //   - https://docs.jfrog.com/artifactory/docs/aql-query-execution.
 //   - https://docs.jfrog.com/artifactory/reference/getstorageitem.
@@ -49,13 +55,15 @@
 //
 // # Status
 //
-// P11 REP-02 single-push target adapter. The federation module opens its factory
-// at application startup and closes it after the owning workers stop.
+// P11 REP-02 single-push target adapter; P12 #1848 adds NTLMv2 proxies. The
+// federation module opens its factory at application startup and closes it after
+// the owning workers stop.
 //
 // # Testing
 //
 // Owned chi HTTP fixtures verify paths, authenticated effects, metadata
-// replacement, safe errors, bounded listing and current connection policy.
+// replacement, safe errors, bounded listing and current connection policy. The
+// fakeupstream NTLM verifier independently checks proxied push proof and identity.
 // test/server/federation separately qualifies the production adapter against a
 // real target process on SQLite/PostgreSQL, including interrupted acknowledgements,
 // restart, revocation, native refusals, metadata discrepancies and timeouts.

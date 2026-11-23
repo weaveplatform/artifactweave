@@ -102,7 +102,10 @@
 // PRJ-04 adds the documented singleton mailServer settings for quota delivery,
 // with its password separated before persistence and guarded configuration reads.
 // LDAP-01 adds security.ldapSettings through access's LDAPSettings, with the
-// connections in the XML export's security element. CFG-05
+// connections in the XML export's security element. CFG-02 adds urlBase and
+// the reverse proxy behind configuration/api.WebServer: its writes build a
+// Patch and Apply it under the guard after a current administrator recheck,
+// and the export writes both in artifactory.xsd's order. CFG-05
 // (https://github.com/weaveplatform/artifactweave/issues/1829) adds gcConfig
 // and trashcanConfig through artifacts' StoragePolicies, exported in XSD
 // order.
@@ -133,4 +136,8 @@
 //     dry run, apply and reapply through the owner's binding, the owner's
 //     refusals in the descriptor's names, rollback with a failing later
 //     write, and the export's defaults, values, order and provider read.
+//   - webserver_test.go: urlBase through Parse, PUT and PATCH with the CDN
+//     rule and the cached effective value; reverse proxy writes, reads with
+//     current authority, the snippet, refusals that store nothing, rollback,
+//     corrupt stored documents and the export's element order.
 package descriptor

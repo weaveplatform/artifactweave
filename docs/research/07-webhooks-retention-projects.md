@@ -14,8 +14,9 @@ subscription administration and package cleanup execution/reports are implemente
 The project workflows use the durable authority foundations from #1730/#1731 rather
 than treating repository `projectKey` persistence as sufficient. Webhook outbound
 delivery, subscription test execution and troubleshooting remain P19a capabilities.
-The remaining replication PRs and exact merged-main P11 qualification are tracked in
-the [build status](../implementation/plan.md#build-status); these delivered contracts
+Single push and pull replication is also implemented. P11's exact merged-main
+qualification (#1765) is tracked in the
+[build status](../implementation/plan.md#build-status); these delivered contracts
 do not claim complete phase sign-off.
 
 Research baseline: **2026-10-12**. Sources: the per-endpoint pages under
