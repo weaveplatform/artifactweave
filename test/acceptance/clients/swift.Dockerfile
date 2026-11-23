@@ -1,7 +1,7 @@
 # Client pins: Swift/SwiftPM 6.4.2 pinned Linux client.
 # SwiftPM is pinned to the multi-platform image index. Its native
 # package-registry client publishes, resolves and downloads in acceptance.
-FROM swift:6.4.2-jammy@sha256:18a1cdd3e55ee32b0b3e1a15f12a4e1320b67544e542ed96c907629e5e434144
+FROM swift:6.4.2-jammy@sha256:c8aedc4833f4fd5d79446200df904e572c311b6e1ec36cc148bb91f422e643f4
 
 COPY ubuntu-mirrors.sh /usr/local/bin/ubuntu-mirrors
 RUN ubuntu-mirrors
