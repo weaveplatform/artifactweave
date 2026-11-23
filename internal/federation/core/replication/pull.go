@@ -152,13 +152,13 @@ func (p Pull) Step(ctx context.Context, ref model.PullReference, fence PushFence
 	if err := p.withRun(ctx, run, fence, nil); err != nil {
 		return run, err
 	}
-	pending, _, err := p.Store.PullProgress().Items(ctx, ref, true, kernel.Page{Limit: 1})
+	pending, found, err := p.Store.PullProgress().NextPending(ctx, ref)
 	if err != nil {
 		return run, fmt.Errorf("read pending pull intent: %w", err)
 	}
 	switch {
-	case len(pending) != 0:
-		err = p.item(ctx, run, pending[0], fence)
+	case found:
+		err = p.item(ctx, run, pending, fence)
 	default:
 		err = p.page(ctx, run, fence)
 	}

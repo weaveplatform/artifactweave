@@ -31,6 +31,13 @@ func (p pullFaultProgress) Items(ctx context.Context, ref model.PullReference, p
 	return p.PullProgressStore.Items(ctx, ref, pending, page)
 }
 
+func (p pullFaultProgress) NextPending(ctx context.Context, ref model.PullReference) (model.PullItem, bool, error) {
+	if p.mode == "pending" {
+		return model.PullItem{}, false, kernel.ErrStore
+	}
+	return p.PullProgressStore.NextPending(ctx, ref)
+}
+
 func (p pullFaultProgress) CreateItem(ctx context.Context, i model.PullItem) (model.PullItem, error) {
 	if p.mode == "intent" {
 		return model.PullItem{}, kernel.ErrStore

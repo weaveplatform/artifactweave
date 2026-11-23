@@ -245,8 +245,14 @@ func (p pullProgress) CreateItem(ctx context.Context, in model.PullItem) (model.
 		if err != nil {
 			return fmt.Errorf("encode pull intent: %w", err)
 		}
-		if _, err := p.s.Exec(ctx, "create pull intent", dialect.Insert("replication_pull_items", dialect.OpsCols(pullItemCols)),
-			in.Run.ID, in.Run.Incarnation, key, fingerprint, in.Action, in.Path, in.Version, in.Phase, document); err != nil {
+		var ordinal int64
+		if err := p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
+			"SELECT COALESCE(MAX(ordinal),0)+1 FROM replication_pull_items WHERE run_id=? AND run_incarnation=?"),
+			in.Run.ID, in.Run.Incarnation).Scan(&ordinal); err != nil {
+			return p.s.Wrap("order pull intent", err)
+		}
+		if _, err := p.s.Exec(ctx, "create pull intent", dialect.Insert("replication_pull_items", append(dialect.OpsCols(pullItemCols), "ordinal")),
+			in.Run.ID, in.Run.Incarnation, key, fingerprint, in.Action, in.Path, in.Version, in.Phase, document, ordinal); err != nil {
 			return err
 		}
 		out = in
@@ -323,6 +329,31 @@ func (p pullProgress) AdvanceItem(ctx context.Context, expected int64, next mode
 		return kernel.ErrConflict
 	}
 	return nil
+}
+
+func (p pullProgress) NextPending(ctx context.Context, ref model.PullReference) (model.PullItem, bool, error) {
+	if err := ref.Validate(); err != nil {
+		return model.PullItem{}, false, fmt.Errorf("validate pull reference: %w", err)
+	}
+	var out model.PullItem
+	found := false
+	err := p.s.Tx(ctx, func(ctx context.Context) error {
+		run, err := p.Run(ctx, ref)
+		if err != nil {
+			return err
+		}
+		return p.s.Rows(ctx, "read next pull intent",
+			"SELECT "+pullItemCols+" FROM replication_pull_items WHERE run_id=? AND run_incarnation=? AND phase<>? ORDER BY ordinal, operation_key LIMIT 1",
+			[]any{ref.ID, ref.Incarnation, model.PullItemComplete}, func(row *sql.Rows) error {
+				out, err = scanPullItem(row, run)
+				found = err == nil
+				return err
+			})
+	})
+	if err != nil {
+		return model.PullItem{}, false, fmt.Errorf("read next pull intent: %w", err)
+	}
+	return out, found, nil
 }
 
 func (p pullProgress) Items(ctx context.Context, ref model.PullReference, pending bool, page kernel.Page) ([]model.PullItem, string, error) {

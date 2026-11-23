@@ -64,8 +64,23 @@ func TestAccPullProgressReopenPreservesVerifiedCacheAndPendingTraversal(t *testi
 		storekit.Get[model.PullItem](t)(second.PullProgress().Item(t.Context(), run.Reference, intent.Action, intent.Path)))
 	storekit.Same(t, "intent replay retains completed cache evidence", stored,
 		storekit.Get[model.PullItem](t)(second.PullProgress().CreateItem(t.Context(), intent)))
+	if _, found, err := second.PullProgress().NextPending(t.Context(), run.Reference); err != nil || found {
+		t.Fatal("a completed intent was pending", found, err)
+	}
+	// Intents are taken in the order they were recorded, not by path or by
+	// their hashed operation keys (#1895).
+	for _, path := range []string{"selected/z", "selected/b", "selected/m"} {
+		later := intent
+		later.Path, later.Source = path, new(*intent.Source)
+		later.Source.Path = path
+		storekit.Get[model.PullItem](t)(second.PullProgress().CreateItem(t.Context(), later))
+	}
+	pending, found, err := second.PullProgress().NextPending(t.Context(), run.Reference)
+	if err != nil || !found || pending.Path != "selected/z" {
+		t.Fatal("next pending intent is not the earliest recorded", pending.Path, found, err)
+	}
 	changed := binding
 	changed.Source.Revision = strings.Repeat("f", 64)
-	_, err := second.PullProgress().Create(t.Context(), "logical-pull", changed, time.Unix(9, 0))
+	_, err = second.PullProgress().Create(t.Context(), "logical-pull", changed, time.Unix(9, 0))
 	storekit.WantErr(t, err, kernel.ErrConflict)
 }

@@ -904,9 +904,11 @@ column replication_pull_items.path text NOT NULL
 column replication_pull_items.version bigint NOT NULL
 column replication_pull_items.phase text NOT NULL
 column replication_pull_items.document text NOT NULL
+column replication_pull_items.ordinal bigint NOT NULL DEFAULT 0
 constraint replication_pull_items.replication_pull_items_pkey PRIMARY KEY (run_id, operation_key)
 constraint replication_pull_items.replication_pull_items_run_id_run_incarnation_fkey FOREIGN KEY (run_id, run_incarnation) REFERENCES replication_pull_runs(run_id, incarnation) ON DELETE CASCADE
 constraint replication_pull_items.replication_pull_items_version_check CHECK ((version > 0))
+index replication_pull_items.replication_pull_items_order CREATE INDEX replication_pull_items_order ON replication_pull_items USING btree (run_id, phase, ordinal)
 index replication_pull_items.replication_pull_items_pending CREATE INDEX replication_pull_items_pending ON replication_pull_items USING btree (run_id, phase, operation_key)
 index replication_pull_items.replication_pull_items_pkey CREATE UNIQUE INDEX replication_pull_items_pkey ON replication_pull_items USING btree (run_id, operation_key)
 table replication_pull_runs

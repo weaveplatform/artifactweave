@@ -34,6 +34,7 @@ type pullWorld struct {
 	// pageSize caps the rows one owner page returns; an owner may return
 	// fewer than the driver asks for. Zero keeps one row per page.
 	pageSize int
+	fetched  []string
 }
 
 type pullSource struct{ w *pullWorld }
@@ -113,6 +114,7 @@ func (s pullSource) Fetch(ctx context.Context, item artifactsapi.PullItem, publi
 		return artifactsapi.PullCached{}, kernel.ErrInvalid
 	}
 	s.w.fetches++
+	s.w.fetched = append(s.w.fetched, item.Path)
 	if s.w.beforeFetch != nil {
 		s.w.beforeFetch()
 	}
@@ -363,5 +365,22 @@ func TestUnitPullCancellationAndMissingFenceCannotReachEnumeration(t *testing.T)
 	}
 	if w.pages != 0 || w.fetches != 0 || w.restores != 0 {
 		t.Fatal("cancelled or unfenced pull reached authority or network work")
+	}
+}
+
+// A page records its intents at once, and their operation keys are hashes;
+// they are still fetched in the owner's enumeration order (#1895), so an
+// interruption leaves the same prefix cached as one-at-a-time enumeration.
+func TestUnitPullFetchesAPageInEnumerationOrder(t *testing.T) {
+	w, _, run := newPullWorld(t, false)
+	w.pageSize = 100
+	var want []string
+	for _, name := range []string{"a", "b", "c", "d", "e", "f", "g", "h"} {
+		w.add(run, "selected/"+name)
+		want = append(want, "selected/"+name)
+	}
+	finishPull(t, w, run)
+	if w.pages != 1 || !slices.Equal(w.fetched, want) {
+		t.Fatal("page fetch order", w.pages, w.fetched)
 	}
 }

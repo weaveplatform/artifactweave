@@ -43,4 +43,9 @@ type PullProgressStore interface {
 	// unfinished intents for recovery before advancing source/target cursors.
 	// An empty continuation ends the walk, including an empty matching page.
 	Items(context.Context, model.PullReference, bool, kernel.Page) ([]model.PullItem, string, error)
+	// NextPending returns the run's earliest-recorded unfinished intent, or
+	// false when none is unfinished. An enumeration page records many intents
+	// at once; taking them in recorded order keeps the owner's enumeration
+	// order for every fetch and removal that follows (#1895).
+	NextPending(context.Context, model.PullReference) (model.PullItem, bool, error)
 }
