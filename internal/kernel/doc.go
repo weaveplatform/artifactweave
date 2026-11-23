@@ -51,8 +51,10 @@
 //   - The auth sentinels, API errors with an HTTP status: ErrBadCredentials
 //     and ErrUnauthenticated (401), and ErrForbidden, ErrAPIRestricted,
 //     ErrPasswordExpired and ErrAccountLocked (403).
-//   - ErrStorageQuota: a generic project-storage refusal in the current route's
-//     envelope, carrying no private owner/usage data or authentication challenge.
+//   - ErrStorageQuota: a hard project storage quota's refusal in the current
+//     route's envelope, carrying no private owner/usage data or authentication
+//     challenge: 7.x's 413 and message under Artifactory's envelope, the
+//     local 403 under the others.
 //   - ErrDiskQuota: the global storage quota's refusal, 7.x's 413 and its
 //     message; ErrStorageCapacity: 503 when an enabled quota cannot measure
 //     its volume. StorageRefusal is true for any of the three, so optional
