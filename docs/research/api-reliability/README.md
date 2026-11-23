@@ -27,6 +27,13 @@ implementation. Partial entries retain unsupported modes and native dispatch
 limitations; neither repository CRUD nor a mounted wildcard proves full native
 support.
 
+An entry's `evidence` lists its persistence family's sources first, then the
+sources reviewed for that operation, then decision 0043 and the limits source.
+Operation-specific sources apply to every served state (implemented, partial or a
+handwritten override). A stub lists only its 501 handler and the stub test. The
+ledger test fails when an entry cites a source twice or one the repository does
+not have.
+
 A specified operation's `retry`, `admission` and `pagination_execution` are derived
 from the classes its spec declares
 ([decision 0043](../decisions/0043-api-reliability.md#rules-for-every-operation)),
