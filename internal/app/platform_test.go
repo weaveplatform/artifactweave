@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	iofs "io/fs"
 	"log/slog"
 	"maps"
 	"os"
@@ -627,26 +628,39 @@ func TestAccMigrateCommand(t *testing.T) {
 		t.Fatalf("unknown action: %v", err)
 	}
 
-	// --module limits each action to one stream.
-	const applied = "applied 8 migration(s): [artifacts:1 artifacts:2 artifacts:3 artifacts:4 artifacts:5 artifacts:6 artifacts:7 artifacts:8]\n"
+	// --module limits each action to one stream. Each stream's latest
+	// version is the number of its embedded SQLite migrations, so a new
+	// migration changes the expected answers without editing this test
+	// (a hard-coded count broke main when federation gained 0009).
+	latest := map[string]int{}
+	var order []string
+	for _, m := range appsql.Modules() {
+		files, err := iofs.Glob(m.Migrations, "sqlite/*.sql")
+		if err != nil || len(files) == 0 {
+			t.Fatalf("module %s has no SQLite migrations: %v", m.Name, err)
+		}
+		latest[m.Name] = len(files)
+		order = append(order, m.Name)
+	}
+	n := latest["artifacts"]
+	var steps []string
+	for v := 1; v <= n; v++ {
+		steps = append(steps, fmt.Sprintf("artifacts:%d", v))
+	}
+	applied := fmt.Sprintf("applied %d migration(s): [%s]\n", n, strings.Join(steps, " "))
 	if got := run("up", 0, "artifacts"); got != applied {
 		t.Fatalf("up --module artifacts: %q", got)
 	}
-	if got := run("version", 0, "artifacts"); got != "schema version 8 of 8 (sqlite, artifacts)\n" {
-		t.Fatalf("version --module artifacts: %q", got)
+	if got, want := run("version", 0, "artifacts"), fmt.Sprintf("schema version %d of %d (sqlite, artifacts)\n", n, n); got != want {
+		t.Fatalf("version --module artifacts: %q; want %q", got, want)
 	}
-	want := "schema version 0 of 3 (sqlite, platform)\n" +
-		"schema version 8 of 8 (sqlite, artifacts)\n" +
-		"schema version 0 of 6 (sqlite, access)\n"
-	for _, m := range []string{"notifications", "retention", "federation", "releases", "workers"} {
-		latest := 1
-		if m == "retention" {
-			latest = 5
+	want := ""
+	for _, m := range order {
+		current := 0
+		if m == "artifacts" {
+			current = n
 		}
-		if m == "federation" {
-			latest = 8
-		}
-		want += fmt.Sprintf("schema version 0 of %d (sqlite, %s)\n", latest, m)
+		want += fmt.Sprintf("schema version %d of %d (sqlite, %s)\n", current, latest[m], m)
 	}
 	if got := run("version", 0, ""); got != want {
 		t.Fatalf("version of every stream: %q; want %q", got, want)
@@ -654,8 +668,8 @@ func TestAccMigrateCommand(t *testing.T) {
 	if got := run("down", -1, "platform"); got != "reverted 0 migration(s): []\n" {
 		t.Fatalf("down --module platform with nothing applied: %q", got)
 	}
-	if got := run("down", -1, "artifacts"); got != "reverted 1 migration(s): [artifacts:8]\n" {
-		t.Fatalf("down --module artifacts: %q", got)
+	if got, want := run("down", -1, "artifacts"), fmt.Sprintf("reverted 1 migration(s): [artifacts:%d]\n", n); got != want {
+		t.Fatalf("down --module artifacts: %q; want %q", got, want)
 	}
 	for _, action := range []string{"up", "down", "version"} {
 		err := Migrate(ctx, cfg, action, -1, "nope", &out)
