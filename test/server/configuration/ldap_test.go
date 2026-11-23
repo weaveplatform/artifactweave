@@ -129,11 +129,9 @@ func TestAccLDAPDescriptorSharesAccessConnections(t *testing.T) {
 	xml := rec.Body.String()
 	if rec.Code != http.StatusOK || strings.Contains(xml, ldapSecret) || strings.Contains(xml, "managerPassword") ||
 		!strings.Contains(xml, "<security><hideUnauthorizedResources>false</hideUnauthorizedResources>"+
-			"<anonAccessEnabled>false</anonAccessEnabled>"+
-			"<userLockPolicy><enabled>false</enabled><loginAttempts>5</loginAttempts></userLockPolicy>"+
-			"<passwordSettings><encryptionPolicy>supported</encryptionPolicy><expirationPolicy><enabled>false</enabled>"+
+			"<passwordSettings><expirationPolicy><enabled>false</enabled>"+
 			"<passwordMaxAge>60</passwordMaxAge><notifyByEmail>true</notifyByEmail></expirationPolicy></passwordSettings>"+
-			"<ldapGroupSettings></ldapGroupSettings></security>") || strings.Contains(xml, "ldapSetting>") {
+			"</security>") || strings.Contains(xml, "ldapSetting>") {
 		t.Fatalf("export %d %s", rec.Code, xml)
 	}
 	// managerPassword null clears it; the entry null deletes the connection.

@@ -131,7 +131,7 @@ func TestUnitSecurityHideUnauthorizedRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(string(body), "<exportSecurity><hideUnauthorizedResources>true</hideUnauthorizedResources>"+
-		"<anonAccessEnabled>false</anonAccessEnabled><userLockPolicy>") {
+		"<passwordSettings>") {
 		t.Fatalf("export %s", body)
 	}
 	if apply("security:\n  hideUnauthorizedResources: false\n", false); hiding() {
@@ -321,8 +321,7 @@ func (f failingSecurity) Set(ctx context.Context, p accessapi.SecurityPolicy) er
 func TestUnitSecurityExportProjection(t *testing.T) {
 	ctx := context.Background()
 	var out exportSecurity
-	if err := exportPolicies(ctx, Deps{}, &out); err != nil || out.HideUnauthorized != nil || out.UserLockPolicy != nil ||
-		out.PasswordSettings != nil {
+	if err := exportPolicies(ctx, Deps{}, &out); err != nil || out.HideUnauthorized != nil || out.PasswordSettings != nil {
 		t.Fatal("an export without the binding", out, err)
 	}
 	db := inmem.New()
@@ -335,13 +334,12 @@ func TestUnitSecurityExportProjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// 7.161.26's SecurityType: no anonAccessEnabled, userLockPolicy,
+	// encryptionPolicy or ldapGroupSettings, which are Access's there.
 	want := "<exportSecurity><hideUnauthorizedResources>false</hideUnauthorizedResources>" +
-		"<anonAccessEnabled>false</anonAccessEnabled>" +
-		"<userLockPolicy><enabled>false</enabled><loginAttempts>5</loginAttempts></userLockPolicy>" +
-		"<passwordSettings><encryptionPolicy>supported</encryptionPolicy><expirationPolicy>" +
+		"<passwordSettings><expirationPolicy>" +
 		"<enabled>false</enabled><passwordMaxAge>60</passwordMaxAge><notifyByEmail>true</notifyByEmail>" +
-		"</expirationPolicy></passwordSettings>" +
-		"<ldapGroupSettings></ldapGroupSettings></exportSecurity>"
+		"</expirationPolicy></passwordSettings></exportSecurity>"
 	if string(body) != want {
 		t.Fatalf("%s", body)
 	}

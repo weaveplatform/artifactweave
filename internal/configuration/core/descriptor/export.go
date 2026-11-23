@@ -61,15 +61,20 @@ type exportDocument struct {
 	DownloadRedirect *exportFields  `xml:"downloadRedirectConfig,omitempty"`
 }
 
+// exportSecurity is 7.161.26's SecurityType (SecurityDescriptor propOrder
+// hideUnauthorizedResources, passwordSettings, centralOAuthProviders,
+// signingKeysSettings, sshServerSettings, buildGlobalBasicReadAllowed,
+// buildGlobalBasicReadForAnonymous). anonAccessEnabled, userLockPolicy,
+// passwordSettings.encryptionPolicy, ldapSettings and ldapGroupSettings are
+// not in it: its PATCH moves them to Access (PlatformConfigMigrationHandler,
+// LdapSettingsMigrationHandler, LdapGroupSettingsMigrationHandler), so they
+// are read through securityconfig and the Access API, never here (#1893,
+// #1905). The elements after passwordSettings name features artifactweave
+// does not have and are left out (all are minOccurs="0") rather than written
+// as their defaults, which would claim the settings are in force.
 type exportSecurity struct {
-	// HideUnauthorized is SecurityType's first element in 7.161.26's
-	// artifactory.xsd (SecurityDescriptor propOrder), ahead of the elements
-	// below that left SecurityType for Access (#1905).
-	HideUnauthorized *bool          `xml:"hideUnauthorizedResources,omitempty"`
-	Anonymous        bool           `xml:"anonAccessEnabled"`
-	UserLockPolicy   *exportFields  `xml:"userLockPolicy,omitempty"`
-	PasswordSettings *exportFields  `xml:"passwordSettings,omitempty"`
-	LDAPGroups       []exportFields `xml:"ldapGroupSettings>ldapGroupSetting"`
+	HideUnauthorized *bool         `xml:"hideUnauthorizedResources,omitempty"`
+	PasswordSettings *exportFields `xml:"passwordSettings,omitempty"`
 }
 
 type exportFields struct {
@@ -196,7 +201,7 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 			*section.target = append(*section.target, entry)
 		}
 	}
-	if out.Security, err = readExportSecurity(ctx, d); err != nil {
+	if err := exportPolicies(ctx, d, &out.Security); err != nil {
 		return out, err
 	}
 	if out.Backups, err = readExportBackups(ctx, d, existing); err != nil {

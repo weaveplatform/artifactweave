@@ -88,5 +88,5 @@ variable "strategy" {
 variable "sub_tree" {
   type        = bool
   default     = false
-  description = "Whether the teams setting searches below ou=groups; the units setting takes the opposite."
+  description = "Whether the teams setting searches below ou=groups."
 }

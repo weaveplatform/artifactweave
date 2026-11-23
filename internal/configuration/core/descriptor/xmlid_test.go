@@ -240,9 +240,11 @@ func TestUnitXMLIDLDAPGroupNamesAreNotIDs(t *testing.T) {
 	if _, err := applyWith(t, d, idEntry(idBackup, "ops")+"security:\n  ldapGroupSettings:\n    ops:\n      enabledLdap: corp\n", false); err != nil {
 		t.Fatal(err)
 	}
-	node, body := exportXML(t, d)
-	if xmlText(t, node, "proxies/proxy[key=devs]/host") != "proxy.example" ||
-		xmlText(t, node, "security/ldapGroupSettings/ldapGroupSetting[name=devs]/enabledLdap") != "corp" {
+	all, err := d.LDAPGroups.GroupSettings(t.Context())
+	if err != nil || len(all) != 2 {
+		t.Fatal("group settings", all, err)
+	}
+	if node, body := exportXML(t, d); xmlText(t, node, "proxies/proxy[key=devs]/host") != "proxy.example" {
 		t.Fatal(body)
 	}
 }

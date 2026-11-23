@@ -170,12 +170,19 @@ downloadRedirectConfig:
 		"repoLayouts/repoLayout/distinctiveDescriptorPathPattern": "false",
 		"mailServer/from":                        "sender <sender@example.invalid>",
 		"mailServer/enabled":                     "false",
-		"security/anonAccessEnabled":             "true",
 		"downloadRedirectConfig/fileMinimumSize": "0",
 	} {
 		if got := xmlText(t, node, path); got != want {
 			t.Errorf("%s = %q, want %q", path, got, want)
 		}
+	}
+	// The patch turned anonymous access on, and 7.161.26's SecurityType has
+	// no element for it: Access holds it and securityconfig reads it.
+	if on, err := d.AnonymousAccess.Enabled(t.Context()); err != nil || !on {
+		t.Fatal("anonymous access not applied", on, err)
+	}
+	if strings.Contains(body, "anonAccessEnabled") {
+		t.Error("the anonymous access switch reached the XML")
 	}
 	for _, secret := range []string{"resolved-fixture", "sensitive-header-fixture", "${", "<password>"} {
 		if strings.Contains(body, secret) {
@@ -219,10 +226,7 @@ func TestUnitExportEmptyAndOptionalState(t *testing.T) {
 	db := inmem.New()
 	d := depsOf(t, db)
 	node, body := exportXML(t, d)
-	if xmlText(t, node, "security/anonAccessEnabled") != "false" {
-		t.Fatal("unset anonymous access was not off")
-	}
-	for _, absent := range []string{"<mailServer>", "<downloadRedirectConfig>", "<backup>", "<ldapSettings>"} {
+	for _, absent := range []string{"<mailServer>", "<downloadRedirectConfig>", "<backup>", "<ldapSettings>", "<anonAccessEnabled>"} {
 		if strings.Contains(body, absent) {
 			t.Error("invented configuration", absent)
 		}
@@ -283,7 +287,7 @@ func (s exportCommitFailure) Tx(ctx context.Context, fn func(context.Context) er
 }
 
 func TestUnitExportFailuresNeverReturnPartialXML(t *testing.T) {
-	for _, name := range []string{"begin", "commit", "guard", "repositories", "proxy", "properties", "layouts", "mail", "redirect", "anonymous", "corrupt", "null mail", "invalid mail", "overflow mail", "current", "authorize"} {
+	for _, name := range []string{"begin", "commit", "guard", "repositories", "proxy", "properties", "layouts", "mail", "redirect", "corrupt", "null mail", "invalid mail", "overflow mail", "current", "authorize"} {
 		t.Run(name, func(t *testing.T) {
 			db := inmem.New()
 			d := depsOf(t, db)
@@ -306,8 +310,6 @@ func TestUnitExportFailuresNeverReturnPartialXML(t *testing.T) {
 				d.Configs = exportFaultConfigs{ConfigStore: d.Configs, kind: configdoc.ConfigMailServer, get: true}
 			case "redirect":
 				d.Configs = exportFaultConfigs{ConfigStore: d.Configs, kind: downloadRedirectKind, get: true}
-			case "anonymous":
-				d.AnonymousAccess = &accessapitest.AnonymousAccess{Err: errExportFailure}
 			case "corrupt":
 				if err := db.Configs().Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigLayout, Key: "corrupt", Document: []byte(`{`)}); err != nil {
 					t.Fatal(err)
