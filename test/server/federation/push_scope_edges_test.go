@@ -9,8 +9,15 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 )
 
-func TestAccSinglePushScopeEdgesSQLite(t *testing.T)   { qualifyPushScopeEdges(t, "sqlite") }
-func TestAccSinglePushScopeEdgesPostgres(t *testing.T) { qualifyPushScopeEdges(t, "postgres") }
+func TestAccSinglePushScopeEdgesSQLite(t *testing.T) {
+	t.Parallel()
+	qualifyPushScopeEdges(t, "sqlite")
+}
+
+func TestAccSinglePushScopeEdgesPostgres(t *testing.T) {
+	t.Parallel()
+	qualifyPushScopeEdges(t, "postgres")
+}
 
 func qualifyPushScopeEdges(t *testing.T, backend string) {
 	t.Helper()

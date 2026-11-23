@@ -48,4 +48,13 @@
 // metadata and checksum companions; native-client consumption belongs to REP-05.
 // NTLM tests push through the fakeupstream NTLMv2 verifier configured by the
 // public descriptor, then refuse a wrong proxy password and its stale run (#1848).
+//
+// Every top-level test runs in parallel (#1882). Each builds its own runtimes,
+// target processes, httptest servers, temporary directories and PostgreSQL
+// scratch schemas, and none sets process environment or package state, so
+// running them together shares nothing a test asserts on. The package is bound
+// by database round trips, not CPU: run serially it was the slowest Go
+// acceptance package and needed about 230s on hosted runners and up to 830s on
+// a loaded workstation, against make accept-go's 15-minute package timeout. A
+// new test that needs process-wide state must not call t.Parallel.
 package federation

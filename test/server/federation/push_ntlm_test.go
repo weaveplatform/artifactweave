@@ -15,8 +15,15 @@ import (
 
 const ntlmPushSecret = "ntlm-push-proxy-secret"
 
-func TestAccSinglePushNTLMProxySQLite(t *testing.T)   { qualifyNTLMPush(t, "sqlite") }
-func TestAccSinglePushNTLMProxyPostgres(t *testing.T) { qualifyNTLMPush(t, "postgres") }
+func TestAccSinglePushNTLMProxySQLite(t *testing.T) {
+	t.Parallel()
+	qualifyNTLMPush(t, "sqlite")
+}
+
+func TestAccSinglePushNTLMProxyPostgres(t *testing.T) {
+	t.Parallel()
+	qualifyNTLMPush(t, "postgres")
+}
 
 // qualifyNTLMPush runs the real source runtime and separate target process
 // through an independent NTLMv2 verifier configured with the public descriptor.
