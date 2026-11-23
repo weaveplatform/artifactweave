@@ -1,5 +1,6 @@
 // Package containertest gates the tests that start containers (decision
-// 0015) and starts the blob-store emulators they use.
+// 0015) and starts the blob-store emulators and the LDAP directory they
+// use.
 //
 // # Role
 //
@@ -31,6 +32,12 @@
 //     makes), and when every source fails the error names each registry's
 //     answer rather than the "No such image" testcontainers' own pull ends
 //     in.
+//   - OpenLDAP and RunOpenLDAP: one OpenLDAP container (osixia/openldap,
+//     pinned by digest, with mirror.gcr.io's copy as its second source)
+//     serving LDAP and LDAPS, as an LDAPEndpoint: its ports, base DN, the
+//     administrator and a read-only reader with their passwords, and the CA
+//     pool its fresh, per-container certificate chains to. Anonymous binds
+//     read nothing.
 //
 // # References
 //
@@ -48,11 +55,13 @@
 //     testcontainers-go does not decode.
 //   - https://github.com/weaveplatform/artifactweave/issues/1463: Azurite's
 //     copy, its second source.
+//   - https://github.com/weaveplatform/artifactweave/issues/1833: the LDAP
+//     directory.
 //
 // # Status
 //
 // Implemented P2 (the Linux engine gate), P2b (the emulators) and P7 (the
 // answer timeout). MinIO's readiness wait added by issue 1307; the checked
 // image pull and the second sources by issue 1448; Azurite's copy by issue
-// 1463.
+// 1463; OpenLDAP by issue 1833 (P12).
 package containertest

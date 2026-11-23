@@ -2,7 +2,7 @@ package authn
 
 import (
 	"context"
-	"crypto/sha256"
+	"errors"
 	"fmt"
 	"maps"
 
@@ -57,13 +57,18 @@ func (a *Authenticator) Current(
 	if !p.Password {
 		return kernel.Principal{}, kernel.ErrBadCredentials
 	}
-	u, err := a.users.Get(ctx, model.FoldUsername(p.Name))
-	if err != nil {
+	name := model.FoldUsername(p.Name)
+	u, err := a.users.Get(ctx, name)
+	found := err == nil
+	if err != nil && (!errors.Is(err, kernel.ErrNotFound) || a.directory == nil) {
 		return kernel.Principal{}, fmt.Errorf("auth: current user: %w", err)
 	}
-	if u.Status != "" && u.Status != model.UserEnabled ||
-		sha256.Sum256(u.PasswordHash) != p.PasswordRevision {
+	if found && u.Status != "" && u.Status != model.UserEnabled {
 		return kernel.Principal{}, kernel.ErrBadCredentials
+	}
+	directory, err := a.currentPasswordProof(ctx, u, found, name, p.PasswordRevision)
+	if err != nil {
+		return kernel.Principal{}, err
 	}
 	on, err := BasicAuthEnabled(ctx, a.settings)
 	if err != nil {
@@ -71,6 +76,18 @@ func (a *Authenticator) Current(
 	}
 	if !on {
 		return kernel.Principal{}, kernel.ErrBadCredentials
+	}
+	if directory {
+		// A directory login has no internal password to expire.
+		if !found {
+			if u, err = a.transientUser(ctx, name); err != nil {
+				return kernel.Principal{}, err
+			}
+		}
+		if err := a.apiAllowed(ctx, u.Name); err != nil {
+			return kernel.Principal{}, err
+		}
+		return directoryPrincipal(u, p.PasswordRevision, !found), nil
 	}
 	if err = a.currentPassword(ctx, u); err != nil {
 		return kernel.Principal{}, err

@@ -1,9 +1,11 @@
 // Package ldap holds the access module's LDAP rules: the LDAP connections
 // that the Access LDAP API and the descriptor's security.ldapSettings
 // section share, their validation and protected manager password, and the
-// revisioned snapshot through which directory clients read them. Binding
-// against a directory (LDAP-02) and group synchronisation (LDAP-03) build on
-// that snapshot.
+// revisioned snapshot through which directory clients read them; and the
+// directory logins (Logins) the authenticator asks, which bind through the
+// Directory port and bind each accepted login to the connection revision
+// that accepted it. Group synchronisation (LDAP-03) builds on the same
+// snapshot.
 //
 // # Role
 //
@@ -12,15 +14,21 @@
 // access/api's LDAPSettings, which the configuration descriptor applies
 // through, over the same Service, so both surfaces store one document per
 // connection. The directory client is access/adapters/ldap, which a core
-// package never imports (decision 0044, dependency rules): it will depend on
-// Source instead. The package imports the standard library, the kernel,
-// access/api, platform/configdoc and platform/tx.
+// package never imports (decision 0044, dependency rules): it implements
+// Directory, and the composition root hands it to NewLogins and to the HTTP
+// adapter's connection test. Logins implements core/authn's Directory. The
+// package imports the standard library, the kernel, access/api,
+// access/core/authn, platform/configdoc and platform/tx.
 //
 // # Inputs
 //
 //   - Service: the configuration document port, and for Snapshot the
 //     transaction runner and the administration guard; optionally the clock
 //     and the source of random revisions.
+//   - NewLogins: the Service, a Directory and LoginOptions (how long and
+//     how many accepted logins are remembered, the clock and the logger).
+//   - TestConnection: an accessapi.LDAPChange to test, which may leave out
+//     the manager password of the stored connection it names.
 //   - accessapi.LDAPChange: the fields a request or descriptor entry sets.
 //     Create and Replace start from Defaults (the Access POST and PUT);
 //     Plan and Apply start from the stored connection, field by field (the
@@ -34,6 +42,13 @@
 //   - Snapshot, Connection and Secret: every connection with its password,
 //     which only Secret.Reveal returns, and revisions for each connection
 //     and for the set. Source is the port the directory clients take.
+//   - From Logins: an authn.DirectoryLogin whose Proof names the user,
+//     connection and revision that accepted the password;
+//     authn.ErrNoDirectory when no connection is enabled;
+//     kernel.ErrBadCredentials when every connection refused or none found
+//     the user; otherwise the joined *DirectoryError of the connections
+//     that could not be asked.
+//   - From TestConnection: the Connection to test, with its password.
 //   - Refusals as *accessapi.LDAPInvalid (matching kernel.ErrInvalid),
 //     ErrExists (also kernel.ErrInvalid) and ErrNotFound; store failures
 //     wrapped, and kernel.ErrStore for a corrupt document.
@@ -57,6 +72,16 @@
 //     runs inside any of them.
 //   - Validation is complete before anything is stored, so a refused
 //     connection, or a descriptor with one, writes nothing.
+//   - Logins asks each enabled connection in key order and accepts the
+//     first that accepts the password; a refusal from any connection
+//     answers for the name when another could not be asked. An accepted
+//     login is remembered for 5 minutes (JFrog's non-UI authentication
+//     cache) under a salted hash of the name and password, and only while
+//     its connection's revision is current, so a disable, update or delete
+//     ends it at once. Current reads the connections, never the directory.
+//   - TestConnection hands a stored connection's password only to a test
+//     of the same key, URL and manager DN, so a test cannot send it to
+//     another server [I].
 //
 // # References
 //
@@ -73,14 +98,15 @@
 //     identity", line 547.
 //   - Plan:
 //     docs/implementation/plan.md#p12-descriptor-export-system-configuration-ldap.
-//   - https://github.com/weaveplatform/artifactweave/issues/1832
+//   - https://github.com/weaveplatform/artifactweave/issues/1832 and
+//     https://github.com/weaveplatform/artifactweave/issues/1833
 //
 // # Status
 //
-// Implemented P12 (LDAP-01): connections, their validation, the sealed
-// manager password and the revisioned Source. Planned: bind and connection
-// tests (LDAP-02) and group synchronisation (LDAP-03), which consume
-// Source.
+// Implemented P12: connections, their validation, the sealed manager
+// password and the revisioned Source (LDAP-01, #1832); directory logins and
+// connection tests (LDAP-02, #1833). Planned: group synchronisation
+// (LDAP-03, #1834), which consumes Source.
 //
 // # Testing
 //
@@ -90,7 +116,12 @@
 // and escaped names that pass), TestUnitPlanAndApply (field-by-field
 // changes and a second apply that writes nothing), TestUnitSnapshotRevisions,
 // TestUnitSnapshotRefusals, TestUnitSecretNeverPrints, TestUnitStoreFailures
-// and TestUnitCorruptDocuments. The SQL sealing and the HTTP and descriptor
+// and TestUnitCorruptDocuments. login_test.go runs Logins over a scripted
+// Directory: TestUnitLoginsNoDirectory, TestUnitLoginsAcceptRefuseAndOrder,
+// TestUnitLoginsForgetChangedConnections, TestUnitLoginsExpireAndBound,
+// TestUnitLoginsUnavailable, TestUnitLoginsStoreFailures and
+// TestUnitTestConnection. The real directory is access/adapters/ldap's
+// tests. The SQL sealing and the HTTP and descriptor
 // surfaces are proved in test/server/access, test/server/configuration and
 // internal/app.
 package ldap

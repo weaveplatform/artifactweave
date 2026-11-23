@@ -28,6 +28,11 @@ const (
 // RealmInternal is the realm of users and groups artifactweave manages itself.
 const RealmInternal = "internal"
 
+// RealmLDAP is the realm of users an LDAP login created (JFrog's "Auto Create
+// System Users"): they have no internal password and authenticate through
+// the directory.
+const RealmLDAP = "ldap"
+
 // RoleFlags are the platform role switches JFrog keeps on users and groups.
 // They are stored as one JSON document per principal (research 15 section 4)
 // because the set grows with JFrog releases and none of them is queried.

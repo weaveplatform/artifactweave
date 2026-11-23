@@ -100,6 +100,7 @@ func serve(
 			Blobs:         rt.Blobs,
 			ColdBlobs:     rt.coldBlobs,
 			Auth:          rt.Auth,
+			LDAP:          rt.LDAP,
 			GC:            art.GC(),
 			BlobLocation:  rt.location,
 			Mirrors:       rt.mirrorsAdmin(),

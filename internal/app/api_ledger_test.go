@@ -551,6 +551,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 	}
 	apiReviewDerive(e)
 	apiReviewLoggers(e)
+	apiReviewLDAPTest(e)
 	if cleanupPolicy {
 		e.Admission += "; current platform/project administration refreshed under the project guard before disclosure/publication; project administrators require own-project collection filter"
 	}
@@ -560,6 +561,21 @@ func apiReviewPolicy(e *apiReviewOperation) {
 			e.Retry += "; optional key replays the committed integer trigger under current policy/project authority; dryRun participates in the fingerprint; unkeyed admissions remain distinct"
 		}
 	}
+}
+
+// apiReviewLDAPTest: the connection test (#1833) asks the directory and
+// stores nothing, so the generic POST row would misdescribe it.
+func apiReviewLDAPTest(e *apiReviewOperation) {
+	if e.State != "implemented" || e.OperationID != "testLdapConnection" {
+		return
+	}
+	e.Effects = "no persisted effect: after the administrator recheck in one guarded transaction, one connect, TLS handshake, manager bind and base read against the directory outside any metadata transaction; a stored connection's sealed manager password is used only for the same key, URL and manager DN"
+	e.Admission += "; directory I/O bounded by 10s connect and 15s per-operation deadlines and the request context"
+	e.Evidence = append(e.Evidence,
+		"internal/access/core/ldap/testconn.go",
+		"internal/access/adapters/ldap/client.go",
+		"test/server/access/ldap_login_test.go",
+	)
 }
 
 func apiReviewLoggers(e *apiReviewOperation) {

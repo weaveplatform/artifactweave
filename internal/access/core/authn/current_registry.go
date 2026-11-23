@@ -2,7 +2,6 @@ package authn
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"maps"
 
@@ -48,8 +47,15 @@ func (a *Authenticator) CurrentRegistry(
 		if !on {
 			return kernel.Principal{}, kernel.ErrBadCredentials
 		}
-	} else if p.Identity == "" && sha256.Sum256(u.PasswordHash) != p.PasswordRevision {
-		return kernel.Principal{}, kernel.ErrBadCredentials
+	} else if p.Identity == "" || p.Identity == kernel.IdentityTransient && p.PasswordRevision != [32]byte{} {
+		// A registry token obtained with a password stays bound to it: the
+		// internal password's hash, or a directory login's proof, which a
+		// transient directory user's token carries too.
+		// tokenUser resolved a stored user unless the token is transient.
+		stored := p.Identity == ""
+		if _, err := a.currentPasswordProof(ctx, u, stored, model.FoldUsername(u.Name), p.PasswordRevision); err != nil {
+			return kernel.Principal{}, err
+		}
 	}
 	fresh := tokenPrincipal(u, p.Scope)
 	fresh.TokenID, fresh.TokenExpires, fresh.Identity = p.TokenID, p.TokenExpires, p.Identity
