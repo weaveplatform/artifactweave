@@ -17,10 +17,12 @@ import (
 )
 
 func TestAccSingleReplicationWorkerProcessesSQLite(t *testing.T) {
+	t.Parallel()
 	qualifyReplicationWorkerProcesses(t, "sqlite")
 }
 
 func TestAccSingleReplicationWorkerProcessesPostgres(t *testing.T) {
+	t.Parallel()
 	qualifyReplicationWorkerProcesses(t, "postgres")
 }
 

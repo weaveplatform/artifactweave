@@ -14,6 +14,7 @@ import (
 )
 
 func TestAccSingleReplicationExplicitPushDestinationDoesNotMutateConfiguration(t *testing.T) {
+	t.Parallel()
 	for _, backend := range []string{"sqlite", "postgres"} {
 		for _, mode := range []string{"without-configuration", "same-destination", "different-destination"} {
 			t.Run(backend+"/"+mode, func(t *testing.T) {

@@ -20,34 +20,42 @@ import (
 )
 
 func TestAccSinglePullCatalogProcessesSQLite(t *testing.T) {
+	t.Parallel()
 	qualifyPullCatalogProcesses(t, "sqlite", false, false)
 }
 
 func TestAccSinglePullCatalogProcessesPostgres(t *testing.T) {
+	t.Parallel()
 	qualifyPullCatalogProcesses(t, "postgres", false, false)
 }
 
 func TestAccSinglePullVirtualCatalogProcessesSQLite(t *testing.T) {
+	t.Parallel()
 	qualifyPullCatalogProcesses(t, "sqlite", true, false)
 }
 
 func TestAccSinglePullVirtualCatalogProcessesPostgres(t *testing.T) {
+	t.Parallel()
 	qualifyPullCatalogProcesses(t, "postgres", true, false)
 }
 
 func TestAccSinglePullCacheProcessesSQLite(t *testing.T) {
+	t.Parallel()
 	qualifyPullCatalogProcesses(t, "sqlite", false, true)
 }
 
 func TestAccSinglePullCacheProcessesPostgres(t *testing.T) {
+	t.Parallel()
 	qualifyPullCatalogProcesses(t, "postgres", false, true)
 }
 
 func TestAccSinglePullVirtualCacheProcessesSQLite(t *testing.T) {
+	t.Parallel()
 	qualifyPullCatalogProcesses(t, "sqlite", true, true)
 }
 
 func TestAccSinglePullVirtualCacheProcessesPostgres(t *testing.T) {
+	t.Parallel()
 	qualifyPullCatalogProcesses(t, "postgres", true, true)
 }
 
