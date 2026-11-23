@@ -146,42 +146,27 @@ func (failingLDAP) Connections(context.Context) ([]accessapi.LDAPConnection, err
 	return nil, errLDAPApply
 }
 
-func TestUnitLDAPExportProjection(t *testing.T) {
-	if out, err := exportLDAP(context.Background(), Deps{}); out != nil || err != nil {
-		t.Fatal("an export without the binding", out, err)
-	}
-	if _, err := exportLDAP(context.Background(), Deps{LDAP: failingLDAP{}}); !errors.Is(err, errLDAPApply) {
+// TestUnitLDAPConnectionsLeftOutOfExport pins 7.161.26's descriptor, whose
+// SecurityDescriptor has no ldapSettings: a connection the descriptor wrote
+// lives in access and the XML export carries no element for it.
+func TestUnitLDAPConnectionsLeftOutOfExport(t *testing.T) {
+	db := inmem.New()
+	d := ldapDeps(t, db)
+	p, err := Parse([]byte("security:\n  ldapSettings:\n    corp-ldap:\n      ldapUrl: ldap://h\n      userDnPattern: uid={0}\n"), noEnv)
+	if err != nil {
 		t.Fatal(err)
 	}
-	db := inmem.New()
-	mustApply := func(doc string) {
-		t.Helper()
-		p, err := Parse([]byte(doc), noEnv)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := Apply(context.Background(), ldapDeps(t, db), p, now, false); err != nil {
-			t.Fatal(err)
-		}
+	if _, err := Apply(context.Background(), d, p, now, false); err != nil {
+		t.Fatal(err)
 	}
-	mustApply("security:\n  ldapSettings:\n    corp:\n      ldapUrl: ldap://h\n      userDnPattern: uid={0}\n      emailAttribute: ''\n")
-	out, err := exportLDAP(context.Background(), ldapDeps(t, db))
-	if err != nil || len(out) != 1 {
-		t.Fatal(out, err)
+	all, err := d.LDAP.Connections(context.Background())
+	if err != nil || len(all) != 1 || all[0].Key != "corp-ldap" {
+		t.Fatal("the descriptor did not write the connection to access", all, err)
 	}
-	var names []string
-	for _, f := range out[0].Fields {
-		names = append(names, f.Name)
-		if f.Name == "search" {
-			for _, c := range f.Children {
-				names = append(names, "search."+c.Name)
-			}
+	_, body := exportXML(t, d)
+	for _, absent := range []string{"ldapSetting", "corp-ldap", "ldap://h"} {
+		if strings.Contains(body, absent) {
+			t.Error("LDAP connection reached the XML", absent)
 		}
-	}
-	// Empty strings are left out; flags never are.
-	want := "key,enabled,ldapUrl,userDnPattern,search,search.searchSubTree,autoCreateUser," +
-		"ldapPoisoningProtection,allowUserToAccessProfile,pagingSupportEnabled"
-	if strings.Join(names, ",") != want {
-		t.Fatal(strings.Join(names, ","))
 	}
 }

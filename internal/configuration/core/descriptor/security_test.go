@@ -254,7 +254,7 @@ func TestUnitSecurityExportProjection(t *testing.T) {
 		"<userLockPolicy><enabled>false</enabled><loginAttempts>5</loginAttempts></userLockPolicy>" +
 		"<passwordSettings><encryptionPolicy>supported</encryptionPolicy><expirationPolicy>" +
 		"<enabled>false</enabled><passwordMaxAge>60</passwordMaxAge><notifyByEmail>true</notifyByEmail>" +
-		"</expirationPolicy></passwordSettings><ldapSettings></ldapSettings>" +
+		"</expirationPolicy></passwordSettings>" +
 		"<ldapGroupSettings></ldapGroupSettings></exportSecurity>"
 	if string(body) != want {
 		t.Fatalf("%s", body)
