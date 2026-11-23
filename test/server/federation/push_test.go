@@ -201,10 +201,12 @@ func (w *pushWorld) finish(push replication.Push, run model.PushRun) []model.Pus
 }
 
 func TestAccSinglePushProcessesSQLite(t *testing.T) {
+	t.Parallel()
 	qualifySinglePushProcesses(t, newPushWorld(t, "sqlite", "", "", "generic"))
 }
 
 func TestAccSinglePushProcessesPostgres(t *testing.T) {
+	t.Parallel()
 	dsn := sqltest.PostgresDSN(t)
 	source := sqltest.ScratchDSN(t, dsn)
 	target := sqltest.ScratchDSN(t, dsn)
@@ -212,10 +214,12 @@ func TestAccSinglePushProcessesPostgres(t *testing.T) {
 }
 
 func TestAccSinglePushNativeTargetHooksSQLite(t *testing.T) {
+	t.Parallel()
 	qualifyPushNativeTarget(t, newPushWorld(t, "sqlite", "", "", "maven"))
 }
 
 func TestAccSinglePushNativeTargetHooksPostgres(t *testing.T) {
+	t.Parallel()
 	dsn := sqltest.PostgresDSN(t)
 	source, target := sqltest.ScratchDSN(t, dsn), sqltest.ScratchDSN(t, dsn)
 	qualifyPushNativeTarget(t, newPushWorld(t, "postgres", source, target, "maven"))

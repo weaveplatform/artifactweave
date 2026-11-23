@@ -79,8 +79,15 @@ func (w *pushWorld) restartSource() replication.Push {
 	return push
 }
 
-func TestAccSinglePushRecoverySQLite(t *testing.T)   { qualifyPushRecovery(t, "sqlite") }
-func TestAccSinglePushRecoveryPostgres(t *testing.T) { qualifyPushRecovery(t, "postgres") }
+func TestAccSinglePushRecoverySQLite(t *testing.T) {
+	t.Parallel()
+	qualifyPushRecovery(t, "sqlite")
+}
+
+func TestAccSinglePushRecoveryPostgres(t *testing.T) {
+	t.Parallel()
+	qualifyPushRecovery(t, "postgres")
+}
 
 func qualifyPushRecovery(t *testing.T, backend string) {
 	t.Helper()

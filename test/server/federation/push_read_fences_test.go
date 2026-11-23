@@ -11,8 +11,15 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 )
 
-func TestAccSinglePushReadFencesSQLite(t *testing.T)   { qualifyPushReadFences(t, "sqlite") }
-func TestAccSinglePushReadFencesPostgres(t *testing.T) { qualifyPushReadFences(t, "postgres") }
+func TestAccSinglePushReadFencesSQLite(t *testing.T) {
+	t.Parallel()
+	qualifyPushReadFences(t, "sqlite")
+}
+
+func TestAccSinglePushReadFencesPostgres(t *testing.T) {
+	t.Parallel()
+	qualifyPushReadFences(t, "postgres")
+}
 
 func qualifyPushReadFences(t *testing.T, backend string) {
 	t.Helper()
