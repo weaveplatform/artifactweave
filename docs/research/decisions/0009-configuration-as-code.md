@@ -63,7 +63,8 @@ P12/#1835 gives remote-source proxy `domain` and `ntHost` runtime effects: NTLMv
 proxy-account domain and client workstation, through the existing resolver and sealed
 password. Configuration storage is unchanged. The [transport contract](../../implementation/remote-http-transport.md)
 records the supported exchange and explicit limits; P12/#1836 gives `redirectedToHosts`
-its scoped redirect-credential effect, and replication's separate consumer is tracked by #1848.
+its scoped redirect-credential effect, and P12/#1848 applies `domain`/`ntHost` to
+single-replication push, where a valid `redirectedToHosts` is accepted without effect.
 
 ## Rationale
 

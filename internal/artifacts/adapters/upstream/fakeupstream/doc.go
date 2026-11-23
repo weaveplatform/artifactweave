@@ -30,7 +30,8 @@
 //   - For NewProxy and NewProxyOn, the proxy's Auth policy and the running
 //     fixtures it may reach. NewProxyOn also takes ownership of a listener.
 //     NewNTLMProxy independently verifies NTLMv2 domain/workstation and proof
-//     over CONNECT or absolute-form forwarding.
+//     over CONNECT or absolute-form forwarding; NTLMOptions.Origins names
+//     owned destinations that are not fixtures, such as an application process.
 //
 // # Outputs
 //

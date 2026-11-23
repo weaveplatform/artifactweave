@@ -183,8 +183,10 @@ P12/#1835 keeps account/configuration policy in the artifacts resolver and adds
 `NTLMProxy.Connect` and its HTTP forward decorator in `platform/outbound` for the actual remote transport consumer.
 That helper owns only bounded connection-scoped NTLMv2 proxy negotiation using the
 pinned protocol library; it imports no module and owns no repository or pool policy.
-Replication's separate consumer (#1848) can use that seam without importing an
-artifacts adapter or duplicating cryptography.
+Replication's separate consumer (#1848) uses that seam through `outbound.Client`'s
+`NTLM` option, without importing an artifacts adapter or duplicating cryptography.
+The redirected-host parser moved to `outbound.ProxyRedirectHosts` for the same reason:
+both consumers validate the descriptor list with one implementation.
 
 ### Package placement and names
 

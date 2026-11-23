@@ -348,7 +348,7 @@ func (w *world) replicationScenarioEvidence(direction, kind string, extra map[st
 		return nil
 	}
 	backend := "sqlite"
-	secrets := []string{testAdminPassword, testMasterKey, replicationTransportPassword}
+	secrets := []string{testAdminPassword, testMasterKey, replicationTransportPassword, replicationNTLMPassword}
 	for _, instance := range []*world{w, w.replicationPeer} {
 		for _, entry := range instance.env {
 			if entry == "ARTIFACTWEAVE_DATABASE_DRIVER=postgres" {

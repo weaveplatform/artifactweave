@@ -112,7 +112,8 @@ includes `@ntlm_proxy`; its JFrog CLI step fails when the required binary is abs
 A controlled proxy independently verifies NTLMv2 proof, domain/workstation and the
 same socket, while separate origin records and downloaded files prove cold bytes.
 Transport suites additionally cover failure, rotation, SQLite and PostgreSQL.
-Replication's separate consumer is #1848, not an effect claimed by this scenario.
+Replication's consumer (#1848) has its own proof: `@replication_ntlm_proxy` pushes
+between two owned processes on SQLite and PostgreSQL through the same verifier.
 
 **Terraform scenarios.** `test/terraform/run.sh` applies the app-layer references in
 `deploy/artifactweave/terraform` (decision 0030), covering the implemented P0–P8 resources

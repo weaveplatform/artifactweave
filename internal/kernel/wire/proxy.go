@@ -9,9 +9,9 @@ import (
 var errProxyConfiguration = errors.New("proxy: invalid configuration")
 
 // ProxyConfiguration is the non-secret Artifactory descriptor document stored
-// separately from its sealed password. The remote resolver supports HTTP(S)
-// Basic and NTLMv2 proxies, and redirectedToHosts scopes reuse of the proxy
-// credentials at challenged redirect hosts.
+// separately from its sealed password. The remote resolver and replication push
+// support HTTP(S) Basic and NTLMv2 proxies; redirectedToHosts scopes reuse of
+// the proxy credentials at challenged remote redirect hosts.
 type ProxyConfiguration struct {
 	Host              string   `json:"host"`
 	Port              int      `json:"port"`

@@ -46,4 +46,6 @@
 // target configuration change. Failure tests use native 401/403 responses and
 // controlled checksum, 503 and socket-timeout faults. Maven tests check native
 // metadata and checksum companions; native-client consumption belongs to REP-05.
+// NTLM tests push through the fakeupstream NTLMv2 verifier configured by the
+// public descriptor, then refuse a wrong proxy password and its stale run (#1848).
 package federation

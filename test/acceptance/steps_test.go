@@ -59,6 +59,7 @@ type world struct {
 	remote            *fakeupstream.Server
 	proxyRedirect     *proxyRedirectFixture
 	ntlmProxy         *fakeupstream.NTLMProxy
+	replicationNTLM   string // NTLM proxy selection: default or explicit
 	podSource         *fakeupstream.Server
 	aiEditor          *aiEditorFixture
 	p2Child           *fakeupstream.Server

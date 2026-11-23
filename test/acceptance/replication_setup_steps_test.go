@@ -56,6 +56,9 @@ func (w *world) configureReplicationPair(direction, kind string) (replicationFix
 	}
 	if direction == "push" {
 		target["url"], target["username"], target["password"] = peer.url+"/artifactory/"+peerRepo, "replication-transport", replicationTransportPassword
+		if w.replicationNTLM == "explicit" {
+			target["proxy"] = replicationNTLMKey
+		}
 	}
 	data, err = json.Marshal(target)
 	if err != nil {

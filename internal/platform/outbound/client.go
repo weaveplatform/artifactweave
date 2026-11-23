@@ -17,9 +17,12 @@ import (
 // ClientOptions is immutable trusted connection policy, never request metadata.
 // Zero SocketTimeout permits no inactivity deadline; the owner supplies its
 // configured default. Explicit proxy credentials are used only for CONNECT.
+// NTLM, which requires Proxy, replaces the proxy URL's Basic userinfo: every
+// new tunnel negotiates NTLMv2 on its own socket and never falls back to Basic.
 type ClientOptions struct {
 	Base          *url.URL
 	Proxy         *url.URL
+	NTLM          *NTLMProxy
 	Policy        *Policy
 	RootCAs       *x509.CertPool
 	SocketTimeout time.Duration
@@ -30,6 +33,7 @@ type ClientOptions struct {
 type Client struct {
 	base      url.URL
 	proxy     *url.URL
+	ntlm      *NTLMProxy
 	policy    *Policy
 	roots     *x509.CertPool
 	timeout   time.Duration
@@ -41,11 +45,12 @@ type Client struct {
 
 // NewClient validates and snapshots options without DNS or network I/O.
 func NewClient(options ClientOptions) (*Client, error) {
-	if checkAuthority(options.Base) != nil || options.Policy == nil || options.SocketTimeout < 0 {
+	if checkAuthority(options.Base) != nil || options.Policy == nil || options.SocketTimeout < 0 ||
+		options.NTLM != nil && options.Proxy == nil {
 		return nil, ErrConfiguration
 	}
 	c := &Client{
-		base: *options.Base, policy: options.Policy, timeout: options.SocketTimeout,
+		base: *options.Base, ntlm: options.NTLM, policy: options.Policy, timeout: options.SocketTimeout,
 		dialer: net.Dialer{Timeout: options.SocketTimeout, KeepAlive: 30 * time.Second},
 	}
 	if options.RootCAs != nil {
@@ -57,7 +62,9 @@ func NewClient(options ClientOptions) (*Client, error) {
 		if checkAuthority(&proxy) != nil || proxy.RawQuery != "" || proxy.Path != "" && proxy.Path != "/" {
 			return nil, ErrConfiguration
 		}
-		proxy.User = options.Proxy.User
+		if options.NTLM == nil {
+			proxy.User = options.Proxy.User
+		}
 		c.proxy = &proxy
 	}
 	c.transport = &http.Transport{
