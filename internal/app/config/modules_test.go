@@ -51,7 +51,10 @@ func TestUnitModuleSettingsFromConfig(t *testing.T) {
 		t.Errorf("Access (-want +got):\n%s", diff)
 	}
 	if diff := cmp.Diff(
-		configapi.Settings{DockerSubdomainMatch: true},
+		configapi.Settings{
+			DockerSubdomainMatch: true, BaseURL: "https://repo.example.com",
+			CDNHosts: []string{"artifacts-x1.z01.azurefd.net", "cdn.example.com", "d111.cloudfront.net"},
+		},
 		cfg.Configuration(),
 	); diff != "" {
 		t.Errorf("Configuration (-want +got):\n%s", diff)

@@ -164,6 +164,7 @@
       "vcs_tables_test.go",
       "webhooks_matrix_test.go",
       "webhooks_status_test.go",
+      "webserver_test.go",
       "xz_test.go"
     ],
     "internal/artifacts/adapters/http": [

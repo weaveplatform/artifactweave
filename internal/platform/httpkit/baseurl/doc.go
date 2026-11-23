@@ -22,8 +22,10 @@
 //
 // # Inputs
 //
-//   - The operator's configured base URL, the base_url setting, which may be
-//     empty.
+//   - The configured base URL, which may be empty: fixed for Middleware,
+//     and read per request for Dynamic, which the router gives the
+//     configuration module's effective value (a stored urlBase, else the
+//     base_url setting).
 //   - Per request: the X-JFrog-Override-Base-Url header; the
 //     X-Forwarded-Host, X-Forwarded-Proto and X-Forwarded-Port headers; and
 //     the request's Host and whether it arrived over TLS.
@@ -33,8 +35,11 @@
 //   - Resolve: the base URL without a trailing slash, from the first source
 //     that gives one: the override header, the configured base URL, the
 //     forwarded headers, then the request's own scheme and host.
-//   - Middleware: a handler wrapper that stores Resolve's result in the
-//     request context, and From, which reads it back.
+//   - Middleware and Dynamic: handler wrappers that store Resolve's result
+//     in the request context, and From, which reads it back. Dynamic also
+//     stores the configured base URL it read, which Configured returns, so
+//     the Docker subdomain method matches hosts under the same base the
+//     request's links use.
 //   - ForwardedHost: the first entry of X-Forwarded-Host; OverrideHeader: the
 //     name of the override header.
 //
@@ -82,7 +87,8 @@
 // Implemented P0: the base URL resolver middleware of plan task 5. Two fixes
 // followed: the first entry of each comma-separated X-Forwarded-* header
 // (#249), and the configured base URL ahead of the forwarded headers, as in
-// Artifactory (#313). Moved here in P9d.
+// Artifactory (#313). Moved here in P9d. P12 CFG-02 (#1826) adds Dynamic and
+// Configured for the descriptor's run-time urlBase.
 //
 // # Testing
 //
@@ -92,6 +98,8 @@
 //     number.
 //   - TestAccMiddlewareAndFrom: Middleware stores the base URL that From
 //     reads, and From on a bare context returns "".
+//   - TestAccDynamicAndConfigured: the configured base read per request and
+//     kept beside an overridden resolved base.
 //   - TestAccForwardedHost: the first, trimmed entry of X-Forwarded-Host.
 //
 // Through the server, TestAccURLsBehindAProxyChain and

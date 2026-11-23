@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -26,15 +27,15 @@ func TestUnitNew(t *testing.T) {
 	}
 
 	// Any call on this store panics, so New succeeding shows it does no I/O.
-	settings := configapi.Settings{DockerSubdomainMatch: true}
+	settings := configapi.Settings{DockerSubdomainMatch: true, BaseURL: "https://reg.example", CDNHosts: []string{"cdn.example"}}
 	m, err := New(Deps{Store: struct{ Store }{}, Settings: settings})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if api := m.API(); api.Descriptor == nil || api.System == nil {
+	if api := m.API(); api.Descriptor == nil || api.System == nil || api.WebServer == nil {
 		t.Errorf("API = %+v, want Descriptor and System bound", api)
 	}
-	if got := m.Settings(); got != settings {
+	if got := m.Settings(); !reflect.DeepEqual(got, settings) {
 		t.Errorf("Settings = %+v, want %+v", got, settings)
 	}
 }

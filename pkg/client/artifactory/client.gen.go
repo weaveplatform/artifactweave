@@ -1434,7 +1434,6 @@ func (e ReplicationTargetStatus) Valid() bool {
 
 // Defines values for ReverseProxyConfigDockerReverseProxyMethod.
 const (
-	DIRECT         ReverseProxyConfigDockerReverseProxyMethod = "DIRECT"
 	PORTPERREPO    ReverseProxyConfigDockerReverseProxyMethod = "PORTPERREPO"
 	REPOPATHPREFIX ReverseProxyConfigDockerReverseProxyMethod = "REPOPATHPREFIX"
 	SUBDOMAIN      ReverseProxyConfigDockerReverseProxyMethod = "SUBDOMAIN"
@@ -1443,8 +1442,6 @@ const (
 // Valid indicates whether the value is a known member of the ReverseProxyConfigDockerReverseProxyMethod enum.
 func (e ReverseProxyConfigDockerReverseProxyMethod) Valid() bool {
 	switch e {
-	case DIRECT:
-		return true
 	case PORTPERREPO:
 		return true
 	case REPOPATHPREFIX:
@@ -1459,6 +1456,7 @@ func (e ReverseProxyConfigDockerReverseProxyMethod) Valid() bool {
 // Defines values for ReverseProxyConfigWebServerType.
 const (
 	APACHE ReverseProxyConfigWebServerType = "APACHE"
+	DIRECT ReverseProxyConfigWebServerType = "DIRECT"
 	NGINX  ReverseProxyConfigWebServerType = "NGINX"
 )
 
@@ -1466,6 +1464,8 @@ const (
 func (e ReverseProxyConfigWebServerType) Valid() bool {
 	switch e {
 	case APACHE:
+		return true
+	case DIRECT:
 		return true
 	case NGINX:
 		return true
@@ -6047,61 +6047,61 @@ type RepositorySummary struct {
 	UsedSpaceInBytes *int64 `json:"usedSpaceInBytes,omitempty"`
 }
 
-// ReverseProxyConfig Reverse proxy settings, stored as the reverseProxies section of the descriptor. Both sslPort and httpsPort are accepted and returned.
+// ReverseProxyConfig Reverse proxy settings, stored as the reverseProxies section of the descriptor. Both sslPort and httpsPort are accepted and returned. A POST replaces the stored settings whole; an omitted field takes its descriptor default.
 type ReverseProxyConfig struct {
-	// ArtifactoryAppContext Optional within this object. The context path under which the proxy reaches the registry. The server always serves under `artifactory`; the value is stored as sent.
+	// ArtifactoryAppContext Optional within this object. The context path under which the proxy reaches the registry, as URL path segments. The server always serves under `artifactory`; the value is stored as sent and defaults to empty.
 	ArtifactoryAppContext *string `json:"artifactoryAppContext,omitempty"`
 
-	// ArtifactoryPort Optional within this object. The listener port the proxy forwards to. When omitted, the server fills it from its own listen address.
+	// ArtifactoryPort Optional within this object. The listener port the proxy forwards to, 1 to 65535; defaults to 8081.
 	ArtifactoryPort *int `json:"artifactoryPort,omitempty"`
 
-	// ArtifactoryServerName Optional within this object. The host the proxy forwards to, usually localhost.
+	// ArtifactoryServerName Optional within this object. The host the proxy forwards to, usually localhost; a host name, an IPv4 address or a bracketed IPv6 address. Required for NGINX and APACHE.
 	ArtifactoryServerName *string `json:"artifactoryServerName,omitempty"`
 
-	// DockerReverseProxyMethod Optional within this object. How Docker clients address repositories. REPOPATHPREFIX is the native method; SUBDOMAIN enables host matching; PORTPERREPO is accepted but not served; DIRECT is treated like REPOPATHPREFIX.
+	// DockerReverseProxyMethod Optional within this object. How Docker clients address repositories through the proxy; defaults to SUBDOMAIN. REPOPATHPREFIX is the native method; under SUBDOMAIN the nginx snippet rewrites <repo>.<server name>/v2 to the repository's path. PORTPERREPO is refused with 400 because no port per repository is offered.
 	DockerReverseProxyMethod *ReverseProxyConfigDockerReverseProxyMethod `json:"dockerReverseProxyMethod,omitempty"`
 
-	// HttpPort Optional within this object. The plain HTTP listener port.
+	// HttpPort Optional within this object. The plain HTTP listener port, 1 to 65535; defaults to 80.
 	HttpPort *int `json:"httpPort,omitempty"`
 
-	// HttpsPort Optional within this object. The TLS listener port. Alias of sslPort.
+	// HttpsPort Optional within this object. The TLS listener port, 1 to 65535. Alias of sslPort; when both are sent they must agree. Defaults to 443.
 	HttpsPort *int `json:"httpsPort,omitempty"`
 
-	// Key Optional within this object. The configuration name. Stored as sent; defaults to nginx.
+	// Key Optional within this object. The configuration name, an XML name. Stored as sent; defaults to nginx.
 	Key *string `json:"key,omitempty"`
 
-	// PublicAppContext Optional within this object. The context path clients use. Must match artifactoryAppContext unless the proxy rewrites paths.
+	// PublicAppContext Optional within this object. The context path clients use, as URL path segments. A POST without it is refused.
 	PublicAppContext *string `json:"publicAppContext,omitempty"`
 
-	// ServerName Optional within this object. The public host name the proxy answers for.
+	// ServerName Optional within this object. The public host name the proxy answers for. Required for NGINX and APACHE.
 	ServerName *string `json:"serverName,omitempty"`
 
-	// ServerNameExpression Optional within this object. A wildcard host expression for the Docker subdomain method, for example *.example.com.
+	// ServerNameExpression Optional within this object. A host name or wildcard host expression for the Docker subdomain method, for example *.example.com; the snippet matches repository subdomains under it, or under serverName when it is empty.
 	ServerNameExpression *string `json:"serverNameExpression,omitempty"`
 
-	// SslCertificate Optional within this object. Path to the TLS certificate on the proxy host.
+	// SslCertificate Optional within this object. Absolute path to the TLS certificate on the proxy host, without spaces or nginx syntax characters. Required with useHttps for NGINX and APACHE. Administrators only.
 	SslCertificate *string `json:"sslCertificate,omitempty"`
 
-	// SslKey Optional within this object. Path to the TLS private key on the proxy host.
+	// SslKey Optional within this object. Absolute path to the TLS private key on the proxy host, without spaces or nginx syntax characters. Required with useHttps for NGINX and APACHE. Administrators only.
 	SslKey *string `json:"sslKey,omitempty"`
 
 	// SslPort Optional within this object. The TLS listener port. Alias of httpsPort; the response carries both.
 	SslPort *int `json:"sslPort,omitempty"`
 
-	// UseHttp Optional within this object. Whether the proxy listens on plain HTTP.
+	// UseHttp Optional within this object. Whether the proxy listens on plain HTTP; defaults to true.
 	UseHttp *bool `json:"useHttp,omitempty"`
 
-	// UseHttps Optional within this object. Whether the proxy listens on TLS.
+	// UseHttps Optional within this object. Whether the proxy listens on TLS; defaults to false.
 	UseHttps *bool `json:"useHttps,omitempty"`
 
-	// WebServerType Optional within this object. The proxy software. Only NGINX renders a snippet.
+	// WebServerType Optional within this object. The proxy software; a POST without it is refused. DIRECT is what the platform_reverse_proxy resource sends for no proxy. Only NGINX renders a snippet.
 	WebServerType *ReverseProxyConfigWebServerType `json:"webServerType,omitempty"`
 }
 
-// ReverseProxyConfigDockerReverseProxyMethod Optional within this object. How Docker clients address repositories. REPOPATHPREFIX is the native method; SUBDOMAIN enables host matching; PORTPERREPO is accepted but not served; DIRECT is treated like REPOPATHPREFIX.
+// ReverseProxyConfigDockerReverseProxyMethod Optional within this object. How Docker clients address repositories through the proxy; defaults to SUBDOMAIN. REPOPATHPREFIX is the native method; under SUBDOMAIN the nginx snippet rewrites <repo>.<server name>/v2 to the repository's path. PORTPERREPO is refused with 400 because no port per repository is offered.
 type ReverseProxyConfigDockerReverseProxyMethod string
 
-// ReverseProxyConfigWebServerType Optional within this object. The proxy software. Only NGINX renders a snippet.
+// ReverseProxyConfigWebServerType Optional within this object. The proxy software; a POST without it is refused. DIRECT is what the platform_reverse_proxy resource sends for no proxy. Only NGINX renders a snippet.
 type ReverseProxyConfigWebServerType string
 
 // RubyGemVersion One version of a RubyGem as the rubygems.org versions API describes it.
@@ -11979,21 +11979,21 @@ type ClientInterface interface {
 
 	// GetReverseProxySnippet Generate an nginx snippet
 	//
-	// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered; APACHE answers 400. Admin only.
+	// Renders an nginx fragment for the http context from the stored reverse proxy configuration: the certificate paths when HTTPS is on, and one server block with the enabled listeners, the server names, one location that proxies to artifactoryServerName:artifactoryPort with the `X-JFrog-Override-Base-Url` header and, for the Docker subdomain method, the rewrite of <repo>.<server name>/v1 and /v2 to /artifactory/api/docker/<repo>/. Returning the snippet installs nothing. Only the NGINX web server type is rendered; APACHE and DIRECT answer 400. Admin only.
 	//
 	// Corresponds with GET /api/system/configuration/reverseProxy/nginx (the `GetReverseProxySnippet` operationId).
 	GetReverseProxySnippet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetReverseProxyConfiguration Read the reverse proxy configuration
 	//
-	// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else. Anonymous callers are refused.
+	// Returns the reverse proxy settings. Stored settings are returned as posted, with both sslPort and httpsPort carrying the same value. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the configured base URL's host (the stored urlBase, else base_url, else the request's) and, with subdomains, serverNameExpression is its wildcard. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else; administrator authority is rechecked when the settings are read. Anonymous callers are refused.
 	//
 	// Corresponds with GET /api/system/configuration/webServer (the `GetReverseProxyConfiguration` operationId).
 	GetReverseProxyConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateReverseProxyConfigurationWithBody Store the reverse proxy configuration
 	//
-	// Creates or replaces the single reverse proxy configuration. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the Docker access method. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
+	// Creates or replaces the single reverse proxy configuration through the descriptor service, which validates it whole and writes it in one transaction. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the XML export; it does not change how this server routes Docker requests. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -12002,7 +12002,7 @@ type ClientInterface interface {
 
 	// UpdateReverseProxyConfiguration Store the reverse proxy configuration
 	//
-	// Creates or replaces the single reverse proxy configuration. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the Docker access method. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
+	// Creates or replaces the single reverse proxy configuration through the descriptor service, which validates it whole and writes it in one transaction. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the XML export; it does not change how this server routes Docker requests. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -18493,7 +18493,7 @@ func (c *Client) GetSystemInfo(ctx context.Context, reqEditors ...RequestEditorF
 
 // GetReverseProxySnippet Generate an nginx snippet
 //
-// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered; APACHE answers 400. Admin only.
+// Renders an nginx fragment for the http context from the stored reverse proxy configuration: the certificate paths when HTTPS is on, and one server block with the enabled listeners, the server names, one location that proxies to artifactoryServerName:artifactoryPort with the `X-JFrog-Override-Base-Url` header and, for the Docker subdomain method, the rewrite of <repo>.<server name>/v1 and /v2 to /artifactory/api/docker/<repo>/. Returning the snippet installs nothing. Only the NGINX web server type is rendered; APACHE and DIRECT answer 400. Admin only.
 //
 // Corresponds with GET /api/system/configuration/reverseProxy/nginx (the `GetReverseProxySnippet` operationId).
 func (c *Client) GetReverseProxySnippet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18510,7 +18510,7 @@ func (c *Client) GetReverseProxySnippet(ctx context.Context, reqEditors ...Reque
 
 // GetReverseProxyConfiguration Read the reverse proxy configuration
 //
-// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else. Anonymous callers are refused.
+// Returns the reverse proxy settings. Stored settings are returned as posted, with both sslPort and httpsPort carrying the same value. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the configured base URL's host (the stored urlBase, else base_url, else the request's) and, with subdomains, serverNameExpression is its wildcard. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else; administrator authority is rechecked when the settings are read. Anonymous callers are refused.
 //
 // Corresponds with GET /api/system/configuration/webServer (the `GetReverseProxyConfiguration` operationId).
 func (c *Client) GetReverseProxyConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18527,7 +18527,7 @@ func (c *Client) GetReverseProxyConfiguration(ctx context.Context, reqEditors ..
 
 // UpdateReverseProxyConfigurationWithBody Store the reverse proxy configuration
 //
-// Creates or replaces the single reverse proxy configuration. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the Docker access method. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
+// Creates or replaces the single reverse proxy configuration through the descriptor service, which validates it whole and writes it in one transaction. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the XML export; it does not change how this server routes Docker requests. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -18546,7 +18546,7 @@ func (c *Client) UpdateReverseProxyConfigurationWithBody(ctx context.Context, co
 
 // UpdateReverseProxyConfiguration Store the reverse proxy configuration
 //
-// Creates or replaces the single reverse proxy configuration. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the Docker access method. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
+// Creates or replaces the single reverse proxy configuration through the descriptor service, which validates it whole and writes it in one transaction. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the XML export; it does not change how this server routes Docker requests. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -39711,7 +39711,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetReverseProxySnippetWithResponse Generate an nginx snippet
 	//
-	// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered; APACHE answers 400. Admin only.
+	// Renders an nginx fragment for the http context from the stored reverse proxy configuration: the certificate paths when HTTPS is on, and one server block with the enabled listeners, the server names, one location that proxies to artifactoryServerName:artifactoryPort with the `X-JFrog-Override-Base-Url` header and, for the Docker subdomain method, the rewrite of <repo>.<server name>/v1 and /v2 to /artifactory/api/docker/<repo>/. Returning the snippet installs nothing. Only the NGINX web server type is rendered; APACHE and DIRECT answer 400. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -39720,7 +39720,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetReverseProxyConfigurationWithResponse Read the reverse proxy configuration
 	//
-	// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else. Anonymous callers are refused.
+	// Returns the reverse proxy settings. Stored settings are returned as posted, with both sslPort and httpsPort carrying the same value. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the configured base URL's host (the stored urlBase, else base_url, else the request's) and, with subdomains, serverNameExpression is its wildcard. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else; administrator authority is rechecked when the settings are read. Anonymous callers are refused.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -39729,7 +39729,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateReverseProxyConfigurationWithBodyWithResponse Store the reverse proxy configuration
 	//
-	// Creates or replaces the single reverse proxy configuration. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the Docker access method. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
+	// Creates or replaces the single reverse proxy configuration through the descriptor service, which validates it whole and writes it in one transaction. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the XML export; it does not change how this server routes Docker requests. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -39738,7 +39738,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateReverseProxyConfigurationWithResponse Store the reverse proxy configuration
 	//
-	// Creates or replaces the single reverse proxy configuration. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the Docker access method. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
+	// Creates or replaces the single reverse proxy configuration through the descriptor service, which validates it whole and writes it in one transaction. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the XML export; it does not change how this server routes Docker requests. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -64259,6 +64259,8 @@ type GetReverseProxySnippetResponse503Headers struct {
 type GetReverseProxySnippetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON429 the response for an HTTP 429 `application/json` response
 	JSON429 *TooManyRequests
 	// JSON503 the response for an HTTP 503 `application/json` response
@@ -64267,6 +64269,11 @@ type GetReverseProxySnippetResponse struct {
 	Headers429 *GetReverseProxySnippetResponse429Headers
 	// Headers503 the parsed response headers for an HTTP 503 response
 	Headers503 *GetReverseProxySnippetResponse503Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetReverseProxySnippetResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON429 returns the response for an HTTP 429 `application/json` response
@@ -78601,7 +78608,7 @@ func (c *ClientWithResponses) GetSystemInfoWithResponse(ctx context.Context, req
 
 // GetReverseProxySnippetWithResponse Generate an nginx snippet
 //
-// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered; APACHE answers 400. Admin only.
+// Renders an nginx fragment for the http context from the stored reverse proxy configuration: the certificate paths when HTTPS is on, and one server block with the enabled listeners, the server names, one location that proxies to artifactoryServerName:artifactoryPort with the `X-JFrog-Override-Base-Url` header and, for the Docker subdomain method, the rewrite of <repo>.<server name>/v1 and /v2 to /artifactory/api/docker/<repo>/. Returning the snippet installs nothing. Only the NGINX web server type is rendered; APACHE and DIRECT answer 400. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -78616,7 +78623,7 @@ func (c *ClientWithResponses) GetReverseProxySnippetWithResponse(ctx context.Con
 
 // GetReverseProxyConfigurationWithResponse Read the reverse proxy configuration
 //
-// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else. Anonymous callers are refused.
+// Returns the reverse proxy settings. Stored settings are returned as posted, with both sslPort and httpsPort carrying the same value. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the configured base URL's host (the stored urlBase, else base_url, else the request's) and, with subdomains, serverNameExpression is its wildcard. An administrator gets every field; any other signed-in user gets dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps) that are set, and nothing else; administrator authority is rechecked when the settings are read. Anonymous callers are refused.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -78631,7 +78638,7 @@ func (c *ClientWithResponses) GetReverseProxyConfigurationWithResponse(ctx conte
 
 // UpdateReverseProxyConfigurationWithBodyWithResponse Store the reverse proxy configuration
 //
-// Creates or replaces the single reverse proxy configuration. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the Docker access method. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
+// Creates or replaces the single reverse proxy configuration through the descriptor service, which validates it whole and writes it in one transaction. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the XML export; it does not change how this server routes Docker requests. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -78646,7 +78653,7 @@ func (c *ClientWithResponses) UpdateReverseProxyConfigurationWithBodyWithRespons
 
 // UpdateReverseProxyConfigurationWithResponse Store the reverse proxy configuration
 //
-// Creates or replaces the single reverse proxy configuration. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the Docker access method. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
+// Creates or replaces the single reverse proxy configuration through the descriptor service, which validates it whole and writes it in one transaction. The document is stored as the reverseProxies section of the descriptor and drives the nginx snippet and the XML export; it does not change how this server routes Docker requests. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -107864,8 +107871,12 @@ func ParseGetReverseProxySnippetResponse(rsp *http.Response) (*GetReverseProxySn
 	}
 
 	switch {
-	case rsp.StatusCode == 400:
-		break // No content-type
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case rsp.StatusCode == 401:
 		break // No content-type

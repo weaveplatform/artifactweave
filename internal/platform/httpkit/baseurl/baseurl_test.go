@@ -221,6 +221,35 @@ func TestAccMiddlewareAndFrom(t *testing.T) {
 	}
 }
 
+// TestAccDynamicAndConfigured: Dynamic reads the configured base URL per
+// request and keeps it beside the resolved one, which the override header
+// may have replaced.
+func TestAccDynamicAndConfigured(t *testing.T) {
+	configured := "https://first.example.com"
+	var seen, kept string
+	var ok bool
+	h := Dynamic(func(context.Context) string { return configured })(
+		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			seen = From(r.Context())
+			kept, ok = Configured(r.Context())
+		}),
+	)
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	if seen != configured || kept != configured || !ok {
+		t.Fatalf("first: %q %q %v", seen, kept, ok)
+	}
+	configured = "https://second.example.com"
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.Header.Set(OverrideHeader, "https://override.example.com")
+	h.ServeHTTP(httptest.NewRecorder(), r)
+	if seen != "https://override.example.com" || kept != configured {
+		t.Fatalf("second: %q %q", seen, kept)
+	}
+	if _, ok := Configured(context.Background()); ok {
+		t.Fatal("Configured on a bare context")
+	}
+}
+
 func TestAccForwardedHost(t *testing.T) {
 	for header, want := range map[string]string{
 		"":                       "",

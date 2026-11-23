@@ -108,13 +108,15 @@ type Registry struct {
 	sources       *source.Service
 	store         registry.Store
 	authenticated bool
-	// parent is the lower-cased host repository subdomains sit under; empty
-	// when subdomain matching is off.
-	parent    string
-	fault     func(*http.Request, error)
-	tokens    TokenIssuer
-	identity  accessapi.Identity
-	endpoints map[endpointKey]Endpoint
+	// subdomains turns on the subdomain method; parent is the lower-cased
+	// host of Options.BaseURL, which parentHost uses when the request carries
+	// no configured base URL.
+	subdomains bool
+	parent     string
+	fault      func(*http.Request, error)
+	tokens     TokenIssuer
+	identity   accessapi.Identity
+	endpoints  map[endpointKey]Endpoint
 	// blobs, uploads and serveBlob serve blobs; uploads is nil without a
 	// blob store.
 	blobs            blob.Store
@@ -140,7 +142,7 @@ func New(o Options) *Registry {
 		endpoints: map[endpointKey]Endpoint{}, tagLists: newTagCache(remoteTagsBudget), locations: layout.NewMemberLocations(),
 	}
 	if o.SubdomainMatch {
-		g.parent = baseHost(o.BaseURL)
+		g.subdomains, g.parent = true, baseHost(o.BaseURL)
 	}
 	if o.Store != nil && o.Blobs != nil {
 		g.blobs = o.Blobs

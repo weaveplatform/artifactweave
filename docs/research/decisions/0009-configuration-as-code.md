@@ -73,6 +73,17 @@ and are validated with the rest of the document before any write; an entry set t
 deletes a connection; the whole-section null is refused as for `mailServer`. The XML export
 lists the connections without their manager passwords.
 
+CFG-02 ([#1826](https://github.com/weaveplatform/artifactweave/issues/1826)) adds the
+descriptor's `urlBase`, through PATCH, config apply, the bootstrap descriptor and
+`PUT /api/system/configuration/baseUrl`, and its single reverse proxy, through
+`POST /api/system/configuration/webServer`; each REST write builds a descriptor patch
+and applies it, so it is validated whole and written in one transaction. The two layers
+stay apart: `base_url` in `artifactweave.yaml` keeps its flag > environment > file
+precedence and is never written at run time, and a stored `urlBase` is tenant state that
+takes precedence over it while set and is exported with the descriptor. Clearing
+`urlBase` brings `base_url` back. The application layer also supplies the rules the
+descriptor cannot see, such as the CDN hosts a `urlBase` may not sit above.
+
 ## Rationale
 
 The Artifactory descriptor is the format Artifactory users already have in version
