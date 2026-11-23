@@ -137,7 +137,7 @@ func TestAccLDAPDescriptorSharesAccessConnections(t *testing.T) {
 			"<managerDn>cn=manager,dc=example,dc=com</managerDn></search><autoCreateUser>true</autoCreateUser>"+
 			"<emailAttribute>email</emailAttribute><ldapPoisoningProtection>true</ldapPoisoningProtection>"+
 			"<allowUserToAccessProfile>false</allowUserToAccessProfile><pagingSupportEnabled>true</pagingSupportEnabled>"+
-			"</ldapSetting></ldapSettings></security>") {
+			"</ldapSetting></ldapSettings><ldapGroupSettings></ldapGroupSettings></security>") {
 		t.Fatalf("export %d %s", rec.Code, xml)
 	}
 	// managerPassword null clears it; the entry null deletes the connection.
@@ -166,7 +166,8 @@ func sameJSON(t *testing.T, a, b any) bool {
 
 // TestAccLDAPDescriptorRefusals refuses a descriptor before anything in it
 // is written: a non-administrator, a repeated key, an invalid connection
-// beside valid entries, and spellings the section does not have.
+// beside valid entries, an invalid group setting beside valid entries, and
+// spellings the section does not have.
 func TestAccLDAPDescriptorRefusals(t *testing.T) {
 	w := newRepoWorld(t)
 	if code, _ := w.patch("reader", ldapYAML); code != http.StatusForbidden {
@@ -197,7 +198,12 @@ func TestAccLDAPDescriptorRefusals(t *testing.T) {
 		"string flag":      {"security:\n  ldapSettings:\n    corp:\n      search:\n        searchSubTree: yes-please\n", "must be a boolean"},
 		"section null":     {"security:\n  ldapSettings: null\n", "must be a mapping of keys to connections"},
 		"entry scalar":     {"security:\n  ldapSettings:\n    corp: true\n", "must be a mapping or null"},
-		"group settings":   {"security:\n  ldapGroupSettings:\n    g:\n      enabledLdap: corp\n", "security.ldapGroupSettings is not applied yet; LDAP group settings arrive with LDAP-03"},
+		// LDAP-03 (#1834) applies group settings; an invalid one beside valid
+		// entries still refuses the whole descriptor.
+		"invalid group setting": {
+			mixed + "security:\n  ldapGroupSettings:\n    g:\n      enabledLdap: corp\n      strategy: NESTED\n",
+			"security.ldapGroupSettings.g: strategy must be STATIC, DYNAMIC or HIERARCHICAL",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			code, body := w.patch("admin", tc.yaml)

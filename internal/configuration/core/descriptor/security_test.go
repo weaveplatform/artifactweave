@@ -60,7 +60,6 @@ func TestUnitSecurityParseMapsEveryField(t *testing.T) {
 func TestUnitSecurityParseRefusals(t *testing.T) {
 	for doc, want := range map[string]string{
 		"security:\n  anonAccessToBuildInfosDisabled: true\n":                                       "security.anonAccessToBuildInfosDisabled is deprecated",
-		"security:\n  ldapGroupSettings: {}\n":                                                      "LDAP group settings arrive with LDAP-03",
 		"security:\n  samlSettings: {}\n":                                                           "SAML login is planned for P21",
 		"security:\n  hideUnauthorizedResources: true\n":                                            "security: unknown field hideUnauthorizedResources",
 		"security:\n  userLockPolicy: null\n":                                                       "security.userLockPolicy cannot be null",
@@ -255,7 +254,8 @@ func TestUnitSecurityExportProjection(t *testing.T) {
 		"<userLockPolicy><enabled>false</enabled><loginAttempts>5</loginAttempts></userLockPolicy>" +
 		"<passwordSettings><encryptionPolicy>supported</encryptionPolicy><expirationPolicy>" +
 		"<enabled>false</enabled><passwordMaxAge>60</passwordMaxAge><notifyByEmail>true</notifyByEmail>" +
-		"</expirationPolicy></passwordSettings><ldapSettings></ldapSettings></exportSecurity>"
+		"</expirationPolicy></passwordSettings><ldapSettings></ldapSettings>" +
+		"<ldapGroupSettings></ldapGroupSettings></exportSecurity>"
 	if string(body) != want {
 		t.Fatalf("%s", body)
 	}

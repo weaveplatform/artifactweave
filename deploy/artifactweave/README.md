@@ -20,6 +20,7 @@ empty plan and destroys it, so a reference that stops working fails the build (s
 | [projects](terraform/projects/README.md) | Projects, members, roles, an environment, synchronous repository attachment, standard shares and hard/soft quotas, verified through real content effects and revocation | `url`, `access_token`, `user_password` |
 | [configuration](terraform/configuration/README.md) | An authenticated outbound proxy and a property set with selection flags and predefined defaults | `url`, `access_token`, `proxy_host` |
 | [general-security](terraform/general-security/README.md) | Anonymous access and the password encryption policy (`artifactory_general_security`), enforced on requests without credentials and on HTTP Basic logins | `url`, `access_token` |
+| [ldap-groups](terraform/ldap-groups/README.md) | LDAP group settings through the Access API (`artifactory_ldap_group_setting_v2`) and the descriptor (`artifactory_ldap_group_setting`), over a disabled connection (`artifactory_ldap_setting_v2`) | `url`, `access_token` |
 | [trashcan](terraform/trashcan/README.md) | The trash can policy (`artifactory_trashcan_config`): whether deletes go to the trash can and how many days a collection pass keeps them | `url`, `access_token` |
 
 Every name a reference creates (repository keys, users, groups, permissions, OIDC providers)

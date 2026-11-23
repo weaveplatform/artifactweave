@@ -571,6 +571,13 @@ func (s AccessService) CreateGroup(
 	if err != nil {
 		return nil, err
 	}
+	if b.ImportFromLdapGroupSetting != nil {
+		d, _, err := s.importGroup(ctx, svc, b.Name, *b, false)
+		if err != nil {
+			return nil, err
+		}
+		return accessgen.CreateGroup201JSONResponse(d), nil
+	}
 	if err := svc.CreateGroup(ctx, g, httpkit.DerefSlice(b.Members)); err != nil {
 		if errors.Is(err, kernel.ErrNotFound) {
 			return nil, unknownMembers()
@@ -609,6 +616,16 @@ func (s AccessService) ReplaceGroup(
 	if err != nil {
 		return nil, err
 	}
+	if b.ImportFromLdapGroupSetting != nil {
+		d, created, err := s.importGroup(ctx, svc, name, b, true)
+		switch {
+		case err != nil:
+			return nil, err
+		case created:
+			return accessgen.ReplaceGroup201JSONResponse(d), nil
+		}
+		return accessgen.ReplaceGroup200JSONResponse(d), nil
+	}
 	created, err := svc.ReplaceGroup(ctx, g, httpkit.DerefSlice(b.Members))
 	if errors.Is(err, kernel.ErrNotFound) {
 		return nil, unknownMembers()
@@ -627,19 +644,13 @@ func (s AccessService) ReplaceGroup(
 }
 
 // groupFromCreate is the group named name that a create body describes,
-// with Create a Group's default for every field the body leaves out. Until
-// LDAP lands (P12) an import answers 400, for a replacement too: JFrog
-// accepts one there only for a group imported from the same LDAP group,
-// and no group here was imported.
+// with Create a Group's default for every field the body leaves out. An
+// import (importGroup) takes its name, realm and members from the
+// directory instead.
 func groupFromCreate(name string, b accessgen.GroupCreateRequest) (model.Group, error) {
-	if b.ImportFromLdapGroupSetting != nil {
-		if b.Members != nil {
-			return model.Group{}, httpkit.BadRequestf(
-				"members and import_from_ldap_group_setting are mutually exclusive",
-			)
-		}
+	if b.ImportFromLdapGroupSetting != nil && b.Members != nil {
 		return model.Group{}, httpkit.BadRequestf(
-			"LDAP group import is not available in artifactweave",
+			"members and import_from_ldap_group_setting are mutually exclusive",
 		)
 	}
 	return model.Group{

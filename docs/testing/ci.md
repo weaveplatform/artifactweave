@@ -1353,13 +1353,16 @@ All deployment roots require Terraform **1.17 or later**; CI pins **1.17.1**.
 `make terraform` runs `test/terraform/run.sh` over `TERRAFORM_SCENARIOS`: the repositories,
 identity, OIDC, CDN repositories, remote repositories, virtual repositories, webhooks, single
 replication, projects and package-cleanup references in `deploy/artifactweave/terraform/`,
-the two-resource `configuration` reference, the `general-security` reference and the
-`trashcan` reference in that same tree. `configuration` qualifies only proxy/property-set
+the two-resource `configuration` reference, the `general-security` reference, the
+`ldap-groups` reference and the `trashcan` reference in that same tree. `configuration` qualifies only proxy/property-set
 write validation; full seven-resource P12 qualification remains #1837. `trashcan` qualifies
 `artifactory_trashcan_config` against the descriptor's `trashcanConfig` (#1829). XML
 descriptor GET is required for these pinned provider controls, so a missing implementation
 fails the required conformance lane. `general-security` reads back through
 `GET /artifactory/api/securityconfig`, so a server without it fails the lane the same way.
+`ldap-groups` qualifies `artifactory_ldap_group_setting_v2` and `artifactory_ldap_group_setting`
+over a disabled `artifactory_ldap_setting_v2` connection (#1834), reading both settings back
+through the Access API and the XML descriptor.
 - It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` and
   `terraform-provider-platform_<version>_<os>_<arch>.zip` and
   `terraform-provider-project_<version>_<os>_<arch>.zip` once into a filesystem mirror,

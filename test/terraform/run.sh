@@ -48,6 +48,7 @@ python3 -I "$here/check-webhooks.py" --inventory "$root"
 python3 -I "$here/check-projects.py" --inventory "$root"
 python3 -I "$here/check-cleanup.py" --inventory "$root"
 python3 -I "$here/check-general-security.py" --inventory "$root"
+python3 -I "$here/check-ldap-groups.py" --inventory "$root"
 scenarios=("$@")
 [ ${#scenarios[@]} -gt 0 ] || scenarios=(deploy/artifactweave/terraform/repositories)
 if [ -n "${TERRAFORM_WORK:-}" ]; then
@@ -618,6 +619,25 @@ apply_general_security() {
 	general_security_revision false SUPPORTED
 }
 
+# Each revision changes the v2 setting's strategy and both settings'
+# sub_tree, reads them back through the Access API and the XML descriptor
+# and refreshes each through the group sync. The connection stays disabled,
+# so the provider's refresh after a v2 write answers 400, which it reports
+# as a warning, and no directory is needed.
+ldap_groups_revision() {
+	export TF_VAR_strategy=$1 TF_VAR_sub_tree=$2
+	tf apply -auto-approve
+	python3 -I "$here/check-ldap-groups.py" --check "$1" "$2"
+	tf apply -refresh-only -auto-approve
+	tf plan -detailed-exitcode
+}
+
+apply_ldap_groups() {
+	export TF_VAR_name_prefix=tf-ldap TF_VAR_connection_key=tf-ldap
+	ldap_groups_revision STATIC false
+	ldap_groups_revision DYNAMIC true
+}
+
 # A singleton every instance has. Each revision is checked against the XML
 # descriptor the provider reads and against what a delete then does, so a
 # value stored but not obeyed fails. Import takes any ID for a singleton.
@@ -652,6 +672,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/package-cleanup) apply_package_cleanup ;;
 	deploy/artifactweave/terraform/configuration) apply_configuration ;;
 	deploy/artifactweave/terraform/general-security) apply_general_security ;;
+	deploy/artifactweave/terraform/ldap-groups) apply_ldap_groups ;;
 	deploy/artifactweave/terraform/trashcan) apply_trashcan ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
@@ -673,6 +694,9 @@ for scenario in "${scenarios[@]}"; do
 		python3 -I "$here/check-general-security.py" --deleted "$work/general-security-encrypted"
 		tf state list >"$work/general-security-remaining-resources.txt"
 		test ! -s "$work/general-security-remaining-resources.txt"
+	fi
+	if [ "$scenario" = deploy/artifactweave/terraform/ldap-groups ]; then
+		python3 -I "$here/check-ldap-groups.py" --deleted
 	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/remote-repositories ]; then
 		python3 -I "$here/check-remotes.py" --remove-proxy

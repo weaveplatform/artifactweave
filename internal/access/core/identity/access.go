@@ -290,3 +290,43 @@ func (s *Service) checkPolicy(ctx context.Context, u model.User, password string
 	}
 	return nil
 }
+
+// ImportGroup stores g, a group Create a Group imports from LDAP (realm
+// ldap, its realm attributes set), and reports whether it created it. A
+// new group starts without members: LDAP login and refresh give it its
+// members. An existing name answers ErrExists, unless replace is set (Replace
+// or Create a Group); then only a group imported from the same LDAP group,
+// with the same realm and realm attributes, is replaced, keeping its
+// members and its platform auditor flag, and any other answers ErrInvalid,
+// as JFrog's Replace or Create a Group page says.
+func (s *Service) ImportGroup(ctx context.Context, g model.Group, replace bool) (bool, error) {
+	if err := validName("group", g.Name); err != nil {
+		return false, err
+	}
+	var created bool
+	err := s.tx(ctx, func(ctx context.Context) error {
+		groups := s.Store.Groups()
+		old, err := groups.Get(ctx, g.Name)
+		next := g
+		switch {
+		case errors.Is(err, kernel.ErrNotFound):
+			created, next.Members = true, nil
+			if err := groups.Create(ctx, next); errors.Is(err, kernel.ErrConflict) {
+				// Created by a concurrent request since the read.
+				return fmt.Errorf("%w: group %q", ErrExists, g.Name)
+			} else if err != nil {
+				return err //nolint:wrapcheck // a store error
+			}
+			return nil
+		case err != nil:
+			return err //nolint:wrapcheck // a store error
+		case !replace:
+			return fmt.Errorf("%w: group %q", ErrExists, g.Name)
+		case old.Realm != g.Realm || old.RealmAttributes != g.RealmAttributes:
+			return invalidf("group %q was not imported from that LDAP group", g.Name)
+		}
+		next.Members, next.Roles.PlatformAuditor = old.Members, old.Roles.PlatformAuditor
+		return groups.Update(ctx, next) //nolint:wrapcheck // a store error
+	})
+	return created, err
+}

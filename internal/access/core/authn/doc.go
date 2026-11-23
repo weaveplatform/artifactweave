@@ -79,7 +79,11 @@
 //     and only then creates the user (auto_create_user, realm ldap, the
 //     directory's email, the connection's profile_updatable, the auto-join
 //     groups) or refreshes its email and last login. A login that fails any
-//     recheck stores nothing and returns no principal.
+//     recheck stores nothing and returns no principal. In the same
+//     transaction Directory.PublishGroups makes a fresh login's directory
+//     groups a stored user's LDAP memberships, and the principal is built
+//     from the user as it then stands, so the request already acts through
+//     them.
 //   - A directory outage is no failed login: it counts toward neither the
 //     lock policy nor the suspension. A refusal counts as a wrong internal
 //     password does.
@@ -135,7 +139,8 @@
 // repository through the artifacts module's Repositories. P12 added
 // directory logins (LDAP-02, #1833), then internal password login as 7.x's
 // "Disable Internal Password Login" beside directories and the password
-// encryption policy (CFG-04, #1828).
+// encryption policy (CFG-04, #1828), then the LDAP group memberships a fresh
+// directory login publishes (LDAP-03, #1834).
 //
 // # Testing
 //
@@ -165,7 +170,8 @@
 //     TestUnitDirectoryAutoCreate, TestUnitDirectoryTransient,
 //     TestUnitDirectoryAndInternalPasswords, TestUnitDirectoryRefusals (a
 //     user disabled or locked and a connection changed while the directory
-//     answered) and TestUnitDirectoryPublicationFailures. The real
+//     answered), TestUnitDirectoryPublicationFailures and
+//     TestUnitDirectoryPublishesGroups. The real
 //     directory and both SQL stores are access/adapters/ldap's
 //     TestAccLDAPLoginPublication and test/server/access's TestAccLDAPLogin.
 //   - username_test.go: TestUnitUsernamesFold and TestUnitUsernameLockFolds

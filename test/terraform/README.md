@@ -108,6 +108,18 @@ over HTTP Basic or are refused as the policy says. The provider's delete sends n
 so the last step restores the defaults, and after `terraform destroy` the checker requires
 them to remain in force and the state to be empty.
 
+The required `ldap-groups` reference manages a disabled `artifactory_ldap_setting_v2`
+connection and two group settings over it: `artifactory_ldap_group_setting_v2` through the
+Access API and the deprecated `artifactory_ldap_group_setting` through the YAML descriptor.
+The driver applies two revisions (the v2 setting `STATIC` then `DYNAMIC`, and `sub_tree`
+flipped on both), and after each `check-ldap-groups.py` reads both settings back through
+`/access/api/v1/ldap/groups` and the XML descriptor, which must agree and keep 7.x's
+`ldapGroupSetting` element order, and refreshes each through the group sync, which answers
+400 because the connection is disabled; the provider reports its own refresh after each v2
+write as a warning. Each revision is then refreshed and must plan empty. After
+`terraform destroy`, which deletes the descriptor setting by clearing the section and
+writing back the rest, the checker requires both settings and the connection to be gone.
+
 The required `trashcan` reference applies pinned `artifactory_trashcan_config` in two
 revisions (off with 3 days, on with 0 days), and after each requires an empty refreshed plan
 and runs `check-trashcan.py`. That script reads the XML descriptor back and checks what a

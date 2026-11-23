@@ -19,7 +19,8 @@
 //   - Deps, which Apply and NewAPI take: the unit of work (platform/tx), the
 //     artifacts module's Repositories, Layouts and StoragePolicies, the
 //     configuration document port (platform/configdoc) and access's
-//     AnonymousAccess, SecurityPolicies and LDAPSettings, all over one store.
+//     AnonymousAccess, SecurityPolicies, LDAPSettings and LDAPGroupSettings,
+//     all over one store.
 //   - DownloadRedirectMinSize: the configuration document port.
 //
 // # Outputs
@@ -58,6 +59,11 @@
 //     two surfaces share one connection; access's refusals are reported with
 //     the descriptor's field names, and the export never carries a manager
 //     password.
+//   - security.ldapGroupSettings entries are written the same way through
+//     access's LDAPGroupSettings, the service behind
+//     /access/api/v1/ldap/groups; the whole section set to null deletes
+//     every group setting, which the artifactory_ldap_group_setting
+//     resource's delete sends [I], and the export writes 7.x's element order.
 //   - gcConfig and trashcanConfig are planned and written through artifacts'
 //     StoragePolicies, which owns the trash can and the collector's Quartz
 //     schedule (decision 0010), so configuration never bypasses deletion or

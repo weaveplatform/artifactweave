@@ -51,6 +51,10 @@ type Deps struct {
 	// reads them for the export. A descriptor that names connections is
 	// refused without it; an export without it has no ldapSettings.
 	LDAP accessapi.LDAPSettings
+	// LDAPGroups checks and writes the security section's LDAP group
+	// settings and reads them for the export. A descriptor that names them
+	// is refused without it; an export without it has no ldapGroupSettings.
+	LDAPGroups accessapi.LDAPGroupSettings
 	// Security checks and writes the security section's userLockPolicy and
 	// passwordSettings and reads them for the export. A descriptor that names
 	// them is refused without it; an export without it leaves them out.

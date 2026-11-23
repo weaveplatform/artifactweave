@@ -103,6 +103,13 @@
 // then Deps.LDAP binds to the directory outside it, and a failure answers
 // 400 naming the step that failed (connect, tls, manager bind, search).
 // Without Deps.LDAP the test answers 501.
+// LDAP-03 (#1834) serves the LDAP group settings (/access/api/v1/ldap/groups,
+// with the v2 provider's trailing-slash collection), the strategy defaults,
+// and the search, import and refresh through access/core/ldap's Sync, whose
+// directory calls run between ldapTx transactions; without Deps.LDAP the
+// search and refresh answer 501. Create a Group and Replace or Create a
+// Group import one directory group by name (import_from_ldap_group_setting)
+// the same way, through Sync's FindNamed and PublishNamed.
 //
 // # Testing
 //
@@ -110,7 +117,9 @@
 // in-memory stores, without the router; TestUnitDeleteKeyPairIsOneTransaction
 // checks the key pair transaction, and TestUnitLDAPConnectionTestAnswers the
 // connection test without a directory client and with a failure that names
-// no LDAP step. The route suites under test/server/access
+// no LDAP step; TestUnitLDAPGroupAnswers each group handler's answers and
+// refusals over a scripted directory, and TestUnitLDAPGroupImportAnswers
+// the group create and replace import. The route suites under test/server/access
 // and the router's guards in app (its status, principal and ledger tables)
 // reach the handlers through the router.
 package accesshttp
