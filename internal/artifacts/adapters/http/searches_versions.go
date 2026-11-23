@@ -1,6 +1,7 @@
 package artifactshttp
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/aql"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/search"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
@@ -44,6 +46,13 @@ func (s ArtifactoryAPI) RegisterSearchRoutes(r chi.Router) {
 func (s ArtifactoryAPI) latestVersionByProperties(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	r, err := s.newSearch(ctx, true)
+	if errors.Is(err, kernel.ErrUnauthenticated) {
+		// 7.161.26's getLatestVersionInternal answers a caller without a
+		// named user itself, never through the exception mappers: a bare 404
+		// while hideUnauthorizedResources is on (98-108), which
+		// RestResponseFilter fills in as the mappers' is (MapperHidden).
+		err = apierror.Hide(err, httpkit.MapperHidden)
+	}
 	if err != nil {
 		httpkit.WriteErr(w, req, err)
 		return

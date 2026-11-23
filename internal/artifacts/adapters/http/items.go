@@ -383,7 +383,7 @@ func (s ArtifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !acc.File(c, req.Path, api.ActionDelete) {
-		httpkit.WriteErr(w, r, httpkit.Denied(p))
+		httpkit.WriteErr(w, r, deleteRefused(c, req.Path, p))
 		return
 	}
 	if c.PackageType == repo.Debian && strings.HasPrefix(req.Path, "snapshots/") {
@@ -406,7 +406,7 @@ func (s ArtifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, sc := range sidecars {
 		if !acc.File(c, sc.From, api.ActionDelete) {
-			httpkit.WriteErr(w, r, httpkit.Denied(p))
+			httpkit.WriteErr(w, r, deleteRefused(c, req.Path, p))
 			return
 		}
 	}
@@ -415,6 +415,28 @@ func (s ArtifactoryAPI) deleteItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteRefused is deleteItem's refusal of a caller without Delete on
+// path, with the answer that hides it. While hideUnauthorizedResources is
+// on, 7.161.26's assertNonRootPathDelete records ARTIFACT_NOT_FOUND in place
+// of REQUIRES_DELETE_PERMISSION (3428-3444), and DeleteMethod sends it as
+// 404 with its text, which names the path as RepoPath.toPrettyPath does,
+// under the storing repository's key: a remote's cache's. The root is
+// asked of isForbiddenRootPathDelete first, which never hides, and a
+// sidecar's refusal is the requested path's, as 7.x asks Delete of that
+// path alone.
+func deleteRefused(c repo.Config, path string, p kernel.Principal) error {
+	refusal := httpkit.Denied(p)
+	if path == "" {
+		return refusal
+	}
+	key := c.Key
+	if c.Class == repo.Remote {
+		key += model.CacheSuffix
+	}
+	return apierror.Hide(refusal, apierror.New(http.StatusNotFound,
+		fmt.Sprintf("Artifact deletion error: Could not locate artifact. Path: '%s/%s'", key, path)))
 }
 
 // GetUploadsConfig tells the JFrog CLI whether to upload large files in

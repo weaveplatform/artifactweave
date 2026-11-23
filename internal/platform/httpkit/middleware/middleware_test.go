@@ -314,3 +314,28 @@ func decode(t *testing.T, body string) any {
 	}
 	return v
 }
+
+// TestUnitBindingErrorHides: a strict handler's refusal answers as
+// hideUnauthorizedResources asks, as WriteErr's does, and a failed read of
+// the setting is the generic 500, without the failure's text.
+func TestUnitBindingErrorHides(t *testing.T) {
+	refusal := apierror.Hide(apierror.New(http.StatusForbidden, "Forbidden"), apierror.New(http.StatusNotFound, ""))
+	for _, tc := range []struct {
+		name   string
+		hides  httpkit.Hiding
+		status int
+		body   string
+	}{
+		{"on", func(context.Context) (bool, error) { return true, nil }, http.StatusNotFound, `"message":""`},
+		{"off", func(context.Context) (bool, error) { return false, nil }, http.StatusForbidden, `"message":"Forbidden"`},
+		{"failing", func(context.Context) (bool, error) { return false, errors.New("settings down") }, http.StatusInternalServerError, "internal error"},
+	} {
+		rec := httptest.NewRecorder()
+		httpkit.HideUnauthorized(tc.hides)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			BindingError(http.StatusInternalServerError)(w, r, refusal)
+		})).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/artifactory/api/x", nil))
+		if rec.Code != tc.status || !strings.Contains(rec.Body.String(), tc.body) || strings.Contains(rec.Body.String(), "settings down") {
+			t.Errorf("%s: %d %s", tc.name, rec.Code, rec.Body)
+		}
+	}
+}
