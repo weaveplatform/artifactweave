@@ -31,6 +31,10 @@ type pullWorld struct {
 	retained          map[string]bool
 	pages, fetches    int
 	deletes, restores int
+	// pageSize caps the rows one owner page returns; an owner may return
+	// fewer than the driver asks for. Zero keeps one row per page.
+	pageSize int
+	fetched  []string
 }
 
 type pullSource struct{ w *pullWorld }
@@ -73,20 +77,36 @@ func (s pullSource) Repository(ctx context.Context, _ string, _ artifactsapi.Pul
 }
 
 func (s pullSource) Items(ctx context.Context, _ artifactsapi.PullRepository, _ artifactsapi.PullSelection, page kernel.Page) ([]artifactsapi.PullItem, string, error) {
-	if s.w.db.InTx(ctx) || page.Limit != 1 {
+	if s.w.db.InTx(ctx) || page.Limit < 1 {
 		return nil, "", kernel.ErrInvalid
 	}
 	s.w.pages++
-	for index, item := range s.w.items {
-		if item.Path > page.After {
+	return window(s.w.items, s.w.limit(page), func(item artifactsapi.PullItem) string { return item.Path })
+}
+
+func (w *pullWorld) limit(page kernel.Page) kernel.Page {
+	page.Limit = min(page.Limit, max(w.pageSize, 1))
+	return page
+}
+
+// window models the owner's keyset page: up to page.Limit rows after
+// page.After, with a continuation only when more rows follow.
+func window[T any](rows []T, page kernel.Page, path func(T) string) ([]T, string, error) {
+	var out []T
+	for index, row := range rows {
+		if path(row) <= page.After {
+			continue
+		}
+		out = append(out, row)
+		if len(out) == page.Limit {
 			next := ""
-			if index+1 < len(s.w.items) {
-				next = item.Path
+			if index+1 < len(rows) {
+				next = path(row)
 			}
-			return []artifactsapi.PullItem{item}, next, nil
+			return out, next, nil
 		}
 	}
-	return nil, "", nil
+	return out, "", nil
 }
 
 func (s pullSource) Fetch(ctx context.Context, item artifactsapi.PullItem, publication artifactsapi.PullPublication) (artifactsapi.PullCached, error) {
@@ -94,6 +114,7 @@ func (s pullSource) Fetch(ctx context.Context, item artifactsapi.PullItem, publi
 		return artifactsapi.PullCached{}, kernel.ErrInvalid
 	}
 	s.w.fetches++
+	s.w.fetched = append(s.w.fetched, item.Path)
 	if s.w.beforeFetch != nil {
 		s.w.beforeFetch()
 	}
@@ -131,19 +152,10 @@ func (s pullSource) CachedItems(
 	_ artifactsapi.PullSelection,
 	page kernel.Page,
 ) ([]artifactsapi.PullCacheCandidate, string, error) {
-	if s.w.db.InTx(ctx) || page.Limit != 1 {
+	if s.w.db.InTx(ctx) || page.Limit < 1 {
 		return nil, "", kernel.ErrInvalid
 	}
-	for index, candidate := range s.w.targets {
-		if candidate.Path > page.After {
-			next := ""
-			if index+1 < len(s.w.targets) {
-				next = candidate.Path
-			}
-			return []artifactsapi.PullCacheCandidate{candidate}, next, nil
-		}
-	}
-	return nil, "", nil
+	return window(s.w.targets, s.w.limit(page), func(candidate artifactsapi.PullCacheCandidate) string { return candidate.Path })
 }
 
 func (s pullSource) Remove(ctx context.Context, candidate artifactsapi.PullCacheCandidate, publication artifactsapi.PullPublication,
@@ -353,5 +365,22 @@ func TestUnitPullCancellationAndMissingFenceCannotReachEnumeration(t *testing.T)
 	}
 	if w.pages != 0 || w.fetches != 0 || w.restores != 0 {
 		t.Fatal("cancelled or unfenced pull reached authority or network work")
+	}
+}
+
+// A page records its intents at once, and their operation keys are hashes;
+// they are still fetched in the owner's enumeration order (#1895), so an
+// interruption leaves the same prefix cached as one-at-a-time enumeration.
+func TestUnitPullFetchesAPageInEnumerationOrder(t *testing.T) {
+	w, _, run := newPullWorld(t, false)
+	w.pageSize = 100
+	var want []string
+	for _, name := range []string{"a", "b", "c", "d", "e", "f", "g", "h"} {
+		w.add(run, "selected/"+name)
+		want = append(want, "selected/"+name)
+	}
+	finishPull(t, w, run)
+	if w.pages != 1 || !slices.Equal(w.fetched, want) {
+		t.Fatal("page fetch order", w.pages, w.fetched)
 	}
 }

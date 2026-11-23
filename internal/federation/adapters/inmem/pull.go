@@ -29,6 +29,11 @@ func (p pullProgress) items() *memtx.Table[pullItemKey, model.PullItem] {
 	return memtx.TableOf[pullItemKey, model.PullItem](p.s.Store, "replication_pull_items")
 }
 
+// order holds each intent's recorded position, as the SQL ordinal column does.
+func (p pullProgress) order() *memtx.Table[pullItemKey, int64] {
+	return memtx.TableOf[pullItemKey, int64](p.s.Store, "replication_pull_item_order")
+}
+
 func (p pullProgress) Create(ctx context.Context, id string, binding model.PullBinding, at time.Time) (model.PullRun, error) {
 	candidate, err := model.NewPullRun(id, binding, at)
 	if err != nil {
@@ -163,7 +168,14 @@ func (p pullProgress) CreateItem(ctx context.Context, in model.PullItem) (model.
 		if err := model.ValidatePullItemCreation(run, in); err != nil {
 			return fmt.Errorf("validate new pull intent: %w", err)
 		}
+		var last int64
+		for key, ordinal := range p.order().Rows {
+			if key.run == in.Run.ID && ordinal > last {
+				last = ordinal
+			}
+		}
 		p.items().Put(pk, in)
+		p.order().Put(pk, last+1)
 		out = kernel.Clone(in)
 		return nil
 	})
@@ -260,6 +272,44 @@ func (p *pullPageKeys) Pop() any {
 	value := (*p)[last]
 	*p = (*p)[:last]
 	return value
+}
+
+func (p pullProgress) NextPending(ctx context.Context, ref model.PullReference) (model.PullItem, bool, error) {
+	if err := ref.Validate(); err != nil {
+		return model.PullItem{}, false, fmt.Errorf("validate pull reference: %w", err)
+	}
+	var out model.PullItem
+	found := false
+	err := p.s.Do(ctx, func() error {
+		run, err := p.run(ref)
+		if err != nil {
+			return err
+		}
+		var best pullItemKey
+		var bestOrdinal int64
+		for key, row := range p.items().Rows {
+			if row.Run != ref || row.Phase == model.PullItemComplete {
+				continue
+			}
+			ordinal, _ := p.order().Get(key)
+			if !found || ordinal < bestOrdinal || ordinal == bestOrdinal && key.operation < best.operation {
+				best, bestOrdinal, found = key, ordinal, true
+			}
+		}
+		if !found {
+			return nil
+		}
+		item, _ := p.items().Get(best)
+		if err := item.Validate(run); err != nil {
+			return fmt.Errorf("stored pull intent is invalid: %w: %w", kernel.ErrStore, err)
+		}
+		out = kernel.Clone(item)
+		return nil
+	})
+	if err != nil {
+		return model.PullItem{}, false, fmt.Errorf("read next pull intent: %w", err)
+	}
+	return out, found, nil
 }
 
 func (p pullProgress) Items(ctx context.Context, ref model.PullReference, pending bool, page kernel.Page) ([]model.PullItem, string, error) {

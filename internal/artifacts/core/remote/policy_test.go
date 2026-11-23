@@ -450,8 +450,12 @@ func TestAccPolicyAdapterTargetsAndPreparation(t *testing.T) {
 		t.Fatal("URL absent from identity")
 	}
 	r := remote.TransportRequest(q, model.RemoteCacheEntry{})
-	if r.ExternalURL != q.Resource.ExternalURL || r.Path != "" || r.Query != "" {
+	if r.ExternalURL != q.Resource.ExternalURL || r.Path != "" || r.Query != "" || r.Management {
 		t.Fatal(r)
+	}
+	q.Resource.PullStorage = true
+	if !remote.TransportRequest(q, model.RemoteCacheEntry{}).Management {
+		t.Fatal("a pull storage read kept the artifact HEAD preflight")
 	}
 }
 

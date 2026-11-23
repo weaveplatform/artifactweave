@@ -113,6 +113,19 @@ func TestAccBypassCallerHEADAndFallback(t *testing.T) {
 			)
 		}
 	}
+	t.Run("management", func(t *testing.T) {
+		s := fakeupstream.New(t, fakeupstream.Options{})
+		s.Set("/item", fakeupstream.Resource{Body: []byte("ok")})
+		c := clientFor(t, repo.Config{URL: s.URL}, remote.Options{})
+		res, err := c.Fetch(t.Context(), remote.Request{Method: "GET", Path: "item", Management: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		body(t, res)
+		if s.Count("HEAD", "") != 0 || s.Count("GET", "") != 1 {
+			t.Fatal("a pull storage read probed with HEAD", s.Requests())
+		}
+	})
 	for _, status := range []int{405, 501, 403} {
 		s := fakeupstream.New(t, fakeupstream.Options{})
 		s.Set("/item", fakeupstream.Resource{Status: status})

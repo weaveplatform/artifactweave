@@ -3,6 +3,7 @@ package replication_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -96,6 +97,50 @@ func TestUnitReplicationSelectionReadFailureRetainsRetryableUnselectedProgress(t
 			must(t, err)
 			if current.Status() != model.ReplicationOK || current.Outcomes != (model.ExecutionOutcomes{Succeeded: 1}) {
 				t.Fatal("selection-count recovery lost or repeated an actual effect")
+			}
+		})
+	}
+}
+
+// One enumeration step records a whole owner page (#1895). A selection
+// ceiling inside that page still refuses the same intent that one-at-a-time
+// enumeration refused, after the intents before it are fetched.
+func TestUnitReplicationPullPageKeepsTheSelectionCeilingInPlace(t *testing.T) {
+	for _, limit := range []int{0, 1, 2, 3} {
+		t.Run(fmt.Sprint(limit), func(t *testing.T) {
+			w := newExecutionWorldWithLimit(t, model.ReplicationPull, nil, limit)
+			w.pull.pageSize = 100
+			run, err := w.db.PullProgress().Run(t.Context(), model.PullReference{ID: w.run.Binding.TransferID, Incarnation: w.run.Binding.TransferIncarnation})
+			must(t, err)
+			w.pull.add(run, "selected/second")
+			w.pull.add(run, "selected/third")
+			must(t, w.worker.Execute(t.Context(), w.item))
+			current, err := w.db.Executions().Run(t.Context(), w.run.Reference)
+			must(t, err)
+			// One listing records every intent when no ceiling meets it.
+			want, wantPages := limit, 1
+			if limit == 0 || limit == 3 {
+				want = 3
+			}
+			if limit == 1 || limit == 2 {
+				// The page that met the ceiling is read again up to it, and the
+				// next enumeration meets the ceiling at its first intent.
+				wantPages = 3
+			}
+			if current.Outcomes != (model.ExecutionOutcomes{Succeeded: int64(want)}) || w.pull.fetches != want || w.pull.pages != wantPages {
+				t.Fatal("page outcomes", current.Outcomes, w.pull.fetches, w.pull.pages)
+			}
+			if limit == 1 || limit == 2 {
+				if current.Failure != model.ExecutionSelectionLimited {
+					t.Fatal("ceiling inside a page was not reported", current.Failure)
+				}
+				count, present, err := w.db.Executions().SelectedPaths(t.Context(), current.Reference, "selected/third")
+				must(t, err)
+				if count != int64(limit) || present {
+					t.Fatal("refused intent was selected", count, present)
+				}
+			} else if current.Status() != model.ReplicationOK {
+				t.Fatal("unlimited page did not complete", current.Failure)
 			}
 		})
 	}

@@ -42,6 +42,7 @@ type Finalizers struct {
 	err         error
 	before      []func(context.Context) error
 	publication func(context.Context) error
+	remembered  map[any]any
 }
 
 // Bind returns a context whose before-commit work belongs to f. A joined
@@ -111,4 +112,5 @@ func (f *Finalizers) Close() {
 	f.closed = true
 	f.before = nil
 	f.publication = nil
+	f.remembered = nil
 }

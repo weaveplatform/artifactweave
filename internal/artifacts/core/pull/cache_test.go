@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
@@ -225,5 +226,50 @@ func TestUnitPullFreshPolicyPropertySyncRenewsEverySharedRepresentation(t *testi
 		if err != nil || current.Smart == nil || len(current.Smart.OwnedProperties["quality"]) != 1 {
 			t.Fatal("shared representation lost remote property ownership", err)
 		}
+	}
+}
+
+// A file-list entry has no MD5 or lastUpdated, so the fetch's own inspection
+// is compared with it only on the facts both reads carry (#1895).
+func TestUnitPullFetchComparesListedFactsOnTheFactsBothReadsCarry(t *testing.T) {
+	for _, mode := range []string{"unchanged", "digest", "size", "modified", "properties-updated"} {
+		t.Run(mode, func(t *testing.T) {
+			w := fixture(t)
+			selection := api.PullSelection{Properties: mode == "properties-updated"}
+			listed := file("a")
+			listed.Listed, listed.Checksums.SHA1 = true, strings.Repeat("1", 40)
+			info := file("a")
+			info.Checksums.SHA1, info.Checksums.MD5, info.Updated = strings.Repeat("1", 40), strings.Repeat("5", 32), time.Unix(30, 0)
+			w.peer.entries, w.peer.inspected = []pull.Entry{listed}, &info
+			repository := binding(t, w, selection)
+			items, _, err := w.source.Items(t.Context(), repository, selection, kernel.Page{})
+			if err != nil || len(items) != 1 {
+				t.Fatal("listed selection", err)
+			}
+			selected := items[0]
+			entry := retainedFile(t, w, selected)
+			w.source.Read = func(context.Context, source.Request) (source.Result, error) {
+				return source.Result{CacheEntry: &entry}, nil
+			}
+			changed := info
+			switch mode {
+			case "digest":
+				changed.Checksums.SHA1 = strings.Repeat("2", 40)
+			case "size":
+				changed.Size++
+			case "modified":
+				changed.Modified = changed.Modified.Add(time.Second)
+			case "properties-updated":
+				changed.Updated = changed.Updated.Add(time.Second)
+			}
+			w.peer.inspected = &changed
+			_, err = w.source.Fetch(t.Context(), selected, publication())
+			if mode == "unchanged" && err != nil {
+				t.Fatal("facts the list does not carry superseded an unchanged file", err)
+			}
+			if mode != "unchanged" && !errors.Is(err, source.ErrSuperseded) {
+				t.Fatal("a changed peer file kept its listed intent", err)
+			}
+		})
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -20,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/maven"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/kernel/antpath"
+	platformtx "github.com/weaveplatform/artifactweave/internal/platform/tx"
 )
 
 // Source binds the artifacts API to runtime-owned P9 services. Open refreshes
@@ -175,6 +177,9 @@ func (s Source) Items(ctx context.Context, repository api.PullRepository, select
 	if err != nil {
 		return nil, "", err
 	}
+	// One page checks every listed file's Read outside a transaction; the
+	// caller is resolved once for the page rather than once per file.
+	ctx = platformtx.WithSession(ctx)
 	state, err := s.prepare(ctx, repository.Repository.Key, selection)
 	if err != nil {
 		return nil, "", err
@@ -236,6 +241,16 @@ func (s selectionState) selected(ctx context.Context, repository api.PullReposit
 		}
 		return api.PullItem{}, false, fmt.Errorf("authorize selected pull path: %w", err)
 	}
+	if selection.Properties && entry.Listed {
+		// Properties are bound to the file info read around them, as for an
+		// inspected entry; a listed entry has no lastUpdated to bind them to.
+		inspected, err := s.peer.Inspect(ctx, entry.Path)
+		if err != nil || inspected.Path != entry.Path || inspected.Folder || inspected.Size != entry.Size ||
+			!inspected.Modified.Equal(entry.Modified) || !sameDigests(inspected.Checksums, entry.Checksums) {
+			return api.PullItem{}, false, source.ErrSuperseded
+		}
+		entry = inspected
+	}
 	selected := api.PullItem{
 		Repository: repository, Selection: selection, Path: path, UpstreamPath: entry.Path,
 		Size: entry.Size, Actual: entry.Checksums, Modified: entry.Modified, Updated: entry.Updated,
@@ -261,4 +276,31 @@ func (s selectionState) selected(ctx context.Context, repository api.PullReposit
 	}
 	selected.Version = version
 	return selected, true, nil
+}
+
+// sameDigests compares the digests both reads carry. The storage file list
+// has SHA-256 and SHA-1 but no MD5 or SHA-512, which file info adds.
+func sameDigests(a, b kernel.Checksums) bool {
+	if a.SHA256 == "" || a.SHA256 != b.SHA256 {
+		return false
+	}
+	for _, pair := range [][2]string{{a.SHA512, b.SHA512}, {a.SHA1, b.SHA1}, {a.MD5, b.MD5}} {
+		if pair[0] != "" && pair[1] != "" && pair[0] != pair[1] {
+			return false
+		}
+	}
+	return true
+}
+
+// sameSelection reports whether a fresh inspection still describes the
+// selected snapshot. An intent enumerated from the file list holds the list's
+// digests and, without a property selection, its property time in place of
+// lastUpdated (#1895), so those are compared as far as both reads carry them;
+// a property selection inspected the file and compares lastUpdated exactly.
+func sameSelection(current, selected api.PullItem) bool {
+	return current.Repository == selected.Repository && current.Selection == selected.Selection &&
+		current.Path == selected.Path && current.UpstreamPath == selected.UpstreamPath && current.Size == selected.Size &&
+		current.Modified.Equal(selected.Modified) && sameDigests(current.Actual, selected.Actual) &&
+		(!selected.Selection.Properties || current.Updated.Equal(selected.Updated)) &&
+		maps.EqualFunc(current.Properties, selected.Properties, slices.Equal[[]string])
 }
