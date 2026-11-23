@@ -34,4 +34,10 @@ resource "artifactory_ldap_group_setting" "units" {
   description_attribute  = "description"
   strategy               = "HIERARCHICAL"
   sub_tree               = !var.sub_tree
+
+  # The provider deletes this resource by reading every group setting,
+  # clearing security.ldapGroupSettings and writing the others back. A
+  # delete of teams that lands in between would be undone by that write, so
+  # Terraform must never run the two deletes at once: this one goes first.
+  depends_on = [artifactory_ldap_group_setting_v2.teams]
 }

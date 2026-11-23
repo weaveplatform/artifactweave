@@ -66,9 +66,13 @@ administrators control.
 ## Teardown
 
 `terraform destroy` deletes both group settings and the connection. The
-descriptor resource deletes by clearing `security.ldapGroupSettings` and
-writing back the settings it does not manage. Groups imported through the
-settings remain as local groups in the `ldap` realm.
+descriptor resource deletes by reading every group setting, clearing
+`security.ldapGroupSettings` and writing back the settings it does not
+manage. A setting deleted by another client between that read and the
+write comes back, so `units` depends on `teams` and the two deletes never
+overlap; keep any other LDAP group setting change out of the same apply or
+destroy as this resource. Groups imported through the settings remain as
+local groups in the `ldap` realm.
 
 ## How this scenario is tested
 

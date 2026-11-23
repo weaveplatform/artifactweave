@@ -157,6 +157,15 @@ from the provider structs.
 | Lifecycle | `artifactory_release_bundle_v2`, `artifactory_release_bundle_v2_promotion` | `POST /lifecycle/api/v2/release_bundle?async=false[&project=]` (+ `X-JFrog-Signing-Key-Name`), `GET/DELETE /lifecycle/api/v2/release_bundle/records/{name}/{version}`; `POST /lifecycle/api/v2/promotion/records/{name}/{version}`, `GET/DELETE .../{created}`; prefix 501; P24 |
 | Webhooks (24) | `artifactory_{artifact, artifact_property, artifact_lifecycle, docker, build, release_bundle, distribution, artifactory_release_bundle, destination, user, release_bundle_v2, release_bundle_v2_promotion}_webhook` and the matching `_custom_webhook` | `POST /event/api/v1/subscriptions` **201**, `GET .../{key}` 200, `PUT` **204**, `DELETE` 204. Event names are validated client-side and echoed verbatim; see [07-webhooks-retention-projects.md](07-webhooks-retention-projects.md) |
 
+`artifactory_ldap_group_setting` deletes by reading every group setting from the XML
+descriptor, sending `security.ldapGroupSettings: ~` and then PATCHing back the settings it
+read, apart from its own (`resourceLdapGroupSettingsDelete`, provider 12.11.14). That is a
+read-modify-write on the client: a group setting deleted through the Access API between the
+read and the last PATCH is written again, by an ordinary descriptor create that the server
+cannot tell from any other. Terraform runs independent deletes in parallel, so a
+configuration with both LDAP group resources must order them (`depends_on`), as the
+`ldap-groups` reference does (#1834).
+
 Data sources: `artifactory_file`, `artifactory_fileinfo`, `artifactory_file_list`,
 `artifactory_group`, `artifactory_user`, `artifactory_permission_target`,
 `artifactory_repositories` (`GET /artifactory/api/repositories/?type=&packageType=&project=`; observed against artifactweave on 2026-10-12: the provider sends a **trailing slash** on this path, so the router must treat `/api/repositories/` and `/api/repositories` alike),
