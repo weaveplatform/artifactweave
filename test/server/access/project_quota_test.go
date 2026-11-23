@@ -52,11 +52,15 @@ func projectQuotaHTTP(t *testing.T, db harness.Store) {
 	}
 	refused := func(rec *httptest.ResponseRecorder, access bool) {
 		t.Helper()
-		want := `{"errors":[{"message":"project storage quota exceeded","status":403}]}`
+		// 7.161.26's ProjectsUtils.PROJ_LIMIT_MSG and SC_REQUEST_TOO_LONG;
+		// 7.x's Access answer is not in its open sources, so attach keeps 403.
+		status := http.StatusRequestEntityTooLarge
+		want := `{"errors":[{"message":"Project storage quota exceeded. If you require more storage, contact your Platform Admin.","status":413}]}`
 		if access {
+			status = http.StatusForbidden
 			want = `{"errors":[{"code":"FORBIDDEN","message":"project storage quota exceeded"}]}`
 		}
-		if strings.TrimSpace(rec.Body.String()) != want || rec.Header().Get("WWW-Authenticate") != "" {
+		if rec.Code != status || strings.TrimSpace(rec.Body.String()) != want || rec.Header().Get("WWW-Authenticate") != "" {
 			t.Fatal("quota refusal exposed private totals/owner or changed the route envelope", rec.Body.String(), rec.Header())
 		}
 	}
@@ -86,7 +90,7 @@ func projectQuotaHTTP(t *testing.T, db harness.Store) {
 		switch rec.Code {
 		case http.StatusCreated:
 			accepted++
-		case http.StatusForbidden:
+		case http.StatusRequestEntityTooLarge:
 			refused(rec, false)
 			denied++
 		default:
@@ -106,7 +110,7 @@ func projectQuotaHTTP(t *testing.T, db harness.Store) {
 	if winner == "" {
 		t.Fatal("committed writer was not downloadable")
 	}
-	refused(request(http.MethodPut, base+"base.bin", strings.Repeat("x", 95), http.StatusForbidden), false)
+	refused(request(http.MethodPut, base+"base.bin", strings.Repeat("x", 95), http.StatusRequestEntityTooLarge), false)
 	if rec := request(http.MethodGet, base+"base.bin", "", http.StatusOK); rec.Body.String() != original {
 		t.Fatal("refused overwrite changed downloadable content")
 	}
@@ -114,7 +118,6 @@ func projectQuotaHTTP(t *testing.T, db harness.Store) {
 	headers := support.Basic("admin", "pw")
 	headers["X-Checksum-Deploy"], headers["X-Checksum-Sha256"] = "true", hex.EncodeToString(digest[:])
 	checksum := support.Do(t, h, http.MethodPut, base+"checksum.bin", headers, "")
-	wantStatus(t, checksum, http.StatusForbidden)
 	refused(checksum, false)
 	bytes("alpha", 90)
 	request(http.MethodPut, "/artifactory/incoming/unassigned.bin", strings.Repeat("u", 15), http.StatusCreated)
@@ -125,14 +128,14 @@ func projectQuotaHTTP(t *testing.T, db harness.Store) {
 		t.Fatal("refused attach changed canonical ownership")
 	}
 	bytes("beta", 0)
-	refused(request(http.MethodPost, "/artifactory/api/repositories/alpha-generic", `{"projectKey":"beta"}`, http.StatusForbidden), false)
+	refused(request(http.MethodPost, "/artifactory/api/repositories/alpha-generic", `{"projectKey":"beta"}`, http.StatusRequestEntityTooLarge), false)
 	bytes("alpha", 90)
 	bytes("beta", 0)
 	request(http.MethodPut, "/access/api/v1/projects/_/share/repositories/alpha-generic/beta?readOnly=true", "", http.StatusNoContent)
 	bytes("alpha", 90)
 	bytes("beta", 0)
 	request(http.MethodPut, "/access/api/v1/projects/alpha", `{"storage_quota_bytes":25}`, http.StatusOK)
-	refused(request(http.MethodPut, base+"above-lowered.bin", "z", http.StatusForbidden), false)
+	refused(request(http.MethodPut, base+"above-lowered.bin", "z", http.StatusRequestEntityTooLarge), false)
 	request(http.MethodPut, base+"base.bin", "shortened!", http.StatusCreated)
 	bytes("alpha", 30)
 	request(http.MethodDelete, base+winner, "", http.StatusNoContent)
