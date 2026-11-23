@@ -689,6 +689,7 @@ func TransportRequest(q source.Request, e model.RemoteCacheEntry) Request {
 		GitLFSActionHeaders: q.Resource.GitLFSActionHeaders.Clone(),
 		Header:              headers,
 		Metadata:            q.Resource.Kind != source.ResourceKindArtifact,
+		Management:          q.Resource.PullStorage,
 	}
 }
 

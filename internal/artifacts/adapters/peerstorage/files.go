@@ -35,7 +35,8 @@ func unsupportedInfo(err error) bool {
 
 // Files streams the documented recursive list into a bounded local window.
 // Storage API has no offset/limit wire contract; every page scans a complete
-// document and independently inspects its selected entries before returning.
+// document. Entries with complete computed facts are returned as listed; any
+// other selected entry is inspected individually before the page returns.
 func (r *Reader) Files(ctx context.Context, page kernel.Page) ([]pull.Entry, string, error) {
 	page, last, err := r.page(page)
 	if err != nil {
@@ -78,6 +79,15 @@ func (r *Reader) Files(ctx context.Context, page kernel.Page) ([]pull.Entry, str
 	}
 	entries := make([]pull.Entry, 0, len(listed))
 	for _, selected := range listed {
+		if selected.complete {
+			// 7.x pull replication reads the peer's tree from this file list,
+			// whose computed size, SHA-256 and lastModified describe each file
+			// as file info does. Asking for every file's info again cost one
+			// request per selected file (#1895); a listing without those
+			// facts still falls back to the exact info lookup below.
+			entries = append(entries, selected.file)
+			continue
+		}
 		entry, err := r.Inspect(ctx, selected.file.Path)
 		if err != nil {
 			return nil, "", fmt.Errorf("inspect selected pull file: %w", err)
@@ -254,6 +264,7 @@ func listedFile(row artifactory.FileListItem, path string) (listedEntry, error) 
 		}
 		entry.Checksums.SHA1 = strings.ToLower(*row.Sha1)
 	}
+	entry.Listed = true
 	return listedEntry{file: entry, complete: entry.Size >= 0 && entry.Checksums.SHA256 != "" && !entry.Modified.IsZero()}, nil
 }
 

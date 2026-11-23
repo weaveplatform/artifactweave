@@ -17,6 +17,11 @@ type Entry struct {
 	Checksums kernel.Checksums
 	Modified  time.Time
 	Updated   time.Time
+	// Listed marks facts taken from the storage file list rather than file
+	// info. The list has no lastUpdated (Updated holds its property time, or
+	// Modified) and no MD5 or SHA-512, so such an entry is compared with a
+	// later inspection only on the facts both carry (#1895).
+	Listed bool
 }
 
 // Peer exposes only ordinary, read-only storage operations on one configured

@@ -10,6 +10,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	platformtx "github.com/weaveplatform/artifactweave/internal/platform/tx"
 )
 
 // PullRequest names one logical selected transfer under an exact target revision.
@@ -144,6 +145,10 @@ func (p Pull) Step(ctx context.Context, ref model.PullReference, fence PushFence
 	if ctx == nil || p.Store.InTx(ctx) {
 		return run, fmt.Errorf("pull author restoration leaked a transaction: %w", kernel.ErrStore)
 	}
+	// The step's checks outside a transaction resolve the restored author once
+	// (#1895); each transaction that records progress or publishes the cache
+	// resolves it again, so revocation still stops the step's effects.
+	ctx = platformtx.WithSession(ctx)
 	if err := p.withRun(ctx, run, fence, nil); err != nil {
 		return run, err
 	}
@@ -167,11 +172,35 @@ func (p Pull) Step(ctx context.Context, ref model.PullReference, fence PushFence
 	return current, nil
 }
 
+// pullPage bounds one enumeration step. The storage file list has no wire
+// paging, so each page costs one complete listing of the selected tree; a
+// whole page of intents commits with its cursor in one transaction, and the
+// following steps fetch them one at a time (#1895). It is kernel.MaxLimit,
+// the largest page an owner accepts.
+const pullPage = kernel.MaxLimit
+
 func (p Pull) page(ctx context.Context, run model.PullRun, fence PushFence) error {
+	limit := pullPage
+	for {
+		refused, err := p.pageOf(ctx, run, fence, limit)
+		if refused <= 0 {
+			return err
+		}
+		// An execution's selection ceiling refused an intent inside the page.
+		// Commit only the peer entries before it, so the intents it accepted
+		// are fetched first and the refusal recurs at the same point it did
+		// when every step selected one intent.
+		limit = refused
+	}
+}
+
+// pageOf records one page and returns the index of an intent the execution
+// selection ceiling refused, or -1.
+func (p Pull) pageOf(ctx context.Context, run model.PullRun, fence PushFence, limit int) (int, error) {
 	next := run
 	next.Version++
 	next.Updated = p.now()
-	var intent *model.PullItem
+	var intents []model.PullItem
 	switch {
 	case run.Phase == model.PullCopy && run.SourceDone:
 		if run.Binding.SyncDeletes {
@@ -182,20 +211,24 @@ func (p Pull) page(ctx context.Context, run model.PullRun, fence PushFence) erro
 	case run.Phase == model.PullReconcile && run.TargetDone:
 		next.Phase, next.Completed = model.PullComplete, next.Updated
 	default:
-		selected, cursor, err := p.enumerate(ctx, run)
+		selected, cursor, err := p.enumerate(ctx, run, limit)
 		if err != nil {
-			return err
+			return -1, err
 		}
-		intent = selected
+		intents = selected
 		if run.Phase == model.PullCopy {
 			next.SourceCursor, next.SourceDone = cursor, cursor == ""
 		} else {
 			next.TargetCursor, next.TargetDone = cursor, cursor == ""
 		}
 	}
-	return p.withRun(ctx, run, fence, func(ctx context.Context, current model.PullRun) error {
-		if intent != nil {
-			if _, err := p.Store.PullProgress().CreateItem(ctx, *intent); err != nil {
+	refused := -1
+	err := p.withRun(ctx, run, fence, func(ctx context.Context, current model.PullRun) error {
+		for index, intent := range intents {
+			if _, err := p.Store.PullProgress().CreateItem(ctx, intent); err != nil {
+				if errors.Is(err, ErrSelectionLimit) {
+					refused = index
+				}
 				return fmt.Errorf("record immutable pull intent: %w", err)
 			}
 		}
@@ -204,48 +237,64 @@ func (p Pull) page(ctx context.Context, run model.PullRun, fence PushFence) erro
 		}
 		return nil
 	})
+	return refused, err
 }
 
-func (p Pull) enumerate(ctx context.Context, run model.PullRun) (*model.PullItem, string, error) {
-	intent := &model.PullItem{Run: run.Reference, Version: 1, Phase: model.PullIntent, Updated: p.now()}
+func (p Pull) enumerate(ctx context.Context, run model.PullRun, limit int) ([]model.PullItem, string, error) {
+	page := kernel.Page{Limit: limit}
+	var intents []model.PullItem
 	var cursor, previous string
 	if run.Phase == model.PullCopy {
 		previous = run.SourceCursor
-		rows, next, err := p.Source.Items(ctx, run.Binding.Source, run.Binding.Selection(), kernel.Page{Limit: 1, After: previous})
+		page.After = previous
+		rows, next, err := p.Source.Items(ctx, run.Binding.Source, run.Binding.Selection(), page)
 		if err != nil {
 			return nil, "", fmt.Errorf("enumerate selected pull source: %w", err)
 		}
-		if len(rows) > 1 {
+		if len(rows) > limit {
 			return nil, "", kernel.ErrStore
 		}
 		cursor = next
-		if len(rows) != 0 {
-			intent.Action, intent.Path, intent.Source = model.PullFetch, rows[0].Path, &rows[0]
+		for index := range rows {
+			intents = append(intents, model.PullItem{
+				Run: run.Reference, Version: 1, Phase: model.PullIntent, Updated: p.now(),
+				Action: model.PullFetch, Path: rows[index].Path, Source: &rows[index],
+			})
 		}
 	} else {
 		previous = run.TargetCursor
-		rows, next, err := p.Source.CachedItems(ctx, run.Binding.Source, run.Binding.Selection(), kernel.Page{Limit: 1, After: previous})
+		page.After = previous
+		rows, next, err := p.Source.CachedItems(ctx, run.Binding.Source, run.Binding.Selection(), page)
 		if err != nil {
 			return nil, "", fmt.Errorf("enumerate selected pull cache: %w", err)
 		}
-		if len(rows) > 1 {
+		if len(rows) > limit {
 			return nil, "", kernel.ErrStore
 		}
 		cursor = next
-		if len(rows) != 0 {
-			intent.Action, intent.Path, intent.Target = model.PullDelete, rows[0].Path, &rows[0]
+		for index := range rows {
+			intents = append(intents, model.PullItem{
+				Run: run.Reference, Version: 1, Phase: model.PullIntent, Updated: p.now(),
+				Action: model.PullDelete, Path: rows[index].Path, Target: &rows[index],
+			})
 		}
 	}
 	if cursor != "" && cursor == previous {
 		return nil, "", fmt.Errorf("pull enumeration did not advance: %w", kernel.ErrStore)
 	}
-	if intent.Path == "" {
-		return nil, cursor, nil
+	seen := make(map[string]bool, len(intents))
+	for _, intent := range intents {
+		if seen[intent.Path] {
+			// One page names each selected path once; a repeat is an owner
+			// fault, not a second intent for the same file.
+			return nil, "", fmt.Errorf("pull enumeration repeated %q: %w", intent.Path, kernel.ErrStore)
+		}
+		seen[intent.Path] = true
+		if err := intent.Validate(run); err != nil {
+			return nil, "", fmt.Errorf("artifact owner escaped pull selection: %w", err)
+		}
 	}
-	if err := intent.Validate(run); err != nil {
-		return nil, "", fmt.Errorf("artifact owner escaped pull selection: %w", err)
-	}
-	return intent, cursor, nil
+	return intents, cursor, nil
 }
 
 func (p Pull) withItem(ctx context.Context, run model.PullRun, expected model.PullItem,

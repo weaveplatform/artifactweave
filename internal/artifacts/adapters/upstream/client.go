@@ -362,7 +362,7 @@ func (c *Client) fetch(ctx context.Context, r remote.Request) (*http.Response, e
 	if r.Method == http.MethodHead {
 		return c.Do(ctx, r)
 	}
-	if !enabled(c.config.BypassHeadRequests) {
+	if !enabled(c.config.BypassHeadRequests) && !r.Management {
 		r.Method = http.MethodHead
 		res, err := c.Do(ctx, r)
 		if err != nil {

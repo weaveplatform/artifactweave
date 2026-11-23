@@ -398,3 +398,31 @@ func TestUnitPullCatalogRefusesTransactionsAndCurrentAuthorityFailures(t *testin
 		t.Fatal("unbounded port response escaped", err)
 	}
 }
+
+// A property selection binds properties to file info read around them; a
+// listed entry, which has no lastUpdated, is inspected first (#1895).
+func TestUnitPullListedPropertySelectionBindsPropertiesToFileInfo(t *testing.T) {
+	for _, mode := range []string{"current", "changed"} {
+		t.Run(mode, func(t *testing.T) {
+			w := fixture(t)
+			selection := api.PullSelection{Properties: true}
+			listed := file("a")
+			listed.Listed, listed.Updated = true, listed.Modified
+			info := file("a")
+			if mode == "changed" {
+				info.Size++
+			}
+			w.peer.entries, w.peer.inspected, w.peer.props = []pull.Entry{listed}, &info, model.Properties{"build": {"1"}}
+			items, _, err := w.source.Items(t.Context(), binding(t, w, selection), selection, kernel.Page{})
+			if mode == "changed" {
+				if !errors.Is(err, source.ErrSuperseded) || len(items) != 0 || w.peer.propertyCalls != 0 {
+					t.Fatal("properties were read for a file that changed after listing", err)
+				}
+				return
+			}
+			if err != nil || len(items) != 1 || !items[0].Updated.Equal(info.Updated) {
+				t.Fatal("listed property selection did not bind file info", items, err)
+			}
+		})
+	}
+}

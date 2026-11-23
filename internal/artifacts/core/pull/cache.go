@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	platformtx "github.com/weaveplatform/artifactweave/internal/platform/tx"
 )
 
 func validItem(selected api.PullItem) bool {
@@ -75,10 +76,33 @@ func (s Source) Fetch(ctx context.Context, selected api.PullItem, publication ap
 	if s.InTx == nil || s.InTx(ctx) || s.Read == nil || publication.Check == nil || publication.Fence == nil {
 		return api.PullCached{}, fmt.Errorf("pull fetch needs external context and execution authority: %w", kernel.ErrInvalid)
 	}
-	if err := publication.Check(ctx); err != nil {
-		return api.PullCached{}, fmt.Errorf("current pull execution: %w", err)
+	ctx = platformtx.WithSession(ctx)
+	check := func(ctx context.Context) (selectionState, error) {
+		if err := publication.Check(ctx); err != nil {
+			return selectionState{}, fmt.Errorf("current pull execution: %w", err)
+		}
+		return s.selectedState(ctx, selected)
 	}
-	state, err := s.selectedState(ctx, selected)
+	// The source checks execution again before every upstream exchange it
+	// makes outside a transaction; each check resolved the run, the target,
+	// the owning remote and the caller afresh (#1895). One resolution serves
+	// this fetch's early checks. Every check inside a transaction, which is
+	// where the cache and the intent are published, still runs in full.
+	checked := new(byte)
+	early := func(ctx context.Context) (selectionState, error) {
+		return platformtx.Remember(ctx, false, checked, func() (selectionState, error) {
+			// Both halves read local state only; one transaction resolves
+			// the caller and the remote once for them.
+			var state selectionState
+			err := s.Content.Store.Tx(ctx, func(ctx context.Context) error {
+				var err error
+				state, err = check(ctx)
+				return err
+			})
+			return state, err //nolint:wrapcheck // check's own refusals
+		})
+	}
+	state, err := early(ctx)
 	if err != nil {
 		return api.PullCached{}, err
 	}
@@ -91,7 +115,7 @@ func (s Source) Fetch(ctx context.Context, selected api.PullItem, publication ap
 	if err != nil {
 		return api.PullCached{}, err
 	}
-	if !visible || current.Version != selected.Version {
+	if !visible || !sameSelection(current, selected) {
 		return api.PullCached{}, source.ErrSuperseded
 	}
 	request := state.request
@@ -106,10 +130,11 @@ func (s Source) Fetch(ctx context.Context, selected api.PullItem, publication ap
 	}
 	request.Publication = &source.Publication{
 		Check: func(ctx context.Context) error {
-			if err := publication.Check(ctx); err != nil {
-				return fmt.Errorf("current pull execution: %w", err)
+			if s.InTx(ctx) {
+				_, err := check(ctx)
+				return err
 			}
-			_, err := s.selectedState(ctx, selected)
+			_, err := early(ctx)
 			return err
 		},
 		Fence: publication.Fence,

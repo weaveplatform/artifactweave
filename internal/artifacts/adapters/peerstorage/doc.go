@@ -15,13 +15,17 @@
 // # Outputs
 //
 // Reader returns verified computed file facts, folder identity and separate
-// property snapshots. Its cursors bind the source lifetime, options revision and
+// property snapshots. A page takes each file's size, SHA-256 and lastModified
+// from the one recursive file list, as 7.x pull replication reads its peer's
+// tree; only a listed file lacking one of them is inspected through file info
+// (#1895). Its cursors bind the source lifetime, options revision and
 // selected scope using a hash, never raw credentials or options.
 //
 // # Invariants
 //
 // All network work uses P9 authorization, transport, offline and circuit policy.
-// Management documents are transient and cannot populate artifact/cache state.
+// Management documents are transient and cannot populate artifact/cache state;
+// each is one GET, without the HEAD preflight of an artifact download.
 // No arbitrary URLs, writes or upstream pagination parameters are exposed.
 // Complete metadata is validated before a page is returned; no transaction
 // spans HTTP. The owner authorizes mapped file paths before consuming their

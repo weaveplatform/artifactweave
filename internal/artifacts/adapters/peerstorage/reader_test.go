@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -263,6 +264,33 @@ func TestAccFilesVerifyOrdinaryStorageMetadataAndResumeBoundedPages(t *testing.T
 	}
 	if w.count() != 8 {
 		t.Fatalf("unexpected requests %d: only anchor, complete list and selected info are allowed", w.count())
+	}
+}
+
+func TestAccFilesTakeCompleteListFactsWithoutPerFileInfo(t *testing.T) {
+	w := fixture(t)
+	sha2 := strings.Repeat("B", 64)
+	w.set("/selected", `{"repo":"source","path":"/selected","children":[]}`)
+	w.set("/selected"+listQuery, fmt.Sprintf(`{"files":[`+
+		`{"uri":"/a.bin","folder":false,"size":4,"lastModified":"2026-11-20T10:00:00Z","sha1":%q,"sha2":%q,"mdTimestamps":{"properties":"2026-11-21T10:00:00Z"}},`+
+		`{"uri":"/b.bin","folder":false,"size":4,"lastModified":"2026-11-20T10:00:00Z"}]}`, strings.Repeat("C", 40), sha2))
+	w.set("/selected/b.bin", fileInfo("selected/b.bin"))
+	files, next, err := w.reader("selected").Files(t.Context(), kernel.Page{})
+	if err != nil || len(files) != 2 || next != "" {
+		t.Fatalf("listed page %+v %q %v", files, next, err)
+	}
+	listed, inspected := files[0], files[1]
+	if listed.Path != "selected/a.bin" || listed.Size != 4 || listed.Checksums.SHA256 != strings.ToLower(sha2) ||
+		listed.Checksums.SHA1 != strings.Repeat("c", 40) || listed.Modified.IsZero() ||
+		!listed.Updated.Equal(listed.Modified.Add(24*time.Hour)) || !listed.Listed {
+		t.Fatalf("complete list facts were not kept %+v", listed)
+	}
+	if inspected.Listed || inspected.Checksums.SHA256 != strings.Repeat("a", 64) {
+		t.Fatalf("a listing without computed digests skipped file info %+v", inspected)
+	}
+	// The anchor, one list and info only for the entry the list left incomplete.
+	if w.count() != 3 || slices.Contains(w.requests, "/selected/a.bin") {
+		t.Fatalf("complete list facts were inspected again: %v", w.requests)
 	}
 }
 

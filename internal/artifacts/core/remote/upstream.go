@@ -64,6 +64,12 @@ type Request struct {
 	Query    string
 	Header   http.Header
 	Metadata bool
+	// Management marks a read-only Storage API document a pull replication
+	// reads from its peer. It is sent as one GET: the HEAD preflight that
+	// bypassHeadRequests governs belongs to downloading an artifact for the
+	// cache, and on a file list it would make the peer build the whole
+	// listing twice (#1895).
+	Management bool
 	// Body is admitted only for closed format-owned metadata POST contracts.
 	Body []byte
 }

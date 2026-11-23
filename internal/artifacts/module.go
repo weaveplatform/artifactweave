@@ -38,6 +38,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
+	platformtx "github.com/weaveplatform/artifactweave/internal/platform/tx"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
@@ -246,15 +247,66 @@ func (m *Module) guardAuthority(ctx context.Context) error {
 	if m.access.Projects == nil {
 		return nil
 	}
-	if err := m.access.Projects.Guard(ctx); err != nil {
+	// The guard row stays locked until the transaction ends, so a pull
+	// session takes it once per transaction rather than once per check.
+	_, err := platformtx.Remember(ctx, m.store.InTx(ctx), authorityGuardKey{}, func() (struct{}, error) {
+		return struct{}{}, m.access.Projects.Guard(ctx)
+	})
+	if err != nil {
 		return fmt.Errorf("artifact current authority: %w", err)
 	}
 	return nil
 }
 
+type authorityGuardKey struct{}
+
 func (m *Module) currentTransferCaller(ctx context.Context) (accessapi.Decider, error) {
 	_, decider, err := m.currentContentCaller(ctx)
 	return decider, err
+}
+
+// callerKey names one principal's resolved authority within one transaction:
+// the WithPrincipal binding it came from and whether it was resolved as a
+// registry credential.
+type callerKey struct {
+	binding  any
+	registry bool
+	content  bool
+}
+
+// rememberCaller resolves a caller's current credential and permissions once
+// per transaction, and once for the early checks outside one, within a pull
+// replication session (platformtx.WithSession). A pull step checks the same
+// caller in every source, cache and publication check it makes, and each read
+// the user, groups, restrictions and permissions again: about 130 resolutions
+// per fetched file (#1895). Every other read keeps resolving per check.
+func (m *Module) rememberCaller(ctx context.Context, key callerKey, resolve func() (accessapi.Decider, error)) (accessapi.Decider, error) {
+	if key.binding == nil {
+		return resolve()
+	}
+	return platformtx.Remember(ctx, m.store.InTx(ctx), key, resolve) //nolint:wrapcheck // resolve's own refusals
+}
+
+// currentSourceCaller is p's current authority for a remote source check:
+// source.ErrDenied when its credential no longer resolves, and
+// source.ErrUnavailable when its permissions cannot be read.
+func (m *Module) currentSourceCaller(ctx context.Context, p kernel.Principal, registry bool) (accessapi.Decider, error) {
+	return m.rememberCaller(ctx, callerKey{binding: kernel.PrincipalBinding(ctx), registry: registry}, func() (accessapi.Decider, error) {
+		var err error
+		if registry {
+			p, err = m.access.Authenticator.CurrentRegistry(ctx, p)
+		} else {
+			p, err = m.access.Authenticator.Current(ctx, p)
+		}
+		if err != nil {
+			return nil, source.ErrDenied
+		}
+		_, d, err := m.access.Authorizer.Authorize(ctx, p, p.Anonymous)
+		if err != nil {
+			return nil, source.ErrUnavailable
+		}
+		return d, nil
+	})
 }
 
 func (m *Module) currentContentCaller(ctx context.Context) (kernel.Principal, accessapi.Decider, error) {
@@ -268,18 +320,38 @@ func (m *Module) currentContentCaller(ctx context.Context) (kernel.Principal, ac
 	if p.Registry != nil {
 		return kernel.Principal{}, nil, kernel.ErrForbidden
 	}
-	p, err = m.access.Authenticator.Current(ctx, p)
-	if errors.Is(err, kernel.ErrNotFound) {
-		return kernel.Principal{}, nil, kernel.ErrBadCredentials
+	resolve := func() (contentCaller, error) {
+		current, err := m.access.Authenticator.Current(ctx, p)
+		if errors.Is(err, kernel.ErrNotFound) {
+			return contentCaller{}, kernel.ErrBadCredentials
+		}
+		if err != nil {
+			return contentCaller{}, fmt.Errorf("current content source credential: %w", err)
+		}
+		decider, err := m.access.Authorizer.For(ctx, current)
+		if err != nil {
+			return contentCaller{}, fmt.Errorf("current content source permissions: %w", err)
+		}
+		return contentCaller{principal: current, decider: decider}, nil
 	}
+	key := callerKey{binding: kernel.PrincipalBinding(ctx), content: true}
+	caller, err := platformtx.Remember(ctx, m.store.InTx(ctx), key, resolve)
 	if err != nil {
-		return kernel.Principal{}, nil, fmt.Errorf("current content source credential: %w", err)
+		return kernel.Principal{}, nil, err //nolint:wrapcheck // resolve's own refusals
 	}
-	decider, err := m.access.Authorizer.For(ctx, p)
-	if err != nil {
-		return kernel.Principal{}, nil, fmt.Errorf("current content source permissions: %w", err)
-	}
-	return p, decider, nil
+	return caller.principal, caller.decider, nil
+}
+
+// remoteConfigKey and remoteIdentityKey name a remote's configuration and
+// source identity in a pull session's memo.
+type (
+	remoteConfigKey   string
+	remoteIdentityKey string
+)
+
+type contentCaller struct {
+	principal kernel.Principal
+	decider   accessapi.Decider
 }
 
 // VirtualCache is shared by protocol reads and member-write invalidation.
@@ -422,7 +494,14 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 	// failed (fenceStoreFault); around the backend read the source service
 	// makes, it supersedes the read as it did.
 	identity := func(ctx context.Context, c repo.Config, fence bool) (model.SourceIdentity, error) {
-		current, err := m.store.Repos().Get(ctx, c.Key)
+		// A pull session reads the remote's configuration and source identity
+		// once per transaction and once for its early checks, as
+		// rememberCaller does the caller. Only configuration edits and layout
+		// changes, never a pull's own cache writes, replace the identity.
+		inTx := m.store.InTx(ctx)
+		current, err := platformtx.Remember(ctx, inTx, remoteConfigKey(c.Key), func() (repo.Config, error) {
+			return m.store.Repos().Get(ctx, c.Key)
+		})
 		if err != nil {
 			if fault := fenceStoreFault(ctx, fence, err); fault != nil {
 				return model.SourceIdentity{}, fault
@@ -432,7 +511,9 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 		if port.RemotePolicyChanged(c, current) {
 			return model.SourceIdentity{}, source.ErrSuperseded
 		}
-		id, err := m.store.RemoteCache().Source(ctx, c.Key)
+		id, err := platformtx.Remember(ctx, inTx, remoteIdentityKey(c.Key), func() (model.SourceIdentity, error) {
+			return m.store.RemoteCache().Source(ctx, c.Key)
+		})
 		if err != nil {
 			return model.SourceIdentity{}, fmt.Errorf("remote identity: %w", err)
 		}
@@ -456,17 +537,9 @@ func (m *Module) OpenRemoteSources(ctx context.Context) error {
 		if !ok {
 			return source.ErrDenied
 		}
-		if registry && p.Registry != nil {
-			p, err = accessAPI.Authenticator.CurrentRegistry(ctx, p)
-		} else {
-			p, err = accessAPI.Authenticator.Current(ctx, p)
-		}
+		d, err := m.currentSourceCaller(ctx, p, registry && p.Registry != nil)
 		if err != nil {
-			return source.ErrDenied
-		}
-		_, d, err := accessAPI.Authorizer.Authorize(ctx, p, p.Anonymous)
-		if err != nil {
-			return source.ErrUnavailable
+			return err
 		}
 		path := q.Resource.Path
 		allows := d.Allows
