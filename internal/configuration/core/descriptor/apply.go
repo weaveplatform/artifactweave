@@ -72,7 +72,7 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 	if err != nil {
 		return res, err
 	}
-	configs, err := planConfigs(ctx, d, p.Configs, repositories, now, &res)
+	configs, err := planConfigs(ctx, d, p.Configs, repositories.after, now, &res)
 	if err != nil {
 		return res, err
 	}
@@ -95,7 +95,13 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 	if err := planSecurity(ctx, d, p, &res); err != nil {
 		return res, err
 	}
-	if err := planLDAP(ctx, d, p, &res); err != nil {
+	ldap, err := planLDAP(ctx, d, p, &res)
+	if err != nil {
+		return res, err
+	}
+	// After every section is planned, so the check sees the state the whole
+	// patch leaves, and before the dry run returns, so a dry run refuses it too.
+	if err := checkXMLIDs(ctx, d, repositories, configs, ldap); err != nil {
 		return res, err
 	}
 	if err := planStorage(ctx, d, p, now, &res); err != nil {
@@ -176,10 +182,11 @@ func planRepos(
 	repos artifactsapi.Repositories,
 	changes []RepoChange,
 	res *configapi.Result,
-) ([]string, []repoOp, map[string]bool, error) {
+) ([]string, []repoOp, repoKeys, error) {
+	var none repoKeys
 	existing, err := repos.List(ctx, artifactsapi.RepoFilter{})
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("list repositories: %w", err)
+		return nil, nil, none, fmt.Errorf("list repositories: %w", err)
 	}
 	stored := map[string]repo.Config{}
 	for _, c := range existing {
@@ -196,7 +203,7 @@ func planRepos(
 		cur, ok := stored[c.Key]
 		switch {
 		case repos.Protected(c.Key):
-			return nil, nil, nil, fmt.Errorf(
+			return nil, nil, none, fmt.Errorf(
 				"%w: %s: this repository cannot be deleted",
 				ErrInvalid,
 				name,
@@ -205,7 +212,7 @@ func planRepos(
 			res.Unchanged = append(res.Unchanged, name)
 			continue
 		case cur.Class != c.Class:
-			return nil, nil, nil, fmt.Errorf(
+			return nil, nil, none, fmt.Errorf(
 				"%w: %s: %s is a %s repository",
 				ErrInvalid,
 				name,
@@ -227,7 +234,7 @@ func planRepos(
 			return repos.CheckEnvironments(ctx, c)
 		})
 		if err != nil {
-			return nil, nil, nil, entryError(name, err)
+			return nil, nil, none, entryError(name, err)
 		}
 		switch {
 		case !changed:
@@ -257,15 +264,18 @@ func planRepos(
 		// before, so it is dropped from the update rather than refused, as
 		// 7.x's RepoConfigReferencesInterceptor drops it.
 		if err := repos.CheckMembers(&op.cfg, before, known); err != nil {
-			return nil, nil, nil, entryError(op.name, err)
+			return nil, nil, none, entryError(op.name, err)
 		}
 		if err := repos.CheckKeypairs(ctx, op.cfg); err != nil {
-			return nil, nil, nil, entryError(op.name, err)
+			return nil, nil, none, entryError(op.name, err)
 		}
 	}
-	keys := make(map[string]bool, len(final))
-	for key := range final {
-		keys[key] = true
+	keys := repoKeys{before: map[string]repo.Class{}, after: map[string]repo.Class{}}
+	for key, c := range stored {
+		keys.before[key] = c.Class
+	}
+	for key, c := range final {
+		keys.after[key] = c.Class
 	}
 	return deletes, writes, keys, nil
 }
@@ -351,7 +361,7 @@ func planConfigs(
 	ctx context.Context,
 	d Deps,
 	changes []ConfigChange,
-	repositories map[string]bool,
+	repositories map[string]repo.Class,
 	now time.Time,
 	res *configapi.Result,
 ) ([]configOp, error) {

@@ -242,7 +242,11 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 		}
 		*section.target = entry
 	}
-	return out, readExportOwned(ctx, d, &out)
+	if err := readExportOwned(ctx, d, &out); err != nil {
+		return out, err
+	}
+	dropDuplicateIDs(&out)
+	return out, nil
 }
 
 // readExportOwned reads the sections whose state another service owns: the
