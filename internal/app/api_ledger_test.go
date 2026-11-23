@@ -205,6 +205,7 @@ func TestAccAPIReliabilityLedger(t *testing.T) {
 		func(a, b apiReviewOperation) int { return strings.Compare(a.Route, b.Route) },
 	)
 	apiReviewPagedInStore(t, out)
+	apiReviewEvidenceExists(t, root, out)
 	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
 		t.Fatal(err)
@@ -384,6 +385,14 @@ func apiReviewCollections(
 
 func apiReviewPolicy(e *apiReviewOperation) {
 	method, path, _ := strings.Cut(e.Route, " ")
+	// The family's sources come first, so the reviewed additions below
+	// extend them: assigning them later silently dropped every source an
+	// operation appended before it (#1804).
+	e.Family, e.Pagination, e.Evidence = apiReviewPersistence(path)
+	// A reviewed operation's effects and sources hold however the router
+	// serves it, as implemented, partial or a handwritten override; only a
+	// stub, which performs no effect, keeps the stub account below.
+	served := !strings.HasPrefix(e.State, "stub:")
 	cleanupPolicy := false
 	cleanupExecution := false
 	switch e.OperationID {
@@ -394,9 +403,9 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		"deletePackageCleanupPolicy",
 		"enableDisablePackageCleanupPolicy",
 		"disableAllCleanupPolicies":
-		cleanupPolicy = e.State == "implemented"
+		cleanupPolicy = served
 	case "runPackageCleanupPolicy", "stopRunningCleanupPolicy", "stopAllRunningCleanupPolicies":
-		cleanupExecution = e.State == "implemented"
+		cleanupExecution = served
 	}
 	projectRepository := false
 	switch e.OperationID {
@@ -407,7 +416,7 @@ func apiReviewPolicy(e *apiReviewOperation) {
 		"unshareRepositoryWithAllProjects",
 		"shareRepositoryWithTargetProject",
 		"unshareRepositoryWithTargetProject":
-		projectRepository = e.State == "implemented"
+		projectRepository = served
 	}
 	r := &http.Request{Method: method, URL: &url.URL{Path: path}}
 	e.Admission = "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue"
@@ -491,7 +500,6 @@ func apiReviewPolicy(e *apiReviewOperation) {
 			e.Effects, e.Retry = "token issuance/rotation/revocation; secret response", "no replay storage and no key support; reconcile; never blindly repeat issuance/refresh"
 		}
 	}
-	e.Family, e.Pagination, e.Evidence = apiReviewPersistence(path)
 	if e.Family == "cleanup-reports" {
 		e.Effects = "current-authorized policy/run metadata and saved outcome reads; original project lifetime retained; no artifact deletion, upstream request or restoration of saved execution credentials"
 		if e.OperationID == "downloadCleanupPolicyRunReport" {
@@ -1305,6 +1313,104 @@ func apiReviewPagedInStore(t *testing.T, out []apiReviewOperation) {
 			strings.HasPrefix(e.Pagination, "page")
 		if e.State == "implemented" && paged && strings.Contains(e.Pagination, "collect") {
 			t.Errorf("%s declares a paging class but collects its list: %s", e.Route, e.Pagination)
+		}
+	}
+}
+
+// apiReviewEvidenceExists fails when an entry cites a source twice or one
+// the repository no longer has: a moved or deleted file would otherwise
+// stay in the review record as evidence nobody can open. An entry may
+// name a test after ": " or a section after "#".
+func apiReviewEvidenceExists(t *testing.T, root string, out []apiReviewOperation) {
+	t.Helper()
+	for _, e := range out {
+		seen := map[string]bool{}
+		for _, evidence := range e.Evidence {
+			if seen[evidence] {
+				t.Errorf("%s cites %s twice", e.Route, evidence)
+			}
+			seen[evidence] = true
+			file, _, _ := strings.Cut(evidence, ": ")
+			file, _, _ = strings.Cut(file, "#")
+			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(file))); err != nil {
+				t.Errorf("%s cites %s: %v", e.Route, evidence, err)
+			}
+		}
+	}
+}
+
+// TestUnitAPIReviewKeepsOperationEvidence: a served project repository or
+// cleanup operation keeps its persistence family's sources, its own
+// reviewed sources and the reliability/limits sources, in that order,
+// whatever served state the router gives it; a stub keeps only its 501
+// account and is not promoted (#1804).
+func TestUnitAPIReviewKeepsOperationEvidence(t *testing.T) {
+	const (
+		attach  = "PUT /access/api/v1/projects/_/attach/repositories/{repoName}/{targetProjectKey}"
+		create  = "POST /artifactory/api/cleanup/packages/policies/{policyKey}"
+		run     = "PUT /artifactory/api/cleanup/packages/policies/{policyKey}/run"
+		partial = "partial: handwritten override of generated operation"
+	)
+	binding := []string{
+		"internal/access/core/project/repositories.go",
+		"internal/artifacts/core/repos/api.go",
+		"test/server/access/project_repository_bindings_test.go",
+	}
+	policy := []string{
+		"internal/retention/core/cleanup/policies.go",
+		"test/server/retention/policies_test.go",
+		"internal/app/storetest/cleanup_policies.go",
+	}
+	execution := []string{
+		"internal/retention/adapters/http/runs.go",
+		"internal/retention/adapters/http/idempotency.go",
+		"internal/retention/core/cleanup/runs.go",
+		"internal/retention/core/cleanup/executor.go",
+		"test/server/retention/runs_test.go",
+		"internal/app/runtime_schedules_test.go",
+	}
+	reliability := []string{"docs/research/decisions/0043-api-reliability.md", "internal/app/limits.go"}
+	family := func(route string) (string, []string) {
+		_, path, _ := strings.Cut(route, " ")
+		name, _, evidence := apiReviewPersistence(path)
+		return name, evidence
+	}
+	served := func(route string, own []string) (string, []string) {
+		name, evidence := family(route)
+		return name, slices.Concat(evidence, own, reliability)
+	}
+	cases := []struct {
+		route, id, state, effects string
+		own                       []string
+	}{
+		{attach, "attachRepositoryToProject", "implemented", "atomic repository configuration/binding", binding},
+		{attach, "attachRepositoryToProject", partial, "atomic repository configuration/binding", binding},
+		{create, "createPackageCleanupPolicy", "implemented", "atomic policy generation", policy},
+		{create, "createPackageCleanupPolicy", partial, "atomic policy generation", policy},
+		{run, "runPackageCleanupPolicy", "implemented", "atomic integer run/trigger", execution},
+	}
+	for _, c := range cases {
+		e := apiReviewOperation{Route: c.route, OperationID: c.id, State: c.state, Handler: "handler.go"}
+		apiReviewPolicy(&e)
+		wantFamily, want := served(c.route, c.own)
+		if e.State != c.state || e.Family != wantFamily || !slices.Equal(e.Evidence, want) ||
+			!strings.HasPrefix(e.Effects, c.effects) {
+			t.Errorf("%s (%s):\n got state %q family %q effects %q evidence %v\nwant state %q family %q effects %q... evidence %v",
+				c.id, c.state, e.State, e.Family, e.Effects, e.Evidence, c.state, wantFamily, c.effects, want)
+		}
+	}
+	for _, c := range []struct{ route, id string }{
+		{attach, "attachRepositoryToProject"},
+		{create, "createPackageCleanupPolicy"},
+		{run, "runPackageCleanupPolicy"},
+	} {
+		e := apiReviewOperation{Route: c.route, OperationID: c.id, State: "stub: 501", Handler: handwrittenStubHandler}
+		apiReviewPolicy(&e)
+		want := []string{handwrittenStubHandler, "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"}
+		if e.State != "stub: 501" || !slices.Equal(e.Evidence, want) ||
+			!strings.HasPrefix(e.Effects, "no operation effect") || strings.Contains(e.Admission, "project guard") {
+			t.Errorf("stub %s: got state %q effects %q admission %q evidence %v",
+				c.id, e.State, e.Effects, e.Admission, e.Evidence)
 		}
 	}
 }

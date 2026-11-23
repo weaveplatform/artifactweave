@@ -502,6 +502,9 @@
       "internal/access/core/project/lifecycle.go",
       "internal/access/adapters/sql/project_lifecycle_test.go",
       "test/server/access/projects_status_test.go",
+      "internal/access/core/project/repositories.go",
+      "internal/artifacts/core/repos/api.go",
+      "test/server/access/project_repository_bindings_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
     ]
@@ -529,6 +532,9 @@
       "internal/access/core/project/lifecycle.go",
       "internal/access/adapters/sql/project_lifecycle_test.go",
       "test/server/access/projects_status_test.go",
+      "internal/access/core/project/repositories.go",
+      "internal/artifacts/core/repos/api.go",
+      "test/server/access/project_repository_bindings_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
     ]
@@ -556,6 +562,9 @@
       "internal/access/core/project/lifecycle.go",
       "internal/access/adapters/sql/project_lifecycle_test.go",
       "test/server/access/projects_status_test.go",
+      "internal/access/core/project/repositories.go",
+      "internal/artifacts/core/repos/api.go",
+      "test/server/access/project_repository_bindings_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
     ]
@@ -3194,6 +3203,9 @@
       "internal/access/core/project/lifecycle.go",
       "internal/access/adapters/sql/project_lifecycle_test.go",
       "test/server/access/projects_status_test.go",
+      "internal/access/core/project/repositories.go",
+      "internal/artifacts/core/repos/api.go",
+      "test/server/access/project_repository_bindings_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
     ]
@@ -21256,6 +21268,9 @@
       "internal/access/core/project/lifecycle.go",
       "internal/access/adapters/sql/project_lifecycle_test.go",
       "test/server/access/projects_status_test.go",
+      "internal/access/core/project/repositories.go",
+      "internal/artifacts/core/repos/api.go",
+      "test/server/access/project_repository_bindings_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
     ]
@@ -21284,6 +21299,9 @@
       "internal/access/core/project/lifecycle.go",
       "internal/access/adapters/sql/project_lifecycle_test.go",
       "test/server/access/projects_status_test.go",
+      "internal/access/core/project/repositories.go",
+      "internal/artifacts/core/repos/api.go",
+      "test/server/access/project_repository_bindings_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
     ]
@@ -21312,6 +21330,9 @@
       "internal/access/core/project/lifecycle.go",
       "internal/access/adapters/sql/project_lifecycle_test.go",
       "test/server/access/projects_status_test.go",
+      "internal/access/core/project/repositories.go",
+      "internal/artifacts/core/repos/api.go",
+      "test/server/access/project_repository_bindings_test.go",
       "docs/research/decisions/0043-api-reliability.md",
       "internal/app/limits.go"
     ]
