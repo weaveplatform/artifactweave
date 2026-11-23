@@ -180,16 +180,16 @@ func setFlag(where string, value any, dst **bool) error {
 // planLDAP checks the patch's connections against the stored ones and
 // records their outcomes. It runs with every other entry's checks, before
 // anything is written.
-func planLDAP(ctx context.Context, d Deps, p *Patch, res *configapi.Result) error {
+func planLDAP(ctx context.Context, d Deps, p *Patch, res *configapi.Result) ([]accessapi.LDAPResult, error) {
 	if len(p.LDAP) == 0 {
-		return nil
+		return nil, nil
 	}
 	if d.LDAP == nil {
-		return fmt.Errorf("security.ldapSettings: no LDAP binding: %w", kernel.ErrStore)
+		return nil, fmt.Errorf("security.ldapSettings: no LDAP binding: %w", kernel.ErrStore)
 	}
 	results, err := d.LDAP.Plan(ctx, p.LDAP)
 	if err != nil {
-		return ldapError(err)
+		return nil, ldapError(err)
 	}
 	for _, r := range results {
 		name := "security.ldapSettings." + r.Key
@@ -204,7 +204,7 @@ func planLDAP(ctx context.Context, d Deps, p *Patch, res *configapi.Result) erro
 			res.Unchanged = append(res.Unchanged, name)
 		}
 	}
-	return nil
+	return results, nil
 }
 
 // applyLDAP writes the patch's connections inside the patch's transaction.

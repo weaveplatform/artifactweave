@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 )
@@ -166,7 +167,7 @@ func validateBackup(doc map[string]any) error {
 // patch does not repeat is dropped instead when its repository is gone:
 // 7.161.26's CentralConfigDescriptorImpl removes a deleted repository from
 // every backup's exclusions, and the export never lists a missing one.
-func checkBackupRepositories(c ConfigChange, doc map[string]any, repositories map[string]bool) error {
+func checkBackupRepositories(c ConfigChange, doc map[string]any, repositories map[string]repo.Class) error {
 	list, _ := doc["excludedRepositories"].([]any)
 	if list == nil {
 		return nil
@@ -175,7 +176,7 @@ func checkBackupRepositories(c ConfigChange, doc map[string]any, repositories ma
 	kept := make([]any, 0, len(list))
 	for _, item := range list {
 		key, _ := item.(string)
-		if repositories[key] {
+		if _, ok := repositories[key]; ok {
 			kept = append(kept, item)
 			continue
 		}

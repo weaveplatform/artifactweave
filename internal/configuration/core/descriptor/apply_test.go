@@ -807,10 +807,17 @@ func (f faultyConfigs) Get(
 	k configdoc.ConfigKind,
 	key string,
 ) (configdoc.ConfigDocument, error) {
-	if f.fail == "config get" {
+	if f.fail == "config get" || f.fail == "reverse proxy get" && k == configdoc.ConfigReverseProxy {
 		return configdoc.ConfigDocument{}, errBoom
 	}
 	return f.ConfigStore.Get(ctx, k, key) //nolint:wrapcheck // test double
+}
+
+func (f faultyConfigs) List(ctx context.Context, k configdoc.ConfigKind) ([]configdoc.ConfigDocument, error) {
+	if f.fail == "config list" {
+		return nil, errBoom
+	}
+	return f.ConfigStore.List(ctx, k) //nolint:wrapcheck // test double
 }
 
 func (f faultyConfigs) Put(ctx context.Context, d configdoc.ConfigDocument) error {
