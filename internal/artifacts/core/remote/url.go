@@ -35,7 +35,8 @@ var (
 	ErrClosed = errors.New("remote: transport pool closed")
 	// ErrConnection is returned when the upstream cannot be reached: its
 	// name resolves to no address, the proxy tunnel fails, or the connection
-	// fails or ends early.
+	// fails or ends early, including when the client's own pool closes it
+	// under the request (a Close, an eviction or the idle limit).
 	ErrConnection = errors.New("remote: connection unavailable")
 	// ErrSecurity is returned when a target fails the destination or TLS
 	// checks: CheckedURL refuses it, it resolves to a cloud metadata address

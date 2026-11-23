@@ -381,7 +381,10 @@ func (c *Client) fetch(ctx context.Context, r remote.Request) (*http.Response, e
 }
 
 // Close releases the client's idle connections; requests in flight finish
-// on their own connections.
+// on their own connections. net/http takes a connection back before it
+// hands over a bodyless answer (a HEAD, a 204, an NTLM 407 challenge), so a
+// request whose connection Close releases in that window fails with
+// remote.ErrConnection, which the caller may retry.
 func (c *Client) Close() { c.close() }
 
 // http.Client errors embed URLs, including signed query strings. Preserve only
@@ -413,7 +416,8 @@ func safeError(err error) error {
 	var connection *net.OpError
 	if errors.As(err, &connection) || errors.Is(err, remote.ErrConnection) ||
 		errors.Is(err, io.EOF) ||
-		errors.Is(err, io.ErrUnexpectedEOF) {
+		errors.Is(err, io.ErrUnexpectedEOF) ||
+		outbound.IdleConnectionLost(err) {
 		return fmt.Errorf("%w: %w", remote.ErrRequest, remote.ErrConnection)
 	}
 	return remote.ErrRequest

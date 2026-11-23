@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"sync"
 	"testing"
 	"time"
@@ -115,6 +116,59 @@ func TestAccReusedConnectionTimeoutIsNotReplayed(t *testing.T) {
 			}
 			if _, slow := p.exchanges(); len(slow) != 1 {
 				t.Fatal("timed-out request reached the peer", len(slow), "times")
+			}
+		})
+	}
+}
+
+// closeOnHandOver returns ctx with a trace that runs closePool once, when
+// net/http has taken the request's connection back but not yet handed over
+// its bodyless answer, and then holds net/http there so the round trip sees
+// the closed connection first. Its PutIdleConn hook runs in that window.
+func closeOnHandOver(ctx context.Context, closePool func(), hold time.Duration) context.Context {
+	var once sync.Once
+	return httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{PutIdleConn: func(error) {
+		once.Do(func() {
+			closePool()
+			time.Sleep(hold)
+		})
+	}})
+}
+
+// A pool that closes a connection while net/http hands over a bodyless
+// answer fails the request as a connection failure the caller may retry.
+// Before #1878 SafeError answered ErrRequest, a refused request.
+func TestAccPoolClosingTheConnectionUnderAnAnswerIsAConnectionFailure(t *testing.T) {
+	for name, tc := range map[string]struct {
+		timeout time.Duration
+		close   func(*Client)
+	}{
+		// Client.Close releases the connection, as at shutdown.
+		"close": {timeout: time.Second, close: (*Client).Close},
+		// The pool's idle limit, half of 40 ms, passes during the hold.
+		"idle-limit": {timeout: 40 * time.Millisecond, close: func(*Client) {}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := newPeer(t, 0)
+			lost := 0
+			// The hold makes the closed connection win; an answer that still
+			// wins on a starved scheduler is retried, never misclassified.
+			for range 5 {
+				client := testClient(t, parsed(t, p.URL), nil, nil, tc.timeout, nil)
+				head := request(t, http.MethodHead, p.URL+"/warm", "")
+				head = head.WithContext(closeOnHandOver(t.Context(), func() { tc.close(client) }, 100*time.Millisecond))
+				response, err := client.Do(head)
+				if err == nil {
+					readResponse(t)(response, nil)
+					continue
+				}
+				if !errors.Is(err, ErrConnection) {
+					t.Fatal("pool close classified as", err)
+				}
+				lost++
+			}
+			if lost == 0 {
+				t.Fatal("no request saw its connection close")
 			}
 		})
 	}
