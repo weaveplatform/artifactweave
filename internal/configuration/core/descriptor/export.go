@@ -179,8 +179,9 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 			entry := exportFields{Fields: []exportField{{Name: section.identity, Text: doc.Key}}}
 			for _, key := range section.fields {
 				if value, present := fields[key]; present {
-					// The pinned proxy provider sends comma-delimited scalar strings. YAML
-					// descriptors may also supply lists; both have the same XML projection.
+					// Writes accept only the comma-delimited strings that the pinned
+					// provider sends (#1839); documents stored before then may hold
+					// lists, which get the same XML projection.
 					if key == "services" || key == "redirectedToHosts" {
 						value = commaList(value)
 					}

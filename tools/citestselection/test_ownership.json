@@ -232,6 +232,7 @@
     ],
     "internal/configuration/adapters/http": [
       "descriptor_test.go",
+      "descriptor_validation_test.go",
       "export_test.go",
       "loggers_test.go",
       "reverseproxy_test.go",

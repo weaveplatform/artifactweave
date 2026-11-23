@@ -115,6 +115,63 @@ func TestAccApplyDescriptorCommandReportsEmptyProxyPasswordUnchanged(t *testing.
 	}
 }
 
+func TestAccDescriptorEntryPointsRejectTypedConfigurationFields(t *testing.T) {
+	t.Setenv("DESCRIPTOR_ENTRY_PASSWORD", "entry-private-fixture")
+	for name, body := range map[string]string{
+		"proxy":      "proxies:\n  broken:\n    host: proxy.invalid\n    port: 3128\n    password: ${DESCRIPTOR_ENTRY_PASSWORD}\n    platformDefault: {unexpected: true}\n",
+		"property":   "propertySets:\n  broken:\n    properties:\n      release:\n        multipleChoice: {unexpected: true}\n",
+		"predefined": "propertySets:\n  broken:\n    properties:\n      release:\n        predefinedValues: {ready: {defaultValue: {unexpected: true}}}\n",
+	} {
+		for _, entry := range []string{"dry-run", "apply", "bootstrap"} {
+			t.Run(name+"/"+entry, func(t *testing.T) {
+				cfg := testConfig(t)
+				cfg.MasterKey = keyOne
+				file := writeFile(t, "localRepositories:\n  would-create: {type: generic}\n"+body)
+				var output bytes.Buffer
+				var err error
+				if entry == "bootstrap" {
+					cfg.Bootstrap.Descriptor = file
+					var rt *Runtime
+					rt, err = OpenRuntime(t.Context(), cfg, slog.New(slog.NewTextHandler(&output, nil)), RuntimeOptions{})
+					if rt != nil {
+						defer func() { _ = rt.Close(context.Background()) }()
+					}
+				} else {
+					err = ApplyDescriptor(t.Context(), cfg, file, entry == "dry-run", &output)
+				}
+				if !errors.Is(err, descriptor.ErrInvalid) {
+					t.Fatal("entry point did not reject invalid descriptor field", err)
+				}
+				if strings.Contains(output.String()+err.Error(), "entry-private-fixture") ||
+					strings.Contains(output.String()+err.Error(), "${DESCRIPTOR_ENTRY_PASSWORD}") {
+					t.Fatal("entry point exposed descriptor credential or reference")
+				}
+				keys, err := Keyring(cfg)
+				if err != nil {
+					t.Fatal(err)
+				}
+				db, err := OpenStore(t.Context(), cfg, appsql.Options{Keyring: keys})
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = db.Close() }()
+				if _, err := db.Repos().Get(t.Context(), "would-create"); !errors.Is(err, kernel.ErrNotFound) {
+					t.Fatal("refused descriptor created its valid repository", err)
+				}
+				for _, kind := range []configdoc.ConfigKind{configdoc.ConfigProxy, configdoc.ConfigPropertySet} {
+					if _, err := db.Configs().Get(t.Context(), kind, "broken"); !errors.Is(err, kernel.ErrNotFound) {
+						t.Fatal("refused descriptor stored invalid configuration", err)
+					}
+				}
+				var marker bootstrapMarker
+				if err := db.Settings().Get(t.Context(), settings.SettingBootstrapDescriptor, &marker); !errors.Is(err, kernel.ErrNotFound) {
+					t.Fatal("refused descriptor wrote a bootstrap marker", err)
+				}
+			})
+		}
+	}
+}
+
 func TestAccApplyDescriptorCommandErrors(t *testing.T) {
 	ctx := context.Background()
 	good := writeFile(t, "localRepositories:\n  x:\n    type: generic\n")

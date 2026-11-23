@@ -475,6 +475,7 @@ func validateConfig(
 			port != float64(int(port)) {
 			return fmt.Errorf("%w: a proxy needs a port between 1 and 65535", ErrInvalid)
 		}
+		return validateProxyFields(doc)
 	case configdoc.ConfigLayout:
 		def := artifactsapi.LayoutDefinition{Name: key}
 		strs := map[string]*string{
@@ -509,17 +510,7 @@ func validateConfig(
 			return fmt.Errorf("%w: %w", ErrInvalid, err)
 		}
 	case configdoc.ConfigPropertySet:
-		if v, ok := doc["properties"]; ok {
-			props, ok := v.(map[string]any)
-			if !ok {
-				return fmt.Errorf("%w: properties must be a mapping of property names", ErrInvalid)
-			}
-			for name, p := range props {
-				if _, ok := p.(map[string]any); p != nil && !ok {
-					return fmt.Errorf("%w: property %s must be a mapping", ErrInvalid, name)
-				}
-			}
-		}
+		return validatePropertySetFields(doc)
 	}
 	return nil
 }

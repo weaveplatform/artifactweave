@@ -1289,8 +1289,11 @@ All deployment roots require Terraform **1.17 or later**; CI pins **1.17.1**.
 
 `make terraform` runs `test/terraform/run.sh` over `TERRAFORM_SCENARIOS`: the repositories,
 identity, OIDC, CDN repositories, remote repositories, virtual repositories, webhooks, single
-replication and projects references in `deploy/artifactweave/terraform/`. `test/terraform/` holds only
-the driver.
+replication, projects and package-cleanup references in `deploy/artifactweave/terraform/`,
+and the two-resource `configuration` reference in that same tree. The latter qualifies
+only proxy/property-set write validation; full seven-resource P12 qualification remains
+#1837. XML descriptor GET is required for these pinned provider controls, so a missing
+implementation fails the required conformance lane.
 - It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` and
   `terraform-provider-platform_<version>_<os>_<arch>.zip` and
   `terraform-provider-project_<version>_<os>_<arch>.zip` once into a filesystem mirror,
