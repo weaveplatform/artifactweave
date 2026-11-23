@@ -394,6 +394,7 @@
       "push_bridge_test.go",
       "push_failures_test.go",
       "push_fences_test.go",
+      "push_ntlm_test.go",
       "push_process_test.go",
       "push_read_fences_test.go",
       "push_recovery_test.go",

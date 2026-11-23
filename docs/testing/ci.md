@@ -1750,6 +1750,11 @@ native lane and requires the pinned JFrog CLI even locally: two cold files pass
 through one independently verified NTLMv2 proxy handshake. Proxy/origin request
 records assert domain/workstation, connection reuse and credential separation.
 Client configuration and output directories are isolated per scenario.
+`@replication_ntlm_proxy` (#1848) runs in the same core lane without a native client:
+two owned application processes on SQLite and PostgreSQL push through the same
+verifier, selected by platform default and by explicit reference. The peer's own
+storage proves bytes, properties, updates and deletes; the verifier proves every
+tunnel's NTLMv2 identity and that target credentials stayed inside it.
 The local macOS run passed 1 scenario/44 steps in 2.12 seconds (7.10 seconds reported
 by Go including startup); this is not a Linux full-suite timing estimate. No timeout
 or matrix change is needed. Runtime race tests additionally cover HEAD/ranges/304,

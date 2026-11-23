@@ -23,6 +23,9 @@ func (w *world) registerSingleReplication(sc *godog.ScenarioContext) {
 	sc.Step(`^a fresh native Maven consumer resolves the "(push|pull)" replicated package while its source is stopped$`, w.qualifyNativeReplication)
 	sc.Step(`^the pinned provider applies, updates, executes and destroys both single replication resources$`, w.qualifyProviderReplication)
 	sc.Step(`^ordinary "(push|pull)" replication recovers after process interruption and refuses revoked pending work$`, w.qualifyReplicationRecovery)
+	sc.Step(`^an NTLM proxy protects the replication peer$`, w.replicationNTLMProxy)
+	sc.Step(`^the "(default|explicit)" NTLM proxy is configured for replication$`, w.configureReplicationNTLM)
+	sc.Step(`^the NTLM proxy verified every replication tunnel$`, w.replicationNTLMVerified)
 }
 
 func (w *world) startSingleReplication(backend string) error {

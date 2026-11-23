@@ -113,8 +113,8 @@ func (f *Factory) Connection(ctx context.Context, target model.Replication) (por
 		return nil, err
 	}
 	proxyURL := ""
-	if proxy != nil {
-		proxyURL = proxy.String()
+	if proxy.url != nil {
+		proxyURL = proxy.url.String()
 	}
 	encoded, err := json.Marshal(f.inputs)
 	if err != nil {
@@ -123,7 +123,15 @@ func (f *Factory) Connection(ctx context.Context, target model.Replication) (por
 	mac := hmac.New(sha256.New, f.key)
 	// Length-delimited fields prevent ambiguous concatenation. Secrets go
 	// directly into the private digest, never a general-purpose document.
-	for _, value := range []string{target.URL, target.Username, target.Password, proxyURL, strconv.FormatInt(int64(target.SocketTimeout), 10), string(encoded)} {
+	values := []string{target.URL, target.Username, target.Password, proxyURL, strconv.FormatInt(int64(target.SocketTimeout), 10), string(encoded)}
+	if proxy.ntlm != nil {
+		// A domain/workstation edit must retire tunnels authenticated as the old
+		// identity. Appending only for NTLM keeps Basic/direct revisions, and
+		// with them persisted run bindings, unchanged. redirectedToHosts is
+		// deliberately absent: push never follows a cross-origin redirect.
+		values = append(values, "ntlm", proxy.domain, proxy.workstation)
+	}
+	for _, value := range values {
 		_, _ = fmt.Fprintf(mac, "%d:", len(value))
 		_, _ = io.WriteString(mac, value)
 	}
@@ -147,7 +155,7 @@ func (f *Factory) Connection(ctx context.Context, target model.Replication) (por
 		delete(f.pool, key)
 	}
 	client, err := outbound.NewClient(outbound.ClientOptions{
-		Base: base, Proxy: proxy, Policy: f.policy, RootCAs: f.roots, SocketTimeout: target.SocketTimeout,
+		Base: base, Proxy: proxy.url, NTLM: proxy.ntlm, Policy: f.policy, RootCAs: f.roots, SocketTimeout: target.SocketTimeout,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("construct replication connection: %w", err)
@@ -179,46 +187,61 @@ func (f *Factory) Close() {
 	}
 }
 
-func (f *Factory) proxy(ctx context.Context, target model.Replication) (*url.URL, error) {
+// proxySelection is the effective proxy policy. Its names are private revision
+// inputs; the NTLM identity also holds the sealed password, never a pool key.
+type proxySelection struct {
+	url                 *url.URL
+	ntlm                *outbound.NTLMProxy
+	domain, workstation string
+}
+
+func (f *Factory) proxy(ctx context.Context, target model.Replication) (proxySelection, error) {
 	if target.DisableProxy {
-		return nil, nil //nolint:nilnil // nil is the explicit direct-connection policy.
+		return proxySelection{}, nil
 	}
 	var selected configdoc.ConfigDocument
 	if target.Proxy != "" {
 		doc, err := f.store.Configs().Get(ctx, configdoc.ConfigProxy, target.Proxy)
 		if err != nil {
-			return nil, proxyError(err)
+			return proxySelection{}, proxyError(err)
 		}
 		selected = doc
 	} else {
 		docs, err := f.store.Configs().List(ctx, configdoc.ConfigProxy)
 		if err != nil {
-			return nil, proxyError(err)
+			return proxySelection{}, proxyError(err)
 		}
 		for _, doc := range docs {
 			var proxy wire.ProxyConfiguration
 			if json.Unmarshal(doc.Document, &proxy) != nil {
-				return nil, outbound.ErrConfiguration
+				return proxySelection{}, outbound.ErrConfiguration
 			}
 			if doc.Enabled && proxy.PlatformDefault && proxyService(proxy.Services) {
 				if selected.Key != "" {
-					return nil, outbound.ErrConfiguration
+					return proxySelection{}, outbound.ErrConfiguration
 				}
 				selected = doc
 			}
 		}
 		if selected.Key == "" {
-			return nil, nil //nolint:nilnil // No default selects the direct connection.
+			// No default selects the direct connection.
+			return proxySelection{}, nil
 		}
 	}
 	return proxyURL(selected)
 }
 
-func proxyURL(doc configdoc.ConfigDocument) (*url.URL, error) {
+func proxyURL(doc configdoc.ConfigDocument) (proxySelection, error) {
 	var proxy wire.ProxyConfiguration
-	if !doc.Enabled || json.Unmarshal(doc.Document, &proxy) != nil || proxy.Port < 1 || proxy.Port > 65535 ||
-		proxy.Domain != "" || proxy.NTHost != "" || proxy.RedirectedToHosts != "" {
-		return nil, outbound.ErrConfiguration
+	if !doc.Enabled || json.Unmarshal(doc.Document, &proxy) != nil || proxy.Port < 1 || proxy.Port > 65535 {
+		return proxySelection{}, outbound.ErrConfiguration
+	}
+	// The list is validated like the remote resolver's, so malformed settings
+	// fail truthfully. A valid list changes nothing here: the outbound client
+	// refuses cross-origin and write redirects, and target credentials are
+	// always the replication's own, never the proxy's.
+	if _, err := outbound.ProxyRedirectHosts(proxy.RedirectedToHosts); err != nil {
+		return proxySelection{}, outbound.ErrConfiguration
 	}
 	host := proxy.Host
 	if !strings.Contains(host, "://") {
@@ -227,14 +250,24 @@ func proxyURL(doc configdoc.ConfigDocument) (*url.URL, error) {
 	u, err := url.Parse(host)
 	if err != nil || u.Hostname() == "" || u.Scheme != "http" && u.Scheme != "https" || u.User != nil || u.Opaque != "" ||
 		u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Port() != "" || u.Path != "" && u.Path != "/" {
-		return nil, outbound.ErrConfiguration
+		return proxySelection{}, outbound.ErrConfiguration
 	}
 	u.Host = net.JoinHostPort(u.Hostname(), strconv.Itoa(proxy.Port))
 	u.Path, u.RawPath = "", ""
 	if proxy.Username != "" || doc.Secrets["password"] != "" {
 		u.User = url.UserPassword(proxy.Username, doc.Secrets["password"])
 	}
-	return u, nil
+	selection := proxySelection{url: u}
+	// As in the remote resolver (#1835), either NTLM field selects NTLMv2 with
+	// the same username and sealed password; Basic is never a fallback.
+	if proxy.Domain != "" || proxy.NTHost != "" {
+		selection.ntlm, err = outbound.NewNTLMProxy(proxy.Username, doc.Secrets["password"], proxy.Domain, proxy.NTHost)
+		if err != nil {
+			return proxySelection{}, outbound.ErrConfiguration
+		}
+		selection.domain, selection.workstation = proxy.Domain, proxy.NTHost
+	}
+	return selection, nil
 }
 
 func proxyService(services []string) bool {

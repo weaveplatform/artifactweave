@@ -98,8 +98,10 @@ Domain/workstation/password changes rotate the pool; stale publication still nee
 the fences described above. Redirected Basic credentials are implemented for artifacts
 upstream (#1836): they answer only a target challenge at an explicitly listed host and
 the proxy port, never proxy authentication, so they are not a Basic fallback for an
-NTLM proxy. Replication's separately bound endpoint, write-replay restrictions and
-NTLM consumer remain independent under #1848. Cookie
+NTLM proxy. Single-replication push (#1848) negotiates the same NTLMv2 identity on each
+CONNECT tunnel before any target write, keeps target credentials inside the tunnel and
+retires authenticated pools when the identity changes; its endpoint, write-replay and
+redirect restrictions are unchanged, so a valid `redirectedToHosts` grants it nothing. Cookie
 domain/path/secure semantics permit eligible cookies across ports within one source;
 jars are isolated between repositories and source revisions. Response-body integrity,
 authenticated cache partitioning and format metadata rewriting have separate adapter

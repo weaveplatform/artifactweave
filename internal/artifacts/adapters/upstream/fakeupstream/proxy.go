@@ -31,9 +31,16 @@ func NewProxyOn(t testing.TB, listener net.Listener, auth Auth, targets ...*Serv
 func newProxy(t testing.TB, options Options, ntlm *NTLMProxy, targets ...*Server) *Server {
 	t.Helper()
 	p := &proxy{allowed: make(map[string]string), connections: make(map[net.Conn]struct{}), ntlm: ntlm}
+	origins := make([]string, 0, len(targets))
 	for _, target := range targets {
-		u, err := url.Parse(target.URL)
-		if err != nil {
+		origins = append(origins, target.URL)
+	}
+	if ntlm != nil {
+		origins = append(origins, ntlm.options.Origins...)
+	}
+	for _, origin := range origins {
+		u, err := url.Parse(origin)
+		if err != nil || u.Host == "" {
 			t.Fatalf("fakeupstream proxy target: %v", err)
 		}
 		p.allowed[u.Host] = u.Scheme
