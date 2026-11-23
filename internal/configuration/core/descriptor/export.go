@@ -201,16 +201,8 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 	if out.Security, err = readExportSecurity(ctx, d); err != nil {
 		return out, err
 	}
-	backups, err := d.Configs.List(ctx, configdoc.ConfigBackup)
-	if err != nil {
-		return out, fmt.Errorf("list export %s: %w", configdoc.ConfigBackup, err)
-	}
-	for _, doc := range backups {
-		fields, err := publicDocument(doc)
-		if err != nil {
-			return out, err
-		}
-		out.Backups = append(out.Backups, exportBackup(doc.Key, fields, existing))
+	if out.Backups, err = readExportBackups(ctx, d, existing); err != nil {
+		return out, err
 	}
 	for _, section := range []struct {
 		kind   configdoc.ConfigKind
@@ -340,4 +332,22 @@ func exportValue(name string, value any) exportField {
 	}
 	field.Text = fmt.Sprint(value)
 	return field
+}
+
+// readExportBackups lists the backup definitions, each naming only the
+// excluded repositories in existing.
+func readExportBackups(ctx context.Context, d Deps, existing map[string]bool) ([]exportFields, error) {
+	backups, err := d.Configs.List(ctx, configdoc.ConfigBackup)
+	if err != nil {
+		return nil, fmt.Errorf("list export %s: %w", configdoc.ConfigBackup, err)
+	}
+	var out []exportFields
+	for _, doc := range backups {
+		fields, err := publicDocument(doc)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, exportBackup(doc.Key, fields, existing))
+	}
+	return out, nil
 }

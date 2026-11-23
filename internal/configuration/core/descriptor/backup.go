@@ -1,6 +1,7 @@
 package descriptor
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -101,16 +102,22 @@ func parseBackups(top map[string]any, p *Patch) error {
 func checkBackupKey(key string) error {
 	if strings.TrimSpace(key) == "" || key == "." || key == ".." || key == "&" ||
 		strings.ContainsAny(key, backupNameForbidden) {
-		return fmt.Errorf("illegal backup key")
+		return errBackupKeyIllegal
 	}
 	for i, r := range key {
 		letter := r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r == '_'
-		if i == 0 && !letter || !letter && !(r >= '0' && r <= '9') && r != '-' && r != '.' {
-			return fmt.Errorf("the backup key must be an XML name")
+		digit := r >= '0' && r <= '9'
+		if i == 0 && !letter || !letter && !digit && r != '-' && r != '.' {
+			return errBackupKeyName
 		}
 	}
 	return nil
 }
+
+var (
+	errBackupKeyIllegal = errors.New("illegal backup key")
+	errBackupKeyName    = errors.New("the backup key must be an XML name")
+)
 
 // backupFieldTypes checks the supplied or merged fields' types.
 func backupFieldTypes(doc map[string]any) error {
