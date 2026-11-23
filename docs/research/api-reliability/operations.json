@@ -388,17 +388,28 @@
     "route": "DELETE /access/api/v1/ldap/settings/{key}",
     "spec": "access.openapi.yaml",
     "operation_id": "deleteLdapSettings",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Removes the connection. Users created through it keep their local accounts but can no longer log in through it, and group settings that name it in enabled_ldap stop synchronising. Returns 204. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap.go: AccessService.DeleteLdapSettings",
+    "direct_calls": [
+      "s.ldapError",
+      "s.ldapTx",
+      "svc.Delete"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:key",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:key: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -2901,37 +2912,60 @@
     "route": "GET /access/api/v1/ldap/settings",
     "spec": "access.openapi.yaml",
     "operation_id": "getAllLdapSettings",
-    "state": "stub: 501",
-    "contract": "Returns every LDAP server connection that logins are checked against. Manager passwords are never returned. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "state": "implemented",
+    "contract": "Returns every LDAP server connection that logins are checked against, by key. Manager passwords are never returned. Requires a platform admin.",
+    "handler": "internal/access/adapters/http/ldap.go: AccessService.GetAllLdapSettings",
+    "direct_calls": [
+      "s.ldapError",
+      "s.ldapTx",
+      "svc.List"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared complete",
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: administrator LDAP connections, read whole after the authority recheck in one guarded transaction; identity: legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "GET /access/api/v1/ldap/settings/{key}",
     "spec": "access.openapi.yaml",
     "operation_id": "getLdapSettingsByKey",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Returns one LDAP connection without its manager password. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap.go: AccessService.GetLdapSettingsByKey",
+    "direct_calls": [
+      "accessgen.GetLdapSettingsByKey200JSONResponse",
+      "s.ldapError",
+      "s.ldapTx",
+      "svc.Get"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -14822,17 +14856,30 @@
     "route": "POST /access/api/v1/ldap/settings",
     "spec": "access.openapi.yaml",
     "operation_id": "createLdapSettings",
-    "state": "stub: 501",
+    "state": "implemented",
     "contract": "Adds an LDAP server that login attempts are checked against, in addition to internal users. Answers 201 with the stored connection. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "handler": "internal/access/adapters/http/ldap.go: AccessService.CreateLdapSettings",
+    "direct_calls": [
+      "accessgen.CreateLdapSettings201JSONResponse",
+      "httpkit.BadRequestf",
+      "s.ldapError",
+      "s.ldapTx",
+      "svc.Create"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on body:/key",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on body:/key: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -20904,17 +20951,30 @@
     "route": "PUT /access/api/v1/ldap/settings",
     "spec": "access.openapi.yaml",
     "operation_id": "updateLdapSettings",
-    "state": "stub: 501",
-    "contract": "Replaces the connection whose key matches the body's key. Requires a platform admin.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "state": "implemented",
+    "contract": "Replaces the connection whose key matches the body's key; a field left out takes its default, except manager_password, which is kept. Answers 404 when no connection has the key. Requires a platform admin.",
+    "handler": "internal/access/adapters/http/ldap.go: AccessService.UpdateLdapSettings",
+    "direct_calls": [
+      "accessgen.UpdateLdapSettings200JSONResponse",
+      "httpkit.BadRequestf",
+      "s.ldapError",
+      "s.ldapTx",
+      "svc.Replace"
+    ],
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on body:/key",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on body:/key: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

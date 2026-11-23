@@ -1,0 +1,29 @@
+name: Maven build tools (pinned)
+description: Verify or prepare the complete tooling closure before native assertions.
+runs:
+  using: composite
+  steps:
+    # Objects are stored by SHA-512, so the manifest alone names the complete
+    # set. A hit is still verified and repaired below: a restored cache says
+    # nothing about missing or corrupt objects.
+    - name: Restore Maven tool objects
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/maven-tools/objects
+        key: maven-tools-${{ hashFiles('test/acceptance/clients/maven-tools.lock.json') }}
+    - name: Prepare and verify Maven tools
+      shell: bash
+      run: |
+        python3 test/acceptance/clients/maven-tools.py prepare --cache "$RUNNER_TEMP/maven-tools"
+        echo "ARTIFACTWEAVE_MAVEN_TOOLS=$RUNNER_TEMP/maven-tools" >> "$GITHUB_ENV"
+    - name: Maven harness units
+      shell: bash
+      env:
+        GOWORK: 'off'
+      run: |
+        # The general unit lane delegates test/acceptance to native owners.
+        # One verbose run proves a nonempty set passed, so these fixture
+        # regressions cannot match nothing and skip silently.
+        go test -v -timeout=5m -race -shuffle=on -count=1 -run '^TestUnitMaven' ./test/acceptance \
+          | tee "$RUNNER_TEMP/maven-harness-units.txt"
+        grep -q '^--- PASS: TestUnitMaven' "$RUNNER_TEMP/maven-harness-units.txt"

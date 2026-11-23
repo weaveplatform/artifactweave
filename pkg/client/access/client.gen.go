@@ -1073,28 +1073,28 @@ type LdapSearchPattern struct {
 	// ManagerDn Optional within this object. DN of the account the server binds as to run searches.
 	ManagerDn *string `json:"manager_dn,omitempty"`
 
-	// ManagerPassword Optional within this object. Password of manager_dn. Stored sealed (decision 0017) and never returned.
+	// ManagerPassword Optional within this object. Password of manager_dn, which it needs. Stored sealed (decision 0017) and never returned. A replace that leaves it out keeps the stored password, an empty value clears it, and a connection whose manager_dn is empty keeps none.
 	ManagerPassword *string `json:"manager_password,omitempty"`
 
-	// SearchBase Optional within this object. DN under which the search starts, relative to the connection's base DN. Empty searches from the base DN.
+	// SearchBase Optional within this object. DN under which the search starts, relative to the connection's base DN. Empty searches from the base DN; several DNs are separated by a pipe (|).
 	SearchBase *string `json:"search_base,omitempty"`
 
-	// SearchFilter Optional within this object. LDAP filter that selects the user's entry, with {0} standing for the username, for example (uid={0}).
+	// SearchFilter Optional within this object. LDAP filter that selects the user's entry, with {0} standing for the username, for example (uid={0}). It must contain {0} and balance its parentheses.
 	SearchFilter *string `json:"search_filter,omitempty"`
 
-	// SearchSubTree Optional within this object. Whether the search descends into sub-trees of search_base.
+	// SearchSubTree Optional within this object. Whether the search descends into sub-trees of search_base. Defaults to true.
 	SearchSubTree *bool `json:"search_sub_tree,omitempty"`
 }
 
-// LdapSettings One LDAP server connection used to authenticate users. manager_password is never returned.
+// LdapSettings One LDAP server connection used to authenticate users. Every field is returned except manager_password, which never is. The descriptor's security.ldapSettings names the same connections.
 type LdapSettings struct {
-	// AllowUserToAccessProfile Optional within this object. Whether users created through this connection may open their own profile.
+	// AllowUserToAccessProfile Optional within this object. Whether users created through this connection may open their own profile. Defaults to false.
 	AllowUserToAccessProfile *bool `json:"allow_user_to_access_profile,omitempty"`
 
-	// AutoCreateUser Optional within this object. Whether a first successful login creates a local user.
+	// AutoCreateUser Optional within this object. Whether a first successful login creates a local user. Defaults to true.
 	AutoCreateUser *bool `json:"auto_create_user,omitempty"`
 
-	// EmailAttribute Optional within this object. Attribute that holds the user's email address, for example mail.
+	// EmailAttribute Optional within this object. Attribute that holds the user's email address. Defaults to mail.
 	EmailAttribute *string `json:"email_attribute,omitempty"`
 
 	// Enabled Optional within this object. Whether logins are checked against this server.
@@ -1103,31 +1103,31 @@ type LdapSettings struct {
 	// Key Optional within this object. Unique name of the connection.
 	Key *string `json:"key,omitempty"`
 
-	// LdapPoisoningProtection Optional within this object. Whether attributes returned by the server are checked to defend against LDAP response poisoning.
+	// LdapPoisoningProtection Optional within this object. Whether attributes returned by the server are checked to defend against LDAP response poisoning. Defaults to true.
 	LdapPoisoningProtection *bool `json:"ldap_poisoning_protection,omitempty"`
 
-	// LdapUrl Optional within this object. Server URL including the base DN, for example ldap://ldap.example.com:389/dc=example,dc=com.
+	// LdapUrl Optional within this object. ldap:// or ldaps:// server URL including the base DN, for example ldap://ldap.example.com:389/dc=example,dc=com. It must not carry credentials.
 	LdapUrl *string `json:"ldap_url,omitempty"`
 
-	// PagingSupportEnabled Optional within this object. Whether searches request paged results, for servers that cap result size.
+	// PagingSupportEnabled Optional within this object. Whether searches request paged results, for servers that cap result size. Defaults to true.
 	PagingSupportEnabled *bool `json:"paging_support_enabled,omitempty"`
 
 	// Search Optional within this object. How to find a user's entry when user_dn_pattern is not set or does not match.
 	Search *LdapSearchPattern `json:"search,omitempty"`
 
-	// UserDnPattern Optional within this object. Pattern that builds a user's DN from the username, with {0} standing for the username, for example uid={0},ou=people.
+	// UserDnPattern Optional within this object. Pattern that builds a user's DN from the username, with {0} standing for the username, for example uid={0},ou=people. It must contain {0}. A connection needs user_dn_pattern, search.search_filter or both.
 	UserDnPattern *string `json:"user_dn_pattern,omitempty"`
 }
 
-// LdapSettingsCreate A new LDAP connection. Same fields as LdapSettings; key and ldap_url are required.
+// LdapSettingsCreate A new LDAP connection. Same fields as LdapSettings; key and ldap_url are required, and a field left out takes its default.
 type LdapSettingsCreate struct {
-	// AllowUserToAccessProfile Optional within this object. Whether users created through this connection may open their own profile.
+	// AllowUserToAccessProfile Optional within this object. Whether users created through this connection may open their own profile. Defaults to false.
 	AllowUserToAccessProfile *bool `json:"allow_user_to_access_profile,omitempty"`
 
-	// AutoCreateUser Optional within this object. Whether a first successful login creates a local user.
+	// AutoCreateUser Optional within this object. Whether a first successful login creates a local user. Defaults to true.
 	AutoCreateUser *bool `json:"auto_create_user,omitempty"`
 
-	// EmailAttribute Optional within this object. Attribute that holds the user's email address, for example mail.
+	// EmailAttribute Optional within this object. Attribute that holds the user's email address. Defaults to mail.
 	EmailAttribute *string `json:"email_attribute,omitempty"`
 
 	// Enabled Optional within this object. Whether logins are checked against this server. Defaults to true.
@@ -1136,19 +1136,19 @@ type LdapSettingsCreate struct {
 	// Key Required within this object. Unique name of the connection.
 	Key string `json:"key"`
 
-	// LdapPoisoningProtection Optional within this object. Whether attributes returned by the server are checked to defend against LDAP response poisoning.
+	// LdapPoisoningProtection Optional within this object. Whether attributes returned by the server are checked to defend against LDAP response poisoning. Defaults to true.
 	LdapPoisoningProtection *bool `json:"ldap_poisoning_protection,omitempty"`
 
-	// LdapUrl Required within this object. Server URL including the base DN, for example ldap://ldap.example.com:389/dc=example,dc=com.
+	// LdapUrl Required within this object. ldap:// or ldaps:// server URL including the base DN, for example ldap://ldap.example.com:389/dc=example,dc=com. It must not carry credentials.
 	LdapUrl string `json:"ldap_url"`
 
-	// PagingSupportEnabled Optional within this object. Whether searches request paged results, for servers that cap result size.
+	// PagingSupportEnabled Optional within this object. Whether searches request paged results, for servers that cap result size. Defaults to true.
 	PagingSupportEnabled *bool `json:"paging_support_enabled,omitempty"`
 
 	// Search Optional within this object. How to find a user's entry when user_dn_pattern is not set or does not match.
 	Search *LdapSearchPattern `json:"search,omitempty"`
 
-	// UserDnPattern Optional within this object. Pattern that builds a user's DN from the username, with {0} standing for the username, for example uid={0},ou=people.
+	// UserDnPattern Optional within this object. Pattern that builds a user's DN from the username, with {0} standing for the username, for example uid={0},ou=people. It must contain {0}. A connection needs user_dn_pattern, search.search_filter or both.
 	UserDnPattern *string `json:"user_dn_pattern,omitempty"`
 }
 
@@ -3364,7 +3364,7 @@ type ClientInterface interface {
 
 	// GetAllLdapSettings List LDAP connections
 	//
-	// Returns every LDAP server connection that logins are checked against. Manager passwords are never returned. Requires a platform admin.
+	// Returns every LDAP server connection that logins are checked against, by key. Manager passwords are never returned. Requires a platform admin.
 	//
 	// Corresponds with GET /api/v1/ldap/settings (the `GetAllLdapSettings` operationId).
 	GetAllLdapSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3389,7 +3389,7 @@ type ClientInterface interface {
 
 	// UpdateLdapSettingsWithBody Replace an LDAP connection
 	//
-	// Replaces the connection whose key matches the body's key. Requires a platform admin.
+	// Replaces the connection whose key matches the body's key; a field left out takes its default, except manager_password, which is kept. Answers 404 when no connection has the key. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3398,7 +3398,7 @@ type ClientInterface interface {
 
 	// UpdateLdapSettings Replace an LDAP connection
 	//
-	// Replaces the connection whose key matches the body's key. Requires a platform admin.
+	// Replaces the connection whose key matches the body's key; a field left out takes its default, except manager_password, which is kept. Answers 404 when no connection has the key. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5547,7 +5547,7 @@ func (c *Client) RefreshLdapGroupSettings(ctx context.Context, name string, para
 
 // GetAllLdapSettings List LDAP connections
 //
-// Returns every LDAP server connection that logins are checked against. Manager passwords are never returned. Requires a platform admin.
+// Returns every LDAP server connection that logins are checked against, by key. Manager passwords are never returned. Requires a platform admin.
 //
 // Corresponds with GET /api/v1/ldap/settings (the `GetAllLdapSettings` operationId).
 func (c *Client) GetAllLdapSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -5602,7 +5602,7 @@ func (c *Client) CreateLdapSettings(ctx context.Context, body CreateLdapSettings
 
 // UpdateLdapSettingsWithBody Replace an LDAP connection
 //
-// Replaces the connection whose key matches the body's key. Requires a platform admin.
+// Replaces the connection whose key matches the body's key; a field left out takes its default, except manager_password, which is kept. Answers 404 when no connection has the key. Requires a platform admin.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5621,7 +5621,7 @@ func (c *Client) UpdateLdapSettingsWithBody(ctx context.Context, contentType str
 
 // UpdateLdapSettings Replace an LDAP connection
 //
-// Replaces the connection whose key matches the body's key. Requires a platform admin.
+// Replaces the connection whose key matches the body's key; a field left out takes its default, except manager_password, which is kept. Answers 404 when no connection has the key. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15547,7 +15547,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAllLdapSettingsWithResponse List LDAP connections
 	//
-	// Returns every LDAP server connection that logins are checked against. Manager passwords are never returned. Requires a platform admin.
+	// Returns every LDAP server connection that logins are checked against, by key. Manager passwords are never returned. Requires a platform admin.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15574,7 +15574,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateLdapSettingsWithBodyWithResponse Replace an LDAP connection
 	//
-	// Replaces the connection whose key matches the body's key. Requires a platform admin.
+	// Replaces the connection whose key matches the body's key; a field left out takes its default, except manager_password, which is kept. Answers 404 when no connection has the key. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15583,7 +15583,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateLdapSettingsWithResponse Replace an LDAP connection
 	//
-	// Replaces the connection whose key matches the body's key. Requires a platform admin.
+	// Replaces the connection whose key matches the body's key; a field left out takes its default, except manager_password, which is kept. Answers 404 when no connection has the key. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -20023,6 +20023,8 @@ type UpdateLdapSettingsResponse struct {
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON429 the response for an HTTP 429 `application/json` response
 	JSON429 *TooManyRequests
 	// JSON503 the response for an HTTP 503 `application/json` response
@@ -20051,6 +20053,11 @@ func (r UpdateLdapSettingsResponse) GetJSON401() *ErrorResponse {
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r UpdateLdapSettingsResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r UpdateLdapSettingsResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
 }
 
 // GetJSON429 returns the response for an HTTP 429 `application/json` response
@@ -32036,7 +32043,7 @@ func (c *ClientWithResponses) RefreshLdapGroupSettingsWithResponse(ctx context.C
 
 // GetAllLdapSettingsWithResponse List LDAP connections
 //
-// Returns every LDAP server connection that logins are checked against. Manager passwords are never returned. Requires a platform admin.
+// Returns every LDAP server connection that logins are checked against, by key. Manager passwords are never returned. Requires a platform admin.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -32081,7 +32088,7 @@ func (c *ClientWithResponses) CreateLdapSettingsWithResponse(ctx context.Context
 
 // UpdateLdapSettingsWithBodyWithResponse Replace an LDAP connection
 //
-// Replaces the connection whose key matches the body's key. Requires a platform admin.
+// Replaces the connection whose key matches the body's key; a field left out takes its default, except manager_password, which is kept. Answers 404 when no connection has the key. Requires a platform admin.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -32096,7 +32103,7 @@ func (c *ClientWithResponses) UpdateLdapSettingsWithBodyWithResponse(ctx context
 
 // UpdateLdapSettingsWithResponse Replace an LDAP connection
 //
-// Replaces the connection whose key matches the body's key. Requires a platform admin.
+// Replaces the connection whose key matches the body's key; a field left out takes its default, except manager_password, which is kept. Answers 404 when no connection has the key. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -38144,6 +38151,13 @@ func ParseUpdateLdapSettingsResponse(rsp *http.Response) (*UpdateLdapSettingsRes
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests

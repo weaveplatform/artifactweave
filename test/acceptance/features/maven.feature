@@ -160,7 +160,7 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
 
   # The P7 Maven exit checks (#284) start here. Every mvn deploy runs package
   # then deploy:deploy, never install, and every resolve uses a fresh local
-  # repository chained to the job's plugin cache, so an artifact under test
+  # repository chained to private pinned tools, so an artifact under test
   # comes from artifactweave alone.
   @maven
   Scenario Outline: <maven> deploys a release and a snapshot twice, and a build resolves both with strict checksums
@@ -220,6 +220,13 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
     And the server answered no request with 500 since the last command
     And the file "fresh/org/acme/smoke/lib/1.0.0/lib-1.0.0.jar" exists
     And the file "fresh/org/acme/smoke/snap/1.0-SNAPSHOT/maven-metadata-aw.xml" contains "<buildNumber>2</buildNumber>"
+    # A warm tool supply cannot satisfy product resolution after its registry
+    # target disappears; this second consumer head is empty too.
+    When I DELETE "/artifactory/api/repositories/mvn-local" as admin
+    Then the response status is 200
+    When I run mvn "-f app/pom.xml -s settings.xml -C -Dmaven.repo.local=/work/disabled-product -Dmaven.repo.local.tail={m2} -Daw.url={url}/mvn-local package"
+    Then the command fails
+    And the server answered no request with 500 since the last command
 
     Examples:
       | maven     |
@@ -353,9 +360,9 @@ Feature: Maven repositories with mvn, the JFrog CLI and Gradle
   # module's files itself at -SNAPSHOT paths with the build's timestamp, and
   # records them for jf rt bp. jf runs the runner's own Maven, 3.10, which
   # the extractor jf 2.131.0 downloads (2.44.1) starts on (#523). The
-  # runner's Java is 17, below the fixtures' release 21, and the build
-  # installs into the scenario's own local repository, never the job's
-  # plugin cache.
+  # runner's Java is 17, below the fixtures' release 21. The build installs
+  # into its own product head, with a private pinned tool tail and a seeded
+  # extractor. External Maven repositories are blocked during assertions.
   @jf @maven @maven_virtual
   Scenario Outline: jf mvn deploys a release and a snapshot through <class> with a build, and jf rt bp publishes it
     Given the registry is running

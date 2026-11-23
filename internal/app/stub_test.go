@@ -301,6 +301,14 @@ var generatedRoutes = map[string]bool{
 	"PUT /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}":    true,
 	"DELETE /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}": true,
 
+	// The LDAP connections (#1832); test/server/access/ldap_test.go holds
+	// their rows. The connection test stays a stub until #1833.
+	"GET /access/api/v1/ldap/settings":          true,
+	"POST /access/api/v1/ldap/settings":         true,
+	"PUT /access/api/v1/ldap/settings":          true,
+	"GET /access/api/v1/ldap/settings/{key}":    true,
+	"DELETE /access/api/v1/ldap/settings/{key}": true,
+
 	// The multi-architecture tag delete (#226), the promotion and the parent
 	// manifest lookup. test/server/artifacts/docker holds their rows
 	// (support.DockerRoutes).

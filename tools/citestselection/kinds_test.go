@@ -175,6 +175,7 @@ func TestUnitTerraformPathsSelectOnlyTheirAffectedLane(t *testing.T) {
 		// select the deployment checks as well as provider conformance.
 		{"deploy/artifactweave/terraform/repositories/main.tf", true, true},
 		{"deploy/artifactweave/terraform/repositories/.terraform.lock.hcl", true, true},
+		{"deploy/artifactweave/terraform/configuration/main.tf", true, true},
 		{"deploy/artifactweave/TEMPLATE.md", true, true},
 		{"test/terraform/run.sh", true, true},
 		{"test/terraform/driver_test.py", true, true},

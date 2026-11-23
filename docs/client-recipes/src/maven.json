@@ -5,7 +5,9 @@
   "client": "Maven 3 image / Temurin 27; compatibility Maven 3.9 image / Temurin 26 (exact bundled versions in CI logs)",
   "version_sources": [
     "test/acceptance/clients/maven.Dockerfile",
-    "test/acceptance/clients/maven-3.9/Dockerfile"
+    "test/acceptance/clients/maven-3.9/Dockerfile",
+    "test/acceptance/clients/maven-tools.lock.json",
+    ".github/actions/maven-tools/action.yml"
   ],
   "endpoint": "${AW_URL}/artifactory/${AW_REPO}",
   "auth": "Use an access or reference token as the HTTP Basic password, with AW_USER equal to its subject. The subject needs read permission for installation and deploy permission for publication on the selected repository; token scopes cannot exceed that identity. The same clients also accept a user password when Basic password authentication is enabled. Use HTTPS.",
@@ -39,7 +41,7 @@
       {
         "language": "sh",
         "code": "mvn -s \"$AW_WORK/settings.xml\" -C -Dmaven.repo.local=\"$AW_WORK/consumer-m2\" org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get -Dartifact=org.acme.smoke:lib:1.0.0 -DremoteRepositories=\"aw::default::$AW_URL/artifactory/$AW_REPO\"",
-        "note": "The tested artifact coordinates are examples; specify your package. A separate consumer repository ensures the artifact is fetched over HTTP. Build/plugin dependencies may come from Maven Central unless mirrored by your policy."
+        "note": "The tested artifact coordinates are examples; specify your package. A separate consumer repository ensures the artifact is fetched over HTTP. Build/plugin dependencies may come from Maven Central unless mirrored by your policy. Required CI separately prepares the pinned plugin/transitive closure and JF extractor, copies tools into private scenario repositories, and blocks public Maven repositories during assertions; tested product coordinates are excluded from that supply."
       }
     ]
   },
@@ -76,6 +78,14 @@
       "contains": [
         "Gradle uses an Ivy artifact pattern to resolve a Maven publication through a different virtual layout",
         "I publish the layout recipe with Maven and token"
+      ]
+    },
+    {
+      "path": "test/acceptance/maven_tools_test.go",
+      "contains": [
+        "mavenToolRepository",
+        "checkMavenToolRepository",
+        "ARTIFACTWEAVE_MAVEN_TOOLS"
       ]
     }
   ]

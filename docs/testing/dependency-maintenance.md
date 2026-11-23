@@ -123,3 +123,46 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/depsync -p '*_te
 python3 tools/depsync/sync.py --check
 GOWORK=off go run ./tools/clientrecipes -check
 ```
+
+## Maven native tool closure
+
+The existing native-client and JVM recipe jobs prepare Maven tools before
+acceptance. `test/acceptance/clients/maven-tools.lock.json` pins every required
+plugin/transitive POM and JAR and JF's extractor with SHA-512; CI verifies each
+cache hit and repairs incomplete objects through the existing `fetch-pinned.sh`.
+Google's [official Central mirror](https://maven.apache.org/repository/) is tried
+first, then Central, with the same digest required from either source. Maven never
+writes product files into that shared object cache. Tool repositories are read-only
+Resolver tails; each publisher and consumer has a separate writable product head,
+including the remote metadata Maven deploy writes without install.
+
+The Python unit tests fail when a fixture POM or a feature command names a plugin
+version the manifest lacks, or when `.github/actions/jfrog-cli` pins a `jf`
+release other than the one the manifest's extractor was qualified with. A Maven
+image update alone needs no change: if it ever needs a tool the manifest lacks,
+the blocked external repositories fail the Maven acceptance at that command. In
+any of these cases, regenerate the closure in a fresh disposable Maven local
+repository. Copy the
+`lib` fixture to a preparation project, change its group to
+`org.artifactweave.tooling`, and use the pinned clients to run `install`,
+`org.apache.maven.plugins:maven-deploy-plugin:3.1.3:deploy` with a private `file:`
+deployment target, and
+`org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy-dependencies`.
+Use a preparation-only settings file that mirrors Central to Google's mirror;
+acceptance uses the separate committed settings that block external repositories.
+Retain the downloaded upstream `.sha1` sidecars. Download the extractor uber
+JAR the pinned `jf` bootstraps, with its `.sha1`, from Central under
+`org/jfrog/buildinfo/build-info-extractor-maven3/`, keeping its file name, then
+run:
+
+```sh
+python3 test/acceptance/clients/maven-tools.py lock \
+  --repository "$AW_MAVEN_LOCK_REPOSITORY" --extractor "$AW_MAVEN_EXTRACTOR_JAR"
+python3 -m unittest discover -s tools/depsync -p '*_test.py'
+```
+
+The lock command verifies those publisher sidecars before pinning SHA-512,
+excludes the synthetic preparation project and rejects product fixture namespaces
+and missing pinned plugins. Requalify both pinned Maven images and `jf mvn` with
+external repositories blocked, empty consumer heads and the deleted-target
+failure controls. An existing warm home or a passing rerun alone is insufficient.
