@@ -368,6 +368,10 @@ inferred:
   a changed schedule superseded and roll back with a failed transaction.
   `TestAccRuntimeRunsGC` applies `gcConfig` through the bootstrap descriptor and sees
   passes across a restart.
+- The `trashcan` reference in `deploy/artifactweave/terraform` drives the pinned
+  `artifactory_trashcan_config` (provider 12.11.14) through two revisions, an import and a
+  destroy, and `test/terraform/check-trashcan.py` checks the XML descriptor and what a
+  delete then does after each.
 - Policy evaluation tests per criterion over a fixture package index.
 - Acceptance: a policy dry run and run with reports, trash restore, GC storage numbers.
 - `artifactory_package_cleanup_policy` Terraform acceptance.

@@ -94,6 +94,13 @@ alone cannot prove password preservation or clearing. XML descriptor GET
 is a required dependency; missing XML fails conformance. The full seven-resource
 P12 qualification remains #1837.
 
+The required `trashcan` reference applies pinned `artifactory_trashcan_config` in two
+revisions (off with 3 days, on with 0 days), and after each requires an empty refreshed plan
+and runs `check-trashcan.py`. That script reads the XML descriptor back and checks what a
+delete then does: final with the trash can off, and with it on kept until a collection pass
+purges it at 0 days. The scenario then imports the singleton into empty state and requires
+an empty plan. Destroy must leave the provider's documented reset, on with 14 days.
+
 The virtual-repositories scenario applies all 33 provider virtual resources, each over a local
 and a remote member, with every virtual field set away from its default. It applies two
 revisions, the second reversing every member list, and after each requires an empty plan and
