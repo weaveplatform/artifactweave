@@ -16,8 +16,15 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 )
 
-func TestAccSinglePushFailuresSQLite(t *testing.T)   { qualifyPushFailures(t, "sqlite") }
-func TestAccSinglePushFailuresPostgres(t *testing.T) { qualifyPushFailures(t, "postgres") }
+func TestAccSinglePushFailuresSQLite(t *testing.T) {
+	t.Parallel()
+	qualifyPushFailures(t, "sqlite")
+}
+
+func TestAccSinglePushFailuresPostgres(t *testing.T) {
+	t.Parallel()
+	qualifyPushFailures(t, "postgres")
+}
 
 func qualifyPushFailures(t *testing.T, backend string) {
 	t.Helper()
