@@ -56,3 +56,15 @@ resource "artifactory_mail_server" "this" {
   use_tls         = var.mail_use_tls
   use_ssl         = var.mail_use_ssl
 }
+
+# A layout's key is its name, which the provider repeats inside the entry and
+# finds again in the XML descriptor's repoLayouts. Setting a descriptor path
+# pattern turns on distinctiveDescriptorPathPattern.
+resource "artifactory_repository_layout" "this" {
+  name                                = var.layout_name
+  artifact_path_pattern               = var.layout_artifact_path_pattern
+  distinctive_descriptor_path_pattern = var.layout_descriptor_path_pattern != null
+  descriptor_path_pattern             = var.layout_descriptor_path_pattern
+  folder_integration_revision_regexp  = var.layout_folder_integration_revision_regexp
+  file_integration_revision_regexp    = var.layout_file_integration_revision_regexp
+}

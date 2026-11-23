@@ -21,6 +21,54 @@ variable "ldap_url" {
   description = "URL of the directory, with its base DN."
 }
 
+variable "user_dn_pattern" {
+  type        = string
+  default     = "uid={0},ou=people"
+  description = "DN of a user relative to the URL's base DN, {0} standing for the login name."
+}
+
+variable "email_attribute" {
+  type        = string
+  default     = "mail"
+  description = "Directory attribute holding a user's email address."
+}
+
+variable "auto_create_user" {
+  type        = bool
+  default     = true
+  description = "Whether a directory user's first login creates a local user in the ldap realm."
+}
+
+variable "allow_user_to_access_profile" {
+  type        = bool
+  default     = false
+  description = "Whether directory users may open their profile page."
+}
+
+variable "paging_support_enabled" {
+  type        = bool
+  default     = true
+  description = "Whether searches ask the directory for paged results."
+}
+
+variable "search" {
+  type = object({
+    filter     = string
+    base       = string
+    sub_tree   = bool
+    manager_dn = string
+  })
+  default     = null
+  description = "Find users by a search filter under base, bound as manager_dn; null finds them by user_dn_pattern only and clears any stored manager password."
+}
+
+variable "manager_password" {
+  type        = string
+  sensitive   = true
+  default     = null
+  description = "Password of the search's manager DN, write-only on the server. Null keeps the stored password; Terraform retains this sensitive attribute in private state."
+}
+
 variable "name_prefix" {
   type        = string
   default     = "corp"

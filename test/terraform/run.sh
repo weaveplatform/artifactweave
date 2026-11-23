@@ -49,6 +49,7 @@ python3 -I "$here/check-projects.py" --inventory "$root"
 python3 -I "$here/check-cleanup.py" --inventory "$root"
 python3 -I "$here/check-general-security.py" --inventory "$root"
 python3 -I "$here/check-ldap-groups.py" --inventory "$root"
+python3 -I "$here/check-p12.py" --inventory "$root"
 scenarios=("$@")
 [ ${#scenarios[@]} -gt 0 ] || scenarios=(deploy/artifactweave/terraform/repositories)
 if [ -n "${TERRAFORM_WORK:-}" ]; then
@@ -62,6 +63,11 @@ fi
 # including when the caller retains several runs in TERRAFORM_WORK.
 work=$(cd "$work" && pwd)
 echo "Terraform provider workspace: $work"
+# The P12 qualification ledger: run.sh records each step it takes for a P12
+# scenario and check-p12.py each verification, and --complete fails a run
+# that skipped one, so a step dropped from this script cannot go unnoticed.
+export P12_LEDGER="$work/p12-steps.jsonl"
+p12_step() { python3 -I "$here/check-p12.py" --step "$scenario" "$1"; }
 # Python effect checkers and native providers also contact the fixture.
 # Preserve proxy routing for release downloads, but every fixture client
 # must bypass it for the private loopback origin.
@@ -508,6 +514,11 @@ apply_package_cleanup() {
 
 # Compare the actual server secret through its canonical store/keyring, not
 # Terraform's retained Password state (the pinned provider never reads it).
+build_configuration_proof() {
+	[ -x "$work/configurationproof" ] ||
+		(cd "$root" && GOWORK=off go build -o "$work/configurationproof" ./tools/configurationproof)
+}
+
 configuration_proof() {
 	CONFIGURATION_PROOF_MASTER_KEY=terraform-master-key-0123456789abcdef0123456789abcdef \
 		CONFIGURATION_PROOF_PASSWORD=${TF_VAR_proxy_password:-} \
@@ -545,8 +556,9 @@ apply_configuration() {
 		TF_VAR_property_set_name=tf-configuration-properties \
 		TF_VAR_proxy_redirect_to_hosts='["one.invalid","two.invalid"]' \
 		TF_VAR_backup_key=tf-configuration-backup TF_VAR_mail_host=127.0.0.1 \
-		TF_VAR_mail_artifactory_url=https://registry.invalid/artifactory/
-	(cd "$root" && GOWORK=off go build -o "$work/configurationproof" ./tools/configurationproof)
+		TF_VAR_mail_artifactory_url=https://registry.invalid/artifactory/ \
+		TF_VAR_layout_name=tf-configuration-layout
+	build_configuration_proof
 	# Backup exclusions must name existing repositories; the module owns none.
 	configuration_patch '{"localRepositories":{"tf-backup-skip-a":{"type":"generic"},"tf-backup-skip-b":{"type":"generic"},"tf-backup-skip-c":{"type":"generic"}}}'
 	for revision in 1 2; do
@@ -562,6 +574,12 @@ apply_configuration() {
 				TF_VAR_backup_retention_period_hours=168 TF_VAR_backup_excluded_repositories='["tf-backup-skip-a","tf-backup-skip-b"]' \
 				TF_VAR_backup_create_archive=false TF_VAR_backup_send_mail_on_error=true \
 				TF_VAR_mail_enabled=true TF_VAR_mail_use_tls=true TF_VAR_mail_use_ssl=false
+			# Each revision's artifact pattern reads one of the two files
+			# check-p12.py deploys as a version, and only that one.
+			export TF_VAR_layout_artifact_path_pattern='[org]/[module]/[baseRev]/[module]-[baseRev].[ext]' \
+				TF_VAR_layout_descriptor_path_pattern='[org]/[module]/[baseRev]/[module]-[baseRev].pom' \
+				TF_VAR_layout_folder_integration_revision_regexp='.*' \
+				TF_VAR_layout_file_integration_revision_regexp='.*' P12_LAYOUT_VERSION=1.0
 		else
 			export TF_VAR_proxy_platform_default=false TF_VAR_proxy_services='["jfrt","jfxr"]' TF_VAR_property_set_visible=false
 			export TF_VAR_properties='{"release":{"closed_predefined_values":true,"multiple_choice":false,"predefined_values":{"ready":false,"waiting":true}},"free":{}}'
@@ -571,12 +589,21 @@ apply_configuration() {
 				TF_VAR_backup_retention_period_hours=0 TF_VAR_backup_excluded_repositories='["tf-backup-skip-c"]' \
 				TF_VAR_backup_create_archive=true TF_VAR_backup_send_mail_on_error=false \
 				TF_VAR_mail_enabled=false TF_VAR_mail_use_tls=false TF_VAR_mail_use_ssl=true
+			# No descriptor pattern turns distinctiveDescriptorPathPattern off.
+			export TF_VAR_layout_artifact_path_pattern='releases/[org]/[module]/[baseRev]/[module]-[baseRev].[ext]' \
+				TF_VAR_layout_folder_integration_revision_regexp=RELEASE \
+				TF_VAR_layout_file_integration_revision_regexp='[0-9]{8}' P12_LAYOUT_VERSION=2.0
+			unset TF_VAR_layout_descriptor_path_pattern
 		fi
 		tf apply -auto-approve
+		p12_step "apply-$revision"
 		if [ "$revision" = 1 ]; then configuration_proof created; else configuration_proof updated; fi
+		[ "$revision" = 2 ] || python3 -I "$here/check-p12.py" --layout-effect create
 		tf apply -refresh-only -auto-approve
 		configuration_proof refreshed
 		tf plan -detailed-exitcode
+		p12_step "plan-$revision"
+		python3 -I "$here/check-p12.py" --check "$scenario" "$revision"
 		no_backup_directory
 	done
 	# ProxyAPIModel.Password and MailServerAPIModel.Password are not
@@ -586,6 +613,8 @@ apply_configuration() {
 	configuration_proof retained
 	tf apply -auto-approve
 	configuration_proof updated
+	tf plan -detailed-exitcode
+	python3 -I "$here/check-p12.py" --check "$scenario" retained
 	# Null makes the pinned providers send an empty or null password; actual
 	# row absence is required even if retained Terraform state looks empty.
 	unset TF_VAR_proxy_password TF_VAR_mail_password
@@ -593,6 +622,43 @@ apply_configuration() {
 	configuration_proof cleared
 	tf apply -refresh-only -auto-approve
 	configuration_proof cleared
+	# A port change makes both providers send their empty password again: a
+	# repeated clear must stay a clear (#1800) and refresh to an empty plan.
+	export TF_VAR_proxy_port=3140 TF_VAR_mail_port=2530
+	tf apply -auto-approve
+	configuration_proof cleared
+	tf plan -detailed-exitcode
+	python3 -I "$here/check-p12.py" --check "$scenario" cleared
+	# The layout goes with the destroy that follows; its repository first.
+	python3 -I "$here/check-p12.py" --layout-effect delete
+}
+
+# A singleton the provider cannot delete. Revision 1 is an HTTP-only NGINX
+# proxy on the repository path method, whose nginx snippet check-p12.py
+# reads; revision 2 an HTTPS APACHE proxy on the subdomain method, for which
+# the snippet is refused. Host names and paths are never contacted or read.
+apply_reverse_proxy() {
+	for revision in 1 2; do
+		if [ "$revision" = 1 ]; then
+			export TF_VAR_server_provider=NGINX TF_VAR_docker_reverse_proxy_method=REPOPATHPREFIX \
+				TF_VAR_public_server_name=registry-one.example.invalid TF_VAR_internal_hostname=127.0.0.1 \
+				TF_VAR_use_https=false TF_VAR_http_port=8080 TF_VAR_https_port=8443
+			unset TF_VAR_ssl_key_path TF_VAR_ssl_certificate_path
+		else
+			export TF_VAR_server_provider=APACHE TF_VAR_docker_reverse_proxy_method=SUBDOMAIN \
+				TF_VAR_public_server_name=registry-two.example.invalid \
+				TF_VAR_internal_hostname=artifactweave.internal.invalid \
+				TF_VAR_use_https=true TF_VAR_http_port=8081 TF_VAR_https_port=9443 \
+				TF_VAR_ssl_key_path=/etc/ssl/private/registry-two.key \
+				TF_VAR_ssl_certificate_path=/etc/ssl/certs/registry-two.crt
+		fi
+		tf apply -auto-approve
+		p12_step "apply-$revision"
+		tf apply -refresh-only -auto-approve
+		tf plan -detailed-exitcode
+		p12_step "plan-$revision"
+		python3 -I "$here/check-p12.py" --check "$scenario" "$revision"
+	done
 }
 
 # The two settings change one at a time, so a provider that sent or read
@@ -619,23 +685,55 @@ apply_general_security() {
 	general_security_revision false SUPPORTED
 }
 
+# The connection's manager password, through the server's own store.
+ldap_proof() {
+	CONFIGURATION_PROOF_MASTER_KEY=terraform-master-key-0123456789abcdef0123456789abcdef \
+		CONFIGURATION_PROOF_PASSWORD=$2 \
+		"$work/configurationproof" "$work/data/artifactweave.db" "ldap/$TF_VAR_connection_key" "$1" "$work/ldap-secret-proof.json"
+}
+
 # Each revision changes the v2 setting's strategy and both settings'
 # sub_tree, reads them back through the Access API and the XML descriptor
 # and refreshes each through the group sync. The connection stays disabled,
 # so the provider's refresh after a v2 write answers 400, which it reports
-# as a warning, and no directory is needed.
+# as a warning, and no directory is needed. Its own fields change with the
+# revisions too, and check-p12.py reads it back through the Access API.
+#
+#   ldap_groups_revision STRATEGY SUB_TREE LABEL PROOF_PHASE EXPECTED_PASSWORD
 ldap_groups_revision() {
 	export TF_VAR_strategy=$1 TF_VAR_sub_tree=$2
 	tf apply -auto-approve
+	p12_step "apply-$3"
+	ldap_proof "$4" "$5"
 	python3 -I "$here/check-ldap-groups.py" --check "$1" "$2"
 	tf apply -refresh-only -auto-approve
+	ldap_proof "$4" "$5"
 	tf plan -detailed-exitcode
+	p12_step "plan-$3"
+	python3 -I "$here/check-p12.py" --check "$scenario" "$3"
 }
 
+# The directory URLs name unused loopback ports: the connection is disabled,
+# so nothing connects to them.
 apply_ldap_groups() {
 	export TF_VAR_name_prefix=tf-ldap TF_VAR_connection_key=tf-ldap
-	ldap_groups_revision STATIC false
-	ldap_groups_revision DYNAMIC true
+	build_configuration_proof
+	export TF_VAR_ldap_url=ldap://127.0.0.1:1389/dc=example,dc=org TF_VAR_user_dn_pattern='uid={0},ou=people' \
+		TF_VAR_email_attribute=email TF_VAR_auto_create_user=false TF_VAR_allow_user_to_access_profile=true \
+		TF_VAR_paging_support_enabled=false TF_VAR_manager_password=ldap-manager-private-fixture-1 \
+		TF_VAR_search='{"filter":"(uid={0})","base":"ou=people","sub_tree":false,"manager_dn":"cn=reader,dc=example,dc=org"}'
+	ldap_groups_revision STATIC false 1 created ldap-manager-private-fixture-1
+	export TF_VAR_ldap_url=ldaps://127.0.0.1:1636/dc=example,dc=net TF_VAR_user_dn_pattern='cn={0},ou=staff' \
+		TF_VAR_email_attribute=userPrincipalName TF_VAR_auto_create_user=true TF_VAR_allow_user_to_access_profile=false \
+		TF_VAR_paging_support_enabled=true TF_VAR_manager_password=ldap-manager-private-fixture-2 \
+		TF_VAR_search='{"filter":"(&(objectClass=person)(cn={0}))","base":"ou=staff","sub_tree":true,"manager_dn":"cn=syncer,dc=example,dc=net"}'
+	ldap_groups_revision DYNAMIC true 2 updated ldap-manager-private-fixture-2
+	# The provider leaves an empty password out of its request, so the
+	# stored one must stay; dropping the search then clears it with the DN.
+	unset TF_VAR_manager_password
+	ldap_groups_revision DYNAMIC true retained retained ldap-manager-private-fixture-2
+	unset TF_VAR_search
+	ldap_groups_revision DYNAMIC true cleared cleared ''
 }
 
 # A singleton every instance has. Each revision is checked against the XML
@@ -671,6 +769,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/projects) apply_projects ;;
 	deploy/artifactweave/terraform/package-cleanup) apply_package_cleanup ;;
 	deploy/artifactweave/terraform/configuration) apply_configuration ;;
+	deploy/artifactweave/terraform/reverse-proxy) apply_reverse_proxy ;;
 	deploy/artifactweave/terraform/general-security) apply_general_security ;;
 	deploy/artifactweave/terraform/ldap-groups) apply_ldap_groups ;;
 	deploy/artifactweave/terraform/trashcan) apply_trashcan ;;
@@ -683,6 +782,14 @@ for scenario in "${scenarios[@]}"; do
 	# wrote.
 	tf plan -detailed-exitcode
 	tf destroy -auto-approve
+	p12_step destroy
+	case $scenario in
+	deploy/artifactweave/terraform/configuration | deploy/artifactweave/terraform/reverse-proxy | deploy/artifactweave/terraform/ldap-groups)
+		python3 -I "$here/check-p12.py" --deleted "$scenario"
+		tf state list >"$work/p12-remaining-resources.txt"
+		test ! -s "$work/p12-remaining-resources.txt"
+		;;
+	esac
 	if [ "$scenario" = deploy/artifactweave/terraform/configuration ]; then
 		configuration_proof deleted
 		tf state list >"$work/descriptor-remaining-resources.txt"
@@ -697,6 +804,7 @@ for scenario in "${scenarios[@]}"; do
 	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/ldap-groups ]; then
 		python3 -I "$here/check-ldap-groups.py" --deleted
+		ldap_proof deleted ''
 	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/remote-repositories ]; then
 		python3 -I "$here/check-remotes.py" --remove-proxy
@@ -718,3 +826,8 @@ for scenario in "${scenarios[@]}"; do
 		python3 -I "$here/check-cleanup.py" --deleted "$work/cleanup-fixture.json" "$work/cleanup-runs.json" "$work/server.log"
 	fi
 done
+
+# Every resource of each P12 scenario that ran must have every step, the
+# run's persistent data, logs and retained evidence no fixture secret, and
+# only then is the sanitized provenance written beside the coverage.
+python3 -I "$here/check-p12.py" --complete "$root" "$mirror" "$work" "${GOCOVERDIR:-$work/cover}" "${scenarios[@]}"

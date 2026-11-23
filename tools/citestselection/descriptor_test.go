@@ -27,11 +27,12 @@ func TestUnitDescriptorProviderControlsAreRequired(t *testing.T) {
 		t.Fatal("descriptor controls left the required provider scenarios")
 	}
 	fixture := read(scenario + "/main.tf")
-	// CFG-07 (issue 1831) added the backup and mail server resources.
-	if strings.Count("\n"+fixture, "\nresource ") != 4 {
-		t.Fatal("descriptor control scope must remain exactly four resources")
+	// CFG-07 (issue 1831) added the backup and mail server resources, and
+	// QUA-01 (issue 1837) the repository layout.
+	if strings.Count("\n"+fixture, "\nresource ") != 5 {
+		t.Fatal("descriptor control scope must remain exactly five resources")
 	}
-	for _, kind := range []string{"artifactory_proxy", "artifactory_property_set", "artifactory_backup", "artifactory_mail_server"} {
+	for _, kind := range []string{"artifactory_proxy", "artifactory_property_set", "artifactory_backup", "artifactory_mail_server", "artifactory_repository_layout"} {
 		if strings.Count(fixture, `resource "`+kind+`"`) != 1 {
 			t.Fatalf("descriptor controls must manage one %s", kind)
 		}
@@ -69,7 +70,12 @@ func TestUnitDescriptorProviderControlsAreRequired(t *testing.T) {
 	if strings.Contains(read(scenario+"/variables.tf"), `variable "revision"`) || strings.Contains(read(scenario+"/variables.tf"), "fixture") {
 		t.Fatal("consumer reference includes harness-only inputs")
 	}
-	for _, file := range []string{scenario + "/main.tf", scenario + "/versions.tf", scenario + "/.terraform.lock.hcl"} {
+	// The P12 step ledger and secret scan (issue 1837) must stay in the
+	// required lane with the scenarios they qualify.
+	for _, file := range []string{
+		scenario + "/main.tf", scenario + "/versions.tf", scenario + "/.terraform.lock.hcl",
+		"deploy/artifactweave/terraform/reverse-proxy/main.tf", "test/terraform/check-p12.py",
+	} {
 		if provider, _ := terraformPathLanes(file); !provider {
 			t.Errorf("%s must select required provider conformance", file)
 		}

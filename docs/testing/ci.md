@@ -1353,9 +1353,17 @@ All deployment roots require Terraform **1.17 or later**; CI pins **1.17.1**.
 `make terraform` runs `test/terraform/run.sh` over `TERRAFORM_SCENARIOS`: the repositories,
 identity, OIDC, CDN repositories, remote repositories, virtual repositories, webhooks, single
 replication, projects and package-cleanup references in `deploy/artifactweave/terraform/`,
-the two-resource `configuration` reference, the `general-security` reference, the
-`ldap-groups` reference and the `trashcan` reference in that same tree. `configuration` qualifies only proxy/property-set
-write validation; full seven-resource P12 qualification remains #1837. `trashcan` qualifies
+the `configuration` and `reverse-proxy` references, the `general-security` reference, the
+`ldap-groups` reference and the `trashcan` reference in that same tree. `configuration`,
+`reverse-proxy` and `ldap-groups` qualify the seven P12 resources (#1837):
+`artifactory_proxy`, `artifactory_property_set`, `artifactory_backup`,
+`artifactory_mail_server`, `artifactory_repository_layout`, `platform_reverse_proxy` and
+`artifactory_ldap_setting_v2`, each in two revisions read back through the XML descriptor,
+the `webServer` API or the Access API, and destroyed. `test/terraform/check-p12.py` records
+every step in a ledger and fails the run when a resource of a P12 scenario that ran lacks
+one, scans the run's database, logs and retained evidence for the fixture secrets, and
+writes sanitized provenance to `cover/terraform/p12-provider-evidence.json`, which the job
+uploads with the coverage. `trashcan` qualifies
 `artifactory_trashcan_config` against the descriptor's `trashcanConfig` (#1829). XML
 descriptor GET is required for these pinned provider controls, so a missing implementation
 fails the required conformance lane. `general-security` reads back through

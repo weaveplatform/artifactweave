@@ -129,6 +129,7 @@ TERRAFORM_SCENARIOS ?= deploy/artifactweave/terraform/repositories \
 	deploy/artifactweave/terraform/projects \
 	deploy/artifactweave/terraform/package-cleanup \
 	deploy/artifactweave/terraform/configuration \
+	deploy/artifactweave/terraform/reverse-proxy \
 	deploy/artifactweave/terraform/general-security \
 	deploy/artifactweave/terraform/ldap-groups \
 	deploy/artifactweave/terraform/trashcan

@@ -24,7 +24,7 @@ import (
 
 var (
 	errPhase           = errors.New("unknown proof phase")
-	errTarget          = errors.New("unknown proof target; use proxy/<key> or mail_server/mailserver")
+	errTarget          = errors.New("unknown proof target; use proxy/<key>, mail_server/mailserver or ldap/<key>")
 	errMasterKey       = errors.New("invalid fixture master key")
 	errKeyring         = errors.New("cannot build fixture keyring")
 	errDatabasePath    = errors.New("cannot resolve fixture database")
@@ -51,8 +51,18 @@ type proof struct {
 	CiphertextSHA256 string `json:"ciphertext_sha256,omitempty"`
 }
 
-// Run verifies one lifecycle phase of target, proxy/<key> or
-// mail_server/mailserver, against the actual owned fixture store and
+// secretNames maps each target kind to the name of its one sealed secret.
+// The descriptor sections keep the provider's "password"; an LDAP connection
+// keeps the Access API's manager_password (internal/access/core/ldap), so a
+// proof that read "password" there would find no row and pass a clear.
+var secretNames = map[configdoc.ConfigKind]string{
+	configdoc.ConfigProxy:      "password",
+	configdoc.ConfigMailServer: "password",
+	configdoc.ConfigLDAP:       "manager_password",
+}
+
+// Run verifies one lifecycle phase of target, proxy/<key>,
+// mail_server/mailserver or ldap/<key>, against the actual owned fixture store and
 // appends credential-free proof evidence only after every assertion passes.
 // It opens path read-only with the canonical keyring, never migrates or writes
 // the database, and returns redacted errors without credentials or stored data.
@@ -62,9 +72,10 @@ func Run(ctx context.Context, path, target, phase, evidence, master, expected st
 	if !slices.Contains([]string{"created", "updated", "refreshed", "retained", "cleared", "deleted"}, phase) {
 		return errPhase
 	}
-	// The two descriptor sections whose password the pinned providers write.
+	// The sections whose password the pinned providers write.
 	kind, key, _ := strings.Cut(target, "/")
-	if kind != string(configdoc.ConfigProxy) && kind != string(configdoc.ConfigMailServer) || key == "" {
+	name, known := secretNames[configdoc.ConfigKind(kind)]
+	if !known || key == "" {
 		return errTarget
 	}
 	material, err := crypt.ParseVersionedKey(master)
@@ -97,7 +108,7 @@ func Run(ctx context.Context, path, target, phase, evidence, master, expected st
 	var sealed []byte
 	err = db.QueryRowContext(ctx,
 		"SELECT value FROM config_secrets WHERE kind = ? AND key = ? AND name = ?",
-		kind, key, "password").Scan(&sealed)
+		kind, key, name).Scan(&sealed)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return errSecretRead
 	}
@@ -119,14 +130,14 @@ func Run(ctx context.Context, path, target, phase, evidence, master, expected st
 			return errClear
 		}
 	default:
-		if expected == "" || doc.Secrets["password"] != expected {
+		if expected == "" || doc.Secrets[name] != expected {
 			return errPassword
 		}
 		if result.SecretRows != 1 || !result.Sealed {
 			return errUnsealed
 		}
 	}
-	if bytes.Contains(doc.Document, []byte(`"password"`)) ||
+	if bytes.Contains(doc.Document, []byte(`"`+name+`"`)) ||
 		(expected != "" && bytes.Contains(doc.Document, []byte(expected))) || bytes.Contains(doc.Document, []byte("${")) {
 		return errPublicDocument
 	}

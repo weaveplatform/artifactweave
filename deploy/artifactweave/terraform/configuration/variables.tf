@@ -171,3 +171,28 @@ variable "mail_use_ssl" {
   default     = false
   description = "Whether to use implicit TLS from the first byte."
 }
+variable "layout_name" {
+  type        = string
+  default     = "release-layout"
+  description = "Name of the repository layout: an XML name, unique among descriptor keys. Changing it replaces the layout."
+}
+variable "layout_artifact_path_pattern" {
+  type        = string
+  default     = "[org]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev])(-[classifier]).[ext]"
+  description = "Path pattern of the layout's artifacts, in layout tokens such as [org], [module], [baseRev] and [ext]."
+}
+variable "layout_descriptor_path_pattern" {
+  type        = string
+  default     = null
+  description = "Path pattern of the layout's descriptors (such as a POM); null uses the artifact path pattern."
+}
+variable "layout_folder_integration_revision_regexp" {
+  type        = string
+  default     = "SNAPSHOT"
+  description = "Regular expression of the integration revision in a folder name, without capturing groups; .* when not applicable."
+}
+variable "layout_file_integration_revision_regexp" {
+  type        = string
+  default     = "SNAPSHOT|(?:(?:[0-9]{8}.[0-9]{6})-(?:[0-9]+))"
+  description = "Regular expression of the integration revision in a file name, without capturing groups; .* when not applicable."
+}

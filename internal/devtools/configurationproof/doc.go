@@ -1,6 +1,6 @@
-// Package configurationproof checks actual proxy and mail server secret
-// storage in an owned Terraform fixture through the server's canonical
-// configuration store/keyring.
+// Package configurationproof checks actual proxy, mail server and LDAP
+// connection secret storage in an owned Terraform fixture through the
+// server's canonical configuration store/keyring.
 //
 // # Role
 //
@@ -9,8 +9,8 @@
 //
 // # Inputs
 //
-// Database path, target (proxy/<key> or mail_server/mailserver), phase and
-// evidence file; the fixture master key and
+// Database path, target (proxy/<key>, mail_server/mailserver or
+// ldap/<key>), phase and evidence file; the fixture master key and
 // expected password arrive only through CONFIGURATION_PROOF_MASTER_KEY and
 // CONFIGURATION_PROOF_PASSWORD. The driver owns every input and database.
 //
@@ -28,11 +28,12 @@
 //
 // # References
 //
-// ADR 0017; ADR 0030; issues 1839 and 1831; test/terraform/run.sh.
+// ADR 0017; ADR 0030; issues 1839, 1831 and 1837; test/terraform/run.sh.
 //
 // # Status
 //
-// Implemented for the P12 configuration reference, which the Terraform
-// provider conformance job runs against the pinned provider; issue 1831 adds
-// the mail server target beside the proxy.
+// Implemented for the P12 configuration and ldap-groups references, which
+// the Terraform provider conformance job runs against the pinned provider;
+// issue 1831 added the mail server target beside the proxy, and issue 1837
+// the LDAP connection's manager_password.
 package configurationproof

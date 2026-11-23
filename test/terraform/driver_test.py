@@ -389,5 +389,73 @@ class DriverTest(unittest.TestCase):
         self.assertFalse((self.work / "child-pid").exists())
 
 
+class P12LedgerTest(unittest.TestCase):
+    """check-p12.py must fail a run that skipped a resource, a step or leaked a secret."""
+
+    SCENARIO = "deploy/artifactweave/terraform/reverse-proxy"
+    STEPS = ["apply-1", "plan-1", "verify-1", "apply-2", "plan-2", "verify-2", "destroy", "deleted"]
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory(prefix="p12-ledger-test-")
+        self.addCleanup(temp.cleanup)
+        self.work = Path(temp.name)
+        for name in ("data", "mirror", "cover"):
+            (self.work / name).mkdir()
+        (self.work / "data" / "artifactweave.db").write_bytes(b"sealed")
+        (self.work / "server.log").write_text("{}\n")
+        self.env = dict(os.environ, P12_LEDGER=str(self.work / "ledger.jsonl"),
+                        TERRAFORM_APPLICATION_COMMIT="owned-driver-regression", TERRAFORM_CLI_VERSION="1.17.1")
+
+    def checker(self, *args, root=ROOT):
+        return subprocess.run(["python3", "-I", str(ROOT / "test/terraform/check-p12.py"), *args],
+                              env=self.env, text=True, capture_output=True, timeout=30, cwd=root)
+
+    def complete(self):
+        return self.checker("--complete", str(ROOT), str(self.work / "mirror"), str(self.work),
+                            str(self.work / "cover"), "deploy/artifactweave/terraform/oidc", self.SCENARIO)
+
+    def record(self, steps):
+        for step in steps:
+            self.assertEqual(self.checker("--step", self.SCENARIO, step).returncode, 0)
+
+    def test_every_step_writes_sanitized_provenance(self):
+        self.record(self.STEPS)
+        result = self.complete()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        evidence = json.loads((self.work / "cover" / "p12-provider-evidence.json").read_text())
+        self.assertEqual(evidence["resources"], {"platform_reverse_proxy": self.STEPS})
+        self.assertEqual(sorted(evidence["scenarios"][self.SCENARIO]),
+                         [".terraform.lock.hcl", "main.tf", "outputs.tf", "variables.tf", "versions.tf"])
+
+    def test_a_missing_step_fails_the_run(self):
+        self.record([step for step in self.STEPS if step != "plan-2"])
+        result = self.complete()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("platform_reverse_proxy plan-2", result.stderr)
+        self.assertFalse((self.work / "cover" / "p12-provider-evidence.json").exists())
+
+    def test_a_plaintext_fixture_secret_fails_the_run(self):
+        self.record(self.STEPS)
+        (self.work / "data" / "artifactweave.db-wal").write_bytes(b"\x00ldap-manager-private-fixture-1\x00")
+        result = self.complete()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("artifactweave.db-wal", result.stderr)
+        self.assertFalse((self.work / "cover" / "p12-provider-evidence.json").exists())
+
+    def test_a_scenario_without_a_resource_fails_the_inventory(self):
+        root = self.work / "root"
+        for path in ["Makefile", "test/terraform/run.sh", "deploy/artifactweave/terraform/configuration",
+                     "deploy/artifactweave/terraform/reverse-proxy", "deploy/artifactweave/terraform/ldap-groups"]:
+            source, target = ROOT / path, root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            (shutil.copytree if source.is_dir() else shutil.copyfile)(source, target)
+        self.assertEqual(self.checker("--inventory", str(root)).returncode, 0)
+        main = root / "deploy/artifactweave/terraform/configuration/main.tf"
+        main.write_text(main.read_text().replace('resource "artifactory_repository_layout"', 'resource "artifactory_dropped"'))
+        result = self.checker("--inventory", str(root))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("artifactory_repository_layout", result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
