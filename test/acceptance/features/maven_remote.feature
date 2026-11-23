@@ -1,7 +1,7 @@
 @p9_maven_remote @maven
 Feature: Maven downloads authoritative upstream content through a remote cache
   The current native Maven client uses an empty artifact cache for each run.
-  The shared local tail contains plugins only for this fixture namespace.
+  The private pinned tool tail contains no product fixture coordinates.
 
   Scenario: Maven resolves release, parent, transitive and both snapshot forms cold and during an upstream outage
     Given the registry is running
@@ -51,3 +51,10 @@ Feature: Maven downloads authoritative upstream content through a remote cache
     When I GET "/artifactory/maven-remote-cache/org/acme/p9remote625/unique/1.1-SNAPSHOT/maven-metadata.xml" as admin
     Then the response status is 200
     And the response body contains "1.1-20261021.120000-1"
+    # Cached tools and prior consumer heads cannot satisfy a new consumer
+    # after the intended remote repository has been removed.
+    When I DELETE "/artifactory/api/repositories/maven-remote" as admin
+    Then the response status is 200
+    When I run mvn "-s settings.xml -C -Dmaven.repo.local=/work/disabled-remote -Dmaven.repo.local.tail={m2} org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy-dependencies -DoutputDirectory=/work/disabled-remote-jars"
+    Then the command fails
+    And the server answered no request with 500 since the last command

@@ -86,7 +86,15 @@ and kept current by Dependabot. They run with `--network host` and the runner's 
 container reaches the binary on `127.0.0.1`, the base URL inside metadata stays valid, and
 cleanup can delete what they write. The npm, Go, Maven, PyPI, NuGet, Helm, Terraform
 registry and Terraform backend scenarios gate their jobs; Gradle runs in an
-informational job and does not gate merge ([0032](0032-package-format-handlers.md)). The default storage is SQLite with the fs blob store;
+informational job and does not gate merge ([0032](0032-package-format-handlers.md)).
+Maven build-tool preparation belongs to those same jobs: the committed SHA-512
+manifest covers plugin/transitive POMs and JARs plus the pinned JF extractor.
+Every restored object is verified, incomplete supplies are repaired before
+assertions, and scenarios receive private tool-only repositories. All Maven
+assertions block external repositories while retaining owned loopback HTTP;
+product fixture coordinates remain cold. Removing the intended repository must
+fail another fresh consumer. Preparation failure fails setup truthfully (#1852).
+The default storage is SQLite with the fs blob store;
 PostgreSQL and MinIO run a `@storage`-tagged subset. Each required partition
 uploads its own coverage, merged into the gate. Budget: 15 minutes wall clock
 per required acceptance job.

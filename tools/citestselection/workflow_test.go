@@ -978,3 +978,66 @@ func contains(values []string, wanted string) bool {
 	}
 	return false
 }
+
+func TestUnitMavenToolsStayInRequiredNativeOwners(t *testing.T) {
+	data, err := os.ReadFile("../../.github/workflows/quality-gate.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Name string `yaml:"name"`
+				Uses string `yaml:"uses"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if err = yaml.Unmarshal(data, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	action, err := os.ReadFile("../../.github/actions/maven-tools/action.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var preparation struct {
+		Runs struct {
+			Steps []struct {
+				Run string `yaml:"run"`
+			} `yaml:"steps"`
+		} `yaml:"runs"`
+	}
+	if err = yaml.Unmarshal(action, &preparation); err != nil {
+		t.Fatal(err)
+	}
+	unitOwner := false
+	for _, step := range preparation.Runs.Steps {
+		if strings.Contains(step.Run, "go test -v -timeout=5m -race -shuffle=on -count=1 -run '^TestUnitMaven'") &&
+			strings.Contains(step.Run, "grep -q '^--- PASS: TestUnitMaven'") {
+			unitOwner = true
+		}
+	}
+	if !unitOwner {
+		t.Fatal("native Maven preparation lost its nonempty unit regression owner")
+	}
+	for job, acceptance := range map[string]string{
+		"acceptance":     "Acceptance features (coverage-instrumented binary)",
+		"acceptance-jvm": "JVM recipe features (coverage-instrumented binary)",
+	} {
+		prepared := false
+		found := false
+		for _, step := range workflow.Jobs[job].Steps {
+			if step.Uses == "./.github/actions/maven-tools" {
+				prepared = true
+			}
+			if step.Name == acceptance {
+				found = true
+				if !prepared {
+					t.Errorf("%s starts native assertions without preparing Maven tools", job)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("%s lost its required native acceptance step", job)
+		}
+	}
+}

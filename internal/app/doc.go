@@ -142,7 +142,8 @@
 // OpenRuntime, its loops and Close; platform_test.go Keyring, OpenStore,
 // Migrate, RotateKeys, the blob tiers and their mirrors; modules_test.go
 // buildModules and the token service; seed_test.go and bootstrap_test.go
-// the first start and config apply; serverlog_test.go the HTTP server's
+// the first start and config apply, bootstrap_ldap_test.go with LDAP
+// connections; serverlog_test.go the HTTP server's
 // error log. hash_test.go lowers the password hashing cost and the token key
 // size for all of them. The suites that read remote content through the
 // composed runtime run from test/server/artifacts/<type>, over the harness's

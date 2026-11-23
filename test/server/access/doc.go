@@ -58,6 +58,11 @@
 //     provider's flow.
 //   - oidc_test.go: the OIDC exchange, self-minting, mappings and restricted
 //     subjects.
+//   - ldap_test.go: the LDAP connections (#1832): the
+//     artifactory_ldap_setting_v2 create, read, update, import and delete
+//     with nothing that would plan again, defaults, the manager password
+//     kept, cleared and never returned, refusals, and every operation
+//     refused to anonymous callers, non-administrators and their tokens.
 //   - api_restrictions_test.go: restriction, recovery, validation and the
 //     project quota.
 //   - username_case_test.go: user names in any case on every route that

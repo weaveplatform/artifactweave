@@ -15,8 +15,9 @@
 // Deps, which app passes New:
 //
 //   - Store, required: the access ports (users, groups, permissions,
-//     tokens, keys, projects and API restrictions, with their transactions)
-//     and the settings, which the bindings read and write. App passes its
+//     tokens, keys, projects and API restrictions, with their transactions),
+//     the settings and the configuration documents that hold the LDAP
+//     connections, which the bindings read and write. App passes its
 //     composite store, which satisfies it.
 //   - Authenticator and Tokens, the authenticator and token service app
 //     built over the same store; either may be nil.
@@ -28,8 +29,9 @@
 //
 //   - Module, whose API returns one binding of each access/api contract:
 //     Authenticator, Authorizer, Tokens, Keys, Identity, Restrictions,
-//     Projects, Grants and AnonymousAccess, with the Settings.
-//   - KeysOf, ProjectsOf, AnonymousAccessOf, RestrictionsOf and TokensOf:
+//     Projects, Grants, AnonymousAccess and LDAP, with the Settings.
+//   - KeysOf, ProjectsOf, AnonymousAccessOf, LDAPSettingsOf, RestrictionsOf
+//     and TokensOf:
 //     the store-only bindings, for code that holds a store before any
 //     module exists, such as bootstrap, and the multipart upload service
 //     and the garbage collector, which app builds before the work queue.
@@ -100,7 +102,9 @@
 // Implemented P9d: New, Module and the store-only bindings, binding every
 // access/api contract over access core's authenticator, evaluator and token
 // service and the store. The module's routes and background work (target
-// layout, line 533) stay in the server and app for now.
+// layout, line 533) stay in the server and app for now. P12 (LDAP-01): the
+// LDAP binding over access/core/ldap, through which the descriptor writes
+// the connections the Access LDAP API serves.
 //
 // # Testing
 //
@@ -116,6 +120,8 @@
 //   - TestUnitStoreBindings: Keys, Identity, Projects, AnonymousAccess and
 //     Restrictions, through API and the store-only constructors, return the
 //     store's answers and its errors as it gave them.
+//   - TestUnitLDAPBinding: API().LDAP and LDAPSettingsOf plan, apply and
+//     list through access/core/ldap, inside the caller's transaction.
 //   - TestUnitItemGrants, TestUnitAccessChange: the scans' target order and
 //     paging, their error texts, and AccessChange at exactly its limit and
 //     one past it.

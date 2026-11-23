@@ -65,6 +65,14 @@ password. Configuration storage is unchanged. The [transport contract](../../imp
 records the supported exchange and explicit limits; P12/#1836 gives `redirectedToHosts`
 its scoped redirect-credential effect, and replication's separate consumer is tracked by #1848.
 
+LDAP-01 ([#1832](https://github.com/weaveplatform/artifactweave/issues/1832)) applies
+`security.ldapSettings` through PATCH, config apply and the bootstrap descriptor, writing through the access module's
+LDAP service rather than its own copy of the rules, so the descriptor and
+`/access/api/v1/ldap/settings` read back one connection. Its entries change field by field
+and are validated with the rest of the document before any write; an entry set to null
+deletes a connection; the whole-section null is refused as for `mailServer`. The XML export
+lists the connections without their manager passwords.
+
 ## Rationale
 
 The Artifactory descriptor is the format Artifactory users already have in version
@@ -90,6 +98,15 @@ allowing the descriptor's looser, JFrog-defined schema.
   `config apply` prints what it created, updated, deleted and left unchanged.
 - `config apply` is idempotent and reports a diff; it is safe in a CI job.
 - Secrets in descriptors are sealed on write ([0017](0017-sealed-columns-and-master-key.md)).
+- Proxy and property-set documents are validated after merging and before any
+  patch writes, including secret sealing. Proxy optional fields keep their
+  documented string/boolean types; property-set visibility, property flags and
+  predefined defaults are booleans. Property definitions and predefined-value
+  objects accept only their supported fields, with dynamic property/value names
+  kept as data. Both provider predefined-value maps and YAML lists (strings or
+  `{value, defaultValue}` objects) are accepted. Existing null clearing, omitted
+  fields and explicit false values retain their behavior. An invalid field
+  refuses the whole descriptor, including a dry run ([#1839](https://github.com/weaveplatform/artifactweave/issues/1839)).
 
 ## Verification
 

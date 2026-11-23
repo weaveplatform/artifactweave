@@ -18,6 +18,7 @@ empty plan and destroys it, so a reference that stops working fails the build (s
 | [remote-repositories](terraform/remote-repositories/README.md) | Fourteen remote repository types, a proxy, cache/fetch/auth/header settings and format-specific endpoints; configuration proof separate from native downloads | `url`, `access_token`, `upstream_urls`, proxy and test/production credentials |
 | [virtual-repositories](terraform/virtual-repositories/README.md) | A virtual repository of each of the 33 types with an `artifactory_virtual_<type>_repository` resource, each over a local and a remote member and deploying to the local one, with every virtual field set away from its default, and the GPG and RSA key pairs they sign with (`artifactory_keypair`); configuration proof separate from virtual resolution | `url`, `access_token`, `upstream_url`, two GPG key pairs and an RSA key pair |
 | [projects](terraform/projects/README.md) | Projects, members, roles, an environment, synchronous repository attachment, standard shares and hard/soft quotas, verified through real content effects and revocation | `url`, `access_token`, `user_password` |
+| [configuration](terraform/configuration/README.md) | An authenticated outbound proxy and a property set with selection flags and predefined defaults | `url`, `access_token`, `proxy_host` |
 
 Every name a reference creates (repository keys, users, groups, permissions, OIDC providers)
 is an input with a default you can keep or change. Each README follows

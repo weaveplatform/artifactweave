@@ -18,8 +18,8 @@
 //   - Parse: a YAML document and a lookup for its ${NAME} references.
 //   - Deps, which Apply and NewAPI take: the unit of work (platform/tx), the
 //     artifacts module's Repositories and Layouts, the configuration
-//     document port (platform/configdoc) and access's AnonymousAccess, all
-//     over one store.
+//     document port (platform/configdoc) and access's AnonymousAccess and
+//     LDAPSettings, all over one store.
 //   - DownloadRedirectMinSize: the configuration document port.
 //
 // # Outputs
@@ -50,6 +50,12 @@
 //   - Parse before key or store: Parse reads none of Deps, so config apply
 //     refuses a broken descriptor before it builds the keyring or opens the
 //     store, and that error is reported ahead of a key or database error.
+//   - security.ldapSettings entries map their camelCase fields explicitly to
+//     access's LDAPChange and are planned and written through access's
+//     LDAPSettings, the service behind /access/api/v1/ldap/settings, so the
+//     two surfaces share one connection; access's refusals are reported with
+//     the descriptor's field names, and the export never carries a manager
+//     password.
 //   - Parsing is strict: an unset ${NAME}, a section artifactweave does not
 //     apply, an unknown field and a null on a field that is not a string are
 //     refused, so a pipeline never takes a 200 for settings that changed
@@ -89,6 +95,8 @@
 // export with current authority rechecks and a guarded transaction snapshot.
 // PRJ-04 adds the documented singleton mailServer settings for quota delivery,
 // with its password separated before persistence and guarded configuration reads.
+// LDAP-01 adds security.ldapSettings through access's LDAPSettings, with the
+// connections in the XML export's security element.
 //
 // # Testing
 //
@@ -109,4 +117,7 @@
 //   - redirect_test.go: downloadRedirectConfig and DownloadRedirectMinSize.
 //   - mail_test.go: singleton mail settings, secret retention/clearing, no-op
 //     enablement, validation, dry-run and enclosing transaction rollback.
+//   - ldap_test.go: every ldapSettings field mapped, outcomes through
+//     access's binding with a dry run and a second apply, a missing binding,
+//     planning and write failures, and the export's element order.
 package descriptor

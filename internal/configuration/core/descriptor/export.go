@@ -51,7 +51,8 @@ type exportDocument struct {
 }
 
 type exportSecurity struct {
-	Anonymous bool `xml:"anonAccessEnabled"`
+	Anonymous bool           `xml:"anonAccessEnabled"`
+	LDAP      []exportFields `xml:"ldapSettings>ldapSetting"`
 }
 
 type exportFields struct {
@@ -179,8 +180,9 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 			entry := exportFields{Fields: []exportField{{Name: section.identity, Text: doc.Key}}}
 			for _, key := range section.fields {
 				if value, present := fields[key]; present {
-					// The pinned proxy provider sends comma-delimited scalar strings. YAML
-					// descriptors may also supply lists; both have the same XML projection.
+					// Writes accept only the comma-delimited strings that the pinned
+					// provider sends (#1839); documents stored before then may hold
+					// lists, which get the same XML projection.
 					if key == "services" || key == "redirectedToHosts" {
 						value = commaList(value)
 					}
@@ -193,12 +195,8 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 			*section.target = append(*section.target, entry)
 		}
 	}
-	out.Security.Anonymous, err = d.AnonymousAccess.Enabled(ctx)
-	if errors.Is(err, kernel.ErrNotFound) {
-		err = nil
-	}
-	if err != nil {
-		return out, fmt.Errorf("read export anonymous access: %w", err)
+	if out.Security, err = readExportSecurity(ctx, d); err != nil {
+		return out, err
 	}
 	for _, section := range []struct {
 		kind   configdoc.ConfigKind

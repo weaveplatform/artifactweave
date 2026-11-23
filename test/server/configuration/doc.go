@@ -38,7 +38,11 @@
 //     (system_health_test.go); an administrator reads the instance id that
 //     jf rt atc --grant-admin builds its scope from (service_id_test.go);
 //     the descriptor PATCH applies, refuses and reports as Artifactory does
-//     (descriptor_test.go).
+//     (descriptor_test.go); security.ldapSettings and the Access LDAP API
+//     read back each other's connections, field-by-field changes keep the
+//     sealed password, the export omits it, refused or failing descriptors
+//     write nothing, and SQLite and PostgreSQL keep the password sealed to
+//     its row and across a reopened store (ldap_test.go, #1832).
 //
 // # References
 //

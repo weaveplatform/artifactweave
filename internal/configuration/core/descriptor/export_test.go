@@ -108,7 +108,7 @@ proxies:
     host: proxy.invalid
     port: 3128
     password: ${PROXY_PASSWORD}
-    services: [jfrt, jfxr]
+    services: jfrt,jfxr
     redirectedToHosts: one.invalid,two.invalid
 propertySets:
   'set <>&':
@@ -451,6 +451,27 @@ func TestUnitExportRepositoryXMLNamesAndCollections(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUnitExportLegacyProxyServiceList(t *testing.T) {
+	db := inmem.New()
+	// Older writes accepted lists here. The XML projection still reads them
+	// although new writes follow ProxyType's xs:string/provider string field.
+	legacy := configdoc.ConfigDocument{
+		Kind: configdoc.ConfigProxy, Key: "legacy-services", Enabled: true,
+		Document: []byte(`{"host":"proxy.invalid","port":3128,"services":["jfrt","jfxr"]}`),
+	}
+	if err := db.Configs().Put(t.Context(), legacy); err != nil {
+		t.Fatal(err)
+	}
+	node, _ := exportXML(t, depsOf(t, db))
+	if got := xmlText(t, node, "proxies/proxy/services"); got != "jfrt,jfxr" {
+		t.Fatalf("legacy services projection = %q", got)
+	}
+	after, err := db.Configs().Get(t.Context(), legacy.Kind, legacy.Key)
+	if err != nil || !slices.Equal(after.Document, legacy.Document) {
+		t.Fatal("reading legacy proxy services rewrote stored data", err)
 	}
 }
 

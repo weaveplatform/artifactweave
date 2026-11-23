@@ -5,7 +5,7 @@
 artifactweave, with the real `jfrog/artifactory`, `jfrog/platform` and `jfrog/project` providers. The
 scenarios, and how to apply one to your own instance, are described in
 [Managing artifactweave with Terraform](../../deploy/artifactweave/README.md). This directory
-holds only the driver.
+holds the driver and runtime assertion helpers; consumer Terraform stays under `deploy/`.
 
 The `terraform` CI job runs every scenario in the Makefile's `TERRAFORM_SCENARIOS`, and so does
 `make terraform` locally:
@@ -84,6 +84,15 @@ secret redaction, checks that persistent data contains no plaintext fixture cred
 and destroys the resources. It seeds/removes its proxy through the YAML descriptor;
 provider `artifactory_proxy` CRUD depends on the XML reads owned by P12/#303. Its endpoints belong to the controlled fixture server. It
 proves management only; native content adapters have separate client acceptance scenarios.
+
+The required `configuration` reference in `deploy/artifactweave/terraform` manages only pinned
+`artifactory_proxy` and `artifactory_property_set` resources. It creates, updates,
+refreshes, requires empty plans, clears the optional proxy password, and destroys
+both resources on the driver's own temporary server and state. Actual server passwords and
+sealed-row presence/absence are checked with `tools/configurationproof`; Terraform state
+alone cannot prove password preservation or clearing. XML descriptor GET
+is a required dependency; missing XML fails conformance. The full seven-resource
+P12 qualification remains #1837.
 
 The virtual-repositories scenario applies all 33 provider virtual resources, each over a local
 and a remote member, with every virtual field set away from its default. It applies two

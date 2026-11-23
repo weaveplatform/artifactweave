@@ -38,7 +38,9 @@ On read, each endpoint applies the masking rule the research records for it: rep
 configuration returns the password field masked. Artifactory XML returns encrypted
 password tokens; CFG-01 deliberately omits credentials instead of inventing portable
 vendor ciphertext. The pinned proxy and mail provider readers retain the configured
-Terraform password without reading it back (research 06). Sensitive repository headers
+Terraform password without reading it back (research 06), and so does
+`artifactory_ldap_setting_v2` for the LDAP manager password, which no LDAP read or export
+returns (research 05, "LDAP connections"). Sensitive repository headers
 retain their identity and sensitivity with no value. Webhook secrets are redacted, key pair reads omit the
 private key, the peer private key and the bundle signing keys are never returned by any
 endpoint, and worker secrets are listed by name only. Pairing tokens are not stored: only
