@@ -32,3 +32,23 @@ func (b ldapSettings) Plan(ctx context.Context, changes []accessapi.LDAPChange) 
 func (b ldapSettings) Apply(ctx context.Context, changes []accessapi.LDAPChange) ([]accessapi.LDAPResult, error) {
 	return b.svc().Apply(ctx, changes) //nolint:wrapcheck // the service's errors are the contract's
 }
+
+var _ accessapi.LDAPGroupSettings = ldapSettings{}
+
+func (b ldapSettings) GroupSettings(ctx context.Context) ([]accessapi.LDAPGroupSetting, error) {
+	return b.svc().GroupSettings(ctx) //nolint:wrapcheck // the service's errors are the contract's
+}
+
+func (b ldapSettings) PlanGroups(
+	ctx context.Context,
+	changes []accessapi.LDAPGroupChange,
+) ([]accessapi.LDAPResult, error) {
+	return b.svc().PlanGroups(ctx, changes) //nolint:wrapcheck // the service's errors are the contract's
+}
+
+func (b ldapSettings) ApplyGroups(
+	ctx context.Context,
+	changes []accessapi.LDAPGroupChange,
+) ([]accessapi.LDAPResult, error) {
+	return b.svc().ApplyGroups(ctx, changes) //nolint:wrapcheck // the service's errors are the contract's
+}

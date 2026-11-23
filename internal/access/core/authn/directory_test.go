@@ -27,6 +27,18 @@ type fakeDirectory struct {
 	// beforePublish runs after Login answers, before publication: the
 	// window in which a connection can change while the directory answered.
 	beforePublish func()
+	// published records PublishGroups' calls; onPublish runs in them, in
+	// the publication's transaction, and its error is theirs.
+	published []DirectoryGroups
+	onPublish func(ctx context.Context, name string) error
+}
+
+func (d *fakeDirectory) PublishGroups(ctx context.Context, name string, groups DirectoryGroups) error {
+	d.published = append(d.published, groups)
+	if d.onPublish != nil {
+		return d.onPublish(ctx, name)
+	}
+	return nil
 }
 
 func (d *fakeDirectory) Login(context.Context, string, string) (DirectoryLogin, error) {
@@ -441,4 +453,48 @@ func TestUnitDirectoryPublicationFailures(t *testing.T) {
 			t.Fatalf("Current of a transient user without groups: %v", err)
 		}
 	})
+}
+
+// A fresh login publishes the groups it read inside its publication, and
+// the principal it answers already acts through them; a remembered login,
+// a transient user and a failed publication publish nothing.
+func TestUnitDirectoryPublishesGroups(t *testing.T) {
+	w := newDirectoryWorld(t)
+	ctx := t.Context()
+	if err := w.db.Groups().Create(ctx, model.Group{Name: "devs", Realm: model.RealmLDAP}); err != nil {
+		t.Fatal(err)
+	}
+	w.dir.login.Groups = &DirectoryGroups{Names: []string{"devs"}, Revision: [32]byte{7}}
+	w.dir.onPublish = func(ctx context.Context, name string) error {
+		return w.db.Groups().AddMembers(ctx, "devs", name)
+	}
+	p, err := w.a.Basic(ctx, "alice", "directory-pw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(p.Groups, []string{"devs", "everyone"}) || len(w.dir.published) != 1 ||
+		w.dir.published[0].Revision != [32]byte{7} {
+		t.Fatalf("principal %+v, published %+v", p, w.dir.published)
+	}
+	// A failed publication refuses the login and stores nothing of it.
+	w.dir.onPublish = func(context.Context, string) error { return errPublish }
+	if _, err := w.a.Basic(ctx, "carol", "directory-pw"); !errors.Is(err, errPublish) {
+		t.Fatalf("failed publication: %v", err)
+	}
+	if _, ok := w.user(t, "carol"); ok {
+		t.Fatal("a failed publication stored its user")
+	}
+	// Remembered logins and transient users publish nothing.
+	w.dir.onPublish = nil
+	w.dir.login.Groups = nil
+	if _, err := w.a.Basic(ctx, "alice", "directory-pw"); err != nil {
+		t.Fatal(err)
+	}
+	w.dir.login.Groups, w.dir.login.AutoCreate = &DirectoryGroups{Names: []string{"devs"}}, false
+	if _, err := w.a.Basic(ctx, "dave", "directory-pw"); err != nil {
+		t.Fatal(err)
+	}
+	if len(w.dir.published) != 2 {
+		t.Fatalf("published %d times, want 2 (alice, then carol's failure)", len(w.dir.published))
+	}
 }

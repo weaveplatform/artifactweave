@@ -332,9 +332,26 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
   is reported as updated or unchanged. `passwordSettings.resetPolicy`, which 7.161.26's
   XSD keeps, is not in the YAML page and answers 400 as an unknown field. Turning the lock
   policy off clears every lock, as the REST API does.
+- `security.ldapGroupSettings` (LDAP-03,
+  [#1834](https://github.com/weaveplatform/artifactweave/issues/1834)) writes the group
+  settings the Access API serves at `/access/api/v1/ldap/groups`, through the access
+  module, so each surface reads back what the other wrote. Entries are keyed by name with
+  `LdapGroupSetting`'s fields `name, groupBaseDn, groupNameAttribute,
+  groupMemberAttribute, subTree, filter, descriptionAttribute, strategy, enabledLdap,
+  forceAttributeSearch`; a `name` other than the key answers 400. A new entry starts from
+  `LdapGroupSetting`'s defaults and a stored one keeps what the document omits; an entry
+  set to `null` deletes it, a `null` string field clears it, and a value the Access API
+  would refuse answers 400 naming `security.ldapGroupSettings.<name>` and the field. Unlike
+  `ldapSettings`, the whole section set to `null` deletes every group setting **[I]**: the
+  pinned `artifactory_ldap_group_setting` deletes one setting by sending exactly that and
+  then the settings it keeps, so refusing it would leave the resource unable to delete.
+  The groups imported through a deleted setting stay. The XML export writes
+  `<ldapGroupSettings><ldapGroupSetting>` after `ldapSettings` in `LdapGroupSetting`'s
+  element order, with `groupBaseDn` and `enabledLdap` always present (their default is
+  `""`) and the other empty strings left out.
 - The other documented security fields answer 400 with their own reason, before anything
   is written: `anonAccessToBuildInfosDisabled` is deprecated since 6.6 and not applied,
-  `ldapGroupSettings` arrives with LDAP-03, and `crowdSettings`, `samlSettings`,
+  and `crowdSettings`, `samlSettings`,
   `oauthSettings` and `httpSsoSettings` with P21 (decision
   [0019](decisions/0019-human-authentication-tiers.md)). The internal password switch is
   in neither the YAML page nor the XSD, so it is not a descriptor field.
@@ -403,7 +420,7 @@ Configuration"). It is accepted by `PATCH` and absent from the XML descriptor.
 | `replicationsConfig` | `blockPullReplications, blockPushReplications` |
 | `systemMessageConfig` | `enabled, message, title, titleColor` |
 | `repoLayouts.<name>` | `artifactPathPattern, distinctiveDescriptorPathPattern, descriptorPathPattern, folderIntegrationRevisionRegExp, fileIntegrationRevisionRegExp` (field names from the XSD; the YAML page does not list them). The `artifactory_repository_layout` resource also sends `name`, repeating the entry key ([S] provider 12.11.14 [`resource_artifactory_repository_layout.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_repository_layout.go)) |
-| `security` | `anonAccessEnabled, anonAccessToBuildInfosDisabled (deprecated), userLockPolicy{enabled, loginAttempts}, passwordSettings{encryptionPolicy: REQUIRED\|SUPPORTED\|UNSUPPORTED, expirationPolicy{enabled, passwordMaxAge, notifyByEmail}}, ldapSettings.<key>{key, ldapUrl, emailAttribute, ldapPoisoningProtection, allowUserToAccessProfile, search{managerDn, managerPassword, searchBase, searchFilter, searchSubTree}, userDnPattern, autoCreateUser, enabled, pagingSupportEnabled}, ldapGroupSettings.<name>{enabledLdap, filter, groupBaseDn, groupMemberAttribute, groupNameAttribute, strategy: STATIC\|DYNAMIC\|HIERARCHY, subTree}, crowdSettings{...}, samlSettings{...}, oauthSettings{enableIntegration, persistUsers, allowUserToAccessProfile, oauthProvidersSettings.<name>{providerType: github\|openId\|google\|cloudfoundry, ...}}, httpSsoSettings{httpSsoProxied, remoteUserRequestVariable, allowUserToAccessProfile, noAutoUserCreation, syncLdapGroups}` |
+| `security` | `anonAccessEnabled, anonAccessToBuildInfosDisabled (deprecated), userLockPolicy{enabled, loginAttempts}, passwordSettings{encryptionPolicy: REQUIRED\|SUPPORTED\|UNSUPPORTED, expirationPolicy{enabled, passwordMaxAge, notifyByEmail}}, ldapSettings.<key>{key, ldapUrl, emailAttribute, ldapPoisoningProtection, allowUserToAccessProfile, search{managerDn, managerPassword, searchBase, searchFilter, searchSubTree}, userDnPattern, autoCreateUser, enabled, pagingSupportEnabled}, ldapGroupSettings.<name>{name, groupBaseDn, groupNameAttribute, groupMemberAttribute, subTree, filter, descriptionAttribute, strategy: STATIC\|DYNAMIC\|HIERARCHICAL, enabledLdap, forceAttributeSearch}, crowdSettings{...}, samlSettings{...}, oauthSettings{enableIntegration, persistUsers, allowUserToAccessProfile, oauthProvidersSettings.<name>{providerType: github\|openId\|google\|cloudfoundry, ...}}, httpSsoSettings{httpSsoProxied, remoteUserRequestVariable, allowUserToAccessProfile, noAutoUserCreation, syncLdapGroups}` |
 | `localRepositories.<key>` | `type, checksumPolicyType, repoLayout, snapshotVersionBehavior, xray{enabled}, downloadRedirect{enabled}, blackedOut, handleReleases, handleSnapshots, includesPattern, excludesPattern, propertySets, yumGroupFileNames, primaryKeyPairDescriptor, secondaryKeyPairRef, ...`; `type` includes `terraformbe` for Terraform backend repositories |
 | `remoteRepositories.<key>` | the local keys plus `url, username, password, proxy, socketTimeoutMillis, assumedOfflinePeriodSecs, retrievalCachePeriodSecs, missedRetrievalCachePeriodSecs, bower, cocoaPods{cocoaPodsSpecsRepoUrl}, nuget, helm, composer, vcs, externalDependencies, contentSynchronisation`; `remoteRepoLayout` in JFrog support's YAML ([research 03](03-repository-configuration-model.md#json-and-yaml-name-differences)) |
 | `virtualRepositories.<key>` | `repositories[], includesPattern, excludesPattern, p2{urls[]}, keyPair, virtualCacheConfig{virtualRetrievalCachePeriodSecs}, forceMavenAuthentication` |
@@ -573,8 +590,8 @@ cannot be deleted, so the settings stay as last applied.
   `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`, `gcConfig`,
   `quotaConfig`, `trashcanConfig`, `downloadRedirectConfig`, `mailServer`, `urlBase`,
   `backups`, `systemMessageConfig`, the `security.anonAccessEnabled` setting, the
-  `security.userLockPolicy` and `security.passwordSettings` policies and the
-  `security.ldapSettings` connections
+  `security.userLockPolicy` and `security.passwordSettings` policies, the
+  `security.ldapSettings` connections and the `security.ldapGroupSettings` group settings
   (`internal/configuration/core/descriptor`). Download redirect configuration applies
   the whole-MB `fileMinimumSize` setting used by CDN/storage redirects
   ([research 19](19-cdn-and-download-redirect.md#5-artifactweave-today)). Artifactory
@@ -583,7 +600,7 @@ cannot be deleted, so the settings stay as last applied.
   with any other top-level section answers 400 naming each such section and listing the
   supported sections, and changes nothing. The check runs before `${NAME}` references are resolved, so the
   error names the section rather than a variable inside it. The other sections arrive with
-  their features: `security.ldapGroupSettings` in P12
+  their features
   ([plan](../implementation/plan.md)). Stored federated repository configuration does
   not establish P13 peer synchronization. P36 completes scheduled backup and migration workflows;
   human identity settings follow P21/P22, and product settings follow their owners in the

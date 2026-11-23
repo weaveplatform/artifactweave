@@ -1,6 +1,7 @@
 // Package ldap is the access module's LDAP client: it checks a user's
-// password against a directory, and tests a connection's settings for the
-// Access API, over github.com/go-ldap/ldap/v3.
+// password against a directory, tests a connection's settings for the
+// Access API, and finds users and reads LDAP groups for group
+// synchronisation, over github.com/go-ldap/ldap/v3.
 //
 // # Role
 //
@@ -49,7 +50,7 @@
 // # References
 //
 //   - Research 05: docs/research/05-platform-identity-and-security-apis.md,
-//     "LDAP connections" and "LDAP login".
+//     "LDAP connections", "LDAP login" and "LDAP groups".
 //   - Decision 0019:
 //     docs/research/decisions/0019-human-authentication-tiers.md.
 //   - Decision 0044:
@@ -59,12 +60,14 @@
 //     tree", line 298, and "Access and identity", line 557.
 //   - Plan:
 //     docs/implementation/plan.md#p12-descriptor-export-system-configuration-ldap.
-//   - https://github.com/weaveplatform/artifactweave/issues/1833
+//   - https://github.com/weaveplatform/artifactweave/issues/1833 and
+//     https://github.com/weaveplatform/artifactweave/issues/1834
 //
 // # Status
 //
-// Implemented P12 (LDAP-02, #1833): password checks and connection tests.
-// Group synchronisation is LDAP-03 (#1834).
+// Implemented P12: password checks and connection tests (LDAP-02, #1833);
+// user lookups and group reads by STATIC, DYNAMIC and HIERARCHICAL
+// strategy (LDAP-03, #1834), in groups.go.
 //
 // # Testing
 //
@@ -76,6 +79,20 @@
 //     certificate, plain LDAP to the TLS port), TestAccDirectoryTest (the
 //     manager bind, a missing base and an unreachable server) and
 //     TestAccDirectoryCancellation.
+//   - groups_test.go, against the same container with
+//     accesstest.SeedDirectoryGroups: TestAccDirectoryGroups (Lookup by DN
+//     pattern and search, every group a setting selects, a user's groups by
+//     STATIC, DYNAMIC and HIERARCHICAL, a nesting loop, the Entra ID match
+//     rule, a refused filter, a missing base and an unreachable server).
+//   - publication_test.go and group_publication_test.go run the real
+//     directory over the SQLite and PostgreSQL stores:
+//     TestAccLDAPLoginPublication (a login whose connection is disabled,
+//     changed or deleted while the directory answered stores nothing) and
+//     TestAccLDAPGroupPublication (a refresh racing a deleted or changed
+//     group setting, or a store failing part-way, publishes no group and no
+//     membership; one racing nothing publishes them all and keeps local
+//     memberships; a login racing a setting change stands without its
+//     groups; no store or error holds the manager password).
 //   - fault_test.go runs against an in-process server that answers
 //     scripted BER: TestUnitDirectoryFaults (malformed answers, a silent
 //     server and TLS handshake, cancellation, referrals, refused filters and

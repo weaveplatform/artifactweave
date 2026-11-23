@@ -56,12 +56,42 @@ type Connection struct {
 	Revision        string
 }
 
-// Snapshot is every connection, by key, read in one guarded transaction,
-// with a revision that changes whenever any connection's does or one is
-// added or removed.
+// GroupSetting is one group setting as a sync reads it, with the revision
+// that changes on every write of it.
+type GroupSetting struct {
+	accessapi.LDAPGroupSetting
+	Revision string
+}
+
+// Snapshot is every connection, by key, and every group setting, by name,
+// read in one guarded transaction, with a revision that changes whenever
+// any of them does or one is added or removed.
 type Snapshot struct {
 	Revision    string
 	Connections []Connection
+	Groups      []GroupSetting
+}
+
+// GroupSetting returns the group setting named name.
+func (s Snapshot) GroupSetting(name string) (GroupSetting, bool) {
+	for _, g := range s.Groups {
+		if g.Name == name {
+			return g, true
+		}
+	}
+	return GroupSetting{}, false
+}
+
+// GroupsOf returns the group settings that read their groups through the
+// connection key, by name.
+func (s Snapshot) GroupsOf(key string) []GroupSetting {
+	var out []GroupSetting
+	for _, g := range s.Groups {
+		if g.EnabledLDAP == key {
+			out = append(out, g)
+		}
+	}
+	return out
 }
 
 // Connection returns the connection named key.
@@ -99,13 +129,19 @@ func (s Service) Snapshot(ctx context.Context) (Snapshot, error) {
 	if s.Tx == nil || s.Guard == nil {
 		return Snapshot{}, fmt.Errorf("%w: %w", errNoSnapshot, kernel.ErrStore)
 	}
-	var all []stored
+	var (
+		all    []stored
+		groups []storedGroup
+	)
 	err := s.Tx.Tx(ctx, func(ctx context.Context) error {
 		if err := s.Guard(ctx); err != nil {
 			return fmt.Errorf("ldap: guard snapshot: %w", err)
 		}
 		var err error
-		all, err = s.all(ctx)
+		if all, err = s.all(ctx); err != nil {
+			return err
+		}
+		groups, err = s.allGroups(ctx)
 		return err
 	})
 	if err != nil {
@@ -120,6 +156,12 @@ func (s Service) Snapshot(ctx context.Context) (Snapshot, error) {
 		out.Connections = append(out.Connections, Connection{
 			LDAPConnection: st.conn, ManagerPassword: Secret{st.password}, Revision: st.revision,
 		})
+	}
+	for _, g := range groups {
+		// The g marker keeps a group setting from colliding with a
+		// connection of the same name.
+		_, _ = h.Write([]byte("g\x00" + g.setting.Name + "\x00" + g.revision + "\x00"))
+		out.Groups = append(out.Groups, GroupSetting{LDAPGroupSetting: g.setting, Revision: g.revision})
 	}
 	out.Revision = hex.EncodeToString(h.Sum(nil))
 	return out, nil

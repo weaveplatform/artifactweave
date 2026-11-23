@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
@@ -41,6 +42,10 @@ type LoginOptions struct {
 	// Log receives the directory failures, by connection key and step,
 	// never a password; nil means slog.Default().
 	Log *slog.Logger
+	// Users and Groups hold the local identities whose LDAP memberships a
+	// fresh login publishes; without them a login reads no groups.
+	Users  port.UserStore
+	Groups port.GroupStore
 }
 
 // Logins checks passwords against the enabled LDAP connections for the
@@ -55,6 +60,8 @@ type Logins struct {
 	now       func() time.Time
 	log       *slog.Logger
 	cache     *loginCache
+	users     port.UserStore
+	groups    port.GroupStore
 }
 
 var _ authn.Directory = (*Logins)(nil)
@@ -79,6 +86,7 @@ func NewLogins(settings Service, directory Directory, o LoginOptions) *Logins {
 	return &Logins{
 		settings: settings, directory: directory, ttl: o.TTL, now: o.Now, log: o.Log,
 		cache: &loginCache{max: o.CacheSize, salt: salt, m: map[[32]byte]cachedLogin{}},
+		users: o.Users, groups: o.Groups,
 	}
 }
 
@@ -140,7 +148,9 @@ func (l *Logins) Login(ctx context.Context, name, password string) (authn.Direct
 			l.cache.put(key, cachedLogin{
 				conn: c.Key, proof: Proof(c.Key, c.Revision, name), email: entry.Email, expires: now.Add(l.ttl),
 			})
-			return login(st, name, entry.Email, true), nil
+			out := login(st, name, entry.Email, true)
+			out.Groups = l.loginGroups(ctx, snap, c, name, entry.DN)
+			return out, nil
 		case errors.Is(err, ErrUnknownUser), errors.Is(err, ErrRefused):
 			refused = true
 		default:
@@ -178,6 +188,67 @@ func (l *Logins) Current(ctx context.Context, name string, proof [32]byte) (auth
 		}
 	}
 	return authn.DirectoryLogin{}, kernel.ErrBadCredentials
+}
+
+// loginGroups reads the user's groups through every group setting of the
+// connection that accepted the login, as 7.x's LDAP login populates them.
+// A failure leaves the memberships as they are rather than refusing a
+// password the directory accepted: the next fresh login reads them again.
+func (l *Logins) loginGroups(ctx context.Context, snap Snapshot, c Connection, name, dn string) *authn.DirectoryGroups {
+	if l.users == nil || l.groups == nil {
+		return nil
+	}
+	names, err := DirectoryMemberships(ctx, l.directory, snap, c, name, dn)
+	if err != nil {
+		l.log.WarnContext(ctx, "LDAP login could not read the user's groups; memberships unchanged",
+			"connection", c.Key, "error", err.Error())
+		return nil
+	}
+	return &authn.DirectoryGroups{Names: names, Revision: groupsRevision(c.Key, c.Revision, snap.GroupsOf(c.Key))}
+}
+
+// groupsRevision binds the groups a login read to the connection and to the
+// group settings, with their revisions, that it read them through.
+func groupsRevision(key, revision string, groups []GroupSetting) [32]byte {
+	h := sha256.New()
+	_, _ = h.Write([]byte("ldap-groups\x00" + key + "\x00" + revision + "\x00"))
+	for _, g := range groups {
+		_, _ = h.Write([]byte(g.Name + "\x00" + g.Revision + "\x00"))
+	}
+	var out [32]byte
+	h.Sum(out[:0])
+	return out
+}
+
+// PublishGroups implements authn.Directory. It recomputes the revision from
+// the settings in ctx's transaction, which holds the administration guard
+// every settings write holds, so groups read under settings changed since
+// are never published.
+func (l *Logins) PublishGroups(ctx context.Context, name string, groups authn.DirectoryGroups) error {
+	if l.users == nil || l.groups == nil {
+		return nil
+	}
+	all, err := l.settings.all(ctx)
+	if err != nil {
+		return err
+	}
+	settings, err := l.settings.allGroups(ctx)
+	if err != nil {
+		return err
+	}
+	snap := Snapshot{}
+	for _, g := range settings {
+		snap.Groups = append(snap.Groups, GroupSetting{LDAPGroupSetting: g.setting, Revision: g.revision})
+	}
+	for _, st := range all {
+		if !st.conn.Enabled || groupsRevision(st.conn.Key, st.revision, snap.GroupsOf(st.conn.Key)) != groups.Revision {
+			continue
+		}
+		_, err := PublishMemberships(ctx, l.users, l.groups, name, groups.Names)
+		return err
+	}
+	l.log.InfoContext(ctx, "LDAP settings changed during a login; its groups were not published", "user", name)
+	return nil
 }
 
 // Enabled implements authn.Directory: whether any connection is enabled.

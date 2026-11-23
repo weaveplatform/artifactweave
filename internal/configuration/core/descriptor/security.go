@@ -29,7 +29,6 @@ const (
 // told why rather than that the field is unknown. Nothing of them is stored.
 var securityUnsupported = map[string]string{
 	"anonAccessToBuildInfosDisabled": "is deprecated since Artifactory 6.6 and not applied",
-	"ldapGroupSettings":              "is not applied yet; LDAP group settings arrive with LDAP-03",
 	"crowdSettings":                  "is not applied; Crowd login is planned for P21",
 	"samlSettings":                   "is not applied; SAML login is planned for P21",
 	"oauthSettings":                  "is not applied; OAuth login is planned for P21",
@@ -65,7 +64,7 @@ func parseSecurity(top map[string]any, p *Patch) error {
 			return fmt.Errorf("%w: security.%s %s", ErrInvalid, name, reason)
 		}
 	}
-	if bad := unknown(m, []string{"anonAccessEnabled", lockSection, passwordSection, ldapSection}); bad != "" {
+	if bad := unknown(m, []string{"anonAccessEnabled", lockSection, passwordSection, ldapSection, ldapGroupSection}); bad != "" {
 		return fmt.Errorf("%w: security: unknown field %s", ErrInvalid, bad)
 	}
 	if value, present := m["anonAccessEnabled"]; present {
@@ -78,7 +77,10 @@ func parseSecurity(top map[string]any, p *Patch) error {
 	if err := parsePolicies(m, p); err != nil {
 		return err
 	}
-	return parseLDAP(m, p)
+	if err := parseLDAP(m, p); err != nil {
+		return err
+	}
+	return parseLDAPGroups(m, p)
 }
 
 // parsePolicies reads userLockPolicy and passwordSettings. A null anywhere

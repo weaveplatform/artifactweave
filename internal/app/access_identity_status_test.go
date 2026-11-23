@@ -105,7 +105,7 @@ func accessIdentityStatusRows() []statusCase {
 
 		{gCreate, groups, "admin", `{"name":"v2-group","description":"d"}`, 201},
 		{gCreate, groups, "admin", `{"name":"v2-group"}`, 409},
-		{gCreate, groups, "admin", `{"name":"v2-ldap","import_from_ldap_group_setting":"x"}`, 400},
+		{gCreate, groups, "admin", `{"name":"v2-ldap","import_from_ldap_group_setting":"x"}`, 404},
 		{gCreate, groups, "admin", `{"name":"v2-other","members":["absent"]}`, 404},
 		{gCreate, groups, "user", `{"name":"v2-other"}`, 403},
 		{gCreate, groups, "", `{"name":"v2-other"}`, 401},
@@ -122,7 +122,7 @@ func accessIdentityStatusRows() []statusCase {
 		{gPut, groups + "/v2-put", "admin", `{"description":"d","members":["admin"]}`, 201},
 		{gPut, groups + "/v2-put", "admin", `{"name":"v2-put"}`, 200},
 		{gPut, groups + "/v2-put", "admin", `{"name":"other"}`, 400},
-		{gPut, groups + "/v2-put", "admin", `{"import_from_ldap_group_setting":"x"}`, 400},
+		{gPut, groups + "/v2-put", "admin", `{"import_from_ldap_group_setting":"x"}`, 404},
 		{gPut, groups + "/v2-put", "admin", `{"members":["absent"]}`, 404},
 		{gPut, groups + "/v2-put", "user", `{}`, 403},
 		{gPut, groups + "/v2-put", "", `{}`, 401},
@@ -257,10 +257,8 @@ func TestAccReplaceGroupAnswers(t *testing.T) {
 		dirReset = groupJSON("dir", `[]`, `"realm":"ldap","realm_attributes":"ldapGroupName=dir"`,
 			"", [3]bool{})
 		mismatch = accessError("BAD_REQUEST", "the group name in the body must match the path")
-		noLDAP   = accessError(
-			"BAD_REQUEST",
-			"LDAP group import is not available in artifactweave",
-		)
+		// An import names an LDAP group setting; none exists here (#1834).
+		noLDAP    = accessError("NOT_FOUND", "no LDAP group setting has that name")
 		exclusive = accessError("BAD_REQUEST",
 			"members and import_from_ldap_group_setting are mutually exclusive")
 		unknown = accessError("NOT_FOUND", "One or more users in members were not found")
@@ -283,9 +281,9 @@ func TestAccReplaceGroupAnswers(t *testing.T) {
 			withUser,
 		},
 		{put, ops, admin, `{"name":"Ops"}`, 400, mismatch},
-		{put, ops, admin, ldap, 400, noLDAP},
+		{put, ops, admin, ldap, 404, noLDAP},
 		{put, ops, admin, `{"import_from_ldap_group_setting":"corp","members":[]}`, 400, exclusive},
-		{put, fresh, admin, ldap, 400, noLDAP},
+		{put, fresh, admin, ldap, 404, noLDAP},
 		{put, ops, admin, `{"members":["user","nobody"]}`, 404, unknown},
 		{put, fresh, admin, `{"members":["nobody"]}`, 404, unknown},
 		// Neither refusal changed anything.
@@ -343,8 +341,8 @@ func TestAccGroupRoutesKeepTheirAnswers(t *testing.T) {
 		},
 		{post, groups, admin, "", 400, accessError("BAD_REQUEST", "can't decode JSON body: EOF")},
 		{
-			post, groups, admin, ldap + `}`, 400,
-			accessError("BAD_REQUEST", "LDAP group import is not available in artifactweave"),
+			post, groups, admin, ldap + `}`, 404,
+			accessError("NOT_FOUND", "no LDAP group setting has that name"),
 		},
 		{post, groups, admin, ldap + `,"members":[]}`, 400, accessError("BAD_REQUEST",
 			"members and import_from_ldap_group_setting are mutually exclusive")},

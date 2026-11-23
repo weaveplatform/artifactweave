@@ -4,8 +4,10 @@
 // revisioned snapshot through which directory clients read them; and the
 // directory logins (Logins) the authenticator asks, which bind through the
 // Directory port and bind each accepted login to the connection revision
-// that accepted it. Group synchronisation (LDAP-03) builds on the same
-// snapshot.
+// that accepted it; and the LDAP group settings both surfaces share
+// (security.ldapGroupSettings and /access/api/v1/ldap/groups), and Sync,
+// which searches, imports and refreshes LDAP groups and their memberships,
+// which a fresh login also publishes, all through the same snapshot.
 //
 // # Role
 //
@@ -27,7 +29,14 @@
 //     the source of random revisions and the settings store whose internal
 //     password switch an enabled connection's write turns off.
 //   - NewLogins: the Service, a Directory and LoginOptions (how long and
-//     how many accepted logins are remembered, the clock and the logger).
+//     how many accepted logins are remembered, the clock, the logger, and
+//     the user and group stores whose memberships a fresh login publishes).
+//   - Sync: the Service, a Directory, the user and group stores, and the
+//     guarded transaction runner of the caller's authority.
+//   - accessapi.LDAPGroupChange: a group setting's fields, applied as
+//     accessapi.LDAPChange's are: CreateGroupSetting and
+//     ReplaceGroupSetting from GroupDefaults, PlanGroups and ApplyGroups
+//     from the stored setting.
 //   - TestConnection: an accessapi.LDAPChange to test, which may leave out
 //     the manager password of the stored connection it names.
 //   - accessapi.LDAPChange: the fields a request or descriptor entry sets.
@@ -50,6 +59,17 @@
 //     the user; otherwise the joined *DirectoryError of the connections
 //     that could not be asked.
 //   - From TestConnection: the Connection to test, with its password.
+//   - accessapi.LDAPGroupSetting, StrategyDefaults (DefaultsOf), and from
+//     Sync the FoundGroups of a search with their GroupStatus, an import's
+//     count and a refresh's Summary, and from FindNamed the NamedGroup
+//     Create a Group imports, which PublishNamed stores only while the
+//     settings it was found through hold; refusals as
+//     *accessapi.LDAPGroupInvalid, ErrGroupSettingExists, ErrNoConnection,
+//     ErrChanged and *UnknownUserError (all kernel.ErrInvalid),
+//     ErrGroupSettingNotFound and ErrGroupNotInDirectory.
+//   - From Logins.Login, the directory groups of a fresh login
+//     (authn.DirectoryGroups), which PublishGroups makes the user's
+//     memberships.
 //   - Refusals as *accessapi.LDAPInvalid (matching kernel.ErrInvalid),
 //     ErrExists (also kernel.ErrInvalid) and ErrNotFound; store failures
 //     wrapped, and kernel.ErrStore for a corrupt document.
@@ -86,6 +106,15 @@
 //     cache) under a salted hash of the name and password, and only while
 //     its connection's revision is current, so a disable, update or delete
 //     ends it at once. Current reads the connections, never the directory.
+//   - Memberships an LDAP group read gives are only ever written in groups
+//     of the ldap realm; other realms' memberships are an administrator's
+//     and stay [I]. Imported groups are lower-case and carry
+//     RealmAttributes (ldapGroupName, groupsStrategy, groupDn).
+//   - Sync asks the directory between two guarded transactions, never in
+//     one; the second rechecks the snapshot revision, which covers every
+//     connection and group setting, and publishes all or nothing. A login's
+//     groups carry the revision of its connection and that connection's
+//     group settings, and PublishGroups writes them only while it holds.
 //   - TestConnection hands a stored connection's password only to a test
 //     of the same key, URL and manager DN, so a test cannot send it to
 //     another server [I].
@@ -93,8 +122,8 @@
 // # References
 //
 //   - Research 05: docs/research/05-platform-identity-and-security-apis.md,
-//     "LDAP connections" (the contract, the defaults and which rules are
-//     local).
+//     "LDAP connections" and "LDAP groups" (the contracts, the defaults and
+//     which rules are local).
 //   - Research 06: docs/research/06-system-configuration-and-descriptor.md,
 //     the security section.
 //   - Decision 0017: docs/research/decisions/0017-sealed-columns-and-master-key.md.
@@ -105,15 +134,16 @@
 //     identity", line 547.
 //   - Plan:
 //     docs/implementation/plan.md#p12-descriptor-export-system-configuration-ldap.
-//   - https://github.com/weaveplatform/artifactweave/issues/1832 and
-//     https://github.com/weaveplatform/artifactweave/issues/1833
+//   - https://github.com/weaveplatform/artifactweave/issues/1832,
+//     https://github.com/weaveplatform/artifactweave/issues/1833 and
+//     https://github.com/weaveplatform/artifactweave/issues/1834
 //
 // # Status
 //
 // Implemented P12: connections, their validation, the sealed manager
 // password and the revisioned Source (LDAP-01, #1832); directory logins and
-// connection tests (LDAP-02, #1833). Planned: group synchronisation
-// (LDAP-03, #1834), which consumes Source.
+// connection tests (LDAP-02, #1833); group settings, their search, import
+// and refresh, and login memberships (LDAP-03, #1834).
 //
 // # Testing
 //
@@ -127,7 +157,15 @@
 // Directory: TestUnitLoginsNoDirectory, TestUnitLoginsAcceptRefuseAndOrder,
 // TestUnitLoginsForgetChangedConnections, TestUnitLoginsExpireAndBound,
 // TestUnitLoginsUnavailable, TestUnitLoginsStoreFailures and
-// TestUnitTestConnection. The real directory is access/adapters/ldap's
+// TestUnitTestConnection. groups_test.go covers the group settings' CRUD,
+// validation, plan and apply, store failures, corrupt documents and the
+// strategy defaults; sync_test.go runs Sync and the login memberships over
+// the application's in-memory store: TestUnitSyncSearchStatuses,
+// TestUnitSyncImport, TestUnitSyncRefresh,
+// TestUnitSyncRefreshPublishesNothingPartial (a setting changed or deleted,
+// a connection changed and a directory failure while the directory
+// answers), TestUnitSyncConnectionGone, TestUnitPublishMemberships and
+// TestUnitLoginsPublishGroups and TestUnitSyncFindNamed. The real directory is access/adapters/ldap's
 // tests. The SQL sealing and the HTTP and descriptor
 // surfaces are proved in test/server/access, test/server/configuration and
 // internal/app.

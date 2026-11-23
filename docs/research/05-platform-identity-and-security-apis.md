@@ -263,7 +263,7 @@ for an unknown member.
 | Method | Path | Status | Notes |
 |---|---|---|---|
 | GET | `/access/api/v2/groups` | 200 | query `limit`, `cursor`, `descendingOrder`, `groupName`, `role`, `resourceType`, `resourceName`, `projectKey`; response `{"groups":[{group_name,uri}],"cursor":"..."}` |
-| POST | `/access/api/v2/groups` | **201** | `members` and `import_from_ldap_group_setting` are mutually exclusive; 409 on conflict; `platform_group` requires 201 |
+| POST | `/access/api/v2/groups` | **201** | `members` and `import_from_ldap_group_setting` are mutually exclusive; 409 on conflict; `platform_group` requires 201; an import is described in [LDAP groups](#ldap-groups) |
 | GET | `/access/api/v2/groups/{name}` | 200 | |
 | PUT | `/access/api/v2/groups/{name}` | **201** or 200 | creates the group (201) or replaces it (200); a body `name` that differs from the path answers 400; a replacement resets every field it leaves out and replaces `members`, keeping `realm` and `realm_attributes` ([replacegroup](https://docs.jfrog.com/administration/reference/replacegroup)) |
 | PATCH | `/access/api/v2/groups/{name}` | 200 | `realm`, `realm_attributes` and `members` are not updatable here |
@@ -474,7 +474,7 @@ padding (`cliSafe`, `internal/auth/token/jwt.go`; decision 0005, "As implemented
 | GET / POST | `/access/api/v1/scim/v2/Users`, `/Groups` | 200 / 201 | read needs admin or `system:identities:r`, write `system:identities:w`; currently 501, P22 ([ADR 0019](decisions/0019-human-authentication-tiers.md)) |
 | GET / PUT / PATCH / DELETE | `/access/api/v1/scim/v2/Users/{id}`, `/Groups/{id}` | 200 / 204 | currently 501, P22 |
 | GET / POST | `/access/api/v1/saml` | 200 | plus `/saml/{name}` and `/saml/general_settings` `{enable,certificateIsPresent}`; currently 501, P21 |
-| GET / POST / PUT | `/access/api/v1/ldap/settings` | 200 / **201** | plus `GET` and `DELETE /settings/{key}` (204); see [LDAP connections](#ldap-connections). `POST /settings/test` (LDAP-02) 204 or 400, see [LDAP login](#ldap-login); `/ldap/groups[/{name}]`, `.../refresh` (LDAP-03) currently 501, P12 |
+| GET / POST / PUT | `/access/api/v1/ldap/settings` | 200 / **201** | plus `GET` and `DELETE /settings/{key}` (204); see [LDAP connections](#ldap-connections). `POST /settings/test` (LDAP-02) 204 or 400, see [LDAP login](#ldap-login); the group settings `/ldap/groups[/{name}]`, `strategy`, `search`, `import` and `{name}/refresh` (LDAP-03), see [LDAP groups](#ldap-groups) |
 | GET / PUT | `/access/api/v1/httpsso`, `/access/api/v1/crowd` | 200 | currently 501, P21 |
 | GET / PUT | `/access/api/v1/config/security/authentication/basic_authentication_enabled` | 200 | `{"enabled":true}`; internal passwords only, see [internal password login](#internal-password-login) |
 | PUT / PATCH | `/access/api/v1/config/security/password_policy` | **204** | `{uppercase,lowercase,digit,special_char,length,not_match_old}`; PUT overwrites all, PATCH is partial; no body |
@@ -604,6 +604,116 @@ Local rules, each **[I]** and listed on [#216](https://github.com/weaveplatform/
   reads each search base when a search is configured, otherwise it only connects. A body
   without `manager_password` uses the stored connection's only when its key, URL and
   manager DN match, so a test cannot send a stored password to another server.
+
+### LDAP groups
+
+Sources: [LDAP](https://docs.jfrog.com/administration/docs/ldap) ("Synchronize LDAP Groups",
+"Group Mapping Strategies", "Importing LDAP Groups", "Configure LDAP Groups with Microsoft
+Entra ID"), [create a group](https://docs.jfrog.com/administration/docs/create-a-group), the
+Access API pages
+[get all](https://docs.jfrog.com/administration/reference/getallldapgroupsettings),
+[create](https://docs.jfrog.com/administration/reference/createldapgroupsettings),
+[update](https://docs.jfrog.com/administration/reference/updateldapgroupsettings),
+[get by name](https://docs.jfrog.com/administration/reference/getldapgroupsettingsbyname),
+[delete](https://docs.jfrog.com/administration/reference/deleteldapgroupsettings),
+[strategy](https://docs.jfrog.com/administration/reference/getldapgroupmappingstrategy),
+[search](https://docs.jfrog.com/administration/reference/searchldapgroups),
+[import](https://docs.jfrog.com/administration/reference/importldapgroups) and
+[refresh](https://docs.jfrog.com/administration/reference/refreshldapgroupsettings), the
+`jfrog/artifactory` provider 12.11.14 `resource_artifactory_ldap_group_setting_v2.go` and
+`resource_artifactory_ldap_group_setting.go`, and the 7.161.26 open source descriptor
+(`LdapGroupSetting.java`, `LdapGroupPopulatorStrategies.java`) and services
+(`RefreshLdapGroupService`, `GroupMappingStrategyService`, `LdapUtils`). Implemented by
+LDAP-03 ([#1834](https://github.com/weaveplatform/artifactweave/issues/1834)).
+
+| Method | Path | Status | Notes |
+|---|---|---|---|
+| GET | `/access/api/v1/ldap/groups` | 200 | every group setting; `[]` when none |
+| POST | `/access/api/v1/ldap/groups` | **201** | the v2 provider posts to the trailing-slash form, checks 201, then refreshes |
+| PUT | `/access/api/v1/ldap/groups` | 200 | the name is in the body; 404 when absent |
+| GET | `/access/api/v1/ldap/groups/{name}` | 200 | 404 when absent, which the provider reads as removed (it also accepts 400) |
+| DELETE | `/access/api/v1/ldap/groups/{name}` | 204 | 404 when absent, which the provider accepts; imported groups stay |
+| GET | `/access/api/v1/ldap/groups/strategy?strategy=` | 200 | `{groupKeyMember,filter,groupNameAttribute,description}` |
+| POST | `/access/api/v1/ldap/groups/search?username=` | 200 | `[{group_name,group_dn,description,required_update}]`; stores nothing |
+| POST | `/access/api/v1/ldap/groups/import` | 204 | `{ldap_group_settings,import_groups}` |
+| POST | `/access/api/v1/ldap/groups/{name}/refresh?operation=&username=` | 200 `text/plain` | `UPDATE`, `IMPORT` or `UPDATE_AND_IMPORT` (the default) |
+
+- **The setting.** `{name,enabled_ldap,group_base_dn,group_name_attribute,
+  group_member_attribute,sub_tree,force_attribute_search,filter,description_attribute,
+  strategy}`, with `LdapGroupSetting`'s defaults: `group_name_attribute` `cn`, `strategy`
+  `STATIC`, the rest empty or false. The strategies are `STATIC`, `DYNAMIC` and
+  `HIERARCHICAL` (`LdapGroupPopulatorStrategies`, both providers' validators). The
+  descriptor's `security.ldapGroupSettings` writes the same settings
+  ([research 06](06-system-configuration-and-descriptor.md#security)).
+- **Strategies.** The LDAP page: STATIC groups list their members' DNs or IDs in the
+  member attribute; DYNAMIC users list their groups' DNs or names (`memberOf`); with
+  HIERARCHICAL the user's DN names the groups, "uid=user1,ou=developers,ou=uk,dc=jfrog,dc=org
+  indicates that user1 belongs to two groups: uk and developers". The strategy defaults
+  are `GroupMappingStrategyService`'s, which answers STATIC's for a value it does not know;
+  the UI sends `hierarchy`.
+- **Statuses.** `RefreshLdapGroupService`: no local group of the name is `DOES_NOT_EXIST`;
+  one whose `realm_attributes` carry another `groupDn=` (or none) is `REQUIRES_UPDATE`;
+  the same DN is `IN_ARTIFACTORY`.
+- **Imported groups.** Realm `ldap`, the name in lower case ("LDAP groups ... are
+  imported in lower case", create a group), `realm_attributes`
+  `ldapGroupName=<name>;groupsStrategy=<STRATEGY>;groupDn=<dn>` (the LDAP page's REST
+  example).
+- **Memberships.** "Once logged-in, you are automatically associated with your LDAP
+  groups"; "Users association to these groups is external and controlled strictly by
+  LDAP". Each fresh login of a directory user reads its groups through every group setting
+  of the connection that accepted it and makes them its memberships in the `ldap`-realm
+  groups (`LdapUtils.populateGroups`); a user the directory no longer finds loses them
+  (`security.ldap.group.policy.cleanOnFail`, on by default). Permissions are read at
+  request time, so a token issued before loses a revoked group's authority at once.
+- **One group by name.** Create a Group's `import_from_ldap_group_setting` names the
+  setting and `name` the directory group, which the directory matches "with its own
+  comparison rule for the group name attribute" (case-insensitive for `cn`); the group is
+  created in the `ldap` realm under the directory's name in lower case, which the response
+  carries, and "LDAP login keeps its members in sync". "The name must identify a single
+  group." Replace or Create a Group accepts the field for an existing group only "when the
+  group was imported from the same LDAP group", keeps its members, and answers 400
+  otherwise; a missing setting or directory group answers 404 (the
+  [creategroup](https://docs.jfrog.com/administration/reference/creategroup) and
+  [replacegroup](https://docs.jfrog.com/administration/reference/replacegroup) pages).
+
+Local rules, each **[I]** and listed on [#216](https://github.com/weaveplatform/artifactweave/issues/216):
+
+- Validation: the name is not empty and has no `/` or control character; the strategy is
+  one of the three; `group_base_dn` is a DN; the attributes are attribute names, the
+  member attribute optionally with an extensible match rule
+  (`member:1.2.840.113556.1.4.1941:`, the Entra ID page's nested-group form, passed to the
+  directory as written); the filter's parentheses balance. A filter without parentheses is
+  wrapped, and an empty one selects every entry.
+- A second `POST` of a name answers 400 and `PUT` replaces from the defaults, as for
+  connections. A search or refresh whose `enabled_ldap` names no enabled connection, or a
+  search for a user no connection finds ("Could not find DN for user"), answers 400, as
+  does a directory failure (`LDAP group search failed: <step>: <reason>`).
+- `force_attribute_search` is stored and returned; artifactweave always names the
+  attributes it reads, so it changes nothing.
+- No strategy follows one group to another: STATIC matches the user's own DN or name,
+  DYNAMIC resolves each value the user lists, HIERARCHICAL reads the DN. Nested groups are
+  the directory's (Entra ID's `msds-memberOfTransitive` or the match rule above), and a
+  nesting loop costs nothing. One search returns at most 10000 groups, and a DYNAMIC user
+  is read for at most 1000 values.
+- A login's memberships change only in groups of the `ldap` realm; memberships an
+  administrator gave in other realms stay. A login whose groups cannot be read still
+  succeeds and leaves its memberships as they were; the next fresh login reads them
+  again. A remembered login (see [LDAP login](#ldap-login)) reads no groups. Users that
+  are not stored (`auto_create_user` false) act in the auto-join groups only.
+- An import is all or nothing and checks each status: `DOES_NOT_EXIST` creates and is
+  refused if the name was taken since, `REQUIRES_UPDATE` takes over the local group of the
+  name (keeping its members), `IN_ARTIFACTORY` is skipped. A refresh imports only names no
+  local group has and never takes over a group of another realm.
+- The refresh asks the directory outside any transaction, then one guarded transaction
+  rechecks the connections' and group settings' revisions and publishes every group and
+  membership together; a setting changed or deleted meanwhile answers 400 or 404 and
+  publishes nothing. Its answer is `Imported <n> LDAP groups, updated <n> and changed the
+  memberships of <n> users`; JFrog documents only that it carries the number imported.
+- Create a Group's import asks the directory the same way and stores the group only while
+  the settings it was found through are unchanged. A name that finds two groups, or one
+  no local group can take, answers 400. The group takes the directory's description
+  unless the request sends one, as an import from the LDAP Groups screen does. A HIERARCHICAL
+  unit without the name attribute is found by its RDN, as a refresh names it.
 
 ### Internal password login
 
