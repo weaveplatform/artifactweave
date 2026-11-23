@@ -257,3 +257,25 @@ type unreadableLDAP struct{ accessapi.LDAPSettings }
 func (unreadableLDAP) Connections(context.Context) ([]accessapi.LDAPConnection, error) {
 	return nil, errBoom
 }
+
+// TestUnitXMLIDLDAPGroupNamesAreNotIDs: an ldapGroupSetting's name is
+// xs:string (LdapGroupSettingType) and 7.161.26's LdapGroupSetting does not
+// mark it @XmlID, so it may repeat any other section's key.
+func TestUnitXMLIDLDAPGroupNamesAreNotIDs(t *testing.T) {
+	db := inmem.New()
+	d := ldapGroupDeps(t, db)
+	if _, err := applyWith(t, d, idEntry(idProxy, "devs"), false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := applyWith(t, d, "security:\n  ldapGroupSettings:\n    devs:\n      enabledLdap: corp\n", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := applyWith(t, d, idEntry(idBackup, "ops")+"security:\n  ldapGroupSettings:\n    ops:\n      enabledLdap: corp\n", false); err != nil {
+		t.Fatal(err)
+	}
+	node, body := exportXML(t, d)
+	if xmlText(t, node, "proxies/proxy[key=devs]/host") != "proxy.example" ||
+		xmlText(t, node, "security/ldapGroupSettings/ldapGroupSetting[name=devs]/enabledLdap") != "corp" {
+		t.Fatal(body)
+	}
+}

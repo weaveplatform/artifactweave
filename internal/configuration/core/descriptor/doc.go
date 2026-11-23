@@ -177,7 +177,8 @@
 //     made through the repositories and LDAP APIs or arriving in one patch,
 //     refused with both entries named and nothing written; the reverse proxy
 //     through POST webServer; keys a patch frees; a clash stored outside the
-//     descriptor left out of the export; and read failures.
+//     descriptor left out of the export; LDAP group names, which are not
+//     IDs, repeating another section's key; and read failures.
 //   - sysmessage_test.go: field merges, clearing, refusals, absence from the
 //     XML, and mailServer deletion with its sealed password.
 //   - ldap_test.go: every ldapSettings field mapped, outcomes through

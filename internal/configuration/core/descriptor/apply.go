@@ -76,21 +76,8 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 	if err != nil {
 		return res, err
 	}
-	var anonymousChanged bool
-	if p.AnonymousAccess != nil {
-		current, err := d.AnonymousAccess.Enabled(ctx)
-		if errors.Is(err, kernel.ErrNotFound) {
-			current, err = false, nil
-		}
-		if err != nil {
-			return res, fmt.Errorf("read security.anonAccessEnabled: %w", err)
-		}
-		anonymousChanged = current != *p.AnonymousAccess
-		if anonymousChanged {
-			res.Updated = append(res.Updated, "security.anonAccessEnabled")
-		} else {
-			res.Unchanged = append(res.Unchanged, "security.anonAccessEnabled")
-		}
+	if err := planAnonymous(ctx, d, p, &res); err != nil {
+		return res, err
 	}
 	if err := planSecurity(ctx, d, p, &res); err != nil {
 		return res, err
@@ -99,15 +86,15 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 	if err != nil {
 		return res, err
 	}
-	// After every section is planned, so the check sees the state the whole
-	// patch leaves, and before the dry run returns, so a dry run refuses it too.
-	if err := checkXMLIDs(ctx, d, repositories, configs, ldap); err != nil {
-		return res, err
-	}
 	if err := planLDAPGroups(ctx, d, p, &res); err != nil {
 		return res, err
 	}
 	if err := planStorage(ctx, d, p, now, &res); err != nil {
+		return res, err
+	}
+	// After every section is planned, so the check sees the state the whole
+	// patch leaves, and before the dry run returns, so a dry run refuses it too.
+	if err := checkXMLIDs(ctx, d, repositories, configs, ldap); err != nil {
 		return res, err
 	}
 	if dryRun {
@@ -177,6 +164,27 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 		return res, fmt.Errorf("apply configuration: %w", err)
 	}
 	return res, nil
+}
+
+// planAnonymous records whether the patch changes the anonymous access
+// switch. A setting that was never written counts as off.
+func planAnonymous(ctx context.Context, d Deps, p *Patch, res *configapi.Result) error {
+	if p.AnonymousAccess == nil {
+		return nil
+	}
+	current, err := d.AnonymousAccess.Enabled(ctx)
+	if errors.Is(err, kernel.ErrNotFound) {
+		current, err = false, nil
+	}
+	if err != nil {
+		return fmt.Errorf("read security.anonAccessEnabled: %w", err)
+	}
+	if current != *p.AnonymousAccess {
+		res.Updated = append(res.Updated, "security.anonAccessEnabled")
+	} else {
+		res.Unchanged = append(res.Unchanged, "security.anonAccessEnabled")
+	}
+	return nil
 }
 
 // planRepos works out the repository changes against the state the patch

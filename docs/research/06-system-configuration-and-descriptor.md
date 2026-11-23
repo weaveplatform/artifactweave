@@ -681,7 +681,9 @@ cannot be deleted, so the settings stay as last applied.
   `UniqueXmlIdValidator` wording ("The ID '%s' is already used.") with the holder. Keys
   compare exactly, as XML IDs do. 7.x's reservation of `direct`, `apache` and `nginx`
   for reverse proxies applies only to its UI's add paths, not to the PATCH, and is not
-  adopted. `ldapGroupSettings` names are `xs:string`, not IDs.
+  adopted. `ldapGroupSettings` names are not IDs: 6.20's XSD types `LdapGroupSettingType.name`
+  `xs:string`, and 7.161.26's `LdapGroupSetting` does not mark it `@XmlID`, so a group setting
+  may repeat any other section's key.
 - **Keys the REST APIs share with the descriptor.** The repositories API and access's
   LDAP settings API check a key only against their own kind, as 7.161.26's do
   (`RepositoryNameRestValidator` consults only the repository store), so they can store
