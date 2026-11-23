@@ -49,7 +49,9 @@ func (b buildStore) DependencyPage(
 	)
 	err := b.s.Do(ctx, func() error {
 		var rows []row
-		runs := b.runs().All(nil, func(x, y model.Build) int { return cmp.Compare(x.ID, y.ID) })
+		// The stored runs, not copies: only the page's references are
+		// copied, below, so a small page does not copy every build.
+		runs := b.runs().Sorted(nil, func(x, y model.Build) int { return cmp.Compare(x.ID, y.ID) })
 		for _, r := range runs {
 			for mi, m := range r.Modules {
 				for fi, f := range m.Dependencies {
@@ -66,7 +68,7 @@ func (b buildStore) DependencyPage(
 			return []any{x.ref.Run.ID, x.module, x.place}
 		})
 		for _, x := range page {
-			out = append(out, x.ref)
+			out = append(out, kernel.Clone(x.ref))
 		}
 		next = cursor
 		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
@@ -88,16 +90,15 @@ func (t trash) BelowByPath(
 		next string
 	)
 	err := t.s.Do(ctx, func() error {
-		rows := t.t().All(func(_ int64, e model.TrashEntry) bool {
+		var err error
+		out, next, err = t.t().Page(func(_ int64, e model.TrashEntry) bool {
 			return below == "/" || strings.HasPrefix(e.TrashPath(), below)
 		}, func(a, b model.TrashEntry) int {
 			return cmp.Or(cmp.Compare(a.TrashPath(), b.TrashPath()), cmp.Compare(a.ID, b.ID))
-		})
-		var err error
-		out, next, err = memtx.Paginate(rows, p, false, func(e model.TrashEntry) []any {
+		}, p, false, func(e model.TrashEntry) []any {
 			return []any{e.TrashPath(), e.ID}
 		})
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

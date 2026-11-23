@@ -15,7 +15,9 @@ import (
 func (r repos) Page(ctx context.Context, l port.RepoListing) (port.RepoPage, error) {
 	var out port.RepoPage
 	err := r.s.Do(ctx, func() error {
-		all := r.t().All(func(_ string, c repo.Config) bool { return listed(l, c) }, compareRepos)
+		// The stored rows, not copies: a summary copies only strings and
+		// flags, so the window needs no copy of every listed repository.
+		all := r.t().Sorted(func(_ string, c repo.Config) bool { return listed(l, c) }, compareRepos)
 		if l.Count {
 			out.Total = len(all)
 		}

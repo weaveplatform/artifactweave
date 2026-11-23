@@ -130,18 +130,16 @@ func (ts tokens) List(
 		next string
 	)
 	err := ts.s.Do(ctx, func() error {
-		rows := ts.t().All(func(_ string, t model.Token) bool {
+		var err error
+		out, next, err = ts.t().Page(func(_ string, t model.Token) bool {
 			return (f.Subject == "" || t.Subject == f.Subject) &&
 				(f.Purpose == "" || t.Purpose == f.Purpose)
-		}, compareTokens)
-		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+		}, compareTokens,
 			p,
 			false,
 			func(t model.Token) []any { return []any{issuedKey(t), t.ID} },
 		)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

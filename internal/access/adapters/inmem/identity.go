@@ -154,10 +154,10 @@ func (us users) List(ctx context.Context, p kernel.Page) ([]model.User, string, 
 		next string
 	)
 	err := us.s.Do(ctx, func() error {
-		rows := us.s.usersT().All(nil, compareByKey(userName))
 		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+		out, next, err = us.s.usersT().Page(
+			nil,
+			compareByKey(userName),
 			p,
 			false,
 			func(u model.User) []any { return []any{u.Name} },
@@ -165,7 +165,7 @@ func (us users) List(ctx context.Context, p kernel.Page) ([]model.User, string, 
 		for i := range out {
 			out[i].Groups = us.s.groupsOf(out[i].Name)
 		}
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -251,8 +251,9 @@ func (us users) LockedPage(ctx context.Context, p kernel.Page) ([]string, string
 		next string
 	)
 	err := us.s.Do(ctx, func() error {
+		// Names are strings, so the stored rows need no copy.
 		var names []string
-		for _, u := range us.s.usersT().All(nil, compareByKey(userName)) {
+		for _, u := range us.s.usersT().Sorted(nil, compareByKey(userName)) {
 			if u.Status == model.UserLocked {
 				names = append(names, u.Name)
 			}
@@ -333,10 +334,10 @@ func (gs groups) List(ctx context.Context, p kernel.Page) ([]model.Group, string
 		next string
 	)
 	err := gs.s.Do(ctx, func() error {
-		rows := gs.s.groupsT().All(nil, compareByKey(groupName))
 		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+		out, next, err = gs.s.groupsT().Page(
+			nil,
+			compareByKey(groupName),
 			p,
 			false,
 			func(g model.Group) []any { return []any{g.Name} },
@@ -344,7 +345,7 @@ func (gs groups) List(ctx context.Context, p kernel.Page) ([]model.Group, string
 		for i := range out {
 			out[i].Members = gs.s.membersOf(out[i].Name)
 		}
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -445,15 +446,15 @@ func (ps permissions) List(ctx context.Context, p kernel.Page) ([]model.Permissi
 		next string
 	)
 	err := ps.s.Do(ctx, func() error {
-		rows := ps.s.permissionsT().All(nil, compareByKey(permissionName))
 		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+		out, next, err = ps.s.permissionsT().Page(
+			nil,
+			compareByKey(permissionName),
 			p,
 			false,
 			func(v model.Permission) []any { return []any{v.Name} },
 		)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

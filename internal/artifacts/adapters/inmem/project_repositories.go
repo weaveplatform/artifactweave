@@ -41,13 +41,10 @@ func (r repos) ProjectRepositories(ctx context.Context, key string, page kernel.
 	}
 	var result []api.ProjectRepository
 	err = r.s.Do(ctx, func() error {
-		for _, entry := range r.t().All(func(_ string, c repo.Config) bool {
+		for _, entry := range r.t().First(func(_ string, c repo.Config) bool {
 			return c.ProjectKey == key && (len(after) == 0 || strings.Compare(c.Key, after[0]) > 0)
-		}, compareRepos) {
+		}, compareRepos, page.Limit+1) {
 			result = append(result, api.ProjectRepository{Key: entry.Key, Class: entry.Class, ProjectKey: entry.ProjectKey, Environments: slices.Clone(entry.Environments)})
-			if len(result) > page.Limit {
-				break
-			}
 		}
 		return nil
 	})

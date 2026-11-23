@@ -37,7 +37,10 @@ func (p packages) search(
 		next string
 	)
 	err := p.s.Do(ctx, func() error {
-		rows := p.t().All(
+		// The stored rows, not copies: only the page's candidates are
+		// copied, below, so a small page does not copy every package and
+		// version of the repository.
+		rows := p.t().Sorted(
 			func(_ int64, v model.Package) bool {
 				return v.RepoKey == repoKey && strings.HasPrefix(v.Name, prefix)
 			},
@@ -50,7 +53,7 @@ func (p packages) search(
 			in[pkg.ID] = true
 		}
 		byPackage := map[int64][]model.PackageVersion{}
-		for _, v := range p.versions().All(
+		for _, v := range p.versions().Sorted(
 			func(_ int64, v model.PackageVersion) bool { return in[v.PackageID] },
 			func(a, b model.PackageVersion) int {
 				return cmp.Or(cmp.Compare(a.OrderKey, b.OrderKey), cmp.Compare(a.Version, b.Version))
@@ -68,9 +71,15 @@ func (p packages) search(
 				}
 			}
 		}
-		var err error
-		out, next, err = memtx.Paginate(found, pg, false,
+		page, cursor, err := memtx.Paginate(found, pg, false,
 			func(c port.SearchCandidate) []any { return []any{c.Package.Name} })
+		if page != nil {
+			out = make([]port.SearchCandidate, len(page))
+		}
+		for i, c := range page {
+			out[i] = kernel.Clone(c)
+		}
+		next = cursor
 		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err

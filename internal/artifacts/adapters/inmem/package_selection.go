@@ -263,7 +263,10 @@ func (p packages) IndexFiles(ctx context.Context, ref api.IndexVersion, properti
 			if link.VersionID != ref.ID || link.ItemID <= after {
 				continue
 			}
-			value, ok := i.t().Get(link.ItemID)
+			// Read in place: the entry copies only scalar fields, and a
+			// copy of every file of the version would cost more than the
+			// page.
+			value, ok := i.t().Rows[link.ItemID]
 			if !ok || value.Folder || value.RepoKey != ref.Package.Repository.Key || value.Cached != (ref.Package.Repository.Class == repo.Remote) {
 				continue
 			}
@@ -271,8 +274,7 @@ func (p packages) IndexFiles(ctx context.Context, ref api.IndexVersion, properti
 				Version: kernel.Clone(ref), ID: value.ID, Path: value.FullPath(), Cached: value.Cached,
 				Size: value.Size, Actual: value.Actual, Created: value.Created, Modified: value.Modified, Updated: value.Updated, PropertiesModified: value.PropertiesModified,
 			}
-			stats, _ := i.stats().Get(value.ID)
-			entry.LastDownloaded = stats.LastDownloaded
+			entry.LastDownloaded = i.stats().Rows[value.ID].LastDownloaded
 			out = indexFirst(out, entry, page.Limit+1, func(a, b api.IndexFile) int { return cmp.Compare(a.ID, b.ID) })
 		}
 		for at := range out {

@@ -64,15 +64,14 @@ func (l gitLFSLocks) List(
 	var out []model.GitLFSLock
 	var next string
 	err := l.s.Do(ctx, func() error {
-		rows := l.rows().All(func(_ string, v model.GitLFSLock) bool {
+		var err error
+		out, next, err = l.rows().Page(func(_ string, v model.GitLFSLock) bool {
 			return v.RepoKey == f.RepoKey && (f.Path == "" || v.Path == f.Path) &&
 				(f.ID == "" || v.ID == f.ID)
-		}, func(a, b model.GitLFSLock) int { return cmp.Compare(a.Path, b.Path) })
-		var err error
-		out, next, err = memtx.Paginate(rows, p, false, func(v model.GitLFSLock) []any {
+		}, func(a, b model.GitLFSLock) int { return cmp.Compare(a.Path, b.Path) }, p, false, func(v model.GitLFSLock) []any {
 			return []any{v.Path}
 		})
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

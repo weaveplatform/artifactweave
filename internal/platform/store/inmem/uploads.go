@@ -71,11 +71,10 @@ func (u uploads) Stale(ctx context.Context, before time.Time, limit int) ([]sess
 	var out []session.Upload
 	err := u.s.Do(ctx, func() error {
 		cutoff := before.UnixMicro()
-		out = u.t().All(func(_ string, up session.Upload) bool { return lastActive(up) < cutoff },
+		out = u.t().First(func(_ string, up session.Upload) bool { return lastActive(up) < cutoff },
 			func(a, b session.Upload) int {
 				return cmp.Or(cmp.Compare(lastActive(a), lastActive(b)), cmp.Compare(a.ID, b.ID))
-			})
-		out = out[:min(len(out), limitOr(limit))]
+			}, limitOr(limit))
 		return nil
 	})
 	return out, err

@@ -161,7 +161,9 @@ func (b buildStore) GetForUpdate(
 func (b buildStore) Latest(ctx context.Context, project, name string) (model.Build, error) {
 	var out model.Build
 	err := b.s.Do(ctx, func() error {
-		runs := b.named(project, name, runsNewestFirst)
+		runs := b.runs().First(func(_ int64, r model.Build) bool {
+			return r.ProjectKey == project && r.Name == name
+		}, runsNewestFirst, 1)
 		if len(runs) == 0 {
 			return memtx.NotFound("build", buildName{project, name})
 		}
@@ -189,7 +191,11 @@ func (b buildStore) Runs(
 		next string
 	)
 	err := b.s.Do(ctx, func() error {
-		named := b.named(project, name, runsNewestFirst)
+		// The stored rows, not copies: a BuildRun holds only scalar fields,
+		// so no build of the name, modules and all, needs a copy.
+		named := b.runs().Sorted(func(_ int64, r model.Build) bool {
+			return r.ProjectKey == project && r.Name == name
+		}, runsNewestFirst)
 		runs := make([]model.BuildRun, 0, len(named))
 		for _, r := range named {
 			runs = append(runs, r.Run())

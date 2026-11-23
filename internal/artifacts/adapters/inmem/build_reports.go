@@ -55,7 +55,8 @@ func (b buildStore) PruneReports(ctx context.Context, now time.Time, limit int) 
 	}
 	var n int64
 	err := b.s.Do(ctx, func() error {
-		expired := b.reports().All(
+		// Only IDs are read, so the stored rows need no copy.
+		expired := b.reports().Sorted(
 			func(_ int64, r model.BuildReport) bool { return !r.Expires.After(now) },
 			func(x, y model.BuildReport) int {
 				if c := x.Expires.Compare(y.Expires); c != 0 {

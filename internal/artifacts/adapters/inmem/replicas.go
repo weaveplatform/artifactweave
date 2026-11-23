@@ -93,13 +93,12 @@ func (r replicaIndex) List(
 		next string
 	)
 	err := r.s.Do(ctx, func() error {
-		rows := r.t().All(func(_ replicaKey, v mirror.BlobReplica) bool {
+		var err error
+		out, next, err = r.t().Page(func(_ replicaKey, v mirror.BlobReplica) bool {
 			return (f.Member == "" || v.Member == f.Member) &&
 				(len(f.States) == 0 || slices.Contains(f.States, v.State))
-		}, compareReplicas)
-		var err error
-		out, next, err = memtx.Paginate(rows, p, false, replicaSortKey)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		}, compareReplicas, p, false, replicaSortKey)
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

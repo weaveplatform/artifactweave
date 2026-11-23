@@ -18,9 +18,10 @@ func (ps permissions) Page(
 ) ([]model.Permission, bool, error) {
 	var out []model.Permission
 	err := ps.s.Do(ctx, func() error {
-		out = ps.s.permissionsT().All(func(_ string, p model.Permission) bool {
+		// One past the page tells the caller whether more follow.
+		out = ps.s.permissionsT().First(func(_ string, p model.Permission) bool {
 			return (q.After == "" || p.Name > q.After) && (!q.Granting || grantsAny(p, q))
-		}, compareByKey(permissionName))
+		}, compareByKey(permissionName), q.Limit+1)
 		return nil
 	})
 	if err != nil {

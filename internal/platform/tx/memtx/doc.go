@@ -22,7 +22,7 @@
 //   - Table names with their key and value types (TableOf), sequence names
 //     (NextID), and the rows the stores put, read, list and delete.
 //   - Rows sorted by a key of string and integer parts, with a
-//     kernel.Page (Paginate).
+//     kernel.Page (Paginate, Table.Page).
 //
 // # Outputs
 //
@@ -30,8 +30,11 @@
 //     metadata store's lifetime), Do, InTx and NextID.
 //     NewWithMiddleware additionally surrounds a new root's ordinary callback
 //     after snapshot/binding and before finalizers. Nested joins run it once.
-//   - Table, from TableOf, with Rows, Get, Has, Put, Del, All and
-//     DeleteWhere.
+//   - Table, from TableOf, with Rows, Get, Has, Put, Del, All, Sorted,
+//     First, Page and DeleteWhere. Page is All and Paginate in one that
+//     copies only the page; First copies only the first n rows; Sorted
+//     returns the stored rows uncopied for a store that returns something
+//     derived from them.
 //   - Paginate, KeyStrings and CompareKey: keyset pages and their cursors.
 //   - NotFound and Conflict: errors that wrap kernel.ErrNotFound and
 //     kernel.ErrConflict with what was looked up or what collided.
@@ -70,6 +73,11 @@
 //     exactly what the SQL columns keep (kernel.Normalise). Stored values
 //     are replaced, never changed in place, so a snapshot only copies each
 //     table's map; code that writes Rows directly keeps to the same rule.
+//   - A list copies only the rows it returns. Page and First filter and
+//     sort the stored values and copy only the page, so reading a long list
+//     a small page at a time copies each row once rather than the whole
+//     list per page (issue 1875). The filters and orders they take, and a
+//     caller of Sorted or Rows, only read the stored values.
 //   - Paginate pages by the same string and integer parts as the SQL stores,
 //     so a cursor from one backend means the same position in the other.
 //   - A transaction belongs to its *Store: a context inside one Store's Tx
@@ -123,9 +131,18 @@
 //     sentinels); TestUnitPaginateRoundTrip (cursors in both directions at
 //     several limits, integer order, and each malformed cursor); and
 //     TestUnitKeyStringsAndCompareKey.
+//   - table_test.go: TestUnitTablePageCopiesOnlyThePage (every page in both
+//     directions at several limits copies only its own rows, where All
+//     copies every match); TestUnitTablePageFiltersAndKeepsAnswers (filter,
+//     cursor, nil for no match, an empty page past the end, and malformed
+//     cursors that copy nothing); TestUnitTablePageAndFirstReturnCopies
+//     (a caller changing its copy changes neither the stored row nor a
+//     later order); TestUnitTableFirstAndSorted (First's bounds and copies,
+//     Sorted's uncopied order); and TestUnitTablePageConcurrent (pages and
+//     writes from several goroutines under the race detector).
 //
 // The metadata store's contract suite runs on its in-memory store, which is
 // built on this package, as on SQLite and PostgreSQL: TxCommit, TxRollback,
 // TxNested, Cancelled and BadCursor, and every entity's subtests through Do,
-// the tables and Paginate.
+// the tables, Page and Paginate.
 package memtx

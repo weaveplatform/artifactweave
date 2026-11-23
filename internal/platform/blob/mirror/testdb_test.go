@@ -104,7 +104,8 @@ func (r memReplicas) List(
 		next string
 	)
 	err := r.db.Do(ctx, func() error {
-		rows := r.t().All(func(_ replicaKey, v mirror.BlobReplica) bool {
+		var err error
+		out, next, err = r.t().Page(func(_ replicaKey, v mirror.BlobReplica) bool {
 			return (f.Member == "" || v.Member == f.Member) &&
 				(len(f.States) == 0 || slices.Contains(f.States, v.State))
 		}, func(a, b mirror.BlobReplica) int {
@@ -113,9 +114,7 @@ func (r memReplicas) List(
 				strings.Compare(a.SHA256, b.SHA256),
 				strings.Compare(a.Member, b.Member),
 			)
-		})
-		var err error
-		out, next, err = memtx.Paginate(rows, p, false, func(v mirror.BlobReplica) []any {
+		}, p, false, func(v mirror.BlobReplica) []any {
 			return []any{replicaMicros(v.Updated), v.SHA256, v.Member}
 		})
 		return err
