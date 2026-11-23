@@ -544,7 +544,11 @@ func TestAccDroppedConnectionClassification(t *testing.T) {
 	if upstream.Count("GET", "/drop") == 0 {
 		t.Fatal("drop fixture was not reached")
 	}
-	for _, cause := range []error{io.EOF, io.ErrUnexpectedEOF} {
+	for _, cause := range []error{
+		io.EOF, io.ErrUnexpectedEOF,
+		// net/http's unexported pool closure, as it reports it (#1878).
+		fmt.Errorf("net/http: HTTP/1.x transport connection broken: %w", errors.New("http: CloseIdleConnections called")),
+	} {
 		if !errors.Is(
 			safeError(
 				&url.Error{Op: "Get", URL: "https://upstream.invalid/?secret=token", Err: cause},
