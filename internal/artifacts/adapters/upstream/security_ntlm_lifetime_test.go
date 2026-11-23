@@ -1,15 +1,18 @@
 package upstream
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"runtime"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
@@ -21,6 +24,72 @@ func TestAccProxyNTLMForwardPoolLifetime(t *testing.T) {
 	for _, mode := range []string{"close", "evict"} {
 		t.Run(mode, func(t *testing.T) { testNTLMForwardPoolLifetime(t, mode) })
 	}
+}
+
+// closeOnHandOver returns ctx with a trace that runs closePool once, when
+// net/http has taken the request's connection back but not yet handed over
+// its bodyless answer, and then holds net/http there so the round trip sees
+// the closed connection first. Its PutIdleConn hook runs in that window.
+func closeOnHandOver(ctx context.Context, closePool func()) context.Context {
+	var once sync.Once
+	return httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{PutIdleConn: func(error) {
+		once.Do(func() {
+			closePool()
+			time.Sleep(100 * time.Millisecond)
+		})
+	}})
+}
+
+// requireConnectionLost sends request through client five times, each
+// closing client's pools while net/http hands over the first bodyless
+// answer. Each failure must be remote.ErrConnection, and at least one must
+// occur; an answer that still wins on a starved scheduler is not a failure.
+func requireConnectionLost(t *testing.T, client *Client, request remote.Request) {
+	t.Helper()
+	lost := 0
+	for range 5 {
+		response, err := client.Do(closeOnHandOver(t.Context(), client.Close), request)
+		if err == nil {
+			_ = body(t, response)
+			continue
+		}
+		if !errors.Is(err, remote.ErrConnection) {
+			t.Fatal("request interrupted by a pool close classified as", err)
+		}
+		lost++
+	}
+	if lost == 0 {
+		t.Fatal("no request saw its connection close")
+	}
+}
+
+// A Close that releases the connection of a bodyless answer, here a HEAD's,
+// fails the request as a connection failure. Before #1878 it answered
+// remote.ErrRequest, which Smart Remote maps to a protocol failure.
+func TestAccClientCloseUnderABodylessAnswerIsAConnectionFailure(t *testing.T) {
+	origin := fakeupstream.New(t, fakeupstream.Options{})
+	origin.Set("/item", fakeupstream.Resource{Body: []byte("bytes")})
+	client := clientFor(t, repo.Config{Class: repo.Remote, URL: origin.URL}, remote.Options{})
+	requireConnectionLost(t, client, remote.Request{Method: http.MethodHead, Path: "item"})
+}
+
+// The NTLM forward exchange takes its connection back before each 407
+// challenge, which has no body. A Close in that window interrupts the
+// challenge as a connection failure (#1878).
+func TestAccProxyNTLMForwardCloseUnderAChallengeIsAConnectionFailure(t *testing.T) {
+	origin := fakeupstream.New(t, fakeupstream.Options{})
+	origin.Set("/item", fakeupstream.Resource{Body: []byte("bytes")})
+	options := ntlmFixtureOptions()
+	options.Forward, options.ForwardOnly = true, true
+	proxy := fakeupstream.NewNTLMProxy(t, options, origin)
+	st := inmem.New()
+	p := proxyConfig(t, proxy.URL)
+	p.Domain, p.NTHost = "CORP", "ARTIFACTWEAVE"
+	putProxy(t, st, "ntlm", p, "proxy-secret")
+	c := repo.Config{Key: "ntlm", Class: repo.Remote, URL: origin.URL, Proxy: "ntlm"}
+	saveRepo(t, st, c)
+	client := clientFor(t, c, resolveFor(t, resolverFor(t, st, ResolverOptions{}), c))
+	requireConnectionLost(t, client, remote.Request{Method: http.MethodGet, Path: "item"})
 }
 
 func testNTLMForwardPoolLifetime(t *testing.T, mode string) {

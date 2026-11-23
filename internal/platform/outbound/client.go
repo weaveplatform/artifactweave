@@ -166,6 +166,8 @@ func (c *Client) redirect(req *http.Request, via []*http.Request) error {
 
 // Close prevents new requests and releases idle connections. The application
 // cancels the contexts of active operations before waiting for their workers.
+// An active request whose bodyless answer is being handed over when Close
+// releases its connection fails with ErrConnection (IdleConnectionLost).
 func (c *Client) Close() {
 	c.closed.Store(true)
 	c.transport.CloseIdleConnections()
@@ -269,7 +271,8 @@ func SafeError(err error) error {
 		return context.DeadlineExceeded
 	}
 	var connection *net.OpError
-	if errors.As(err, &connection) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+	if errors.As(err, &connection) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		IdleConnectionLost(err) {
 		return ErrConnection
 	}
 	return ErrRequest

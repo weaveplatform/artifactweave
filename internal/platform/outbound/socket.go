@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"time"
 )
 
@@ -32,6 +33,34 @@ func IdleConnTimeout(socketTimeout time.Duration) time.Duration {
 		limit = min(limit, max(socketTimeout/2, time.Nanosecond))
 	}
 	return limit
+}
+
+// idleConnectionLosses are the errors with which net/http's pool ends an idle
+// connection: CloseIdleConnections (a client Close, a pool eviction), the
+// IdleConnTimeout limit, and the peer closing it while idle. net/http does
+// not export them, so they are matched by their text. The acceptance tests
+// produce the pool's own closures (Close, the idle limit) through net/http
+// and fail if a Go release changes that text.
+var idleConnectionLosses = []string{
+	"http: CloseIdleConnections called",
+	"http: idle connection timeout",
+	"http: server closed idle connection",
+}
+
+// IdleConnectionLost reports whether err is net/http's report that a pooled
+// connection ended under a request. The pool takes a connection back before
+// it hands over a bodyless answer (a HEAD, a 204, an NTLM 407 challenge), so
+// a pool close in that window fails the request with "net/http: HTTP/1.x
+// transport connection broken" wrapping the closure, and a request net/http
+// will not replay on another connection fails with the closure itself. Both
+// are connection failures the caller may retry, not refused requests (#1878).
+func IdleConnectionLost(err error) bool {
+	for ; err != nil; err = errors.Unwrap(err) {
+		if slices.Contains(idleConnectionLosses, err.Error()) {
+			return true
+		}
+	}
+	return false
 }
 
 type idleConn struct {

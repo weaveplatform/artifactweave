@@ -27,7 +27,9 @@
 // for Client and for the remote repository client, which builds its own
 // transport.
 // Errors retain safe classifications and context cancellation,
-// never URLs, headers, bodies or credentials.
+// never URLs, headers, bodies or credentials. A connection the pool closes
+// under a request (Close or the idle limit) is ErrConnection, as
+// IdleConnectionLost reports for the remote repository client too.
 //
 // # Invariants
 //

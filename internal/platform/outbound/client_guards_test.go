@@ -3,6 +3,7 @@ package outbound
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -87,6 +88,12 @@ func TestUnitFixedOriginBodyAndNetworkErrorsDiscardPrivateText(t *testing.T) {
 		&net.OpError{Op: "read", Net: "secret", Err: os.ErrDeadlineExceeded}:                  context.DeadlineExceeded,
 		&url.Error{Op: "PUT", URL: "https://secret.example/signed", Err: io.ErrUnexpectedEOF}: ErrConnection,
 		errors.New("secret upstream body"):                                                    ErrRequest,
+		// net/http's unexported pool closures, as it reports them (#1878).
+		&url.Error{Op: "HEAD", URL: "https://secret.example/", Err: fmt.Errorf(
+			"net/http: HTTP/1.x transport connection broken: %w", errors.New("http: CloseIdleConnections called"))}: ErrConnection,
+		fmt.Errorf("net/http: HTTP/1.x transport connection broken: %w", errors.New("http: idle connection timeout")): ErrConnection,
+		&url.Error{Op: "PUT", URL: "https://secret.example/", Err: errors.New("http: server closed idle connection")}: ErrConnection,
+		errors.New("http: CloseIdleConnections called secret"):                                                        ErrRequest,
 	} {
 		err := SafeError(original)
 		if !errors.Is(err, want) || strings.Contains(err.Error(), "secret") {
