@@ -84,6 +84,7 @@ func configurationOver(st *appsql.Store) configapi.API {
 		LDAP:            access.LDAPSettingsOf(st),
 		StoragePolicies: artifacts.StoragePoliciesOf(st),
 		Projects:        access.ProjectsOf(st),
+		Capacity:        st.StorageCapacity(),
 	})
 }
 

@@ -292,10 +292,12 @@ The descriptor is a patch:
 | `downloadRedirectConfig` | One mapping, not entries by name: `fileMinimumSize`, the smallest file in whole MB that a repository with `downloadRedirect` or `cdnRedirect` redirects, Artifactory's "Minimum Direct Cloud Storage Download Size". It takes precedence over `download.redirect.min_size` from the next download on. It cannot be set to null; set it to the size wanted instead |
 | `gcConfig` | One mapping: `cronExp`, the Quartz expression (six or seven fields, evaluated in UTC) on which every node's shared scheduler runs garbage collection. Unset, it is Artifactory's `0 0 /4 * * ?`. An expression that does not parse or never fires again is refused. Fires missed while no node ran are coalesced into one pass |
 | `trashcanConfig` | One mapping: `enabled` (a delete with it off is final) and `retentionPeriodDays` (how long a trashed item waits before a collection pass purges it; `0` purges at the next pass). Unset, the trash can is on for 14 days. A negative period, or one reaching back before February 2003, is refused; `allowPermDeletes` is refused as unknown |
+| `quotaConfig` | One mapping, the global storage quota: `enabled`, `diskSpaceLimitPercentage` and `diskSpaceWarningPercentage`, whole percentages from 0 to 100 of the volume holding the hot blob store (the one `GET /api/storageinfo` reports). While enabled, a write that grows storage when the volume is at or above the limit answers `413` "Datastore disk usage is too high…"; reads, deletions and shrinking writes still pass, and project quotas apply as well. Crossing the warning or the limit mails every enabled administrator with an email address once, through `mailServer`, until usage falls back below it. Unset, the quota is off; a field left out keeps its value. Enabling it is refused where the volume cannot be measured (object storage), and an enabled quota whose measurement fails answers `503` to growing writes |
 
 `gcConfig`, `trashcanConfig` and their fields cannot be null, and the XML export
 (`GET /artifactory/api/system/configuration`) always carries both with the effective values.
-Any other section, such as `backups` or `quotaConfig`, is refused (`400`),
+`quotaConfig` and its fields cannot be null either; the export carries it once it has been set.
+Any other section, such as `backups`, is refused (`400`),
 naming it, and nothing in the descriptor is applied. P12 owns completion of the
 baseline descriptor, including security, backup and mail settings; P13 owns federated
 peer convergence. Settings that activate other products

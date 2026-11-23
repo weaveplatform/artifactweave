@@ -50,6 +50,7 @@ type exportDocument struct {
 	URLBase          *string        `xml:"urlBase,omitempty"`
 	Layouts          []exportFields `xml:"repoLayouts>repoLayout"`
 	GC               *exportFields  `xml:"gcConfig,omitempty"`
+	Quota            *exportFields  `xml:"quotaConfig,omitempty"`
 	Trashcan         *exportFields  `xml:"trashcanConfig,omitempty"`
 	DownloadRedirect *exportFields  `xml:"downloadRedirectConfig,omitempty"`
 }
@@ -259,6 +260,9 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 // transaction, so the document stays one snapshot.
 func readExportOwned(ctx context.Context, d Deps, out *exportDocument) error {
 	if err := readWebServerExport(ctx, d, out); err != nil {
+		return err
+	}
+	if err := readExportQuota(ctx, d, out); err != nil {
 		return err
 	}
 	return readExportStorage(ctx, d, out)

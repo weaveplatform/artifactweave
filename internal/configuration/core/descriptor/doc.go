@@ -62,6 +62,12 @@
 //     collection. Both are required singletons: neither a section nor one
 //     of its fields can be null, and the export always carries both, with
 //     Artifactory's defaults when nothing set them.
+//   - quotaConfig is the global storage quota (configuration/core/quota). It
+//     is an optional singleton merged field by field, so the export carries
+//     it, in QuotaConfigType's order, only once it has been set. Its
+//     percentages are whole numbers from 0 to 100, and enabling it is refused
+//     where the hot blob store's volume cannot be measured (Deps.Capacity is
+//     nil, as for object storage), because the policy could never take effect.
 //   - Parsing is strict: an unset ${NAME}, a section artifactweave does not
 //     apply, an unknown field and a null on a field that is not a string are
 //     refused, so a pipeline never takes a 200 for settings that changed
@@ -108,7 +114,8 @@
 // and the export writes both in artifactory.xsd's order. CFG-05
 // (https://github.com/weaveplatform/artifactweave/issues/1829) adds gcConfig
 // and trashcanConfig through artifacts' StoragePolicies, exported in XSD
-// order.
+// order. CFG-06 (https://github.com/weaveplatform/artifactweave/issues/1830)
+// adds quotaConfig.
 //
 // # Testing
 //
@@ -136,6 +143,9 @@
 //     dry run, apply and reapply through the owner's binding, the owner's
 //     refusals in the descriptor's names, rollback with a failing later
 //     write, and the export's defaults, values, order and provider read.
+//   - quota_test.go: quotaConfig parsing and refusals, dry run, merge and
+//     reapply, the refusal to enable without a measurable volume, a corrupt
+//     stored policy, and the export's presence, defaults and order.
 //   - webserver_test.go: urlBase through Parse, PUT and PATCH with the CDN
 //     rule and the cached effective value; reverse proxy writes, reads with
 //     current authority, the snippet, refusals that store nothing, rollback,

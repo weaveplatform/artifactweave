@@ -144,3 +144,67 @@ func TestUnitProjectContentInitializationFailurePoisonsRoot(t *testing.T) {
 		})
 	}
 }
+
+// The global admission sees one net delta for the whole transaction, across
+// projects, unassigned repositories and orphan rows, before any project
+// counter settles, and its refusal rolls the transaction back.
+func TestUnitProjectStorageAdmissionSeesTheWholeTransaction(t *testing.T) {
+	var accounting project.StorageAccounting
+	backend := memtx.NewWithMiddleware(accounting.Middleware)
+	store := accinmem.New(backend)
+	owners := map[string]string{"owned": "alpha", "unassigned": ""}
+	accounting.Service = project.Service{Store: store, StorageBytes: func(context.Context, string) (int64, error) { return 0, nil }}
+	accounting.Repository = func(_ context.Context, key string) (artifactsapi.ProjectRepository, error) {
+		owner, ok := owners[key]
+		if !ok {
+			return artifactsapi.ProjectRepository{}, kernel.ErrNotFound
+		}
+		return artifactsapi.ProjectRepository{ProjectKey: owner}, nil
+	}
+	var seen []int64
+	var refuse error
+	var committed int64
+	accounting.Admission = func(ctx context.Context, delta int64) error {
+		state, _, err := store.Projects().Storage(ctx, "alpha")
+		must(t, err)
+		if state.Bytes != committed {
+			t.Fatal("the project counter settled before the global admission")
+		}
+		seen = append(seen, delta)
+		return refuse
+	}
+	ctx := t.Context()
+	must(t, store.Projects().Create(ctx, model.Project{Key: "alpha", DisplayName: "Alpha", StorageQuotaBytes: 1000}))
+	write := func(changes map[string]int64) error {
+		return backend.Tx(ctx, func(ctx context.Context) error {
+			for repository, bytes := range changes {
+				change, err := accounting.Content(ctx, repository)
+				if err != nil {
+					return err
+				}
+				if err := change(ctx, bytes); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
+	must(t, write(map[string]int64{"owned": 10, "unassigned": 5, "orphan": 2}))
+	committed = 10
+	must(t, write(map[string]int64{"owned": 10, "unassigned": -10}))
+	committed = 20
+	must(t, write(map[string]int64{"owned": -3}))
+	committed = 17
+	if len(seen) != 1 || seen[0] != 17 {
+		t.Fatal("admission deltas", seen)
+	}
+	refuse = kernel.ErrDiskQuota
+	if err := write(map[string]int64{"owned": 1}); !errors.Is(err, kernel.ErrDiskQuota) {
+		t.Fatal(err)
+	}
+	state, _, err := store.Projects().Storage(ctx, "alpha")
+	must(t, err)
+	if state.Bytes != 17 {
+		t.Fatal("a refused write settled its project bytes", state.Bytes)
+	}
+}

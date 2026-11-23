@@ -59,6 +59,12 @@ under the shared guard before delivery starts. Disabled mail and string clearing
 are explicit; whole-section null is refused. CFG-01 includes these public mail settings in XML; mail testing endpoints and the
 remaining system administration retain their P12 owners.
 
+P12 CFG-06 (#1830) applies `quotaConfig` through the same path. The section is
+stored as one configuration document; the configuration module's quota core admits
+growing writes against the measured hot blob volume inside each metadata
+transaction and mails administrators through `mailServer`
+([research 06](../06-system-configuration-and-descriptor.md#global-storage-quota)).
+
 P12/#1835 gives remote-source proxy `domain` and `ntHost` runtime effects: NTLMv2
 proxy-account domain and client workstation, through the existing resolver and sealed
 password. Configuration storage is unchanged. The [transport contract](../../implementation/remote-http-transport.md)

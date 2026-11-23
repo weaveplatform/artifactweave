@@ -47,6 +47,14 @@
 // Quota and email-policy edits settle a zero byte delta, so enabling/disabling
 // notifications or changing the threshold does not wait for another upload.
 //
+// StorageAccounting's optional Admission hook receives the whole root
+// transaction's net content delta, across projects, unassigned repositories
+// and rows of no repository, before any project counter settles: the global
+// storage quota (quotaConfig), checked first as 7.x's assertStorageQuota
+// does. Its refusal fails the transaction, so neither quota exempts the
+// other and a refused write leaves no counters, items or warnings
+// (https://github.com/weaveplatform/artifactweave/issues/1830).
+//
 // # References
 //
 //   - Target layout:

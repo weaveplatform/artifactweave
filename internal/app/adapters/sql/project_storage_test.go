@@ -16,3 +16,12 @@ func TestAccProjectStorageComposition(t *testing.T) {
 		appstoretest.RunProjectStorage(t, func(t *testing.T) appstoretest.Store { return newStore(t) })
 	}, sqltest.WithPostgres(), sqltest.WithKeyring(nil))
 }
+
+func TestAccStorageQuotaComposition(t *testing.T) {
+	vol := &appstoretest.Volume{}
+	sqltest.RunModule(t, appsql.Modules(), func(base *dialect.Store) *appsql.Store {
+		return appsql.NewWithCapacity(base.DB(), base.Dialect(), nil, vol)
+	}, func(t *testing.T, newStore func(*testing.T) *appsql.Store) {
+		appstoretest.RunStorageQuota(t, vol, func(t *testing.T) appstoretest.Store { return newStore(t) })
+	}, sqltest.WithPostgres(), sqltest.WithKeyring(nil))
+}

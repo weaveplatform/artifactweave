@@ -102,7 +102,7 @@ func (s *Kit) pomBeforeReturn(r *http.Request, st Store, v repo.Config, path str
 	original = s.pomCopyUsage(r, st, f, it, original)
 	copy, err := s.savePOMCopy(r.Context(), st, v, path, f.Repo.Key, it.Actual.SHA256, policy, cleaned)
 	if err != nil {
-		if errors.Is(err, kernel.ErrStorageQuota) {
+		if kernel.StorageRefusal(err) {
 			// Optional retention has rolled back. The transformed bytes are
 			// already owned by this request, so serve them without a CAS
 			// reference while retaining the source's final delivery fence.

@@ -21,6 +21,9 @@
 //     the access module's API, whose AnonymousAccess and LDAP the security
 //     section writes. All of them are bound over the same store, so a descriptor's
 //     writes commit or roll back together.
+//   - The store's StorageCapacity, when it has one: the hot blob volume the
+//     quotaConfig section is enforced against, without which enabling it is
+//     refused.
 //   - Settings, the configuration options from app/config's Configuration
 //     (docker.subdomain_match).
 //   - Log and Logging, the structured sink and shared process logging control.
@@ -76,6 +79,9 @@
 // Loggers and owned timer cleanup: an actual Logging control binds the API, and
 // the caller owns Module.Close. app's runtime supplies both; standalone router
 // composition leaves its logger API unavailable without an OnClose registrar.
+// CFG-06 adds the global storage quota in core/quota: app installs its
+// Admission in the store's accounting and runs its Monitor and Delivery
+// (https://github.com/weaveplatform/artifactweave/issues/1830).
 //
 // # Testing
 //

@@ -8,19 +8,22 @@ import (
 	artsql "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/sql"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
+	platsql "github.com/weaveplatform/artifactweave/internal/platform/store/sql"
 )
 
 // AccessArtifactsSQLStore is the real composite store used by cross-module
 // access/artifact transaction tests through this permitted test-support surface.
 type AccessArtifactsSQLStore = appsql.Store
 
-// RunAccessArtifactsSQL applies only the access/artifacts streams and runs a
+// RunAccessArtifactsSQL applies the access/artifacts streams, and the
+// platform stream whose configuration documents every growing write's global
+// storage quota admission reads (configuration/core/quota), and runs a
 // suite on SQLite memory/file and PostgreSQL. Each factory call gets its own
 // database or scratch schema, as sqltest.RunModule documents. The suite must
-// use only those two stores; other migration streams are not applied.
+// use only those stores; other migration streams are not applied.
 func RunAccessArtifactsSQL(t *testing.T, suite func(*testing.T, func(*testing.T) *AccessArtifactsSQLStore)) {
 	t.Helper()
-	sqltest.RunModule(t, []dialect.Module{accsql.Module, artsql.Module}, func(db *dialect.Store) *AccessArtifactsSQLStore {
+	sqltest.RunModule(t, []dialect.Module{platsql.Module, accsql.Module, artsql.Module}, func(db *dialect.Store) *AccessArtifactsSQLStore {
 		return appsql.New(db.DB(), db.Dialect(), nil)
 	}, suite, sqltest.WithPostgres())
 }

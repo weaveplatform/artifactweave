@@ -374,6 +374,9 @@ func planConfigs(
 		if err := validateWebServer(d, c.Kind, doc); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
+		if err := validateQuota(d, c.Kind, doc); err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
 		enabled, sameEnabled := true, true
 		if c.Kind == configdoc.ConfigMailServer {
 			if flag, present := doc["enabled"].(bool); present {

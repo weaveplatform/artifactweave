@@ -23,4 +23,7 @@ const (
 	// the Access user lock policy's fields that the lock and expiration
 	// policies have no place for.
 	SettingAccessLockSettings = "security.access_lock_settings"
+	// SettingStorageQuotaWarning holds the global storage quota's armed-off
+	// warning occurrences, so a restart neither forgets nor repeats them.
+	SettingStorageQuotaWarning = "storage.quota_warning"
 )
