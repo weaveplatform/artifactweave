@@ -10,4 +10,4 @@
 # artifactweave-accept-dotnet10 and runs it with --network host, so NuGet
 # reaches the binary on 127.0.0.1. dotnet.Dockerfile is the .NET client on
 # the newest line.
-FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:bef136a371963aaa46ec97882845ef6f54dec15728bb4b128b1c2a400ffbc9b4
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:2b1e13a22e46b55117f9cdb4b38e73172de08a30370166c8227d06cdaff82473
