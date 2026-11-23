@@ -114,13 +114,14 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	}
 	artifactsAPI := art.API()
 	conf, err := configuration.New(configuration.Deps{
-		Store:        d.store,
-		Repositories: artifactsAPI.Repositories,
-		Layouts:      artifactsAPI.Layouts,
-		Access:       accessAPI,
-		Settings:     cfg.Configuration(),
-		Log:          d.logging.Logger("artifactweave.configuration"),
-		Logging:      d.logging,
+		Store:           d.store,
+		Repositories:    artifactsAPI.Repositories,
+		Layouts:         artifactsAPI.Layouts,
+		StoragePolicies: artifactsAPI.StoragePolicies,
+		Access:          accessAPI,
+		Settings:        cfg.Configuration(),
+		Log:             d.logging.Logger("artifactweave.configuration"),
+		Logging:         d.logging,
 	})
 	if err != nil {
 		return modules{}, fmt.Errorf("configuration: %w", err)

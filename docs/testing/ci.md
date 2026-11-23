@@ -1332,9 +1332,10 @@ All deployment roots require Terraform **1.17 or later**; CI pins **1.17.1**.
 `make terraform` runs `test/terraform/run.sh` over `TERRAFORM_SCENARIOS`: the repositories,
 identity, OIDC, CDN repositories, remote repositories, virtual repositories, webhooks, single
 replication, projects and package-cleanup references in `deploy/artifactweave/terraform/`,
-and the two-resource `configuration` reference in that same tree. The latter qualifies
-only proxy/property-set write validation; full seven-resource P12 qualification remains
-#1837. XML descriptor GET is required for these pinned provider controls, so a missing
+the two-resource `configuration` reference and the `trashcan` reference in that same
+tree. `configuration` qualifies only proxy/property-set write validation; full
+seven-resource P12 qualification remains #1837. `trashcan` qualifies
+`artifactory_trashcan_config` against the descriptor's `trashcanConfig` (#1829). XML descriptor GET is required for these pinned provider controls, so a missing
 implementation fails the required conformance lane.
 - It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` and
   `terraform-provider-platform_<version>_<os>_<arch>.zip` and
@@ -1485,7 +1486,13 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
      summary with the CSV. Require another empty plan, destroy the policy and repository,
      and require both delete responses to be 200. The earlier dry-run and actual CSVs
      must remain readable after deletion. The required inventory refuses an omitted
-     resource, provider pin, scenario or execution hook (#1759).
+     resource, provider pin, scenario or execution hook (#1759);
+   - **trashcan:** apply `artifactory_trashcan_config` off with 3 days, then on with 0 days.
+     After each, require an empty refreshed plan, check the values in the XML descriptor
+     and what a delete does with `test/terraform/check-trashcan.py`: final when off, and
+     when on kept in the trash can until `POST /api/system/storage/gc` purges it at 0 days.
+     Remove the resource from state, import it and require an empty plan. Destroy it and
+     require the documented reset to on with 14 days (#1829).
 4. Require `terraform plan -detailed-exitcode` to exit 0.
 5. Destroy.
 

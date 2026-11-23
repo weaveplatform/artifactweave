@@ -36,8 +36,10 @@ var ErrNothingTrashed = errors.New("trash: nothing is trashed at the path")
 var ErrNotPermitted = errors.New("trash: restoring an item is not permitted")
 
 // Settings returns the trash can settings. Unset means on with Artifactory's
-// 14 days, and a stored retention below one day means the default too: the
-// settings document may carry only "enabled".
+// 14 days, and so does a document that carries only "enabled". A stored
+// retention of zero days is kept: it purges what is trashed at the next
+// collection pass, as Artifactory's trash can accepts 0 (its settings form's
+// minimum) and expires entries older than now minus the period.
 func Settings(
 	ctx context.Context,
 	st interface{ Settings() settings.SettingsStore },
@@ -50,7 +52,7 @@ func Settings(
 	case err != nil:
 		return t, fmt.Errorf("trash: settings: %w", err)
 	}
-	if t.RetentionDays < 1 {
+	if t.RetentionDays < 0 {
 		t.RetentionDays = DefaultRetentionDays
 	}
 	return t, nil

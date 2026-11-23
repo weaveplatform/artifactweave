@@ -17,9 +17,9 @@
 //
 //   - Parse: a YAML document and a lookup for its ${NAME} references.
 //   - Deps, which Apply and NewAPI take: the unit of work (platform/tx), the
-//     artifacts module's Repositories and Layouts, the configuration
-//     document port (platform/configdoc) and access's AnonymousAccess and
-//     LDAPSettings, all over one store.
+//     artifacts module's Repositories, Layouts and StoragePolicies, the
+//     configuration document port (platform/configdoc) and access's
+//     AnonymousAccess and LDAPSettings, all over one store.
 //   - DownloadRedirectMinSize: the configuration document port.
 //
 // # Outputs
@@ -58,6 +58,12 @@
 //     two surfaces share one connection; access's refusals are reported with
 //     the descriptor's field names, and the export never carries a manager
 //     password.
+//   - gcConfig and trashcanConfig are planned and written through artifacts'
+//     StoragePolicies, which owns the trash can and the collector's Quartz
+//     schedule (decision 0010), so configuration never bypasses deletion or
+//     collection. Both are required singletons: neither a section nor one
+//     of its fields can be null, and the export always carries both, with
+//     Artifactory's defaults when nothing set them.
 //   - Parsing is strict: an unset ${NAME}, a section artifactweave does not
 //     apply, an unknown field and a null on a field that is not a string are
 //     refused, so a pipeline never takes a 200 for settings that changed
@@ -107,9 +113,12 @@
 // connections in the XML export's security element. CFG-02 adds urlBase and
 // the reverse proxy behind configuration/api.WebServer: its writes build a
 // Patch and Apply it under the guard after a current administrator recheck,
-// and the export writes both in artifactory.xsd's order. CFG-07 (issue 1831)
-// adds backups (exported in XSD BackupType order), systemMessageConfig and
-// mailServer deletion by null, as the artifactory_mail_server resource sends.
+// and the export writes both in artifactory.xsd's order. CFG-05
+// (https://github.com/weaveplatform/artifactweave/issues/1829) adds gcConfig
+// and trashcanConfig through artifacts' StoragePolicies, exported in XSD
+// order. CFG-07 (issue 1831) adds backups (exported in XSD BackupType
+// order), systemMessageConfig and mailServer deletion by null, as the
+// artifactory_mail_server resource sends.
 //
 // # Testing
 //
@@ -140,6 +149,10 @@
 //   - ldap_test.go: every ldapSettings field mapped, outcomes through
 //     access's binding with a dry run and a second apply, a missing binding,
 //     planning and write failures, and the export's element order.
+//   - storage_test.go: gcConfig and trashcanConfig parsing and refusals,
+//     dry run, apply and reapply through the owner's binding, the owner's
+//     refusals in the descriptor's names, rollback with a failing later
+//     write, and the export's defaults, values, order and provider read.
 //   - webserver_test.go: urlBase through Parse, PUT and PATCH with the CDN
 //     rule and the cached effective value; reverse proxy writes, reads with
 //     current authority, the snippet, refusals that store nothing, rollback,

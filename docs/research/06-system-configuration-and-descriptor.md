@@ -520,9 +520,10 @@ closed source, so its use of the shared builder is inferred [I].
 ### What artifactweave serves
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
-  `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`,
-  `downloadRedirectConfig`, `mailServer`, `urlBase`, `backups`, `systemMessageConfig`,
-  the `security.anonAccessEnabled` setting and the `security.ldapSettings` connections
+  `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`, `gcConfig`,
+  `trashcanConfig`, `downloadRedirectConfig`, `mailServer`, `urlBase`, `backups`,
+  `systemMessageConfig`, the `security.anonAccessEnabled` setting and the
+  `security.ldapSettings` connections
   (`internal/configuration/core/descriptor`). Download redirect configuration applies
   the whole-MB `fileMinimumSize` setting used by CDN/storage redirects
   ([research 19](19-cdn-and-download-redirect.md#5-artifactweave-today)). Artifactory
@@ -531,8 +532,7 @@ closed source, so its use of the shared builder is inferred [I].
   with any other top-level section answers 400 naming each such section and listing the
   supported sections, and changes nothing. The check runs before `${NAME}` references are resolved, so the
   error names the section rather than a variable inside it. The other sections arrive with
-  their features: `gcConfig`, `trashcanConfig`, `quotaConfig` and the remaining
-  baseline security settings in P12
+  their features: `quotaConfig` and the remaining baseline security settings in P12
   ([plan](../implementation/plan.md)). Stored federated repository configuration does
   not establish P13 peer synchronization. P36 completes scheduled backup and migration workflows;
   human identity settings follow P21/P22, and product settings follow their owners in the
@@ -614,6 +614,24 @@ closed source, so its use of the shared builder is inferred [I].
   managerDn}, autoCreateUser, emailAttribute, ldapPoisoningProtection,
   allowUserToAccessProfile, pagingSupportEnabled`), leaving out empty strings and always
   leaving out `managerPassword`.
+- `gcConfig.cronExp`, `trashcanConfig.enabled` and `trashcanConfig.retentionPeriodDays`
+  (CFG-05, [#1829](https://github.com/weaveplatform/artifactweave/issues/1829)) go
+  through the artifacts module's storage policy, which owns the trash can and the
+  collector's Quartz schedule: the next deletion, purge and scheduled pass follow them.
+  Both are required singletons (XSD `minOccurs="1"` on each section and field), so
+  neither a section nor a field can be null, and a field left out keeps its value.
+  `allowPermDeletes` is refused as an unknown field. A cron expression that does not
+  parse or never fires, a negative retention period and one reaching back before
+  February 2003 answer 400 naming the field. The result names each section given as
+  `Updated` or `Unchanged`, never `Created`: the policy always exists. The XML export
+  always carries both sections after `repoLayouts`, in XSD order, with the effective
+  values, so `gcConfig/cronExp` is `0 0 /4 * * ?` and `trashcanConfig` is on for 14 days
+  until a descriptor changes them; the `artifactory_trashcan_config` resource reads
+  `trashcanConfig/enabled` and `retentionPeriodDays` and drops itself from state when
+  the section is missing ([S] provider 12.11.14
+  [`resource_artifactory_trashcan_config.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_trashcan_config.go)).
+  [Decision 0010](decisions/0010-retention-trash-and-gc.md), "Descriptor policy", has the
+  schedule, defaults and bounds.
 - CFG-01 collects repositories, proxies, property sets, layouts, anonymous access, mail
   and download redirect configuration in one metadata transaction under the shared
   `Projects.Guard`, before returning bytes after commit. Export refuses an existing

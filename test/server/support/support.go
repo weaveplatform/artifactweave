@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/core/gc"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/layout"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
@@ -80,6 +81,10 @@ type (
 // Layouts is the artifacts module's Layouts, bound as the server binds it:
 // the layout engine's check, which reads and writes nothing.
 func Layouts() artifactsapi.Layouts { return layout.Checker{} }
+
+// StoragePolicies is the artifacts module's StoragePolicies over db, as the
+// server binds it: the trash can settings and the collector's schedule.
+func StoragePolicies(db gc.PolicyStore) artifactsapi.StoragePolicies { return gc.Policies{Store: db} }
 
 // Seed creates the built-in principals in db as a new server does (the admin
 // user, anonymous, the readers group, the Anything and Any Remote permissions

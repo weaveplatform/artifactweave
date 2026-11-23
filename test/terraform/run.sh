@@ -593,6 +593,25 @@ apply_configuration() {
 	configuration_proof cleared
 }
 
+# A singleton every instance has. Each revision is checked against the XML
+# descriptor the provider reads and against what a delete then does, so a
+# value stored but not obeyed fails. Import takes any ID for a singleton.
+apply_trashcan() {
+	for revision in 1 2; do
+		if [ "$revision" = 1 ]; then
+			export TF_VAR_enabled=false TF_VAR_retention_period_days=3
+		else
+			export TF_VAR_enabled=true TF_VAR_retention_period_days=0
+		fi
+		tf apply -auto-approve
+		tf plan -detailed-exitcode
+		python3 -I "$here/check-trashcan.py" --check "$TF_VAR_enabled" "$TF_VAR_retention_period_days"
+	done
+	tf state rm artifactory_trashcan_config.this
+	tf import artifactory_trashcan_config.this trashcan
+	tf plan -detailed-exitcode
+}
+
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
 	case $scenario in
@@ -607,6 +626,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/projects) apply_projects ;;
 	deploy/artifactweave/terraform/package-cleanup) apply_package_cleanup ;;
 	deploy/artifactweave/terraform/configuration) apply_configuration ;;
+	deploy/artifactweave/terraform/trashcan) apply_trashcan ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1
@@ -635,6 +655,9 @@ for scenario in "${scenarios[@]}"; do
 	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/projects ]; then
 		python3 -I "$here/check-projects.py" --deleted "$work/project-fixture.json" "$project_evidence"
+	fi
+	if [ "$scenario" = deploy/artifactweave/terraform/trashcan ]; then
+		python3 -I "$here/check-trashcan.py" --deleted
 	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/package-cleanup ]; then
 		python3 -I "$here/check-cleanup.py" --deleted "$work/cleanup-fixture.json" "$work/cleanup-runs.json" "$work/server.log"

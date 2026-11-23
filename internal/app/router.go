@@ -25,6 +25,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/ldap"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/internal/artifacts"
 	artifactshttp "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
@@ -400,7 +401,8 @@ func withConfiguration(cfg RouterConfig) RouterConfig {
 		Store:        cfg.Store,
 		Repositories: repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects, repositoryLifecycle(cfg)),
 		Layouts:      layout.Checker{}, Access: cfg.Access, Logging: ownedLogging, Log: cfg.Logger,
-		Settings: configapi.Settings{DockerSubdomainMatch: cfg.DockerSubdomainMatch, BaseURL: cfg.BaseURL},
+		StoragePolicies: artifacts.StoragePoliciesOf(cfg.Store),
+		Settings:        configapi.Settings{DockerSubdomainMatch: cfg.DockerSubdomainMatch, BaseURL: cfg.BaseURL},
 	})
 	if err == nil {
 		bound := m.API()

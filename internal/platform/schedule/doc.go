@@ -3,7 +3,8 @@
 //
 // # Role
 //
-// This platform foundation is shared by cleanup and single replication. It
+// This platform foundation is shared by cleanup, single replication and
+// garbage collection (gcConfig.cronExp, artifacts/core/gc). It
 // imports no business module. Owners update a schedule snapshot in the same
 // transaction as their configuration, after their own domain guard. The order
 // is owner/domain state, schedule row, then queue row; no owner lookup occurs
@@ -24,7 +25,8 @@
 // # Invariants
 //
 // Parse accepts Quartz six/seven-field syntax, including seconds, named ranges,
-// lists, increments, ?, L, L-offset, W, LW and #. Exactly one day field is ?.
+// lists, increments (a bare "/n" is "*/n", as in Quartz and Artifactory's
+// default "0 0 /4 * * ?"), ?, L, L-offset, W, LW and #. Exactly one day field is ?.
 // The published 1970–2099 year range bounds all searches. Real calendar dates
 // prevent invalid February days from normalizing into March.
 //
@@ -61,7 +63,10 @@
 //
 // # Status
 //
-// Implemented for P11 CLN-01. Cleanup and replication owners consume this
+// Implemented for P11 CLN-01; P12 CFG-05 moved garbage collection onto it
+// and accepted the bare increment
+// (https://github.com/weaveplatform/artifactweave/issues/1829). Cleanup and
+// replication owners consume this
 // foundation in their execution tickets; this package does not activate their
 // public APIs or replace unrelated fixed-interval maintenance jobs.
 //

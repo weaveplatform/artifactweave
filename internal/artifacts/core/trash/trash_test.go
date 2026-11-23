@@ -177,6 +177,17 @@ func TestUnitSettings(t *testing.T) {
 		got.RetentionDays != trash.DefaultRetentionDays {
 		t.Fatalf("no retention stored = %+v, %v", got, err)
 	}
+	// Zero days is a period of its own (purge at the next pass); only a
+	// negative one, which the descriptor refuses, falls back to the default.
+	for stored, want := range map[int]int{0: 0, -1: trash.DefaultRetentionDays} {
+		if err := db.Settings().Put(ctx, settings.SettingTrashcan,
+			model.TrashcanSettings{Enabled: true, RetentionDays: stored}); err != nil {
+			t.Fatal(err)
+		}
+		if got, err = trash.Settings(ctx, db); err != nil || got.RetentionDays != want {
+			t.Fatalf("stored %d = %+v, %v", stored, got, err)
+		}
+	}
 	if err := db.Settings().Put(ctx, settings.SettingTrashcan, "not an object"); err != nil {
 		t.Fatal(err)
 	}

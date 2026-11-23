@@ -464,7 +464,7 @@ offlineMode: false
 	_, err := Parse([]byte(doc), noEnv)
 	want := "sections not supported: offlineMode; " +
 		"the supported sections are localRepositories, remoteRepositories, virtualRepositories, federatedRepositories, " +
-		"proxies, propertySets, repoLayouts, downloadRedirectConfig, mailServer, security, urlBase, backups, systemMessageConfig"
+		"proxies, propertySets, repoLayouts, gcConfig, trashcanConfig, downloadRedirectConfig, mailServer, security, urlBase, backups, systemMessageConfig"
 	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), want) {
 		t.Fatalf("%v", err)
 	}
