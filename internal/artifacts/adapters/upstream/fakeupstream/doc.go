@@ -38,8 +38,9 @@
 //     that trusts the server's certificate, and that Certificate for the
 //     transport under test.
 //   - Recorded requests: Requests returns redacted snapshots in arrival
-//     order, Count counts them by method and path, and Request.HeaderMatches
-//     checks a header value the test knows without the record holding it.
+//     order, Count counts them by method and path, Request.HeaderMatches
+//     checks a header value the test knows without the record holding it, and
+//     Request.RemoteAddr tells a reused connection from a replay on a new one.
 //   - NewProxy and NewProxyOn: a forward proxy that forwards plain HTTP and tunnels CONNECT
 //     to the listed fixtures only. ClientIdentity: a test CA and client
 //     certificate for mutual TLS.

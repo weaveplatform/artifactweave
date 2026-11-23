@@ -68,9 +68,17 @@ func NewClient(c repo.Config, opts remote.Options) (*Client, error) {
 		}
 		dialer.LocalAddr = &net.TCPAddr{IP: ip}
 	}
+	// A pooled connection's read loop waits under the idle deadline it set when
+	// the connection went idle, and idleConn.Write moves that deadline only once
+	// the next request is written. Handing out only connections idle for less
+	// than half the socket timeout keeps that deadline out of reach in between.
+	idleConnTimeout := 90 * time.Second
+	if idle > 0 {
+		idleConnTimeout = min(idleConnTimeout, max(idle/2, time.Nanosecond))
+	}
 	tr := &http.Transport{
 		MaxIdleConns: 100, MaxIdleConnsPerHost: 10, MaxConnsPerHost: 32,
-		IdleConnTimeout: 90 * time.Second, TLSHandshakeTimeout: idle,
+		IdleConnTimeout: idleConnTimeout, TLSHandshakeTimeout: idle,
 		ResponseHeaderTimeout: idle, ExpectContinueTimeout: time.Second,
 		DisableCompression:     true,
 		MaxResponseHeaderBytes: 1 << 20,
@@ -454,8 +462,20 @@ func (c *idleConn) Read(p []byte) (int, error) {
 
 func (c *idleConn) Write(p []byte) (int, error) {
 	if c.timeout > 0 {
-		if err := c.SetWriteDeadline(time.Now().Add(c.timeout)); err != nil {
+		now := time.Now()
+		if err := c.SetWriteDeadline(now.Add(c.timeout)); err != nil {
 			return 0, fmt.Errorf("set write deadline: %w", err)
+		}
+		// The transport's read loop is already blocked in a read on a reused
+		// connection, under the deadline it set when the connection went idle.
+		// Left alone, that deadline expires while the origin is still answering,
+		// and net/http replays an idempotent request whose first response read
+		// fails on a reused connection: one fetch, two origin exchanges (#1866).
+		// Twice the timeout leaves the header wait to ResponseHeaderTimeout,
+		// which starts when the write completes and fails without a replay,
+		// while every pending read stays bounded.
+		if err := c.SetReadDeadline(now.Add(2 * c.timeout)); err != nil {
+			return 0, fmt.Errorf("set read deadline: %w", err)
 		}
 	}
 	n, err := c.Conn.Write(p)
