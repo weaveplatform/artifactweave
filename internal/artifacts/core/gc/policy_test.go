@@ -288,14 +288,21 @@ func TestUnitScheduledStopsOnShutdown(t *testing.T) {
 	if err := c.Scheduled(w.db, nil)(t.Context(), trigger); err != nil {
 		t.Fatal(err)
 	}
-	// A fire whose successor is already due is skipped: missed fires run once.
-	w.advance(4 * time.Hour)
-	if err := run(t.Context(), trigger); err != nil || reported != 1 {
+	// A fire whose successor is already queued (the position is past it) is
+	// skipped: missed fires run once. Lateness alone skips nothing: a fire
+	// whose successor is due but not yet queued runs, or a frequent
+	// expression would never get a pass.
+	position := gcSchedule(t, w.db).Next
+	w.advance(12 * time.Hour)
+	if err := run(t.Context(), schedule.Trigger{Reference: trigger.Reference, Fire: position.Add(-8 * time.Hour)}); err != nil || reported != 1 {
 		t.Fatalf("superseded fire: %v, reported %d", err, reported)
+	}
+	if err := run(t.Context(), schedule.Trigger{Reference: trigger.Reference, Fire: position.Add(-4 * time.Hour)}); err != nil || reported != 2 {
+		t.Fatalf("late fire: %v, reported %d", err, reported)
 	}
 	// A schedule removed since admission still gets its pass, and a store
 	// that cannot be read fails the occurrence so the queue retries it.
-	if err := run(t.Context(), schedule.Trigger{Reference: schedule.Reference{Kind: gc.ScheduleKind, Key: "gone"}, Fire: w.now()}); err != nil || reported != 2 {
+	if err := run(t.Context(), schedule.Trigger{Reference: schedule.Reference{Kind: gc.ScheduleKind, Key: "gone"}, Fire: w.now()}); err != nil || reported != 3 {
 		t.Fatalf("removed schedule: %v, reported %d", err, reported)
 	}
 	failing := c.Scheduled(failingPolicyStore{w.db, "schedules.get"}, nil)

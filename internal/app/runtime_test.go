@@ -184,8 +184,11 @@ func TestAccRuntimeRunsGC(t *testing.T) {
 		if rt.modules.artifacts.GC() == nil || rt.location.Type != "file-system" {
 			t.Fatalf("runtime %+v", rt)
 		}
+		// A fire every second is always overdue by the time its occurrence
+		// runs on a loaded runner, so this also proves lateness alone never
+		// skips a pass. The bound is for a stalled scheduler, not a timing.
 		passes := strings.Count(logs.String(), "garbage collection: nothing to do")
-		for deadline := time.Now().Add(10 * time.Second); strings.Count(logs.String(),
+		for deadline := time.Now().Add(30 * time.Second); strings.Count(logs.String(),
 			"garbage collection: nothing to do") == passes; {
 			if time.Now().After(deadline) {
 				t.Fatalf("start %d: no scheduled garbage collection pass logged:\n%s", start, logs.String())

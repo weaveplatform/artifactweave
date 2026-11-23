@@ -199,10 +199,12 @@ func invalid(field, reason string) error {
 //
 // The shared scheduler catches up every fire missed while no node ran, and
 // each pass walks the whole blob store, so after a long stop the passes
-// would run back to back for nothing. A fire whose successor is already due
-// is skipped instead: missed fires run once, as Quartz's default cron
-// misfire instruction (MISFIRE_INSTRUCTION_FIRE_ONCE_NOW) runs them in
-// Artifactory. The last missed fire has no due successor, so it runs.
+// would run back to back for nothing. A fire is skipped when a later one is
+// already queued: missed fires run once, as Quartz's default cron misfire
+// instruction (MISFIRE_INSTRUCTION_FIRE_ONCE_NOW) runs them in Artifactory.
+// The test is what has been queued, not what is due by the clock: with a
+// frequent expression the next fire is always due by the time a queued one
+// runs, and a clock test would skip every pass.
 func (c *Collector) Scheduled(schedules interface{ Schedules() schedule.Store }, onRun func(Report, error)) schedule.Handler {
 	return func(ctx context.Context, trigger schedule.Trigger) error {
 		later, err := c.superseded(ctx, schedules.Schedules(), trigger)
@@ -220,9 +222,12 @@ func (c *Collector) Scheduled(schedules interface{ Schedules() schedule.Store },
 	}
 }
 
-// superseded reports whether the fire after trigger's is already due. The
-// scheduler admitted trigger under the schedule's current revision, so the
-// stored expression is the one that produced it.
+// superseded reports whether the fire after trigger's has been queued. The
+// scheduler queues the fire at its stored position and then advances the
+// position to the fire after it, so a position past trigger's successor
+// means that successor is queued and will run the pass. The scheduler
+// admitted trigger under the schedule's current revision, so the stored
+// expression is the one that produced it.
 func (c *Collector) superseded(ctx context.Context, schedules schedule.Store, trigger schedule.Trigger) (bool, error) {
 	state, err := schedules.Get(ctx, trigger.Reference)
 	switch {
@@ -235,5 +240,5 @@ func (c *Collector) superseded(ctx context.Context, schedules schedule.Store, tr
 	// the zero Expression's Next fails and the pass runs, the safe answer.
 	e, _ := schedule.Parse(state.Cron, state.Zone)
 	next, err := e.Next(trigger.Fire)
-	return err == nil && !next.After(c.now()), nil
+	return err == nil && next.Before(state.Next), nil
 }

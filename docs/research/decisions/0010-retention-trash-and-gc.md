@@ -150,12 +150,14 @@ sections with the effective values, Artifactory's defaults included.
   admits before a pass runs under the `storage-gc` lease. A pass cut short by shutdown
   hands its occurrence back; a failed pass is logged and the next fire runs another, as
   the fixed-interval loop did.
-- Fires missed while no node ran are each queued, but a fire whose successor is already
-  due is skipped, so they give one pass, as Quartz's default cron misfire instruction
-  (`MISFIRE_INSTRUCTION_FIRE_ONCE_NOW`, what Quartz's smart policy means for a cron
-trigger) gives one run in Artifactory **[I]**. Each pass walks the
-  whole blob store, so running every missed fire back to back would cost much and remove
-  nothing more.
+- Fires missed while no node ran are each queued, but a fire is skipped when the fire
+  after it is already queued, so they are coalesced into the last one, as Quartz's default
+  cron misfire instruction (`MISFIRE_INSTRUCTION_FIRE_ONCE_NOW`, what Quartz's smart policy
+  means for a cron trigger) gives one run in Artifactory **[I]**. Each pass walks the whole
+  blob store, so running every missed fire back to back would cost much and remove nothing
+  more. The test is what has been queued, not the clock: with a frequent expression the
+  next fire is always due by the time a queued one runs, so skipping late fires would skip
+  every pass.
 - A bare increment such as `/4` is `*/4`, as Quartz's `CronExpression` reads it. The shared
   parser refused it before CFG-05, which would have refused Artifactory's own default; the
   cleanup and replication schedules accept it too.

@@ -66,9 +66,10 @@
 //     finishes without a pass. Policies writes in the transaction ctx
 //     carries, so a descriptor that fails later rolls the trash can
 //     settings and the schedule back with it.
-//   - A fire whose successor is already due is skipped, so fires missed
-//     while no node ran give one pass, as Quartz's default cron misfire
-//     instruction does in Artifactory.
+//   - A fire is skipped when the fire after it is already queued, so fires
+//     missed while no node ran are coalesced into the last one, as Quartz's
+//     default cron misfire instruction does in Artifactory. Lateness alone
+//     skips nothing, so a frequent expression still runs its passes.
 //   - A retention period is refused when negative or when it reaches back
 //     before Artifactory's floor (February 2003); zero purges at the next
 //     pass. A cron expression is refused when it does not parse or never
