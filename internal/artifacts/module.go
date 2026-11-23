@@ -37,6 +37,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
 )
 
@@ -56,6 +57,8 @@ type Store interface {
 	remote.Store
 	upstream.ResolverStore
 	InTx(context.Context) bool
+	// Schedules holds the garbage collector's Quartz schedule (gc.Policies).
+	Schedules() schedule.Store
 }
 
 // Deps is what app passes New: what the module's services and its remote
@@ -82,14 +85,14 @@ type Deps struct {
 	// Work is the work queue that the item service queues derived work on
 	// and RegisterWork registers its kinds with.
 	Work *work.Queue
-	// GC is the garbage collector, whose loop Start runs. app builds it,
-	// because its reapers come from app's multipart and registry upload
-	// services.
+	// GC is the garbage collector, whose passes ScheduleHandlers runs on
+	// gcConfig's schedule. app builds it, because its reapers come from
+	// app's multipart and registry upload services.
 	GC *gc.Collector
 	// Settings are the module's settings, from app/config's Artifacts.
 	Settings Settings
-	// Log receives the logs of the remote runtimes and of the garbage
-	// collection loop; nil means slog.Default().
+	// Log receives the logs of the remote runtimes and of the scheduled
+	// garbage collection passes; nil means slog.Default().
 	Log *slog.Logger
 	// PrepareNIMModelUpload prepares a NIM model remote's cache upload. It
 	// lives in nimmodel's http package, which the module root may not import
@@ -114,7 +117,6 @@ type Module struct {
 	log                   *slog.Logger
 	prepareNIMModelUpload func(source.Request, *item.CacheUpload)
 	allowedPrivateOrigins []string
-	gcInterval            time.Duration
 	api                   artifactsapi.API
 	// items runs the formats' derived work, and the remote policies ingest
 	// through it.
@@ -170,11 +172,13 @@ func New(d Deps) (*Module, error) {
 		log:                   log,
 		prepareNIMModelUpload: d.PrepareNIMModelUpload,
 		allowedPrivateOrigins: d.Settings.AllowedPrivateOrigins,
-		gcInterval:            d.Settings.GCInterval,
 		api: artifactsapi.API{
 			Lifetimes:    repos.NewRepositoryLifetimes(d.Store),
 			Repositories: repos.NewRepositories(d.Store, d.Access.Keys, d.Access.Projects, d.RepositoryLifecycle),
 			Layouts:      layout.Checker{},
+			// The policy is read on every deletion, purge and schedule tick,
+			// so the binding holds nothing a change could leave stale.
+			StoragePolicies: gc.Policies{Store: d.Store},
 		},
 		formats:      formats,
 		virtualCache: cache,
@@ -204,6 +208,13 @@ func New(d Deps) (*Module, error) {
 		m.items.Work = d.Work
 	}
 	return m, nil
+}
+
+// StoragePoliciesOf returns the StoragePolicies binding over st alone, for
+// code that holds a store before any module exists, such as config apply and
+// the bootstrap descriptor. It is the binding API().StoragePolicies holds.
+func StoragePoliciesOf(st gc.PolicyStore) artifactsapi.StoragePolicies {
+	return gc.Policies{Store: st}
 }
 
 // API returns the module's repository, layout, package-index, transfer-source and guarded-removal contracts,
@@ -312,20 +323,26 @@ func (m *Module) MavenEager() *maven.MavenEager { return m.mavenEager }
 // maintenance with the work queue. app calls it once the queue is open and
 // before the queue runs, because a kind with no handler waits (decision
 // 0033); the cache maintenance writes its schedule, so it cannot run in New.
-// The errors are the item service's, unwrapped.
+// It also creates the garbage collector's Quartz schedule at Artifactory's
+// default when no descriptor has set one; an existing schedule is kept, so
+// a restart adds none. The errors are the item service's and the
+// collector's, unwrapped.
 func (m *Module) RegisterWork(ctx context.Context) error {
 	if err := m.items.RegisterWork(m.work); err != nil {
 		return err //nolint:wrapcheck // the item service names its own errors
 	}
-	return m.items.RegisterCacheMaintenance(ctx, m.work) //nolint:wrapcheck // as above
+	if err := m.items.RegisterCacheMaintenance(ctx, m.work); err != nil {
+		return err //nolint:wrapcheck // as above
+	}
+	return gc.Policies{Store: m.store}.EnsureSchedule(ctx, time.Now()) //nolint:wrapcheck // the collector names its own errors
 }
 
-// Start runs the garbage collection loop through goLoop, so the caller that
-// cancels ctx can wait for it to return. It runs a pass every
-// Settings.GCInterval under the storage-gc lease, and logs each one with
-// logGC.
-func (m *Module) Start(ctx context.Context, goLoop func(func())) {
-	goLoop(func() { _ = m.gc.Loop(ctx, m.gcInterval, logGC(m.log)) })
+// ScheduleHandlers binds the garbage collector to its Quartz schedule
+// (gc.ScheduleKind): each fire of gcConfig.cronExp runs one pass under the
+// storage-gc lease, logged with logGC. app merges it with the other
+// modules' handlers before the shared scheduler runs.
+func (m *Module) ScheduleHandlers() map[string]schedule.Handler {
+	return map[string]schedule.Handler{gc.ScheduleKind: m.gc.Scheduled(m.store, logGC(m.log))}
 }
 
 // Close stops the Maven eager-companion queue and both Smart Remote runtimes,

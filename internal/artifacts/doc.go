@@ -29,25 +29,29 @@
 //   - Settings, one field per configured value that the module's code
 //     reads, named as that code names it, and the formats' settings.
 //   - Module, built by New: API, the module's artifacts/api surface
-//     (Repositories and Layouts); RegisterWork, which registers the item
-//     service's derived work and cache maintenance with the work queue;
-//     OpenRemoteSources, which opens the remote policies, the Maven
-//     eager-companion queue and both Smart Remote runtimes; Start, which
-//     runs the garbage collection loop; Close, which stops what
+//     (Repositories, Layouts and StoragePolicies, the gcConfig and
+//     trashcanConfig policy); RegisterWork, which registers the item
+//     service's derived work and cache maintenance with the work queue and
+//     creates the collector's default Quartz schedule; OpenRemoteSources,
+//     which opens the remote policies, the Maven eager-companion queue and
+//     both Smart Remote runtimes; ScheduleHandlers, which binds the
+//     collector to the shared scheduler; Close, which stops what
 //     OpenRemoteSources started; and the accessors that the router and the
 //     Debian snapshot work take: FormatSettings, GC, RemoteHTTP,
 //     RemoteSources, RegistrySources, RemoteStatus and MavenEager.
-//   - Deps.
+//   - Deps, and StoragePoliciesOf, the StoragePolicies binding over a store
+//     alone, for config apply and the bootstrap descriptor.
 //
 // # Invariants
 //
 //   - New does no I/O: it binds and builds, and the store, the network and
 //     the file system are reached only by the methods app calls after it.
 //     It refuses only Deps without a store.
-//   - app calls RegisterWork, OpenRemoteSources and Start in OpenRuntime's
-//     order, after the work queue opens and before it runs: a work kind with
-//     no handler waits (decision 0033), and the loops must start last so a
-//     failed start closes everything it opened.
+//   - app calls RegisterWork and OpenRemoteSources in OpenRuntime's order,
+//     and binds ScheduleHandlers, after the work queue opens and before it
+//     and the scheduler run: a work kind with no handler waits (decision
+//     0033), and the loops must start last so a failed start closes
+//     everything it opened.
 //   - The persisted names stay byte for byte: the setting
 //     remote.internal_policy_key, which holds the remote policy key without
 //     a master key (a new name would mint a new key and change every remote
@@ -82,7 +86,9 @@
 //   - Decision 0007: docs/research/decisions/0007-remote-repositories.md.
 //   - Decision 0008: docs/research/decisions/0008-virtual-repositories.md.
 //   - Decision 0010: docs/research/decisions/0010-retention-trash-and-gc.md
-//     (the garbage collection loop under the storage-gc lease).
+//     (scheduled garbage collection under the storage-gc lease, on the
+//     descriptor's gcConfig.cronExp since P12 CFG-05,
+//     https://github.com/weaveplatform/artifactweave/issues/1829).
 //   - Decision 0032: docs/research/decisions/0032-package-format-handlers.md.
 //   - Decision 0033: docs/research/decisions/0033-persistent-work-queue.md.
 //   - Plan: docs/implementation/plan.md#p9d-modular-monolith-migration,
@@ -97,7 +103,8 @@
 // # Status
 //
 // Implemented P9d: the module settings, New and Module, with the remote
-// wiring and the garbage collection loop moved from app. The module's routes
+// wiring and the garbage collection loop moved from app. P12 CFG-05 replaced
+// the loop's fixed interval with the shared Quartz scheduler. The module's routes
 // stay in the server; the multipart upload service and the garbage
 // collector stay built by app.
 //

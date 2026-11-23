@@ -17,6 +17,7 @@ import (
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/weaveplatform/artifactweave/internal/app/config"
+	"github.com/weaveplatform/artifactweave/internal/artifacts"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/s3"
@@ -166,28 +167,38 @@ func TestAccRuntimeOnPostgresAndMinIO(t *testing.T) {
 	}
 }
 
+// TestAccRuntimeRunsGC applies gcConfig through the bootstrap descriptor and
+// sees the shared scheduler run passes on it; a restart keeps the one
+// schedule the descriptor set rather than adding the default beside it.
 func TestAccRuntimeRunsGC(t *testing.T) {
 	var logs syncBuffer
 	log := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	cfg := testConfig(t)
-	cfg.GC.Interval = 10 * time.Millisecond
+	cfg.Bootstrap.Descriptor = writeFile(t, "gcConfig:\n  cronExp: '* * * * * ?'\n")
 	ctx := context.Background()
-	rt, err := OpenRuntime(ctx, cfg, log, RuntimeOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rt.modules.artifacts.GC() == nil || rt.location.Type != "file-system" {
-		t.Fatalf("runtime %+v", rt)
-	}
-	for deadline := time.Now().Add(5 * time.Second); !strings.Contains(logs.String(),
-		"garbage collection: nothing to do"); {
-		if time.Now().After(deadline) {
-			t.Fatalf("no garbage collection pass logged:\n%s", logs.String())
+	for start := range 2 {
+		rt, err := OpenRuntime(ctx, cfg, log, RuntimeOptions{})
+		if err != nil {
+			t.Fatal(err)
 		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	if err := rt.Close(ctx); err != nil {
-		t.Fatal(err)
+		if rt.modules.artifacts.GC() == nil || rt.location.Type != "file-system" {
+			t.Fatalf("runtime %+v", rt)
+		}
+		passes := strings.Count(logs.String(), "garbage collection: nothing to do")
+		for deadline := time.Now().Add(10 * time.Second); strings.Count(logs.String(),
+			"garbage collection: nothing to do") == passes; {
+			if time.Now().After(deadline) {
+				t.Fatalf("start %d: no scheduled garbage collection pass logged:\n%s", start, logs.String())
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		policy, err := artifacts.StoragePoliciesOf(rt.Store).Current(ctx)
+		if err != nil || policy.GCCron != "* * * * * ?" {
+			t.Fatalf("start %d: effective policy %+v, %v", start, policy, err)
+		}
+		if err := rt.Close(ctx); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

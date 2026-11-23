@@ -23,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/internal/artifacts"
 	artifactshttp "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/pkgroute"
@@ -394,6 +395,7 @@ func withConfiguration(cfg RouterConfig) RouterConfig {
 		Store:        cfg.Store,
 		Repositories: repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects, repositoryLifecycle(cfg)),
 		Layouts:      layout.Checker{}, Access: cfg.Access, Logging: ownedLogging, Log: cfg.Logger,
+		StoragePolicies: artifacts.StoragePoliciesOf(cfg.Store),
 	})
 	if err == nil {
 		bound := m.API()

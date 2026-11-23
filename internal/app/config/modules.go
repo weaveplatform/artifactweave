@@ -51,7 +51,6 @@ func (c Config) Artifacts() artifacts.Settings {
 		NuGetSnapshotCleanupInterval:   c.NuGet.SnapshotCleanupInterval,
 		AllowedPrivateOrigins:          c.Remote.AllowedPrivateOrigins,
 		GCGrace:                        c.GC.GracePeriod,
-		GCInterval:                     c.GC.Interval,
 		VirtualCacheEntries:            c.Virtual.MetadataCache.MaxEntries,
 		VirtualCacheBytes:              int64(c.Virtual.MetadataCache.MaxSize),
 		Formats: ecosystem.Settings{

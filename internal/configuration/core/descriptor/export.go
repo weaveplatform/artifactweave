@@ -47,6 +47,8 @@ type exportDocument struct {
 	Proxies          []exportFields `xml:"proxies>proxy"`
 	PropertySets     []exportFields `xml:"propertySets>propertySet"`
 	Layouts          []exportFields `xml:"repoLayouts>repoLayout"`
+	GC               *exportFields  `xml:"gcConfig,omitempty"`
+	Trashcan         *exportFields  `xml:"trashcanConfig,omitempty"`
 	DownloadRedirect *exportFields  `xml:"downloadRedirectConfig,omitempty"`
 }
 
@@ -196,6 +198,9 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 		}
 	}
 	if out.Security, err = readExportSecurity(ctx, d); err != nil {
+		return out, err
+	}
+	if err := readExportStorage(ctx, d, &out); err != nil {
 		return out, err
 	}
 	for _, section := range []struct {

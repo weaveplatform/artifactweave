@@ -17,9 +17,9 @@
 //
 //   - Parse: a YAML document and a lookup for its ${NAME} references.
 //   - Deps, which Apply and NewAPI take: the unit of work (platform/tx), the
-//     artifacts module's Repositories and Layouts, the configuration
-//     document port (platform/configdoc) and access's AnonymousAccess and
-//     LDAPSettings, all over one store.
+//     artifacts module's Repositories, Layouts and StoragePolicies, the
+//     configuration document port (platform/configdoc) and access's
+//     AnonymousAccess and LDAPSettings, all over one store.
 //   - DownloadRedirectMinSize: the configuration document port.
 //
 // # Outputs
@@ -56,6 +56,12 @@
 //     two surfaces share one connection; access's refusals are reported with
 //     the descriptor's field names, and the export never carries a manager
 //     password.
+//   - gcConfig and trashcanConfig are planned and written through artifacts'
+//     StoragePolicies, which owns the trash can and the collector's Quartz
+//     schedule (decision 0010), so configuration never bypasses deletion or
+//     collection. Both are required singletons: neither a section nor one
+//     of its fields can be null, and the export always carries both, with
+//     Artifactory's defaults when nothing set them.
 //   - Parsing is strict: an unset ${NAME}, a section artifactweave does not
 //     apply, an unknown field and a null on a field that is not a string are
 //     refused, so a pipeline never takes a 200 for settings that changed
@@ -96,7 +102,10 @@
 // PRJ-04 adds the documented singleton mailServer settings for quota delivery,
 // with its password separated before persistence and guarded configuration reads.
 // LDAP-01 adds security.ldapSettings through access's LDAPSettings, with the
-// connections in the XML export's security element.
+// connections in the XML export's security element. CFG-05
+// (https://github.com/weaveplatform/artifactweave/issues/1829) adds gcConfig
+// and trashcanConfig through artifacts' StoragePolicies, exported in XSD
+// order.
 //
 // # Testing
 //
@@ -120,4 +129,8 @@
 //   - ldap_test.go: every ldapSettings field mapped, outcomes through
 //     access's binding with a dry run and a second apply, a missing binding,
 //     planning and write failures, and the export's element order.
+//   - storage_test.go: gcConfig and trashcanConfig parsing and refusals,
+//     dry run, apply and reapply through the owner's binding, the owner's
+//     refusals in the descriptor's names, rollback with a failing later
+//     write, and the export's defaults, values, order and provider read.
 package descriptor

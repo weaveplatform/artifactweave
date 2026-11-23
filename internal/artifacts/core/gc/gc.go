@@ -17,9 +17,6 @@ import (
 )
 
 const (
-	// DefaultInterval is Artifactory's default garbage collection schedule,
-	// every four hours.
-	DefaultInterval = 4 * time.Hour
 	// DefaultGrace is how long a blob must have been unreferenced, or its
 	// content unindexed, before it is deleted. It must outlast any upload in
 	// flight: content is written before its reference, so younger
@@ -413,27 +410,4 @@ func (c *Collector) prune(ctx context.Context, rep *Report) error {
 		return fmt.Errorf("gc: prune tombstones: %w", err)
 	}
 	return nil
-}
-
-// Loop runs a pass every interval until ctx ends, then returns ctx's error.
-// Each pass's report and error go to onRun when it is set; a failed pass
-// does not stop the loop.
-func (c *Collector) Loop(
-	ctx context.Context,
-	every time.Duration,
-	onRun func(Report, error),
-) error {
-	ticker := time.NewTicker(cmp.Or(every, DefaultInterval))
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("gc: loop: %w", ctx.Err())
-		case <-ticker.C:
-		}
-		rep, err := c.Run(ctx)
-		if onRun != nil {
-			onRun(rep, err)
-		}
-	}
 }

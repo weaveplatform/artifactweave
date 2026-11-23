@@ -26,7 +26,6 @@ func TestUnitModuleSettingsFromConfig(t *testing.T) {
 	cfg, err := Load(LoadOptions{
 		File: filepath.Join("testdata", "every-key.yaml"),
 		Flags: map[string]string{
-			"gc.interval":                          "7m",
 			"gc.grace_period":                      "3h",
 			"npm.merge_dist_tags_by_version":       "true",
 			"npm.external_dependencies_versioning": "true",
@@ -79,7 +78,6 @@ func TestUnitModuleSettingsFromConfig(t *testing.T) {
 		NuGetSnapshotCleanupInterval:   3 * time.Minute,
 		AllowedPrivateOrigins:          []string{"https://mirror.example.com"},
 		GCGrace:                        3 * time.Hour,
-		GCInterval:                     7 * time.Minute,
 		VirtualCacheEntries:            2000,
 		VirtualCacheBytes:              64 << 20,
 		Formats: ecosystem.Settings{

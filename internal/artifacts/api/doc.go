@@ -26,7 +26,9 @@
 // internal/artifacts/core/repos's NewRepositories binds Repositories over
 // the store and access's Keys and Projects, and artifacts/core/layout's
 // Checker implements Layouts; pkgindex.NewReader supplies PackageIndex, and
-// removal.New supplies ItemRemoval over the normal item service and current access.
+// removal.New supplies ItemRemoval over the normal item service and current access,
+// and gc.Policies supplies StoragePolicies over the trash can settings and the
+// collector's schedule.
 //
 // # Outputs
 //
@@ -59,6 +61,11 @@
 //   - ItemRemoval: current credential/native Delete and exact file facts fence
 //     normal item/trash/index/event mutations. The owner's selection check and
 //     durable acknowledgement join the deletion transaction; failures roll it back.
+//   - StoragePolicies, with StoragePolicy, StoragePolicyChange,
+//     StoragePolicyResult and StoragePolicyInvalid: the garbage collection
+//     schedule and trash can policy that the configuration descriptor's
+//     gcConfig and trashcanConfig apply and export, through the services
+//     that own collection and deletion.
 //   - API: the contracts as the module binds them, consumed by configuration,
 //     retention and the application composition.
 //

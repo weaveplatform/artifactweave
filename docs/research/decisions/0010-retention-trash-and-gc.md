@@ -119,8 +119,9 @@ Project scheduling policy is explicit: UTC by default, optional named IANA timez
 skip nonexistent civil times and use the first instant of repeated civil times. Missed
 fires catch up from the persisted logical fire in bounded passes. These are project
 choices, not claimed vendor runtime observations. Cleanup/replication execution tickets
-consume this foundation and own their run/report APIs. Existing fixed-interval trash,
-GC and format maintenance jobs retain their current behavior.
+consume this foundation and own their run/report APIs. Garbage collection runs on it from
+P12 CFG-05, on the descriptor's `gcConfig.cronExp` (below); the existing fixed-interval
+format maintenance jobs retain their current behavior.
 
 **Trash can.** Deleting an item, or a repository with its content, moves the items to the
 trash with the original repository and path; `trashcanConfig.retentionPeriodDays` governs
@@ -128,6 +129,56 @@ purge; `empty`, `clean` and `restore` follow the documented endpoints and permis
 
 **Garbage collection.** `POST /api/system/storage/gc` removes blobs with no referencing
 item or trash entry and refreshes the storage summary.
+
+**Descriptor policy (P12 CFG-05, [#1829](https://github.com/weaveplatform/artifactweave/issues/1829)).**
+`gcConfig.cronExp`, `trashcanConfig.enabled` and `trashcanConfig.retentionPeriodDays`
+are applied by PATCH, `config apply` and the bootstrap descriptor through the artifacts
+module's `StoragePolicies` (`internal/artifacts/core/gc`, `Policies`), never by writing
+the stored state from configuration, so the next deletion, purge and scheduled pass see
+the change. The descriptor plans the whole document first and writes the policy in its
+one transaction, so a later failing write rolls the trash can settings and the
+collector's schedule back with everything else. The XML export always carries both
+sections with the effective values, Artifactory's defaults included.
+- The schedule row (`storage:gc`, `gcConfig`) on the shared scheduler is the one copy of
+  the expression. A start that finds none creates it at Artifactory's default
+  `0 0 /4 * * ?` ([D] [regular maintenance](https://docs.jfrog.com/administration/docs/regular-maintenance-operations.md):
+  every four hours; the expression is 6.20's shipped `artifactory.config.xml` **[I]**).
+  A restart or a repeated apply finds that row, so neither adds a schedule, and an
+  unchanged expression keeps its revision and position. A changed one takes a fresh
+  revision, so an occurrence already queued under the old one finishes without a pass.
+- Each fire queues a durable occurrence that the work queue leases and the scheduler
+  admits before a pass runs under the `storage-gc` lease. A pass cut short by shutdown
+  hands its occurrence back; a failed pass is logged and the next fire runs another, as
+  the fixed-interval loop did.
+- Fires missed while no node ran are each queued, but a fire whose successor is already
+  due is skipped, so they give one pass, as Quartz's default cron misfire instruction
+  (`MISFIRE_INSTRUCTION_FIRE_ONCE_NOW`, what Quartz's smart policy means for a cron
+trigger) gives one run in Artifactory **[I]**. Each pass walks the
+  whole blob store, so running every missed fire back to back would cost much and remove
+  nothing more.
+- A bare increment such as `/4` is `*/4`, as Quartz's `CronExpression` reads it. The shared
+  parser refused it before CFG-05, which would have refused Artifactory's own default; the
+  cleanup and replication schedules accept it too.
+- An expression that does not parse, or that never fires again, answers 400 naming
+  `gcConfig.cronExp`: Quartz refuses to schedule a trigger that will never fire. Fire
+  times are evaluated in UTC, the scheduler's project policy above; Artifactory uses the
+  server's time zone **[I]**.
+- `retentionPeriodDays` of zero purges what is trashed at the next pass: Artifactory's
+  settings form takes 0 as its minimum and its small collection expires entries trashed
+  before now minus the period (6.20 `general.html`, `TrashServiceImpl.getTrashValidFrom`
+  **[I]**). A negative period answers 400, as the `artifactory_trashcan_config` resource's
+  `AtLeast(0)` also refuses it; so does one reaching back before February 2003, the floor
+  at which Artifactory refuses "Illegal retention date. Retention period goes back too
+  far." (6.20 `TrashServiceImpl.validateRetentionPeriodTimestamp`, run on every
+  configuration save **[I]**).
+- Neither section nor any of its fields can be null: the XSD makes `gcConfig`,
+  `cronExp`, `trashcanConfig`, `enabled` and `retentionPeriodDays` required, and
+  Artifactory's "delete an element" page allows null only on strings of repositories. A
+  field left out keeps its value. `trashcanConfig.allowPermDeletes`, which the XSD has and
+  the documented YAML and the provider resource do not, is refused as an unknown field:
+  artifactweave has no permanent deletion for it to allow.
+- The application key `gc.interval` is gone: two schedules would let the export report one
+  while the other ran. `gc.grace_period` stays, as no descriptor field holds it.
 
 **Implementation (P3).**
 - **Trash can.**
@@ -150,7 +201,7 @@ item or trash entry and refreshes the storage summary.
   - Permission failures on `clean`, `empty` and `restore` answer 400, as Artifactory reports them.
   - While the trash can is off, a delete removes the item for good, and every `auto-trashcan` storage view, its root included, answers 404 "Could not find resource" to every caller, an administrator too, as a path that was not there did when this was decided (#490). The check comes before the caller's rights, as a repository that does not exist answers 404 before them. Without credentials while anonymous access is off, the caller still gets 401.
   - What the trash can held when it was turned off stays. `restore`, `clean` and `empty` still act on it, and nothing in it expires until the trash can is on again, when the retention period applies to it as before.
-- **Garbage collection** runs every `gc.interval` (4 hours) and on `POST /api/system/storage/gc`, under the `storage-gc` lease. A pass:
+- **Garbage collection** runs on `gcConfig.cronExp` (every four hours unless a descriptor sets it; see "Descriptor policy") and on `POST /api/system/storage/gc`, under the `storage-gc` lease. A pass:
   - purges expired trash entries while the trash can is on;
   - reaps upload sessions untouched for 24 hours;
   - finishes removals a crashed pass left deleting;
@@ -310,6 +361,13 @@ inferred:
 ## Verification
 
 - Cron parser conformance test over the documented examples.
+- `TestAccStoragePolicyEffects` (`internal/artifacts/core/gc`) on memory, SQLite and
+  PostgreSQL: scheduled passes on a controlled clock keep trashed content within the
+  retention period, restore it, purge it after, keep bytes another item references,
+  collect a delete made with the trash can off, run missed fires once, drop an occurrence
+  a changed schedule superseded and roll back with a failed transaction.
+  `TestAccRuntimeRunsGC` applies `gcConfig` through the bootstrap descriptor and sees
+  passes across a restart.
 - Policy evaluation tests per criterion over a fixture package index.
 - Acceptance: a policy dry run and run with reports, trash restore, GC storage numbers.
 - `artifactory_package_cleanup_policy` Terraform acceptance.
@@ -320,3 +378,7 @@ inferred:
 - <https://docs.jfrog.com/administration/reference/storage-and-archive/llms.txt>
 - <https://github.com/reugn/go-quartz>
 - <https://github.com/influxdata/cron>
+- <https://docs.jfrog.com/installation/docs/advanced-configurations-in-artifactory-yaml.md> (`gcConfig`)
+- <https://docs.jfrog.com/installation/docs/general-general-property-sets-proxy-mail-configurations-in-artifactory-yaml.md> (`trashcanConfig`)
+- <https://docs.jfrog.com/administration/docs/regular-maintenance-operations.md>
+- <https://jfrog.com/help/r/artifactory-how-to-temporarily-disable-garbage-collection> (GC cannot be disabled, only rescheduled)

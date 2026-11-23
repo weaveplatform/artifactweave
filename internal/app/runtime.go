@@ -115,7 +115,8 @@ func (o RuntimeOptions) withDefaults() RuntimeOptions {
 
 // OpenRuntime opens the store (applying pending migrations), builds both
 // blob tiers and the modules, and starts a repair loop for each mirror, the
-// garbage collector and the work queue's workers, with the costs opts sets.
+// work queue's workers and the shared Quartz scheduler, which runs garbage
+// collection on gcConfig's schedule, with the costs opts sets.
 // On failure everything opened so far is closed again. The caller closes
 // the runtime with Close.
 func OpenRuntime(
@@ -232,11 +233,13 @@ func OpenRuntime(
 	}
 	scheduler := &schedule.Service{Store: st}
 	scheduleHandlers := mods.retention.ScheduleHandlers()
-	for kind, handler := range mods.federation.ScheduleHandlers() {
-		if _, exists := scheduleHandlers[kind]; exists {
-			return nil, errors.Join(fmt.Errorf("duplicate application schedule handler: %w", kernel.ErrStore), st.Close())
+	for _, owner := range []map[string]schedule.Handler{mods.federation.ScheduleHandlers(), art.ScheduleHandlers()} {
+		for kind, handler := range owner {
+			if _, exists := scheduleHandlers[kind]; exists {
+				return nil, errors.Join(fmt.Errorf("duplicate application schedule handler: %w", kernel.ErrStore), st.Close())
+			}
+			scheduleHandlers[kind] = handler
 		}
-		scheduleHandlers[kind] = handler
 	}
 	if err := scheduler.Register(queue, scheduleHandlers); err != nil {
 		return nil, errors.Join(err, st.Close())
@@ -317,7 +320,6 @@ func OpenRuntime(
 		rt.mirrors = append(rt.mirrors, t.m)
 		rt.loops.Go(func() { _ = t.m.RunRepair(lctx, repairEvery, trigger) })
 	}
-	art.Start(lctx, rt.loops.Go)
 	// Stopping hands back the leases of runs it cuts short, so another node
 	// or the next start picks them up at once.
 	rt.loops.Go(func() { _ = queue.Run(lctx) })

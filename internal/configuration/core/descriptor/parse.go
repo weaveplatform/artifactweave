@@ -87,6 +87,9 @@ type Patch struct {
 	// LDAP are the security.ldapSettings connections, written through
 	// access's LDAPSettings.
 	LDAP []accessapi.LDAPChange
+	// Storage is the gcConfig and trashcanConfig sections, written through
+	// artifacts' StoragePolicies; nil when the document has neither.
+	Storage *StorageChange
 	// Changes is the number Artifactory reports as "<n> changes to config
 	// merged successfully": every value in the document, whether or not it
 	// differs from what is stored (see values).
@@ -202,6 +205,9 @@ func Parse(doc []byte, env Lookup) (*Patch, error) {
 	if err := parseSecurity(top, p); err != nil {
 		return nil, err
 	}
+	if err := parseStorage(top, p); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 
@@ -266,6 +272,8 @@ var applied = []string{
 	SectionProxies,
 	SectionPropertySets,
 	SectionLayouts,
+	SectionGC,
+	SectionTrashcan,
 	SectionDownloadRedirect,
 	SectionMailServer,
 	SectionSecurity,

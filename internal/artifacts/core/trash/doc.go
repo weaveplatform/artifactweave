@@ -18,7 +18,8 @@
 //     of auto-trashcan paths; the repository delete
 //     (internal/artifacts/core/repos), which keeps a repository's content
 //     here (Keep); the garbage collector (internal/artifacts/core/gc),
-//     which expires entries (PurgeExpired); and the format contract suite
+//     which expires entries (PurgeExpired) and whose Policies writes the
+//     settings the descriptor's trashcanConfig sets; and the format contract suite
 //     (artifacts/core/formattest), which restores.
 //   - Driven: the metadata store, through Store, for trash entries, items
 //     and their properties, blob references, the trash can settings and
@@ -27,7 +28,8 @@
 //     restored items and names the sidecars a file's format keeps with it
 //     (format.SidecarKeeper).
 //   - The trash can settings: whether it is on, and the retention period in
-//     days. Unset, it is on with Artifactory's 14 days.
+//     days. Unset, it is on with Artifactory's 14 days; zero days purges at
+//     the next collection pass.
 //   - The caller's permit (Restore) and filter (Children, Below, Walk,
 //     Holds), which judge each item at its original path. Nil allows every
 //     item, for an administrator.
@@ -119,7 +121,7 @@
 // # Testing
 //
 //   - TestUnitSettings: the defaults, a stored setting, a stored setting with
-//     no retention, and a malformed one.
+//     no retention, zero and negative retentions, and a malformed one.
 //   - TestUnitRestoreToOriginal, TestUnitRestoreElsewhere,
 //     TestUnitRestoreNewestAndOverwrite and
 //     TestUnitRestoreIntoExistingFolder: where a restore puts items, and
