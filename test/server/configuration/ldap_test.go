@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
+	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/dialect"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/storekit"
@@ -75,6 +76,14 @@ func TestAccLDAPDescriptorSharesAccessConnections(t *testing.T) {
 	if code, body := w.patch("admin", ldapYAML); code != http.StatusOK || body != "6 changes to config merged successfully" {
 		t.Fatal(code, body)
 	}
+	// The first enabled connection turned internal password login off, as
+	// in 7.x; the administrator, who has no token here, turns it back on
+	// (TestAccInternalPasswordLogin covers the switch).
+	var internal bool
+	if err := w.db.Settings().Get(t.Context(), settings.SettingBasicAuthEnabled, &internal); err != nil || internal {
+		t.Fatalf("internal password login after the first connection: %t %v", internal, err)
+	}
+	storekit.Must(t, w.db.Settings().Put(t.Context(), settings.SettingBasicAuthEnabled, true))
 	code, got := w.ldap("corp")
 	want := map[string]any{
 		"key": "corp", "enabled": true, "ldap_url": "ldaps://ldap.example.com:636/dc=example,dc=com",
@@ -118,7 +127,11 @@ func TestAccLDAPDescriptorSharesAccessConnections(t *testing.T) {
 	rec := w.do(http.MethodGet, configPath, "admin", "")
 	xml := rec.Body.String()
 	if rec.Code != http.StatusOK || strings.Contains(xml, ldapSecret) || strings.Contains(xml, "managerPassword") ||
-		!strings.Contains(xml, "<security><anonAccessEnabled>false</anonAccessEnabled><ldapSettings><ldapSetting>"+
+		!strings.Contains(xml, "<security><anonAccessEnabled>false</anonAccessEnabled>"+
+			"<userLockPolicy><enabled>false</enabled><loginAttempts>5</loginAttempts></userLockPolicy>"+
+			"<passwordSettings><encryptionPolicy>supported</encryptionPolicy><expirationPolicy><enabled>false</enabled>"+
+			"<passwordMaxAge>60</passwordMaxAge><notifyByEmail>true</notifyByEmail></expirationPolicy></passwordSettings>"+
+			"<ldapSettings><ldapSetting>"+
 			"<key>corp</key><enabled>false</enabled><ldapUrl>ldaps://ldap.example.com:636/dc=example,dc=com</ldapUrl>"+
 			"<search><searchFilter>(uid={0})</searchFilter><searchBase>ou=people</searchBase><searchSubTree>true</searchSubTree>"+
 			"<managerDn>cn=manager,dc=example,dc=com</managerDn></search><autoCreateUser>true</autoCreateUser>"+
@@ -184,7 +197,7 @@ func TestAccLDAPDescriptorRefusals(t *testing.T) {
 		"string flag":      {"security:\n  ldapSettings:\n    corp:\n      search:\n        searchSubTree: yes-please\n", "must be a boolean"},
 		"section null":     {"security:\n  ldapSettings: null\n", "must be a mapping of keys to connections"},
 		"entry scalar":     {"security:\n  ldapSettings:\n    corp: true\n", "must be a mapping or null"},
-		"group settings":   {"security:\n  ldapGroupSettings:\n    g:\n      enabledLdap: corp\n", "unknown field ldapGroupSettings"},
+		"group settings":   {"security:\n  ldapGroupSettings:\n    g:\n      enabledLdap: corp\n", "security.ldapGroupSettings is not applied yet; LDAP group settings arrive with LDAP-03"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			code, body := w.patch("admin", tc.yaml)
@@ -241,6 +254,12 @@ func TestAccLDAPDescriptorFailedWriteRollsBack(t *testing.T) {
 	}
 	if _, err := w.db.Repos().Get(t.Context(), "ldap-local"); !errors.Is(err, kernel.ErrNotFound) {
 		t.Fatal("the repository outlived the failed descriptor")
+	}
+	// The internal password switch the connection would have turned off
+	// is written in the same transaction, so it was never written either.
+	var internal bool
+	if err := w.db.Settings().Get(t.Context(), settings.SettingBasicAuthEnabled, &internal); !errors.Is(err, kernel.ErrNotFound) {
+		t.Fatal("the internal password switch outlived the failed descriptor", internal, err)
 	}
 	// A dry run plans the connection and writes nothing.
 	result, err := api.Descriptor.Apply(t.Context(), plan, time.Now(), true)

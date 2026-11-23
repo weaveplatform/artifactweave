@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
 	"github.com/weaveplatform/artifactweave/internal/access/core/login"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
@@ -736,14 +737,42 @@ func (s *Service) LockPolicy(ctx context.Context) (model.UserLockPolicy, error) 
 	return authn.LockPolicy(ctx, s.Store.Settings()) //nolint:wrapcheck // already wrapped
 }
 
-// SetLockPolicy stores p. Disabling the policy also clears every lock, as
-// Artifactory does, so turning it off is never a way to strand users.
-func (s *Service) SetLockPolicy(ctx context.Context, p model.UserLockPolicy) error {
+// CheckLockPolicy returns p as SetLockPolicy stores it: no loginAttempts
+// means the default. Every surface that writes the policy, the REST APIs
+// and the descriptor, checks it here, so they accept and store alike.
+func CheckLockPolicy(p model.UserLockPolicy) (model.UserLockPolicy, error) {
 	if p.LoginAttempts == 0 {
 		p.LoginAttempts = authn.DefaultLoginAttempts
 	}
 	if p.LoginAttempts < 1 {
-		return invalidf("loginAttempts must be at least 1")
+		return p, invalidf("loginAttempts must be at least 1")
+	}
+	return p, nil
+}
+
+// CheckExpirationPolicy refuses what SetExpirationPolicy refuses.
+func CheckExpirationPolicy(p model.PasswordExpirationPolicy) error {
+	if p.MaxAgeDays < 1 {
+		return invalidf("passwordMaxAge must be at least 1 day")
+	}
+	return nil
+}
+
+// CheckPasswordEncryption refuses a policy other than the three 7.x has.
+func CheckPasswordEncryption(p accessapi.PasswordEncryption) error {
+	switch p {
+	case accessapi.EncryptionSupported, accessapi.EncryptionRequired, accessapi.EncryptionUnsupported:
+		return nil
+	}
+	return invalidf("encryptionPolicy must be REQUIRED, SUPPORTED or UNSUPPORTED")
+}
+
+// SetLockPolicy stores p. Disabling the policy also clears every lock, as
+// Artifactory does, so turning it off is never a way to strand users.
+func (s *Service) SetLockPolicy(ctx context.Context, p model.UserLockPolicy) error {
+	p, err := CheckLockPolicy(p)
+	if err != nil {
+		return err
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
 		if err := s.Store.Settings().
@@ -767,8 +796,8 @@ func (s *Service) SetExpirationPolicy(
 	ctx context.Context,
 	p model.PasswordExpirationPolicy,
 ) (model.PasswordExpirationPolicy, error) {
-	if p.MaxAgeDays < 1 {
-		return p, invalidf("passwordMaxAge must be at least 1 day")
+	if err := CheckExpirationPolicy(p); err != nil {
+		return p, err
 	}
 	if err := s.tx(ctx, func(ctx context.Context) error {
 		return s.Store.Settings().Put(ctx, settings.SettingPasswordExpirationPolicy, p)

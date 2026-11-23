@@ -15,6 +15,7 @@ func (w *world) registerDescriptor(sc *godog.ScenarioContext) {
 	sc.Step(`^I PATCH descriptor file "([^"]*)" as admin$`, w.patchDescriptorFile)
 	sc.Step(`^I apply descriptor file "([^"]*)" to the server store$`, w.applyDescriptorFile)
 	sc.Step(`^the XML field "([^"]*)" equals "([^"]*)"$`, w.xmlFieldEquals)
+	w.registerMail(sc)
 }
 
 func (w *world) patchDescriptorFile(name string) error {

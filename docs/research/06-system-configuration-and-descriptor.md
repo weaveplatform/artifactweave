@@ -313,11 +313,31 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
   when present, must equal the entry key. A `null` flag or `search` block, an unknown
   field (including the Access API's snake_case names) and every connection the Access API
   would refuse answer 400 naming `security.ldapSettings.<key>` and the field, before anything
-  in the document is written. **[I]** A whole-section `ldapSettings: null` is refused, as
-  for `mailServer`; the deprecated `artifactory_ldap_setting` resource deletes with it,
+  in the document is written. **[I]** A whole-section `ldapSettings: null` is refused; the
+  deprecated `artifactory_ldap_setting` resource deletes with it,
   and `artifactory_ldap_setting_v2` deletes through the Access API instead. Reapplying a
-  document changes nothing and keeps each connection's revision. `ldapGroupSettings`
-  arrives with LDAP-03.
+  document changes nothing and keeps each connection's revision. The first enabled
+  connection turns internal password login off while that switch was never written, in
+  the same transaction ([research 05](05-platform-identity-and-security-apis.md#internal-password-login)).
+- `security.userLockPolicy` and `security.passwordSettings` (CFG-04,
+  [#1828](https://github.com/weaveplatform/artifactweave/issues/1828)) write the state of
+  `PUT /api/security/userLockPolicy`, `PUT /api/security/configuration/passwordExpirationPolicy`
+  and the Access `password-encryption` setting through the access module, checked by the
+  REST APIs' rules, so each surface reads back what the other wrote. An omitted field keeps
+  its stored value; `loginAttempts: 0` is the default 5, below that, a `passwordMaxAge`
+  below 1 or another `encryptionPolicy` answers 400 naming the field, and the whole document
+  is refused. `encryptionPolicy` takes `REQUIRED`, `SUPPORTED` or `UNSUPPORTED` in any
+  case. A `null` anywhere in the two blocks is refused **[I]**: no field there is a free
+  string, and 7.x documents no `null` that resets a policy. Each block the document names
+  is reported as updated or unchanged. `passwordSettings.resetPolicy`, which 7.161.26's
+  XSD keeps, is not in the YAML page and answers 400 as an unknown field. Turning the lock
+  policy off clears every lock, as the REST API does.
+- The other documented security fields answer 400 with their own reason, before anything
+  is written: `anonAccessToBuildInfosDisabled` is deprecated since 6.6 and not applied,
+  `ldapGroupSettings` arrives with LDAP-03, and `crowdSettings`, `samlSettings`,
+  `oauthSettings` and `httpSsoSettings` with P21 (decision
+  [0019](decisions/0019-human-authentication-tiers.md)). The internal password switch is
+  in neither the YAML page nor the XSD, so it is not a descriptor field.
 - A successful patch answers `<n> changes to config merged successfully` ([J]
   [RTFACT-31174](https://jfrog.atlassian.net/browse/RTFACT-31174) quotes "14 changes to
   config merged successfully" from 7.84; [RTFACT-17040](https://jfrog.atlassian.net/browse/RTFACT-17040)).
@@ -360,7 +380,12 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
 `virtualCacheCleanupConfig`, `quotaConfig`, `folderDownloadConfig`, `trashcanConfig`,
 `itemsBrowserPagingSize`, `replicationsConfig`, `sumoLogicConfig`, `releaseBundlesConfig`,
 `signedUrlConfig`, `downloadRedirectConfig`, `eula`, `subscription`, `keyPairs`,
-`retentionSettings`, `authentication`, `systemMessageConfig`.
+`retentionSettings`, `authentication`.
+
+`systemMessageConfig` is not an XSD element: the published `artifactory.xsd` (namespace
+3.4.8) has no `systemMessage` type, while the YAML page documents the section ([D]
+https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration.md, "General
+Configuration"). It is accepted by `PATCH` and absent from the XML descriptor.
 
 ### Section shapes
 
@@ -370,7 +395,7 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
 | `proxies.<key>` | `host, port, username, password, domain, ntHost, redirectedToHosts, platformDefault, services[jfrt,jfmc,jfxr,jfds]` |
 | `mailServer` | `enabled, artifactoryUrl, from, host, port, username, password, subjectPrefix, ssl, tls` |
 | `propertySets.<name>` | `properties{<prop>{predefinedValues, closedPredefinedValues, multipleChoice}}, visible` |
-| `backups.<name>` | `cronExp, retentionPeriodHours, createArchive, excludedRepositories, excludeNewRepositories, sendMailOnError, enabled` |
+| `backups.<name>` | `cronExp, retentionPeriodHours, createArchive, excludedRepositories, excludeNewRepositories, sendMailOnError, enabled`; the `artifactory_backup` resource also sends `key`, `precalculate` and `exportMissionControl` ([S] provider 12.11.14 [`resource_artifactory_backup.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_backup.go)). XSD `BackupType` order: `key, enabled, dir, cronExp, retentionPeriodHours, createArchive, excludedRepositories{repositoryRef*}, sendMailOnError, excludeBuilds, excludeNewRepositories, precalculate, exportMissionControl` |
 | `indexer` | `enabled, cronExp, includedRepositories` |
 | `gcConfig`, `cleanupConfig`, `virtualCacheCleanupConfig` | `cronExp` |
 | `quotaConfig` | `enabled, diskSpaceLimitPercentage, diskSpaceWarningPercentage` |
@@ -512,12 +537,44 @@ name in the redirected Basic retry. P19/#216 retains live comparison. Push repli
 redirect, so a valid list only stops disabling proxy use; the push client itself is
 closed source, so its use of the shared builder is inferred [I].
 
+### General security read
+
+`GET /artifactory/api/securityconfig` is the read `artifactory_general_security` refreshes
+from; JFrog documents no REST page for it. [S] 7.161.26's
+`GeneralSecurityConfigResource` (`@Path("securityconfig")`, `@RolesAllowed(admin)`) sits in
+the UI's Jersey application, which `web.xml` also maps to `/api/*`, and
+`GetSecurityConfigService` fills its `SecurityConfig` model: `anonAccessEnabled`,
+`buildGlobalBasicReadAllowed`, `buildGlobalBasicReadForAnonymous`,
+`hideUnauthorizedResources`, `passwordSettings{encryptionPolicy, encryptionRequired,
+encryptionEnabled, expirationPolicy, resetPolicy}`, `userLockPolicy{enabled,
+loginAttempts}`, `basicAuthEnabled`, `centralOAuthProviders`, `curationEntitled` and
+`allowDownloadWhenUnavailable`, serialized without nulls. `EncryptionPolicy`'s JSON names
+are `SUPPORTED`, `REQUIRED` and `UNSUPPORTED`, and provider 12.11.14 compares the value
+with its plan as read. 7.x takes `userLockPolicy.enabled` from Access as `loginAttempts > 0`.
+
+artifactweave serves it to administrators (401 without credentials, 403 otherwise) from
+the access module's settings (CFG-04,
+[#1828](https://github.com/weaveplatform/artifactweave/issues/1828)):
+`anonAccessEnabled`, `basicAuthEnabled` (the internal password switch),
+`passwordSettings{encryptionPolicy, encryptionRequired, encryptionEnabled,
+expirationPolicy{enabled, passwordMaxAge, notifyByEmail}}` and
+`userLockPolicy{enabled, loginAttempts}`, each the value the descriptor PATCH and the
+REST APIs write and the descriptor export reports. **[I]** The other fields name features
+artifactweave does not have (build-info global read, hidden resources, password reset,
+central OAuth providers, curation) and are left out rather than reported as off;
+`encryptionEnabled` is taken as "the policy is not `UNSUPPORTED`" and the lock policy's
+`enabled` as the stored switch, since artifactweave keeps it apart from the attempt count.
+The provider's delete sends no request and only warns that the security configuration
+cannot be deleted, so the settings stay as last applied.
+
 ### What artifactweave serves
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
   `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`, `gcConfig`,
-  `quotaConfig`, `trashcanConfig`, `downloadRedirectConfig`, `mailServer`, `urlBase`, the
-  `security.anonAccessEnabled` setting and the `security.ldapSettings` connections
+  `quotaConfig`, `trashcanConfig`, `downloadRedirectConfig`, `mailServer`, `urlBase`,
+  `backups`, `systemMessageConfig`, the `security.anonAccessEnabled` setting, the
+  `security.userLockPolicy` and `security.passwordSettings` policies and the
+  `security.ldapSettings` connections
   (`internal/configuration/core/descriptor`). Download redirect configuration applies
   the whole-MB `fileMinimumSize` setting used by CDN/storage redirects
   ([research 19](19-cdn-and-download-redirect.md#5-artifactweave-today)). Artifactory
@@ -526,8 +583,7 @@ closed source, so its use of the shared builder is inferred [I].
   with any other top-level section answers 400 naming each such section and listing the
   supported sections, and changes nothing. The check runs before `${NAME}` references are resolved, so the
   error names the section rather than a variable inside it. The other sections arrive with
-  their features: `backups`,
-  `systemMessageConfig` and the remaining baseline security settings in P12
+  their features: `security.ldapGroupSettings` in P12
   ([plan](../implementation/plan.md)). Stored federated repository configuration does
   not establish P13 peer synchronization. P36 completes scheduled backup and migration workflows;
   human identity settings follow P21/P22, and product settings follow their owners in the
@@ -537,10 +593,44 @@ closed source, so its use of the shared builder is inferred [I].
   is in force when it is not. Unsupported contents are not stored, including any secrets.
   PRJ-04 supplies the narrow documented singleton `mailServer` fields needed for quota
   delivery. Its password is separated into the existing sealed secret store; omitted
-  fields are retained and null clears strings. Whole-section null is refused; disable
-  notifications with `enabled: false`. Delivery reads settings and credentials under one
-  guarded local transaction before network I/O. CFG-01 exports the public mail fields;
-  mail testing endpoints and provider-wide qualification retain their P12 owners.
+  fields are retained and null clears strings. CFG-07
+  ([#1831](https://github.com/weaveplatform/artifactweave/issues/1831)) accepts
+  `mailServer: null` (or `~`) as deleting the settings and the sealed password, because
+  the `artifactory_mail_server` resource deletes with exactly that document ([S] provider
+  12.11.14 [`resource_artifactory_mail_server.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_mail_server.go)
+  `Delete`); `enabled: false` disables mail and keeps the settings. A cleared `subjectPrefix`
+  still falls back to the `[JFrog]` default, as PRJ-04 delivered it. Delivery reads settings and credentials under one
+  guarded local transaction before network I/O. CFG-01 exports the public mail fields.
+- **Mail test.** 7.x's "Send Test Email" is served only to its UI; no REST endpoint is
+  documented. `artifactweave mail test <recipient>` sends it through the stored settings
+  and sealed password, from the server's configuration and master key, like `config
+  apply`. It answers `A test message has been sent successfully to '<recipient>'` on
+  delivery. Missing, disabled or hostless settings answer `Mail server configuration must
+  be enabled with a defined host and port.`, and an SMTP failure names the stage (`mail connect`, `mail TLS`, `mail STARTTLS`,
+  `mail authentication`, `mail sender`, `mail recipient`, `mail DATA` and the like) followed
+  by `mail delivery failed`, without the password or the server's reply.
+  **[I]** The subject is `<subjectPrefix> Test` and the body names the configured
+  Artifactory URL; the wording is artifactweave's, as 7.x's template is not published.
+- **Backups.** Each `backups.<key>` entry is a definition: artifactweave validates,
+  stores and exports it, and P36 runs, retains and restores backups, so no backup
+  directory is created. Fields merge as in the other keyed sections, defaults
+  (`enabled: true`, `retentionPeriodHours: 168`, `sendMailOnError: true`, the other flags
+  false) fill a new entry, and `null` on the entry deletes it. `cronExp` is required and
+  must be a Quartz expression. Every `excludedRepositories` entry must name a repository
+  that exists once the document is applied. An entry is a `repositoryRef`, an IDREF to
+  the repository (XSD `BackupType`), so deleting the repository by any path (the
+  descriptor, the REST API) removes its key from every backup in the same transaction,
+  and a repository created again under that key is not excluded. `key`, when sent, must equal the entry key; `excludeBuilds`, deprecated in the
+  XSD, is accepted and dropped. `dir` is refused: **[I]** a backup target on the server's
+  filesystem is P36's decision, and accepting it unused would claim a location is in force.
+  The export states every field, with `excludedRepositories` always present so the
+  resource reads an empty list back as empty.
+- **System message.** `systemMessageConfig` merges `enabled`, `message`, `title` and
+  `titleColor` field by field into one singleton; `null` clears a string, and a
+  whole-section `null` is refused because no resource or document deletes it that way.
+  It is not in the XML descriptor (see "Top-level elements"). The banner is rendered by
+  the P39 UI, which reads it through the configuration module's `SystemMessage` read
+  contract.
 - A successful patch answers `<n> changes to config merged successfully` as `text/plain`,
   with no newline after it, `<n>` counted as "Semantics" describes ([J] RTFACT-31174,
   RTFACT-17040; [S] `MapToDiffConverter`). `artifactweave config apply` prints its own
@@ -570,7 +660,13 @@ closed source, so its use of the shared builder is inferred [I].
   ([S] provider 12.11.14
   [`resource_artifactory_repository_layout.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_repository_layout.go)),
   so the XML gives each layout its key as `name`.
-- The export's `security` element carries `ldapSettings/ldapSetting` in XSD order
+- The export's `security` element carries `anonAccessEnabled`, then `userLockPolicy`
+  (`enabled, loginAttempts`) and `passwordSettings` (`encryptionPolicy` in lower case,
+  then `expirationPolicy{enabled, passwordMaxAge, notifyByEmail}`), each with its value
+  or its default when never written **[I]**: 7.161.26's XSD keeps only the expiration
+  policy, the lock and encryption policies having moved to Access, so their names, values
+  and places follow the descriptor classes 7.161.26 still ships (`UserLockPolicy`,
+  `EncryptionPolicy`). Then `ldapSettings/ldapSetting` in XSD order
   (`key, enabled, ldapUrl, userDnPattern, search{searchFilter, searchBase, searchSubTree,
   managerDn}, autoCreateUser, emailAttribute, ldapPoisoningProtection,
   allowUserToAccessProfile, pagingSupportEnabled`), leaving out empty strings and always

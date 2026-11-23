@@ -380,7 +380,8 @@ func withAccess(cfg RouterConfig) RouterConfig {
 func accessUnset(a accessapi.API) bool {
 	return a.Authenticator == nil && a.Authorizer == nil && a.Tokens == nil &&
 		a.Keys == nil && a.Identity == nil && a.Restrictions == nil &&
-		a.Projects == nil && a.Grants == nil && a.AnonymousAccess == nil && a.LDAP == nil
+		a.Projects == nil && a.Grants == nil && a.AnonymousAccess == nil && a.LDAP == nil &&
+		a.Security == nil
 }
 
 // withConfiguration returns cfg with Configuration bound over its store by
@@ -447,8 +448,38 @@ func withFederation(cfg RouterConfig) RouterConfig {
 }
 
 func repositoryLifecycle(cfg RouterConfig) artifactsapi.RepositoryLifecycle {
+	var all repositoryLifecycles
 	if cfg.Federation != nil {
-		return cfg.Federation.RepositoryLifecycle()
+		all = append(all, cfg.Federation.RepositoryLifecycle())
+	}
+	if cfg.Store != nil {
+		all = append(all, configuration.RepositoryLifecycle(cfg.Store))
+	}
+	if len(all) == 0 {
+		return nil
+	}
+	return all
+}
+
+// repositoryLifecycles runs each consumer's lifecycle in turn, inside the
+// repository change's transaction; the first failure stops it and rolls the
+// change and every earlier consumer's effect back.
+type repositoryLifecycles []artifactsapi.RepositoryLifecycle
+
+func (l repositoryLifecycles) ResetRepository(ctx context.Context, key string) error {
+	for _, lifecycle := range l {
+		if err := lifecycle.ResetRepository(ctx, key); err != nil {
+			return err //nolint:wrapcheck // the consumer names what failed
+		}
+	}
+	return nil
+}
+
+func (l repositoryLifecycles) RefreshRepository(ctx context.Context, key string) error {
+	for _, lifecycle := range l {
+		if err := lifecycle.RefreshRepository(ctx, key); err != nil {
+			return err //nolint:wrapcheck // the consumer names what failed
+		}
 	}
 	return nil
 }

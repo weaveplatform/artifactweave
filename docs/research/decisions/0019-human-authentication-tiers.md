@@ -57,6 +57,20 @@ UI-based exclusion is replaced by [decision 0042](0042-capability-scope-and-supe
 - LDAP and federated login must keep a local administrator fallback. LDAP-02 meets it by
   checking the internal password before any directory, so the local administrator logs
   in while every directory is unreachable.
+- **Conflict with 7.x's internal password default (CFG-04,
+  [#1828](https://github.com/weaveplatform/artifactweave/issues/1828)).** From 7.104,
+  enabling LDAP turns "Disable Internal Password Login" on by default, and 7.x exempts no
+  one but the UI-only list of "Internal users allowed to use basic authentication".
+  artifactweave follows 7.x: the first enabled connection turns internal password login
+  off while the switch was never written, and the local administrator's password stops
+  working with everyone else's. The fallback this constraint asks for is therefore not
+  the internal password by default but either of: an administrator access token, which
+  the switch never affects; or the switch written on
+  (`PUT /access/api/v1/config/security/authentication/basic_authentication_enabled`),
+  before the connection is enabled or afterwards with a token, which no connection write
+  overwrites. With the switch on, the ordering above still holds. An installation without
+  LDAP sees no change
+  ([research 05](../05-platform-identity-and-security-apis.md#internal-password-login)).
 - No metadata transaction spans directory I/O: the directory answers first, then one
   guarded transaction rechecks the connection's revision and the user before it publishes
   the login, and a connection's change ends its logins, tokens and downloads at once.
@@ -69,7 +83,9 @@ UI-based exclusion is replaced by [decision 0042](0042-capability-scope-and-supe
 - OIDC exchange acceptance with a fake issuer.
 - Current stub tests record the unimplemented endpoints; they are not completion evidence.
 - P12: LDAP acceptance against a test directory container: an OpenLDAP container pinned
-  by digest, over LDAP and LDAPS, on SQLite and PostgreSQL (LDAP-02).
+  by digest, over LDAP and LDAPS, on SQLite and PostgreSQL (LDAP-02), including internal
+  and directory passwords with internal password login on and off and LDAP enabled and
+  disabled, and the default the first connection writes (CFG-04).
 - P21: real identity-provider login and native-client approval, including denial, replay,
   expired sessions and untrusted proxy headers.
 - P22: real SCIM provider create/update/group-sync/deactivate flows and resulting access

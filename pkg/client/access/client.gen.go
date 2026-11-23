@@ -2272,7 +2272,7 @@ type GetRootCertificateParams struct {
 
 // SetBasicAuthenticationStatusJSONBody defines parameters for SetBasicAuthenticationStatus.
 type SetBasicAuthenticationStatusJSONBody struct {
-	// Enabled Required within this object. true accepts usernames and passwords over HTTP Basic; false refuses them while tokens keep working.
+	// Enabled Required within this object. true accepts internal passwords over HTTP Basic; false refuses them while LDAP passwords and tokens keep working.
 	Enabled bool `json:"enabled"`
 }
 
@@ -3046,14 +3046,14 @@ type ClientInterface interface {
 
 	// GetBasicAuthenticationStatus Get the basic authentication switch
 	//
-	// Returns whether usernames and passwords are accepted over HTTP Basic. When the switch is off, only access tokens and reference tokens authenticate (decision 0005). Requires a platform admin.
+	// Returns whether internal passwords are accepted over HTTP Basic (the UI's "Disable Internal Password Login" unchecked). When the switch is off, internal passwords and their encrypted passwords are refused, while an enabled LDAP connection's passwords and access and reference tokens go on authenticating. Unset reads true; enabling the first LDAP connection writes it false unless it was ever written. Requires a platform admin.
 	//
 	// Corresponds with GET /api/v1/config/security/authentication/basic_authentication_enabled (the `GetBasicAuthenticationStatus` operationId).
 	GetBasicAuthenticationStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetBasicAuthenticationStatusWithBody Set the basic authentication switch
 	//
-	// Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.
+	// Turns acceptance of internal passwords over HTTP Basic on or off for the whole instance, from the next request on. A value written here is never overwritten by enabling an LDAP connection. Returns 200 with no body. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3062,7 +3062,7 @@ type ClientInterface interface {
 
 	// SetBasicAuthenticationStatus Set the basic authentication switch
 	//
-	// Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.
+	// Turns acceptance of internal passwords over HTTP Basic on or off for the whole instance, from the next request on. A value written here is never overwritten by enabling an LDAP connection. Returns 200 with no body. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4849,7 +4849,7 @@ func (c *Client) GetRootCertificate(ctx context.Context, params *GetRootCertific
 
 // GetBasicAuthenticationStatus Get the basic authentication switch
 //
-// Returns whether usernames and passwords are accepted over HTTP Basic. When the switch is off, only access tokens and reference tokens authenticate (decision 0005). Requires a platform admin.
+// Returns whether internal passwords are accepted over HTTP Basic (the UI's "Disable Internal Password Login" unchecked). When the switch is off, internal passwords and their encrypted passwords are refused, while an enabled LDAP connection's passwords and access and reference tokens go on authenticating. Unset reads true; enabling the first LDAP connection writes it false unless it was ever written. Requires a platform admin.
 //
 // Corresponds with GET /api/v1/config/security/authentication/basic_authentication_enabled (the `GetBasicAuthenticationStatus` operationId).
 func (c *Client) GetBasicAuthenticationStatus(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -4866,7 +4866,7 @@ func (c *Client) GetBasicAuthenticationStatus(ctx context.Context, reqEditors ..
 
 // SetBasicAuthenticationStatusWithBody Set the basic authentication switch
 //
-// Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.
+// Turns acceptance of internal passwords over HTTP Basic on or off for the whole instance, from the next request on. A value written here is never overwritten by enabling an LDAP connection. Returns 200 with no body. Requires a platform admin.
 //
 // Takes any type of body and a specified content type.
 //
@@ -4885,7 +4885,7 @@ func (c *Client) SetBasicAuthenticationStatusWithBody(ctx context.Context, conte
 
 // SetBasicAuthenticationStatus Set the basic authentication switch
 //
-// Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.
+// Turns acceptance of internal passwords over HTTP Basic on or off for the whole instance, from the next request on. A value written here is never overwritten by enabling an LDAP connection. Returns 200 with no body. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15205,7 +15205,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetBasicAuthenticationStatusWithResponse Get the basic authentication switch
 	//
-	// Returns whether usernames and passwords are accepted over HTTP Basic. When the switch is off, only access tokens and reference tokens authenticate (decision 0005). Requires a platform admin.
+	// Returns whether internal passwords are accepted over HTTP Basic (the UI's "Disable Internal Password Login" unchecked). When the switch is off, internal passwords and their encrypted passwords are refused, while an enabled LDAP connection's passwords and access and reference tokens go on authenticating. Unset reads true; enabling the first LDAP connection writes it false unless it was ever written. Requires a platform admin.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15214,7 +15214,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetBasicAuthenticationStatusWithBodyWithResponse Set the basic authentication switch
 	//
-	// Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.
+	// Turns acceptance of internal passwords over HTTP Basic on or off for the whole instance, from the next request on. A value written here is never overwritten by enabling an LDAP connection. Returns 200 with no body. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15223,7 +15223,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetBasicAuthenticationStatusWithResponse Set the basic authentication switch
 	//
-	// Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.
+	// Turns acceptance of internal passwords over HTTP Basic on or off for the whole instance, from the next request on. A value written here is never overwritten by enabling an LDAP connection. Returns 200 with no body. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -17551,7 +17551,7 @@ type GetBasicAuthenticationStatusResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *struct {
-		// Enabled Optional within this object. Whether usernames and passwords over HTTP Basic are accepted.
+		// Enabled Optional within this object. Whether internal passwords over HTTP Basic are accepted.
 		Enabled *bool `json:"enabled,omitempty"`
 	}
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -17570,7 +17570,7 @@ type GetBasicAuthenticationStatusResponse struct {
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetBasicAuthenticationStatusResponse) GetJSON200() *struct {
-	// Enabled Optional within this object. Whether usernames and passwords over HTTP Basic are accepted.
+	// Enabled Optional within this object. Whether internal passwords over HTTP Basic are accepted.
 	Enabled *bool `json:"enabled,omitempty"`
 } {
 	return r.JSON200
@@ -31473,7 +31473,7 @@ func (c *ClientWithResponses) GetRootCertificateWithResponse(ctx context.Context
 
 // GetBasicAuthenticationStatusWithResponse Get the basic authentication switch
 //
-// Returns whether usernames and passwords are accepted over HTTP Basic. When the switch is off, only access tokens and reference tokens authenticate (decision 0005). Requires a platform admin.
+// Returns whether internal passwords are accepted over HTTP Basic (the UI's "Disable Internal Password Login" unchecked). When the switch is off, internal passwords and their encrypted passwords are refused, while an enabled LDAP connection's passwords and access and reference tokens go on authenticating. Unset reads true; enabling the first LDAP connection writes it false unless it was ever written. Requires a platform admin.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -31488,7 +31488,7 @@ func (c *ClientWithResponses) GetBasicAuthenticationStatusWithResponse(ctx conte
 
 // SetBasicAuthenticationStatusWithBodyWithResponse Set the basic authentication switch
 //
-// Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.
+// Turns acceptance of internal passwords over HTTP Basic on or off for the whole instance, from the next request on. A value written here is never overwritten by enabling an LDAP connection. Returns 200 with no body. Requires a platform admin.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -31503,7 +31503,7 @@ func (c *ClientWithResponses) SetBasicAuthenticationStatusWithBodyWithResponse(c
 
 // SetBasicAuthenticationStatusWithResponse Set the basic authentication switch
 //
-// Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.
+// Turns acceptance of internal passwords over HTTP Basic on or off for the whole instance, from the next request on. A value written here is never overwritten by enabling an LDAP connection. Returns 200 with no body. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -35159,7 +35159,7 @@ func ParseGetBasicAuthenticationStatusResponse(rsp *http.Response) (*GetBasicAut
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			// Enabled Optional within this object. Whether usernames and passwords over HTTP Basic are accepted.
+			// Enabled Optional within this object. Whether internal passwords over HTTP Basic are accepted.
 			Enabled *bool `json:"enabled,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

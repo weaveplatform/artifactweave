@@ -1349,6 +1349,7 @@ func securityMatrix() []matrixRow {
 		at("GET "+secLockPol, "", administrators, 200),
 		at("PUT "+secLockPol, `{"enabled":"false","loginAttempts":"3"}`, administrators, 200),
 		at("GET "+secExpiry, "", administrators, 200),
+		at("GET "+secConfig, "", administrators, 200),
 		at("PUT "+secExpiry, `{"enabled":"false","passwordMaxAge":"30"}`, administrators, 200),
 		at("POST "+secExpire, `["v-{p}"]`, administrators, 200),
 		row("POST "+secUnexpire+"{userName}", secUnexpire+"v-{p}", "", administrators, 200),
@@ -1574,6 +1575,11 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	cheapSeed(t, db)
 	seedFixtureIdentity(t, db)
 	seedKeys(t, db)
+	// The LDAP rows enable connections, which would turn internal password
+	// login off for every later row; an explicit choice is never overwritten.
+	if err := db.Settings().Put(ctx, settings.SettingBasicAuthEnabled, true); err != nil {
+		t.Fatal(err)
+	}
 	names := make([]string, 0, len(matrixPrincipals))
 	for _, p := range matrixPrincipals {
 		names = append(names, p.name)

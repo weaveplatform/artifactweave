@@ -20,8 +20,9 @@
 //     reads the keys a module owns only through its accessors, Access,
 //     Artifacts and Configuration, and the platform's keys as fields.
 //   - The command line, through cmd/artifactweave: serve calls Run, migrate
-//     calls Migrate, keys rotate calls RotateKeys, and config apply calls
-//     ApplyDescriptor with the descriptor file it names.
+//     calls Migrate, keys rotate calls RotateKeys, config apply calls
+//     ApplyDescriptor with the descriptor file it names, and mail test calls
+//     TestMail with the recipient it names.
 //
 // # Outputs
 //
@@ -143,7 +144,7 @@
 // Migrate, RotateKeys, the blob tiers and their mirrors; modules_test.go
 // buildModules and the token service; seed_test.go and bootstrap_test.go
 // the first start and config apply, bootstrap_ldap_test.go with LDAP
-// connections; serverlog_test.go the HTTP server's
+// connections; mailtest_test.go the mail test over a real store; serverlog_test.go the HTTP server's
 // error log. hash_test.go lowers the password hashing cost and the token key
 // size for all of them. The suites that read remote content through the
 // composed runtime run from test/server/artifacts/<type>, over the harness's

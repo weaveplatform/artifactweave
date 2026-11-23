@@ -99,6 +99,7 @@
       "project_repositories_test.go",
       "project_wire_test.go",
       "roles_internal_test.go",
+      "securityconfig_internal_test.go",
       "tokens_internal_test.go"
     ],
     "internal/app": [
@@ -127,6 +128,7 @@
       "limits_test.go",
       "loggers_status_test.go",
       "loggers_test.go",
+      "mailtest_test.go",
       "matrix_pkgtest_test.go",
       "matrix_reindex_test.go",
       "matrix_test.go",
@@ -288,6 +290,7 @@
       "projects_test.go",
       "roles_status_test.go",
       "roles_test.go",
+      "security_baseline_test.go",
       "security_test.go",
       "streamed_lists_test.go",
       "streamed_memory_test.go",
@@ -376,10 +379,12 @@
       "virtual_write_test.go"
     ],
     "test/server/configuration": [
+      "backup_test.go",
       "descriptor_test.go",
       "fixture_test.go",
       "forwarded_test.go",
       "ldap_test.go",
+      "mail_delivery_test.go",
       "mail_test.go",
       "proxy_test.go",
       "service_id_test.go",

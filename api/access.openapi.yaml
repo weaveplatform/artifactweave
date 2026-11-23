@@ -253,7 +253,7 @@ paths:
       x-cost: ordinary
   /api/v1/config/security/authentication/basic_authentication_enabled:
     get:
-      description: Returns whether usernames and passwords are accepted over HTTP Basic. When the switch is off, only access tokens and reference tokens authenticate (decision 0005). Requires a platform admin.
+      description: Returns whether internal passwords are accepted over HTTP Basic (the UI's "Disable Internal Password Login" unchecked). When the switch is off, internal passwords and their encrypted passwords are refused, while an enabled LDAP connection's passwords and access and reference tokens go on authenticating. Unset reads true; enabling the first LDAP connection writes it false unless it was ever written. Requires a platform admin.
       operationId: getBasicAuthenticationStatus
       responses:
         '200':
@@ -262,7 +262,7 @@ paths:
               schema:
                 properties:
                   enabled:
-                    description: Optional within this object. Whether usernames and passwords over HTTP Basic are accepted.
+                    description: Optional within this object. Whether internal passwords over HTTP Basic are accepted.
                     type: boolean
                 type: object
           description: The current switch value.
@@ -289,7 +289,7 @@ paths:
       x-idempotency: safe
       x-cost: ordinary
     put:
-      description: Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.
+      description: Turns acceptance of internal passwords over HTTP Basic on or off for the whole instance, from the next request on. A value written here is never overwritten by enabling an LDAP connection. Returns 200 with no body. Requires a platform admin.
       operationId: setBasicAuthenticationStatus
       requestBody:
         content:
@@ -297,7 +297,7 @@ paths:
             schema:
               properties:
                 enabled:
-                  description: Required within this object. true accepts usernames and passwords over HTTP Basic; false refuses them while tokens keep working.
+                  description: Required within this object. true accepts internal passwords over HTTP Basic; false refuses them while LDAP passwords and tokens keep working.
                   type: boolean
               required:
                 - enabled

@@ -34,7 +34,10 @@ func (s AccessService) ldapTx(ctx context.Context, fn func(context.Context, ldap
 	if (az == nil) != (an == nil) {
 		return fmt.Errorf("ldap: incomplete authority bindings: %w", kernel.ErrStore)
 	}
-	svc := ldap.Service{Configs: st.Configs()}
+	svc := ldap.Service{Configs: st.Configs(), Settings: st.Settings()}
+	// Enabling a connection may write the internal password switch off
+	// (ldap.Service), which this instance's logins then apply at once.
+	defer s.forgetPolicies()
 	return st.Tx(ctx, func(ctx context.Context) error { //nolint:wrapcheck // fn's errors are mapped by ldapError
 		if err := st.Projects().Guard(ctx); err != nil {
 			return fmt.Errorf("ldap: guard administration: %w", err)

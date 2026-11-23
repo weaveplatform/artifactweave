@@ -1474,6 +1474,27 @@ func (e ReverseProxyConfigWebServerType) Valid() bool {
 	}
 }
 
+// Defines values for SecurityConfigPasswordSettingsEncryptionPolicy.
+const (
+	SecurityConfigPasswordSettingsEncryptionPolicyREQUIRED    SecurityConfigPasswordSettingsEncryptionPolicy = "REQUIRED"
+	SecurityConfigPasswordSettingsEncryptionPolicySUPPORTED   SecurityConfigPasswordSettingsEncryptionPolicy = "SUPPORTED"
+	SecurityConfigPasswordSettingsEncryptionPolicyUNSUPPORTED SecurityConfigPasswordSettingsEncryptionPolicy = "UNSUPPORTED"
+)
+
+// Valid indicates whether the value is a known member of the SecurityConfigPasswordSettingsEncryptionPolicy enum.
+func (e SecurityConfigPasswordSettingsEncryptionPolicy) Valid() bool {
+	switch e {
+	case SecurityConfigPasswordSettingsEncryptionPolicyREQUIRED:
+		return true
+	case SecurityConfigPasswordSettingsEncryptionPolicySUPPORTED:
+		return true
+	case SecurityConfigPasswordSettingsEncryptionPolicyUNSUPPORTED:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UserConfigurationMfaStatus.
 const (
 	UserConfigurationMfaStatusDISABLED UserConfigurationMfaStatus = "DISABLED"
@@ -6148,6 +6169,39 @@ type RubyGemVersion struct {
 	// Summary Optional within this object. One-line gem summary from the gemspec.
 	Summary *string `json:"summary,omitempty"`
 }
+
+// SecurityConfig The general security settings, as one read. Admin only. Fields for features this server does not have are left out rather than reported as off.
+type SecurityConfig struct {
+	// AnonAccessEnabled Required within this object. Whether requests without credentials act as the anonymous user.
+	AnonAccessEnabled bool `json:"anonAccessEnabled"`
+
+	// BasicAuthEnabled Required within this object. Whether internal passwords are accepted over HTTP Basic, the switch `/access/api/v1/config/security/authentication/basic_authentication_enabled` sets.
+	BasicAuthEnabled bool `json:"basicAuthEnabled"`
+
+	// PasswordSettings Required within this object. The password encryption and expiration policies.
+	PasswordSettings SecurityConfigPasswordSettings `json:"passwordSettings"`
+
+	// UserLockPolicy Required within this object. The user lock policy `/api/security/userLockPolicy` reads.
+	UserLockPolicy UserLockPolicy `json:"userLockPolicy"`
+}
+
+// SecurityConfigPasswordSettings Required within this object. The password encryption and expiration policies.
+type SecurityConfigPasswordSettings struct {
+	// EncryptionEnabled Required within this object. Whether the encrypted password is accepted, that is encryptionPolicy is not `UNSUPPORTED`.
+	EncryptionEnabled bool `json:"encryptionEnabled"`
+
+	// EncryptionPolicy Required within this object. `SUPPORTED` accepts the clear-text and the encrypted password, `REQUIRED` only the encrypted one outside the web UI, `UNSUPPORTED` only the clear-text one.
+	EncryptionPolicy SecurityConfigPasswordSettingsEncryptionPolicy `json:"encryptionPolicy"`
+
+	// EncryptionRequired Required within this object. Whether encryptionPolicy is `REQUIRED`.
+	EncryptionRequired bool `json:"encryptionRequired"`
+
+	// ExpirationPolicy Required within this object. The password expiration policy `/api/security/configuration/passwordExpirationPolicy` reads.
+	ExpirationPolicy PasswordExpirationPolicy `json:"expirationPolicy"`
+}
+
+// SecurityConfigPasswordSettingsEncryptionPolicy Required within this object. `SUPPORTED` accepts the clear-text and the encrypted password, `REQUIRED` only the encrypted one outside the web UI, `UNSUPPORTED` only the clear-text one.
+type SecurityConfigPasswordSettingsEncryptionPolicy string
 
 // SecurityInfoMessage A confirmation message returned by several mutating operations.
 type SecurityInfoMessage struct {
@@ -11925,6 +11979,13 @@ type ClientInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	CreateOrReplaceUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBody(ctx context.Context, userName string, body CreateOrReplaceUserApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSecurityConfig Get the general security settings
+	//
+	// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.
+	//
+	// Corresponds with GET /api/securityconfig (the `GetSecurityConfig` operationId).
+	GetSecurityConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateSignedUrlWithBody Create a signed download URL
 	//
@@ -18360,6 +18421,23 @@ func (c *Client) CreateOrReplaceUser(ctx context.Context, userName string, body 
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) CreateOrReplaceUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBody(ctx context.Context, userName string, body CreateOrReplaceUserApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateOrReplaceUserRequestWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBody(c.Server, userName, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSecurityConfig Get the general security settings
+//
+// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.
+//
+// Corresponds with GET /api/securityconfig (the `GetSecurityConfig` operationId).
+func (c *Client) GetSecurityConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSecurityConfigRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -32083,6 +32161,33 @@ func NewCreateOrReplaceUserRequestWithBody(server string, userName string, conte
 	return req, nil
 }
 
+// NewGetSecurityConfigRequest constructs an http.Request for the GetSecurityConfig method
+func NewGetSecurityConfigRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/securityconfig")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewCreateSignedUrlRequest calls the generic CreateSignedUrl builder with application/json body
 func NewCreateSignedUrlRequest(server string, body CreateSignedUrlJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -39647,6 +39752,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	CreateOrReplaceUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBodyWithResponse(ctx context.Context, userName string, body CreateOrReplaceUserApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrReplaceUserResponse, error)
+
+	// GetSecurityConfigWithResponse Get the general security settings
+	//
+	// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/securityconfig (the `GetSecurityConfig` operationId).
+	GetSecurityConfigWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSecurityConfigResponse, error)
 
 	// CreateSignedUrlWithBodyWithResponse Create a signed download URL
 	//
@@ -63748,6 +63862,100 @@ func (r CreateOrReplaceUserResponse) ContentType() string {
 	return ""
 }
 
+// GetSecurityConfigResponse429Headers the declared response headers of an HTTP 429 response for GetSecurityConfig
+type GetSecurityConfigResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// GetSecurityConfigResponse503Headers the declared response headers of an HTTP 503 response for GetSecurityConfig
+type GetSecurityConfigResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type GetSecurityConfigResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SecurityConfig
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *SecurityUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *SecurityForbidden
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *SecurityInternalServerError
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *GetSecurityConfigResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetSecurityConfigResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSecurityConfigResponse) GetJSON200() *SecurityConfig {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetSecurityConfigResponse) GetJSON401() *SecurityUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetSecurityConfigResponse) GetJSON403() *SecurityForbidden {
+	return r.JSON403
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r GetSecurityConfigResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetSecurityConfigResponse) GetJSON500() *SecurityInternalServerError {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetSecurityConfigResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSecurityConfigResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSecurityConfigResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSecurityConfigResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSecurityConfigResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // CreateSignedUrlResponse429Headers the declared response headers of an HTTP 429 response for CreateSignedUrl
 type CreateSignedUrlResponse429Headers struct {
 	RateLimit       *string
@@ -78501,6 +78709,21 @@ func (c *ClientWithResponses) CreateOrReplaceUserWithApplicationVndOrgJfrogArtif
 		return nil, err
 	}
 	return ParseCreateOrReplaceUserResponse(rsp)
+}
+
+// GetSecurityConfigWithResponse Get the general security settings
+//
+// Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/securityconfig (the `GetSecurityConfig` operationId).
+func (c *ClientWithResponses) GetSecurityConfigWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSecurityConfigResponse, error) {
+	rsp, err := c.GetSecurityConfig(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSecurityConfigResponse(rsp)
 }
 
 // CreateSignedUrlWithBodyWithResponse Create a signed download URL
@@ -107219,6 +107442,118 @@ func ParseCreateOrReplaceUserResponse(rsp *http.Response) (*CreateOrReplaceUserR
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers CreateOrReplaceUserResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetSecurityConfigResponse parses an HTTP response from a GetSecurityConfigWithResponse call
+func ParseGetSecurityConfigResponse(rsp *http.Response) (*GetSecurityConfigResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSecurityConfigResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SecurityConfig
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest SecurityUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest SecurityForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest SecurityInternalServerError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers GetSecurityConfigResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetSecurityConfigResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {

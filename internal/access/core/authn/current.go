@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -48,6 +49,13 @@ func (a *Authenticator) Current(
 			if err = a.currentPassword(ctx, u); err != nil {
 				return kernel.Principal{}, err
 			}
+			policy, err := PasswordEncryption(ctx, a.settings)
+			if err != nil {
+				return kernel.Principal{}, err
+			}
+			if policy == accessapi.EncryptionUnsupported {
+				return kernel.Principal{}, kernel.ErrBadCredentials
+			}
 		}
 		fresh := tokenPrincipal(u, t.Scope)
 		fresh.TokenID, fresh.TokenExpires, fresh.Identity = t.ID, t.ExpiresAt, t.Identity
@@ -66,16 +74,12 @@ func (a *Authenticator) Current(
 	if found && u.Status != "" && u.Status != model.UserEnabled {
 		return kernel.Principal{}, kernel.ErrBadCredentials
 	}
+	// currentPasswordProof applies the internal password switch to an
+	// internal password's proof; a directory login outlives the switch, as
+	// its login does.
 	directory, err := a.currentPasswordProof(ctx, u, found, name, p.PasswordRevision)
 	if err != nil {
 		return kernel.Principal{}, err
-	}
-	on, err := BasicAuthEnabled(ctx, a.settings)
-	if err != nil {
-		return kernel.Principal{}, err
-	}
-	if !on {
-		return kernel.Principal{}, kernel.ErrBadCredentials
 	}
 	if directory {
 		// A directory login has no internal password to expire.
@@ -99,8 +103,17 @@ func (a *Authenticator) Current(
 }
 
 // Publication needs current policy, not the login hot path's short policy cache.
+// An encrypted password stands for the internal password, so the internal
+// password switch governs it too.
 func (a *Authenticator) currentPassword(ctx context.Context, u model.User) error {
 	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled {
+		return kernel.ErrBadCredentials
+	}
+	on, err := BasicAuthEnabled(ctx, a.settings)
+	if err != nil {
+		return err
+	}
+	if !on {
 		return kernel.ErrBadCredentials
 	}
 	expiry, err := ExpirationPolicy(ctx, a.settings)

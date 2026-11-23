@@ -20,6 +20,10 @@ type fakeDirectory struct {
 	loginErr   error
 	currentErr error
 	logins     int
+	// disabled answers Enabled false, as with no connection enabled;
+	// enabledErr fails it.
+	disabled   bool
+	enabledErr error
 	// beforePublish runs after Login answers, before publication: the
 	// window in which a connection can change while the directory answered.
 	beforePublish func()
@@ -40,6 +44,10 @@ func (d *fakeDirectory) Current(_ context.Context, _ string, proof [32]byte) (Di
 	out := d.login
 	out.Email, out.Fresh = "", false
 	return out, nil
+}
+
+func (d *fakeDirectory) Enabled(context.Context) (bool, error) {
+	return !d.disabled, d.enabledErr
 }
 
 var errPublish = errors.New("publish failed")
@@ -142,8 +150,14 @@ func TestUnitDirectoryAutoCreate(t *testing.T) {
 	if err := w.db.Settings().Put(ctx, settings.SettingBasicAuthEnabled, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.a.Current(ctx, p, w.db.Tokens()); !errors.Is(err, kernel.ErrBadCredentials) {
-		t.Fatalf("Current with basic authentication off: %v", err)
+	// The switch turns internal passwords off, not a directory's: the
+	// directory login and its recheck go on.
+	w.a.ForgetPolicies()
+	if _, err := w.a.Current(ctx, p, w.db.Tokens()); err != nil {
+		t.Fatalf("Current with internal password login off: %v", err)
+	}
+	if again, err := w.a.Basic(ctx, "alice", "directory-pw"); err != nil || again.PasswordRevision != p.PasswordRevision {
+		t.Fatalf("a directory login with internal password login off: %+v %v", again, err)
 	}
 	if err := w.db.Settings().Delete(ctx, settings.SettingBasicAuthEnabled); err != nil {
 		t.Fatal(err)

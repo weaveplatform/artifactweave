@@ -173,7 +173,7 @@ func OpenRuntime(
 	// them.
 	directory := accessldap.Client{RootCAs: opts.LDAPRootCAs}
 	logins := ldap.NewLogins(
-		ldap.Service{Configs: st.Configs(), Tx: st, Guard: st.Projects().Guard},
+		ldap.Service{Configs: st.Configs(), Settings: st.Settings(), Tx: st, Guard: st.Projects().Guard},
 		directory, ldap.LoginOptions{Log: logs.Logger("artifactweave.access")},
 	)
 	authenticator, err := authn.NewAuthenticator(st.Users(), st.Settings(), authn.Options{

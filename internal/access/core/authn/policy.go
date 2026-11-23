@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
@@ -30,13 +31,24 @@ const (
 // effect here within this long.
 const policyTTL = 10 * time.Second
 
-// ErrBasicAuthDisabled answers a user name and password while the platform
-// accepts only tokens (basic_authentication_enabled is false).
+// ErrBasicAuthDisabled answers an internal password while internal password
+// login is off (basic_authentication_enabled is false) and no directory
+// accepted the password either.
 var ErrBasicAuthDisabled = apierror.New(http.StatusUnauthorized,
 	"Basic authentication with a password is disabled; use an access token")
 
-// BasicAuthEnabled reports whether user names and passwords are accepted
-// over HTTP Basic. Unset means on, as Artifactory ships.
+// ErrClearTextPassword answers a clear-text password outside a UI request
+// while the password encryption policy is required. JFrog documents only
+// that "clear-text authentication fails"; the wording is artifactweave's.
+var ErrClearTextPassword = apierror.New(http.StatusUnauthorized,
+	"Only encrypted passwords are accepted; send the encrypted password instead of the clear-text password")
+
+// BasicAuthEnabled reports whether internal passwords log in over HTTP
+// Basic: Access's security.authentication.basic-authentication-enabled,
+// whose UI checkbox is "Disable Internal Password Login". It governs
+// internal passwords and the encrypted passwords standing for them, never a
+// directory's password. Unset means on, as Artifactory ships; enabling the
+// first LDAP connection writes it off (access/core/ldap).
 func BasicAuthEnabled(ctx context.Context, settings platformsettings.SettingsStore) (bool, error) {
 	on := true
 	if err := settings.Get(ctx, platformsettings.SettingBasicAuthEnabled, &on); err != nil &&
@@ -44,6 +56,37 @@ func BasicAuthEnabled(ctx context.Context, settings platformsettings.SettingsSto
 		return on, fmt.Errorf("auth: basic authentication switch: %w", err)
 	}
 	return on, nil
+}
+
+// PasswordEncryption returns the stored password encryption policy, or
+// supported, the default.
+func PasswordEncryption(
+	ctx context.Context,
+	settings platformsettings.SettingsStore,
+) (accessapi.PasswordEncryption, error) {
+	p := accessapi.EncryptionSupported
+	if err := settings.Get(ctx, platformsettings.SettingPasswordEncryption, &p); err != nil &&
+		!errors.Is(err, kernel.ErrNotFound) {
+		return accessapi.EncryptionSupported, fmt.Errorf("auth: password encryption policy: %w", err)
+	}
+	return p, nil
+}
+
+type uiRequestKey struct{}
+
+// WithUIRequest marks ctx as a request 7.x counts as its UI's
+// (UiRequestUtils.isUiRestRequest), which the required encryption policy
+// lets send a clear-text password: the UI is where 7.x's users obtain the
+// encrypted password a remote client must then send. Without the exception
+// no user could ever obtain one, since GET /api/security/encryptedPassword
+// itself needs the clear-text password.
+func WithUIRequest(ctx context.Context) context.Context {
+	return context.WithValue(ctx, uiRequestKey{}, true)
+}
+
+func uiRequest(ctx context.Context) bool {
+	on, _ := ctx.Value(uiRequestKey{}).(bool)
+	return on
 }
 
 // LockPolicy returns the stored user lock policy, or the default.
@@ -109,6 +152,7 @@ type policyCache struct {
 	expiry         model.PasswordExpirationPolicy
 	allowBasicAuth bool
 	access         model.AccessLockSettings
+	encryption     accessapi.PasswordEncryption
 }
 
 // policies returns the lock and expiration policies, from the cache when
@@ -139,8 +183,23 @@ func (a *Authenticator) policies(
 	if err != nil {
 		return lock, expiry, err
 	}
-	c.lock, c.expiry, c.allowBasicAuth, c.access, c.fetched = lock, expiry, basic, access, now
+	encryption, err := PasswordEncryption(ctx, a.settings)
+	if err != nil {
+		return lock, expiry, err
+	}
+	c.lock, c.expiry, c.allowBasicAuth, c.access, c.encryption = lock, expiry, basic, access, encryption
+	c.fetched = now
 	return lock, expiry, nil
+}
+
+// encryption is the cached password encryption policy.
+func (a *Authenticator) encryption(ctx context.Context) (accessapi.PasswordEncryption, error) {
+	if _, _, err := a.policies(ctx); err != nil {
+		return accessapi.EncryptionSupported, err
+	}
+	a.policy.mu.Lock()
+	defer a.policy.mu.Unlock()
+	return a.policy.encryption, nil
 }
 
 // basicEnabled is the cached basic authentication switch.

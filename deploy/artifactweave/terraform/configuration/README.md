@@ -1,8 +1,8 @@
-# configuration: outbound proxy and property definitions
+# configuration: proxy, properties, backup and mail
 
-Manage an outbound proxy and an assignable property set with the pinned JFrog
-provider. The reference accepts ordinary proxy settings and named property
-definitions; it creates no repositories or cloud resources.
+Manage an outbound proxy, an assignable property set, a backup definition and
+the mail server settings with the pinned JFrog provider. It creates no
+repositories or cloud resources.
 
 ## What it configures
 
@@ -10,6 +10,12 @@ definitions; it creates no repositories or cloud resources.
   default-service selection and redirect hosts.
 - `artifactory_property_set.this`: named properties, selection flags and
   predefined values with explicit default choices.
+- `artifactory_backup.this`: a backup definition with its Quartz schedule,
+  retention, flags and excluded repositories. artifactweave stores and exports
+  the definition but does not yet run backups (P36), so applying it writes
+  nothing outside the server's database.
+- `artifactory_mail_server.this`: the SMTP server, sender, subject prefix,
+  linked URL and TLS mode used for every mail the server sends.
 
 ## Prerequisites
 
@@ -28,10 +34,18 @@ proxy_host        = "proxy.example.com"
 proxy_port        = 3128
 proxy_username    = "proxy-user"
 property_set_name = "release-properties"
+backup_cron_exp   = "0 0 2 ? * MON-FRI"
+mail_host         = "smtp.example.com"
+mail_port         = 587
+mail_use_tls      = true
+mail_from         = "artifacts@example.com"
+mail_artifactory_url = "https://artifacts.example.com/artifactory/"
 ```
 
 Pass credentials through sensitive environment variables such as
-`TF_VAR_access_token` and `TF_VAR_proxy_password`. Set `properties` to replace
+`TF_VAR_access_token`, `TF_VAR_proxy_password` and `TF_VAR_mail_password`.
+`backup_excluded_repositories` must name repositories that already exist. Set
+`properties` to replace
 the default release/free definitions. Each predefined-value map entry is a
 boolean indicating whether that value is selected by default.
 
@@ -44,21 +58,24 @@ terraform plan
 ```
 
 The follow-up plan is empty after the provider refreshes the XML descriptor.
-Changing the proxy password updates the server secret; setting it to null
-clears it through the pinned provider's empty-password YAML form.
+Changing the proxy or mail password updates the server secret; setting it to
+null clears it. Changing `mail_host` replaces the mail settings. Run
+`artifactweave mail test <address>` on the server host to send a test message
+through the stored settings.
 
 ## Security
 
-The access token and proxy password are sensitive inputs and remain out of
+The access token, proxy password and mail password are sensitive inputs and remain out of
 ordinary plans and logs. Terraform state can retain sensitive values, so keep
 it private. artifactweave seals the proxy password at rest when a master key is
-configured. Only include trusted hosts in `proxy_redirect_to_hosts`, since
+configured, and never returns either password. Only include trusted hosts in `proxy_redirect_to_hosts`, since
 proxy authentication may be sent to those hosts.
 
 ## Teardown
 
-`terraform destroy` removes the proxy and property set. Remove repository
-references to these definitions before destroying them.
+`terraform destroy` removes all four. Removing the mail server settings
+disables every mail the server sends. Remove repository references to the
+proxy and property set before destroying them.
 
 ## How this scenario is tested
 
@@ -66,11 +83,12 @@ The existing required Terraform conformance lane runs this reference against
 its own temporary server through `test/terraform/run.sh`. The driver supplies
 two revisions of ordinary inputs, applies and refreshes each, requires empty
 plans, tests omitted-password retention through a partial descriptor patch,
-clears the password, and destroys both resources. A read-only checker uses the
+clears both passwords, destroys all four resources and checks that no backup
+directory appeared. A read-only checker uses the
 server's own keyring/store code to check the actual secret and sealed rows
 after each phase; retained evidence contains hashes and assertion results.
 
-The provider reads both resources back through the XML descriptor GET (#1825),
+The provider reads every resource back through the XML descriptor GET (#1825),
 so a server without it fails these controls rather than skipping them. The full
 seven-resource P12 qualification remains #1837.
 
@@ -100,6 +118,8 @@ No modules.
 
 | Name | Type |
 | ---- | ---- |
+| [artifactory_backup.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/backup) | resource |
+| [artifactory_mail_server.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/mail_server) | resource |
 | [artifactory_property_set.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/property_set) | resource |
 | [artifactory_proxy.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/proxy) | resource |
 
@@ -108,6 +128,26 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | access\_token | Admin access token, sent as a Bearer token. | `string` | n/a | yes |
+| backup\_create\_archive | Whether a backup is written as a Zip archive. | `bool` | `false` | no |
+| backup\_cron\_exp | Quartz cron expression of the backup schedule. | `string` | `"0 0 2 ? * MON-FRI"` | no |
+| backup\_enabled | Whether the backup definition is enabled. | `bool` | `true` | no |
+| backup\_exclude\_new\_repositories | Whether repositories created later are left out of the backup. | `bool` | `false` | no |
+| backup\_excluded\_repositories | Existing repositories to leave out of the backup; null excludes none. Keep it non-empty once set: the pinned provider omits an empty list, which leaves the stored one in place. | `list(string)` | `null` | no |
+| backup\_export\_mission\_control | The exportMissionControl flag of the backup definition. | `bool` | `false` | no |
+| backup\_key | Unique key of the backup definition: an XML name. | `string` | `"nightly"` | no |
+| backup\_retention\_period\_hours | Hours to keep a backup; 0 keeps every backup. | `number` | `168` | no |
+| backup\_send\_mail\_on\_error | Whether administrators are mailed when a backup fails. | `bool` | `true` | no |
+| backup\_verify\_disk\_space | Whether a backup first checks the target has room (precalculate). | `bool` | `false` | no |
+| mail\_artifactory\_url | Registry URL linked from outgoing mail. Required here: the pinned provider reads an unset URL back as an empty string and plans a change. | `string` | n/a | yes |
+| mail\_enabled | Whether mail notifications are sent. | `bool` | `true` | no |
+| mail\_from | Sender address of outgoing mail. | `string` | `null` | no |
+| mail\_host | SMTP server host name or IP address. Changing it replaces the mail server settings. | `string` | n/a | yes |
+| mail\_password | SMTP AUTH password; null clears it. Sealed by the server and never returned; Terraform retains this sensitive attribute in private state. | `string` | `null` | no |
+| mail\_port | SMTP server port. | `number` | `25` | no |
+| mail\_subject\_prefix | Prefix of every outgoing subject. Set a value: a null prefix reads back as the [JFrog] default and plans a change. | `string` | `"[artifactweave]"` | no |
+| mail\_use\_ssl | Whether to use implicit TLS from the first byte. | `bool` | `false` | no |
+| mail\_use\_tls | Whether to upgrade the connection with STARTTLS. | `bool` | `false` | no |
+| mail\_username | SMTP AUTH username; null sends no credentials. | `string` | `null` | no |
 | properties | Property names, selection flags and predefined values mapped to whether each is selected by default. | ```map(object({ closed_predefined_values = optional(bool, false) multiple_choice = optional(bool, false) predefined_values = optional(map(bool), {}) }))``` | ```{ "free": {}, "release": { "closed_predefined_values": true, "predefined_values": { "ready": true, "waiting": false } } }``` | no |
 | property\_set\_name | Name of the property set. | `string` | `"release-properties"` | no |
 | property\_set\_visible | Whether the property set is visible and assignable. | `bool` | `true` | no |
@@ -125,6 +165,8 @@ No modules.
 
 | Name | Description |
 | ---- | ----------- |
+| backup\_key | Key of the configured backup definition. |
+| mail\_host | SMTP host of the configured mail server. |
 | property\_set\_name | Name of the configured property set. |
 | proxy\_key | Key of the configured outbound proxy. |
 <!-- END_TF_DOCS -->

@@ -611,3 +611,18 @@ func (u racingUsers) Get(ctx context.Context, name string) (model.User, error) {
 	}
 	return got, err //nolint:wrapcheck // test double
 }
+
+func TestUnitCheckPasswordEncryption(t *testing.T) {
+	for _, p := range []api.PasswordEncryption{
+		api.EncryptionSupported, api.EncryptionRequired, api.EncryptionUnsupported,
+	} {
+		if err := identity.CheckPasswordEncryption(p); err != nil {
+			t.Errorf("%s: %v", p, err)
+		}
+	}
+	for _, p := range []api.PasswordEncryption{"", "SUPPORTED", "sometimes"} {
+		if err := identity.CheckPasswordEncryption(p); !errors.Is(err, identity.ErrInvalid) {
+			t.Errorf("%q: %v", p, err)
+		}
+	}
+}
