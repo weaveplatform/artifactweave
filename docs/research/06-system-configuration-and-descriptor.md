@@ -192,12 +192,15 @@ administrator authority is rechecked under the configuration guard.
 
 - `urlBase` is a top-level YAML scalar ([D] General settings in the
   [YAML configuration page](https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration.md)).
-  `PATCH` and `PUT baseUrl` accept an absolute `http` or `https` URL, or blank or null to
+  `PATCH`, `PUT baseUrl`, `config apply` and the bootstrap descriptor accept an absolute
+  `http` or `https` URL, or blank or null to
   clear it, as 6.20's `ConfigResource.setUrlBase` does ("we allow removing custom
   urlBase") [I: 6.20 fallback]. User information, a query or a fragment is refused,
   because no link built on the base could carry it **[I]**, and so is a host that a
   configured CDN domain is, or sits under, the rule `base_url` already follows
-  ([research 19](19-cdn-and-download-redirect.md)) **[I]**. Surrounding whitespace is
+  ([research 19](19-cdn-and-download-redirect.md)) **[I]**; each of the four is bound
+  with the installation's CDN hosts, so all four refuse it and write nothing
+  ([#1902](https://github.com/weaveplatform/artifactweave/issues/1902)). Surrounding whitespace is
   trimmed. The CFG-01 export writes `<urlBase>` after `<propertySets>`.
 - The effective configured base URL is the stored `urlBase`, else the installation's
   `base_url` ([decision 0002](decisions/0002-api-compatibility-fidelity.md)). Every link
@@ -573,23 +576,60 @@ artifactweave serves it to administrators (401 without credentials, 403 otherwis
 the access module's settings (CFG-04,
 [#1828](https://github.com/weaveplatform/artifactweave/issues/1828)):
 `anonAccessEnabled`, `basicAuthEnabled` (the internal password switch),
+`hideUnauthorizedResources` ([#1903](https://github.com/weaveplatform/artifactweave/issues/1903)),
 `passwordSettings{encryptionPolicy, encryptionRequired, encryptionEnabled,
 expirationPolicy{enabled, passwordMaxAge, notifyByEmail}}` and
 `userLockPolicy{enabled, loginAttempts}`, each the value the descriptor PATCH and the
 REST APIs write and the descriptor export reports. **[I]** The other fields name features
-artifactweave does not have (build-info global read, hidden resources, password reset,
+artifactweave does not have (build-info global read, password reset,
 central OAuth providers, curation) and are left out rather than reported as off;
 `encryptionEnabled` is taken as "the policy is not `UNSUPPORTED`" and the lock policy's
 `enabled` as the stored switch, since artifactweave keeps it apart from the attempt count.
 The provider's delete sends no request and only warns that the security configuration
 cannot be deleted, so the settings stay as last applied.
 
+### Hiding unauthorized resources
+
+`security.hideUnauthorizedResources` is a boolean, default `false`: [S] 7.161.26's
+`artifactory.xsd` makes it `SecurityType`'s first element (`minOccurs="0"
+default="false"`), as `SecurityDescriptor`'s `propOrder` does, and 6.20's
+`SecurityDescriptor` put it directly after `anonAccessEnabled`. JFrog's
+[security configuration page](https://docs.jfrog.com/administration/docs/security-configuration#hide-existence-of-unauthorized-resources)
+(updated 2026-11-19) shows the same `<security><hideUnauthorizedResources>` element.
+JFrog's YAML security page does not list it; the YAML PATCH applies its document to the
+descriptor model by field name (`ConfigResource.patchConfig`), so the YAML spelling is the
+field's, `security.hideUnauthorizedResources` **[I]**.
+
+7.x reads the global setting in several places. artifactweave applies the one its
+download path evidences: `DownloadServiceImpl.shouldHideUnauthorisedResponse` (1499-1518)
+returns the global setting first and the virtual repository's only when it is off, for
+whatever repository the request names, and `respondResourceNotFound` (1465-1497) then
+answers a 401 or 403 unfound resource as 404 `Resource not found; Path: '<repoPath>'`,
+with no challenge. A local, remote, remote-cache and virtual file download is therefore
+hidden, a checksum and an archive entry as their file, and so is the trace of one. A
+cache fill the remote's deploy check rejects keeps its answer, since
+`respondFoundResource` answers it; a folder keeps its listing's answer; and a deployment
+keeps its answer, the deploy handlers being closed code **[I]**. The Git LFS and Hugging
+Face virtual handlers, whose 7.x code is closed, hide their anonymous challenge under
+either setting, as `PackageSecurityServiceImpl.shouldHideUnauthorizedResources` gives the
+global one to package handlers **[I]**. The REST surfaces 7.x also hides
+(`ArtifactoryRestExceptionMapperBase`, the storage and statistics resources, the
+versions search, permission targets v2, WebDAV `PROPFIND`, path deletion and
+`GET /api/system/configuration/platform/security`) keep their answers until their own
+issue applies the setting there.
+
+artifactweave stores it in the access module beside the baseline policies, applies it
+through PATCH, `config apply` and the bootstrap descriptor, exports it first in the
+`security` element, reports it in `GET /api/securityconfig`, and reads it at each
+refusal, so a PATCH applies to the next download on every instance.
+
 ### What artifactweave serves
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
   `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`, `gcConfig`,
   `quotaConfig`, `trashcanConfig`, `downloadRedirectConfig`, `mailServer`, `urlBase`,
-  `backups`, `systemMessageConfig`, the `security.anonAccessEnabled` setting, the
+  `backups`, `systemMessageConfig`, the `security.anonAccessEnabled` and
+  `security.hideUnauthorizedResources` settings, the
   `security.userLockPolicy` and `security.passwordSettings` policies, the
   `security.ldapSettings` connections and the `security.ldapGroupSettings` group settings
   (`internal/configuration/core/descriptor`). Download redirect configuration applies

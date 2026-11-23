@@ -92,8 +92,8 @@ type Patch struct {
 	// to null, which deletes every group setting.
 	LDAPGroups        []accessapi.LDAPGroupChange
 	LDAPGroupsCleared bool
-	// Security is the userLockPolicy and passwordSettings blocks, written
-	// through access's SecurityPolicies.
+	// Security is hideUnauthorizedResources and the userLockPolicy and
+	// passwordSettings blocks, written through access's SecurityPolicies.
 	Security *SecurityChange
 	// Storage is the gcConfig and trashcanConfig sections, written through
 	// artifacts' StoragePolicies; nil when the document has neither.

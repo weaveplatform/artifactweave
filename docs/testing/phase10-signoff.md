@@ -248,7 +248,7 @@ Remaining final qualification steps:
 | Owner | Boundary retained after P10 |
 | --- | --- |
 | P11 | Project-source sharing and related project authorization remain separate from virtual membership. |
-| P12 security configuration | Complete the global `hideUnauthorizedResources` configuration surface; per-virtual hiding and the current global runtime policy retain R4's tests. |
+| P12 security configuration | Delivered by [#1903](https://github.com/weaveplatform/artifactweave/issues/1903): `security.hideUnauthorizedResources` applies through PATCH, `config apply` and the bootstrap descriptor, is exported and reported by `GET /api/securityconfig`, and hides every download refusal at run time (`TestAccGlobalHideUnauthorizedResources`); per-virtual hiding retains R4's tests unchanged. |
 | P13 | Cross-peer federation, convergence and peer recovery; this ledger proves one-node federated members only. |
 | P19 / #216 | Choose a live Artifactory build and compare the recorded inferred answers; no trial or live capture was performed for this work. |
 | P28 / named format owners | Remaining protocol/client compatibility beyond the explicitly linked P10 flows. |

@@ -9030,7 +9030,7 @@
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getSecurityConfig",
     "state": "implemented",
-    "contract": "Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled` and `security.passwordSettings.encryptionPolicy` write.",
+    "contract": "Returns the general security settings in one read, the read `artifactory_general_security` refreshes from. Admin only. Its anonymous access, hiding and encryption policy are the values the configuration descriptor's `security.anonAccessEnabled`, `security.hideUnauthorizedResources` and `security.passwordSettings.encryptionPolicy` write.",
     "handler": "internal/access/adapters/http/securityconfig.go: SecurityAPI.GetSecurityConfig",
     "direct_calls": [
       "artgen.GetSecurityConfig200JSONResponse",

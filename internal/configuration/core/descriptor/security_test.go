@@ -55,13 +55,97 @@ func TestUnitSecurityParseMapsEveryField(t *testing.T) {
 	if p, err := Parse([]byte("security:\n  anonAccessEnabled: true\n"), noEnv); err != nil || p.Security != nil {
 		t.Fatal("anonymous access alone touches no policy", p, err)
 	}
+	// The global hiding switch alone names no other policy (#1903).
+	p, err = Parse([]byte("security:\n  hideUnauthorizedResources: true\n"), noEnv)
+	if err != nil || p.Changes != 1 || p.Security == nil || !*p.Security.HideUnauthorized ||
+		p.Security.LockEnabled != nil || p.Security.touchesPasswords() {
+		t.Fatal("hideUnauthorizedResources", p, err)
+	}
+}
+
+// TestUnitSecurityHideUnauthorizedRoundTrip (#1903): the global
+// hideUnauthorizedResources is checked by a dry run without a write,
+// stored through access beside the other policies, reported unchanged when
+// repeated, exported first in the security element and switched off again, while
+// the policies the document leaves out keep their state.
+func TestUnitSecurityHideUnauthorizedRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	d := securityDeps(t, db)
+	apply := func(doc string, dryRun bool) []string {
+		t.Helper()
+		p, err := Parse([]byte(doc), noEnv)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := Apply(ctx, d, p, now, dryRun)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return append(res.Updated, res.Unchanged...)
+	}
+	hiding := func() bool {
+		t.Helper()
+		on, err := d.Security.HidesUnauthorized(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return on
+	}
+	const on = "security:\n  hideUnauthorizedResources: true\n"
+	if got := apply(on, true); strings.Join(got, ",") != "security.hideUnauthorizedResources" || hiding() {
+		t.Fatal("dry run", got)
+	}
+	if keys, _ := db.Settings().Keys(ctx); len(keys) != 0 {
+		t.Fatal("the dry run wrote", keys)
+	}
+	apply(securityDoc, false)
+	before, err := d.Security.Current(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if apply(on, false); !hiding() {
+		t.Fatal("not stored")
+	}
+	after, err := d.Security.Current(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.HideUnauthorizedResources = true; after != before {
+		t.Fatalf("the switch changed another policy: %+v, want %+v", after, before)
+	}
+	p, err := Parse([]byte(on), noEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, err := Apply(ctx, d, p, now, false); err != nil ||
+		strings.Join(res.Unchanged, ",") != "security.hideUnauthorizedResources" || len(res.Updated) != 0 {
+		t.Fatal("repeat", res, err)
+	}
+	var out exportSecurity
+	if err := exportPolicies(ctx, d, &out); err != nil {
+		t.Fatal(err)
+	}
+	body, err := xml.Marshal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(body), "<exportSecurity><hideUnauthorizedResources>true</hideUnauthorizedResources>"+
+		"<anonAccessEnabled>false</anonAccessEnabled><userLockPolicy>") {
+		t.Fatalf("export %s", body)
+	}
+	if apply("security:\n  hideUnauthorizedResources: false\n", false); hiding() {
+		t.Fatal("not switched off")
+	}
 }
 
 func TestUnitSecurityParseRefusals(t *testing.T) {
 	for doc, want := range map[string]string{
 		"security:\n  anonAccessToBuildInfosDisabled: true\n":                                       "security.anonAccessToBuildInfosDisabled is deprecated",
 		"security:\n  samlSettings: {}\n":                                                           "SAML login is planned for P21",
-		"security:\n  hideUnauthorizedResources: true\n":                                            "security: unknown field hideUnauthorizedResources",
+		"security:\n  hideUnauthorizedResources: null\n":                                            "security.hideUnauthorizedResources cannot be null",
+		"security:\n  hideUnauthorizedResources: 'true'\n":                                          "security.hideUnauthorizedResources must be a boolean",
+		"security:\n  hideUnauthorizedResources: {}\n":                                              "security.hideUnauthorizedResources must be a boolean",
 		"security:\n  userLockPolicy: null\n":                                                       "security.userLockPolicy cannot be null",
 		"security:\n  userLockPolicy: 3\n":                                                          "security.userLockPolicy must be a mapping",
 		"security:\n  userLockPolicy:\n    attempts: 3\n":                                           "security.userLockPolicy: unknown field attempts",
@@ -237,7 +321,8 @@ func (f failingSecurity) Set(ctx context.Context, p accessapi.SecurityPolicy) er
 func TestUnitSecurityExportProjection(t *testing.T) {
 	ctx := context.Background()
 	var out exportSecurity
-	if err := exportPolicies(ctx, Deps{}, &out); err != nil || out.UserLockPolicy != nil || out.PasswordSettings != nil {
+	if err := exportPolicies(ctx, Deps{}, &out); err != nil || out.HideUnauthorized != nil || out.UserLockPolicy != nil ||
+		out.PasswordSettings != nil {
 		t.Fatal("an export without the binding", out, err)
 	}
 	db := inmem.New()
@@ -250,7 +335,8 @@ func TestUnitSecurityExportProjection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "<exportSecurity><anonAccessEnabled>false</anonAccessEnabled>" +
+	want := "<exportSecurity><hideUnauthorizedResources>false</hideUnauthorizedResources>" +
+		"<anonAccessEnabled>false</anonAccessEnabled>" +
 		"<userLockPolicy><enabled>false</enabled><loginAttempts>5</loginAttempts></userLockPolicy>" +
 		"<passwordSettings><encryptionPolicy>supported</encryptionPolicy><expirationPolicy>" +
 		"<enabled>false</enabled><passwordMaxAge>60</passwordMaxAge><notifyByEmail>true</notifyByEmail>" +

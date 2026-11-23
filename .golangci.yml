@@ -171,6 +171,9 @@ linters:
       # encoder; a wrap would wrap nothing.
       extra-ignore-sigs:
         - apierror.New(
+        # A refusal with the answer that hides it (#1903) is the answer
+        # itself, as New's value is.
+        - apierror.Hide(
         - format.Rejectf(
         - format.PolicyRefusal(
         - dialect.Store).

@@ -150,7 +150,13 @@
 // quotaConfig. Issue 1872 makes the keyed sections' xs:ID keys one
 // namespace across the patch and the export. Issue 1893 follows 7.161.26's
 // descriptor: the export no longer carries repositories or LDAP connections,
-// and neither is in the xs:ID namespace.
+// and neither is in the xs:ID namespace. Issue 1903 adds the global
+// security.hideUnauthorizedResources beside CFG-04's policies (access's
+// SecurityPolicies), first in the export's security element as in
+// SecurityType, and reported by GET /api/securityconfig; httpkit applies it
+// to every download refusal at run time. Issue 1902 binds config apply and
+// the bootstrap descriptor with the installation's Settings, so they refuse
+// a urlBase at or above a CDN host as PATCH does.
 //
 // # Testing
 //

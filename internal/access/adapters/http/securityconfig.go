@@ -17,9 +17,9 @@ import (
 // read artifactory_general_security refreshes from. 7.161.26 serves it from
 // the UI's GeneralSecurityConfigResource, whose Jersey application also
 // answers under /api, so the provider reaches it as /api/securityconfig. It
-// carries only the settings artifactweave has: the build-info, hidden
-// resource, password reset, central OAuth and curation fields 7.x adds are
-// left out rather than reported as off [I]. The encryption policy is spelled
+// carries only the settings artifactweave has: the build-info, password
+// reset, central OAuth and curation fields 7.x adds are left out rather than
+// reported as off [I]. The encryption policy is spelled
 // in upper case, as EncryptionPolicy's JSON names are and as the provider
 // compares it with its plan.
 func (s SecurityAPI) GetSecurityConfig(
@@ -60,7 +60,11 @@ func securityConfig(ctx context.Context, store settings.SettingsStore) (artgen.S
 	if err != nil {
 		return doc, err //nolint:wrapcheck // already wrapped
 	}
-	doc.AnonAccessEnabled, doc.BasicAuthEnabled = anonymous, basic
+	hide, err := authn.HideUnauthorizedResources(ctx, store)
+	if err != nil {
+		return doc, err //nolint:wrapcheck // already wrapped
+	}
+	doc.AnonAccessEnabled, doc.BasicAuthEnabled, doc.HideUnauthorizedResources = anonymous, basic, hide
 	doc.UserLockPolicy = artgen.UserLockPolicy{Enabled: &lock.Enabled, LoginAttempts: &lock.LoginAttempts}
 	doc.PasswordSettings = artgen.SecurityConfigPasswordSettings{
 		EncryptionPolicy:   artgen.SecurityConfigPasswordSettingsEncryptionPolicy(strings.ToUpper(string(encryption))),

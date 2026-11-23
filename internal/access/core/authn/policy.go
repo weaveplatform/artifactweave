@@ -72,6 +72,20 @@ func PasswordEncryption(
 	return p, nil
 }
 
+// HideUnauthorizedResources returns the stored global
+// hideUnauthorizedResources, or false, 7.x's default (SecurityDescriptor,
+// 7.161.26). It sits beside the other security settings readers although
+// it decides no login: the access module owns every security setting the
+// descriptor's security section names.
+func HideUnauthorizedResources(ctx context.Context, settings platformsettings.SettingsStore) (bool, error) {
+	on := false
+	if err := settings.Get(ctx, platformsettings.SettingHideUnauthorizedResources, &on); err != nil &&
+		!errors.Is(err, kernel.ErrNotFound) {
+		return false, fmt.Errorf("auth: hide unauthorized resources: %w", err)
+	}
+	return on, nil
+}
+
 type uiRequestKey struct{}
 
 // WithUIRequest marks ctx as a request 7.x counts as its UI's

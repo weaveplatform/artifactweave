@@ -31,12 +31,16 @@ func TestUnitSecurityPolicyBinding(t *testing.T) {
 		}
 		want := defaults
 		want.LockEnabled, want.LoginAttempts, want.Encryption = true, 2, accessapi.EncryptionRequired
+		want.HideUnauthorizedResources = true
 		err := w.st.Tx(ctx, func(ctx context.Context) error {
 			if err := b.Set(ctx, want); err != nil {
 				return err
 			}
 			if got, err := b.Current(ctx); err != nil || got != want {
 				t.Fatalf("%s read back %+v, %v", name, got, err)
+			}
+			if hide, err := b.HidesUnauthorized(ctx); err != nil || !hide {
+				t.Fatalf("%s HidesUnauthorized = %v, %v", name, hide, err)
 			}
 			return errRollback
 		})
@@ -45,6 +49,9 @@ func TestUnitSecurityPolicyBinding(t *testing.T) {
 		}
 		if got, _ := b.Current(ctx); got != defaults {
 			t.Fatalf("%s: a rolled-back Set left %+v", name, got)
+		}
+		if hide, err := b.HidesUnauthorized(ctx); err != nil || hide {
+			t.Fatalf("%s: a rolled-back Set left hiding %v, %v", name, hide, err)
 		}
 		b.Forget()
 	}
@@ -102,6 +109,7 @@ func TestUnitSecurityPolicyStoreFailures(t *testing.T) {
 	boom := errors.New("settings down")
 	for _, key := range []string{
 		settings.SettingUserLockPolicy, settings.SettingPasswordExpirationPolicy, settings.SettingPasswordEncryption,
+		settings.SettingHideUnauthorizedResources,
 	} {
 		b := access.SecurityPoliciesOf(keyedFailure{Store: w.st, key: key, err: boom})
 		if _, err := b.Current(ctx); !errors.Is(err, boom) {
@@ -111,6 +119,9 @@ func TestUnitSecurityPolicyStoreFailures(t *testing.T) {
 			LockEnabled: true, LoginAttempts: 1, PasswordMaxAge: 1, Encryption: accessapi.EncryptionSupported,
 		}); !errors.Is(err, boom) {
 			t.Errorf("Set with %s failing: %v", key, err)
+		}
+		if _, err := b.HidesUnauthorized(ctx); key == settings.SettingHideUnauthorizedResources && !errors.Is(err, boom) {
+			t.Errorf("HidesUnauthorized with %s failing: %v", key, err)
 		}
 	}
 }

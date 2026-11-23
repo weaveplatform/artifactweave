@@ -35,6 +35,10 @@
 //   - Error profiles: ProfileRule, ProfileFor, ErrorProfiles, ErrorProfile
 //     and WithProfileRules.
 //   - Writing: WriteErr, WriteErrProfile, WriteJSON, EscapePath and FormatTime.
+//   - Hiding: HideUnauthorized, the middleware that carries the security
+//     configuration's hideUnauthorizedResources reader (Hiding) on each
+//     request, Hides, which asks it, and Hidden, which picks the Hidden
+//     answer of an apierror.Hideable while it is on (#1903).
 //   - File names: EncodeQuery, EncodeUnreserved, EscapeQuoted and
 //     PrintableASCII, the encodings 7.x writes a downloaded file's name in
 //     (X-Artifactory-Filename, Content-Disposition).
@@ -60,6 +64,10 @@
 //     sees only a bare 500. An error caused by cancellation of the HTTP request itself is
 //     noted and aborts through net/http instead; independent backend errors
 //     and server deadlines keep their existing error profiles.
+//   - WriteErr and WriteErrProfile write an apierror.Hideable's Hidden answer
+//     while Hides reports true, and its refusal otherwise; Hides reads the
+//     setting only then, so an answer that cannot be hidden costs no read,
+//     and a failed read is written as that failure's 500.
 //   - NoteCause and NoteUser do nothing on a context that never passed the
 //     access log, so a handler called on its own neither panics nor logs.
 //   - The caller checks answer with the kernel's typed errors
@@ -116,6 +124,8 @@
 // pointers' nil cases, the route patterns and each caller check's answers.
 // TestUnitNextLink holds the next page's target to the client's path and
 // parameters, only the position changed.
+// hiding_test.go covers Hidden without the middleware, with the setting on
+// and off and with a failing read, and an answer that cannot be hidden.
 // stream_test.go holds a streamed list to the bytes WriteJSON sends for the
 // same list, empty, short and over several pages, filtered and enveloped,
 // and covers a failure before the first byte, after it, an expired

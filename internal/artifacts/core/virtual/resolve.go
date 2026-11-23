@@ -280,8 +280,10 @@ func (d Denial) Message() string {
 // it. path is the resource path the walk looked for: the archive of an
 // archive entry and the file of a checksum, as 7.x's request names them
 // (DownloadRequestContext.getResourcePath). hideGlobal is the security
-// configuration's hideUnauthorizedResources, which artifactweave does not
-// have yet, so callers pass false.
+// configuration's hideUnauthorizedResources when the caller has read it;
+// the item routes pass false and leave the choice to the request, since
+// each 401 and 403 below is an apierror.Hideable whose Hidden answer is the
+// 404, which httpkit.Hidden gives while the setting is on (#1903).
 //
 // The answers are DownloadServiceImpl.respondResourceNotFound's (1465-1497)
 // for the unfound resource processStandard returns (newUnfoundResource
@@ -301,17 +303,28 @@ func Answer(v repo.Config, path string, r Resolution, anonymous, hideGlobal bool
 	}
 	suffix := "; Path: '" + v.Key + ":" + path + "'"
 	d := r.Forbidden
-	switch {
-	case d == nil:
+	if d == nil {
 		reason := r.Missing
 		if reason == "" {
 			reason = "Could not find resource"
 		}
 		return apierror.New(http.StatusNotFound, reason+suffix)
-	case hideGlobal || v.HideUnauthorizedResources != nil && *v.HideUnauthorizedResources:
-		return apierror.New(http.StatusNotFound, "Resource not found"+suffix)
-	case anonymous:
-		return apierror.New(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
 	}
-	return apierror.New(http.StatusForbidden, d.Message()+suffix)
+	hidden := Hidden(v, path)
+	var answer *apierror.Error
+	switch {
+	case hideGlobal || v.HideUnauthorizedResources != nil && *v.HideUnauthorizedResources:
+		return hidden
+	case anonymous:
+		answer = apierror.New(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized))
+	default:
+		answer = apierror.New(http.StatusForbidden, d.Message()+suffix)
+	}
+	return apierror.Hide(answer, hidden)
+}
+
+// Hidden is the 404 "Resource not found" with the path of v that hides a
+// refusal of path through v (respondResourceNotFound 1465-1497).
+func Hidden(v repo.Config, path string) *apierror.Error {
+	return apierror.New(http.StatusNotFound, "Resource not found; Path: '"+v.Key+":"+path+"'")
 }

@@ -130,6 +130,13 @@ is closed code: artifactweave writes `Unauthorized`, as 6.20's
 `HttpArtifactoryResponse.sendAuthorizationRequired` does and as a direct request's challenge
 does ([0032](0032-package-format-handlers.md#decision)).
 
+The global setting is the descriptor's `security.hideUnauthorizedResources`, which the
+access module stores and the item routes read at each refusal
+([#1903](https://github.com/weaveplatform/artifactweave/issues/1903)). Since
+`shouldHideUnauthorisedResponse` reads it for whatever repository a download names, it
+hides a local, remote or remote-cache file's refusal too, not only a virtual walk's
+([research 06](../06-system-configuration-and-descriptor.md#hiding-unauthorized-resources)).
+
 Sources: `engine/DownloadServiceImpl.respondResourceNotFound` 1465-1497,
 `shouldHideUnauthorisedResponse` 1499-1518 and `shouldSendAuthRequired` 1460-1463;
 `base/common/src/main/java/org/artifactory/repo/VirtualRepositoryConfigurationImpl` line 74;

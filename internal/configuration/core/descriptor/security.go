@@ -17,11 +17,14 @@ import (
 // access's SecurityPolicies, the state the Artifactory and Access REST APIs
 // write: PUT /api/security/userLockPolicy,
 // PUT /api/security/configuration/passwordExpirationPolicy and
-// PUT /access/api/v1/config/security/user_lock_policy.
+// PUT /access/api/v1/config/security/user_lock_policy. hideField is the
+// global switch beside them (#1903), which no REST API writes: 7.x sets it
+// from the descriptor and its UI alone.
 const (
 	lockSection     = "userLockPolicy"
 	passwordSection = "passwordSettings"
 	expirySection   = "expirationPolicy"
+	hideField       = "hideUnauthorizedResources"
 )
 
 // securityUnsupported are security fields 7.x documents that artifactweave
@@ -44,10 +47,12 @@ type SecurityChange struct {
 	PasswordMaxAge    *int
 	NotifyByEmail     *bool
 	Encryption        *accessapi.PasswordEncryption
+	HideUnauthorized  *bool
 }
 
 // parseSecurity accepts Artifactory's anonymous access switch, the
-// baseline policies (userLockPolicy and passwordSettings) and the LDAP
+// baseline policies (hideUnauthorizedResources, userLockPolicy and
+// passwordSettings) and the LDAP
 // connections (parseLDAP). Other security settings remain unsupported and
 // fail closed.
 func parseSecurity(top map[string]any, p *Patch) error {
@@ -64,7 +69,7 @@ func parseSecurity(top map[string]any, p *Patch) error {
 			return fmt.Errorf("%w: security.%s %s", ErrInvalid, name, reason)
 		}
 	}
-	if bad := unknown(m, []string{"anonAccessEnabled", lockSection, passwordSection, ldapSection, ldapGroupSection}); bad != "" {
+	if bad := unknown(m, []string{"anonAccessEnabled", hideField, lockSection, passwordSection, ldapSection, ldapGroupSection}); bad != "" {
 		return fmt.Errorf("%w: security: unknown field %s", ErrInvalid, bad)
 	}
 	if value, present := m["anonAccessEnabled"]; present {
@@ -83,12 +88,18 @@ func parseSecurity(top map[string]any, p *Patch) error {
 	return parseLDAPGroups(m, p)
 }
 
-// parsePolicies reads userLockPolicy and passwordSettings. A null anywhere
-// in them is refused: no field is a free string, and 7.x documents no null
-// that resets a policy [I].
+// parsePolicies reads hideUnauthorizedResources, userLockPolicy and
+// passwordSettings. A null anywhere in them is refused: no field is a free
+// string, and 7.x documents no null that resets a policy [I].
 func parsePolicies(security map[string]any, p *Patch) error {
 	var ch SecurityChange
 	touched := false
+	if v, present := security[hideField]; present {
+		touched = true
+		if err := setFlag("security."+hideField, v, &ch.HideUnauthorized); err != nil {
+			return err
+		}
+	}
 	if v, present := security[lockSection]; present {
 		touched = true
 		lock, err := block("security."+lockSection, v, "enabled", "loginAttempts")
@@ -206,6 +217,7 @@ func (ch SecurityChange) merge(cur accessapi.SecurityPolicy) accessapi.SecurityP
 	set(&cur.PasswordMaxAge, ch.PasswordMaxAge)
 	set(&cur.NotifyByEmail, ch.NotifyByEmail)
 	set(&cur.Encryption, ch.Encryption)
+	set(&cur.HideUnauthorizedResources, ch.HideUnauthorized)
 	return cur
 }
 
@@ -233,6 +245,10 @@ func planSecurity(ctx context.Context, d Deps, p *Patch, res *configapi.Result) 
 		named   bool
 		changed bool
 	}{
+		{
+			"security." + hideField, p.Security.HideUnauthorized != nil,
+			cur.HideUnauthorizedResources != next.HideUnauthorizedResources,
+		},
 		{
 			"security." + lockSection, p.Security.LockEnabled != nil || p.Security.LoginAttempts != nil,
 			cur.LockEnabled != next.LockEnabled || cur.LoginAttempts != next.LoginAttempts,
@@ -294,8 +310,10 @@ func applySecurity(ctx context.Context, d Deps, p *Patch) error {
 	return nil
 }
 
-// exportPolicies renders userLockPolicy and passwordSettings. 7.161.26's
-// artifactory.xsd keeps only passwordSettings' expirationPolicy (enabled,
+// exportPolicies renders hideUnauthorizedResources, userLockPolicy and
+// passwordSettings. hideUnauthorizedResources is SecurityType's first
+// element in 7.161.26's artifactory.xsd, so it opens the security element
+// (exportSecurity). 7.161.26's artifactory.xsd keeps only passwordSettings' expirationPolicy (enabled,
 // passwordMaxAge, notifyByEmail, in that order) and resetPolicy: the lock
 // policy and the encryption policy moved to Access with anonAccessEnabled
 // and ldapSettings, which this export already carries beside them for the
@@ -311,6 +329,7 @@ func exportPolicies(ctx context.Context, d Deps, out *exportSecurity) error {
 	if err != nil {
 		return fmt.Errorf("read export security policies: %w", err)
 	}
+	out.HideUnauthorized = &p.HideUnauthorizedResources
 	out.UserLockPolicy = &exportFields{Fields: []exportField{
 		exportValue("enabled", p.LockEnabled), exportValue("loginAttempts", p.LoginAttempts),
 	}}

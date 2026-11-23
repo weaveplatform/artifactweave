@@ -141,6 +141,13 @@
 //     answered, as checkDownloadIsAllowed checks it before getInfo. A
 //     folder request, a member read of a virtual repository (MemberRead)
 //     and an entry an archive lacks keep ItemNotFound and httpkit.Denied.
+//   - A refused file request, direct or through a virtual repository, is an
+//     apierror.Hideable: while the security configuration's
+//     hideUnauthorizedResources is on, httpkit.WriteErr and the trace give
+//     404 "Resource not found" with the same suffix in its place, as
+//     shouldHideUnauthorisedResponse reads that setting for every download
+//     (#1903). VirtualReadRefused does the same for the overlays' virtual
+//     read gate; a deployment's VirtualRefused is not hidden by it.
 //   - The download policy's refusal of such a file request
 //     (format.RejectionError.Policy: a blackout, the include and exclude
 //     patterns, Maven's release and snapshot handling) takes the same

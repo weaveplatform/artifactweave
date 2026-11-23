@@ -3,6 +3,7 @@ package virtual_test
 import (
 	"context"
 	"errors"
+	"net/http"
 	"slices"
 	"strings"
 	"testing"
@@ -481,6 +482,31 @@ func TestUnitAnswer(t *testing.T) {
 			t.Errorf("%s: %v, want none", tc.name, err)
 		case tc.status != 0 && (!errors.As(err, &e) || e.Status != tc.status || e.Message != tc.message):
 			t.Errorf("%s: %v, want %d %q", tc.name, err, tc.status, tc.message)
+		}
+	}
+}
+
+// TestUnitAnswerCarriesTheHiddenAnswer (#1903): a refusal Answer does not
+// hide itself is an apierror.Hideable whose Hidden answer is the 404,
+// which a request gives while the global hideUnauthorizedResources is on
+// (httpkit.Hidden); a miss and an answer already hidden carry none.
+func TestUnitAnswerCarriesTheHiddenAnswer(t *testing.T) {
+	var refused virtual.Resolution
+	refused.Deny(virtual.Denial{Member: "a-local", Path: "d/x.bin", User: "bob"})
+	for _, anonymous := range []bool{false, true} {
+		var h *apierror.Hideable
+		if err := virtual.Answer(virt("virt"), "d/x.bin", refused, anonymous, false); !errors.As(err, &h) ||
+			h.Hidden.Status != http.StatusNotFound || h.Hidden.Message != "Resource not found; Path: 'virt:d/x.bin'" {
+			t.Errorf("anonymous %t: %v", anonymous, err)
+		}
+	}
+	for name, err := range map[string]error{
+		"miss":   virtual.Answer(virt("virt"), "d/x.bin", virtual.Resolution{}, false, false),
+		"hidden": virtual.Answer(virt("virt"), "d/x.bin", refused, false, true),
+	} {
+		var h *apierror.Hideable
+		if errors.As(err, &h) {
+			t.Errorf("%s: %v carries a hidden answer", name, err)
 		}
 	}
 }

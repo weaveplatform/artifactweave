@@ -385,6 +385,16 @@ func accessUnset(a accessapi.API) bool {
 		a.Security == nil
 }
 
+// hidesUnauthorized reads the security configuration's
+// hideUnauthorizedResources through access, or reports it off, 7.x's
+// default, for a router built without a security policy binding.
+func hidesUnauthorized(a accessapi.API) httpkit.Hiding {
+	if a.Security == nil {
+		return func(context.Context) (bool, error) { return false, nil }
+	}
+	return a.Security.HidesUnauthorized
+}
+
 // withConfiguration returns cfg with Configuration bound over its store by
 // the configuration module when cfg sets a store and no descriptor, export or
 // system contract. It runs after withAccess: the descriptor checks the key
@@ -709,6 +719,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		keyGate(),
 		accesshttp.APIRecoveryContext,
 		xzRequests,
+		// Every handler's refusal is written through httpkit, which asks the
+		// stored setting only for an answer it can hide (#1903).
+		httpkit.HideUnauthorized(hidesUnauthorized(cfg.Access)),
 	)
 	limits := newLimitOptions(cfg.RequestLimits)
 	limiter := requestLimiter{cfg: cfg}

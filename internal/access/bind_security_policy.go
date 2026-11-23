@@ -38,11 +38,19 @@ func (b securityPolicies) Current(ctx context.Context) (accessapi.SecurityPolicy
 	if err != nil {
 		return accessapi.SecurityPolicy{}, err //nolint:wrapcheck // already wrapped
 	}
+	hide, err := authn.HideUnauthorizedResources(ctx, store)
+	if err != nil {
+		return accessapi.SecurityPolicy{}, err //nolint:wrapcheck // already wrapped
+	}
 	return accessapi.SecurityPolicy{
 		LockEnabled: lock.Enabled, LoginAttempts: lock.LoginAttempts,
 		ExpirationEnabled: expiry.Enabled, PasswordMaxAge: expiry.MaxAgeDays, NotifyByEmail: expiry.NotifyByEmail,
-		Encryption: encryption,
+		Encryption: encryption, HideUnauthorizedResources: hide,
 	}, nil
+}
+
+func (b securityPolicies) HidesUnauthorized(ctx context.Context) (bool, error) {
+	return authn.HideUnauthorizedResources(ctx, b.st.Settings()) //nolint:wrapcheck // already wrapped
 }
 
 func (b securityPolicies) Check(p accessapi.SecurityPolicy) (accessapi.SecurityPolicy, error) {
@@ -78,6 +86,7 @@ func (b securityPolicies) Set(ctx context.Context, p accessapi.SecurityPolicy) e
 			{settings.SettingUserLockPolicy, model.UserLockPolicy{Enabled: p.LockEnabled, LoginAttempts: p.LoginAttempts}},
 			{settings.SettingPasswordExpirationPolicy, expiration(p)},
 			{settings.SettingPasswordEncryption, p.Encryption},
+			{settings.SettingHideUnauthorizedResources, p.HideUnauthorizedResources},
 		} {
 			if err := store.Put(ctx, w.key, w.v); err != nil {
 				return err //nolint:wrapcheck // a store error
