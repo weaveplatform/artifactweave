@@ -141,27 +141,9 @@ func (a exportAPI) currentAdmin(ctx context.Context) error {
 
 func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 	var out exportDocument
-	repos, err := d.Repositories.List(ctx, artifactsapi.RepoFilter{})
+	existing, err := readExportRepositories(ctx, d, &out)
 	if err != nil {
-		return out, fmt.Errorf("list export repositories: %w", err)
-	}
-	existing := make(map[string]bool, len(repos))
-	for _, c := range repos {
-		existing[c.Key] = true
-		fields, err := exportRepository(c)
-		if err != nil {
-			return out, err
-		}
-		switch c.Class {
-		case repo.Local:
-			out.Local = append(out.Local, fields)
-		case repo.Remote:
-			out.Remote = append(out.Remote, fields)
-		case repo.Virtual:
-			out.Virtual = append(out.Virtual, fields)
-		case repo.Federated:
-			out.Federated = append(out.Federated, fields)
-		}
+		return out, err
 	}
 	for _, section := range []struct {
 		kind     configdoc.ConfigKind
@@ -355,4 +337,32 @@ func readExportBackups(ctx context.Context, d Deps, existing map[string]bool) ([
 		out = append(out, exportBackup(doc.Key, fields, existing))
 	}
 	return out, nil
+}
+
+// readExportRepositories fills out's repository sections and returns the
+// keys of every repository, which backup exclusions are checked against.
+func readExportRepositories(ctx context.Context, d Deps, out *exportDocument) (map[string]bool, error) {
+	repos, err := d.Repositories.List(ctx, artifactsapi.RepoFilter{})
+	if err != nil {
+		return nil, fmt.Errorf("list export repositories: %w", err)
+	}
+	existing := make(map[string]bool, len(repos))
+	for _, c := range repos {
+		existing[c.Key] = true
+		fields, err := exportRepository(c)
+		if err != nil {
+			return nil, err
+		}
+		switch c.Class {
+		case repo.Local:
+			out.Local = append(out.Local, fields)
+		case repo.Remote:
+			out.Remote = append(out.Remote, fields)
+		case repo.Virtual:
+			out.Virtual = append(out.Virtual, fields)
+		case repo.Federated:
+			out.Federated = append(out.Federated, fields)
+		}
+	}
+	return existing, nil
 }
