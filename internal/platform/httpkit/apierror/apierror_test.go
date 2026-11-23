@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -271,7 +272,7 @@ func TestUnitOCICodes(t *testing.T) {
 			if rec.Code != c.err.Status || rec.Body.String() != want {
 				t.Fatalf("%d %s, want %d %s", rec.Code, rec.Body, c.err.Status, want)
 			}
-			if *c.err != before {
+			if !reflect.DeepEqual(*c.err, before) {
 				t.Fatalf("rendering changed the error: %+v, was %+v", *c.err, before)
 			}
 		})
@@ -282,6 +283,35 @@ func TestUnitOCICodes(t *testing.T) {
 	Write(rec, ProfileAccess, shared)
 	if got := rec.Body.String(); got != `{"errors":[{"code":"FORBIDDEN","message":"refused"}]}`+"\n" {
 		t.Fatalf("access envelope after OCI: %s", got)
+	}
+}
+
+// TestUnitByProfile: an error answers with its override under the profile
+// the override names, headers included, and as itself under any other; an
+// override's own overrides are not followed.
+func TestUnitByProfile(t *testing.T) {
+	deeper := New(http.StatusTeapot, "deeper")
+	shared := &Error{
+		Status: http.StatusForbidden, Code: "FORBIDDEN", Message: "local", NoChallenge: true,
+		ByProfile: map[Profile]*Error{ProfileArtifactory: {
+			Status: http.StatusRequestEntityTooLarge, Message: "vendor", NoChallenge: true,
+			ByProfile: map[Profile]*Error{ProfileArtifactory: deeper},
+		}},
+	}
+	for _, c := range []struct {
+		profile Profile
+		status  int
+		body    string
+	}{
+		{ProfileArtifactory, http.StatusRequestEntityTooLarge, `{"errors":[{"message":"vendor","status":413}]}`},
+		{ProfileAccess, http.StatusForbidden, `{"errors":[{"code":"FORBIDDEN","message":"local"}]}`},
+		{ProfilePub, http.StatusForbidden, `{"error":{"code":"FORBIDDEN","message":"local"}}`},
+	} {
+		rec := httptest.NewRecorder()
+		Write(rec, c.profile, fmt.Errorf("wrapped: %w", shared))
+		if rec.Code != c.status || strings.TrimSpace(rec.Body.String()) != c.body || rec.Header().Get("WWW-Authenticate") != "" {
+			t.Fatalf("profile %d: %d %s %v", c.profile, rec.Code, rec.Body, rec.Header())
+		}
 	}
 }
 

@@ -8,12 +8,24 @@ import (
 )
 
 // ErrStorageQuota refuses project-owned logical growth. It carries no owner or
-// usage data and uses each route's existing error envelope. The 403 and generic
-// wording are local choices: primary quota docs establish refusal, not its wire
-// answer. This is not an authentication challenge, including for Pub clients.
+// usage data and is not an authentication challenge, including for Pub
+// clients. Under Artifactory's envelope it is 7.161.26's answer:
+// RepositoryServiceImpl.assertStorageQuota runs
+// ProjectsService.assertProjectStorageQuota on every deploy, and
+// ProjectsUtils.handleStatusUpdateByQuotaLimitType sets PROJ_LIMIT_MSG with
+// SC_REQUEST_TOO_LONG, which UploadServiceImpl sends back. 7.x's Access, Docker
+// and pub handlers are not in its open sources, so those envelopes, and the
+// read paths that classify the error by its fields, keep the local 403.
 var ErrStorageQuota = &apierror.Error{
 	Status: http.StatusForbidden, Code: "FORBIDDEN",
 	Message: "project storage quota exceeded", NoChallenge: true,
+	ByProfile: map[apierror.Profile]*apierror.Error{
+		apierror.ProfileArtifactory: {
+			Status: http.StatusRequestEntityTooLarge, Code: "REQUEST_ENTITY_TOO_LARGE",
+			Message:     "Project storage quota exceeded. If you require more storage, contact your Platform Admin.",
+			NoChallenge: true,
+		},
+	},
 }
 
 // ErrDiskQuota refuses positive storage growth while the measured hot blob
