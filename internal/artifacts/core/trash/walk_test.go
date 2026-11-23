@@ -193,29 +193,42 @@ func hashOf(s string) uint32 {
 // The walk yields exactly the nodes the collected Below did, in its order,
 // for every folder, depth and caller, whatever the store's page size and
 // the nodes asked for a page; and Holds says whether there are any.
+//
+// The sweep reads each seed's store through readOnce: the in-memory store
+// deep-copies and sorts every entry below the folder on each page it
+// answers, so a walk a store page of one entry at a time costs the square
+// of the entries, and every caller and depth asked the same pages again.
+// That made this test take four minutes under -race (#1870); the walk
+// itself, every seed and every filter are unchanged.
 func TestUnitWalkMatchesCollected(t *testing.T) {
 	ctx := context.Background()
+	pages := []int{1, 3, 0}
 	for seed := range uint64(24) {
 		rng := rand.New(rand.NewPCG(seed, 1409))
 		db, fulls := randomTrash(t, rng, 5+rng.IntN(60))
-		ref := &trash.Service{Store: db}
-		for _, page := range []int{1, 3, 0} {
-			svc := &trash.Service{Store: db}
-			trash.SetPage(svc, page)
-			for _, dir := range walkDirs(fulls) {
-				for name, sees := range walkFilters {
-					for _, deep := range []bool{false, true} {
-						want, err := collectedBelow(ctx, ref, dir, deep, sees)
-						if err != nil {
-							t.Fatal(err)
-						}
+		read := newReadOnce(db)
+		ref := &trash.Service{Store: read}
+		svcs := make([]*trash.Service, len(pages))
+		for i, page := range pages {
+			svcs[i] = &trash.Service{Store: read}
+			trash.SetPage(svcs[i], page)
+		}
+		for _, dir := range walkDirs(fulls) {
+			for name, sees := range walkFilters {
+				for _, deep := range []bool{false, true} {
+					// The collected Below does not depend on the page size.
+					want, err := collectedBelow(ctx, ref, dir, deep, sees)
+					if err != nil {
+						t.Fatal(err)
+					}
+					for i, svc := range svcs {
 						got, err := walked(ctx, svc.Walk(dir, deep, sees), 1+rng.IntN(4))
 						if err != nil {
 							t.Fatal(err)
 						}
 						if !slices.Equal(nodeText(got), nodeText(want)) {
 							t.Fatalf("seed %d, page %d, %s, Walk(%q, %v):\n got %q\nwant %q",
-								seed, page, name, dir, deep, nodeText(got), nodeText(want))
+								seed, pages[i], name, dir, deep, nodeText(got), nodeText(want))
 						}
 						if deep {
 							continue
@@ -223,13 +236,82 @@ func TestUnitWalkMatchesCollected(t *testing.T) {
 						holds, err := svc.Holds(ctx, dir, sees)
 						if err != nil || holds != (len(want) > 0) {
 							t.Fatalf("seed %d, page %d, %s, Holds(%q) = %v, %v; nodes %q",
-								seed, page, name, dir, holds, err, nodeText(want))
+								seed, pages[i], name, dir, holds, err, nodeText(want))
 						}
 					}
 				}
 			}
 		}
 	}
+}
+
+// readOnce is a store whose trash answers each List and BelowByPath query
+// with the store's first answer to it. Only a sweep that writes nothing
+// may use it, so no answer goes stale; every query still reaches the store
+// once, so its order and cursors are the store's own.
+type readOnce struct {
+	*inmem.Store
+	trash *onceTrash
+}
+
+func newReadOnce(db *inmem.Store) readOnce {
+	return readOnce{db, &onceTrash{TrashStore: db.Trash(), answers: map[onceQuery]onceAnswer{}}}
+}
+
+func (r readOnce) Trash() port.TrashStore { return r.trash }
+
+type onceQuery struct {
+	list         bool
+	repoKey, dir string
+	page         kernel.Page
+}
+
+type onceAnswer struct {
+	rows []model.TrashEntry
+	next string
+}
+
+type onceTrash struct {
+	port.TrashStore
+	answers map[onceQuery]onceAnswer
+}
+
+func (o *onceTrash) List(
+	ctx context.Context,
+	repoKey, prefix string,
+	p kernel.Page,
+) ([]model.TrashEntry, string, error) {
+	return o.answer(onceQuery{true, repoKey, prefix, p}, func() ([]model.TrashEntry, string, error) {
+		return o.TrashStore.List(ctx, repoKey, prefix, p) //nolint:wrapcheck // test double
+	})
+}
+
+func (o *onceTrash) BelowByPath(
+	ctx context.Context,
+	dir string,
+	p kernel.Page,
+) ([]model.TrashEntry, string, error) {
+	return o.answer(onceQuery{false, "", dir, p}, func() ([]model.TrashEntry, string, error) {
+		return o.TrashStore.BelowByPath(ctx, dir, p) //nolint:wrapcheck // test double
+	})
+}
+
+// answer gives each caller its own slice, as the store would, so one
+// caller's appends never reach another's rows.
+func (o *onceTrash) answer(
+	q onceQuery,
+	read func() ([]model.TrashEntry, string, error),
+) ([]model.TrashEntry, string, error) {
+	a, ok := o.answers[q]
+	if !ok {
+		rows, next, err := read()
+		if err != nil {
+			return nil, "", err
+		}
+		a = onceAnswer{rows, next}
+		o.answers[q] = a
+	}
+	return slices.Clone(a.rows), a.next, nil
 }
 
 // failAfter is a store whose trash fails BelowByPath once it has answered
