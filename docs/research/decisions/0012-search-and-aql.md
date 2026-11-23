@@ -101,7 +101,7 @@ resolve against the configured repositories before the query runs, on every engi
   and a member key no repository has are skipped, as 7.x's member resolution skips
   them (decision 0008, R2; #1252); traversal beyond eight virtual levels or 256 nodes
   fails closed. Configurable
-  `artifactory.aql.transitive.remote.repos.limit` remains P12. Default five and the
+  `artifactory.aql.transitive.remote.repos.limit` is not offered ([DV-204](../../implementation/deviations.md#api-behaviour)). Default five and the
   query restrictions are documented; nested ordering/bounds remain [I]/#216.
 - **Transient identity and precedence [I].** An actual cached result reports
   `<local-remote>-cache`. An upstream-only result reports the normal local remote
@@ -448,6 +448,12 @@ second query. Refusing the query, as artifactweave first did, broke `jf rt s --o
 `jf rt dl --offset` (#386), which keep `property` in the include. The rows differ from
 Artifactory's, so this is a deviation
 ([DV-074](../../implementation/deviations.md#api-behaviour)).
+
+**A fixed transitive member limit of five**, 7.x's default for
+`artifactory.aql.transitive.remote.repos.limit`, needs no setting: artifactweave has no
+system properties (DV-202), and no client or deployment source asks for another value.
+It is a deviation ([DV-204](../../implementation/deviations.md#api-behaviour)) rather
+than a later phase's setting (#1904).
 
 **A root without a record made at search time**, rather than a record for every
 repository, keeps the item store as it is: a root's record exists only to hold its

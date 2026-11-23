@@ -51,6 +51,6 @@ ranges, conflicting
 row duplicates and partial-result notifications fail closed. Unsupported query or
 source shapes return 400, changed/revoked authority 403, timeout 408 and remaining
 source failures 502. Exact statuses, limits and nested ordering remain [I]/#216.
-P12 owns the configurable member-limit system property; P10 owns native package
+The member limit is fixed at 7.x's default of five (DV-204); P10 owns native package
 virtual resolution. See [ADR0012](../research/decisions/0012-search-and-aql.md) and
 [Smart discovery configuration](smart-remote.md).

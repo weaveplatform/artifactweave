@@ -1479,8 +1479,8 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
      checks. Sensitive repository values are redacted and persistent bytes contain no
      plaintext fixture credentials. A remote `terraformbackend` request must fail validation.
      Upstream URLs use the fixture server; this proves management only, with native content
-     evidence owned by #624 to #633. Provider `artifactory_proxy` CRUD still requires P12/#303
-     XML descriptor reads; the fixture removes its proxy through PATCH after destroy;
+     evidence owned by #624 to #633. Provider `artifactory_proxy` CRUD is qualified in the
+     `configuration` scenario (#1837); this fixture removes its proxy through PATCH after destroy;
    - **virtual-repositories:** make two GPG key pairs with `tools/gpgkey` and an RSA pair
      with `openssl`, apply all 33 provider virtual resources, each over a local and a remote
      member pointing at the fixture server and deploying to the local one, with every

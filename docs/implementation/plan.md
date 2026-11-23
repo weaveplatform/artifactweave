@@ -926,7 +926,8 @@ adds bounded upstream-only rows to direct/virtual `items.find(...).transitive()`
 with five ordered remote members, explicit failure behavior and current authority
 fences. Search does not create cache items. Cached-path precedence and cold normal-key
 JFrog search/download are covered; precise current-vendor wire mapping remains
-[I]/#216. Configurable member limits stay P12 and package virtual delivery stays P10.
+[I]/#216. The member limit is fixed at 7.x's default of five (DV-204), and package
+virtual delivery stays P10.
 
 **Tasks**
 1. `internal/artifacts/core/remote` fetcher with the full remote field set, the retrieval decision table, negative caching, offline and hard-fail modes, assumed-offline tripping, HEAD-before-GET, singleflight, client TLS, custom headers, Docker Hub token auth.
@@ -1641,8 +1642,8 @@ requires P26/P27. Independent client and signing work may land earlier.
    proved replacement; broad input refusal must not hide an unplanned feature.
 4. Complete NuGet non-normalized mode/migration and global SemVer2/authentication settings,
    Helm global policy enforcement, Docker list-overwrite cleanup and target digest variants,
-   copy-time creation timestamps and global exclude patterns, with P12 configuration and
-   P36 migration support. P9/P10 retain remote NuGet signatures
+   copy-time creation timestamps and global exclude patterns, each with its descriptor or
+   system-property surface (#1904), and P36 migration support. P9/P10 retain remote NuGet signatures
    and other upstream/class behavior; these must be checked in their own exits.
 5. Research and deliver the target npm stage/token/profile/legacy-search contracts and
    trusted-publishing/provenance integration with P21/P23. Implement Terraform state-version

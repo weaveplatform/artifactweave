@@ -15,7 +15,8 @@ Research baseline: **2026-10-12**. Sources are the per-endpoint pages on docs.jf
 Claims not confirmed against a primary source are marked *(unverified)*.
 
 P4 and the OIDC follow-up implement the local identity, token and permission flows
-described here. LDAP and the broader system descriptor remain P12. Human/browser login,
+described here. P12 implements LDAP connections, bind and group synchronization
+(#1832–#1834) and the broader system descriptor. Human/browser login,
 SAML, Crowd, HTTP-SSO and MFA belong to P21; SCIM provisioning and lifecycle belong to P22.
 Their wire inventories below describe target contracts, not working handlers. Current
 stub responses and all remaining owners are tracked in the

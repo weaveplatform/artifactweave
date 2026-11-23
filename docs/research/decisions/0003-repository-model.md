@@ -72,7 +72,7 @@ adapter, its version comparator for the package index and its reindex endpoint.
 `/v2/{repo}/{image...}` is routed to the Docker handler for `{repo}` without any reverse
 proxy, which is what `docker push host/<repo>/<image>` sends and what the OCI conformance
 suite needs. Port-per-repository routing remains unimplemented and belongs to P28,
-with P12 configuration support. The registry answers on these paths
+with its configuration surface. The registry answers on these paths
 (decision [0031](0031-docker-oci-registry.md) has what each operation does):
 
 | Path | Serves |

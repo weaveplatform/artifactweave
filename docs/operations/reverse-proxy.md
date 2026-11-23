@@ -1,7 +1,8 @@
 # Reverse proxy
 
-Status: routing guidance for the implemented P0–P8 protocols. Reverse proxy configuration
-and generated snippets remain P12 work.
+Status: routing guidance for the implemented protocols. P12 (#1826) stores the
+descriptor's `urlBase` and the reverse proxy settings and renders the nginx snippet from
+them.
 
 artifactweave serves every JFrog path on one listener: `/artifactory/...`, `/access/...`,
 `/event/...`, `/router/api/v1/system/health`, `/.well-known/terraform.json` and
@@ -15,7 +16,9 @@ Terraform download URLs, Docker upload locations and the token realm, file info 
 use this precedence, matching Artifactory:
 
 1. `X-JFrog-Override-Base-Url` request header
-2. `base_url` from the application configuration
+2. a stored `urlBase` (descriptor PATCH, `config apply`, the bootstrap descriptor or
+   `PUT /artifactory/api/system/configuration/baseUrl`), else `base_url` from the
+   application configuration
 3. `X-Forwarded-Proto`, `X-Forwarded-Host`, `X-Forwarded-Port`
 4. The request's own scheme and host
 
@@ -56,7 +59,9 @@ repository used this way needs a key that is a valid DNS label.
 Port-per-repository is currently unsupported and belongs to P28.
 
 `GET /artifactory/api/system/configuration/reverseProxy/nginx` returns a snippet
-generated from the stored reverse proxy configuration once P12 lands.
+generated from the reverse proxy settings stored through
+`POST /artifactory/api/system/configuration/webServer` (which `platform_reverse_proxy`
+uses), and 400 when none are stored or their type is not NGINX.
 
 ## Terraform
 

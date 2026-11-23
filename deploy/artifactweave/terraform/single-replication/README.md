@@ -79,8 +79,9 @@ JSON representation, defaults/selected fields and credential redaction, rotates
 secrets and applies revision 2, then repeats the checks and requires another
 empty plan. It verifies stable target identity, sealed persistent bytes and no
 unexpected target/upstream requests, destroys the resources and observes GET404
-for both configurations. The proxy is seeded through descriptor PATCH because
-provider proxy CRUD requires XML reads owned by P12. Fixture URLs point to unused
+for both configurations. The proxy is seeded through descriptor PATCH; provider
+`artifactory_proxy` CRUD is qualified separately in the `configuration` reference (#1837).
+Fixture URLs point to unused
 loopback paths; transfer behavior is outside this scenario.
 
 ## Reference

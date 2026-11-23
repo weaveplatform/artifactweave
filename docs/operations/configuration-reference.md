@@ -18,8 +18,9 @@ artifactweave has three configuration layers (decision
 2. **Platform configuration as code**: the Artifactory YAML descriptor format, applied
    with `artifactweave config apply <file>`, with `--bootstrap <file>` at start, or with
    `PATCH /artifactory/api/system/configuration`. This is where repositories, proxies,
-   property sets, layouts and download redirect settings live. Other descriptor sections
-   are assigned to P12 and their product phases as described below.
+   property sets, layouts, download redirect, base URL, garbage collection, trash can,
+   storage quota, mail, backup, system message and baseline security and LDAP settings
+   live. The sections it applies are listed below; others belong to their product phases.
 3. **The REST APIs**, including the JFrog Terraform providers.
 
 ## Application configuration keys
@@ -296,14 +297,14 @@ The descriptor is a patch:
 | `mailServer` | One mapping: `enabled`, `host`, `port`, `username`, `password`, `from`, `subjectPrefix`, `artifactoryUrl`, `tls` (STARTTLS) and `ssl` (implicit TLS), used for every mail the server sends. Omitted fields are kept and `null` clears a string; `password` is sealed and never returned. `enabled: false` stops mail and keeps the settings; `mailServer: null` deletes them and the password |
 | `backups` | Backup definitions by key: `cronExp` (Quartz, required), `enabled`, `retentionPeriodHours`, `createArchive`, `excludedRepositories` (repositories that exist once the document is applied; deleting a repository, also through the REST API, removes it from every backup), `excludeNewRepositories`, `sendMailOnError`, `precalculate` and `exportMissionControl`. The definitions are stored and exported; running, retaining and restoring backups belongs to P36, so no backup is written yet. `dir` is refused |
 | `systemMessageConfig` | One mapping: `enabled`, `message`, `title`, `titleColor`; `null` clears a string. It is not part of the XML descriptor, as in Artifactory's XSD |
-| `security` | `anonAccessEnabled` and the `ldapSettings` connections |
+| `urlBase` | The public base URL, a string: an absolute `http` or `https` URL without user information, a query or a fragment, whose host is not a CDN domain of the hot blob tier or a parent of one. While set it takes precedence over `base_url` for every link; blank or `null` clears it. `PUT /artifactory/api/system/configuration/baseUrl` writes the same value |
+| `security` | `anonAccessEnabled`, `hideUnauthorizedResources` (a file download refused with 401 or 403, in any repository, answers 404 instead; research 06 lists the surfaces it covers), the `userLockPolicy` and `passwordSettings` policies, the `ldapSettings` connections and the `ldapGroupSettings` group settings |
 
 `gcConfig`, `trashcanConfig` and their fields cannot be null, and the XML export
 (`GET /artifactory/api/system/configuration`) always carries both with the effective values.
 `quotaConfig` and its fields cannot be null either; the export carries it once it has been set.
 Any other section, such as `offlineMode`, is refused (`400`), naming it, and nothing in the
-descriptor is applied. P12 owns completion of the baseline descriptor, including the
-remaining security settings; P13 owns federated peer convergence. Settings that activate other products
+descriptor is applied. P13 owns federated peer convergence. Settings that activate other products
 follow their owning phases, including P21/P22 identity, P24 Lifecycle and P26/P27 security.
 Acceptance must apply a setting's actual behavior rather than merely store it.
 Artifactory's own bootstrap file, `artifactory.config.import.yml`, is a different format
