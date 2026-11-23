@@ -28,3 +28,31 @@ resource "artifactory_property_set" "this" {
     }
   }
 }
+
+# A backup definition is administered configuration: artifactweave stores and
+# exports it, and P36 owns running, retaining and restoring backups.
+resource "artifactory_backup" "this" {
+  key                      = var.backup_key
+  enabled                  = var.backup_enabled
+  cron_exp                 = var.backup_cron_exp
+  retention_period_hours   = var.backup_retention_period_hours
+  excluded_repositories    = var.backup_excluded_repositories
+  create_archive           = var.backup_create_archive
+  exclude_new_repositories = var.backup_exclude_new_repositories
+  send_mail_on_error       = var.backup_send_mail_on_error
+  verify_disk_space        = var.backup_verify_disk_space
+  export_mission_control   = var.backup_export_mission_control
+}
+
+resource "artifactory_mail_server" "this" {
+  enabled         = var.mail_enabled
+  host            = var.mail_host
+  port            = var.mail_port
+  username        = var.mail_username
+  password        = var.mail_password
+  from            = var.mail_from
+  subject_prefix  = var.mail_subject_prefix
+  artifactory_url = var.mail_artifactory_url
+  use_tls         = var.mail_use_tls
+  use_ssl         = var.mail_use_ssl
+}

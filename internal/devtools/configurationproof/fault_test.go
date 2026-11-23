@@ -67,22 +67,24 @@ func (f proofFixture) exec(t *testing.T, query string, args ...any) {
 
 func TestAccConfigurationProofRejectsFailuresWithoutPublishingEvidence(t *testing.T) {
 	for _, tc := range []struct {
-		name, phase, master, expected, want string
-		prepare                             func(*testing.T, *proofFixture)
+		name, phase, master, expected, want, target string
+		prepare                                     func(*testing.T, *proofFixture)
 	}{
 		{name: "unknown phase", phase: "invented", want: "unknown proof phase"},
+		{name: "unknown target", target: "backup/owned", want: "unknown proof target"},
+		{name: "empty key", target: "mail_server/", want: "unknown proof target"},
 		{name: "invalid master", master: "short", want: "invalid fixture master key"},
-		{name: "wrong keyring", master: "different-master-key-material-32-bytes", want: "cannot read actual proxy configuration"},
-		{name: "missing document", want: "expected proxy configuration is missing", prepare: func(t *testing.T, f *proofFixture) {
+		{name: "wrong keyring", master: "different-master-key-material-32-bytes", want: "cannot read actual configuration"},
+		{name: "missing document", want: "expected configuration is missing", prepare: func(t *testing.T, f *proofFixture) {
 			f.exec(t, "DELETE FROM config_documents")
 		}},
-		{name: "deleted document still present", phase: "deleted", want: "deleted proxy retained configuration or secret rows"},
-		{name: "deleted orphan secret", phase: "deleted", want: "deleted proxy retained configuration or secret rows", prepare: func(t *testing.T, f *proofFixture) {
+		{name: "deleted document still present", phase: "deleted", want: "deleted configuration retained document or secret rows"},
+		{name: "deleted orphan secret", phase: "deleted", want: "deleted configuration retained document or secret rows", prepare: func(t *testing.T, f *proofFixture) {
 			f.db.SetMaxOpenConns(1)
 			f.exec(t, "PRAGMA foreign_keys = OFF")
 			f.exec(t, "DELETE FROM config_documents")
 		}},
-		{name: "secret query failure", phase: "deleted", want: "cannot inspect proxy secret storage", prepare: func(t *testing.T, f *proofFixture) {
+		{name: "secret query failure", phase: "deleted", want: "cannot inspect configuration secret storage", prepare: func(t *testing.T, f *proofFixture) {
 			f.exec(t, "DELETE FROM config_documents")
 			f.exec(t, "DROP TABLE config_secrets")
 		}},
@@ -93,17 +95,17 @@ func TestAccConfigurationProofRejectsFailuresWithoutPublishingEvidence(t *testin
 		{name: "plaintext secret", want: "actual server password is not sealed at rest", prepare: func(t *testing.T, f *proofFixture) {
 			f.exec(t, "UPDATE config_secrets SET value = ?", []byte(fixturePassword))
 		}},
-		{name: "public password field", want: "public proxy document contains secret material", prepare: func(t *testing.T, f *proofFixture) {
+		{name: "public password field", want: "public configuration document contains secret material", prepare: func(t *testing.T, f *proofFixture) {
 			f.exec(t, "UPDATE config_documents SET document = ?", []byte(`{"password":"masked"}`))
 		}},
-		{name: "public secret value", want: "public proxy document contains secret material", prepare: func(t *testing.T, f *proofFixture) {
+		{name: "public secret value", want: "public configuration document contains secret material", prepare: func(t *testing.T, f *proofFixture) {
 			data, err := json.Marshal(map[string]string{"host": fixturePassword})
 			if err != nil {
 				t.Fatal(err)
 			}
 			f.exec(t, "UPDATE config_documents SET document = ?", data)
 		}},
-		{name: "unresolved reference", want: "public proxy document contains secret material", prepare: func(t *testing.T, f *proofFixture) {
+		{name: "unresolved reference", want: "public configuration document contains secret material", prepare: func(t *testing.T, f *proofFixture) {
 			f.exec(t, "UPDATE config_documents SET document = ?", []byte(`{"host":"${UNRESOLVED_FIXTURE}"}`))
 		}},
 		{name: "invalid evidence", want: "invalid private proof evidence", prepare: func(t *testing.T, f *proofFixture) {
@@ -120,13 +122,16 @@ func TestAccConfigurationProofRejectsFailuresWithoutPublishingEvidence(t *testin
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newProofFixture(t)
-			if err := Run(t.Context(), f.database, "owned", "created", f.evidence, fixtureMaster, fixturePassword); err != nil {
+			if err := Run(t.Context(), f.database, "proxy/owned", "created", f.evidence, fixtureMaster, fixturePassword); err != nil {
 				t.Fatal(err)
 			}
 			if tc.prepare != nil {
 				tc.prepare(t, &f)
 			}
-			phase, master, expected := tc.phase, tc.master, tc.expected
+			phase, master, expected, target := tc.phase, tc.master, tc.expected, tc.target
+			if target == "" {
+				target = "proxy/owned"
+			}
 			if phase == "" {
 				phase = "created"
 			}
@@ -137,7 +142,7 @@ func TestAccConfigurationProofRejectsFailuresWithoutPublishingEvidence(t *testin
 				expected = fixturePassword
 			}
 			before, beforeErr := os.ReadFile(f.evidence)
-			err := Run(t.Context(), f.database, "owned", phase, f.evidence, master, expected)
+			err := Run(t.Context(), f.database, target, phase, f.evidence, master, expected)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("proof error = %v; want %s", err, tc.want)
 			}
@@ -160,7 +165,7 @@ func TestAccConfigurationProofRejectsFailuresWithoutPublishingEvidence(t *testin
 func TestAccConfigurationProofAppendsActualSealedRowEvidence(t *testing.T) {
 	f := newProofFixture(t)
 	for _, phase := range []string{"created", "refreshed", "retained"} {
-		if err := Run(t.Context(), f.database, "owned", phase, f.evidence, fixtureMaster, fixturePassword); err != nil {
+		if err := Run(t.Context(), f.database, "proxy/owned", phase, f.evidence, fixtureMaster, fixturePassword); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -65,6 +65,7 @@ func newRoot() *cobra.Command {
 		serveCmd(load),
 		migrateCmd(load),
 		configCmd(load),
+		mailCmd(load),
 		keysCmd(load),
 		versionCmd(),
 	)
@@ -178,6 +179,25 @@ func configCmd(load func(*cobra.Command, string) (config.Config, error)) *cobra.
 	apply.Flags().
 		BoolVar(&dryRun, "dry-run", false, "check the descriptor and print what would change, writing nothing")
 	c.AddCommand(apply)
+	return c
+}
+
+func mailCmd(load func(*cobra.Command, string) (config.Config, error)) *cobra.Command {
+	c := &cobra.Command{Use: "mail", Short: "Check the mail server settings"}
+	c.AddCommand(&cobra.Command{
+		Use:   "test <recipient>",
+		Short: "Send a test message through the stored mail server settings",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := load(cmd, "")
+			if err != nil {
+				return err
+			}
+			return app.TestMail( //nolint:wrapcheck // names the command
+				cmd.Context(), cfg, args[0], nil, cmd.OutOrStdout(),
+			)
+		},
+	})
 	return c
 }
 

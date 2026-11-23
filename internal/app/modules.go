@@ -103,7 +103,7 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 	}
 	art, err := artifacts.New(artifacts.Deps{
 		Store: d.store, Blobs: d.blobs, Keys: d.keys, Access: accessAPI,
-		RepositoryLifecycle: fed.RepositoryLifecycle(),
+		RepositoryLifecycle: repositoryLifecycles{fed.RepositoryLifecycle(), configuration.RepositoryLifecycle(d.store)},
 		Work:                d.work, GC: d.gc, Settings: cfg.Artifacts(), Log: d.logging.Logger("artifactweave.artifacts"),
 		// The artifacts module root may not import an ecosystem's http
 		// package, where NIM's upload preparation lives; app may.

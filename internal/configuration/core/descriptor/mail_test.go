@@ -119,7 +119,7 @@ func TestUnitMailServerDescriptorMergesSealedSecretsAndEnablement(t *testing.T) 
 
 func TestUnitMailServerDescriptorRejectsInvalidPatchesBeforeStorage(t *testing.T) {
 	for _, yaml := range []string{
-		"mailServer: null", "mailServer: []", "mailServer: {unknown: value}",
+		"mailServer: []", "mailServer: {unknown: value}",
 		"mailServer: {port: '25'}", "mailServer: {port: 1.5}", "mailServer: {port: 0}",
 		"mailServer: {port: 65536}", "mailServer: {port: .nan}",
 		"mailServer: {tls: 'true'}", "mailServer: {ssl: null}", "mailServer: {enabled: 1}",

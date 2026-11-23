@@ -42,7 +42,8 @@ var _ configapi.WebServer = webServerAPI{}
 
 // singleton reports the sections whose results name the section alone.
 func singleton(c ConfigChange) bool {
-	return c.Kind == configdoc.ConfigMailServer || c.Section == SectionURLBase || c.Section == SectionReverseProxies
+	return c.Kind == configdoc.ConfigMailServer || c.Section == SectionURLBase || c.Section == SectionReverseProxies ||
+		c.Section == SectionSystemMessage
 }
 
 // parseURLBase adds the urlBase scalar of top, when present, to p. A null or

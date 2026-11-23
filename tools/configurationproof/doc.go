@@ -7,7 +7,8 @@
 //
 // # Inputs
 //
-// Database path, proxy key, lifecycle phase and evidence path as arguments;
+// Database path, target (proxy/<key> or mail_server/mailserver), lifecycle
+// phase and evidence path as arguments;
 // CONFIGURATION_PROOF_MASTER_KEY and CONFIGURATION_PROOF_PASSWORD from the
 // owning driver's private environment.
 //
@@ -19,9 +20,10 @@
 //
 // # References
 //
-// ADR 0017; ADR 0030; issue 1839; internal/devtools/configurationproof.
+// ADR 0017; ADR 0030; issues 1839 and 1831; internal/devtools/configurationproof.
 //
 // # Status
 //
-// Implemented for the P12 two-resource configuration reference.
+// Implemented for the P12 configuration reference: proxy and mail server
+// passwords (issue 1831 added the mail target).
 package main

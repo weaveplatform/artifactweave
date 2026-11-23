@@ -97,6 +97,17 @@ type System interface {
 	// false when no descriptor has set it, and the caller then keeps the
 	// installation's download.redirect.min_size (decision 0029).
 	DownloadRedirectMinSize(ctx context.Context) (n int64, ok bool, err error)
+	// SystemMessage returns the systemMessageConfig settings the descriptor
+	// set, or the disabled default when none has. It reads only metadata.
+	SystemMessage(ctx context.Context) (SystemMessage, error)
+}
+
+// SystemMessage is the system message banner's settings
+// (systemMessageConfig). Displaying it belongs to the platform UI (P39);
+// storing it shows nothing to any client.
+type SystemMessage struct {
+	Enabled                    bool
+	Message, Title, TitleColor string
 }
 
 // API is the configuration module's published surface: one implementation

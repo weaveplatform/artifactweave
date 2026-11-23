@@ -6,8 +6,8 @@
 //
 // # Inputs
 //
-// None yet. Planned: the backups section of the descriptor (plan P12, task
-// 2).
+// None yet. The backups section of the descriptor is applied and exported
+// by the descriptor package (P12, issue 1831); P36 reads those definitions.
 //
 // # Outputs
 //
@@ -32,5 +32,6 @@
 //
 // # Status
 //
-// Placeholder: implemented by P12, P36.
+// Placeholder: implemented by P36. P12 CFG-07 (issue 1831) delivered the
+// administered definitions in core/descriptor; nothing here runs them yet.
 package backup

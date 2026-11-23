@@ -1,5 +1,5 @@
 // Command artifactweave is the registry server and its operator commands:
-// serve, migrate, config, keys and version.
+// serve, migrate, config, keys, mail and version.
 //
 // # Role
 //
@@ -15,7 +15,8 @@
 //     history.
 //   - The subcommand and its arguments: serve; migrate up, down and version,
 //     which --module limits to one module's migration stream; config
-//     validate and apply; keys rotate; version.
+//     validate and apply; keys rotate; mail test with its recipient;
+//     version.
 //   - The version, commit and build date stamped into
 //     internal/platform/buildinfo at link time (the -X flags in the Makefile
 //     and the release build).
@@ -23,8 +24,8 @@
 // # Outputs
 //
 //   - The running server, schema migrations, a validated or applied
-//     configuration descriptor and a rotated master key, each done by
-//     internal/app.
+//     configuration descriptor, a rotated master key and a sent test mail,
+//     each done by internal/app.
 //   - Logs through log/slog in the configured level and format. A failed
 //     command prints "error: " and the error on standard error and exits 1.
 //
@@ -39,5 +40,5 @@
 // # Status
 //
 // Implemented P0 (serve, config validate and version), P2 (migrate and keys
-// rotate) and P3 (config apply).
+// rotate), P3 (config apply) and P12 (mail test, issue 1831).
 package main

@@ -1,7 +1,7 @@
-// Package system validates and reads the mail-server settings needed by quota
-// delivery, administers bounded temporary logger sessions, and validates,
-// stores in document form and renders the web server settings: urlBase and
-// the reverse proxy with its nginx snippet.
+// Package system validates and reads the mail-server settings, sends the
+// administrator's test mail, administers bounded temporary logger sessions,
+// and validates, stores in document form and renders the web server
+// settings: urlBase and the reverse proxy with its nginx snippet.
 //
 // # Role
 //
@@ -20,7 +20,10 @@
 //
 // Validated mail settings behind configuration/api.Mail. Every read captures
 // public settings and the password under one guarded metadata transaction,
-// completed before SMTP starts. No function here opens a network connection.
+// completed before SMTP starts. MailTest sends Artifactory's test
+// message through a MailSender after that read, refusing to start inside a
+// transaction, and answers 7.x's confirmation or refusal texts; it opens no
+// connection itself.
 // Loggers validates temporary level requests, applies one in-memory session,
 // restores current baseline decisions on expiry/delete and joins timers on Close.
 // CheckReverseProxy and CheckURLBase refuse with configuration/api.ErrInvalid;
@@ -48,12 +51,15 @@
 //
 // PRJ-04 supplies the narrow documented mailServer dependency for quota warnings.
 // P12 CFG-03 supplies actual process-local logger controls. P12 CFG-02 (#1826)
-// supplies the base URL and reverse proxy settings. Remaining system and mail
-// administration stay P12; log collection and streaming stay P38.
+// supplies the base URL and reverse proxy settings. P12 CFG-07 (issue 1831)
+// adds MailTest behind `artifactweave mail test`. Log collection and
+// streaming stay P38.
 //
 // # Testing
 //
 //   - webserver_test.go: every reverse proxy refusal, the stored document's
 //     round trip, urlBase refusals, the snippet's shapes and the PublicURL
 //     cache.
+//   - mailtest_test.go: the test message's subject, body, sender fallback
+//     and Message-ID, and every refusal, none of which opens SMTP.
 package system

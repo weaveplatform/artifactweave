@@ -139,3 +139,7 @@ type systemAPI struct{ configs configdoc.ConfigStore }
 func (s systemAPI) DownloadRedirectMinSize(ctx context.Context) (int64, bool, error) {
 	return DownloadRedirectMinSize(ctx, s.configs)
 }
+
+func (s systemAPI) SystemMessage(ctx context.Context) (configapi.SystemMessage, error) {
+	return SystemMessage(ctx, s.configs)
+}

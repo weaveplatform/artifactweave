@@ -509,7 +509,31 @@ apply_package_cleanup() {
 configuration_proof() {
 	CONFIGURATION_PROOF_MASTER_KEY=terraform-master-key-0123456789abcdef0123456789abcdef \
 		CONFIGURATION_PROOF_PASSWORD=${TF_VAR_proxy_password:-} \
-		"$work/configurationproof" "$work/data/artifactweave.db" "$TF_VAR_proxy_key" "$1" "$work/configuration-secret-proof.json"
+		"$work/configurationproof" "$work/data/artifactweave.db" "proxy/$TF_VAR_proxy_key" "$1" "$work/configuration-secret-proof.json"
+	CONFIGURATION_PROOF_MASTER_KEY=terraform-master-key-0123456789abcdef0123456789abcdef \
+		CONFIGURATION_PROOF_PASSWORD=${TF_VAR_mail_password:-} \
+		"$work/configurationproof" "$work/data/artifactweave.db" mail_server/mailserver "$1" "$work/mail-secret-proof.json"
+}
+
+# configuration_patch sends a YAML descriptor patch as the admin; JSON is
+# YAML, so the body is the JSON form of its argument.
+configuration_patch() {
+	CONFIGURATION_PATCH="$1" python3 -I - <<'PYTHON'
+import os
+from urllib.request import ProxyHandler, Request, build_opener
+req = Request(os.environ["TF_VAR_url"] + "/artifactory/api/system/configuration",
+              data=os.environ["CONFIGURATION_PATCH"].encode(), method="PATCH",
+              headers={"Authorization": "Bearer " + os.environ["TF_VAR_access_token"],
+                       "Content-Type": "application/yaml"})
+with build_opener(ProxyHandler({})).open(req, timeout=10) as response:
+    assert response.status == 200, "descriptor patch failed"
+PYTHON
+}
+
+# A backup definition is configuration only (P36 runs backups): no provider
+# step may create a backup directory beside the server's data.
+no_backup_directory() {
+	test -z "$(find "$work/data" -iname '*backup*' -print -quit)"
 }
 
 # The reference is consumer-facing; revisions and password-clear orchestration
@@ -517,43 +541,52 @@ configuration_proof() {
 apply_configuration() {
 	export TF_VAR_proxy_key=tf-configuration-proxy TF_VAR_proxy_host=127.0.0.1 \
 		TF_VAR_property_set_name=tf-configuration-properties \
-		TF_VAR_proxy_redirect_to_hosts='["one.invalid","two.invalid"]'
+		TF_VAR_proxy_redirect_to_hosts='["one.invalid","two.invalid"]' \
+		TF_VAR_backup_key=tf-configuration-backup TF_VAR_mail_host=127.0.0.1 \
+		TF_VAR_mail_artifactory_url=https://registry.invalid/artifactory/
 	(cd "$root" && GOWORK=off go build -o "$work/configurationproof" ./tools/configurationproof)
+	# Backup exclusions must name existing repositories; the module owns none.
+	configuration_patch '{"localRepositories":{"tf-backup-skip-a":{"type":"generic"},"tf-backup-skip-b":{"type":"generic"},"tf-backup-skip-c":{"type":"generic"}}}'
 	for revision in 1 2; do
 		export TF_VAR_proxy_port=$((3128 + revision)) TF_VAR_proxy_username=fixture-user-$revision \
-			TF_VAR_proxy_password=descriptor-private-fixture-$revision
+			TF_VAR_proxy_password=descriptor-private-fixture-$revision \
+			TF_VAR_mail_port=$((2524 + revision)) TF_VAR_mail_username=mail-user-$revision \
+			TF_VAR_mail_password=mail-private-fixture-$revision \
+			TF_VAR_mail_from=sender-$revision@example.invalid TF_VAR_mail_subject_prefix="[revision $revision]"
 		if [ "$revision" = 1 ]; then
 			export TF_VAR_proxy_platform_default=true TF_VAR_proxy_services='[]' TF_VAR_property_set_visible=true
 			export TF_VAR_properties='{"release":{"closed_predefined_values":true,"multiple_choice":true,"predefined_values":{"ready":true,"waiting":false}},"free":{}}'
+			export TF_VAR_backup_cron_exp='0 0 2 ? * MON-FRI' TF_VAR_backup_enabled=true \
+				TF_VAR_backup_retention_period_hours=168 TF_VAR_backup_excluded_repositories='["tf-backup-skip-a","tf-backup-skip-b"]' \
+				TF_VAR_backup_create_archive=false TF_VAR_backup_send_mail_on_error=true \
+				TF_VAR_mail_enabled=true TF_VAR_mail_use_tls=true TF_VAR_mail_use_ssl=false
 		else
 			export TF_VAR_proxy_platform_default=false TF_VAR_proxy_services='["jfrt","jfxr"]' TF_VAR_property_set_visible=false
 			export TF_VAR_properties='{"release":{"closed_predefined_values":true,"multiple_choice":false,"predefined_values":{"ready":false,"waiting":true}},"free":{}}'
+			# A list left out of the provider's patch keeps the stored one
+			# (excludedRepositories is omitempty), so revisions change it.
+			export TF_VAR_backup_cron_exp='0 30 3 * * ?' TF_VAR_backup_enabled=false \
+				TF_VAR_backup_retention_period_hours=0 TF_VAR_backup_excluded_repositories='["tf-backup-skip-c"]' \
+				TF_VAR_backup_create_archive=true TF_VAR_backup_send_mail_on_error=false \
+				TF_VAR_mail_enabled=false TF_VAR_mail_use_tls=false TF_VAR_mail_use_ssl=true
 		fi
 		tf apply -auto-approve
 		if [ "$revision" = 1 ]; then configuration_proof created; else configuration_proof updated; fi
 		tf apply -refresh-only -auto-approve
 		configuration_proof refreshed
 		tf plan -detailed-exitcode
+		no_backup_directory
 	done
-	# ProxyAPIModel.Password is not omitempty: only a partial descriptor can
-	# omit it. Prove preservation before the provider restores its metadata.
-	python3 -I - <<'PYTHON'
-import json, os
-from urllib.request import ProxyHandler, Request, build_opener
-body = {"proxies": {os.environ["TF_VAR_proxy_key"]: {"username": "retention-check"}}}
-req = Request(os.environ["TF_VAR_url"] + "/artifactory/api/system/configuration",
-              data=json.dumps(body).encode(), method="PATCH",
-              headers={"Authorization": "Bearer " + os.environ["TF_VAR_access_token"],
-                       "Content-Type": "application/yaml"})
-with build_opener(ProxyHandler({})).open(req, timeout=10) as response:
-    assert response.status == 200, "omitted-password descriptor update failed"
-PYTHON
+	# ProxyAPIModel.Password and MailServerAPIModel.Password are not
+	# omitempty: only a partial descriptor can omit them. Prove preservation
+	# before the provider restores its metadata.
+	configuration_patch "{\"proxies\":{\"$TF_VAR_proxy_key\":{\"username\":\"retention-check\"}},\"mailServer\":{\"username\":\"retention-check\"}}"
 	configuration_proof retained
 	tf apply -auto-approve
 	configuration_proof updated
-	# Null makes the pinned provider send an empty password; actual row
-	# absence is required even if its retained Terraform state looks empty.
-	unset TF_VAR_proxy_password
+	# Null makes the pinned providers send an empty or null password; actual
+	# row absence is required even if retained Terraform state looks empty.
+	unset TF_VAR_proxy_password TF_VAR_mail_password
 	tf apply -auto-approve
 	configuration_proof cleared
 	tf apply -refresh-only -auto-approve
@@ -607,6 +640,8 @@ for scenario in "${scenarios[@]}"; do
 		configuration_proof deleted
 		tf state list >"$work/descriptor-remaining-resources.txt"
 		test ! -s "$work/descriptor-remaining-resources.txt"
+		no_backup_directory
+		configuration_patch '{"localRepositories":{"tf-backup-skip-a":null,"tf-backup-skip-b":null,"tf-backup-skip-c":null}}'
 	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/remote-repositories ]; then
 		python3 -I "$here/check-remotes.py" --remove-proxy
