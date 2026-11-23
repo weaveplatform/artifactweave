@@ -322,18 +322,25 @@ func isDeploymentPath(file string) bool {
 	return strings.HasPrefix(file, "deploy/") || strings.HasPrefix(file, "test/terraform/")
 }
 
-// A provider fixture only proves the pinned JFrog provider apply, empty-plan
-// and destroy contract. Deployment roots and their mocked terraform tests are
-// a separate lane. Unknown deploy tooling can affect both, so it selects both.
+// Each path selects the lanes whose job reads it.
+//
+// deploy/check.sh, the deployment checks, reads all of deploy/ and
+// test/terraform/ (#1858): it validates, lints and drift-checks every root,
+// the JFrog provider roots included through run.sh validate; lints every
+// root's files and every Markdown file under deploy/ against the contract;
+// and runs deploy/ci's script tests and test/terraform/driver_test.py, which
+// drives run.sh against the fixture server. check-remotes.py and
+// check-replications.py run only in their own scenarios' apply, but the
+// harness is selected whole so that a new driver test needs no rule change.
+//
+// Provider conformance reads the JFrog roots and the harness, never a README
+// or a deployment root. Other deploy tooling may feed it, so it selects both.
 func terraformPathLanes(file string) (provider, deployment bool) {
 	switch {
-	case strings.HasPrefix(file, "deploy/artifactweave/terraform/"),
-		strings.HasPrefix(file, "test/terraform/"),
-		strings.HasPrefix(file, "deploy/ci/jfrog-"),
-		strings.HasPrefix(file, "deploy/ci/testdata/jfrog-providers/"):
-		return true, false
 	case strings.HasPrefix(file, "deploy/platform/"),
-		strings.HasPrefix(file, "deploy/ci/terraform/"):
+		strings.HasPrefix(file, "deploy/ci/terraform/"),
+		strings.HasPrefix(file, "deploy/") && path.Base(file) == "README.md" &&
+			!strings.Contains(file, "/testdata/"):
 		return false, true
 	default:
 		return true, true

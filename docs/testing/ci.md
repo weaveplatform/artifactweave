@@ -74,7 +74,7 @@ current Go reverse import graph. It includes the format's server test packages,
 the shared tests that `format_dependencies` lists for it, production importers, matching
 native acceptance tags and only their client inputs. Edits to registrations,
 package templates, test data, API generation, workflows, stores, auth or
-multiple owners run full. Deployment templates select the deployment checks.
+multiple owners run full. Deployment templates and guides select the deployment checks.
 Deletions, renames, new or unmapped server tests, an unknown path, a test-kind
 inventory failure and an unavailable import graph select full or fail visibly.
 
@@ -84,14 +84,21 @@ The required `Quality gate` status runs on every PR and manual dispatch. Its
 `Select CI tests` job resolves the PR base/head merge-base from full git history
 and inspects the changed paths, including both sides of renames and deletions.
 The root README, changelog, contributor, conduct and security guides,
-`README.md` files outside `testdata/`, Markdown under `docs/`, and retained
+`README.md` files outside `testdata/` and `deploy/`, Markdown under `docs/`, and retained
 JSON evidence under `docs/testing/evidence/` qualify for the `docs` profile.
 That profile checks changed-file whitespace and evidence JSON syntax. A single
-mapped format's Go code or tests select `format`. Terraform provider fixtures
-under `deploy/artifactweave/terraform/` and their `test/terraform/` harness
-select provider conformance. Deployment roots under `deploy/platform/` and
-`deploy/ci/terraform/` select Terraform deployment checks. Shared or ambiguous
-Terraform tooling selects both. Shared Go code, fixtures, generated API, workflow, unknown status/path
+mapped format's Go code or tests select `format`. Every path under `deploy/`
+and `test/terraform/` except `test/terraform/README.md` selects the Terraform
+deployment checks, because `deploy/check.sh` reads them all (#1858): it
+validates, lints and drift-checks every root, including the JFrog provider
+fixtures under `deploy/artifactweave/terraform/` through
+`test/terraform/run.sh validate`, lints every Markdown file under `deploy/`
+against the reference-deployment contract, and runs the harness's driver test
+and `deploy/ci`'s script tests. Those provider fixtures, their
+`test/terraform/` harness and the other deploy tooling also select provider
+conformance. Deployment roots under `deploy/platform/` and
+`deploy/ci/terraform/`, and the READMEs under `deploy/`, do not, because no
+provider apply reads them. Shared Go code, fixtures, generated API, workflow, unknown status/path
 or failed diff resolution select `full`.
 The same-repository `release-please--branches--main` PR always selects `full`
 even if it changes only release metadata; an arbitrary title does not affect
