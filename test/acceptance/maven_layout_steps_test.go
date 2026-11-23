@@ -54,25 +54,19 @@ func (w *world) publishMavenLayoutRecipe(token string) error {
 	if err = os.WriteFile(filepath.Join(dir, "layout-settings.xml"), []byte(settings), 0o600); err != nil {
 		return err
 	}
-	plugins := os.Getenv("ARTIFACTWEAVE_MAVEN_REPO")
-	if plugins == "" {
-		home, homeErr := os.UserHomeDir()
-		if homeErr != nil {
-			return homeErr
-		}
-		plugins = filepath.Join(home, ".m2", "repository")
-	}
-	// Docker creates a missing bind source as root, but the client uses the
-	// caller's UID and must be able to write Maven's plugin locks there.
-	if err = os.MkdirAll(plugins, 0o755); err != nil {
-		return fmt.Errorf("create Maven plugin cache: %w", err)
+	plugins, err := w.mavenToolRepository()
+	if err != nil {
+		return err
 	}
 	// Only build-tool plugins are warmed. The artifact coordinate is published
 	// by Maven here and Gradle resolves it from an empty dependency cache.
-	return w.runJVMRecipe([]string{"--entrypoint", "mvn", "-v", plugins + ":/m2"}, []string{
+	return w.runJVMRecipe([]string{"--entrypoint", "mvn", "-v", plugins + ":/m2:ro"}, []string{
 		"-B",
 		"--no-transfer-progress",
-		"-Dmaven.repo.local=/m2",
+		"--global-settings",
+		"/work/maven-tools-settings.xml",
+		"-Dmaven.repo.local=/work/layout-publish-m2",
+		"-Dmaven.repo.local.tail=/m2",
 		"-Duser.home=/work/layout-publish-home",
 		"-s",
 		"/work/layout-settings.xml",

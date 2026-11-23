@@ -725,20 +725,55 @@ matrix is needed.
   of a module whose source is a zip's item URL. The wheel and the nupkg are built by the
   steps, so no scenario reaches a build backend on the network.
 
-- **Maven's plugins** come from `~/.m2/repository`, restored by `actions/cache` and keyed
-  on the fixture POMs that pin every plugin version. The scenarios deploy with
-  `package deploy:deploy`, never `install`, and resolve into a fresh local repository
-  that chains to the cache, so an artifact under test is never served from the cache.
+- **Maven's build tools** come from the SHA-512 manifest
+  [`maven-tools.lock.json`](../../test/acceptance/clients/maven-tools.lock.json)
+  (#1852). It pins every plugin and transitive POM and JAR the fixture builds and
+  feature command lines need, plus the JF Maven extractor. The native and JVM
+  recipe jobs run the `maven-tools` action before any assertion, also on a cache
+  hit: it verifies each cached object and repairs missing or corrupt ones through
+  `fetch-pinned.sh`, from Google's official Central mirror first and Central
+  second. Preparation has a ten-minute budget and a 90-second bound per file; a
+  failure stops the job in setup, before acceptance starts. Objects are stored
+  by digest, so the cache key is the manifest alone.
+  The manifest must name every plugin version the fixture POMs and the
+  `org.apache.maven.plugins:...` coordinates in the features and steps use, and
+  must record the pinned `jf` release, whose extractor it holds. Product
+  namespaces cannot be pinned. A Maven image update needs no manifest change
+  while those pins hold.
+  Each scenario receives a private repository holding exactly the manifest's
+  tools, checked before every Maven command, so a product file or a new fixture
+  group there fails the step. Container clients mount it read-only and every
+  client, `jf mvn` included, uses it as a Resolver tail. Publishers and consumers
+  write to separate heads, because Maven deploy writes remote metadata even
+  without install, and fresh consumer heads still resolve products from
+  ArtifactWeave. Maven's global settings block `external:*` during every
+  assertion, Central included, and leave loopback repositories available
+  ([mirror selection](https://maven.apache.org/guides/mini/guide-mirror-settings.html));
+  offline mode would also stop the product's HTTP resolution. A tool missing
+  from the manifest therefore fails at the command that needed it. The
+  release/snapshot and remote features also delete their intended repository
+  and require another empty consumer head to fail, even with warm tools.
+  For a local native run, execute `python3 test/acceptance/clients/maven-tools.py
+  prepare --cache "$AW_MAVEN_TOOLS"` and export
+  `ARTIFACTWEAVE_MAVEN_TOOLS="$AW_MAVEN_TOOLS"`, with a disposable path.
 - **The JFrog CLI's package commands** use the runner's tools for `jf npm`, `jf mvn` and
   `jf gradle` (Maven 3.10 and Gradle on the default Java 17). The Python and .NET scenarios
   instead mount the pinned CLI into the existing Python and SDK containers, so delegated
   commands use those exact client versions and isolated configuration.
-  `jf mvn` runs the JFrog Maven extractor that the pinned `jf` downloads: 2.131.0 takes
+  `jf mvn` runs the JFrog Maven extractor seeded from the same pinned supply: 2.131.0 takes
   `build-info-extractor-maven3` 2.44.1, the first release that starts on Maven 3.10, whose
   Maven Resolver 2.x dropped the constructors 2.43.9 called
   ([#523](https://github.com/weaveplatform/artifactweave/issues/523)). Its builds set
   `maven.compiler.release` to 17 for the runner's Java, and install into the scenario's own
-  local repository. The "Maven client versions" step prints the runner's `mvn --version`
+  local repository with the private tool repository as its Resolver tail. Each
+  isolated JF home receives `dependencies/maven/2.44.1/` with the checksum-pinned
+  uber JAR, matching the pinned
+  [CLI Maven bootstrap](https://github.com/jfrog/jfrog-cli-artifactory/blob/30c80a7deec4/artifactory/commands/mvn/utils.go)
+  and [extractor version/filename](https://github.com/jfrog/build-info-go/blob/f0cd26bfc2de/build/maven.go).
+  The install plugin is explicitly pinned to
+  [3.2.0](https://maven.apache.org/plugins/maven-install-plugin/plugin-info.html)
+  alongside the existing lifecycle plugins, matching the primary pinned Maven
+  3.10 image's effective install binding. The "Maven client versions" step prints the runner's `mvn --version`
   beside the images'.
 - **Gradle** runs informationally for M2 (decisions 0015 and 0036). `make accept` runs with
   `ARTIFACTWEAVE_ACCEPT_TAGS=~@gradle`, and a later step with `continue-on-error` runs the
@@ -1668,7 +1703,7 @@ to the gitignored `dist/`.
 | `make gate` | Local vet, formatting/lint, Go unit and package acceptance tests, coverage, vulnerability scan and cross-compilation. Generation/parity, native acceptance, OCI conformance and Terraform checks are separate targets; this is not the complete CI gate |
 | `make test` | Run anchored `TestUnit` tests and the reviewed fuzz seed corpora; CI supplies the affected package list and exact name expression |
 | `make accept-go` | Run anchored `TestAcc` package tests on Linux and write `cover/accept-go`; CI supplies the affected package list and exact name expression |
-| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN`, `ARTIFACTWEAVE_COSIGN_BIN`, `ARTIFACTWEAVE_HELM_BIN` and `ARTIFACTWEAVE_TERRAFORM_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras`, `cosign`, `helm` and `terraform` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1. `ARTIFACTWEAVE_NODE_IMAGE`, `ARTIFACTWEAVE_NPM12_IMAGE`, `ARTIFACTWEAVE_MAVEN_IMAGE`, `ARTIFACTWEAVE_MAVEN39_IMAGE`, `ARTIFACTWEAVE_PYTHON_IMAGE`, `ARTIFACTWEAVE_DOTNET_IMAGE` and `ARTIFACTWEAVE_DOTNET10_IMAGE` name the npm 11, npm 12, Maven 3.10, Maven 3.9, Python, newest .NET and .NET 10 images built from `test/acceptance/clients`, and their scenarios skip without them or off Linux. `jf npm`, `jf mvn` and `jf gradle` run the `npm`, `mvn` and `gradle` on `PATH` and skip without them. `ARTIFACTWEAVE_ACCEPT_TAGS` takes a godog tag expression, such as `~@gradle`. `ARTIFACTWEAVE_MAVEN_REPO` moves the Maven repository they mount from `~/.m2/repository`. The `@go` scenarios need only `go` on `PATH` |
+| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN`, `ARTIFACTWEAVE_COSIGN_BIN`, `ARTIFACTWEAVE_HELM_BIN` and `ARTIFACTWEAVE_TERRAFORM_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras`, `cosign`, `helm` and `terraform` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1. `ARTIFACTWEAVE_NODE_IMAGE`, `ARTIFACTWEAVE_NPM12_IMAGE`, `ARTIFACTWEAVE_MAVEN_IMAGE`, `ARTIFACTWEAVE_MAVEN39_IMAGE`, `ARTIFACTWEAVE_PYTHON_IMAGE`, `ARTIFACTWEAVE_DOTNET_IMAGE` and `ARTIFACTWEAVE_DOTNET10_IMAGE` name the npm 11, npm 12, Maven 3.10, Maven 3.9, Python, newest .NET and .NET 10 images built from `test/acceptance/clients`, and their scenarios skip without them or off Linux. `jf npm`, `jf mvn` and `jf gradle` run the `npm`, `mvn` and `gradle` on `PATH` and skip without them. `ARTIFACTWEAVE_ACCEPT_TAGS` takes a godog tag expression, such as `~@gradle`. `ARTIFACTWEAVE_MAVEN_TOOLS` names the verified build-tool object cache; run `clients/maven-tools.py prepare` before Maven scenarios. The `@go` scenarios need only `go` on `PATH` |
 | `make oci-conformance` | The OCI conformance job (needs network the first time, to fetch and build the suite into `.tools/`); reports in `oci-report/` |
 | `make generate` | Regenerate servers and clients; CI fails on drift |
 | `make terraform TERRAFORM_MODE=apply` | The terraform job (needs `terraform`; without the mode it only validates) |
@@ -1728,7 +1763,7 @@ qualification obligations.
 against the real application and a controlled upstream. An empty client repository
 resolves a release, parent/transitive dependency and both unique/non-unique snapshots.
 After upstream shutdown, a second empty client repository resolves the same dependency
-set from the server cache. The shared client tail contains plugins, not this fixture's
+set from the server cache. The private pinned tool tail contains plugins, not this fixture's
 artifact namespace. The feature also verifies authoritative snapshot XML through the
 cache alias.
 

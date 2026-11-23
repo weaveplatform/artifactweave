@@ -1,0 +1,14 @@
+<settings>
+  <!-- Tools are supplied before assertions. external:* excludes loopback and
+       file repositories, so the owned registry stays reachable while Central
+       and any other public build repository fail closed. Do not use offline
+       mode: it would also suppress the product's HTTP resolution. -->
+  <mirrors>
+    <mirror>
+      <id>acceptance-external-unavailable</id>
+      <mirrorOf>external:*</mirrorOf>
+      <url>http://127.0.0.1:9/external-repositories-unavailable</url>
+      <blocked>true</blocked>
+    </mirror>
+  </mirrors>
+</settings>

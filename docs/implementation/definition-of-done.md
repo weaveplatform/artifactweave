@@ -64,7 +64,8 @@ A phase is complete when:
 The required native acceptance partitions run SQLite and the local disk blob store
 by default and PostgreSQL/MinIO for scenarios tagged `@storage`. Native clients use
 pinned binaries or the [client image catalog](../testing/ci-client-images.md),
-with isolated client configuration and a shared Maven plugin cache.
+with isolated client configuration and a verified pinned Maven tool supply copied
+into private scenario repositories; product caches remain cold.
 
 The core job waits for its selected images to build successfully before starting
 acceptance. Its 45-minute wrapper bounds image readiness, compilation and execution;
