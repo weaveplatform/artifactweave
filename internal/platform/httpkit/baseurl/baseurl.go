@@ -64,14 +64,37 @@ func isPort(s string) bool {
 	return s != "" && len(s) <= 5 && strings.Trim(s, "0123456789") == ""
 }
 
-// Middleware stores the resolved base URL in the request context.
+// Middleware stores the resolved base URL in the request context, with
+// configured as the fixed configured base URL.
 func Middleware(configured string) func(http.Handler) http.Handler {
+	return Dynamic(func(context.Context) string { return configured })
+}
+
+// Dynamic is Middleware with the configured base URL read per request:
+// the configuration module's effective value, which an administrator
+// changes at run time (PUT /api/system/configuration/baseUrl). It is read
+// once per request and stored beside the resolved base, so the Docker
+// subdomain method and every link in one answer agree on it.
+func Dynamic(configured func(context.Context) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), ctxKey{}, Resolve(r, configured))
+			c := configured(r.Context())
+			ctx := context.WithValue(r.Context(), ctxKey{}, Resolve(r, c))
+			ctx = context.WithValue(ctx, configuredKey{}, c)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// configuredKey holds the configured base URL Dynamic read.
+type configuredKey struct{}
+
+// Configured returns the configured base URL the middleware read for this
+// request, whatever headers resolved the request's own base, and false
+// when the middleware did not run.
+func Configured(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(configuredKey{}).(string)
+	return v, ok
 }
 
 // From returns the base URL stored by Middleware, or "" when the middleware

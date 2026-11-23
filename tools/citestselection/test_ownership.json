@@ -95,6 +95,7 @@
       "ldap_internal_test.go",
       "permissions_fault_test.go",
       "project_access_test.go",
+      "project_handler_faults_test.go",
       "project_repositories_test.go",
       "project_wire_test.go",
       "roles_internal_test.go",
@@ -165,6 +166,7 @@
       "vcs_tables_test.go",
       "webhooks_matrix_test.go",
       "webhooks_status_test.go",
+      "webserver_test.go",
       "xz_test.go"
     ],
     "internal/artifacts/adapters/http": [

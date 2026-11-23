@@ -61,6 +61,9 @@ type Deps struct {
 	// do not use these read-authority contracts.
 	Authenticator accessapi.Authenticator
 	Authorizer    accessapi.Authorizer
+	// Settings supply the installation's base_url, which a stored urlBase
+	// overrides, and the CDN hosts a urlBase may not sit above.
+	Settings configapi.Settings
 }
 
 // NewAPI binds the configuration module's API over d. Its Descriptor parses
@@ -75,11 +78,13 @@ func NewAPI(d Deps) configapi.API {
 	if d.Projects != nil {
 		guard = d.Projects.Guard
 	}
+	public := newPublicURL(d)
 	return configapi.API{
-		Descriptor: descriptorAPI{d: d},
+		Descriptor: descriptorAPI{d: d, public: public},
 		Export:     exportAPI{d: d},
 		System:     systemAPI{configs: d.Configs},
 		Mail:       system.Mail{Configs: d.Configs, Tx: d.Tx, Guard: guard},
+		WebServer:  webServerAPI{d: d, public: public},
 	}
 }
 
@@ -87,7 +92,10 @@ func NewAPI(d Deps) configapi.API {
 // returns and its Apply takes.
 func (*Patch) DescriptorPlan() {}
 
-type descriptorAPI struct{ d Deps }
+type descriptorAPI struct {
+	d      Deps
+	public *system.PublicURL
+}
 
 func (descriptorAPI) Parse(
 	doc []byte,
@@ -111,7 +119,13 @@ func (a descriptorAPI) Apply(
 	if !ok || p == nil {
 		return configapi.Result{}, errNotParsed
 	}
-	return Apply(ctx, a.d, p, now, dryRun)
+	res, err := Apply(ctx, a.d, p, now, dryRun)
+	if err == nil && !dryRun && touchesURLBase(p) {
+		// Inside an enclosing transaction this runs before that commits; the
+		// next read may then cache the old value until PublicURLRefresh.
+		a.public.Invalidate()
+	}
+	return res, err
 }
 
 type systemAPI struct{ configs configdoc.ConfigStore }

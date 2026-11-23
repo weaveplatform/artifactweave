@@ -846,6 +846,21 @@ func (c Config) validateCDN() []error {
 	return errs
 }
 
+// cdnHosts are the lower-cased hosts of the hot tier's CDN domains, which
+// validateCDN keeps base_url from sitting above. The configuration module
+// applies the same rule to a urlBase stored at run time. A domain that does
+// not parse is left out: validation has already refused it.
+func (c Config) cdnHosts() []string {
+	hot := c.Blob.cdnDomains("blob")
+	var hosts []string
+	for _, key := range slices.Sorted(maps.Keys(hot)) {
+		if u, err := cdn.ParseDomain(hot[key]); err == nil {
+			hosts = append(hosts, strings.ToLower(u.Hostname()))
+		}
+	}
+	return hosts
+}
+
 // RequireMasterKey is the extra check `serve` makes; `config validate` and
 // `migrate` run without the key so operators can check a file before the
 // secret exists.

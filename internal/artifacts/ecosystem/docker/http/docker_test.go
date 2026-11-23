@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/registry"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
+	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/baseurl"
 )
 
 func TestUnitParseTarget(t *testing.T) {
@@ -502,6 +503,32 @@ func TestAccSubdomainFromForwardedHost(t *testing.T) {
 	})
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"repo":"oci-local"`) {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+}
+
+// The configured base URL the request's middleware read, a stored urlBase,
+// moves the subdomain parent; without one the registry keeps its own.
+func TestAccSubdomainFollowsConfiguredBaseURL(t *testing.T) {
+	h := router(
+		echoing(
+			Options{Store: fixture(t), SubdomainMatch: true, BaseURL: "https://reg.example.com"},
+		),
+	)
+	for configured, host := range map[string]string{
+		"https://Stored.Example.org/root": "oci-local.stored.example.org",
+		"":                                "oci-local.reg.example.com",
+	} {
+		wrapped := baseurl.Dynamic(func(context.Context) string { return configured })(h)
+		rec := serve(t, wrapped, http.MethodGet, "/v2/app/tags/list", map[string]string{"Host": host})
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"repo":"oci-local"`) {
+			t.Fatalf("%q under %q: status %d: %s", host, configured, rec.Code, rec.Body)
+		}
+	}
+	// The old parent no longer matches once a urlBase moves it.
+	wrapped := baseurl.Dynamic(func(context.Context) string { return "https://stored.example.org" })(h)
+	rec := serve(t, wrapped, http.MethodGet, "/v2/app/tags/list", map[string]string{"Host": "oci-local.reg.example.com"})
+	if strings.Contains(rec.Body.String(), `"repo":"oci-local"`) {
+		t.Fatalf("old parent matched: %s", rec.Body)
 	}
 }
 

@@ -20,13 +20,16 @@ func TestUnitClassify(t *testing.T) {
 			"docs",
 		},
 		{
+			// deploy/check.sh reads these, so they are not documentation
+			// only; selectPlan narrows the full profile to deployment.
 			"deployment guides only",
 			[]change{
 				{status: "M", path: "deploy/platform/README.md"},
 				{status: "M", path: "deploy/platform/terraform/aws/cdn/README.md"},
 			},
-			"docs",
+			"full",
 		},
+		{"Terraform harness guide", []change{{status: "M", path: "test/terraform/README.md"}}, "docs"},
 		{"root contributor guide", []change{{status: "M", path: "CONTRIBUTING.md"}}, "docs"},
 		{
 			"fixture readme",

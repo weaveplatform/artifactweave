@@ -348,9 +348,14 @@ func documentationPath(path string) bool {
 			return true
 		}
 	}
-	// Repository README files document the adjacent code or deployment. A
-	// README inside testdata may be a fixture and must retain full coverage.
+	// Repository README files document the adjacent code. A README inside
+	// testdata may be a fixture and must retain full coverage. A README under
+	// deploy/ is an input of deploy/check.sh, not only a guide: its contract
+	// lint reads every Markdown file there (G2) and each root README's
+	// headings, and its terraform-docs drift check reads the generated
+	// section, so it selects the deployment checks instead (#1858).
 	return strings.HasSuffix(path, "/README.md") &&
+		!strings.HasPrefix(path, "deploy/") &&
 		!strings.HasPrefix(path, "testdata/") &&
 		!strings.Contains(path, "/testdata/")
 }
