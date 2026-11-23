@@ -43,8 +43,9 @@ func (us users) ListSummaries(ctx context.Context, f port.UserFilter, p kernel.P
 			}
 			admin := u.Admin
 			for _, name := range memberships {
-				g, _ := us.s.groupsT().Get(name)
-				admin = admin || g.AdminPrivileges
+				// Read in place: only the flag is read, and copying each
+				// group of every user would cost more than the page.
+				admin = admin || us.s.groupsT().Rows[name].AdminPrivileges
 			}
 			if f.OnlyAdmins && !admin ||
 				!us.s.identityGranted(u.Name, memberships, f.Resource, false) {

@@ -98,19 +98,17 @@ func (a archivedItemStore) Items(
 		next string
 	)
 	err := a.s.Do(ctx, func() error {
-		rows := a.items().All(func(_ int64, v model.ArchivedItem) bool {
+		var err error
+		out, next, err = a.items().Page(func(_ int64, v model.ArchivedItem) bool {
 			return (f.RepoKey == "" || v.Item.RepoKey == f.RepoKey) &&
 				(f.PolicyKey == "" || v.PolicyKey == f.PolicyKey) &&
 				(f.ExecutionID == 0 || v.ExecutionID == f.ExecutionID)
-		}, func(x, y model.ArchivedItem) int { return cmp.Compare(x.ID, y.ID) })
-		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+		}, func(x, y model.ArchivedItem) int { return cmp.Compare(x.ID, y.ID) },
 			p,
 			false,
 			func(v model.ArchivedItem) []any { return []any{v.ID} },
 		)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -133,12 +131,11 @@ func (a archivedItemStore) ExpiredItems(
 	before = before.Truncate(time.Microsecond)
 	var out []model.ArchivedItem
 	err := a.s.Do(ctx, func() error {
-		out = a.items().All(func(_ int64, v model.ArchivedItem) bool {
+		out = a.items().First(func(_ int64, v model.ArchivedItem) bool {
 			return !v.ExpiresAt.IsZero() && v.ExpiresAt.Before(before)
 		}, func(x, y model.ArchivedItem) int {
 			return cmp.Or(x.ExpiresAt.Compare(y.ExpiresAt), cmp.Compare(x.ID, y.ID))
-		})
-		out = out[:min(len(out), expiredLimit(limit))]
+		}, expiredLimit(limit))
 		return nil
 	})
 	return out, err

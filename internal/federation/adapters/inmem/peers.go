@@ -256,17 +256,15 @@ func (f federationStore) FullSyncs(
 		next string
 	)
 	err := f.s.Do(ctx, func() error {
-		rows := f.runs().All(func(_ int64, v model.FullSyncRun) bool {
-			return repoKey == "" || v.RepoKey == repoKey
-		}, func(a, b model.FullSyncRun) int { return cmp.Compare(b.ID, a.ID) })
 		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+		out, next, err = f.runs().Page(func(_ int64, v model.FullSyncRun) bool {
+			return repoKey == "" || v.RepoKey == repoKey
+		}, func(a, b model.FullSyncRun) int { return cmp.Compare(b.ID, a.ID) },
 			p,
 			true,
 			func(v model.FullSyncRun) []any { return []any{v.ID} },
 		)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

@@ -209,16 +209,15 @@ func (w workerStore) Executions(
 		next string
 	)
 	err := w.s.Do(ctx, func() error {
-		rows := w.executions().All(func(_ string, v model.WorkerExecution) bool {
+		var err error
+		out, next, err = w.executions().Page(func(_ string, v model.WorkerExecution) bool {
 			return worker == "" || v.WorkerKey == worker
 		}, func(x, y model.WorkerExecution) int {
 			return cmp.Or(y.Started.Compare(x.Started), strings.Compare(y.ID, x.ID))
-		})
-		var err error
-		out, next, err = memtx.Paginate(rows, p, true, func(v model.WorkerExecution) []any {
+		}, p, true, func(v model.WorkerExecution) []any {
 			return []any{v.Started.UnixMicro(), v.ID}
 		})
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

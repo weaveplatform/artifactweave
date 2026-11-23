@@ -97,24 +97,23 @@ func (r remoteRecords) listEntries(
 	var out []model.RemoteCacheEntry
 	var next string
 	err := r.s.Do(ctx, func() error {
-		rows := r.entries().All(func(_ string, e model.RemoteCacheEntry) bool {
-			return e.Token.Key.RepoKey == key &&
-				(exact && e.Token.Key.Path == prefix || !exact && port.RemotePathMatches(e.Token.Key.Path, prefix))
-		},
+		var err error
+		out, next, err = r.entries().Page(
+			func(_ string, e model.RemoteCacheEntry) bool {
+				return e.Token.Key.RepoKey == key &&
+					(exact && e.Token.Key.Path == prefix || !exact && port.RemotePathMatches(e.Token.Key.Path, prefix))
+			},
 			func(a, b model.RemoteCacheEntry) int {
 				return cmp.Compare(
 					port.RemoteCacheID(a.Token.Key),
 					port.RemoteCacheID(b.Token.Key),
 				)
-			})
-		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+			},
 			p,
 			false,
 			func(e model.RemoteCacheEntry) []any { return []any{port.RemoteCacheID(e.Token.Key)} },
 		)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

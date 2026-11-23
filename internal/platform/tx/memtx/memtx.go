@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"sync/atomic"
 
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	platformtx "github.com/weaveplatform/artifactweave/internal/platform/tx"
@@ -183,8 +184,8 @@ type snapshotter interface {
 	snapshot() snapshotter
 }
 
-// Table is one in-memory table of rows of type V keyed by K. Get, All and
-// Put copy rows on the way out and in, so callers never share memory with
+// Table is one in-memory table of rows of type V keyed by K. Get, All,
+// First, Page and Put copy rows on the way out and in, so callers never share memory with
 // the store, and Put normalises times and durations to what the SQL columns
 // keep. Stored values are private copies that are replaced, never mutated,
 // so a snapshot only needs to copy the map. Call its methods inside Do or
@@ -224,7 +225,7 @@ func (t *Table[K, V]) Get(k K) (V, bool) {
 	if !ok {
 		return v, false
 	}
-	return kernel.Clone(v), true
+	return copyRow(v), true
 }
 
 // Has reports whether a row exists at k.
@@ -244,16 +245,78 @@ func (t *Table[K, V]) Del(k K) bool {
 }
 
 // All returns copies of the rows matching keep (every row when nil),
-// sorted by cmp (in no set order when cmp is nil).
+// sorted by cmp (in no set order when cmp is nil). It copies every match;
+// a list that returns only some of them uses Page or First instead.
 func (t *Table[K, V]) All(keep func(K, V) bool, cmp func(a, b V) int) []V {
+	return copyRows(t.Sorted(keep, cmp))
+}
+
+// Sorted returns the rows matching keep (every row when nil), sorted by cmp
+// (in no set order when cmp is nil). They are the stored values, not
+// copies, like Rows: read them without changing them, and copy whatever
+// part of them a caller keeps. keep and cmp see the stored values too and
+// must not change them. A store uses Sorted when it returns something
+// derived from the rows, or only some of them in a way Page and First do not
+// cover, so that it copies only what it returns.
+func (t *Table[K, V]) Sorted(keep func(K, V) bool, cmp func(a, b V) int) []V {
 	out := make([]V, 0, len(t.Rows))
 	for k, v := range t.Rows {
 		if keep == nil || keep(k, v) {
-			out = append(out, kernel.Clone(v))
+			out = append(out, v)
 		}
 	}
 	if cmp != nil {
 		slices.SortFunc(out, cmp)
+	}
+	return out
+}
+
+// First returns copies of at most n of the rows matching keep, the first in
+// cmp's order, as All would list them. It copies only those it returns.
+func (t *Table[K, V]) First(keep func(K, V) bool, cmp func(a, b V) int, n int) []V {
+	rows := t.Sorted(keep, cmp)
+	return copyRows(rows[:max(0, min(n, len(rows)))])
+}
+
+// Page returns copies of one page of the rows matching keep, sorted by cmp
+// and paged by key as Paginate pages them (cmp must order rows as key does,
+// ascending or, when desc, descending), with the next page's cursor and
+// Paginate's errors. It is All and Paginate in one, but it copies only the
+// rows of the page, not every match: a caller reading a long list a small
+// page at a time would otherwise copy the whole list for every page.
+func (t *Table[K, V]) Page(
+	keep func(K, V) bool,
+	cmp func(a, b V) int,
+	p kernel.Page,
+	desc bool,
+	key func(V) []any,
+) ([]V, string, error) {
+	rows, next, err := Paginate(t.Sorted(keep, cmp), p, desc, key)
+	if err != nil {
+		return nil, "", err
+	}
+	return copyRows(rows), next, nil
+}
+
+// copied counts the rows Get, All, First and Page have copied out, so that
+// a test can check a page copies no more than its own rows.
+var copied atomic.Int64
+
+func copyRow[V any](v V) V {
+	copied.Add(1)
+	return kernel.Clone(v)
+}
+
+// copyRows returns copies of rows in a new slice, nil for nil and empty
+// for empty as All and Paginate have always answered, so the result shares
+// neither the stored values nor the backing array of the sorted matches.
+func copyRows[V any](rows []V) []V {
+	if rows == nil {
+		return nil
+	}
+	out := make([]V, len(rows))
+	for i, v := range rows {
+		out[i] = copyRow(v)
 	}
 	return out
 }

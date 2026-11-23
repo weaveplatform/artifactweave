@@ -163,18 +163,17 @@ func (b bundleStore) List(
 		next string
 	)
 	err := b.s.Do(ctx, func() error {
-		rows := b.bundles().All(func(_ bundleKey, v model.ReleaseBundle) bool {
+		var err error
+		out, next, err = b.bundles().Page(func(_ bundleKey, v model.ReleaseBundle) bool {
 			return (f.Name == "" || v.Name == f.Name) &&
 				(f.Origin == "" || v.Origin == f.Origin) &&
 				(f.ProjectKey == "" || v.ProjectKey == f.ProjectKey)
 		}, func(x, y model.ReleaseBundle) int {
 			return cmp.Or(strings.Compare(x.Name, y.Name), strings.Compare(x.Version, y.Version))
-		})
-		var err error
-		out, next, err = memtx.Paginate(rows, p, false, func(v model.ReleaseBundle) []any {
+		}, p, false, func(v model.ReleaseBundle) []any {
 			return []any{v.Name, v.Version}
 		})
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

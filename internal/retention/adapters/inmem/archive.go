@@ -124,18 +124,16 @@ func (a archiveStore) Executions(
 		next string
 	)
 	err := a.s.Do(ctx, func() error {
-		rows := a.executions().All(func(_ int64, v model.ArchiveExecution) bool {
+		var err error
+		out, next, err = a.executions().Page(func(_ int64, v model.ArchiveExecution) bool {
 			return (f.PolicyKey == "" || v.PolicyKey == f.PolicyKey) &&
 				(f.Kind == "" || v.Kind == f.Kind)
-		}, func(x, y model.ArchiveExecution) int { return cmp.Compare(y.ID, x.ID) })
-		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+		}, func(x, y model.ArchiveExecution) int { return cmp.Compare(y.ID, x.ID) },
 			p,
 			true,
 			func(v model.ArchiveExecution) []any { return []any{v.ID} },
 		)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

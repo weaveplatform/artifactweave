@@ -186,10 +186,9 @@ func (i items) page(
 		next string
 	)
 	err := i.s.Do(ctx, func() error {
-		rows := i.t().All(func(_ int64, it model.Item) bool { return keep(it) }, order)
 		var err error
-		out, next, err = memtx.Paginate(rows, p, false, key)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		out, next, err = i.t().Page(func(_ int64, it model.Item) bool { return keep(it) }, order, p, false, key)
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

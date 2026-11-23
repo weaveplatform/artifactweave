@@ -107,18 +107,17 @@ func (t trash) List(
 		next string
 	)
 	err := t.s.Do(ctx, func() error {
-		rows := t.t().All(func(_ int64, e model.TrashEntry) bool {
+		var err error
+		out, next, err = t.t().Page(func(_ int64, e model.TrashEntry) bool {
 			return (repoKey == "" || e.Record.Item.RepoKey == repoKey) && keep(e)
 		}, func(a, b model.TrashEntry) int {
 			x, y := a.Record.Item, b.Record.Item
 			return cmp.Or(cmp.Compare(x.RepoKey, y.RepoKey), cmp.Compare(x.Path, y.Path),
 				cmp.Compare(x.Name, y.Name), cmp.Compare(a.ID, b.ID))
-		})
-		var err error
-		out, next, err = memtx.Paginate(rows, p, false, func(e model.TrashEntry) []any {
+		}, p, false, func(e model.TrashEntry) []any {
 			return []any{e.Record.Item.RepoKey, e.Record.Item.Path, e.Record.Item.Name, e.ID}
 		})
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
@@ -140,12 +139,11 @@ func (t trash) Expired(
 	var out []model.TrashEntry
 	err := t.s.Do(ctx, func() error {
 		cutoff := before.UnixMicro()
-		out = t.t().All(func(_ int64, e model.TrashEntry) bool {
+		out = t.t().First(func(_ int64, e model.TrashEntry) bool {
 			return !e.DeletedAt.IsZero() && e.DeletedAt.UnixMicro() < cutoff
 		}, func(a, b model.TrashEntry) int {
 			return cmp.Or(cmp.Compare(deletedKey(a), deletedKey(b)), cmp.Compare(a.ID, b.ID))
-		})
-		out = out[:min(len(out), limitOr(limit))]
+		}, limitOr(limit))
 		return nil
 	})
 	return out, err
@@ -235,16 +233,15 @@ func (p packages) List(
 		next string
 	)
 	err := p.s.Do(ctx, func() error {
-		rows := p.t().All(func(_ int64, v model.Package) bool { return v.RepoKey == repoKey },
-			func(a, b model.Package) int { return cmp.Compare(a.Name, b.Name) })
 		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+		out, next, err = p.t().Page(
+			func(_ int64, v model.Package) bool { return v.RepoKey == repoKey },
+			func(a, b model.Package) int { return cmp.Compare(a.Name, b.Name) },
 			pg,
 			false,
 			func(v model.Package) []any { return []any{v.Name} },
 		)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

@@ -161,16 +161,15 @@ func (c cleanupStore) Entries(ctx context.Context, q port.CleanupEntryQuery, pag
 	var out []model.CleanupEntry
 	var next string
 	err := c.s.Do(ctx, func() error {
-		rows := c.entries().All(func(_ cleanupEntryKey, e model.CleanupEntry) bool {
+		var err error
+		out, next, err = c.entries().Page(func(_ cleanupEntryKey, e model.CleanupEntry) bool {
 			return e.RunID == q.RunID && (q.VersionID == 0 || e.VersionID == q.VersionID) && (q.Kind == "" || e.Kind == q.Kind) && (q.State == "" || e.State == q.State)
 		}, func(a, b model.CleanupEntry) int {
 			if n := strings.Compare(string(a.Kind), string(b.Kind)); n != 0 {
 				return n
 			}
 			return cmp.Compare(a.EntityID, b.EntityID)
-		})
-		var err error
-		out, next, err = memtx.Paginate(rows, page, false, func(e model.CleanupEntry) []any { return []any{string(e.Kind), e.EntityID} })
+		}, page, false, func(e model.CleanupEntry) []any { return []any{string(e.Kind), e.EntityID} })
 		return err //nolint:wrapcheck // the shared paginator names its invalid cursor
 	})
 	return out, next, err

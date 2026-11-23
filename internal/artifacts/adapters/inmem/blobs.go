@@ -116,9 +116,9 @@ func (b blobIndex) Find(ctx context.Context, c kernel.Checksums) (blob.Blob, err
 		if err != nil {
 			return err
 		}
-		rows := b.t().All(func(_ string, v blob.Blob) bool {
+		rows := b.t().First(func(_ string, v blob.Blob) bool {
 			return v.State == blob.BlobLive && match(v.Checksums)
-		}, compareBlobs)
+		}, compareBlobs, 1)
 		if len(rows) == 0 {
 			return memtx.NotFound(b.table+" "+what, c)
 		}
@@ -157,15 +157,15 @@ func (b blobIndex) list(
 		next string
 	)
 	err := b.s.Do(ctx, func() error {
-		rows := b.t().All(func(_ string, v blob.Blob) bool { return keep(v) }, compareBlobs)
 		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+		out, next, err = b.t().Page(
+			func(_ string, v blob.Blob) bool { return keep(v) },
+			compareBlobs,
 			p,
 			false,
 			func(v blob.Blob) []any { return []any{v.Checksums.SHA256} },
 		)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

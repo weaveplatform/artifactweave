@@ -76,10 +76,9 @@ func (o outboxStore) Read(
 ) ([]outbox.OutboxEntry, error) {
 	var out []outbox.OutboxEntry
 	err := o.s.Do(ctx, func() error {
-		out = o.entries().All(func(k outboxKey, _ outbox.OutboxEntry) bool {
+		out = o.entries().First(func(k outboxKey, _ outbox.OutboxEntry) bool {
 			return k.origin == origin && k.stream == stream && k.seq > after
-		}, func(a, b outbox.OutboxEntry) int { return cmp.Compare(a.Seq, b.Seq) })
-		out = out[:min(len(out), limitOr(limit))]
+		}, func(a, b outbox.OutboxEntry) int { return cmp.Compare(a.Seq, b.Seq) }, limitOr(limit))
 		return nil
 	})
 	return out, err

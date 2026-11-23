@@ -119,7 +119,7 @@ func (w webhookStore) Deliveries(
 ) ([]model.WebhookDelivery, error) {
 	var out []model.WebhookDelivery
 	err := w.s.Do(ctx, func() error {
-		out = w.deliveries().All(func(_ int64, d model.WebhookDelivery) bool {
+		out = w.deliveries().First(func(_ int64, d model.WebhookDelivery) bool {
 			// Bounds compare at stored precision, as the SQL stores do.
 			at := d.AttemptedAt
 			return (f.WebhookKey == "" || d.WebhookKey == f.WebhookKey) &&
@@ -130,8 +130,7 @@ func (w webhookStore) Deliveries(
 				return c
 			}
 			return cmp.Compare(b.ID, a.ID)
-		})
-		out = out[:min(len(out), deliveryLimit(f.Limit))]
+		}, deliveryLimit(f.Limit))
 		return nil
 	})
 	return out, err

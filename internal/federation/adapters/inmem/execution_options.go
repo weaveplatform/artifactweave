@@ -86,7 +86,9 @@ func (p executions) ExplicitTargets(ctx context.Context, repository, incarnation
 			if !options.Independent {
 				continue
 			}
-			run, exists := p.runs().Get(ref.ID)
+			// Read in place: only the run's keys are compared, and copying
+			// every run with options would cost more than the page.
+			run, exists := p.runs().Rows[ref.ID]
 			if !exists || run.Reference != ref || run.Binding.Repository.Key != repository || run.Binding.Repository.Incarnation != incarnation ||
 				len(key) > 0 && run.Binding.TargetKey <= key[0] {
 				continue

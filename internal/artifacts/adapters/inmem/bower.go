@@ -65,16 +65,15 @@ func (b bowerRegistrations) List(
 	var out []model.BowerRegistration
 	var next string
 	err := b.s.Do(ctx, func() error {
-		rows := b.rows().
-			All(func(_ string, v model.BowerRegistration) bool { return v.RepoKey == repoKey }, func(a, b model.BowerRegistration) int { return cmp.Compare(a.Name, b.Name) })
 		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+		out, next, err = b.rows().Page(
+			func(_ string, v model.BowerRegistration) bool { return v.RepoKey == repoKey },
+			func(a, b model.BowerRegistration) int { return cmp.Compare(a.Name, b.Name) },
 			p,
 			false,
 			func(v model.BowerRegistration) []any { return []any{v.Name} },
 		)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }

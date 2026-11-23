@@ -19,18 +19,16 @@ func (rs replicationStore) StatusTargets(ctx context.Context, repoKey string, pa
 	}
 	var states []model.ReplicationTargetState
 	err = rs.s.Do(ctx, func() error {
-		targets := rs.replications().All(func(_ string, target model.Replication) bool {
+		targets := rs.replications().First(func(_ string, target model.Replication) bool {
 			return target.RepoKey == repoKey && (len(key) == 0 || target.Key > key[0])
-		}, compareReplications)
-		if len(targets) > page.Limit+1 {
-			targets = targets[:page.Limit+1]
-		}
+		}, compareReplications, page.Limit+1)
 		for _, target := range targets {
 			state := model.ReplicationTargetState{Key: target.Key, URL: target.URL}
-			runs := rs.runs().All(func(key replicationRunKey, _ model.ReplicationRun) bool { return key.key == target.Key },
+			// Only the latest run is returned, so only it is copied.
+			runs := rs.runs().Sorted(func(key replicationRunKey, _ model.ReplicationRun) bool { return key.key == target.Key },
 				func(a, b model.ReplicationRun) int { return b.Started.Compare(a.Started) })
 			if len(runs) > 0 {
-				state.Latest = runs[0]
+				state.Latest = kernel.Clone(runs[0])
 			}
 			for _, run := range runs {
 				if run.Completed.After(state.LastCompleted) {

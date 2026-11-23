@@ -143,19 +143,17 @@ func (c cleanupStore) Runs(
 		next string
 	)
 	err := c.s.Do(ctx, func() error {
-		rows := c.runs().All(func(_ int64, r model.CleanupRun) bool {
+		var err error
+		out, next, err = c.runs().Page(func(_ int64, r model.CleanupRun) bool {
 			return (f.PolicyKey == "" || r.PolicyKey == f.PolicyKey) &&
 				(f.ItemType == "" || r.ItemType == f.ItemType) &&
 				(len(f.Statuses) == 0 || slices.Contains(f.Statuses, r.Status))
-		}, newestFirst)
-		var err error
-		out, next, err = memtx.Paginate(
-			rows,
+		}, newestFirst,
 			p,
 			true,
 			func(r model.CleanupRun) []any { return []any{r.ID} },
 		)
-		return err //nolint:wrapcheck // Paginate's error wraps kernel.ErrInvalidCursor
+		return err //nolint:wrapcheck // Page's error wraps kernel.ErrInvalidCursor
 	})
 	return out, next, err
 }
