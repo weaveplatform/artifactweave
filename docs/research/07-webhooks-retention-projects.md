@@ -14,10 +14,10 @@ subscription administration and package cleanup execution/reports are implemente
 The project workflows use the durable authority foundations from #1730/#1731 rather
 than treating repository `projectKey` persistence as sufficient. Webhook outbound
 delivery, subscription test execution and troubleshooting remain P19a capabilities.
-Single push and pull replication is also implemented. P11's exact merged-main
-qualification (#1765) is tracked in the
-[build status](../implementation/plan.md#build-status); these delivered contracts
-do not claim complete phase sign-off.
+Single push and pull replication is also implemented. P11 passed its exact
+merged-main qualification (#1765) on 2026-11-23, recorded in the
+[build status](../implementation/plan.md#build-status); the P19a capabilities above
+remain outside that sign-off.
 
 Research baseline: **2026-10-12**. Sources: the per-endpoint pages under
 https://docs.jfrog.com/integrations/reference/jfrog-platform-webhooks-api/llms.txt,

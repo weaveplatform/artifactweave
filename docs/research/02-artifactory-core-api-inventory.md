@@ -16,7 +16,7 @@ the identity, system and platform families are in
 Repository management, generic artifacts, searches, AQL, build-info and the local
 package protocols are implemented. P9 remote protocol proxying and upstream search
 are implemented and qualified; P11 single push and pull replication is implemented
-with its merged-main qualification pending, and virtual metadata belongs to P10. The tables below
+and qualified on merged main, and virtual metadata belongs to P10. The tables below
 record JFrog's contract, including later-phase operations, rather than a runtime
 support checklist. Remaining search/AQL/build-info and existing-format gaps belong to
 P28; the other package types belong to P29–P33, with release bundles in P15. All
