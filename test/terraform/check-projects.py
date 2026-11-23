@@ -28,6 +28,7 @@ RESOURCES = {
 GIB = 1 << 30
 QUOTA_BYTES = GIB - (1 << 20)
 CHUNK = b"artifactweave-project-quota-proof\n" * 2048
+PROJECT_QUOTA_MESSAGE = "Project storage quota exceeded. If you require more storage, contact your Platform Admin."
 
 
 def inventory(root):
@@ -171,10 +172,11 @@ def quota_effects(fixture, evidence):
     copy = "/artifactory/" + repository + "/quota-copy.bin"
     headers = {"X-Checksum-Deploy": "true", "X-Checksum-Sha256": quota["sha256"]}
     revision = fixture["revision"]
-    result = request(copy, "PUT", b"", 403 if revision == 1 else 201, "quota", fixture, headers)
+    result = request(copy, "PUT", b"", 413 if revision == 1 else 201, "quota", fixture, headers)
     if revision == 1:
         refusal = json.loads(result)
-        assert refusal["errors"] == [{"message": "project storage quota exceeded", "status": 403}], "hard quota failed for a different reason"
+        # 7.161.26's ProjectsUtils.PROJ_LIMIT_MSG, sent with SC_REQUEST_TOO_LONG.
+        assert refusal["errors"] == [{"message": PROJECT_QUOTA_MESSAGE, "status": 413}], "hard quota failed for a different reason"
         request(copy, want=404)
     else:
         metadata = document("/artifactory/api/storage/" + repository + "/quota-copy.bin")

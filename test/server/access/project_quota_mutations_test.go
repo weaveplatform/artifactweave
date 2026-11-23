@@ -92,13 +92,13 @@ func projectQuotaTransfersAndTrash(t *testing.T, db harness.Store) {
 	call(http.MethodPost, "/artifactory/api/move/alpha-first/shared.bin?to=/alpha-second/shared.bin", "", http.StatusOK)
 	quotaMutationBytes(t, db, "alpha", 100)
 	call(http.MethodGet, "/artifactory/alpha-first/shared.bin", "", http.StatusNotFound)
-	call(http.MethodPost, "/artifactory/api/copy/alpha-first/other.bin?to=/alpha-second/refused.bin", "", http.StatusForbidden)
+	call(http.MethodPost, "/artifactory/api/copy/alpha-first/other.bin?to=/alpha-second/refused.bin", "", http.StatusRequestEntityTooLarge)
 	call(http.MethodGet, "/artifactory/alpha-second/refused.bin", "", http.StatusNotFound)
 	quotaMutationBytes(t, db, "alpha", 100)
 	call(http.MethodPost, "/artifactory/api/copy/alpha-second/shared.bin?to=/beta-first/shared.bin", "", http.StatusOK)
 	quotaMutationBytes(t, db, "alpha", 100)
 	quotaMutationBytes(t, db, "beta", 40)
-	call(http.MethodPost, "/artifactory/api/move/alpha-first/other.bin?to=/beta-first/other.bin", "", http.StatusForbidden)
+	call(http.MethodPost, "/artifactory/api/move/alpha-first/other.bin?to=/beta-first/other.bin", "", http.StatusRequestEntityTooLarge)
 	if rec := call(http.MethodGet, "/artifactory/alpha-first/other.bin", "", http.StatusOK); rec.Body.String() != other {
 		t.Fatal("refused cross-project move changed source content")
 	}
@@ -129,7 +129,7 @@ func projectQuotaTransfersAndTrash(t *testing.T, db harness.Store) {
 	storekit.Must(t, err)
 	refs(2)
 	call(http.MethodPut, "/access/api/v1/projects/beta", `{"storage_quota_bytes":80}`, http.StatusOK)
-	call(http.MethodPost, "/artifactory/api/trash/restore/beta-first/shared.bin?to=beta-first", "", http.StatusForbidden)
+	call(http.MethodPost, "/artifactory/api/trash/restore/beta-first/shared.bin?to=beta-first", "", http.StatusRequestEntityTooLarge)
 	quotaMutationBytes(t, db, "beta", 60)
 	refs(2)
 	call(http.MethodGet, "/artifactory/beta-first/shared.bin", "", http.StatusNotFound)
@@ -307,7 +307,7 @@ func projectQuotaCompetingMutations(t *testing.T, db harness.Store) {
 		case http.StatusCreated:
 			accepted++
 			want = strings.Repeat(value.name[:1], 55)
-		case http.StatusForbidden:
+		case http.StatusRequestEntityTooLarge:
 			refused++
 		default:
 			t.Fatalf("competing overwrite failed outside quota admission: %d %s", value.response.Code, value.response.Body)

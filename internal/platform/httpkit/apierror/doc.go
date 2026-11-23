@@ -20,8 +20,8 @@
 // # Inputs
 //
 //   - A handler's error: an *Error from New or NotSupported, or one built
-//     with an OCI or Access code, a Detail, NoChallenge, RetryAfterSeconds or
-//     Allow;
+//     with an OCI or Access code, a Detail, NoChallenge, RetryAfterSeconds,
+//     Allow or ByProfile;
 //     an error that wraps an *Error, which Write finds with errors.As; or any
 //     other error.
 //   - The Profile of the route, which the caller chooses by request path: the
@@ -34,7 +34,10 @@
 //
 // # Outputs
 //
-//   - Write: the status, the profile's envelope as JSON (the message as
+//   - Write: under a profile the error's ByProfile names, the override's
+//     answer in place of the error's own, as a hard project storage quota
+//     answers 7.x's 413 in Artifactory's envelope and 403 elsewhere (#1881).
+//     Then the status, the profile's envelope as JSON (the message as
 //     plain text under ProfileText) and the profile's content type:
 //     application/json, application/vnd.api+json for the Terraform backend,
 //     application/problem+json for APM and the Swift registry, and
@@ -135,7 +138,8 @@
 // specification's code, and a code keeps only letters and underscores
 // (#1248). A Swift registry error carries Content-Version: 1 (#1278). P10
 // added Allow, for 7.x's 405 to a deploy through a virtual repository that
-// has no local deployment repository (#1534).
+// has no local deployment repository (#1534). P12 added ByProfile, for the project
+// storage quota's 7.x answer in Artifactory's envelope (#1881).
 //
 // # Testing
 //
@@ -143,6 +147,9 @@
 //     and the envelope of eleven profiles, with and without Detail, for a
 //     wrapped *Error, and the 500 that another error becomes.
 //   - TestUnitWriteText: the plain-text body and content type of ProfileText.
+//   - TestUnitByProfile: an override answers under the profile it names,
+//     the error itself under the others, and an override's own overrides
+//     are not followed.
 //   - TestUnitTerraformBackendEnvelope: the JSON:API document and its
 //     content type.
 //   - TestUnitUnauthorizedChallenges: the Basic challenge on a 401, a
