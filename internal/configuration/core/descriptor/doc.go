@@ -89,6 +89,14 @@
 //     counts. BackupExclusions, the artifacts module's RepositoryLifecycle
 //     for backups, drops a repository's key from every backup when the
 //     repository is created or deleted outside the descriptor too.
+//   - Keys are one namespace of XML IDs (issue 1872): Apply refuses a patch
+//     that leaves a key in two of the repository sections, proxies, the
+//     reverse proxy, backups, propertySets, repoLayouts and
+//     security.ldapSettings when it was not there before, reading the state
+//     the whole patch leaves, including repositories and LDAP connections
+//     their REST APIs created. A clash those APIs stored does not block an
+//     unrelated patch; the export leaves out the repository or LDAP
+//     connection that shares the key, so it never carries one ID twice.
 //   - Error texts reach clients and logs, so they stay byte-identical.
 //
 // # References
@@ -138,7 +146,8 @@
 // order), systemMessageConfig and mailServer deletion by null, as the
 // artifactory_mail_server resource sends. CFG-06
 // (https://github.com/weaveplatform/artifactweave/issues/1830) adds
-// quotaConfig.
+// quotaConfig. Issue 1872 makes the keyed sections' xs:ID keys one
+// namespace across the patch and the export.
 //
 // # Testing
 //
@@ -164,6 +173,12 @@
 //     reapply and delete, defaults, repository references that follow the
 //     patch, refusals that write nothing, and a final-write fault that rolls
 //     back repositories, backups, mail and the system message together.
+//   - xmlid_test.go: keys shared between every kind of section, stored before,
+//     made through the repositories and LDAP APIs or arriving in one patch,
+//     refused with both entries named and nothing written; the reverse proxy
+//     through POST webServer; keys a patch frees; a clash stored outside the
+//     descriptor left out of the export; LDAP group names, which are not
+//     IDs, repeating another section's key; and read failures.
 //   - sysmessage_test.go: field merges, clearing, refusals, absence from the
 //     XML, and mailServer deletion with its sealed password.
 //   - ldap_test.go: every ldapSettings field mapped, outcomes through

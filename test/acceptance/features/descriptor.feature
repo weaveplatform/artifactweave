@@ -223,6 +223,53 @@ Feature: Configuration descriptor
     Then the response status is 400
     And the response body contains "repoLayouts.tf-layout: name other-layout does not match the entry key"
 
+  Scenario: A key reused across xs:ID sections is refused and writes nothing
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      proxies:
+        id-shared:
+          host: proxy.example.invalid
+          port: 8080
+      """
+    Then the response status is 200
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      localRepositories:
+        id-new-local: {type: generic}
+      backups:
+        id-shared:
+          cronExp: "0 0 2 ? * MON-FRI"
+      """
+    Then the response status is 400
+    And the response body contains "backups.id-shared: the ID 'id-shared' is already used by proxies.id-shared"
+    When I GET "/artifactory/api/repositories/id-new-local" as admin
+    Then the response status is 404
+    When I PUT "/artifactory/api/repositories/id-rest-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"generic"}
+      """
+    Then the response status is 200
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      repoLayouts:
+        id-rest-local:
+          artifactPathPattern: "[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"
+      """
+    Then the response status is 400
+    And the response body contains "repoLayouts.id-rest-local: the ID 'id-rest-local' is already used by localRepositories.id-rest-local"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      proxies:
+        id-shared: null
+      backups:
+        id-shared:
+          cronExp: "0 0 2 ? * MON-FRI"
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/system/configuration" as admin
+    Then the XML field "backups/backup[key=id-shared]/cronExp" equals "0 0 2 ? * MON-FRI"
+    And the response body does not contain "<key>id-shared</key><host>"
+
   Scenario: Mixed PATCH and config apply share one protected XML read model
     Given a file "mixed-descriptor.yaml" with content:
       """
