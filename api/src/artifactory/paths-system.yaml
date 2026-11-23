@@ -366,7 +366,7 @@ paths:
       x-cost: ordinary
   /api/system/configuration:
     get:
-      description: 'Admin only. Returns the currently delivered descriptor sections as application/xml from one committed metadata and current-authority snapshot: proxies, property sets, repository layouts, mailServer, security.anonAccessEnabled and downloadRedirectConfig. As on 7.161.26, the five repository sections are empty and security carries no ldapSettings: repositories are read at /api/repositories and LDAP connections at /access/api/v1/ldap/settings. Resource identities are preserved; absent optional configuration remains absent. Passwords and sensitive custom HTTP header values are omitted or empty. The pinned Terraform provider preserves mail and proxy passwords from its prior state. No public YAML read endpoint is supplied. Unsupported sections and full XML replacement remain owned by their future phases.'
+      description: 'Admin only. Returns the currently delivered descriptor sections as application/xml from one committed metadata and current-authority snapshot: proxies, property sets, repository layouts, mailServer, security and downloadRedirectConfig. As on 7.161.26, the five repository sections are empty, and security is SecurityType: hideUnauthorizedResources and passwordSettings with its expirationPolicy, without anonAccessEnabled, userLockPolicy, encryptionPolicy, ldapSettings or ldapGroupSettings, which 7.x keeps in Access. Repositories are read at /api/repositories, anonymous access and the lock and encryption policies at /api/securityconfig, LDAP connections at /access/api/v1/ldap/settings and LDAP group settings at /access/api/v1/ldap/groups. Resource identities are preserved; absent optional configuration remains absent. Passwords and sensitive custom HTTP header values are omitted or empty. The pinned Terraform provider preserves mail and proxy passwords from its prior state. No public YAML read endpoint is supplied. Unsupported sections and full XML replacement remain owned by their future phases.'
       operationId: getSystemConfiguration
       responses:
         '200':
@@ -397,7 +397,8 @@ paths:
         `username`, `password`, `from`, `subjectPrefix`, `artifactoryUrl`, `tls` and `ssl` fields. Its password is
         sealed separately from the public configuration document; omitted fields are retained, and null clears
         a string field. Disable it with `enabled: false`; whole-section null is refused. The
-        `security` section currently accepts `anonAccessEnabled`. The `downloadRedirectConfig.fileMinimumSize` field sets the smallest file, in whole MB, that a repository with
+        `security` section accepts `anonAccessEnabled`, `hideUnauthorizedResources`, `userLockPolicy`, `passwordSettings`,
+        `ldapSettings` and `ldapGroupSettings`. The `downloadRedirectConfig.fileMinimumSize` field sets the smallest file, in whole MB, that a repository with
         `downloadRedirect` or `cdnRedirect` answers with a redirect, a value that may not be null. Any other
         top-level section
         answers 400 naming it, and nothing is applied. Named entities that do not exist are created, existing ones

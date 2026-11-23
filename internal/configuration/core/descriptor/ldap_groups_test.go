@@ -2,7 +2,6 @@ package descriptor
 
 import (
 	"context"
-	"encoding/xml"
 	"errors"
 	"strings"
 	"testing"
@@ -172,38 +171,25 @@ func (failingGroups) GroupSettings(context.Context) ([]accessapi.LDAPGroupSettin
 	return nil, errLDAPApply
 }
 
-func TestUnitLDAPGroupsExportProjection(t *testing.T) {
-	if out, err := exportLDAPGroups(context.Background(), Deps{}); out != nil || err != nil {
-		t.Fatal("an export without the binding", out, err)
-	}
-	if _, err := exportLDAPGroups(context.Background(), Deps{LDAPGroups: failingGroups{}}); !errors.Is(err, errLDAPApply) {
-		t.Fatal(err)
-	}
+// TestUnitLDAPGroupsLeftOutOfTheExport (#1905): 7.161.26's SecurityType has
+// no ldapGroupSettings, its PATCH moving them to Access
+// (LdapGroupSettingsMigrationHandler), so a stored setting is read through
+// the Access API and the export names none.
+func TestUnitLDAPGroupsLeftOutOfTheExport(t *testing.T) {
 	db := inmem.New()
+	d := ldapGroupDeps(t, db)
 	p, err := Parse([]byte("security:\n  ldapGroupSettings:\n    devs:\n      enabledLdap: corp\n"+
 		"      groupMemberAttribute: uniqueMember\n      filter: (objectClass=groupOfNames)\n"), noEnv)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Apply(context.Background(), ldapGroupDeps(t, db), p, now, false); err != nil {
+	if _, err := Apply(context.Background(), d, p, now, false); err != nil {
 		t.Fatal(err)
 	}
-	out := exportSecurity{}
-	if out.LDAPGroups, err = exportLDAPGroups(context.Background(), ldapGroupDeps(t, db)); err != nil {
-		t.Fatal(err)
+	if all, err := d.LDAPGroups.GroupSettings(context.Background()); err != nil || len(all) != 1 {
+		t.Fatal("not stored", all, err)
 	}
-	body, err := xml.Marshal(out)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// 7.x's element order; groupBaseDn and enabledLdap are written empty,
-	// descriptionAttribute, empty, is left out.
-	want := "<ldapGroupSettings><ldapGroupSetting><name>devs</name><groupBaseDn></groupBaseDn>" +
-		"<groupNameAttribute>cn</groupNameAttribute><groupMemberAttribute>uniqueMember</groupMemberAttribute>" +
-		"<subTree>false</subTree><filter>(objectClass=groupOfNames)</filter><strategy>STATIC</strategy>" +
-		"<enabledLdap>corp</enabledLdap><forceAttributeSearch>false</forceAttributeSearch></ldapGroupSetting>" +
-		"</ldapGroupSettings>"
-	if !strings.Contains(string(body), want) {
-		t.Fatalf("%s", body)
+	if _, body := exportXML(t, d); strings.Contains(body, "ldapGroupSetting") || strings.Contains(body, "devs") {
+		t.Fatalf("group settings reached the export: %s", body)
 	}
 }

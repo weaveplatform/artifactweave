@@ -1,11 +1,11 @@
 # ldap-groups: LDAP group settings
 
 Manage how groups are read from an LDAP directory and mapped to local groups:
-the LDAP connection they read through, a group setting through the Access API
-and another through the system configuration. Use it to keep directory group
-synchronisation in code next to the permissions granted to those groups. It
-creates no repositories or cloud resources, and it never contacts the
-directory: the connection is created disabled.
+the LDAP connection they read through and two group settings through the
+Access API. Use it to keep directory group synchronisation in code next to the
+permissions granted to those groups. It creates no repositories or cloud
+resources, and it never contacts the directory: the connection is created
+disabled.
 
 ## What it configures
 
@@ -15,14 +15,19 @@ directory: the connection is created disabled.
 - `artifactory_ldap_group_setting_v2.teams`: groups under `ou=groups` read by
   member lists (`STATIC`, `uniqueMember`) or by the users' `memberOf`
   (`DYNAMIC`), through the Access API.
-- `artifactory_ldap_group_setting.units`: groups named by the `ou` RDNs of a
-  user's DN (`HIERARCHICAL`), through the YAML descriptor.
+- `artifactory_ldap_group_setting_v2.units`: groups named by the `ou` RDNs of
+  a user's DN (`HIERARCHICAL`), through the Access API.
+
+The deprecated `artifactory_ldap_group_setting` is not used. It writes through
+the YAML descriptor and reads `security.ldapGroupSettings` back from the XML
+descriptor, which neither Artifactory 7.x nor artifactweave carries any more
+(JFrog's own tests of the resource skip from Artifactory 7.57.1), so it cannot
+read a setting back.
 
 ## Prerequisites
 
-- A running artifactweave or Artifactory with the Access LDAP API, YAML
-  descriptor PATCH and the XML descriptor available, and its base URL without
-  `/artifactory`.
+- A running artifactweave or Artifactory with the Access LDAP API available,
+  and its base URL without `/artifactory`.
 - An admin access token.
 - Terraform 1.17 or later and `jfrog/artifactory` 12.11.14, as pinned in
   `versions.tf` and `.terraform.lock.hcl`.
@@ -59,7 +64,7 @@ terraform apply
 terraform plan
 ```
 
-After each create or update the v2 resource asks the server to refresh the
+After each create or update each resource asks the server to refresh the
 setting's groups. With the connection disabled the server refuses that
 refresh, and the provider reports it as a warning; the setting is stored all
 the same. Enable the connection (and give it a search or a working DN
@@ -79,24 +84,18 @@ administrators control.
 
 ## Teardown
 
-`terraform destroy` deletes both group settings and the connection. The
-descriptor resource deletes by reading every group setting, clearing
-`security.ldapGroupSettings` and writing back the settings it does not
-manage. A setting deleted by another client between that read and the
-write comes back, so `units` depends on `teams` and the two deletes never
-overlap; keep any other LDAP group setting change out of the same apply or
-destroy as this resource. Groups imported through the settings remain as
-local groups in the `ldap` realm.
+`terraform destroy` deletes both group settings and the connection. Groups
+imported through the settings remain as local groups in the `ldap` realm.
 
 ## How this scenario is tested
 
 The required Terraform conformance lane runs this reference against its own
 temporary server through `test/terraform/run.sh`. The driver applies two
-revisions, `STATIC` with `sub_tree` off and `DYNAMIC` with it on (the units
-setting takes the opposite), and after each `test/terraform/check-ldap-groups.py`
-reads both settings back through the Access API and the XML descriptor, which
-must agree and keep 7.x's element order, and refreshes each through the group
-sync, which refuses it because the connection is disabled. The connection
+revisions of the teams setting, `STATIC` with `sub_tree` off and `DYNAMIC`
+with it on, and after each `test/terraform/check-ldap-groups.py` reads both
+settings back through the Access API, requires the XML descriptor to carry no
+`ldapGroupSettings`, as 7.x's does not, and refreshes each setting through the
+group sync, which refuses it because the connection is disabled. The connection
 changes with the revisions too: its URL (unused loopback ports, never
 contacted), user DN pattern, search, manager DN and password, email attribute
 and login options, which `test/terraform/check-p12.py` reads back through the
@@ -132,8 +131,8 @@ No modules.
 
 | Name | Type |
 | ---- | ---- |
-| [artifactory_ldap_group_setting.units](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/ldap_group_setting) | resource |
 | [artifactory_ldap_group_setting_v2.teams](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/ldap_group_setting_v2) | resource |
+| [artifactory_ldap_group_setting_v2.units](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/ldap_group_setting_v2) | resource |
 | [artifactory_ldap_setting_v2.directory](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/ldap_setting_v2) | resource |
 
 ### Inputs
@@ -151,7 +150,7 @@ No modules.
 | paging\_support\_enabled | Whether searches ask the directory for paged results. | `bool` | `true` | no |
 | search | Find users by a search filter under base, bound as manager\_dn; null finds them by user\_dn\_pattern only and clears any stored manager password. | ```object({ filter = string base = string sub_tree = bool manager_dn = string })``` | `null` | no |
 | strategy | How the teams setting maps memberships: STATIC (groups list their members) or DYNAMIC (users list their groups in memberOf). | `string` | `"STATIC"` | no |
-| sub\_tree | Whether the teams setting searches below ou=groups; the units setting takes the opposite. | `bool` | `false` | no |
+| sub\_tree | Whether the teams setting searches below ou=groups. | `bool` | `false` | no |
 | url | Base URL of artifactweave, without /artifactory. | `string` | n/a | yes |
 | user\_dn\_pattern | DN of a user relative to the URL's base DN, {0} standing for the login name. | `string` | `"uid={0},ou=people"` | no |
 
@@ -159,6 +158,6 @@ No modules.
 
 | Name | Description |
 | ---- | ----------- |
-| teams | Name of the Access API group setting. |
-| units | Name of the descriptor group setting. |
+| teams | Name of the STATIC or DYNAMIC group setting. |
+| units | Name of the HIERARCHICAL group setting. |
 <!-- END_TF_DOCS -->

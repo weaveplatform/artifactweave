@@ -348,10 +348,11 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
   `ldapSettings`, the whole section set to `null` deletes every group setting **[I]**: the
   pinned `artifactory_ldap_group_setting` deletes one setting by sending exactly that and
   then the settings it keeps, so refusing it would leave the resource unable to delete.
-  The groups imported through a deleted setting stay. The XML export writes
-  `<ldapGroupSettings><ldapGroupSetting>` after `ldapSettings` in `LdapGroupSetting`'s
-  element order, with `groupBaseDn` and `enabledLdap` always present (their default is
-  `""`) and the other empty strings left out.
+  The groups imported through a deleted setting stay. The XML export carries no
+  `ldapGroupSettings` ([#1905](https://github.com/weaveplatform/artifactweave/issues/1905)):
+  7.161.26's `SecurityType` has none, and its PATCH moves the section to Access
+  (`LdapGroupSettingsMigrationHandler`), so the settings are read at
+  `/access/api/v1/ldap/groups` (see "The security element" below).
 - The other documented security fields answer 400 with their own reason, before anything
   is written: `anonAccessToBuildInfosDisabled` is deprecated since 6.6 and not applied,
   and `crowdSettings`, `samlSettings`,
@@ -580,7 +581,8 @@ the access module's settings (CFG-04,
 `passwordSettings{encryptionPolicy, encryptionRequired, encryptionEnabled,
 expirationPolicy{enabled, passwordMaxAge, notifyByEmail}}` and
 `userLockPolicy{enabled, loginAttempts}`, each the value the descriptor PATCH and the
-REST APIs write and the descriptor export reports. **[I]** The other fields name features
+REST APIs write. Of them the descriptor export reports only `hideUnauthorizedResources`
+and the expiration policy, the rest being Access's on 7.x (see "The security element"). **[I]** The other fields name features
 artifactweave does not have (build-info global read, password reset,
 central OAuth providers, curation) and are left out rather than reported as off;
 `encryptionEnabled` is taken as "the policy is not `UNSUPPORTED`" and the lock policy's
@@ -781,18 +783,53 @@ refusal, so a PATCH applies to the next download on every instance.
   7.x: JFrog's own acceptance tests of that resource skip every step on Artifactory 7.57.1
   or later (`onOrAfterVersion7571`, [S] provider 12.11.14
   [`resource_artifactory_ldap_setting_test.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_ldap_setting_test.go)),
-  and `artifactory_ldap_setting_v2` is the resource that manages a connection. The `artifactory_repository_layout` resource finds its layout
+  and `artifactory_ldap_setting_v2` is the resource that manages a connection. The same
+  holds for `artifactory_ldap_group_setting`, which reads
+  `security/ldapGroupSettings/ldapGroupSetting` back and finds nothing (#1905): JFrog's tests
+  of it skip from 7.57.1 too ([S] provider 12.11.14
+  [`resource_artifactory_ldap_group_setting_test.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_ldap_group_setting_test.go)),
+  and `artifactory_ldap_group_setting_v2` manages a group setting through the Access API. The `artifactory_repository_layout` resource finds its layout
   by the `name` element of `repoLayouts/repoLayout`, both to read it and before deleting it
   ([S] provider 12.11.14
   [`resource_artifactory_repository_layout.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_repository_layout.go)),
   so the XML gives each layout its key as `name`.
-- The export's `security` element carries `anonAccessEnabled`, then `userLockPolicy`
-  (`enabled, loginAttempts`) and `passwordSettings` (`encryptionPolicy` in lower case,
-  then `expirationPolicy{enabled, passwordMaxAge, notifyByEmail}`), each with its value
-  or its default when never written **[I]**: 7.161.26's XSD keeps only the expiration
-  policy, the lock and encryption policies having moved to Access, so their names, values
-  and places follow the descriptor classes 7.161.26 still ships (`UserLockPolicy`,
-  `EncryptionPolicy`). It carries no `ldapSettings` (#1893).
+- **The security element** ([#1905](https://github.com/weaveplatform/artifactweave/issues/1905)).
+  [S] 7.161.26's `SecurityDescriptor` (`@XmlType(name = "SecurityType", propOrder =
+  {"hideUnauthorizedResources", "passwordSettings", "centralOAuthProviders",
+  "signingKeysSettings", "sshServerSettings", "buildGlobalBasicReadAllowed",
+  "buildGlobalBasicReadForAnonymous"})`) and `artifactory.xsd`'s `SecurityType` have no
+  `anonAccessEnabled`, `userLockPolicy`, `ldapSettings` or `ldapGroupSettings`, and
+  `PasswordSettingsType` holds only `expirationPolicy{enabled, passwordMaxAge,
+  notifyByEmail, currentPasswordValidFor}` and `resetPolicy{enabled,
+  maxAttemptsPerAddress, timeToBlockInMinutes}`, no `encryptionPolicy`. The PATCH hands
+  `security` to `accessService.moveYamlConfigResourcesToAccess` before the merge:
+  `PlatformConfigMigrationHandler` writes `anonAccessEnabled`, `userLockPolicy` (as
+  Access's login attempts) and `passwordSettings.encryptionPolicy` to Access,
+  `LdapSettingsMigrationHandler` and `LdapGroupSettingsMigrationHandler` the connections
+  and group settings. 7.x reports the first three in `GET /api/securityconfig`
+  (`GetSecurityConfigService`, from Access) and the others at
+  `/access/api/v1/ldap/settings` and `/access/api/v1/ldap/groups`. The
+  expiration policy stays in the descriptor: `PUT
+  /api/security/configuration/passwordExpirationPolicy`
+  (`SecurityConfigurationResource.updatePasswordPolicy`) saves it there.
+
+  artifactweave follows 7.161.26 (decision recorded on #1905, option 2): the export's
+  `security` element is `hideUnauthorizedResources`, then `passwordSettings` with
+  `expirationPolicy{enabled, passwordMaxAge, notifyByEmail}`, each with its value or its
+  default when never written. The PATCH, `config apply` and the bootstrap descriptor still
+  apply every security field they did; only the export changed. The pinned
+  `artifactory_general_security` already reads `GET /api/securityconfig`, and no other
+  `artifactory_*` resource of provider 12.11.14 reads the security element but
+  `artifactory_ldap_setting` and `artifactory_ldap_group_setting`, which find nothing, as on
+  7.x from 7.57.1 (above). `resetPolicy`, `centralOAuthProviders`, `signingKeysSettings`,
+  `sshServerSettings` and the two `buildGlobalBasicRead*` flags (all `minOccurs="0"`)
+  name features artifactweave does not have, so they are left out rather than written as
+  defaults that would claim them in force, as `GET /api/securityconfig` leaves them out
+  **[I]**; `currentPasswordValidFor` is null unless set, so JAXB leaves it out too. **[I]**
+  until P19 ([#216](https://github.com/weaveplatform/artifactweave/issues/216)): what a live
+  7.x's `GET /api/system/configuration` writes under `security` (7.x's JAXB writes the
+  primitive `buildGlobalBasicRead*` flags and the always-present `resetPolicy` too); this
+  rests on the source alone.
 - `gcConfig.cronExp`, `trashcanConfig.enabled` and `trashcanConfig.retentionPeriodDays`
   (CFG-05, [#1829](https://github.com/weaveplatform/artifactweave/issues/1829)) go
   through the artifacts module's storage policy, which owns the trash can and the
@@ -815,7 +852,7 @@ refusal, so a PATCH applies to the next download on every instance.
   is the global storage quota, applied by `internal/configuration/core/quota`. See
   "Global storage quota" below.
 - CFG-01 collects the repository keys backup exclusions are checked against, proxies,
-  property sets, layouts, anonymous access, mail and download redirect configuration in one
+  property sets, layouts, the security policies, mail and download redirect configuration in one
   metadata transaction under the shared
   `Projects.Guard`, before returning bytes after commit. Export refuses an existing
   transaction on that store before any read; section readers join the transaction

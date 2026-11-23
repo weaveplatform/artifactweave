@@ -101,8 +101,9 @@ func (w baselineWorld) exported() string {
 
 // TestAccSecurityBaselineDescriptor drives CFG-04 (#1828) on SQLite and
 // PostgreSQL: the descriptor's userLockPolicy and passwordSettings read back
-// through the REST APIs and the XML export, a REST write and the equivalent
-// descriptor export the same XML, and every policy is enforced on real
+// through the REST APIs, the expiration policy also through the XML export
+// (the rest are Access's in 7.161.26's SecurityType, #1905), a REST write and
+// the equivalent descriptor read back alike, and every policy is enforced on real
 // logins (the lock, its clearing, expiry and the encryption policy) while
 // the administrator keeps a way back; a refused policy rolls back the rest
 // of its document, a sealed secret included.
@@ -134,21 +135,19 @@ func securityBaseline(t *testing.T, backend string) {
 		t.Fatalf("expiration policy through REST: %q", got)
 	}
 	want := "<security><hideUnauthorizedResources>false</hideUnauthorizedResources>" +
-		"<anonAccessEnabled>false</anonAccessEnabled>" +
-		"<userLockPolicy><enabled>true</enabled><loginAttempts>2</loginAttempts></userLockPolicy>" +
-		"<passwordSettings><encryptionPolicy>supported</encryptionPolicy><expirationPolicy><enabled>true</enabled>" +
+		"<passwordSettings><expirationPolicy><enabled>true</enabled>" +
 		"<passwordMaxAge>30</passwordMaxAge><notifyByEmail>false</notifyByEmail></expirationPolicy></passwordSettings>" +
-		"<ldapGroupSettings></ldapGroupSettings></security>"
+		"</security>"
 	if got := w.exported(); got != want {
 		t.Fatalf("export %s", got)
 	}
 
-	// A REST write and the equivalent descriptor export alike.
+	// A REST write and the equivalent descriptor read back alike.
 	ldapCall(t, w.h, http.MethodPut, secLockPol, w.admin, `{"enabled":true,"loginAttempts":3}`, http.StatusOK)
-	viaREST := w.exported()
+	viaREST := w.get(secLockPol)
 	w.patch("security:\n  userLockPolicy:\n    loginAttempts: 2\n", http.StatusOK)
 	w.patch("security:\n  userLockPolicy:\n    loginAttempts: 3\n", http.StatusOK)
-	if got := w.exported(); got != viaREST || !strings.Contains(got, "<loginAttempts>3</loginAttempts>") {
+	if got := w.get(secLockPol); got != viaREST || got != "{\"enabled\":true,\"loginAttempts\":3}\n" {
 		t.Fatalf("REST %s, descriptor %s", viaREST, got)
 	}
 
@@ -209,7 +208,7 @@ func securityBaseline(t *testing.T, backend string) {
 	w.patch("security:\n  passwordSettings:\n    encryptionPolicy: unsupported\n", http.StatusOK)
 	w.wantLogin("the encrypted password while unsupported", encrypted, http.StatusUnauthorized)
 	w.wantLogin("a clear-text password while unsupported", dev, http.StatusNotFound)
-	if got := w.exported(); !strings.Contains(got, "<encryptionPolicy>unsupported</encryptionPolicy>") {
+	if got := w.exported(); strings.Contains(got, "encryptionPolicy") || strings.Contains(got, "userLockPolicy") {
 		t.Fatalf("export %s", got)
 	}
 	// The general security read artifactory_general_security refreshes from

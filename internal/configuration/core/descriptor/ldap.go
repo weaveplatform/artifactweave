@@ -227,28 +227,3 @@ func ldapError(err error) error {
 	}
 	return err
 }
-
-// readExportSecurity reads the security element: the anonymous access switch,
-// unset until first written, the policies and the LDAP group settings. The
-// LDAP connections are not in it: 7.161.26's SecurityDescriptor has no
-// ldapSettings, which its PATCH moves to Access
-// (LdapSettingsMigrationHandler), so they are read at
-// /access/api/v1/ldap/settings.
-func readExportSecurity(ctx context.Context, d Deps) (exportSecurity, error) {
-	var out exportSecurity
-	var err error
-	out.Anonymous, err = d.AnonymousAccess.Enabled(ctx)
-	if errors.Is(err, kernel.ErrNotFound) {
-		err = nil
-	}
-	if err != nil {
-		return out, fmt.Errorf("read export anonymous access: %w", err)
-	}
-	if err := exportPolicies(ctx, d, &out); err != nil {
-		return out, err
-	}
-	if out.LDAPGroups, err = exportLDAPGroups(ctx, d); err != nil {
-		return out, err
-	}
-	return out, nil
-}

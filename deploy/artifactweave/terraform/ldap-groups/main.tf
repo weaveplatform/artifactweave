@@ -36,22 +36,19 @@ resource "artifactory_ldap_group_setting_v2" "teams" {
   sub_tree               = var.sub_tree
 }
 
-# The descriptor's security.ldapGroupSettings entry, written by YAML PATCH
-# and read back from the XML descriptor.
-resource "artifactory_ldap_group_setting" "units" {
+# A second Access API group setting, mapping the `ou` RDNs of a user's DN.
+# The provider refuses sub_tree with HIERARCHICAL, so it stays off. The
+# deprecated artifactory_ldap_group_setting is not used: it reads
+# security.ldapGroupSettings back from the XML descriptor, which 7.x's
+# descriptor and artifactweave's no longer carry (JFrog's own tests of it
+# skip from Artifactory 7.57.1), so it cannot read a setting back.
+resource "artifactory_ldap_group_setting_v2" "units" {
   name                   = "${var.name_prefix}-units"
-  ldap_setting_key       = artifactory_ldap_setting_v2.directory.key
-  group_base_dn          = ""
+  enabled_ldap           = artifactory_ldap_setting_v2.directory.key
   group_name_attribute   = "ou"
   group_member_attribute = "ou"
   filter                 = "(objectClass=organizationalUnit)"
   description_attribute  = "description"
   strategy               = "HIERARCHICAL"
-  sub_tree               = !var.sub_tree
-
-  # The provider deletes this resource by reading every group setting,
-  # clearing security.ldapGroupSettings and writing the others back. A
-  # delete of teams that lands in between would be undone by that write, so
-  # Terraform must never run the two deletes at once: this one goes first.
-  depends_on = [artifactory_ldap_group_setting_v2.teams]
+  sub_tree               = false
 }

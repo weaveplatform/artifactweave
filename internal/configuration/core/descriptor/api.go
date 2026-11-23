@@ -52,12 +52,14 @@ type Deps struct {
 	// refused without it; an export without it has no ldapSettings.
 	LDAP accessapi.LDAPSettings
 	// LDAPGroups checks and writes the security section's LDAP group
-	// settings and reads them for the export. A descriptor that names them
-	// is refused without it; an export without it has no ldapGroupSettings.
+	// settings. A descriptor that names them is refused without it. The
+	// export never carries them, as 7.161.26's SecurityType does not.
 	LDAPGroups accessapi.LDAPGroupSettings
-	// Security checks and writes the security section's userLockPolicy and
-	// passwordSettings and reads them for the export. A descriptor that names
-	// them is refused without it; an export without it leaves them out.
+	// Security checks and writes the security section's
+	// hideUnauthorizedResources, userLockPolicy and passwordSettings and
+	// reads the descriptor's part of them (hideUnauthorizedResources and
+	// the expiration policy) for the export. A descriptor that names them is
+	// refused without it; an export without it leaves them out.
 	Security accessapi.SecurityPolicies
 	// StoragePolicies checks and writes the gcConfig and trashcanConfig
 	// sections through the artifacts module, which owns collection and the

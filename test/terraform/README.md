@@ -147,22 +147,23 @@ so the last step restores the defaults, and after `terraform destroy` the checke
 them to remain in force and the state to be empty.
 
 The required `ldap-groups` reference manages a disabled `artifactory_ldap_setting_v2`
-connection and two group settings over it: `artifactory_ldap_group_setting_v2` through the
-Access API and the deprecated `artifactory_ldap_group_setting` through the YAML descriptor.
-The driver applies two revisions (the v2 setting `STATIC` then `DYNAMIC`, and `sub_tree`
-flipped on both), and after each `check-ldap-groups.py` reads both settings back through
-`/access/api/v1/ldap/groups` and the XML descriptor, which must agree and keep 7.x's
-`ldapGroupSetting` element order, and refreshes each through the group sync, which answers
-400 because the connection is disabled; the provider reports its own refresh after each v2
-write as a warning. The connection's URL (unused loopback ports, never contacted), user DN
+connection and two `artifactory_ldap_group_setting_v2` settings over it through the Access
+API: `teams` and a `HIERARCHICAL` `units`. The deprecated `artifactory_ldap_group_setting`
+is not qualified: it reads `security.ldapGroupSettings` back from the XML descriptor, which
+7.161.26's `SecurityType` does not carry (#1905), so it cannot read a setting back, as on
+7.x, where JFrog's own tests of it skip from 7.57.1. The driver applies two revisions
+(`teams` `STATIC` then `DYNAMIC`, with `sub_tree` flipped), and after each
+`check-ldap-groups.py` reads both settings back through `/access/api/v1/ldap/groups`,
+requires the XML descriptor to carry no `ldapGroupSettings`, and refreshes each through the
+group sync, which answers 400 because the connection is disabled; the provider reports its
+own refresh after each write as a warning. The connection's URL (unused loopback ports, never contacted), user DN
 pattern, search, manager DN and password, email attribute and login options change with the
 revisions, and `check-p12.py` reads it back through `/access/api/v1/ldap/settings/{key}`;
 the connection is not read from the XML descriptor, which 7.161.26 does not export it in
 (#1893). Two more applies leave the manager password out, which keeps it, and drop the
 search, which clears it with the manager DN; `tools/configurationproof` checks the sealed
 `manager_password` row after every apply. Each apply is refreshed and must plan empty. After
-`terraform destroy`, which deletes the descriptor setting by clearing the section and
-writing back the rest, the checkers require both settings, the connection and its sealed
+`terraform destroy` the checkers require both settings, the connection and its sealed
 password to be gone.
 
 The required `trashcan` reference applies pinned `artifactory_trashcan_config` in two

@@ -42,8 +42,9 @@ func TestUnitLDAPGroupsProviderScenarioIsRequired(t *testing.T) {
 		{"omitted apply handler", "test/terraform/run.sh", scenario + ") apply_ldap_groups ;;", "omitted-ldap-groups-handler"},
 		{"omitted effect checks", "test/terraform/run.sh", `python3 -I "$here/check-ldap-groups.py" --check`, "omitted-ldap-groups-effect-checks"},
 		{"omitted deletion checks", "test/terraform/run.sh", `python3 -I "$here/check-ldap-groups.py" --deleted`, "omitted-ldap-groups-deletion-checks"},
-		{"omitted v2 resource", scenario + "/main.tf", `resource "artifactory_ldap_group_setting_v2"`, `resource "omitted_ldap_group_setting_v2"`},
-		{"omitted descriptor resource", scenario + "/main.tf", `resource "artifactory_ldap_group_setting" `, `resource "omitted_ldap_group_setting" `},
+		{"omitted teams resource", scenario + "/main.tf", `resource "artifactory_ldap_group_setting_v2" "teams"`, `resource "omitted_ldap_group_setting_v2" "teams"`},
+		{"omitted units resource", scenario + "/main.tf", `resource "artifactory_ldap_group_setting_v2" "units"`, `resource "omitted_ldap_group_setting_v2" "units"`},
+		{"deprecated descriptor resource", scenario + "/main.tf", `resource "artifactory_ldap_group_setting_v2" "units"`, `resource "artifactory_ldap_group_setting" "units"`},
 		{"wrong provider lock", scenario + "/.terraform.lock.hcl", `provider "registry.terraform.io/jfrog/artifactory"`, `provider "registry.terraform.io/jfrog/omitted-artifactory"`},
 		{"unpinned release", "test/terraform/run.sh", "\nARTIFACTORY_VERSION=", "\nOMITTED_ARTIFACTORY_VERSION="},
 	} {
