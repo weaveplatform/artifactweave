@@ -92,6 +92,9 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 			res.Unchanged = append(res.Unchanged, "security.anonAccessEnabled")
 		}
 	}
+	if err := planLDAP(ctx, d, p, &res); err != nil {
+		return res, err
+	}
 	if dryRun {
 		return res, nil
 	}
@@ -133,6 +136,9 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 			if err != nil {
 				return fmt.Errorf("%s: %w", op.name, err)
 			}
+		}
+		if err := applyLDAP(ctx, d, p); err != nil {
+			return err
 		}
 		// Write whenever requested: another admin may have changed the setting
 		// after the planning read and before this transaction began.
@@ -475,6 +481,7 @@ func validateConfig(
 			port != float64(int(port)) {
 			return fmt.Errorf("%w: a proxy needs a port between 1 and 65535", ErrInvalid)
 		}
+		return validateProxyFields(doc)
 	case configdoc.ConfigLayout:
 		def := artifactsapi.LayoutDefinition{Name: key}
 		strs := map[string]*string{
@@ -509,17 +516,7 @@ func validateConfig(
 			return fmt.Errorf("%w: %w", ErrInvalid, err)
 		}
 	case configdoc.ConfigPropertySet:
-		if v, ok := doc["properties"]; ok {
-			props, ok := v.(map[string]any)
-			if !ok {
-				return fmt.Errorf("%w: properties must be a mapping of property names", ErrInvalid)
-			}
-			for name, p := range props {
-				if _, ok := p.(map[string]any); p != nil && !ok {
-					return fmt.Errorf("%w: property %s must be a mapping", ErrInvalid, name)
-				}
-			}
-		}
+		return validatePropertySetFields(doc)
 	}
 	return nil
 }

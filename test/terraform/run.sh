@@ -504,6 +504,62 @@ apply_package_cleanup() {
 	python3 -I "$here/check-cleanup.py" --check "$work/cleanup-fixture.json" "$work/cleanup-runs.json" "$work/server.log"
 }
 
+# Compare the actual server secret through its canonical store/keyring, not
+# Terraform's retained Password state (the pinned provider never reads it).
+configuration_proof() {
+	CONFIGURATION_PROOF_MASTER_KEY=terraform-master-key-0123456789abcdef0123456789abcdef \
+		CONFIGURATION_PROOF_PASSWORD=${TF_VAR_proxy_password:-} \
+		"$work/configurationproof" "$work/data/artifactweave.db" "$TF_VAR_proxy_key" "$1" "$work/configuration-secret-proof.json"
+}
+
+# The reference is consumer-facing; revisions and password-clear orchestration
+# live only here. Missing XML GET fails the pinned provider apply, never skips.
+apply_configuration() {
+	export TF_VAR_proxy_key=tf-configuration-proxy TF_VAR_proxy_host=127.0.0.1 \
+		TF_VAR_property_set_name=tf-configuration-properties \
+		TF_VAR_proxy_redirect_to_hosts='["one.invalid","two.invalid"]'
+	(cd "$root" && GOWORK=off go build -o "$work/configurationproof" ./tools/configurationproof)
+	for revision in 1 2; do
+		export TF_VAR_proxy_port=$((3128 + revision)) TF_VAR_proxy_username=fixture-user-$revision \
+			TF_VAR_proxy_password=descriptor-private-fixture-$revision
+		if [ "$revision" = 1 ]; then
+			export TF_VAR_proxy_platform_default=true TF_VAR_proxy_services='[]' TF_VAR_property_set_visible=true
+			export TF_VAR_properties='{"release":{"closed_predefined_values":true,"multiple_choice":true,"predefined_values":{"ready":true,"waiting":false}},"free":{}}'
+		else
+			export TF_VAR_proxy_platform_default=false TF_VAR_proxy_services='["jfrt","jfxr"]' TF_VAR_property_set_visible=false
+			export TF_VAR_properties='{"release":{"closed_predefined_values":true,"multiple_choice":false,"predefined_values":{"ready":false,"waiting":true}},"free":{}}'
+		fi
+		tf apply -auto-approve
+		if [ "$revision" = 1 ]; then configuration_proof created; else configuration_proof updated; fi
+		tf apply -refresh-only -auto-approve
+		configuration_proof refreshed
+		tf plan -detailed-exitcode
+	done
+	# ProxyAPIModel.Password is not omitempty: only a partial descriptor can
+	# omit it. Prove preservation before the provider restores its metadata.
+	python3 -I - <<'PYTHON'
+import json, os
+from urllib.request import ProxyHandler, Request, build_opener
+body = {"proxies": {os.environ["TF_VAR_proxy_key"]: {"username": "retention-check"}}}
+req = Request(os.environ["TF_VAR_url"] + "/artifactory/api/system/configuration",
+              data=json.dumps(body).encode(), method="PATCH",
+              headers={"Authorization": "Bearer " + os.environ["TF_VAR_access_token"],
+                       "Content-Type": "application/yaml"})
+with build_opener(ProxyHandler({})).open(req, timeout=10) as response:
+    assert response.status == 200, "omitted-password descriptor update failed"
+PYTHON
+	configuration_proof retained
+	tf apply -auto-approve
+	configuration_proof updated
+	# Null makes the pinned provider send an empty password; actual row
+	# absence is required even if its retained Terraform state looks empty.
+	unset TF_VAR_proxy_password
+	tf apply -auto-approve
+	configuration_proof cleared
+	tf apply -refresh-only -auto-approve
+	configuration_proof cleared
+}
+
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
 	case $scenario in
@@ -517,6 +573,7 @@ for scenario in "${scenarios[@]}"; do
 	deploy/artifactweave/terraform/single-replication) apply_single_replication ;;
 	deploy/artifactweave/terraform/projects) apply_projects ;;
 	deploy/artifactweave/terraform/package-cleanup) apply_package_cleanup ;;
+	deploy/artifactweave/terraform/configuration) apply_configuration ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1
@@ -526,6 +583,11 @@ for scenario in "${scenarios[@]}"; do
 	# wrote.
 	tf plan -detailed-exitcode
 	tf destroy -auto-approve
+	if [ "$scenario" = deploy/artifactweave/terraform/configuration ]; then
+		configuration_proof deleted
+		tf state list >"$work/descriptor-remaining-resources.txt"
+		test ! -s "$work/descriptor-remaining-resources.txt"
+	fi
 	if [ "$scenario" = deploy/artifactweave/terraform/remote-repositories ]; then
 		python3 -I "$here/check-remotes.py" --remove-proxy
 	fi

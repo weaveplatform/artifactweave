@@ -89,6 +89,11 @@ type world struct {
 	// jfHome is the JFrog CLI's configuration for the scenario, so a
 	// server added by jf c add is there for the commands after it.
 	jfHome string
+	// mavenTools is the scenario's private, verified build-tool repository.
+	mavenTools string
+	// mavenExtractorHome is the JF home that already holds the pinned Maven
+	// extractor, so each jf mvn in a scenario seeds it at most once.
+	mavenExtractorHome string
 	// jfEnv is added to the JFrog CLI's environment for the rest of the
 	// scenario, such as JFROG_RUN_NATIVE, without which jf docker build
 	// collects no build-info.
@@ -1081,6 +1086,22 @@ func (w *world) runJFIn(args, sub string) error {
 	for i := range argv {
 		argv[i] = strings.ReplaceAll(argv[i], "{sp}", " ")
 	}
+	if len(argv) > 0 && argv[0] == "mvn" {
+		repository, err := w.mavenToolRepository()
+		if err != nil {
+			return err
+		}
+		if err = w.seedMavenExtractor(); err != nil {
+			return err
+		}
+		// jf installs product files into its existing per-scenario jf-m2 head.
+		// Its tool tail and external-repository block match ordinary Maven.
+		argv = append(argv[:1], append([]string{
+			"--global-settings", filepath.Join(w.dir, "maven-tools-settings.xml"),
+			"--settings", filepath.Join(w.dir, "maven-tools-settings.xml"),
+			"-Dmaven.repo.local.tail=" + repository,
+		}, argv[1:]...)...)
+	}
 	cmd := exec.Command(os.Getenv("ARTIFACTWEAVE_JF_BIN"), argv...)
 	// Relative file specs resolve against the scenario's files, so an
 	// upload of "org/*" keeps the tree's layout under the target.
@@ -1091,6 +1112,7 @@ func (w *world) runJFIn(args, sub string) error {
 	cmd.Env = append(
 		os.Environ(),
 		"JFROG_CLI_HOME_DIR="+home,
+		"JFROG_CLI_DEPENDENCIES_DIR="+filepath.Join(home, "dependencies"),
 		// Unset, parallel runs on one machine share $TMPDIR/jfrog-<user>/builds.
 		"JFROG_CLI_TEMP_DIR="+filepath.Join(home, "tmp"),
 		"JFROG_CLI_REPORT_USAGE=false",

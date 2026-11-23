@@ -373,7 +373,7 @@ func withAccess(cfg RouterConfig) RouterConfig {
 func accessUnset(a accessapi.API) bool {
 	return a.Authenticator == nil && a.Authorizer == nil && a.Tokens == nil &&
 		a.Keys == nil && a.Identity == nil && a.Restrictions == nil &&
-		a.Projects == nil && a.Grants == nil && a.AnonymousAccess == nil
+		a.Projects == nil && a.Grants == nil && a.AnonymousAccess == nil && a.LDAP == nil
 }
 
 // withConfiguration returns cfg with Configuration bound over its store by

@@ -70,7 +70,7 @@ internal/
     adapters/                  # the composite stores: inmem, sql (sqlite, postgres)
     apptest/ storetest/        # test support that needs the composite stores
   layout/                      # repository-wide layout, documentation and guard tests
-  devtools/                    # openapibundle, optable, specoracle, stubgen: libraries behind tools/
+  devtools/                    # configurationproof and spec-generation libraries behind tools/
 pkg/
   client/<service>/            # generated Go clients (oapi-codegen), used by tests
   containertest/               # gates the tests that start containers (Docker on Linux)
@@ -97,6 +97,7 @@ tools/
   clientrecipes/               # validates and renders the client connection recipes
   coverexec/                   # isolates each test binary's coverage output before merging
   gpgkey/                      # generates temporary OpenPGP keys for Terraform scenarios
+  configurationproof/          # thin command over the covered canonical fixture-secret proof engine
   acceptancepartition/         # tests the workflow's native acceptance partitions; no executable
   depsync/                     # Python scripts that keep pinned client and image versions current
 deploy/                        # Terraform reference deployments (below)

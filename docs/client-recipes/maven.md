@@ -44,7 +44,7 @@ mvn -s "$AW_WORK/settings.xml" -Dmaven.repo.local="$AW_WORK/publisher-m2" packag
 
 Classes: **local, remote, virtual, federated**. Select a local, remote, virtual or one-node federated repository with read permission. Dependencies must also be available through that repository.
 
-The tested artifact coordinates are examples; specify your package. A separate consumer repository ensures the artifact is fetched over HTTP. Build/plugin dependencies may come from Maven Central unless mirrored by your policy.
+The tested artifact coordinates are examples; specify your package. A separate consumer repository ensures the artifact is fetched over HTTP. Build/plugin dependencies may come from Maven Central unless mirrored by your policy. Required CI separately prepares the pinned plugin/transitive closure and JF extractor, copies tools into private scenario repositories, and blocks public Maven repositories during assertions; tested product coordinates are excluded from that supply.
 
 ```sh
 mvn -s "$AW_WORK/settings.xml" -C -Dmaven.repo.local="$AW_WORK/consumer-m2" org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get -Dartifact=org.acme.smoke:lib:1.0.0 -DremoteRepositories="aw::default::$AW_URL/artifactory/$AW_REPO"
@@ -64,7 +64,10 @@ These are the pinned client definitions and executable evidence from which this 
 
 - Client pin: [test/acceptance/clients/maven.Dockerfile](../../test/acceptance/clients/maven.Dockerfile).
 - Client pin: [test/acceptance/clients/maven-3.9/Dockerfile](../../test/acceptance/clients/maven-3.9/Dockerfile).
+- Client pin: [test/acceptance/clients/maven-tools.lock.json](../../test/acceptance/clients/maven-tools.lock.json).
+- Client pin: [.github/actions/maven-tools/action.yml](../../.github/actions/maven-tools/action.yml).
 - Evidence: [test/acceptance/features/maven.feature](../../test/acceptance/features/maven.feature).
 - Evidence: [test/acceptance/features/maven_remote.feature](../../test/acceptance/features/maven_remote.feature).
 - Evidence: [test/acceptance/features/maven.feature](../../test/acceptance/features/maven.feature).
 - Evidence: [test/acceptance/features/system_recipes.feature](../../test/acceptance/features/system_recipes.feature).
+- Evidence: [test/acceptance/maven_tools_test.go](../../test/acceptance/maven_tools_test.go).

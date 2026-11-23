@@ -595,6 +595,7 @@ func matrixTable() []matrixRow {
 		securityMatrix(),
 		accessIdentityMatrix(),
 		oidcMatrix(),
+		ldapMatrix(),
 		buildMatrix(),
 		searchMatrix(),
 		webServerMatrixRows(),
@@ -718,6 +719,22 @@ func oidcMatrix() []matrixRow {
 		row("PUT "+one, mine+"/m-{p}", `{"name":"m-{p}",`+spec+`}`, administrators, 200),
 		row("DELETE "+one, mine+"/m-{p}", "", administrators, 204),
 		at("POST "+cfg+"/token", `{}`, noCredentials, 400),
+	}
+}
+
+// ldapMatrix covers the LDAP connections (#1832), administrators' alone. The
+// fixture seeded each principal's connection lc-{p}.
+func ldapMatrix() []matrixRow {
+	const (
+		cfg  = "/access/api/v1/ldap/settings"
+		conn = `"ldap_url":"ldap://ldap.example.com","user_dn_pattern":"uid={0}"}`
+	)
+	return []matrixRow{
+		at("GET "+cfg, "", administrators, 200),
+		at("POST "+cfg, `{"key":"ln-{p}",`+conn, administrators, 201),
+		at("PUT "+cfg, `{"key":"lc-{p}",`+conn, administrators, 200),
+		row("GET "+cfg+"/{key}", cfg+"/lc-{p}", "", administrators, 200),
+		row("DELETE "+cfg+"/{key}", cfg+"/lc-{p}", "", administrators, 204),
 	}
 }
 
@@ -1719,6 +1736,14 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		})
 		must(err)
 	}
+
+	url, pattern := "ldap://ldap.example.com", "uid={0}"
+	var connections []api.LDAPChange
+	for _, p := range names {
+		connections = append(connections, api.LDAPChange{Key: "lc-" + p, URL: &url, UserDNPattern: &pattern})
+	}
+	_, err = accessmodule.LDAPSettingsOf(db).Apply(ctx, connections)
+	must(err)
 
 	tokens, secrets := seedMatrixTokens(t, db)
 	a, err := authn.NewAuthenticator(db.Users(), db.Settings(), authn.Options{

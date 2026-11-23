@@ -339,27 +339,18 @@ func (w *world) runNPMWith(stdin io.Reader, args string) error {
 	}, w.clientArgs(args))
 }
 
-// runMaven runs mvn in the pinned Maven image. ARTIFACTWEAVE_MAVEN_REPO, the
-// job's cached ~/.m2/repository, is mounted at /m2 for {m2}; user.home is
-// set because the runner's user has no entry in the image's passwd.
+// runMaven runs the pinned Maven image with private tools and product caches.
+// The shared object cache is read only by the preparation/seed commands.
 func (w *world) runMaven(args string) error {
-	repo := os.Getenv("ARTIFACTWEAVE_MAVEN_REPO")
-	if repo == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		repo = filepath.Join(home, ".m2", "repository")
-	}
-	if err := os.MkdirAll(repo, 0o750); err != nil {
+	repo, err := w.mavenToolRepository()
+	if err != nil {
 		return err
 	}
-	argv := w.clientArgs(strings.ReplaceAll(args, "{m2}", "/m2"))
 	return w.runContainer(w.mavenImage, []string{
 		"--entrypoint", "mvn",
-		"-v", repo + ":/m2",
+		"-v", repo + ":/m2:ro",
 		"-e", "MAVEN_OPTS=-Duser.home=/work",
-	}, append([]string{"-B", "--no-transfer-progress"}, argv...))
+	}, w.mavenClientArgs(args))
 }
 
 // binaryAvailable skips the scenario unless the client's pinned binary is

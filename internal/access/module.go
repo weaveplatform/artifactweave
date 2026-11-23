@@ -10,17 +10,21 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/port"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
+	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
 
-// Store is the access data the bindings read and write: the access ports
-// and the settings that hold the anonymous access switch. The application
-// passes its composite store. Every call joins the transaction ctx carries.
+// Store is the access data the bindings read and write: the access ports,
+// the settings that hold the anonymous access switch and the configuration
+// documents that hold the LDAP connections. The application passes its
+// composite store. Every call joins the transaction ctx carries.
 type Store interface {
 	port.Store
 	// Settings holds the anonymous access switch, which AnonymousAccess
 	// reads and writes and the authorizer reads.
 	Settings() settings.SettingsStore
+	// Configs holds the LDAP connections, which LDAP reads and writes.
+	Configs() configdoc.ConfigStore
 }
 
 // errNoStore refuses Deps without a store, which every binding reads.
@@ -83,6 +87,7 @@ func New(d Deps) (*Module, error) {
 			Projects:        ProjectsOf(d.Store),
 			Grants:          grants{st: d.Store},
 			AnonymousAccess: AnonymousAccessOf(d.Store),
+			LDAP:            LDAPSettingsOf(d.Store),
 			Settings:        d.Settings,
 		},
 	}
@@ -133,3 +138,8 @@ func TokensOf(st Store, svc *token.Service) accessapi.Tokens {
 func AnonymousAccessOf(st Store) accessapi.AnonymousAccess {
 	return anonymousAccess{st: st}
 }
+
+// LDAPSettingsOf returns the LDAP binding over st alone, for code that holds
+// a store before any module exists, such as config apply and the bootstrap
+// descriptor. The errors are the core service's.
+func LDAPSettingsOf(st Store) accessapi.LDAPSettings { return ldapSettings{st: st} }

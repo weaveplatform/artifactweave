@@ -11,6 +11,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
@@ -83,6 +84,9 @@ type Patch struct {
 	// AnonymousAccess, when present, updates the instance's anonymous access
 	// switch. Permissions still determine which repositories it can read.
 	AnonymousAccess *bool
+	// LDAP are the security.ldapSettings connections, written through
+	// access's LDAPSettings.
+	LDAP []accessapi.LDAPChange
 	// Changes is the number Artifactory reports as "<n> changes to config
 	// merged successfully": every value in the document, whether or not it
 	// differs from what is stored (see values).
