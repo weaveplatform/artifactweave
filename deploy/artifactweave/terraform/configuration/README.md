@@ -1,8 +1,8 @@
-# configuration: proxy, properties, backup and mail
+# configuration: proxy, properties, backup, mail and layout
 
-Manage an outbound proxy, an assignable property set, a backup definition and
-the mail server settings with the pinned JFrog provider. It creates no
-repositories or cloud resources.
+Manage an outbound proxy, an assignable property set, a backup definition,
+the mail server settings and a repository layout with the pinned JFrog
+provider. It creates no repositories or cloud resources.
 
 ## What it configures
 
@@ -16,6 +16,10 @@ repositories or cloud resources.
   nothing outside the server's database.
 - `artifactory_mail_server.this`: the SMTP server, sender, subject prefix,
   linked URL and TLS mode used for every mail the server sends.
+- `artifactory_repository_layout.this`: a named layout, the path patterns and
+  integration revision expressions by which repositories that use it read an
+  artifact's organisation, module and version. Setting
+  `layout_descriptor_path_pattern` turns on a distinct descriptor pattern.
 
 ## Prerequisites
 
@@ -40,6 +44,8 @@ mail_port         = 587
 mail_use_tls      = true
 mail_from         = "artifacts@example.com"
 mail_artifactory_url = "https://artifacts.example.com/artifactory/"
+layout_name       = "release-layout"
+layout_artifact_path_pattern = "[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"
 ```
 
 Pass credentials through sensitive environment variables such as
@@ -59,7 +65,9 @@ terraform plan
 
 The follow-up plan is empty after the provider refreshes the XML descriptor.
 Changing the proxy or mail password updates the server secret; setting it to
-null clears it. Changing `mail_host` replaces the mail settings. Run
+null clears it. Changing `mail_host` replaces the mail settings, and changing
+`layout_name` replaces the layout. A repository uses the layout once its
+`repoLayoutRef` names it. Run
 `artifactweave mail test <address>` on the server host to send a test message
 through the stored settings.
 
@@ -73,24 +81,31 @@ proxy authentication may be sent to those hosts.
 
 ## Teardown
 
-`terraform destroy` removes all four. Removing the mail server settings
+`terraform destroy` removes all five. Removing the mail server settings
 disables every mail the server sends. Remove repository references to the
-proxy and property set before destroying them.
+proxy, property set and layout before destroying them.
 
 ## How this scenario is tested
 
 The existing required Terraform conformance lane runs this reference against
 its own temporary server through `test/terraform/run.sh`. The driver supplies
-two revisions of ordinary inputs, applies and refreshes each, requires empty
-plans, tests omitted-password retention through a partial descriptor patch,
-clears both passwords, destroys all four resources and checks that no backup
-directory appeared. A read-only checker uses the
-server's own keyring/store code to check the actual secret and sealed rows
-after each phase; retained evidence contains hashes and assertion results.
+two revisions of ordinary inputs, applies and refreshes each and requires
+empty plans. After each, `test/terraform/check-p12.py` reads all five
+resources back from the XML descriptor and compares every field with the
+revision's inputs. For the layout it also asks for the effect: a generic
+repository on the layout holds `acme/tool/1.0/tool-1.0.bin` and
+`releases/acme/tool/2.0/tool-2.0.bin`, and the version search for `acme:tool`
+must find 1.0 under revision 1's pattern and 2.0 under revision 2's. The
+driver then tests omitted-password retention through a partial descriptor
+patch, clears both passwords, changes both ports so the provider sends the
+empty passwords again, destroys all five resources and checks that they are
+gone from the descriptor and that no backup directory appeared. A read-only
+checker uses the server's own keyring/store code to check the actual secret
+and sealed rows after each phase; retained evidence contains hashes and
+assertion results.
 
 The provider reads every resource back through the XML descriptor GET (#1825),
-so a server without it fails these controls rather than skipping them. The full
-seven-resource P12 qualification remains #1837.
+so a server without it fails these controls rather than skipping them.
 
 ## Reference
 
@@ -122,6 +137,7 @@ No modules.
 | [artifactory_mail_server.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/mail_server) | resource |
 | [artifactory_property_set.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/property_set) | resource |
 | [artifactory_proxy.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/proxy) | resource |
+| [artifactory_repository_layout.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/repository_layout) | resource |
 
 ### Inputs
 
@@ -138,6 +154,11 @@ No modules.
 | backup\_retention\_period\_hours | Hours to keep a backup; 0 keeps every backup. | `number` | `168` | no |
 | backup\_send\_mail\_on\_error | Whether administrators are mailed when a backup fails. | `bool` | `true` | no |
 | backup\_verify\_disk\_space | Whether a backup first checks the target has room (precalculate). | `bool` | `false` | no |
+| layout\_artifact\_path\_pattern | Path pattern of the layout's artifacts, in layout tokens such as [org], [module], [baseRev] and [ext]. | `string` | `"[org]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev])(-[classifier]).[ext]"` | no |
+| layout\_descriptor\_path\_pattern | Path pattern of the layout's descriptors (such as a POM); null uses the artifact path pattern. | `string` | `null` | no |
+| layout\_file\_integration\_revision\_regexp | Regular expression of the integration revision in a file name, without capturing groups; .* when not applicable. | `string` | `"SNAPSHOT|(?:(?:[0-9]{8}.[0-9]{6})-(?:[0-9]+))"` | no |
+| layout\_folder\_integration\_revision\_regexp | Regular expression of the integration revision in a folder name, without capturing groups; .* when not applicable. | `string` | `"SNAPSHOT"` | no |
+| layout\_name | Name of the repository layout: an XML name, unique among descriptor keys. Changing it replaces the layout. | `string` | `"release-layout"` | no |
 | mail\_artifactory\_url | Registry URL linked from outgoing mail. Required here: the pinned provider reads an unset URL back as an empty string and plans a change. | `string` | n/a | yes |
 | mail\_enabled | Whether mail notifications are sent. | `bool` | `true` | no |
 | mail\_from | Sender address of outgoing mail. | `string` | `null` | no |
@@ -166,6 +187,7 @@ No modules.
 | Name | Description |
 | ---- | ----------- |
 | backup\_key | Key of the configured backup definition. |
+| layout\_name | Name of the configured repository layout. |
 | mail\_host | SMTP host of the configured mail server. |
 | property\_set\_name | Name of the configured property set. |
 | proxy\_key | Key of the configured outbound proxy. |

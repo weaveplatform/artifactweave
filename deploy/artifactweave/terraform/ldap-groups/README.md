@@ -9,7 +9,9 @@ directory: the connection is created disabled.
 
 ## What it configures
 
-- `artifactory_ldap_setting_v2.directory`: the LDAP connection, disabled.
+- `artifactory_ldap_setting_v2.directory`: the LDAP connection, disabled: its
+  URL, user DN pattern, optional user search with its manager DN and
+  password, email attribute and login options.
 - `artifactory_ldap_group_setting_v2.teams`: groups under `ou=groups` read by
   member lists (`STATIC`, `uniqueMember`) or by the users' `memberOf`
   (`DYNAMIC`), through the Access API.
@@ -31,13 +33,23 @@ directory: the connection is created disabled.
 url            = "https://artifacts.example.com"
 connection_key = "corp"
 ldap_url       = "ldaps://ldap.example.com:636/dc=example,dc=org"
+search = {
+  filter     = "(uid={0})"
+  base       = "ou=people"
+  sub_tree   = true
+  manager_dn = "cn=reader,dc=example,dc=org"
+}
 name_prefix    = "corp"
 strategy       = "STATIC"
 sub_tree       = false
 ```
 
-Pass the token through the sensitive `TF_VAR_access_token` environment
-variable.
+Pass the token and the manager password through the sensitive
+`TF_VAR_access_token` and `TF_VAR_manager_password` environment variables.
+The provider requires the search fields and the manager password together.
+It leaves an empty password out of its request, so a null
+`manager_password` with a search keeps the stored password, and setting
+`search` to null clears the manager DN and the stored password with it.
 
 ## Applying it
 
@@ -56,8 +68,10 @@ login. The follow-up plan is empty.
 
 ## Security
 
-The access token is a sensitive input and stays out of ordinary plans and
-logs. This reference sets no manager password. Memberships in imported groups
+The access token and manager password are sensitive inputs and stay out of
+ordinary plans and logs. Terraform state can retain the manager password, so
+keep it private. artifactweave seals the manager password at rest when a
+master key is configured and never returns it. Memberships in imported groups
 follow the directory: a user removed from a directory group loses the
 permissions granted to it at the next fresh login or group refresh, tokens
 included. Grant permissions to imported groups only for groups the directory's
@@ -82,9 +96,15 @@ revisions, `STATIC` with `sub_tree` off and `DYNAMIC` with it on (the units
 setting takes the opposite), and after each `test/terraform/check-ldap-groups.py`
 reads both settings back through the Access API and the XML descriptor, which
 must agree and keep 7.x's element order, and refreshes each through the group
-sync, which refuses it because the connection is disabled. The driver then
-refreshes and requires an empty plan. After `terraform destroy` the checker
-requires both settings and the connection to be gone.
+sync, which refuses it because the connection is disabled. The connection
+changes with the revisions too: its URL (unused loopback ports, never
+contacted), user DN pattern, search, manager DN and password, email attribute
+and login options, which `test/terraform/check-p12.py` reads back through the
+Access API. Two more applies leave the password out, which must keep it, and
+drop the search, which must clear it; the server's own store is checked for
+the sealed password after each. Each apply is refreshed and must plan empty.
+After `terraform destroy` the checkers require both settings, the connection
+and its sealed password to be gone.
 
 ## Reference
 
@@ -121,12 +141,19 @@ No modules.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | access\_token | Admin access token, sent as a Bearer token. | `string` | n/a | yes |
+| allow\_user\_to\_access\_profile | Whether directory users may open their profile page. | `bool` | `false` | no |
+| auto\_create\_user | Whether a directory user's first login creates a local user in the ldap realm. | `bool` | `true` | no |
 | connection\_key | Key of the LDAP connection the group settings read through. | `string` | `"corp"` | no |
+| email\_attribute | Directory attribute holding a user's email address. | `string` | `"mail"` | no |
 | ldap\_url | URL of the directory, with its base DN. | `string` | `"ldap://ldap.example.com:389/dc=example,dc=org"` | no |
+| manager\_password | Password of the search's manager DN, write-only on the server. Null keeps the stored password; Terraform retains this sensitive attribute in private state. | `string` | `null` | no |
 | name\_prefix | Prefix of the two group settings' names. | `string` | `"corp"` | no |
+| paging\_support\_enabled | Whether searches ask the directory for paged results. | `bool` | `true` | no |
+| search | Find users by a search filter under base, bound as manager\_dn; null finds them by user\_dn\_pattern only and clears any stored manager password. | ```object({ filter = string base = string sub_tree = bool manager_dn = string })``` | `null` | no |
 | strategy | How the teams setting maps memberships: STATIC (groups list their members) or DYNAMIC (users list their groups in memberOf). | `string` | `"STATIC"` | no |
 | sub\_tree | Whether the teams setting searches below ou=groups; the units setting takes the opposite. | `bool` | `false` | no |
 | url | Base URL of artifactweave, without /artifactory. | `string` | n/a | yes |
+| user\_dn\_pattern | DN of a user relative to the URL's base DN, {0} standing for the login name. | `string` | `"uid={0},ou=people"` | no |
 
 ### Outputs
 

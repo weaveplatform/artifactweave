@@ -14,3 +14,7 @@ output "mail_host" {
   value       = artifactory_mail_server.this.host
   description = "SMTP host of the configured mail server."
 }
+output "layout_name" {
+  value       = artifactory_repository_layout.this.name
+  description = "Name of the configured repository layout."
+}

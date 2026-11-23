@@ -74,7 +74,9 @@ existing platform ownership rather than joining the three-OS package-unit matrix
 `python3 -I test/terraform/driver_test.py` exercises the shell entry point with owned
 ephemeral listeners, a Go/chi HTTP fixture built once, and stub Go/Terraform clients. The
 draining-child cases hold an active request, signal shutdown and bind an owned replacement
-spy; neither authentication nor provider reconnects may send it request bytes.
+spy; neither authentication nor provider reconnects may send it request bytes. Its
+`P12LedgerTest` cases require `check-p12.py` to fail a run missing a step, a run that left a
+fixture secret in its data, and a reference that stopped declaring one of the seven resources.
 `make deploy-check` runs the same
 regressions; the pinned provider lane supplies real apply/plan/destroy evidence.
 
@@ -82,20 +84,56 @@ The remote-repositories scenario covers all fourteen P9 provider resource types.
 two revisions, requires an empty refreshed plan after each, checks API configuration and
 secret redaction, checks that persistent data contains no plaintext fixture credentials,
 and destroys the resources. It seeds/removes its proxy through the YAML descriptor;
-provider `artifactory_proxy` CRUD depends on the XML reads owned by P12/#303. Its endpoints belong to the controlled fixture server. It
+the `configuration` reference qualifies `artifactory_proxy` itself. Its endpoints belong to the controlled fixture server. It
 proves management only; native content adapters have separate client acceptance scenarios.
 
+The three P12 references qualify the seven P12 resources (#1837), and `check-p12.py` holds
+them to it. Its `--inventory`, run first by every invocation, fails when a reference stops
+declaring one of `platform_reverse_proxy`, `artifactory_backup`, `artifactory_mail_server`,
+`artifactory_property_set`, `artifactory_proxy`, `artifactory_repository_layout` and
+`artifactory_ldap_setting_v2`, leaves the Makefile's list, loses its `run.sh` case or pins a
+provider `run.sh` does not mirror. During an apply run `run.sh` records each apply, empty
+plan and destroy of a P12 scenario in a private ledger, and each `--check` and `--deleted`
+records the verification it passed. At the end `--complete` requires, for every resource of
+each P12 scenario that ran, both revisions applied, planned empty and verified, the destroy
+and the check after it, and for the secret-bearing scenarios a verified omitted and cleared
+password. It then scans the server's data directory (database and WAL included), the
+server and forwarder logs, the secret proofs' evidence and the coverage directory for the
+`private-fixture` marker every P12 fixture secret carries; `--check` refuses a fixture
+secret without it and any answer that carries one. Only then does it write
+`p12-provider-evidence.json` beside the coverage: the application commit, Terraform
+version, SHA-256 of each mirrored provider zip, of each scenario's `.tf` files and lock
+file and of the driver, the steps of each resource and the number of files scanned. It
+holds no secret or Terraform state. Validate-only runs and runs of other scenarios write
+none.
+
 The required `configuration` reference in `deploy/artifactweave/terraform` manages pinned
-`artifactory_proxy`, `artifactory_property_set`, `artifactory_backup` and
-`artifactory_mail_server` resources. It creates, updates, refreshes, requires empty plans,
-clears the optional proxy and mail passwords, and destroys all four resources on the driver's
-own temporary server and state. The driver creates the repositories the backup excludes, and
-checks that no backup directory appears beside the server's data: a backup definition is
-configuration, and P36 runs backups. Actual server passwords and sealed-row presence/absence
-are checked with `tools/configurationproof` for both the proxy and the mail server; Terraform
-state alone cannot prove password preservation or clearing. XML descriptor GET
-is a required dependency; missing XML fails conformance. The full seven-resource
-P12 qualification remains #1837.
+`artifactory_proxy`, `artifactory_property_set`, `artifactory_backup`,
+`artifactory_mail_server` and `artifactory_repository_layout` resources. It creates, updates,
+refreshes and requires empty plans, and after each revision `check-p12.py` reads every field
+of all five back from the XML descriptor. The layout's effect is read too: a generic
+repository on it holds two files, and the version search must read only the one the
+revision's artifact pattern describes. The driver then keeps an omitted password, clears the
+optional proxy and mail passwords, changes both ports so the providers send the empty
+passwords again (#1800), and destroys all five resources on the driver's own temporary
+server and state, which the checker requires gone from the descriptor. The driver creates
+the repositories the backup excludes, and checks that no backup directory appears beside
+the server's data: a backup definition is configuration, and P36 runs backups. Actual server
+passwords and sealed-row presence/absence are checked with `tools/configurationproof` for
+both the proxy and the mail server; Terraform state alone cannot prove password
+preservation or clearing. XML descriptor GET is a required dependency; missing XML fails
+conformance. Mail delivery through these settings, and proxy and LDAP connections, are
+qualified by the native CFG, PRX and LDAP acceptance tests, not here.
+
+The required `reverse-proxy` reference applies pinned `platform_reverse_proxy` in two
+revisions: an HTTP-only NGINX server on the repository path method, then an HTTPS APACHE
+server on the subdomain method. After each it refreshes, requires an empty plan and runs
+`check-p12.py`, which reads the settings back through `GET
+/artifactory/api/system/configuration/webServer` and the XML descriptor's `reverseProxies`,
+and requires the nginx snippet to follow them: rendered from revision 1's port and internal
+host, refused for APACHE. The provider's delete sends nothing ("Reverse proxy cannot be
+deleted"), so after `terraform destroy` the checker requires an empty state and revision 2
+still served unchanged.
 
 The required `general-security` reference manages the one pinned
 `artifactory_general_security` resource. The driver creates it at the defaults, then
@@ -116,9 +154,16 @@ flipped on both), and after each `check-ldap-groups.py` reads both settings back
 `/access/api/v1/ldap/groups` and the XML descriptor, which must agree and keep 7.x's
 `ldapGroupSetting` element order, and refreshes each through the group sync, which answers
 400 because the connection is disabled; the provider reports its own refresh after each v2
-write as a warning. Each revision is then refreshed and must plan empty. After
+write as a warning. The connection's URL (unused loopback ports, never contacted), user DN
+pattern, search, manager DN and password, email attribute and login options change with the
+revisions, and `check-p12.py` reads it back through `/access/api/v1/ldap/settings/{key}`;
+the connection is not read from the XML descriptor, which 7.161.26 does not export it in
+(#1893). Two more applies leave the manager password out, which keeps it, and drop the
+search, which clears it with the manager DN; `tools/configurationproof` checks the sealed
+`manager_password` row after every apply. Each apply is refreshed and must plan empty. After
 `terraform destroy`, which deletes the descriptor setting by clearing the section and
-writing back the rest, the checker requires both settings and the connection to be gone.
+writing back the rest, the checkers require both settings, the connection and its sealed
+password to be gone.
 
 The required `trashcan` reference applies pinned `artifactory_trashcan_config` in two
 revisions (off with 3 days, on with 0 days), and after each requires an empty refreshed plan

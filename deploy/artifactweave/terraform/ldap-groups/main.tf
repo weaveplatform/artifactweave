@@ -1,11 +1,25 @@
 # The connection the group settings read through. It stays disabled: the
 # settings are qualified as stored and served, and a disabled connection
 # neither turns internal password login off nor asks a directory at login.
+#
+# The provider requires the four search fields and manager_password together
+# and leaves an empty password out of its request, which keeps the stored
+# one; so a null manager_password with a search keeps it, and dropping the
+# search clears the manager DN and with it the stored password.
 resource "artifactory_ldap_setting_v2" "directory" {
-  key             = var.connection_key
-  enabled         = false
-  ldap_url        = var.ldap_url
-  user_dn_pattern = "uid={0},ou=people"
+  key                          = var.connection_key
+  enabled                      = false
+  ldap_url                     = var.ldap_url
+  user_dn_pattern              = var.user_dn_pattern
+  email_attribute              = var.email_attribute
+  auto_create_user             = var.auto_create_user
+  allow_user_to_access_profile = var.allow_user_to_access_profile
+  paging_support_enabled       = var.paging_support_enabled
+  search_filter                = var.search == null ? null : var.search.filter
+  search_base                  = var.search == null ? null : var.search.base
+  search_sub_tree              = var.search == null ? null : var.search.sub_tree
+  manager_dn                   = var.search == null ? null : var.search.manager_dn
+  manager_password             = var.search == null ? null : (var.manager_password == null ? "" : var.manager_password)
 }
 
 # The Access API's group setting, which the provider refreshes after each

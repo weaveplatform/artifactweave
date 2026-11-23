@@ -128,3 +128,53 @@ func TestAccConfigurationProofReadsTheMailServerPassword(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAccConfigurationProofReadsTheLDAPManagerPassword(t *testing.T) {
+	f := newProofFixture(t)
+	material, err := crypt.ParseVersionedKey(fixtureMaster)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, err := crypt.NewKeyring(material)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := platformsql.New(dialect.New(f.db, sqlite.Dialect, keys))
+	ldap := configdoc.ConfigDocument{
+		Kind: configdoc.ConfigLDAP, Key: "directory",
+		Document: []byte(`{"ldap_url":"ldap://127.0.0.1:1389/dc=example,dc=org","search":{"manager_dn":"cn=reader"}}`),
+		Secrets:  map[string]string{"manager_password": "ldap-proof-fixture"},
+	}
+	if err := store.Configs().Put(t.Context(), ldap); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(t.Context(), f.database, "ldap/directory", "created", f.evidence, fixtureMaster, "ldap-proof-fixture"); err != nil {
+		t.Fatal(err)
+	}
+	// A clear must look at manager_password: a row under "password" would
+	// let a retained manager password pass as cleared.
+	if err := Run(t.Context(), f.database, "ldap/directory", "cleared", f.evidence, fixtureMaster, ""); err == nil {
+		t.Fatal("LDAP clear proof accepted a retained manager password")
+	}
+	ldap.Secrets = nil
+	if err := store.Configs().Put(t.Context(), ldap); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(t.Context(), f.database, "ldap/directory", "cleared", f.evidence, fixtureMaster, ""); err != nil {
+		t.Fatal(err)
+	}
+	ldap.Document = []byte(`{"ldap_url":"ldap://127.0.0.1:1389","manager_password":"ldap-proof-fixture"}`)
+	ldap.Secrets = map[string]string{"manager_password": "ldap-proof-fixture"}
+	if err := store.Configs().Put(t.Context(), ldap); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(t.Context(), f.database, "ldap/directory", "updated", f.evidence, fixtureMaster, "ldap-proof-fixture"); err == nil {
+		t.Fatal("LDAP proof accepted a public document naming the manager password")
+	}
+	if err := store.Configs().Delete(t.Context(), ldap.Kind, ldap.Key); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(t.Context(), f.database, "ldap/directory", "deleted", f.evidence, fixtureMaster, ""); err != nil {
+		t.Fatal(err)
+	}
+}

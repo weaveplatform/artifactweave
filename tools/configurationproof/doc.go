@@ -7,8 +7,8 @@
 //
 // # Inputs
 //
-// Database path, target (proxy/<key> or mail_server/mailserver), lifecycle
-// phase and evidence path as arguments;
+// Database path, target (proxy/<key>, mail_server/mailserver or ldap/<key>),
+// lifecycle phase and evidence path as arguments;
 // CONFIGURATION_PROOF_MASTER_KEY and CONFIGURATION_PROOF_PASSWORD from the
 // owning driver's private environment.
 //
@@ -20,10 +20,12 @@
 //
 // # References
 //
-// ADR 0017; ADR 0030; issues 1839 and 1831; internal/devtools/configurationproof.
+// ADR 0017; ADR 0030; issues 1839, 1831 and 1837;
+// internal/devtools/configurationproof.
 //
 // # Status
 //
-// Implemented for the P12 configuration reference: proxy and mail server
-// passwords (issue 1831 added the mail target).
+// Implemented for the P12 configuration and ldap-groups references: proxy
+// and mail server passwords (issue 1831 added the mail target) and the LDAP
+// connection's manager password (issue 1837).
 package main
