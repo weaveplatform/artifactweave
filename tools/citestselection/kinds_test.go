@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -168,8 +169,24 @@ func TestUnitTerraformPathsSelectOnlyTheirAffectedLane(t *testing.T) {
 		path                 string
 		provider, deployment bool
 	}{
-		{"deploy/artifactweave/terraform/repositories/main.tf", true, false},
-		{"test/terraform/run.sh", true, false},
+		// deploy/check.sh validates, lints and drift-checks the JFrog
+		// provider roots through test/terraform/run.sh and runs the
+		// harness's driver test and deploy/ci's table tests, so all of these
+		// select the deployment checks as well as provider conformance.
+		{"deploy/artifactweave/terraform/repositories/main.tf", true, true},
+		{"deploy/artifactweave/terraform/repositories/.terraform.lock.hcl", true, true},
+		{"deploy/artifactweave/TEMPLATE.md", true, true},
+		{"test/terraform/run.sh", true, true},
+		{"test/terraform/driver_test.py", true, true},
+		{"test/terraform/fixture-server.py", true, true},
+		{"test/terraform/webhook-cases.json", true, true},
+		{"test/terraform/testdata/server/main.go", true, true},
+		{"deploy/ci/jfrog-providers.sh", true, true},
+		{"deploy/ci/testdata/jfrog-providers/README.md", true, true},
+		// No provider apply reads a README, but deploy/check.sh's contract
+		// lint and terraform-docs drift check do.
+		{"deploy/artifactweave/terraform/repositories/README.md", false, true},
+		{"deploy/platform/README.md", false, true},
 		{"deploy/platform/terraform/modules/aws/cdn/main.tf", false, true},
 		{"deploy/ci/terraform/aws/backend.tf", false, true},
 		{"deploy/check.sh", true, true},
@@ -183,6 +200,38 @@ func TestUnitTerraformPathsSelectOnlyTheirAffectedLane(t *testing.T) {
 			candidate.shouldTestTerraformProviders != tc.provider ||
 			candidate.shouldTestTerraformDeployment != tc.deployment {
 			t.Errorf("%s: %+v", tc.path, candidate)
+		}
+	}
+}
+
+// deploy/check.sh reads the whole of deploy/ and test/terraform/ (see
+// terraformPathLanes), so every committed file there must select it. The one
+// exception is the harness guide, which nothing under check.sh reads.
+func TestUnitDeployCheckInputsSelectTheDeploymentChecks(t *testing.T) {
+	root, err := moduleRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("git", "ls-files", "-z", "--", "deploy", "test/terraform")
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
+	if len(files) < 100 || !slices.Contains(files, "deploy/check.sh") {
+		t.Fatalf("git ls-files listed %d files without deploy/check.sh", len(files))
+	}
+	for _, file := range files {
+		candidate := proposeAffected([]change{{status: "M", path: file}})
+		if file == "test/terraform/README.md" {
+			if candidate.profile != "docs" {
+				t.Errorf("%s: %+v", file, candidate)
+			}
+			continue
+		}
+		if candidate.profile != "deployment" || !candidate.shouldTestTerraformDeployment {
+			t.Errorf("%s does not select the deployment checks: %+v", file, candidate)
 		}
 	}
 }

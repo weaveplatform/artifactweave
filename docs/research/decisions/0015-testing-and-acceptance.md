@@ -36,8 +36,10 @@ with their godog tags. The full core native job also runs the other acceptance
 harness `TestAcc` entries once.
 The provider conformance lane applies the pinned JFrog providers, demands an
 empty plan and destroys. The deployment lane checks Terraform formatting,
-validation, lint, Trivy, mocked tests and docs. Provider fixture changes select
-the first, deployment roots the second, and shared Terraform tooling both.
+validation, lint, Trivy, mocked tests and docs. Deployment roots and the
+READMEs under `deploy/` select the second. Provider fixtures, their harness and
+shared Terraform tooling select both, because the deployment lane also
+validates, lints and drift-checks the provider roots (#1858).
 Full release/manual runs require all four kinds and same-run merged coverage;
 the stable `Quality gate` rejects missing, failed or canceled selected lanes.
 Acceptance-only format owners explicitly skip the unit matrix while retaining
