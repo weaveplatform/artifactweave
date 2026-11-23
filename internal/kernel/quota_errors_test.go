@@ -11,21 +11,26 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 )
 
-func TestUnitStorageQuotaKeepsExistingErrorEnvelopes(t *testing.T) {
+func TestUnitStorageQuotaAnswersPerEnvelope(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		profile apierror.Profile
+		status  int
 		body    string
 	}{
-		{"artifactory", apierror.ProfileArtifactory, `{"errors":[{"message":"project storage quota exceeded","status":403}]}`},
-		{"access", apierror.ProfileAccess, `{"errors":[{"code":"FORBIDDEN","message":"project storage quota exceeded"}]}`},
-		{"oci", apierror.ProfileOCI, `{"errors":[{"code":"DENIED","message":"project storage quota exceeded"}]}`},
-		{"pub", apierror.ProfilePub, `{"error":{"code":"FORBIDDEN","message":"project storage quota exceeded"}}`},
+		// 7.161.26's ProjectsUtils.PROJ_LIMIT_MSG with SC_REQUEST_TOO_LONG.
+		{
+			"artifactory", apierror.ProfileArtifactory, http.StatusRequestEntityTooLarge,
+			`{"errors":[{"message":"Project storage quota exceeded. If you require more storage, contact your Platform Admin.","status":413}]}`,
+		},
+		{"access", apierror.ProfileAccess, http.StatusForbidden, `{"errors":[{"code":"FORBIDDEN","message":"project storage quota exceeded"}]}`},
+		{"oci", apierror.ProfileOCI, http.StatusForbidden, `{"errors":[{"code":"DENIED","message":"project storage quota exceeded"}]}`},
+		{"pub", apierror.ProfilePub, http.StatusForbidden, `{"error":{"code":"FORBIDDEN","message":"project storage quota exceeded"}}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
 			apierror.Write(rec, tc.profile, fmt.Errorf("private operation context: %w", kernel.ErrStorageQuota))
-			if rec.Code != http.StatusForbidden || strings.TrimSpace(rec.Body.String()) != tc.body || rec.Header().Get("WWW-Authenticate") != "" {
+			if rec.Code != tc.status || strings.TrimSpace(rec.Body.String()) != tc.body || rec.Header().Get("WWW-Authenticate") != "" {
 				t.Fatal("quota refusal changed envelope, exposed private wrapping or challenged credentials", rec.Code, rec.Body.String(), rec.Header())
 			}
 		})
