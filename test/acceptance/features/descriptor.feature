@@ -268,6 +268,11 @@ Feature: Configuration descriptor
         anonAccessEnabled: true
       downloadRedirectConfig:
         fileMinimumSize: 0
+      gcConfig:
+        cronExp: '0 0 /6 * * ?'
+      trashcanConfig:
+        enabled: true
+        retentionPeriodDays: 7
       """
     When I PATCH descriptor file "mixed-descriptor.yaml" as admin
     Then the response status is 200
@@ -293,6 +298,9 @@ Feature: Configuration descriptor
     And the XML field "repoLayouts/repoLayout[name=xml-layout]/name" equals "xml-layout"
     And the XML field "security/anonAccessEnabled" equals "true"
     And the XML field "downloadRedirectConfig/fileMinimumSize" equals "0"
+    And the XML field "gcConfig/cronExp" equals "0 0 /6 * * ?"
+    And the XML field "trashcanConfig/enabled" equals "true"
+    And the XML field "trashcanConfig/retentionPeriodDays" equals "7"
     And the response body does not contain "private-fixture"
     When I GET "/artifactory/api/system/configuration"
     Then the response status is 401

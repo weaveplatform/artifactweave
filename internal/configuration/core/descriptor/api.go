@@ -51,6 +51,12 @@ type Deps struct {
 	// reads them for the export. A descriptor that names connections is
 	// refused without it; an export without it has no ldapSettings.
 	LDAP accessapi.LDAPSettings
+	// StoragePolicies checks and writes the gcConfig and trashcanConfig
+	// sections through the artifacts module, which owns collection and the
+	// trash can, and reads them for the export. A descriptor that names
+	// either section is refused without it; an export without it has
+	// neither section.
+	StoragePolicies artifactsapi.StoragePolicies
 	// Projects serializes planning and publication before repository locks,
 	// including a descriptor that also changes anonymous credential policy.
 	Projects accessapi.Projects

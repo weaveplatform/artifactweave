@@ -401,27 +401,3 @@ func TestUnitStepFailures(t *testing.T) {
 		t.Fatalf("a lease lost mid-pass stops the pass: %v", err)
 	}
 }
-
-func TestUnitLoop(t *testing.T) {
-	w := newWorld(t)
-	c, err := gc.New(w.db, w.blobs, gc.Options{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	ran := make(chan gc.Report, 1)
-	done := make(chan error, 1)
-	go func() {
-		done <- c.Loop(ctx, time.Millisecond, func(r gc.Report, _ error) {
-			select {
-			case ran <- r:
-			default:
-			}
-		})
-	}()
-	<-ran
-	cancel()
-	if err := <-done; !errors.Is(err, context.Canceled) {
-		t.Fatalf("loop ended with %v", err)
-	}
-}

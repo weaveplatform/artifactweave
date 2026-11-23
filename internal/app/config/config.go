@@ -260,12 +260,11 @@ type Redirect struct {
 	TTL time.Duration `yaml:"ttl"`
 }
 
-// GC schedules garbage collection (decision 0010). Zero values mean
-// the defaults: a pass every four hours, as Artifactory schedules it, and an
-// hour's grace.
+// GC tunes garbage collection (decision 0010). A zero value means the
+// default, an hour's grace. When passes run is the tenant descriptor's
+// gcConfig.cronExp, not application configuration, so that one schedule is
+// in force and the XML export reports it.
 type GC struct {
-	// Interval is the time between scheduled passes.
-	Interval time.Duration `yaml:"interval"`
 	// GracePeriod is how long unreferenced content is kept before it is
 	// deleted. It must outlast the slowest upload: content is written before
 	// the reference that keeps it.
@@ -445,7 +444,6 @@ var keys = append(append([]string{
 	"docker.subdomain_match",
 	"log.level",
 	"log.format",
-	"gc.interval",
 	"gc.grace_period",
 	"download.redirect.min_size",
 	"download.redirect.ttl",
@@ -551,8 +549,6 @@ func set(cfg *Config, key, value string) error {
 		cfg.Log.Level = value
 	case "log.format":
 		cfg.Log.Format = value
-	case "gc.interval":
-		return setDuration(&cfg.GC.Interval, key, value)
 	case "gc.grace_period":
 		return setDuration(&cfg.GC.GracePeriod, key, value)
 	case "search.aql.max_results":
@@ -757,8 +753,8 @@ func (c Config) Validate() error {
 	default:
 		errs = append(errs, fmt.Errorf("%w: log.format %q", ErrInvalidValue, c.Log.Format))
 	}
-	if c.GC.Interval < 0 || c.GC.GracePeriod < 0 {
-		errs = append(errs, fmt.Errorf("%w: gc.interval and gc.grace_period must not be negative",
+	if c.GC.GracePeriod < 0 {
+		errs = append(errs, fmt.Errorf("%w: gc.grace_period must not be negative",
 			ErrInvalidValue))
 	}
 	if ttl := c.Download.Redirect.TTL; ttl <= 0 || ttl > maxRedirectTTL {

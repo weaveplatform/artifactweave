@@ -10,4 +10,7 @@ type API struct {
 	TransferSource TransferSource
 	PullSource     PullSource
 	ItemRemoval    ItemRemoval
+	// StoragePolicies is the garbage collection schedule and trash can
+	// policy, which the configuration descriptor applies and exports.
+	StoragePolicies StoragePolicies
 }

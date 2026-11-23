@@ -49,6 +49,8 @@ type exportDocument struct {
 	PropertySets     []exportFields `xml:"propertySets>propertySet"`
 	URLBase          *string        `xml:"urlBase,omitempty"`
 	Layouts          []exportFields `xml:"repoLayouts>repoLayout"`
+	GC               *exportFields  `xml:"gcConfig,omitempty"`
+	Trashcan         *exportFields  `xml:"trashcanConfig,omitempty"`
 	DownloadRedirect *exportFields  `xml:"downloadRedirectConfig,omitempty"`
 }
 
@@ -249,10 +251,17 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 		}
 		*section.target = entry
 	}
-	if err := readWebServerExport(ctx, d, &out); err != nil {
-		return out, err
+	return out, readExportOwned(ctx, d, &out)
+}
+
+// readExportOwned reads the sections whose state another service owns: the
+// web server settings and the storage policy. Each joins the export's
+// transaction, so the document stays one snapshot.
+func readExportOwned(ctx context.Context, d Deps, out *exportDocument) error {
+	if err := readWebServerExport(ctx, d, out); err != nil {
+		return err
 	}
-	return out, nil
+	return readExportStorage(ctx, d, out)
 }
 
 func publicDocument(doc configdoc.ConfigDocument) (map[string]any, error) {
