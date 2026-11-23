@@ -53,6 +53,10 @@
 //     ErrPasswordExpired and ErrAccountLocked (403).
 //   - ErrStorageQuota: a generic project-storage refusal in the current route's
 //     envelope, carrying no private owner/usage data or authentication challenge.
+//   - ErrDiskQuota: the global storage quota's refusal, 7.x's 413 and its
+//     message; ErrStorageCapacity: 503 when an enabled quota cannot measure
+//     its volume. StorageRefusal is true for any of the three, so optional
+//     retention (remote caching, POM copies) skips storing instead of failing.
 //   - Credential references: CredentialReference, with RegistryReference
 //     for a registry token's caller, is what queued work keeps of the
 //     principal that scheduled it, and DownloadCredential is what a signed

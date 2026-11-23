@@ -13,6 +13,8 @@ import (
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	artport "github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
+	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
+	"github.com/weaveplatform/artifactweave/internal/configuration/core/quota"
 	fedinmem "github.com/weaveplatform/artifactweave/internal/federation/adapters/inmem"
 	fedport "github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -51,6 +53,7 @@ type Store struct {
 	federation    *fedinmem.Store
 	releases      *relinmem.Store
 	workers       *wrkinmem.Store
+	capacity      configapi.StorageCapacity
 }
 
 // New returns an empty store. It registers the artifacts module's layout
@@ -59,8 +62,13 @@ type Store struct {
 // in the same transaction (decision 0007).
 // It also binds project storage accounting around every root transaction,
 // settling actual artifacts deltas and warning work before publication fences.
-func New() *Store {
-	s := &Store{}
+func New() *Store { return NewWithCapacity(nil) }
+
+// NewWithCapacity is New with the volume that an enabled quotaConfig
+// measures; nil means none can be measured, as for object storage, and the
+// descriptor then refuses to enable the quota.
+func NewWithCapacity(capacity configapi.StorageCapacity) *Store {
+	s := &Store{capacity: capacity}
 	accounting := &project.StorageAccounting{
 		Service: project.Service{
 			Store: s,
@@ -78,6 +86,9 @@ func New() *Store {
 		Repository: func(ctx context.Context, key string) (artapi.ProjectRepository, error) {
 			return s.Repos().ProjectRepository(ctx, key) //nolint:wrapcheck // the repository projection names its operation
 		},
+		Admission: func(ctx context.Context, delta int64) error {
+			return s.StorageQuota().Admit(ctx, delta) //nolint:wrapcheck // the admission's refusals are API errors
+		},
 	}
 	s.Store = memtx.NewWithMiddleware(accounting.Middleware)
 	s.artifacts = artinmem.NewWithStorageWatch(s.Store, accounting)
@@ -89,6 +100,15 @@ func New() *Store {
 	s.releases = relinmem.New(s.Store)
 	s.workers = wrkinmem.New(s.Store)
 	return s
+}
+
+// StorageCapacity is the measured volume NewWithCapacity was given, or nil.
+func (s *Store) StorageCapacity() configapi.StorageCapacity { return s.capacity }
+
+// StorageQuota is the global storage quota's admission over this store,
+// joining the caller's transaction.
+func (s *Store) StorageQuota() quota.Admission {
+	return quota.Admission{Configs: s.Configs(), Settings: s.Settings(), Queue: s.WorkQueue(), Capacity: s.capacity}
 }
 
 // Settings is the platform's settings store.

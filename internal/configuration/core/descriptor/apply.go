@@ -391,6 +391,9 @@ func planConfigs(
 		if err := validateWebServer(d, c.Kind, doc); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
+		if err := validateQuota(d, c.Kind, doc); err != nil {
+			return nil, fmt.Errorf("%s: %w", name, err)
+		}
 		if c.Kind == configdoc.ConfigBackup {
 			if err := checkBackupRepositories(c, doc, repositories); err != nil {
 				return nil, fmt.Errorf("%s: %w", name, err)

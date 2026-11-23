@@ -29,6 +29,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
 	debianhttp "github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/debian/http"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraformbackend"
+	"github.com/weaveplatform/artifactweave/internal/configuration/core/quota"
 	"github.com/weaveplatform/artifactweave/internal/federation"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
@@ -45,6 +46,12 @@ import (
 // repairEvery is how often a mirror's repair loop runs a pass; a variable
 // so tests need not wait a minute for one.
 var repairEvery = mirror.DefaultRepairInterval
+
+// quotaCheckEvery is how often the global storage quota measures the blob
+// volume without a write, to raise the limit warning a refused write cannot
+// record and to rearm thresholds the volume fell back below; a variable so
+// tests need not wait a minute for one.
+var quotaCheckEvery = time.Minute
 
 // registerDebianSnapshotWork registers the Debian snapshot handler with the
 // work queue. It is a variable so tests can see the kit it is given.
@@ -264,8 +271,7 @@ func OpenRuntime(
 	if err := scheduler.Register(queue, scheduleHandlers); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
-	warnings := project.WarningDelivery{Store: st, Queue: st.WorkQueue(), Mail: mods.configuration.API().Mail, Sender: mail.Sender{}}
-	if err := queue.Handle(project.StorageWarningKind, warnings.Handle); err != nil {
+	if err := handleStorageWarnings(queue, st, mods); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
 	// The loops outlive startup's context and stop only through close, after
@@ -345,7 +351,29 @@ func OpenRuntime(
 	// or the next start picks them up at once.
 	rt.loops.Go(func() { _ = queue.Run(lctx) })
 	rt.loops.Go(func() { runSchedules(lctx, scheduler, log) })
+	monitor := quota.Monitor{
+		Admission: st.StorageQuota(), Tx: st, Guard: st.Projects().Guard, Log: logs.Logger("artifactweave.configuration"),
+	}
+	rt.loops.Go(func() { monitor.Run(lctx, quotaCheckEvery) })
 	return rt, nil
+}
+
+// handleStorageWarnings registers the delivery of both storage quotas
+// warnings: a project's, to its administrators, and the global quotaConfig's,
+// to the system's.
+func handleStorageWarnings(queue *work.Queue, st *appsql.Store, mods modules) error {
+	warnings := project.WarningDelivery{Store: st, Queue: st.WorkQueue(), Mail: mods.configuration.API().Mail, Sender: mail.Sender{}}
+	if err := queue.Handle(project.StorageWarningKind, warnings.Handle); err != nil {
+		return fmt.Errorf("handle project storage warnings: %w", err)
+	}
+	disk := quota.Delivery{
+		Store: st, Configs: st.Configs(), Settings: st.Settings(), Queue: st.WorkQueue(), Guard: st.Projects().Guard,
+		Identity: mods.access.API().Identity, Mail: mods.configuration.API().Mail, Sender: mail.Sender{},
+	}
+	if err := queue.Handle(quota.WarningKind, disk.Handle); err != nil {
+		return fmt.Errorf("handle global storage warnings: %w", err)
+	}
+	return nil
 }
 
 // formatSettings are the formats' options from cfg's artifacts settings,

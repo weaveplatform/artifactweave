@@ -588,10 +588,10 @@ cannot be deleted, so the settings stay as last applied.
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
   `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`, `gcConfig`,
-  `trashcanConfig`, `downloadRedirectConfig`, `mailServer`, `urlBase`, `backups`,
-  `systemMessageConfig`, the `security.anonAccessEnabled` setting, the
-  `security.userLockPolicy` and `security.passwordSettings` policies and the
-  `security.ldapSettings` connections
+  `quotaConfig`, `trashcanConfig`, `downloadRedirectConfig`, `mailServer`, `urlBase`,
+  `backups`, `systemMessageConfig`, the `security.anonAccessEnabled` setting, the
+  `security.userLockPolicy` and `security.passwordSettings` policies, the
+  `security.ldapSettings` connections and the `security.ldapGroupSettings` group settings
   (`internal/configuration/core/descriptor`). Download redirect configuration applies
   the whole-MB `fileMinimumSize` setting used by CDN/storage redirects
   ([research 19](19-cdn-and-download-redirect.md#5-artifactweave-today)). Artifactory
@@ -600,7 +600,7 @@ cannot be deleted, so the settings stay as last applied.
   with any other top-level section answers 400 naming each such section and listing the
   supported sections, and changes nothing. The check runs before `${NAME}` references are resolved, so the
   error names the section rather than a variable inside it. The other sections arrive with
-  their features: `quotaConfig` in P12
+  their features
   ([plan](../implementation/plan.md)). Stored federated repository configuration does
   not establish P13 peer synchronization. P36 completes scheduled backup and migration workflows;
   human identity settings follow P21/P22, and product settings follow their owners in the
@@ -706,6 +706,9 @@ cannot be deleted, so the settings stay as last applied.
   [`resource_artifactory_trashcan_config.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_trashcan_config.go)).
   [Decision 0010](decisions/0010-retention-trash-and-gc.md), "Descriptor policy", has the
   schedule, defaults and bounds.
+- `quotaConfig` (CFG-06, [#1830](https://github.com/weaveplatform/artifactweave/issues/1830))
+  is the global storage quota, applied by `internal/configuration/core/quota`. See
+  "Global storage quota" below.
 - CFG-01 collects repositories, proxies, property sets, layouts, anonymous access, mail
   and download redirect configuration in one metadata transaction under the shared
   `Projects.Guard`, before returning bytes after commit. Export refuses an existing
@@ -751,6 +754,72 @@ cannot be deleted, so the settings stay as last applied.
   bootstrap migration. General system XML `POST` remains in scope in P36.
 - `GET /artifactory/api/system/locks` and `/locks/local`, new in 7.161.15 for PostgreSQL
   with native locks ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)), currently answer 501. P38 owns their inspection API, using the coordination model qualified in P35.
+
+### Global storage quota
+
+What 7.x does ([S 7.161.26] unless marked):
+
+- `quotaConfig` (`QuotaConfigType`, between `virtualCacheCleanupConfig` and
+  `folderDownloadConfig`, `minOccurs="0"`) holds `enabled`, `diskSpaceLimitPercentage`
+  and `diskSpaceWarningPercentage`, with XSD defaults `false`, `0` and `0`
+  (`QuotaConfigDescriptor`, whose `propOrder` is that order). Neither the descriptor
+  nor the XSD bounds the percentages; the settings form proposes 95 and 85 [I]. The
+  documented YAML has the same three keys ([D]
+  [advanced configurations](https://docs.jfrog.com/installation/docs/advanced-configurations-in-artifactory-yaml.md)).
+- `StorageServiceImpl.getStorageQuotaInfo` measures the binary store's volume (total and
+  used space of the partition holding the filestore) and ignores the upload's length.
+  `StorageQuotaInfo` reaches the limit when `used / total * 100 >= limit`, and the
+  warning likewise, so an enabled quota with a limit of 0 refuses every deployment.
+- `RepositoryServiceImpl.assertStorageQuota` runs on the deploy path, global first and
+  then `ProjectsService.assertProjectStorageQuota`. At the limit it answers
+  413 (`SC_REQUEST_TOO_LONG`) "Datastore disk usage is too high. Contact your Artifactory
+  administrator to add additional storage space or change the disk quota limits.",
+  keeping usage out of the client's message, and logs StorageQuotaInfo's error text
+  ("N% Storage Space Reached: Your maximum storage limit has been reached. New
+  artifact deployments are blocked until more disk space is added."). At the warning
+  level it logs "N% storage space reached. Your maximum limit is M%. It is recommended
+  to add disk space." The XSD documentation and [D]
+  [managing disk space usage](https://docs.jfrog.com/administration/docs/managing-disk-space-usage.md)
+  add that administrators see both messages in the UI.
+- No resource of the pinned Terraform provider (12.11.14) manages `quotaConfig`, so no
+  Terraform reference drives it.
+
+What artifactweave does (CFG-06, [#1830](https://github.com/weaveplatform/artifactweave/issues/1830),
+`internal/configuration/core/quota`):
+
+- The section is applied through the descriptor's one write path, merged field by field,
+  and exported in XSD order once set. `null` is refused for the section and each field.
+- The measurement is the volume of the hot blob store's local root, the one
+  `GET /api/storageinfo` reports, with used as total less available, behind
+  `configapi.StorageCapacity` so tests supply a fixed one.
+- Admission runs inside each root metadata transaction, after the accounting guard that
+  already serializes project quotas, on the transaction's net growth, before project
+  counters settle; a refusal rolls back the item, the accounting and any warning. The
+  measurement includes blobs of racing uploads that have landed but not committed, so no
+  interleaving passes the limit. The refused upload's blob is unreferenced and the
+  collector removes it after `gc.grace_period`, as for any failed upload.
+- Project quotas still apply with the global one enabled, disabled or not reached, and a
+  project with room never exempts a write from the global limit.
+- The answer at the limit is 7.x's 413 and message, in the route's error envelope.
+
+Local choices, inferred where 7.x shows no answer **[I]** (posted on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216)):
+
+- Only positive net growth is refused; reads, deletions and shrinking or net-zero writes
+  pass, so space can always be reclaimed. 7.x checks only on the deploy path, which
+  growth-only admission matches for uploads; artifactweave applies it to every write
+  that grows storage, remote caching and transformed copies included, which are then
+  served without being kept, as for a project quota.
+- Percentages must be whole numbers from 0 to 100 (400 otherwise); 7.x stores any int.
+- Enabling the quota is refused (400) where no volume can be measured (object storage);
+  an enabled quota whose measurement fails answers 503 to growing writes rather than
+  admitting them.
+- With no UI to show the messages, every enabled administrator with an email address is
+  mailed through `mailServer` once per crossing, with 7.x's message text, until a
+  measurement falls back below the threshold; disabling the quota rearms both. A refused
+  write cannot record the limit occurrence, so a monitor measures every minute and at
+  start. Delivery retries under the work queue's policy with one Message-ID per
+  occurrence, so retries and restarts never send a second, different message.
 
 Primary URLs: https://docs.jfrog.com/administration/reference/jfrog-platform-artifactory-system-api/llms.txt,
 https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt,

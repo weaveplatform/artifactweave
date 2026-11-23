@@ -31,3 +31,26 @@ func TestUnitStorageQuotaKeepsExistingErrorEnvelopes(t *testing.T) {
 		})
 	}
 }
+
+func TestUnitDiskQuotaAnswersAs7x(t *testing.T) {
+	rec := httptest.NewRecorder()
+	apierror.Write(rec, apierror.ProfileArtifactory, fmt.Errorf("private volume context: %w", kernel.ErrDiskQuota))
+	want := `{"errors":[{"message":"Datastore disk usage is too high. Contact your Artifactory administrator to add ` +
+		`additional storage space or change the disk quota limits.","status":413}]}`
+	if rec.Code != http.StatusRequestEntityTooLarge || strings.TrimSpace(rec.Body.String()) != want || rec.Header().Get("WWW-Authenticate") != "" {
+		t.Fatal("disk quota refusal", rec.Code, rec.Body.String(), rec.Header())
+	}
+	rec = httptest.NewRecorder()
+	apierror.Write(rec, apierror.ProfileArtifactory, fmt.Errorf("statfs failed: %w", kernel.ErrStorageCapacity))
+	if rec.Code != http.StatusServiceUnavailable || strings.Contains(rec.Body.String(), "statfs") {
+		t.Fatal("unmeasurable capacity", rec.Code, rec.Body.String())
+	}
+	for _, err := range []error{kernel.ErrStorageQuota, kernel.ErrDiskQuota, fmt.Errorf("wrapped: %w", kernel.ErrStorageCapacity)} {
+		if !kernel.StorageRefusal(err) {
+			t.Error("not a storage refusal", err)
+		}
+	}
+	if kernel.StorageRefusal(kernel.ErrStore) || kernel.StorageRefusal(nil) {
+		t.Error("an unrelated failure counted as a storage refusal")
+	}
+}

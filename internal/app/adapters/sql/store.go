@@ -14,6 +14,8 @@ import (
 	artapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	artport "github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/virtual"
+	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
+	"github.com/weaveplatform/artifactweave/internal/configuration/core/quota"
 	fedsql "github.com/weaveplatform/artifactweave/internal/federation/adapters/sql"
 	fedport "github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -55,6 +57,7 @@ type Store struct {
 	federation    *fedsql.Store
 	releases      *relsql.Store
 	workers       *wrksql.Store
+	capacity      configapi.StorageCapacity
 }
 
 // Options configures Open.
@@ -64,6 +67,10 @@ type Options struct {
 	// Keyring seals secret columns. Without one they are stored in plain
 	// text. Enabling a keyring later requires Reseal to convert existing values.
 	Keyring *crypt.Keyring
+	// Capacity is the volume an enabled quotaConfig measures; nil means none
+	// can be measured, as for object storage, and the descriptor then
+	// refuses to enable the quota.
+	Capacity configapi.StorageCapacity
 }
 
 // Open pings db and wraps it. Unless o.SkipMigrate, it first applies the
@@ -82,7 +89,7 @@ func Open(ctx context.Context, db *sql.DB, d dialect.Dialect, o Options) (*Store
 			return nil, err
 		}
 	}
-	s := New(db, d, o.Keyring)
+	s := NewWithCapacity(db, d, o.Keyring, o.Capacity)
 	if !o.SkipMigrate {
 		for _, m := range mods {
 			if m.AfterMigrate == nil {
@@ -104,7 +111,12 @@ func Open(ctx context.Context, db *sql.DB, d dialect.Dialect, o Options) (*Store
 // Project storage accounting surrounds every root transaction on this shared
 // backend; actual artifact changes and durable warnings settle before fences.
 func New(db *sql.DB, d dialect.Dialect, keys *crypt.Keyring) *Store {
-	s := &Store{}
+	return NewWithCapacity(db, d, keys, nil)
+}
+
+// NewWithCapacity is New with the volume the global storage quota measures.
+func NewWithCapacity(db *sql.DB, d dialect.Dialect, keys *crypt.Keyring, capacity configapi.StorageCapacity) *Store {
+	s := &Store{capacity: capacity}
 	accounting := &project.StorageAccounting{
 		Service: project.Service{
 			Store: s,
@@ -122,6 +134,9 @@ func New(db *sql.DB, d dialect.Dialect, keys *crypt.Keyring) *Store {
 		Repository: func(ctx context.Context, key string) (artapi.ProjectRepository, error) {
 			return s.Repos().ProjectRepository(ctx, key) //nolint:wrapcheck // the repository projection names its operation
 		},
+		Admission: func(ctx context.Context, delta int64) error {
+			return s.StorageQuota().Admit(ctx, delta) //nolint:wrapcheck // the admission's refusals are API errors
+		},
 	}
 	s.Store = dialect.NewWithMiddleware(db, d, keys, accounting.Middleware)
 	s.artifacts = artsql.NewWithStorageWatch(s.Store, accounting)
@@ -133,6 +148,15 @@ func New(db *sql.DB, d dialect.Dialect, keys *crypt.Keyring) *Store {
 	s.releases = relsql.New(s.Store)
 	s.workers = wrksql.New(s.Store)
 	return s
+}
+
+// StorageCapacity is the measured volume the store was opened with, or nil.
+func (s *Store) StorageCapacity() configapi.StorageCapacity { return s.capacity }
+
+// StorageQuota is the global storage quota's admission over this store,
+// joining the caller's transaction.
+func (s *Store) StorageQuota() quota.Admission {
+	return quota.Admission{Configs: s.Configs(), Settings: s.Settings(), Queue: s.WorkQueue(), Capacity: s.capacity}
 }
 
 // Settings is the platform's settings store.

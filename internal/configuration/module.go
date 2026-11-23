@@ -60,6 +60,17 @@ type Deps struct {
 	Logging *logging.Control
 }
 
+// capacityOf is the measurable blob volume of an application store, which
+// holds it for the global storage quota's admission; nil for any other store.
+func capacityOf(st Store) configapi.StorageCapacity {
+	if holder, ok := st.(interface {
+		StorageCapacity() configapi.StorageCapacity
+	}); ok {
+		return holder.StorageCapacity()
+	}
+	return nil
+}
+
 // Module is the configuration module as app holds it. It is safe for
 // concurrent use: its bindings serialize temporary logger session changes.
 type Module struct {
@@ -90,6 +101,7 @@ func New(d Deps) (*Module, error) {
 		Authenticator:   d.Access.Authenticator,
 		Authorizer:      d.Access.Authorizer,
 		Settings:        d.Settings,
+		Capacity:        capacityOf(d.Store),
 	})
 	var loggers *system.Loggers
 	if d.Logging != nil {

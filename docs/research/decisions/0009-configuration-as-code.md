@@ -70,6 +70,12 @@ with P36. The system message is a singleton outside the XSD, so it is
 not exported. `artifactweave mail test` sends Artifactory's test message from the stored
 settings without holding a metadata transaction across SMTP.
 
+P12 CFG-06 (#1830) applies `quotaConfig` through the same path. The section is
+stored as one configuration document; the configuration module's quota core admits
+growing writes against the measured hot blob volume inside each metadata
+transaction and mails administrators through `mailServer`
+([research 06](../06-system-configuration-and-descriptor.md#global-storage-quota)).
+
 P12/#1835 gives remote-source proxy `domain` and `ntHost` runtime effects: NTLMv2
 proxy-account domain and client workstation, through the existing resolver and sealed
 password. Configuration storage is unchanged. The [transport contract](../../implementation/remote-http-transport.md)

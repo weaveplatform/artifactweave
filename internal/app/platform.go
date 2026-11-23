@@ -21,6 +21,7 @@ import (
 	artport "github.com/weaveplatform/artifactweave/internal/artifacts/core/port"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/terraformstate"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/usage"
+	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/azure"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
@@ -75,11 +76,8 @@ func tiers(cfg config.Config, st tierStore) (hot, cold blobTier) {
 	if coldRoot == "" {
 		coldRoot = filepath.Join(cfg.DataDir, "cold-blobs")
 	}
-	hot = blobTier{
-		section: "blob", cfg: cfg.Blob,
-		root: cfg.BlobRoot(), storesDir: filepath.Join(cfg.DataDir, "blob-stores"),
-		blobs: st.Blobs(), replicas: st.Replicas(), lease: "blob-mirror-repair",
-	}
+	hot = hotBlobTier(cfg)
+	hot.blobs, hot.replicas = st.Blobs(), st.Replicas()
 	cold = blobTier{
 		section: "cold_blob", cfg: cfg.ColdBlob,
 		root: coldRoot, storesDir: filepath.Join(cfg.DataDir, "cold-blob-stores"),
@@ -87,6 +85,25 @@ func tiers(cfg config.Config, st tierStore) (hot, cold blobTier) {
 		lease: "cold-blob-mirror-repair",
 	}
 	return hot, cold
+}
+
+// hotBlobTier is the hot tier's configuration, before any store is open.
+func hotBlobTier(cfg config.Config) blobTier {
+	return blobTier{
+		section: "blob", cfg: cfg.Blob,
+		root: cfg.BlobRoot(), storesDir: filepath.Join(cfg.DataDir, "blob-stores"),
+		lease: "blob-mirror-repair",
+	}
+}
+
+// storageCapacity is the volume the global storage quota measures: the one
+// GET /api/storageinfo reports for the hot tier. Object storage has none, and
+// the interface is then nil rather than holding a nil pointer.
+func storageCapacity(cfg config.Config) configapi.StorageCapacity {
+	if c := usage.CapacityOf(hotBlobTier(cfg).location()); c != nil {
+		return c
+	}
+	return nil
 }
 
 // openedTier is a built tier: its store (nil when the section configures
@@ -431,6 +448,9 @@ func OpenStore(
 	cfg config.Config,
 	o appsql.Options,
 ) (*appsql.Store, error) {
+	if o.Capacity == nil {
+		o.Capacity = storageCapacity(cfg)
+	}
 	if cfg.Database.Driver == "postgres" {
 		s, err := postgres.Open(ctx, cfg.Database.DSN, postgres.Options{Options: o})
 		if err != nil {

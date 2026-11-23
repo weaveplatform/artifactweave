@@ -237,6 +237,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerPackageWiring(sc)
 	w.registerWaits(sc)
 	w.registerProjectQuota(sc)
+	w.registerStorageQuota(sc)
 	sc.Step(`^the registry is running$`, w.start)
 	sc.Step(`^the registry is running with environment "([^"]*)"$`, w.startWith)
 	sc.Step(`^I GET "([^"]*)"$`, w.get)

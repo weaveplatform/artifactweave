@@ -22,6 +22,12 @@ import (
 type StorageAccounting struct {
 	Service    Service
 	Repository func(context.Context, string) (artifactsapi.ProjectRepository, error)
+	// Admission, when set, decides the whole transaction's net content delta,
+	// across every project, unassigned repositories and orphan rows, before
+	// the project counters settle: the global storage quota, whose limit 7.x
+	// checks ahead of the project's (RepositoryServiceImpl.assertStorageQuota).
+	// It joins the transaction and must perform no network I/O.
+	Admission func(context.Context, int64) error
 }
 
 type storageAccountingKey struct{ owner *StorageAccounting }
@@ -35,6 +41,7 @@ type storageChanges struct {
 	mu             sync.Mutex
 	accounting     *StorageAccounting
 	entries        map[storageLifetime]*big.Int
+	total          big.Int
 	err            error
 	sealed, closed bool
 }
@@ -163,17 +170,20 @@ func (a *StorageAccounting) Content(ctx context.Context, repository string) (art
 		return nil, err
 	}
 	owner, err := a.Repository(ctx, repository)
-	if errors.Is(err, kernel.ErrNotFound) {
+	orphan := errors.Is(err, kernel.ErrNotFound)
+	if orphan && a.Admission == nil {
 		return nil, nil //nolint:nilnil // orphan rows are charged when a repository claims them
 	}
-	if err != nil {
+	if err != nil && !orphan {
 		c.err = fmt.Errorf("read storage repository owner: %w", err)
 		return nil, c.err
 	}
-	delta, err := c.entry(ctx, owner.ProjectKey)
-	if err != nil {
-		c.err = err
-		return nil, err
+	var delta *big.Int
+	if !orphan {
+		if delta, err = c.entry(ctx, owner.ProjectKey); err != nil {
+			c.err = err
+			return nil, err
+		}
 	}
 	return func(_ context.Context, bytes int64) error {
 		c.mu.Lock()
@@ -181,6 +191,9 @@ func (a *StorageAccounting) Content(ctx context.Context, repository string) (art
 		if err := c.open(); err != nil {
 			return err
 		}
+		// Orphan rows have no project counter, but their bytes still occupy
+		// the volume the global quota limits.
+		c.total.Add(&c.total, big.NewInt(bytes))
 		if delta != nil {
 			delta.Add(delta, big.NewInt(bytes))
 		}
@@ -241,6 +254,16 @@ func (c *storageChanges) settle(ctx context.Context) error {
 		return nil
 	}
 	c.sealed = true
+	if c.accounting.Admission != nil && c.total.Sign() > 0 {
+		if !c.total.IsInt64() {
+			c.err = fmt.Errorf("logical storage delta exceeds accounting range: %w", kernel.ErrStore)
+			return c.err
+		}
+		if err := c.accounting.Admission(ctx, c.total.Int64()); err != nil {
+			c.err = err
+			return err
+		}
+	}
 	keys := make([]storageLifetime, 0, len(c.entries))
 	for key := range c.entries {
 		keys = append(keys, key)

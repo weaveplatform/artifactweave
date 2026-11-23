@@ -35,4 +35,9 @@ type Identity interface {
 	// order. A transient user, which a token names while no stored account
 	// has its name, acts through these groups.
 	AutoJoinGroups(ctx context.Context) ([]string, error)
+	// Administrators returns every account that is currently an
+	// administrator, directly or through a group with admin privileges, in
+	// name order, whatever its status; Admin is true on each. Callers that
+	// notify administrators filter on Enabled and the address themselves.
+	Administrators(ctx context.Context) ([]UserInfo, error)
 }
