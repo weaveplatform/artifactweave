@@ -42,7 +42,10 @@
 //   - App: the application runtime opened as serve opens it, over AppConfig
 //     (the default configuration with a temporary data directory) with
 //     AppOptions (a cheap password hash and a small signing key), closed
-//     when the test ends.
+//     when the test ends. OpenApp opens it over a given configuration and
+//     options, such as the CA an LDAPS directory chains to, and leaves the
+//     closing to the caller, so a test can restart it; Runtime names its
+//     type.
 //   - RemoteWorld, from NewRemoteWorld: the router over an App runtime with
 //     the generic remote repository remote in front of a fake upstream, the
 //     users reader and denied and the remote-read permission. Request sends

@@ -27,7 +27,9 @@
 //     the Access lock settings that suspension follows) and Options: the
 //     verified-password cache, the hash cost and concurrency, the
 //     TokenVerifier, the group store that a transient user's automatic
-//     groups come from, and the API restriction store.
+//     groups come from, the API restriction store, and the external
+//     Directory with the transaction runner and guard its logins are
+//     published under.
 //   - Basic, Token and ExpiredToken: the credentials a request presents.
 //   - Current, CurrentRegistry and RestoreDownload: a principal verified
 //     earlier, or the reference a download envelope carries, with the token
@@ -68,6 +70,21 @@
 //     wrong answer takes does not tell which user names exist.
 //   - The seed writes everything or nothing, and an instance that loses
 //     the race to seed a shared database reports false, not an error.
+//   - The internal password is checked before any directory, so the local
+//     administrator logs in while every directory is unreachable [I]. No
+//     directory I/O runs inside a transaction: Directory.Login answers
+//     first, then one guarded transaction rechecks that the accepting
+//     connection is still enabled and unchanged and the user still enabled,
+//     and only then creates the user (auto_create_user, realm ldap, the
+//     directory's email, the connection's profile_updatable, the auto-join
+//     groups) or refreshes its email and last login. A login that fails any
+//     recheck stores nothing and returns no principal.
+//   - A directory outage is no failed login: it counts toward neither the
+//     lock policy nor the suspension. A refusal counts as a wrong internal
+//     password does.
+//   - A directory login's principal carries the login's proof as its
+//     PasswordRevision, so Current, CurrentRegistry and RestoreDownload end
+//     it as soon as the connection is disabled, changed or deleted.
 //
 // # References
 //
@@ -75,7 +92,8 @@
 //   - Decision 0006: docs/research/decisions/0006-authorization-native-permission-model.md
 //     (Authorize and the decider in the context).
 //   - Decision 0019: docs/research/decisions/0019-human-authentication-tiers.md
-//     (local users and tokens first; the other tiers come later).
+//     (local users and tokens first, then LDAP with the local administrator
+//     as fallback).
 //   - Decision 0044: docs/research/decisions/0044-modular-monolith-migration.md.
 //   - Research: docs/research/05-platform-identity-and-security-apis.md (the
 //     built-in principals) and docs/research/21-oidc-token-exchange.md
@@ -103,7 +121,8 @@
 // CurrentRegistry (pull request 664) and RestoreDownload (pull request 674);
 // API restrictions came with retry safety and bounded API execution (pull
 // request 905). Moved here in P9d, where the seed creates the build-info
-// repository through the artifacts module's Repositories.
+// repository through the artifacts module's Repositories. P12 added
+// directory logins (LDAP-02, #1833).
 //
 // # Testing
 //
@@ -129,6 +148,13 @@
 //     TestUnitDownloadCredentialRestoration and
 //     TestUnitDownloadCredentialRejectsUnverifiedAndMixedReferences.
 //   - api_restriction_test.go: TestUnitAPIRestrictionCredentialsAndRecovery.
+//   - directory_test.go, over a fake Directory: TestUnitDirectoryNeedsPublication,
+//     TestUnitDirectoryAutoCreate, TestUnitDirectoryTransient,
+//     TestUnitDirectoryAndInternalPasswords, TestUnitDirectoryRefusals (a
+//     user disabled or locked and a connection changed while the directory
+//     answered) and TestUnitDirectoryPublicationFailures. The real
+//     directory and both SQL stores are access/adapters/ldap's
+//     TestAccLDAPLoginPublication and test/server/access's TestAccLDAPLogin.
 //   - username_test.go: TestUnitUsernamesFold and TestUnitUsernameLockFolds
 //     (logins, locks and restrictions name a user in any case, #1432).
 //   - authorize_test.go and principal_test.go: TestUnitAuthorize,

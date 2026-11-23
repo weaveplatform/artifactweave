@@ -37,6 +37,11 @@
 //   - HashPassword and ErrLoginSuspended: cheap password hashes for the
 //     users a test stores, and the suspended-login sentinel, which the
 //     kernel does not declare.
+//   - DirectoryUsers (Alice, Bob, Carol, Dave and Erin) and SeedDirectory:
+//     the users an LDAP test directory holds, with their passwords and
+//     emails, and the seed that writes them into a containertest OpenLDAP
+//     container. Carol has no password, so her binds always fail; Erin's
+//     name holds the characters a DN and a filter must escape.
 //   - ProjectAdministration: real project lifecycle operations over a composite
 //     store and canonical repository API for SQL rollback/concurrency proofs.
 //   - The access records a test stores (User, Group, Permission, Token,

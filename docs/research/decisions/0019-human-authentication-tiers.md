@@ -30,10 +30,13 @@ Implementation sequence, governed by the
   permission and token consequences. SCIM is an identity lifecycle API, independent of
   the full web console.
 
-LDAP group settings and the connection test, SAML, Crowd, HTTP-SSO and SCIM currently
-answer `501`; LDAP connections are managed since LDAP-01
+LDAP group settings, SAML, Crowd, HTTP-SSO and SCIM currently answer `501`; LDAP
+connections are managed since LDAP-01
 ([#1832](https://github.com/weaveplatform/artifactweave/issues/1832)), administrators only,
-their manager passwords sealed and never returned. That response describes
+their manager passwords sealed and never returned, and LDAP-02
+([#1833](https://github.com/weaveplatform/artifactweave/issues/1833)) authenticates Basic
+logins and tests connections against the directory
+([research 05](../05-platform-identity-and-security-apis.md#ldap-login)). That response describes
 unfinished work, not an exclusion; their Terraform resource names remain inventoried in
 [10-scope-and-tiers](../10-scope-and-tiers.md).
 
@@ -51,7 +54,12 @@ UI-based exclusion is replaced by [decision 0042](0042-capability-scope-and-supe
 
 ## Constraints
 
-- LDAP and federated login must keep a local administrator fallback.
+- LDAP and federated login must keep a local administrator fallback. LDAP-02 meets it by
+  checking the internal password before any directory, so the local administrator logs
+  in while every directory is unreachable.
+- No metadata transaction spans directory I/O: the directory answers first, then one
+  guarded transaction rechecks the connection's revision and the user before it publishes
+  the login, and a connection's change ends its logins, tokens and downloads at once.
 - P21 must define trusted proxy headers, redirect validation, session expiry and MFA
   behavior; P22 must define ownership conflicts and deprovisioning effects before either
   phase claims compatibility.
@@ -60,7 +68,8 @@ UI-based exclusion is replaced by [decision 0042](0042-capability-scope-and-supe
 
 - OIDC exchange acceptance with a fake issuer.
 - Current stub tests record the unimplemented endpoints; they are not completion evidence.
-- P12: LDAP acceptance against a test directory container.
+- P12: LDAP acceptance against a test directory container: an OpenLDAP container pinned
+  by digest, over LDAP and LDAPS, on SQLite and PostgreSQL (LDAP-02).
 - P21: real identity-provider login and native-client approval, including denial, replay,
   expired sessions and untrusted proxy headers.
 - P22: real SCIM provider create/update/group-sync/deactivate flows and resulting access

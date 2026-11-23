@@ -19,8 +19,10 @@ import (
 	"github.com/weaveplatform/artifactweave/api"
 	accessmodule "github.com/weaveplatform/artifactweave/internal/access"
 	accesshttp "github.com/weaveplatform/artifactweave/internal/access/adapters/http"
+	accessldap "github.com/weaveplatform/artifactweave/internal/access/adapters/ldap"
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/authn"
+	"github.com/weaveplatform/artifactweave/internal/access/core/ldap"
 	"github.com/weaveplatform/artifactweave/internal/access/core/token"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
 	artifactshttp "github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http"
@@ -185,6 +187,10 @@ type RouterConfig struct {
 	// authentication, which only tests do: such a handler has no store and
 	// answers just the system endpoints and the stubs.
 	Auth *authn.Authenticator
+	// LDAP is the directory client the LDAP connection test asks. A router
+	// over Store without one asks a client with the system's trust, as the
+	// application's does.
+	LDAP ldap.Directory
 	// Mirrors administers the blob mirrors; nil when no tier is a mirror.
 	Mirrors artifactshttp.Mirrors
 	// RemoteStatus serves artifactweave-only, administrator-only diagnostics.
@@ -549,6 +555,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		cfg.Logger = cfg.Logging.Logger("artifactweave")
 	}
 	cfg = withConfiguration(withFederation(withAccess(cfg)))
+	if cfg.LDAP == nil && cfg.Store != nil {
+		cfg.LDAP = accessldap.Client{}
+	}
 	if cfg.Notifications == nil && cfg.Store != nil {
 		// New refuses only a nil store and performs no I/O.
 		cfg.Notifications, _ = notifications.New(notifications.Deps{
@@ -638,6 +647,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		CompatVersion: cfg.CompatVersion,
 		Log:           routerLogger(cfg, "artifactweave.access"),
 		Repositories:  repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
+		LDAP:          cfg.LDAP,
 	})
 	// The artifacts repositories collection, and access's key pairs.
 	slashes := artifactshttp.SlashCollections()

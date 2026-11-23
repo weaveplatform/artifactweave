@@ -722,7 +722,8 @@ func oidcMatrix() []matrixRow {
 	}
 }
 
-// ldapMatrix covers the LDAP connections (#1832), administrators' alone. The
+// ldapMatrix covers the LDAP connections (#1832) and their connection test
+// (#1833), administrators' alone. The
 // fixture seeded each principal's connection lc-{p}.
 func ldapMatrix() []matrixRow {
 	const (
@@ -735,6 +736,10 @@ func ldapMatrix() []matrixRow {
 		at("PUT "+cfg, `{"key":"lc-{p}",`+conn, administrators, 200),
 		row("GET "+cfg+"/{key}", cfg+"/lc-{p}", "", administrators, 200),
 		row("DELETE "+cfg+"/{key}", cfg+"/lc-{p}", "", administrators, 204),
+		// Nothing listens on port 1: an administrator's test reaches the
+		// directory and reports the connect failure.
+		at("POST "+cfg+"/test", `{"key":"lt-{p}","ldap_url":"ldap://127.0.0.1:1","user_dn_pattern":"uid={0}"}`,
+			administrators, 400),
 	}
 }
 

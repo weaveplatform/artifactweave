@@ -20,6 +20,10 @@ type Secret struct{ value string }
 
 const redacted = "[redacted]"
 
+// SecretOf wraps a password, as a connection test's body or a directory
+// client's test supplies one.
+func SecretOf(password string) Secret { return Secret{password} }
+
 // Reveal returns the password.
 func (s Secret) Reveal() string { return s.value }
 
