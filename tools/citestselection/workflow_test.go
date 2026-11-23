@@ -418,8 +418,9 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 	for _, name := range append([]string{"lint"}, unitJobs...) {
 		job := workflow.Jobs[name]
 		if !contains(job.Needs, "impact") || !strings.Contains(job.If, "profile == 'full'") ||
-			!strings.Contains(job.If, "profile == 'format'") {
-			t.Errorf("%s is not gated by full or format", name)
+			!strings.Contains(job.If, "profile == 'format'") ||
+			!strings.Contains(job.If, "profile == 'deployment'") {
+			t.Errorf("%s is not gated by full, format or deployment", name)
 		}
 	}
 	for name, flag := range map[string]string{
@@ -745,18 +746,39 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 		{"docs rejects unexpected Windows SQLite acceptance", "", map[string]string{
 			"DOCS": "success", "SQLITE_WINDOWS": "success",
 		}, false},
-		{"provider fixture only", "", map[string]string{
-			"PROFILE": "deployment", "PROVIDER_SELECTED": "true", "TERRAFORM": "success",
+		// Every deployment run selects the harness guard tests and lint
+		// (#1861).
+		{"provider fixture only", "success", map[string]string{
+			"PROFILE": "deployment", "HAS_UNIT": "true", "LINT": "success",
+			"PROVIDER_SELECTED": "true", "TERRAFORM": "success",
 		}, true},
-		{"deployment root only", "", map[string]string{
-			"PROFILE": "deployment", "DEPLOY_SELECTED": "true", "DEPLOY": "success",
+		{"deployment root only", "success", map[string]string{
+			"PROFILE": "deployment", "HAS_UNIT": "true", "LINT": "success",
+			"DEPLOY_SELECTED": "true", "DEPLOY": "success",
 		}, true},
-		{"deployment rejects an unexpected unit job", "", map[string]string{
-			"PROFILE": "deployment", "DEPLOY_SELECTED": "true", "DEPLOY": "success",
-			"UNIT_MACOS": "success",
+		{"deployment rejects skipped harness guard tests", "", map[string]string{
+			"PROFILE": "deployment", "HAS_UNIT": "true", "LINT": "success",
+			"DEPLOY_SELECTED": "true", "DEPLOY": "success",
 		}, false},
-		{"shared Terraform tooling", "", map[string]string{
-			"PROFILE": "deployment", "PROVIDER_SELECTED": "true", "TERRAFORM": "success",
+		{"deployment rejects one failed harness guard job", "success", map[string]string{
+			"PROFILE": "deployment", "HAS_UNIT": "true", "LINT": "success",
+			"UNIT_WINDOWS": "failure", "DEPLOY_SELECTED": "true", "DEPLOY": "success",
+		}, false},
+		{"deployment rejects skipped lint", "success", map[string]string{
+			"PROFILE": "deployment", "HAS_UNIT": "true",
+			"DEPLOY_SELECTED": "true", "DEPLOY": "success",
+		}, false},
+		{"deployment rejects an unexpected unit job", "", map[string]string{
+			"PROFILE": "deployment", "LINT": "success",
+			"DEPLOY_SELECTED": "true", "DEPLOY": "success", "UNIT_MACOS": "success",
+		}, false},
+		{"deployment rejects unexpected package acceptance", "success", map[string]string{
+			"PROFILE": "deployment", "HAS_UNIT": "true", "LINT": "success",
+			"DEPLOY_SELECTED": "true", "DEPLOY": "success", "GO_ACCEPTANCE": "success",
+		}, false},
+		{"shared Terraform tooling", "success", map[string]string{
+			"PROFILE": "deployment", "HAS_UNIT": "true", "LINT": "success",
+			"PROVIDER_SELECTED": "true", "TERRAFORM": "success",
 			"DEPLOY_SELECTED": "true", "DEPLOY": "success",
 		}, true},
 		{"release full gate", "success", full, true},
@@ -826,12 +848,13 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			"GO_ACCEPTANCE": "success", "LINT": "success", "ACCEPTANCE": "success",
 			"AFFECTED_COVERAGE": "success",
 		}, false},
-		{"cancelled selected provider", "", map[string]string{
-			"PROFILE": "deployment", "PROVIDER_SELECTED": "true", "TERRAFORM": "cancelled",
+		{"cancelled selected provider", "success", map[string]string{
+			"PROFILE": "deployment", "HAS_UNIT": "true", "LINT": "success",
+			"PROVIDER_SELECTED": "true", "TERRAFORM": "cancelled",
 		}, false},
-		{"unexpected provider on deployment only", "", map[string]string{
-			"PROFILE": "deployment", "DEPLOY_SELECTED": "true", "DEPLOY": "success",
-			"TERRAFORM": "success",
+		{"unexpected provider on deployment only", "success", map[string]string{
+			"PROFILE": "deployment", "HAS_UNIT": "true", "LINT": "success",
+			"DEPLOY_SELECTED": "true", "DEPLOY": "success", "TERRAFORM": "success",
 		}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

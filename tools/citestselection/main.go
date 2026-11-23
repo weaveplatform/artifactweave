@@ -85,31 +85,7 @@ func main() {
 	}
 	provider, deployment := p.terraformLanes()
 	if *output != "" {
-		body := fmt.Sprintf(
-			"profile=%s\nmerge_base=%s\nowner=%s\nunits=%s\ntags=%s\nclients=%s\ncoverpkg=%s\nchanged_packages=%s\nunit_packages=%s\nacceptance_packages=%s\nfuzz_packages=%s\nunit_run=%s\nacceptance_run=%s\nhas_unit=%t\nhas_acceptance=%t\nterraform_provider=%t\nterraform_deployment=%t\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
-			p.profile,
-			p.mergeBase,
-			p.candidate.owner,
-			strings.Join(p.candidate.units, " "),
-			p.candidate.tags,
-			strings.Join(p.candidate.clients, ","),
-			p.candidate.coverpkg,
-			strings.Join(p.candidate.changedPackages, ","),
-			strings.Join(kinds.Unit, " "),
-			strings.Join(kinds.Acc, " "),
-			strings.Join(kinds.Fuzz, " "),
-			kinds.runPattern(p.profile, "unit"),
-			kinds.runPattern(p.profile, "acceptance"),
-			kinds.hasUnit(),
-			len(kinds.Acc) != 0,
-			provider,
-			deployment,
-			p.candidate.profile,
-			p.candidate.owner,
-			strings.Join(p.candidate.units, " "),
-			p.candidate.tags,
-			strings.Join(p.candidate.clients, ","),
-		)
+		body := githubOutputs(p, kinds)
 		if err := appendFile(*output, body); err != nil {
 			fatal(err)
 		}
@@ -148,6 +124,12 @@ func main() {
 				p.candidate.tags,
 				strings.Join(p.candidate.clients, ","),
 			)
+		} else if p.profile == "deployment" {
+			fmt.Fprintf(
+				&body,
+				"\nTerraform harness guard tests, vet and lint: `%s`.\n",
+				strings.Join(p.candidate.units, " "),
+			)
 		}
 		fmt.Fprintf(
 			&body,
@@ -173,6 +155,37 @@ func main() {
 	}
 	fmt.Printf("CI profile: %s (%s)\n", p.profile, p.reason)
 	fmt.Printf("Affected candidate: %s (%s)\n", p.candidate.profile, p.candidate.reason)
+}
+
+// githubOutputs is the impact job's output file, whose keys the quality gate's
+// job conditions read as needs.impact.outputs.
+func githubOutputs(p plan, kinds kindSelection) string {
+	provider, deployment := p.terraformLanes()
+	return fmt.Sprintf(
+		"profile=%s\nmerge_base=%s\nowner=%s\nunits=%s\ntags=%s\nclients=%s\ncoverpkg=%s\nchanged_packages=%s\nunit_packages=%s\nacceptance_packages=%s\nfuzz_packages=%s\nunit_run=%s\nacceptance_run=%s\nhas_unit=%t\nhas_acceptance=%t\nterraform_provider=%t\nterraform_deployment=%t\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
+		p.profile,
+		p.mergeBase,
+		p.candidate.owner,
+		strings.Join(p.candidate.units, " "),
+		p.candidate.tags,
+		strings.Join(p.candidate.clients, ","),
+		p.candidate.coverpkg,
+		strings.Join(p.candidate.changedPackages, ","),
+		strings.Join(kinds.Unit, " "),
+		strings.Join(kinds.Acc, " "),
+		strings.Join(kinds.Fuzz, " "),
+		kinds.runPattern(p.profile, "unit"),
+		kinds.runPattern(p.profile, "acceptance"),
+		kinds.hasUnit(),
+		len(kinds.Acc) != 0,
+		provider,
+		deployment,
+		p.candidate.profile,
+		p.candidate.owner,
+		strings.Join(p.candidate.units, " "),
+		p.candidate.tags,
+		strings.Join(p.candidate.clients, ","),
+	)
 }
 
 func laneState(selected bool) string {
