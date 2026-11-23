@@ -33,6 +33,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/access/core/idtoken/idtokentest"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/platform/cdn/cdntest"
+	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
 
 // testMasterKey is a fixed key so scenarios are reproducible; it protects
@@ -110,6 +111,8 @@ type world struct {
 	env []string
 	// edge is the scenario's fake CDN edge, nil unless a step starts it.
 	edge *cdntest.Edge
+	// smtp is the scenario's Mailpit server, nil unless a step starts it.
+	smtp *containertest.MailpitEndpoint
 	// closers release what steps started (containers, the edge), after
 	// the server has stopped.
 	closers []func()
@@ -176,7 +179,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 		for i := len(w.closers) - 1; i >= 0; i-- {
 			w.closers[i]()
 		}
-		w.closers, w.edge, w.env = nil, nil, nil
+		w.closers, w.edge, w.env, w.smtp = nil, nil, nil, nil
 		if aqlCapture != "" {
 			err = errors.Join(err, w.captureAQL(s.Name))
 		}

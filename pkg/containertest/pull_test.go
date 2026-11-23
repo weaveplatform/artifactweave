@@ -314,6 +314,7 @@ func TestUnitEmulatorSourcesShareADigest(t *testing.T) {
 		MinIOImage:   minioSources,
 		FakeGCSImage: fakeGCSSources,
 		AzuriteImage: azuriteSources,
+		MailpitImage: mailpitSources,
 	} {
 		if sources[0] != image {
 			t.Fatalf("first source %q, want %q", sources[0], image)

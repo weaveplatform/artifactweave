@@ -56,8 +56,17 @@ the same PATCH, config-apply and bootstrap path. Its documented singleton fields
 merge into the existing mail configuration document; the password is separated
 and sealed with the configured keyring. Settings and password are read together
 under the shared guard before delivery starts. Disabled mail and string clearing
-are explicit; whole-section null is refused. CFG-01 includes these public mail settings in XML; mail testing endpoints and the
-remaining system administration retain their P12 owners.
+are explicit. CFG-01 includes these public mail settings in XML.
+
+CFG-07 ([#1831](https://github.com/weaveplatform/artifactweave/issues/1831)) completes
+`mailServer`, `backups` and `systemMessageConfig` on the same path, validated with the
+rest of the document and written in its one transaction. `mailServer: null` deletes the
+settings and their sealed password, as the pinned `artifactory_mail_server` resource
+deletes them. Backup definitions are stored and exported in XSD `BackupType` order, with
+schedules and repository exclusions checked against the document's final repositories;
+running them stays with P36. The system message is a singleton outside the XSD, so it is
+not exported. `artifactweave mail test` sends Artifactory's test message from the stored
+settings without holding a metadata transaction across SMTP.
 
 P12/#1835 gives remote-source proxy `domain` and `ntHost` runtime effects: NTLMv2
 proxy-account domain and client workstation, through the existing resolver and sealed
@@ -70,7 +79,7 @@ LDAP-01 ([#1832](https://github.com/weaveplatform/artifactweave/issues/1832)) ap
 LDAP service rather than its own copy of the rules, so the descriptor and
 `/access/api/v1/ldap/settings` read back one connection. Its entries change field by field
 and are validated with the rest of the document before any write; an entry set to null
-deletes a connection; the whole-section null is refused as for `mailServer`. The XML export
+deletes a connection; the whole-section null is refused. The XML export
 lists the connections without their manager passwords.
 
 ## Rationale

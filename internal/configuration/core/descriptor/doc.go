@@ -35,6 +35,8 @@
 //   - NewAPI: configapi.API, with Descriptor, Export, System and Mail bound over Deps.
 //   - Export.XML: one committed, protected XML descriptor of delivered sections;
 //     its typed section document is the extension seam for future sections.
+//   - SystemMessage (configapi.System): the systemMessageConfig singleton,
+//     the default when none is stored; it is not in the XML, as in the XSD.
 //   - The section names (SectionLocal and the rest) and Lookup.
 //
 // # Invariants
@@ -63,6 +65,10 @@
 //     JSON.
 //   - Applying a descriptor again changes nothing, and Merged answers the
 //     same count of values either time.
+//   - A backup is a definition only: no field names a directory, and its
+//     excludedRepositories are checked against the repositories the whole
+//     patch leaves, so a repository created or deleted in the same document
+//     counts. Exclusions of repositories removed later are not exported.
 //   - Error texts reach clients and logs, so they stay byte-identical.
 //
 // # References
@@ -96,7 +102,9 @@
 // PRJ-04 adds the documented singleton mailServer settings for quota delivery,
 // with its password separated before persistence and guarded configuration reads.
 // LDAP-01 adds security.ldapSettings through access's LDAPSettings, with the
-// connections in the XML export's security element.
+// connections in the XML export's security element. CFG-07 (issue 1831) adds
+// backups (exported in XSD BackupType order), systemMessageConfig and
+// mailServer deletion by null, as the artifactory_mail_server resource sends.
 //
 // # Testing
 //
@@ -117,6 +125,12 @@
 //   - redirect_test.go: downloadRedirectConfig and DownloadRedirectMinSize.
 //   - mail_test.go: singleton mail settings, secret retention/clearing, no-op
 //     enablement, validation, dry-run and enclosing transaction rollback.
+//   - backup_test.go: the artifactory_backup bodies through create, update,
+//     reapply and delete, defaults, repository references that follow the
+//     patch, refusals that write nothing, and a final-write fault that rolls
+//     back repositories, backups, mail and the system message together.
+//   - sysmessage_test.go: field merges, clearing, refusals, absence from the
+//     XML, and mailServer deletion with its sealed password.
 //   - ldap_test.go: every ldapSettings field mapped, outcomes through
 //     access's binding with a dry run and a second apply, a missing binding,
 //     planning and write failures, and the export's element order.

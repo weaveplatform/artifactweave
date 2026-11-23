@@ -27,10 +27,11 @@ func TestUnitDescriptorProviderControlsAreRequired(t *testing.T) {
 		t.Fatal("descriptor controls left the required provider scenarios")
 	}
 	fixture := read(scenario + "/main.tf")
-	if strings.Count("\n"+fixture, "\nresource ") != 2 {
-		t.Fatal("descriptor control scope must remain exactly two resources")
+	// CFG-07 (issue 1831) added the backup and mail server resources.
+	if strings.Count("\n"+fixture, "\nresource ") != 4 {
+		t.Fatal("descriptor control scope must remain exactly four resources")
 	}
-	for _, kind := range []string{"artifactory_proxy", "artifactory_property_set"} {
+	for _, kind := range []string{"artifactory_proxy", "artifactory_property_set", "artifactory_backup", "artifactory_mail_server"} {
 		if strings.Count(fixture, `resource "`+kind+`"`) != 1 {
 			t.Fatalf("descriptor controls must manage one %s", kind)
 		}
@@ -51,7 +52,7 @@ func TestUnitDescriptorProviderControlsAreRequired(t *testing.T) {
 		t.Fatal("descriptor provider handler is missing")
 	}
 	handler, _, _ = strings.Cut(handler, "\n}")
-	for _, step := range []string{"for revision in 1 2", "tf apply -auto-approve", "tf apply -refresh-only -auto-approve", "tf plan -detailed-exitcode", "unset TF_VAR_proxy_password", "configuration_proof created", "configuration_proof updated", "configuration_proof refreshed", "configuration_proof retained", "configuration_proof cleared"} {
+	for _, step := range []string{"for revision in 1 2", "tf apply -auto-approve", "tf apply -refresh-only -auto-approve", "tf plan -detailed-exitcode", "unset TF_VAR_proxy_password TF_VAR_mail_password", "configuration_proof created", "configuration_proof updated", "configuration_proof refreshed", "configuration_proof retained", "configuration_proof cleared"} {
 		if !strings.Contains(handler, step) {
 			t.Errorf("descriptor provider handler lost %s", step)
 		}
@@ -61,6 +62,9 @@ func TestUnitDescriptorProviderControlsAreRequired(t *testing.T) {
 	}
 	if !strings.Contains(runner, "configuration_proof deleted") {
 		t.Fatal("configuration scenario lost the actual secret destruction proof")
+	}
+	if !strings.Contains(runner, "mail_server/mailserver") || strings.Count(runner, "no_backup_directory") < 3 {
+		t.Fatal("configuration scenario lost the mail secret or backup directory proof")
 	}
 	if strings.Contains(read(scenario+"/variables.tf"), `variable "revision"`) || strings.Contains(read(scenario+"/variables.tf"), "fixture") {
 		t.Fatal("consumer reference includes harness-only inputs")

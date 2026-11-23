@@ -7,8 +7,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 )
 
-// SectionMailServer is the documented singleton SMTP descriptor section. It
-// supplies quota delivery's narrow dependency; full mail administration is P12.
+// SectionMailServer is the documented singleton SMTP descriptor section,
+// read by quota delivery and the mail test (system.MailTest).
 const SectionMailServer = "mailServer"
 
 func parseMailServer(top map[string]any, p *Patch) error {
@@ -16,10 +16,16 @@ func parseMailServer(top map[string]any, p *Patch) error {
 	if !present {
 		return nil
 	}
-	// A singleton is disabled explicitly. Whole-section null semantics are not
-	// documented, so retain the descriptor's refusal instead of guessing delete.
+	// The pinned artifactory_mail_server resource destroys with
+	// `mailServer: ~` ([S] provider 12.11.14 Delete), which 7.x merges as a
+	// descriptor without a mail server. The document and its sealed password
+	// go; deliveries then find no transport. enabled: false disables instead.
 	if value == nil {
-		return nullRefused(SectionMailServer)
+		p.Configs = append(p.Configs, ConfigChange{
+			Section: SectionMailServer, Kind: configdoc.ConfigMailServer, Key: system.MailServerKey,
+			Delete: true, singleton: true,
+		})
+		return nil
 	}
 	fields, ok := value.(map[string]any)
 	if !ok {
@@ -30,7 +36,7 @@ func parseMailServer(top map[string]any, p *Patch) error {
 	}
 	p.Configs = append(p.Configs, ConfigChange{
 		Section: SectionMailServer, Kind: configdoc.ConfigMailServer, Key: system.MailServerKey,
-		Fields: fields, secrets: []string{"password"},
+		Fields: fields, secrets: []string{"password"}, singleton: true,
 	})
 	return nil
 }

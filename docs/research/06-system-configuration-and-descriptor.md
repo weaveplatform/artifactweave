@@ -253,8 +253,8 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
   when present, must equal the entry key. A `null` flag or `search` block, an unknown
   field (including the Access API's snake_case names) and every connection the Access API
   would refuse answer 400 naming `security.ldapSettings.<key>` and the field, before anything
-  in the document is written. **[I]** A whole-section `ldapSettings: null` is refused, as
-  for `mailServer`; the deprecated `artifactory_ldap_setting` resource deletes with it,
+  in the document is written. **[I]** A whole-section `ldapSettings: null` is refused; the
+  deprecated `artifactory_ldap_setting` resource deletes with it,
   and `artifactory_ldap_setting_v2` deletes through the Access API instead. Reapplying a
   document changes nothing and keeps each connection's revision. `ldapGroupSettings`
   arrives with LDAP-03.
@@ -300,7 +300,12 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
 `virtualCacheCleanupConfig`, `quotaConfig`, `folderDownloadConfig`, `trashcanConfig`,
 `itemsBrowserPagingSize`, `replicationsConfig`, `sumoLogicConfig`, `releaseBundlesConfig`,
 `signedUrlConfig`, `downloadRedirectConfig`, `eula`, `subscription`, `keyPairs`,
-`retentionSettings`, `authentication`, `systemMessageConfig`.
+`retentionSettings`, `authentication`.
+
+`systemMessageConfig` is not an XSD element: the published `artifactory.xsd` (namespace
+3.4.8) has no `systemMessage` type, while the YAML page documents the section ([D]
+https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration.md, "General
+Configuration"). It is accepted by `PATCH` and absent from the XML descriptor.
 
 ### Section shapes
 
@@ -310,7 +315,7 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
 | `proxies.<key>` | `host, port, username, password, domain, ntHost, redirectedToHosts, platformDefault, services[jfrt,jfmc,jfxr,jfds]` |
 | `mailServer` | `enabled, artifactoryUrl, from, host, port, username, password, subjectPrefix, ssl, tls` |
 | `propertySets.<name>` | `properties{<prop>{predefinedValues, closedPredefinedValues, multipleChoice}}, visible` |
-| `backups.<name>` | `cronExp, retentionPeriodHours, createArchive, excludedRepositories, excludeNewRepositories, sendMailOnError, enabled` |
+| `backups.<name>` | `cronExp, retentionPeriodHours, createArchive, excludedRepositories, excludeNewRepositories, sendMailOnError, enabled`; the `artifactory_backup` resource also sends `key`, `precalculate` and `exportMissionControl` ([S] provider 12.11.14 [`resource_artifactory_backup.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_backup.go)). XSD `BackupType` order: `key, enabled, dir, cronExp, retentionPeriodHours, createArchive, excludedRepositories{repositoryRef*}, sendMailOnError, excludeBuilds, excludeNewRepositories, precalculate, exportMissionControl` |
 | `indexer` | `enabled, cronExp, includedRepositories` |
 | `gcConfig`, `cleanupConfig`, `virtualCacheCleanupConfig` | `cronExp` |
 | `quotaConfig` | `enabled, diskSpaceLimitPercentage, diskSpaceWarningPercentage` |
@@ -454,8 +459,8 @@ replication proxy configuration, preserving its independent endpoint and replay 
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
   `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`,
-  `downloadRedirectConfig`, `mailServer`, the `security.anonAccessEnabled` setting and
-  the `security.ldapSettings` connections (`internal/configuration/core/descriptor`). Download redirect configuration applies
+  `downloadRedirectConfig`, `mailServer`, `backups`, `systemMessageConfig`, the
+  `security.anonAccessEnabled` setting and the `security.ldapSettings` connections (`internal/configuration/core/descriptor`). Download redirect configuration applies
   the whole-MB `fileMinimumSize` setting used by CDN/storage redirects
   ([research 19](19-cdn-and-download-redirect.md#5-artifactweave-today)). Artifactory
   applies every section its YAML pages document ([D]
@@ -463,8 +468,8 @@ replication proxy configuration, preserving its independent endpoint and replay 
   with any other top-level section answers 400 naming each such section and listing the
   supported sections, and changes nothing. The check runs before `${NAME}` references are resolved, so the
   error names the section rather than a variable inside it. The other sections arrive with
-  their features: `backups`, `gcConfig`, `trashcanConfig`, `quotaConfig`,
-  `systemMessageConfig` and the remaining baseline security settings in P12
+  their features: `gcConfig`, `trashcanConfig`, `quotaConfig` and the remaining
+  baseline security settings in P12
   ([plan](../implementation/plan.md)). Stored federated repository configuration does
   not establish P13 peer synchronization. P36 completes scheduled backup and migration workflows;
   human identity settings follow P21/P22, and product settings follow their owners in the
@@ -474,10 +479,42 @@ replication proxy configuration, preserving its independent endpoint and replay 
   is in force when it is not. Unsupported contents are not stored, including any secrets.
   PRJ-04 supplies the narrow documented singleton `mailServer` fields needed for quota
   delivery. Its password is separated into the existing sealed secret store; omitted
-  fields are retained and null clears strings. Whole-section null is refused; disable
-  notifications with `enabled: false`. Delivery reads settings and credentials under one
-  guarded local transaction before network I/O. CFG-01 exports the public mail fields;
-  mail testing endpoints and provider-wide qualification retain their P12 owners.
+  fields are retained and null clears strings. CFG-07
+  ([#1831](https://github.com/weaveplatform/artifactweave/issues/1831)) accepts
+  `mailServer: null` (or `~`) as deleting the settings and the sealed password, because
+  the `artifactory_mail_server` resource deletes with exactly that document ([S] provider
+  12.11.14 [`resource_artifactory_mail_server.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_mail_server.go)
+  `Delete`); `enabled: false` disables mail and keeps the settings. A cleared `subjectPrefix`
+  still falls back to the `[JFrog]` default, as PRJ-04 delivered it. Delivery reads settings and credentials under one
+  guarded local transaction before network I/O. CFG-01 exports the public mail fields.
+- **Mail test.** 7.x's "Send Test Email" is served only to its UI; no REST endpoint is
+  documented. `artifactweave mail test <recipient>` sends it through the stored settings
+  and sealed password, from the server's configuration and master key, like `config
+  apply`. It answers `A test message has been sent successfully to '<recipient>'` on
+  delivery. Missing, disabled or hostless settings answer `Mail server configuration must
+  be enabled with a defined host and port.`, and an SMTP failure names the stage (`mail connect`, `mail TLS`, `mail STARTTLS`,
+  `mail authentication`, `mail sender`, `mail recipient`, `mail DATA` and the like) followed
+  by `mail delivery failed`, without the password or the server's reply.
+  **[I]** The subject is `<subjectPrefix> Test` and the body names the configured
+  Artifactory URL; the wording is artifactweave's, as 7.x's template is not published.
+- **Backups.** Each `backups.<key>` entry is a definition: artifactweave validates,
+  stores and exports it, and P36 runs, retains and restores backups, so no backup
+  directory is created. Fields merge as in the other keyed sections, defaults
+  (`enabled: true`, `retentionPeriodHours: 168`, `sendMailOnError: true`, the other flags
+  false) fill a new entry, and `null` on the entry deletes it. `cronExp` is required and
+  must be a Quartz expression. Every `excludedRepositories` entry must name a repository
+  that exists once the document is applied; one removed later disappears from the
+  export. `key`, when sent, must equal the entry key; `excludeBuilds`, deprecated in the
+  XSD, is accepted and dropped. `dir` is refused: **[I]** a backup target on the server's
+  filesystem is P36's decision, and accepting it unused would claim a location is in force.
+  The export states every field, with `excludedRepositories` always present so the
+  resource reads an empty list back as empty.
+- **System message.** `systemMessageConfig` merges `enabled`, `message`, `title` and
+  `titleColor` field by field into one singleton; `null` clears a string, and a
+  whole-section `null` is refused because no resource or document deletes it that way.
+  It is not in the XML descriptor (see "Top-level elements"). The banner is rendered by
+  the P39 UI, which reads it through the configuration module's `SystemMessage` read
+  contract.
 - A successful patch answers `<n> changes to config merged successfully` as `text/plain`,
   with no newline after it, `<n>` counted as "Semantics" describes ([J] RTFACT-31174,
   RTFACT-17040; [S] `MapToDiffConverter`). `artifactweave config apply` prints its own

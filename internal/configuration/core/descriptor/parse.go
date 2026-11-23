@@ -112,9 +112,15 @@ type ConfigChange struct {
 	Kind    configdoc.ConfigKind
 	Key     string
 	Delete  bool
-	// Fields are the descriptor's own names; a nil value removes the field.
+	// Fields are the descriptor's own names; a nil value removes the field,
+	// or with keepNulls stores it as null.
 	Fields  map[string]any
 	secrets []string
+	// singleton names the change by its section alone (mailServer).
+	singleton bool
+	// keepNulls stores a cleared field as null, for a section whose reader
+	// tells a cleared field from one never written.
+	keepNulls bool
 }
 
 // Lookup resolves an environment variable, as os.LookupEnv does.
@@ -199,6 +205,12 @@ func Parse(doc []byte, env Lookup) (*Patch, error) {
 	if err := parseMailServer(top, p); err != nil {
 		return nil, err
 	}
+	if err := parseBackups(top, p); err != nil {
+		return nil, err
+	}
+	if err := parseSystemMessage(top, p); err != nil {
+		return nil, err
+	}
 	if err := parseSecurity(top, p); err != nil {
 		return nil, err
 	}
@@ -269,6 +281,8 @@ var applied = []string{
 	SectionDownloadRedirect,
 	SectionMailServer,
 	SectionSecurity,
+	SectionBackups,
+	SectionSystemMessage,
 }
 
 // unapplied refuses the sections artifactweave does not apply yet. They are

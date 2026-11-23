@@ -29,6 +29,11 @@ var (
 	messageID   = regexp.MustCompile(`^[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+$`)
 )
 
+// FallbackFrom is the sender when the configured from is empty, which the
+// primary XSD permits. It is a local choice, not a vendor-generated address
+// or an administrator identity; every delivery owner uses this one.
+const FallbackFrom = "artifactweave@localhost"
+
 // Server is a current transport snapshot. Never log it: Password is secret.
 type Server struct {
 	Host, Username, Password, From string

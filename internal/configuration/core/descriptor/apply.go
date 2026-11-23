@@ -68,11 +68,11 @@ func Apply(
 
 func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool) (configapi.Result, error) {
 	res := configapi.Result{Changes: p.Changes, DryRun: dryRun}
-	deletes, writes, err := planRepos(ctx, d.Repositories, p.Repos, &res)
+	deletes, writes, repositories, err := planRepos(ctx, d.Repositories, p.Repos, &res)
 	if err != nil {
 		return res, err
 	}
-	configs, err := planConfigs(ctx, d, p.Configs, now, &res)
+	configs, err := planConfigs(ctx, d, p.Configs, repositories, now, &res)
 	if err != nil {
 		return res, err
 	}
@@ -164,10 +164,10 @@ func planRepos(
 	repos artifactsapi.Repositories,
 	changes []RepoChange,
 	res *configapi.Result,
-) ([]string, []repoOp, error) {
+) ([]string, []repoOp, map[string]bool, error) {
 	existing, err := repos.List(ctx, artifactsapi.RepoFilter{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("list repositories: %w", err)
+		return nil, nil, nil, fmt.Errorf("list repositories: %w", err)
 	}
 	stored := map[string]repo.Config{}
 	for _, c := range existing {
@@ -184,7 +184,7 @@ func planRepos(
 		cur, ok := stored[c.Key]
 		switch {
 		case repos.Protected(c.Key):
-			return nil, nil, fmt.Errorf(
+			return nil, nil, nil, fmt.Errorf(
 				"%w: %s: this repository cannot be deleted",
 				ErrInvalid,
 				name,
@@ -193,7 +193,7 @@ func planRepos(
 			res.Unchanged = append(res.Unchanged, name)
 			continue
 		case cur.Class != c.Class:
-			return nil, nil, fmt.Errorf(
+			return nil, nil, nil, fmt.Errorf(
 				"%w: %s: %s is a %s repository",
 				ErrInvalid,
 				name,
@@ -215,7 +215,7 @@ func planRepos(
 			return repos.CheckEnvironments(ctx, c)
 		})
 		if err != nil {
-			return nil, nil, entryError(name, err)
+			return nil, nil, nil, entryError(name, err)
 		}
 		switch {
 		case !changed:
@@ -245,13 +245,17 @@ func planRepos(
 		// before, so it is dropped from the update rather than refused, as
 		// 7.x's RepoConfigReferencesInterceptor drops it.
 		if err := repos.CheckMembers(&op.cfg, before, known); err != nil {
-			return nil, nil, entryError(op.name, err)
+			return nil, nil, nil, entryError(op.name, err)
 		}
 		if err := repos.CheckKeypairs(ctx, op.cfg); err != nil {
-			return nil, nil, entryError(op.name, err)
+			return nil, nil, nil, entryError(op.name, err)
 		}
 	}
-	return deletes, writes, nil
+	keys := make(map[string]bool, len(final))
+	for key := range final {
+		keys[key] = true
+	}
+	return deletes, writes, keys, nil
 }
 
 // planRepo plans one entry. environments validates the planned environments
@@ -335,13 +339,14 @@ func planConfigs(
 	ctx context.Context,
 	d Deps,
 	changes []ConfigChange,
+	repositories map[string]bool,
 	now time.Time,
 	res *configapi.Result,
 ) ([]configOp, error) {
 	var ops []configOp
 	for _, c := range changes {
 		name := c.Section + "." + c.Key
-		if c.Kind == configdoc.ConfigMailServer {
+		if c.singleton {
 			name = c.Section
 		}
 		cur, err := d.Configs.Get(ctx, c.Kind, c.Key)
@@ -365,8 +370,14 @@ func planConfigs(
 		if err := validateConfig(d.Layouts, c.Kind, c.Key, doc); err != nil {
 			return nil, fmt.Errorf("%s: %w", name, err)
 		}
+		if c.Kind == configdoc.ConfigBackup {
+			if err := checkBackupRepositories(c, doc, repositories); err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+		}
 		enabled, sameEnabled := true, true
-		if c.Kind == configdoc.ConfigMailServer {
+		// Both default to enabled (MailServerType, BackupType).
+		if c.Kind == configdoc.ConfigMailServer || c.Kind == configdoc.ConfigBackup {
 			if flag, present := doc["enabled"].(bool); present {
 				enabled = flag
 			}
@@ -435,7 +446,7 @@ func mergeConfig(
 				return nil, nil, fmt.Errorf("%w: %s must be a string", ErrInvalid, k)
 			}
 			secrets[k] = s
-		case v == nil:
+		case v == nil && !c.keepNulls:
 			delete(doc, k)
 		default:
 			doc[k] = v
@@ -517,6 +528,8 @@ func validateConfig(
 		}
 	case configdoc.ConfigPropertySet:
 		return validatePropertySetFields(doc)
+	case configdoc.ConfigBackup:
+		return validateBackup(doc)
 	}
 	return nil
 }

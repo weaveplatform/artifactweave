@@ -1,5 +1,5 @@
 // Package containertest gates the tests that start containers (decision
-// 0015) and starts the blob-store emulators they use.
+// 0015) and starts the blob-store emulators and the SMTP server they use.
 //
 // # Role
 //
@@ -31,6 +31,10 @@
 //     makes), and when every source fails the error names each registry's
 //     answer rather than the "No such image" testcontainers' own pull ends
 //     in.
+//   - Mailpit and RunMailpit: a real SMTP server with AUTH and STARTTLS over
+//     a certificate from a CA made per run (MailpitEndpoint.CA), with
+//     Messages and Clear over its message API, so mail tests check what an
+//     independent server received. Its second source is mirror.gcr.io.
 //
 // # References
 //
@@ -48,11 +52,13 @@
 //     testcontainers-go does not decode.
 //   - https://github.com/weaveplatform/artifactweave/issues/1463: Azurite's
 //     copy, its second source.
+//   - https://github.com/weaveplatform/artifactweave/issues/1831: Mailpit,
+//     for mail test and quota warning delivery.
 //
 // # Status
 //
 // Implemented P2 (the Linux engine gate), P2b (the emulators) and P7 (the
 // answer timeout). MinIO's readiness wait added by issue 1307; the checked
 // image pull and the second sources by issue 1448; Azurite's copy by issue
-// 1463.
+// 1463; Mailpit by issue 1831.
 package containertest

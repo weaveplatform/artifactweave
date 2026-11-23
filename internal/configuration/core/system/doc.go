@@ -1,5 +1,6 @@
-// Package system validates and reads the mail-server settings needed by quota
-// delivery and administers bounded temporary logger sessions.
+// Package system validates and reads the mail-server settings, sends the
+// administrator's test mail and administers bounded temporary logger
+// sessions.
 //
 // # Role
 //
@@ -16,7 +17,10 @@
 //
 // Validated mail settings behind configuration/api.Mail. Every read captures
 // public settings and the password under one guarded metadata transaction,
-// completed before SMTP starts. No function here opens a network connection.
+// completed before SMTP starts. MailTest sends Artifactory's test
+// message through a MailSender after that read, refusing to start inside a
+// transaction, and answers 7.x's confirmation or refusal texts; it opens no
+// connection itself.
 // Loggers validates temporary level requests, applies one in-memory session,
 // restores current baseline decisions on expiry/delete and joins timers on Close.
 //
@@ -38,6 +42,7 @@
 // # Status
 //
 // PRJ-04 supplies the narrow documented mailServer dependency for quota warnings.
-// P12 CFG-03 supplies actual process-local logger controls. Remaining system and
-// mail administration stay P12; log collection and streaming stay P38.
+// P12 CFG-03 supplies actual process-local logger controls. P12 CFG-07 (issue
+// 1831) adds MailTest behind `artifactweave mail test`. Log collection and
+// streaming stay P38.
 package system

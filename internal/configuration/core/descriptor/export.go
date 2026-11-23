@@ -40,6 +40,7 @@ type exportDocument struct {
 	XMLName          xml.Name       `xml:"http://artifactory.jfrog.org/xsd/3.5.11 config"`
 	Mail             *exportFields  `xml:"mailServer,omitempty"`
 	Security         exportSecurity `xml:"security"`
+	Backups          []exportFields `xml:"backups>backup"`
 	Local            []exportFields `xml:"localRepositories>localRepository"`
 	Remote           []exportFields `xml:"remoteRepositories>remoteRepository"`
 	Virtual          []exportFields `xml:"virtualRepositories>virtualRepository"`
@@ -142,7 +143,9 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 	if err != nil {
 		return out, fmt.Errorf("list export repositories: %w", err)
 	}
+	existing := make(map[string]bool, len(repos))
 	for _, c := range repos {
+		existing[c.Key] = true
 		fields, err := exportRepository(c)
 		if err != nil {
 			return out, err
@@ -197,6 +200,17 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 	}
 	if out.Security, err = readExportSecurity(ctx, d); err != nil {
 		return out, err
+	}
+	backups, err := d.Configs.List(ctx, configdoc.ConfigBackup)
+	if err != nil {
+		return out, fmt.Errorf("list export %s: %w", configdoc.ConfigBackup, err)
+	}
+	for _, doc := range backups {
+		fields, err := publicDocument(doc)
+		if err != nil {
+			return out, err
+		}
+		out.Backups = append(out.Backups, exportBackup(doc.Key, fields, existing))
 	}
 	for _, section := range []struct {
 		kind   configdoc.ConfigKind
