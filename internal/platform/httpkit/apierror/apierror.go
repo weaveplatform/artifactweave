@@ -84,6 +84,14 @@ type Error struct {
 	// its 405 for a deploy to a virtual repository that has no local
 	// deployment repository (7.161.26, 337-352).
 	Allow string
+	// ByProfile, when it names the route's profile, is the answer Write
+	// gives there in place of this one. A kernel sentinel keeps one identity
+	// for errors.Is and for code that reads its fields, while the surface
+	// whose 7.x answer is known gives that answer and the others keep the
+	// local one: a hard project storage quota is 7.x's 413 in Artifactory's
+	// envelope and the earlier 403 elsewhere (decision 0013, #1881). Only
+	// one level is followed; an override's own ByProfile is ignored.
+	ByProfile map[Profile]*Error
 }
 
 // Error returns Message alone, without Status or Code, so an Error that is
@@ -126,6 +134,9 @@ func Write(w http.ResponseWriter, s Profile, err error) {
 	var e *Error
 	if !errors.As(err, &e) {
 		e = New(http.StatusInternalServerError, "internal error")
+	}
+	if answer := e.ByProfile[s]; answer != nil {
+		e = answer
 	}
 	// Clients send credentials only after a challenge. A handler that needs
 	// another scheme (the Docker token flow's Bearer) sets its own first.

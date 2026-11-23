@@ -140,10 +140,27 @@ zero bytes, so warning enablement and threshold rearming do not await another
 upload. Durable warnings retain a project incarnation and occurrence identity;
 SMTP delivery cannot promise exactly once after acknowledgement loss.
 
-Refusals use the existing route envelope with HTTP 403 and the generic message
-`project storage quota exceeded`, without owner names, usage totals or an
-authentication challenge. Status and wording are **[I]** choices: primary quota
-documentation establishes refusal but does not establish that wire answer.
+Refusals carry no owner names, usage totals or authentication challenge, in the
+route's envelope. Under Artifactory's envelope a refusal answers 7.x's `413`
+`Project storage quota exceeded. If you require more storage, contact your
+Platform Admin.` In the 7.161.26 sources (SHA-256 `b867422f…`),
+`RepositoryServiceImpl.assertStorageQuota` runs
+`ProjectsService.assertProjectStorageQuota` on every deploy, right after the
+global `quotaConfig` check that answers 413 too; for a hard limit
+`ProjectsUtils.handleStatusUpdateByQuotaLimitType` sets `PROJ_LIMIT_MSG` with
+`SC_REQUEST_TOO_LONG`, and `UploadServiceImpl` sends that status and message
+back ([#1881](https://github.com/weaveplatform/artifactweave/issues/1881)).
+artifactweave refuses on the committed delta, so a checksum deploy, a copy,
+a move, a trash restore and a repository's move into another project (`POST
+/api/repositories/{key}` with a new `projectKey`) can be refused where 7.x,
+which counts the request's `Content-Length` and checks only deploys, would not;
+in Artifactory's envelope they give the same 413 and message **[I]**. Every other envelope keeps `403`
+and `project storage quota exceeded` **[I]**, among them the Access attach route
+(`FORBIDDEN`), Docker (`DENIED`) and pub (`FORBIDDEN`): 7.x's Access server and
+its Docker, pub and other package handlers are not in its open sources, and no
+documentation, release note or KB article gives their answer. The error keeps
+its 403 fields, which read paths classify, and names the Artifactory answer as
+an override for that envelope (`apierror.Error.ByProfile`).
 The [mail-server guide](https://docs.jfrog.com/administration/docs/mail-server-configuration)
 identifies project quota notifications as a mail-server use case. PRJ-04 supplies
 its narrow configuration/delivery path; full descriptor administration remains P12.
