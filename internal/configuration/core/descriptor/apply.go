@@ -92,6 +92,9 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 			res.Unchanged = append(res.Unchanged, "security.anonAccessEnabled")
 		}
 	}
+	if err := planLDAP(ctx, d, p, &res); err != nil {
+		return res, err
+	}
 	if dryRun {
 		return res, nil
 	}
@@ -133,6 +136,9 @@ func applyPlan(ctx context.Context, d Deps, p *Patch, now time.Time, dryRun bool
 			if err != nil {
 				return fmt.Errorf("%s: %w", op.name, err)
 			}
+		}
+		if err := applyLDAP(ctx, d, p); err != nil {
+			return err
 		}
 		// Write whenever requested: another admin may have changed the setting
 		// after the planning read and before this transaction began.

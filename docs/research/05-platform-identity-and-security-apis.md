@@ -474,7 +474,7 @@ padding (`cliSafe`, `internal/auth/token/jwt.go`; decision 0005, "As implemented
 | GET / POST | `/access/api/v1/scim/v2/Users`, `/Groups` | 200 / 201 | read needs admin or `system:identities:r`, write `system:identities:w`; currently 501, P22 ([ADR 0019](decisions/0019-human-authentication-tiers.md)) |
 | GET / PUT / PATCH / DELETE | `/access/api/v1/scim/v2/Users/{id}`, `/Groups/{id}` | 200 / 204 | currently 501, P22 |
 | GET / POST | `/access/api/v1/saml` | 200 | plus `/saml/{name}` and `/saml/general_settings` `{enable,certificateIsPresent}`; currently 501, P21 |
-| GET / POST | `/access/api/v1/ldap/settings` | 200 | plus `/settings/{key}`, `/settings/test`; `/ldap/groups[/{name}]`, `.../refresh`; currently 501, P12 |
+| GET / POST / PUT | `/access/api/v1/ldap/settings` | 200 / **201** | plus `GET` and `DELETE /settings/{key}` (204); see [LDAP connections](#ldap-connections). `/settings/test` (LDAP-02) and `/ldap/groups[/{name}]`, `.../refresh` (LDAP-03) currently 501, P12 |
 | GET / PUT | `/access/api/v1/httpsso`, `/access/api/v1/crowd` | 200 | currently 501, P21 |
 | GET / PUT | `/access/api/v1/config/security/authentication/basic_authentication_enabled` | 200 | `{"enabled":true}` |
 | PUT / PATCH | `/access/api/v1/config/security/password_policy` | **204** | `{uppercase,lowercase,digit,special_char,length,not_match_old}`; PUT overwrites all, PATCH is partial; no body |
@@ -487,6 +487,55 @@ padding (`cliSafe`, `internal/auth/token/jwt.go`; decision 0005, "As implemented
 The global-role action vocabulary (25 values) and the project-role vocabulary (32 values,
 which omits `READ_POLICIES_SECURITY`) are listed in
 [07-webhooks-retention-projects.md](07-webhooks-retention-projects.md).
+
+### LDAP connections
+
+Sources: [create](https://docs.jfrog.com/administration/reference/createldapsettings),
+[update](https://docs.jfrog.com/administration/reference/updateldapsettings),
+[get all](https://docs.jfrog.com/administration/reference/getallldapsettings),
+[get by key](https://docs.jfrog.com/administration/reference/getldapsettingsbykey),
+[delete](https://docs.jfrog.com/administration/reference/deleteldapsettings),
+[LDAP](https://docs.jfrog.com/administration/docs/ldap), the `jfrog/artifactory` provider
+12.11.14 `resource_artifactory_ldap_setting_v2.go` and `resource_artifactory_ldap_setting.go`,
+and the 7.161.26 open source descriptor (`base/config/.../security/ldap/LdapSetting.java`,
+`SearchPattern.java`). Implemented by LDAP-01
+([#1832](https://github.com/weaveplatform/artifactweave/issues/1832)).
+
+| Method | Path | Status | Notes |
+|---|---|---|---|
+| GET | `/access/api/v1/ldap/settings` | 200 | every connection; `[]` when none |
+| GET | `/access/api/v1/ldap/settings/{key}` | 200 | 404 when absent, which the provider reads as removed (it also accepts 400) |
+| POST | `/access/api/v1/ldap/settings` | **201** | the provider posts to the trailing-slash form and checks 201 |
+| PUT | `/access/api/v1/ldap/settings` | 200 | the key is in the body; the provider checks 200 |
+| DELETE | `/access/api/v1/ldap/settings/{key}` | 204 | the provider also accepts 404 |
+
+The body is `{key,enabled,ldap_url,user_dn_pattern,email_attribute,auto_create_user,
+ldap_poisoning_protection,allow_user_to_access_profile,paging_support_enabled,
+search:{search_filter,search_base,search_sub_tree,manager_dn,manager_password}}`. Defaults
+come from `LdapSetting` and the provider's schema: `enabled`, `auto_create_user`,
+`ldap_poisoning_protection`, `paging_support_enabled` and `search_sub_tree` true,
+`email_attribute` `mail`, `allow_user_to_access_profile` false. `search_base` may hold
+several bases separated by `|` (the LDAP page). The provider sends every field, leaves out
+empty search strings and the password, and keeps the password from its state on read, so
+the manager password is write-only: artifactweave never returns it, keeps the stored one
+when a request leaves it out, and seals it in `config_secrets`
+([ADR 0017](decisions/0017-sealed-columns-and-master-key.md)). Every operation needs an
+administrator, an administrator's token included.
+
+Local rules, each **[I]** and listed on [#216](https://github.com/weaveplatform/artifactweave/issues/216):
+
+- `PUT` replaces the connection from the defaults, keeping only an omitted password, and
+  answers 404 for an unknown key; a second `POST` of a key answers 400.
+- An explicit `""` password clears it; a password needs `manager_dn`, and clearing
+  `manager_dn` drops the stored password.
+- Validation: the key is not empty and has no `/` or control character; `ldap_url` is
+  `ldap://` or `ldaps://` with a host, no credentials, query or fragment, and any path is a
+  DN; a connection needs `user_dn_pattern` or `search_filter`, each containing `{0}`;
+  DNs parse, the filter's parentheses balance, and `email_attribute` is an attribute name.
+- Reads return every field, with `""` for an empty string.
+
+The descriptor's `security.ldapSettings` writes the same connections
+([research 06](06-system-configuration-and-descriptor.md#security)).
 
 ## Authentication accepted on every endpoint
 

@@ -43,8 +43,9 @@ type Deps struct {
 	Repositories artifactsapi.Repositories
 	// Layouts checks each repoLayouts entry before it is stored.
 	Layouts artifactsapi.Layouts
-	// Access is the access module's API, through whose AnonymousAccess the
-	// descriptor writes the security section's anonymous access switch.
+	// Access is the access module's API, through whose AnonymousAccess and
+	// LDAP the descriptor writes the security section's anonymous access
+	// switch and LDAP connections.
 	Access accessapi.API
 	// Settings are the configuration options of the module's code, from
 	// app/config's Configuration, which Settings returns.
@@ -78,6 +79,7 @@ func New(d Deps) (*Module, error) {
 		Layouts:         d.Layouts,
 		Configs:         configs{st: d.Store},
 		AnonymousAccess: d.Access.AnonymousAccess,
+		LDAP:            d.Access.LDAP,
 		Projects:        d.Access.Projects,
 		Authenticator:   d.Access.Authenticator,
 		Authorizer:      d.Access.Authorizer,

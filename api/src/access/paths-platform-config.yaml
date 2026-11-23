@@ -309,34 +309,38 @@ components:
           description: Optional within this object. DN of the account the server binds as to run searches.
           type: string
         manager_password:
-          description: Optional within this object. Password of manager_dn. Stored sealed (decision 0017) and never
-            returned.
+          description: Optional within this object. Password of manager_dn, which it needs. Stored sealed (decision
+            0017) and never returned. A replace that leaves it out keeps the stored password, an empty value clears
+            it, and a connection whose manager_dn is empty keeps none.
           type: string
           writeOnly: true
         search_base:
           description: Optional within this object. DN under which the search starts, relative to the connection's
-            base DN. Empty searches from the base DN.
+            base DN. Empty searches from the base DN; several DNs are separated by a pipe (|).
           type: string
         search_filter:
           description: Optional within this object. LDAP filter that selects the user's entry, with {0} standing
-            for the username, for example (uid={0}).
+            for the username, for example (uid={0}). It must contain {0} and balance its parentheses.
           type: string
         search_sub_tree:
           description: Optional within this object. Whether the search descends into sub-trees of search_base.
+            Defaults to true.
           type: boolean
       type: object
     LdapSettings:
-      description: One LDAP server connection used to authenticate users. manager_password is never returned.
+      description: One LDAP server connection used to authenticate users. Every field is returned except
+        manager_password, which never is. The descriptor's security.ldapSettings names the same connections.
       properties:
         allow_user_to_access_profile:
           description: Optional within this object. Whether users created through this connection may open their
-            own profile.
+            own profile. Defaults to false.
           type: boolean
         auto_create_user:
-          description: Optional within this object. Whether a first successful login creates a local user.
+          description: Optional within this object. Whether a first successful login creates a local user. Defaults
+            to true.
           type: boolean
         email_attribute:
-          description: Optional within this object. Attribute that holds the user's email address, for example mail.
+          description: Optional within this object. Attribute that holds the user's email address. Defaults to mail.
           type: string
         enabled:
           description: Optional within this object. Whether logins are checked against this server.
@@ -346,14 +350,15 @@ components:
           type: string
         ldap_poisoning_protection:
           description: Optional within this object. Whether attributes returned by the server are checked to defend
-            against LDAP response poisoning.
+            against LDAP response poisoning. Defaults to true.
           type: boolean
         ldap_url:
-          description: Optional within this object. Server URL including the base DN, for example ldap://ldap.example.com:389/dc=example,dc=com.
+          description: Optional within this object. ldap:// or ldaps:// server URL including the base DN, for
+            example ldap://ldap.example.com:389/dc=example,dc=com. It must not carry credentials.
           type: string
         paging_support_enabled:
           description: Optional within this object. Whether searches request paged results, for servers that cap
-            result size.
+            result size. Defaults to true.
           type: boolean
         search:
           allOf:
@@ -362,21 +367,24 @@ components:
             does not match.
         user_dn_pattern:
           description: Optional within this object. Pattern that builds a user's DN from the username, with {0}
-            standing for the username, for example uid={0},ou=people.
+            standing for the username, for example uid={0},ou=people. It must contain {0}. A connection needs
+            user_dn_pattern, search.search_filter or both.
           type: string
       type: object
     LdapSettingsCreate:
-      description: A new LDAP connection. Same fields as LdapSettings; key and ldap_url are required.
+      description: A new LDAP connection. Same fields as LdapSettings; key and ldap_url are required, and a field
+        left out takes its default.
       properties:
         allow_user_to_access_profile:
           description: Optional within this object. Whether users created through this connection may open their
-            own profile.
+            own profile. Defaults to false.
           type: boolean
         auto_create_user:
-          description: Optional within this object. Whether a first successful login creates a local user.
+          description: Optional within this object. Whether a first successful login creates a local user. Defaults
+            to true.
           type: boolean
         email_attribute:
-          description: Optional within this object. Attribute that holds the user's email address, for example mail.
+          description: Optional within this object. Attribute that holds the user's email address. Defaults to mail.
           type: string
         enabled:
           default: true
@@ -388,14 +396,15 @@ components:
           type: string
         ldap_poisoning_protection:
           description: Optional within this object. Whether attributes returned by the server are checked to defend
-            against LDAP response poisoning.
+            against LDAP response poisoning. Defaults to true.
           type: boolean
         ldap_url:
-          description: Required within this object. Server URL including the base DN, for example ldap://ldap.example.com:389/dc=example,dc=com.
+          description: Required within this object. ldap:// or ldaps:// server URL including the base DN, for
+            example ldap://ldap.example.com:389/dc=example,dc=com. It must not carry credentials.
           type: string
         paging_support_enabled:
           description: Optional within this object. Whether searches request paged results, for servers that cap
-            result size.
+            result size. Defaults to true.
           type: boolean
         search:
           allOf:
@@ -404,7 +413,8 @@ components:
             does not match.
         user_dn_pattern:
           description: Optional within this object. Pattern that builds a user's DN from the username, with {0}
-            standing for the username, for example uid={0},ou=people.
+            standing for the username, for example uid={0},ou=people. It must contain {0}. A connection needs
+            user_dn_pattern, search.search_filter or both.
           type: string
       required:
       - key
@@ -2168,8 +2178,8 @@ paths:
       x-cost: expensive
   /api/v1/ldap/settings:
     get:
-      description: Returns every LDAP server connection that logins are checked against. Manager passwords are never
-        returned. Requires a platform admin.
+      description: Returns every LDAP server connection that logins are checked against, by key. Manager passwords
+        are never returned. Requires a platform admin.
       operationId: getAllLdapSettings
       responses:
         '200':
@@ -2245,7 +2255,9 @@ paths:
       - body:/key
       x-cost: expensive
     put:
-      description: Replaces the connection whose key matches the body's key. Requires a platform admin.
+      description: Replaces the connection whose key matches the body's key; a field left out takes its default,
+        except manager_password, which is kept. Answers 404 when no connection has the key. Requires a platform
+        admin.
       operationId: updateLdapSettings
       requestBody:
         content:
@@ -2279,6 +2291,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No connection has the body's key.
       summary: Replace an LDAP connection
       tags:
       - ldap

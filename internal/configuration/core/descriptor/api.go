@@ -47,6 +47,10 @@ type Deps struct {
 	// AnonymousAccess reads and writes the security section's anonymous
 	// access switch.
 	AnonymousAccess accessapi.AnonymousAccess
+	// LDAP checks and writes the security section's LDAP connections and
+	// reads them for the export. A descriptor that names connections is
+	// refused without it; an export without it has no ldapSettings.
+	LDAP accessapi.LDAPSettings
 	// Projects serializes planning and publication before repository locks,
 	// including a descriptor that also changes anonymous credential policy.
 	Projects accessapi.Projects

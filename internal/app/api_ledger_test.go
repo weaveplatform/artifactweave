@@ -742,6 +742,7 @@ var apiReviewCollected = map[string]string{
 	"GET /access/api/v1/environments":                                                  "administrator-defined environments, which the store reads whole",
 	"GET /access/api/v1/oidc":                                                          "administrator OIDC configurations, which the store reads whole",
 	"GET /access/api/v1/oidc/{provider_name}/identity_mappings":                        "one provider's identity mappings, administrator configuration the store reads whole",
+	"GET /access/api/v1/ldap/settings":                                                 "administrator LDAP connections, read whole after the authority recheck in one guarded transaction",
 	"GET /access/api/v1/roles":                                                         "administrator-defined roles, which the store reads whole",
 	"GET /access/api/v1/projects":                                                      "administrator-defined projects, filtered against current project administration under one guarded metadata snapshot",
 	"GET /access/api/v1/projects/{projectKey}/environments":                            "one project's configured environments, bounded by its environment limit and read whole",
