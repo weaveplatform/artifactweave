@@ -96,7 +96,10 @@
 // PRJ-04 adds the documented singleton mailServer settings for quota delivery,
 // with its password separated before persistence and guarded configuration reads.
 // LDAP-01 adds security.ldapSettings through access's LDAPSettings, with the
-// connections in the XML export's security element.
+// connections in the XML export's security element. CFG-02 adds urlBase and
+// the reverse proxy behind configuration/api.WebServer: its writes build a
+// Patch and Apply it under the guard after a current administrator recheck,
+// and the export writes both in artifactory.xsd's order.
 //
 // # Testing
 //
@@ -120,4 +123,8 @@
 //   - ldap_test.go: every ldapSettings field mapped, outcomes through
 //     access's binding with a dry run and a second apply, a missing binding,
 //     planning and write failures, and the export's element order.
+//   - webserver_test.go: urlBase through Parse, PUT and PATCH with the CDN
+//     rule and the cached effective value; reverse proxy writes, reads with
+//     current authority, the snippet, refusals that store nothing, rollback,
+//     corrupt stored documents and the export's element order.
 package descriptor

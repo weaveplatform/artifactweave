@@ -89,7 +89,8 @@ Authorization, TLS client identity, cookies and destination grants; with a proxy
 domain the retry uses the NT principal name `DOMAIN\user`. Source/bytecode
 registration and local restrictions are recorded in
 [research 06](../06-system-configuration-and-descriptor.md#proxy-redirect-credential-contract).
-Replication's consumer and broader proxy configuration remain separate under #1848.
+P12 #1848 applies the NTLMv2 helper to single-replication push and accepts its valid
+redirected-host lists without changing its own endpoint or redirect rules.
 Proxy service strings from the descriptor/provider and historical stored lists
 share one read decoder. String separators follow the pinned Artifactory source;
 explicit selection and platform-default `jfrt` filtering retain their existing

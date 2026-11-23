@@ -57,70 +57,81 @@ components:
       type: object
     ReverseProxyConfig:
       description: Reverse proxy settings, stored as the reverseProxies section of the descriptor. Both sslPort
-        and httpsPort are accepted and returned.
+        and httpsPort are accepted and returned. A POST replaces the stored settings whole; an omitted field takes
+        its descriptor default.
       properties:
         artifactoryAppContext:
-          description: Optional within this object. The context path under which the proxy reaches the registry.
-            The server always serves under `artifactory`; the value is stored as sent.
+          description: Optional within this object. The context path under which the proxy reaches the registry,
+            as URL path segments. The server always serves under `artifactory`; the value is stored as sent and
+            defaults to empty.
           type: string
         artifactoryPort:
-          description: Optional within this object. The listener port the proxy forwards to. When omitted, the server
-            fills it from its own listen address.
+          description: Optional within this object. The listener port the proxy forwards to, 1 to 65535; defaults
+            to 8081.
           type: integer
         artifactoryServerName:
-          description: Optional within this object. The host the proxy forwards to, usually localhost.
+          description: Optional within this object. The host the proxy forwards to, usually localhost; a host name,
+            an IPv4 address or a bracketed IPv6 address. Required for NGINX and APACHE.
           type: string
         dockerReverseProxyMethod:
-          description: Optional within this object. How Docker clients address repositories. REPOPATHPREFIX is the
-            native method; SUBDOMAIN enables host matching; PORTPERREPO is accepted but not served; DIRECT is treated
-            like REPOPATHPREFIX.
+          description: Optional within this object. How Docker clients address repositories through the proxy;
+            defaults to SUBDOMAIN. REPOPATHPREFIX is the native method; under SUBDOMAIN the nginx snippet rewrites
+            <repo>.<server name>/v2 to the repository's path. PORTPERREPO is refused with 400 because no port per
+            repository is offered.
           enum:
           - SUBDOMAIN
           - REPOPATHPREFIX
           - PORTPERREPO
-          - DIRECT
           type: string
         httpPort:
-          description: Optional within this object. The plain HTTP listener port.
+          description: Optional within this object. The plain HTTP listener port, 1 to 65535; defaults to 80.
           type: integer
         httpsPort:
-          description: Optional within this object. The TLS listener port. Alias of sslPort.
+          description: Optional within this object. The TLS listener port, 1 to 65535. Alias of sslPort; when both
+            are sent they must agree. Defaults to 443.
           type: integer
         key:
-          description: Optional within this object. The configuration name. Stored as sent; defaults to nginx.
+          description: Optional within this object. The configuration name, an XML name. Stored as sent; defaults
+            to nginx.
           type: string
         publicAppContext:
-          description: Optional within this object. The context path clients use. Must match artifactoryAppContext
-            unless the proxy rewrites paths.
+          description: Optional within this object. The context path clients use, as URL path segments. A POST
+            without it is refused.
           type: string
         serverName:
-          description: Optional within this object. The public host name the proxy answers for.
+          description: Optional within this object. The public host name the proxy answers for. Required for NGINX
+            and APACHE.
           type: string
         serverNameExpression:
-          description: Optional within this object. A wildcard host expression for the Docker subdomain method,
-            for example *.example.com.
+          description: Optional within this object. A host name or wildcard host expression for the Docker subdomain
+            method, for example *.example.com; the snippet matches repository subdomains under it, or under serverName
+            when it is empty.
           type: string
         sslCertificate:
-          description: Optional within this object. Path to the TLS certificate on the proxy host.
+          description: Optional within this object. Absolute path to the TLS certificate on the proxy host, without
+            spaces or nginx syntax characters. Required with useHttps for NGINX and APACHE. Administrators only.
           type: string
         sslKey:
-          description: Optional within this object. Path to the TLS private key on the proxy host.
+          description: Optional within this object. Absolute path to the TLS private key on the proxy host, without
+            spaces or nginx syntax characters. Required with useHttps for NGINX and APACHE. Administrators only.
           type: string
         sslPort:
           description: Optional within this object. The TLS listener port. Alias of httpsPort; the response carries
             both.
           type: integer
         useHttp:
-          description: Optional within this object. Whether the proxy listens on plain HTTP.
+          description: Optional within this object. Whether the proxy listens on plain HTTP; defaults to true.
           type: boolean
         useHttps:
-          description: Optional within this object. Whether the proxy listens on TLS.
+          description: Optional within this object. Whether the proxy listens on TLS; defaults to false.
           type: boolean
         webServerType:
-          description: Optional within this object. The proxy software. Only NGINX renders a snippet.
+          description: Optional within this object. The proxy software; a POST without it is refused. DIRECT
+            is what the platform_reverse_proxy resource sends for no proxy. Only NGINX renders a snippet.
           enum:
           - NGINX
           - APACHE
+          - DIRECT
           type: string
       type: object
     StatusMessage:
@@ -472,29 +483,31 @@ paths:
       x-cost: expensive
   /api/system/configuration/baseUrl:
     put:
-      description: 'Not implemented; answers 501. It would set the urlBase section of the descriptor: the scheme,
-        host and optional path prefix that embedded links use when no `X-JFrog-Override-Base-Url` or `X-Forwarded-*`
-        header is present (decision 0002). An empty body would clear it, after which links derive from the request.
-        Admin only.'
+      description: 'Sets the urlBase section of the descriptor: the scheme, host and optional path prefix that
+        embedded links use when no `X-JFrog-Override-Base-Url` header is present (decision 0002). While set it takes
+        precedence over the installation''s base_url. A blank body clears it, after which links use base_url or derive
+        from the request. Admin only.'
       operationId: updateCustomUrlBase
       requestBody:
         content:
           text/plain:
             schema:
-              description: An absolute http or https URL without a trailing slash.
+              description: An absolute http or https URL without user information, query or fragment, or blank.
               type: string
-        description: The URL as plain text, for example https://artifacts.example.com.
+        description: The URL as plain text, for example https://artifacts.example.com. Surrounding whitespace is
+          ignored.
         required: true
       responses:
         '200':
           content:
             text/plain:
               schema:
-                description: A confirmation line echoing the stored value.
+                description: URL base has been successfully updated to "<url>".
                 type: string
-          description: The base URL was stored.
+          description: The base URL was stored or cleared.
         '400':
-          description: The body is not an absolute http or https URL.
+          description: The body is not an absolute http or https URL, carries user information, a query or a fragment,
+            or names a host that a configured CDN domain sits under.
         '401':
           description: Rejected credentials.
         '403':
@@ -504,17 +517,18 @@ paths:
       - system
       - handwritten
       x-handwritten: true
-      x-tier: stub
       x-idempotency: natural
       x-idempotency-natural:
       - route
       x-cost: expensive
   /api/system/configuration/reverseProxy/nginx:
     get:
-      description: 'Renders an nginx server block from the stored reverse proxy configuration: the server name,
-        the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service
-        prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered;
-        APACHE answers 400. Admin only.'
+      description: 'Renders an nginx fragment for the http context from the stored reverse proxy configuration:
+        the certificate paths when HTTPS is on, and one server block with the enabled listeners, the server names, one
+        location that proxies to artifactoryServerName:artifactoryPort with the `X-JFrog-Override-Base-Url` header and,
+        for the Docker subdomain method, the rewrite of <repo>.<server name>/v1 and /v2 to /artifactory/api/docker/<repo>/.
+        Returning the snippet installs nothing. Only the NGINX web server type is rendered; APACHE and DIRECT answer
+        400. Admin only.'
       operationId: getReverseProxySnippet
       responses:
         '200':
@@ -525,6 +539,10 @@ paths:
                 type: string
           description: The snippet.
         '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           description: No reverse proxy configuration is stored or its type is not NGINX.
         '401':
           description: Rejected credentials.
@@ -537,12 +555,14 @@ paths:
       x-cost: ordinary
   /api/system/configuration/webServer:
     get:
-      description: Returns the reverse proxy settings. Without stored settings, the response describes this server.
+      description: Returns the reverse proxy settings. Stored settings are returned as posted, with both sslPort
+        and httpsPort carrying the same value. Without stored settings, the response describes this server.
         dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName
-        is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both
-        sslPort and httpsPort with the same value. An administrator gets every field; any other signed-in user gets
+        is the configured base URL's host (the stored urlBase, else base_url, else the request's) and, with subdomains,
+        serverNameExpression is its wildcard. An administrator gets every field; any other signed-in user gets
         dockerReverseProxyMethod and the port fields (artifactoryPort, httpPort, httpsPort, sslPort, useHttp, useHttps)
-        that are set, and nothing else. Anonymous callers are refused.
+        that are set, and nothing else; administrator authority is rechecked when the settings are read. Anonymous
+        callers are refused.
       operationId: getReverseProxyConfiguration
       responses:
         '200':
@@ -556,16 +576,17 @@ paths:
         '403':
           description: Not returned.
         '404':
-          description: No reverse proxy configuration has been stored yet.
+          description: Not returned; without stored settings the response describes this server.
       summary: Read the reverse proxy configuration
       tags:
       - system
       x-idempotency: safe
       x-cost: ordinary
     post:
-      description: Creates or replaces the single reverse proxy configuration. The document is stored as the reverseProxies
-        section of the descriptor and drives the nginx snippet and the Docker access method. Either sslPort or httpsPort
-        may be sent; when both are present they must agree. Admin only.
+      description: Creates or replaces the single reverse proxy configuration through the descriptor service, which
+        validates it whole and writes it in one transaction. The document is stored as the reverseProxies section of
+        the descriptor and drives the nginx snippet and the XML export; it does not change how this server routes
+        Docker requests. Either sslPort or httpsPort may be sent; when both are present they must agree. Admin only.
       operationId: updateReverseProxyConfiguration
       requestBody:
         content:
@@ -582,7 +603,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: A required field is missing, an enum value is unknown, or sslPort and httpsPort disagree.
+          description: A required field is missing, an enum value is unknown, a port is outside 1 to 65535, a value
+            would change the nginx snippet's syntax, or sslPort and httpsPort disagree. Nothing is stored.
         '401':
           description: Rejected credentials.
         '403':

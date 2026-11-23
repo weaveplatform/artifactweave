@@ -460,12 +460,12 @@ security:
 mailServer:
   host: smtp.example
 backups: null
-urlBase: https://example.test
+offlineMode: false
 `
 	_, err := Parse([]byte(doc), noEnv)
-	want := "sections not supported: backups, urlBase; " +
+	want := "sections not supported: backups, offlineMode; " +
 		"the supported sections are localRepositories, remoteRepositories, virtualRepositories, federatedRepositories, " +
-		"proxies, propertySets, repoLayouts, downloadRedirectConfig, mailServer, security"
+		"proxies, propertySets, repoLayouts, downloadRedirectConfig, mailServer, security, urlBase"
 	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), want) {
 		t.Fatalf("%v", err)
 	}

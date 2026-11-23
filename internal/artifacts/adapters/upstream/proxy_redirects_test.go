@@ -12,13 +12,13 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"unicode/utf8"
 
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/upstream/fakeupstream"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote"
 	"github.com/weaveplatform/artifactweave/internal/kernel/wire"
+	"github.com/weaveplatform/artifactweave/internal/platform/outbound"
 )
 
 func redirectProxy(t *testing.T, target *fakeupstream.Server, others ...*fakeupstream.Server) *fakeupstream.Server {
@@ -199,40 +199,6 @@ func TestAccResolverProxyRedirectCredentials(t *testing.T) {
 	}
 }
 
-func TestUnitProxyRedirectHosts(t *testing.T) {
-	for _, raw := range []string{"Example.COM. example.com,127.0.0.1;::1\nother.example", "", ", ; \n"} {
-		hosts, err := proxyRedirectHosts(raw)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if raw != "" && strings.Contains(raw, "Example") && (len(hosts) != 5 || !hosts["example.com."] || !hosts["example.com"] || !hosts["::1"]) {
-			t.Fatal(hosts)
-		}
-	}
-	for _, raw := range []string{"*", "*.example.com", "https://example.com", "example.com:8080", "user@example.com", "example.com/path", "a\tb", "a\rb", "a..b", "-a.example", "a-.example", "a_b", "[::1]", "bad%2eexample", "a?b", "a#b", "a\\b", strings.Repeat("a", 64), strings.Repeat("a.", 127) + "a"} {
-		t.Run(strconv.Quote(raw), func(t *testing.T) {
-			if _, err := proxyRedirectHosts(raw); !errors.Is(err, remote.ErrConfiguration) {
-				t.Fatal("accepted malformed credential host")
-			}
-		})
-	}
-	for c := rune(0); c <= ' '; c++ {
-		hosts, err := proxyRedirectHosts(string(c) + "example.com" + string(c))
-		if err != nil || !hosts["example.com"] || len(hosts) != 1 {
-			t.Errorf("canonical edge trim rejected U+%04X", c)
-		}
-	}
-	for _, c := range []rune{'\u0085', '\u00a0', '\u1680', '\u2000', '\u2028', '\u2029', '\u202f', '\u205f', '\u3000'} {
-		for _, raw := range []string{string(c) + "example.com", "example.com" + string(c)} {
-			t.Run(strconv.Quote(raw), func(t *testing.T) {
-				if _, err := proxyRedirectHosts(raw); !errors.Is(err, remote.ErrConfiguration) {
-					t.Fatal("Unicode whitespace became a credential grant")
-				}
-			})
-		}
-	}
-}
-
 func TestAccResolverProxyRedirectUnicodeEdges(t *testing.T) {
 	target := fakeupstream.New(t, fakeupstream.Options{Auth: fakeupstream.Auth{Username: "proxy-user", Password: "proxy-secret"}})
 	target.Set("/artifact", fakeupstream.Resource{Body: []byte("protected artifact")})
@@ -277,28 +243,6 @@ func TestAccResolverProxyRedirectUnicodeEdges(t *testing.T) {
 			}
 			if !errors.Is(err, remote.ErrConfiguration) || target.Count("", "") != beforeTarget || proxy.Count("", "") != beforeProxy {
 				t.Fatal("malformed Unicode host was not refused before network I/O")
-			}
-		})
-	}
-}
-
-func TestUnitProxyRedirectUnicodeASCIIKeys(t *testing.T) {
-	// The source UnicodeData/SpecialCasing audit finds Kelvin as the only
-	// non-ASCII rune whose full root lowercase becomes an ASCII host label.
-	// This also refuses broader Fold/IDNA aliases such as long s and ligatures.
-	for r := rune(utf8.RuneSelf); r <= utf8.MaxRune; r++ {
-		want := ""
-		if r == '\u212a' {
-			want = "k.example"
-		}
-		if got := proxyRedirectHost(string(r) + ".example"); got != want {
-			t.Fatalf("U+%04X credential key %q, want %q", r, got, want)
-		}
-	}
-	for _, host := range []string{"A\u0130.example", "I\u0307.example", "\u0130\u0307.example", "OS\u03a3.example"} {
-		t.Run(strconv.Quote(host), func(t *testing.T) {
-			if proxyRedirectHost(host) != "" {
-				t.Fatalf("non-ASCII full lowercase became a host grant: %q", host)
 			}
 		})
 	}
@@ -418,7 +362,7 @@ func TestUnitProxyRedirectLiteralIPKeys(t *testing.T) {
 		{"::ffff:127.0.0.1", "http://[::ffff:7f00:1]/artifact", false},
 	} {
 		t.Run(tc.listed+"/"+tc.target, func(t *testing.T) {
-			hosts, err := proxyRedirectHosts(tc.listed)
+			hosts, err := outbound.ProxyRedirectHosts(tc.listed)
 			if err != nil {
 				t.Fatal(err)
 			}

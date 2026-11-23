@@ -52,6 +52,8 @@ retains no authentication packet in evidence. Domain/workstation or password cha
 replace authenticated idle connections; active retrieval publication retains the
 existing source-revision fence. SQLite and PostgreSQL tests verify sealed storage,
 rotation, denial with stale credentials and a newly configured proxy identity.
+Single-replication push (#1848) reads the same sealed password into its keyed transport
+revision, together with the domain and workstation, and adds no stored material.
 
 ## Sensitive repository header checkpoint (#652)
 

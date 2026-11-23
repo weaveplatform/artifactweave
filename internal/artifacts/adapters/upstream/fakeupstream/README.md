@@ -76,6 +76,8 @@ protocol's MD4/HMAC-MD5 primitives, without the production NTLM dependency. The 
 `Negotiations` records retain only message kinds, connection IDs, names and outcomes;
 no password, proof, hash or packet is retained. Fault options cover malformed
 challenges, oversized bodies, interruption, closed connections and cancellation.
-Only explicitly supplied target fixtures can be tunneled.
+Only explicitly supplied target fixtures can be tunneled. `NTLMOptions.Origins`
+adds explicitly named owned destinations that are not fixture servers, such as the
+separate application process a single-replication push writes to.
 `NTLMOptions.Listener`, like `NewProxyOn`, lets the proxy share a port with a
 destination on another loopback address for redirected-credential scope tests.

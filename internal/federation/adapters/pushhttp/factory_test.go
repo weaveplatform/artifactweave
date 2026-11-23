@@ -123,15 +123,19 @@ func TestUnitTargetConnectionResolvesCurrentPolicyWithoutNetwork(t *testing.T) {
 	}
 }
 
-func TestUnitTargetProxySelectionAndUnsupportedPolicy(t *testing.T) {
+func TestUnitTargetProxySelectionAndInvalidPolicy(t *testing.T) {
 	for _, test := range []struct {
 		name string
 		edit func(*wire.ProxyConfiguration)
 	}{
 		{"invalid port", func(p *wire.ProxyConfiguration) { p.Port = 0 }},
-		{"NTLM domain", func(p *wire.ProxyConfiguration) { p.Domain = "domain" }},
-		{"NTLM host", func(p *wire.ProxyConfiguration) { p.NTHost = "host" }},
-		{"forwarded credentials", func(p *wire.ProxyConfiguration) { p.RedirectedToHosts = "other.invalid" }},
+		{"NTLM without username", func(p *wire.ProxyConfiguration) { p.Domain = "domain" }},
+		{"NTLM ambiguous account", func(p *wire.ProxyConfiguration) { p.Username, p.Domain = `OTHER\user`, "domain" }},
+		{"NTLM qualified domain", func(p *wire.ProxyConfiguration) { p.Username, p.Domain = "user", `domain\user` }},
+		{"NTLM control workstation", func(p *wire.ProxyConfiguration) { p.Username, p.NTHost = "user", "host\r\nX: secret" }},
+		{"redirected wildcard", func(p *wire.ProxyConfiguration) { p.RedirectedToHosts = "*.invalid" }},
+		{"redirected URL", func(p *wire.ProxyConfiguration) { p.RedirectedToHosts = "https://other.invalid" }},
+		{"redirected port", func(p *wire.ProxyConfiguration) { p.RedirectedToHosts = "other.invalid:8080" }},
 		{"embedded password", func(p *wire.ProxyConfiguration) { p.Host = "http://user:secret@proxy.invalid" }},
 		{"path", func(p *wire.ProxyConfiguration) { p.Host = "http://proxy.invalid/path" }},
 		{"query", func(p *wire.ProxyConfiguration) { p.Host = "http://proxy.invalid?password=secret" }},
@@ -152,7 +156,7 @@ func TestUnitTargetProxySelectionAndUnsupportedPolicy(t *testing.T) {
 			target.Proxy = "explicit"
 			err = store.Tx(t.Context(), func(ctx context.Context) error { _, err := factory.Connection(ctx, target); return err })
 			if !errors.Is(err, outbound.ErrConfiguration) || strings.Contains(err.Error(), "secret") {
-				t.Fatal("unsupported proxy admitted or leaked", err)
+				t.Fatal("invalid proxy admitted or leaked", err)
 			}
 		})
 	}
@@ -401,12 +405,12 @@ func TestUnitTargetProxyServicesDocuments(t *testing.T) {
 				if explicit {
 					target.Proxy = "services"
 				}
-				u, err := factory.proxy(t.Context(), target)
+				selected, err := factory.proxy(t.Context(), target)
 				if tc.invalid {
 					if !errors.Is(err, outbound.ErrConfiguration) || strings.Contains(err.Error(), "private-value") {
 						t.Fatal("invalid services admitted or disclosed", err)
 					}
-				} else if err != nil || (u != nil) != (explicit || tc.selected) {
+				} else if err != nil || (selected.url != nil) != (explicit || tc.selected) {
 					t.Fatal("proxy services selection changed", err)
 				}
 			}

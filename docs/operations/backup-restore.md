@@ -25,7 +25,7 @@ blob store (decision [0041](../research/decisions/0041-terraform-backend.md)). K
 secret manager that provides `ARTIFACTWEAVE_MASTER_KEY`. `artifactweave keys rotate` re-seals
 both the sealed columns and those states under the new key, so `master_key_previous` can go
 once it has run. A sealed state copied to another instance opens only under the same master
-key. Cross-instance repository replication remains planned in P11, with advanced and
+key. P11 implements single push and pull repository replication, with advanced and
 external interoperability in P37; the intended backend
 replication contract requires `encryptStates` off, as 7.x does. Retain the key versions
 needed by older backups even after retiring them from the running instance.

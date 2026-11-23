@@ -144,8 +144,11 @@ file-info `uri` and `downloadUri`, repository `url`) come from one resolver in
 [HTTP settings](https://docs.jfrog.com/installation/docs/http-settings) page documents the
 `X-JFrog-Override-Base-Url` header and the Custom Base URL but not their precedence, so the
 order is **[I]**, unconfirmed for 7.x): `X-JFrog-Override-Base-Url`, then the
-configured `base_url` (Artifactory's `urlBase`), then `X-Forwarded-Proto`, `X-Forwarded-Host`
-and `X-Forwarded-Port`, then the request. A configured `base_url` is the operator naming the
+configured base URL, then `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Port`, then
+the request. The configured base URL is the descriptor's `urlBase` while an administrator has
+stored one (`PUT /api/system/configuration/baseUrl`, P12 CFG-02), else the installation's
+`base_url`; the middleware reads it once per request, so a stored change applies from the next
+request. A configured `base_url` is the operator naming the
 public URL, so no header the operator does not control overrides it; before #313 the forwarded
 headers came first, which let a client that could set `X-Forwarded-Host` choose the Docker
 token realm other clients send credentials to. A middleware puts the resolved base into the
@@ -154,7 +157,8 @@ proxy; the resolver takes the first entry, the client-facing hop, ignores an emp
 entry, and accepts only `http` or `https` as the forwarded scheme and a number as the
 forwarded port (#249, research 17). The Docker subdomain method still reads the host the
 client addressed (the first `X-Forwarded-Host` entry, else `Host`) to pick the repository,
-but the URLs it answers with take their host from the resolved base URL. The legacy
+under the configured base URL's host, but the URLs it answers with take their host from the
+resolved base URL. The legacy
 `X-Artifactory-Override-Base-Url` is not honoured (DV-037), and a configured `base_url` is
 used as written rather than with the request's scheme (DV-038).
 
