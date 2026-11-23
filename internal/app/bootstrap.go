@@ -86,6 +86,7 @@ func configurationOver(st *appsql.Store) configapi.API {
 		Security:        access.SecurityPoliciesOf(st),
 		StoragePolicies: artifacts.StoragePoliciesOf(st),
 		Projects:        access.ProjectsOf(st),
+		Capacity:        st.StorageCapacity(),
 	})
 }
 

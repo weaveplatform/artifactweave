@@ -162,7 +162,7 @@ func (p *Policy) fetch(
 	u := p.upload(q, permit, opts.Revision, token, res, false)
 	committed, err := p.cache(ctx, q, permit, opts, u)
 	if err != nil {
-		if errors.Is(err, kernel.ErrStorageQuota) {
+		if kernel.StorageRefusal(err) {
 			// Retaining a copy is optional for this read. Quota admission has
 			// already rolled its metadata back; do not turn that local refusal
 			// into an upstream failure or disclose another caller's shared

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -236,5 +237,20 @@ func TestUnitSummarizeFailures(t *testing.T) {
 		) {
 			t.Errorf("%s: %v", op, err)
 		}
+	}
+}
+
+func TestUnitCapacityMeasuresTheSummaryVolume(t *testing.T) {
+	if usage.CapacityOf(usage.Location{Type: "s3-storage-v3-direct", Directory: usage.NoFilesystem}) != nil {
+		t.Fatal("object storage reported a measurable capacity")
+	}
+	dir := t.TempDir()
+	c := usage.CapacityOf(usage.Location{Root: dir})
+	total, used, err := c.Measure(t.Context())
+	if err != nil || total <= 0 || used < 0 || used > total {
+		t.Fatal("local volume capacity", total, used, err)
+	}
+	if _, _, err := (&usage.Capacity{Root: filepath.Join(dir, "missing")}).Measure(t.Context()); err == nil {
+		t.Fatal("an unreadable volume was measured")
 	}
 }

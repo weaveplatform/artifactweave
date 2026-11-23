@@ -512,7 +512,19 @@ func TestUnitIdentity(t *testing.T) {
 	if again, _ := id.AutoJoinGroups(ctx); again[0] != "everyone" {
 		t.Error("changing the returned groups changed the fake's")
 	}
+	id.Users["root"] = accessapi.UserInfo{Name: "root", Admin: true, Groups: []string{"ops"}}
+	admins, err := id.Administrators(ctx)
+	if err != nil || len(admins) != 1 || admins[0].Name != "root" {
+		t.Fatalf("Administrators = %+v, %v; want root", admins, err)
+	}
+	admins[0].Groups[0] = "changed"
+	if again, _ := id.Administrators(ctx); again[0].Groups[0] != "ops" {
+		t.Error("changing a returned administrator's groups changed the fake's")
+	}
 	id.Err = errBoom
+	if a, err := id.Administrators(ctx); a != nil || err != errBoom { //nolint:errorlint // Err, as it is
+		t.Errorf("failing Administrators = %v, %v; want nil, Err", a, err)
+	}
 	if _, err := id.User(ctx, "ann"); err != errBoom { //nolint:errorlint // Err, as it is
 		t.Errorf("failing User = %v, want Err", err)
 	}

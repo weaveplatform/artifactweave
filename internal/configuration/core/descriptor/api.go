@@ -71,6 +71,9 @@ type Deps struct {
 	// do not use these read-authority contracts.
 	Authenticator accessapi.Authenticator
 	Authorizer    accessapi.Authorizer
+	// Capacity is the hot blob store's measurable volume, which an enabled
+	// quotaConfig needs; nil refuses enabling it.
+	Capacity configapi.StorageCapacity
 	// Settings supply the installation's base_url, which a stored urlBase
 	// overrides, and the CDN hosts a urlBase may not sit above.
 	Settings configapi.Settings

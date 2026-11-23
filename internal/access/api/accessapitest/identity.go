@@ -3,6 +3,7 @@ package accessapitest
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
@@ -50,4 +51,20 @@ func (i *Identity) AutoJoinGroups(context.Context) ([]string, error) {
 		return nil, i.Err
 	}
 	return slices.Clone(i.AutoJoin), nil
+}
+
+// Administrators returns copies of the Users whose Admin is set, in name
+// order, or Err. The fake has no groups, so only direct administrators count.
+func (i *Identity) Administrators(context.Context) ([]accessapi.UserInfo, error) {
+	if i.Err != nil {
+		return nil, i.Err
+	}
+	var out []accessapi.UserInfo
+	for _, name := range slices.Sorted(maps.Keys(i.Users)) {
+		if u := i.Users[name]; u.Admin {
+			u.Groups = slices.Clone(u.Groups)
+			out = append(out, u)
+		}
+	}
+	return out, nil
 }

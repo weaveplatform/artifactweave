@@ -221,6 +221,9 @@ func Parse(doc []byte, env Lookup) (*Patch, error) {
 	if err := parseStorage(top, p); err != nil {
 		return nil, err
 	}
+	if err := parseQuota(top, p); err != nil {
+		return nil, err
+	}
 	if err := parseURLBase(top, p); err != nil {
 		return nil, err
 	}
@@ -289,6 +292,7 @@ var applied = []string{
 	SectionPropertySets,
 	SectionLayouts,
 	SectionGC,
+	SectionQuota,
 	SectionTrashcan,
 	SectionDownloadRedirect,
 	SectionMailServer,

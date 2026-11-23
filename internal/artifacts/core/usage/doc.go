@@ -32,6 +32,10 @@
 //     and the Rows, sorted by key. There is one Row per repository, a remote
 //     repository's under its cache alias ("<key>-cache", type CACHE), and
 //     one for the trash can.
+//   - Capacity, the configuration module's StorageCapacity port: the same
+//     volume measured for the global storage quota (quotaConfig), used being
+//     total less what the operating system reports available. CapacityOf is
+//     nil for object storage, where no volume can be measured.
 //   - DefaultProject, the project key of a repository in no project and of
 //     the trash can's row, and NoFilesystem, the directory an object store
 //     reports.
@@ -67,8 +71,9 @@
 //     (task 2, storageinfo), #p2b-cloud-blob-storage-and-mirroring and
 //     #p9d-modular-monolith-migration, epic ART
 //     (https://github.com/weaveplatform/artifactweave/issues/941).
-//   - https://github.com/weaveplatform/artifactweave/issues/973 and
-//     https://github.com/weaveplatform/artifactweave/issues/1088
+//   - https://github.com/weaveplatform/artifactweave/issues/973,
+//     https://github.com/weaveplatform/artifactweave/issues/1088 and
+//     https://github.com/weaveplatform/artifactweave/issues/1830 (Capacity)
 //
 // # Status
 //
@@ -82,7 +87,9 @@
 // NoFilesystem for an object store
 // (https://github.com/weaveplatform/artifactweave/issues/461). Moved here in
 // P9d, which narrowed Summarize's store to Store
-// (https://github.com/weaveplatform/artifactweave/issues/1088).
+// (https://github.com/weaveplatform/artifactweave/issues/1088). P12 added
+// Capacity for the global storage quota
+// (https://github.com/weaveplatform/artifactweave/issues/1830).
 //
 // # Testing
 //
@@ -93,4 +100,6 @@
 //   - TestUnitSummarizeReadsTheWholeTrash: more trash entries than one page
 //     of the trash listing holds.
 //   - TestUnitSummarizeFailures: every store failure surfaces.
+//   - TestUnitCapacityMeasuresTheSummaryVolume: Capacity reports the
+//     summary's volume, none without a local root, and a failed read.
 package usage

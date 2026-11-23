@@ -489,6 +489,15 @@ func TestUnitStoreBindings(t *testing.T) {
 		!reflect.DeepEqual(g, []string{"everyone", "zeta"}) {
 		t.Errorf("AutoJoinGroups = %v, %v; want [everyone zeta]", g, err)
 	}
+	// Administrators counts direct and group-conferred authority, whatever
+	// the account's status; callers choose whom to notify.
+	must(t, st.Groups().Create(ctx, model.Group{Name: "admins", AdminPrivileges: true}))
+	must(t, st.Users().Create(ctx, model.User{Name: "root", Email: "root@example.com", Admin: true}))
+	must(t, st.Users().Create(ctx, model.User{Name: "viagroup", Groups: []string{"admins"}, Status: model.UserDisabled}))
+	if a, err := w.api.Identity.Administrators(ctx); err != nil || len(a) != 2 ||
+		a[0].Name != "root" || !a[0].Admin || a[1].Name != "viagroup" || !a[1].Admin || a[1].Enabled() {
+		t.Errorf("Administrators = %+v, %v; want root and viagroup", a, err)
+	}
 
 	must(t, st.Projects().Create(ctx, model.Project{Key: "ml", DisplayName: "ML"}))
 	for _, e := range []model.Environment{{ProjectKey: "ml", Name: "ML-STAGE"}, {ProjectKey: "ml", Name: "ML-LAB"}, {Name: "QA"}} {
