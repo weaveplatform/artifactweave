@@ -10,8 +10,9 @@
 // # Inputs
 //
 // Immutable trusted destination/proxy origins, an optional DNS resolver and
-// root certificate pool, socket timeout, and caller-owned request contexts.
-// NewPolicy, NewClient and NewNTLMProxy do no network I/O. Operators explicitly configure
+// root certificate pool, socket timeout, an optional NTLMProxy identity, and
+// caller-owned request contexts. NewPolicy, NewClient, NewNTLMProxy and
+// ProxyRedirectHosts do no network I/O. Operators explicitly configure
 // private origins; metadata/link-local destinations remain forbidden.
 //
 // # Outputs
@@ -19,7 +20,9 @@
 // Policy.Addresses returns only checked physical addresses. Client.Do transfers
 // response-body ownership on success; Close stops new requests and releases idle
 // connections. NTLMProxy.Connect negotiates an already dialed, checked proxy
-// connection and transfers the authenticated tunnel to its caller.
+// connection and transfers the authenticated tunnel to its caller; a Client
+// with an NTLM identity calls it for every new CONNECT tunnel. ProxyRedirectHosts
+// returns canonical redirectedToHosts keys, which grant no reachability.
 // Errors retain safe classifications and context cancellation,
 // never URLs, headers, bodies or credentials.
 //
@@ -40,6 +43,7 @@
 // # Status
 //
 // Shared address rules and fixed-origin transport for P11 single push, plus
-// connection-scoped NTLMv2 CONNECT negotiation consumed by the P12 remote adapter.
+// connection-scoped NTLMv2 CONNECT negotiation consumed by the P12 remote adapter
+// and, through ClientOptions.NTLM, by single push (#1848).
 // Remote-cache adapters retain their broader protocol-specific request policy.
 package outbound

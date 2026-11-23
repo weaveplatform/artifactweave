@@ -37,6 +37,9 @@ type NTLMOptions struct {
 	ForwardOnly                             bool
 	// Listener, when set, is owned by the proxy, as with NewProxyOn.
 	Listener net.Listener
+	// Origins adds owned destinations that are not fixture servers, such as a
+	// separately started application process; each is a scheme://host:port URL.
+	Origins []string
 }
 
 // NTLMRequest is a safe protocol record. It retains no packet, password, proof
