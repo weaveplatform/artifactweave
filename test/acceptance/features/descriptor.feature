@@ -249,14 +249,19 @@ Feature: Configuration descriptor
       {"rclass":"local","packageType":"generic"}
       """
     Then the response status is 200
+    # 7.161.26 keeps repositories and LDAP connections outside its descriptor,
+    # so a repository and a descriptor section may share a key, in either order.
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
       """
       repoLayouts:
         id-rest-local:
           artifactPathPattern: "[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"
+      localRepositories:
+        id-shared: {type: generic}
       """
-    Then the response status is 400
-    And the response body contains "repoLayouts.id-rest-local: the ID 'id-rest-local' is already used by localRepositories.id-rest-local"
+    Then the response status is 200
+    When I GET "/artifactory/api/repositories/id-shared" as admin
+    Then the response status is 200
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
       """
       proxies:
@@ -268,7 +273,9 @@ Feature: Configuration descriptor
     Then the response status is 200
     When I GET "/artifactory/api/system/configuration" as admin
     Then the XML field "backups/backup[key=id-shared]/cronExp" equals "0 0 2 ? * MON-FRI"
+    And the XML field "repoLayouts/repoLayout[name=id-rest-local]/name" equals "id-rest-local"
     And the response body does not contain "<key>id-shared</key><host>"
+    And the response body contains "<localRepositories></localRepositories>"
 
   Scenario: Mixed PATCH and config apply share one protected XML read model
     Given a file "mixed-descriptor.yaml" with content:
@@ -326,7 +333,7 @@ Feature: Configuration descriptor
     When I GET "/artifactory/api/system/configuration" as admin
     Then the response status is 200
     And the response header "Content-Type" contains "application/xml"
-    And the XML field "localRepositories/localRepository[key=xml-local]/description" equals "data <>&"
+    And the response body contains "<localRepositories></localRepositories><remoteRepositories></remoteRepositories><virtualRepositories></virtualRepositories><federatedRepositories></federatedRepositories><releaseBundlesRepositories></releaseBundlesRepositories>"
     And the XML field "proxies/proxy[key=xml-proxy]/key" equals "xml-proxy"
     And the XML field "propertySets/propertySet[name=xml-set]/properties/property/predefinedValues/predefinedValue/value" equals "value <>&"
     And the XML field "repoLayouts/repoLayout[name=xml-layout]/name" equals "xml-layout"
@@ -339,7 +346,7 @@ Feature: Configuration descriptor
     And the output does not contain "Updated:"
     When I GET "/artifactory/api/system/configuration" as admin
     Then the response status is 200
-    And the XML field "localRepositories/localRepository[key=xml-local]/description" equals "data <>&"
+    And the response body does not contain "xml-local"
     And the XML field "proxies/proxy[key=xml-proxy]/host" equals "proxy.invalid"
     And the XML field "propertySets/propertySet[name=xml-set]/name" equals "xml-set"
     And the XML field "repoLayouts/repoLayout[name=xml-layout]/name" equals "xml-layout"
@@ -349,6 +356,9 @@ Feature: Configuration descriptor
     And the XML field "trashcanConfig/enabled" equals "true"
     And the XML field "trashcanConfig/retentionPeriodDays" equals "7"
     And the response body does not contain "private-fixture"
+    When I GET "/artifactory/api/repositories/xml-local" as admin
+    Then the response status is 200
+    And the JSON field "description" equals "data <>&"
     When I GET "/artifactory/api/system/configuration"
     Then the response status is 401
 

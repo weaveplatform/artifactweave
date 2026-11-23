@@ -40,7 +40,7 @@
 //     the descriptor PATCH applies, refuses and reports as Artifactory does
 //     (descriptor_test.go); security.ldapSettings and the Access LDAP API
 //     read back each other's connections, field-by-field changes keep the
-//     sealed password, the export omits it, refused or failing descriptors
+//     sealed password, the export carries no ldapSettings (#1893), refused or failing descriptors
 //     write nothing, and SQLite and PostgreSQL keep the password sealed to
 //     its row and across a reopened store (ldap_test.go, #1832).
 //

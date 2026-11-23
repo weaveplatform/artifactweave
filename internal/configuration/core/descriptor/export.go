@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
-	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/configuration/core/system"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -37,14 +36,20 @@ type exportTransactions interface {
 // The namespace and names follow 7.161.26's artifactory.xsd, not the YAML aliases.
 // Pointer sections retain the distinction between absent and explicitly empty.
 type exportDocument struct {
-	XMLName          xml.Name       `xml:"http://artifactory.jfrog.org/xsd/3.5.11 config"`
-	Mail             *exportFields  `xml:"mailServer,omitempty"`
-	Security         exportSecurity `xml:"security"`
-	Backups          []exportFields `xml:"backups>backup"`
-	Local            []exportFields `xml:"localRepositories>localRepository"`
-	Remote           []exportFields `xml:"remoteRepositories>remoteRepository"`
-	Virtual          []exportFields `xml:"virtualRepositories>virtualRepository"`
-	Federated        []exportFields `xml:"federatedRepositories>federatedRepository"`
+	XMLName  xml.Name       `xml:"http://artifactory.jfrog.org/xsd/3.5.11 config"`
+	Mail     *exportFields  `xml:"mailServer,omitempty"`
+	Security exportSecurity `xml:"security"`
+	Backups  []exportFields `xml:"backups>backup"`
+	// 7.161.26 empties every repository map before it stores its descriptor
+	// (CentralConfigServiceImpl.getFilteredDescriptor), and the GET serves the
+	// descriptor reloaded from that store, so JAXB writes each repository
+	// section as an empty element. Repositories are read through
+	// /api/repositories; no pinned artifactory_* resource reads them here.
+	Local            struct{}       `xml:"localRepositories"`
+	Remote           struct{}       `xml:"remoteRepositories"`
+	Virtual          struct{}       `xml:"virtualRepositories"`
+	Federated        struct{}       `xml:"federatedRepositories"`
+	ReleaseBundles   struct{}       `xml:"releaseBundlesRepositories"`
 	Proxies          []exportFields `xml:"proxies>proxy"`
 	ReverseProxies   []exportFields `xml:"reverseProxies>reverseProxy"`
 	PropertySets     []exportFields `xml:"propertySets>propertySet"`
@@ -60,7 +65,6 @@ type exportSecurity struct {
 	Anonymous        bool           `xml:"anonAccessEnabled"`
 	UserLockPolicy   *exportFields  `xml:"userLockPolicy,omitempty"`
 	PasswordSettings *exportFields  `xml:"passwordSettings,omitempty"`
-	LDAP             []exportFields `xml:"ldapSettings>ldapSetting"`
 	LDAPGroups       []exportFields `xml:"ldapGroupSettings>ldapGroupSetting"`
 }
 
@@ -147,7 +151,7 @@ func (a exportAPI) currentAdmin(ctx context.Context) error {
 
 func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 	var out exportDocument
-	existing, err := readExportRepositories(ctx, d, &out)
+	existing, err := readExportRepositoryKeys(ctx, d)
 	if err != nil {
 		return out, err
 	}
@@ -243,11 +247,7 @@ func readExport(ctx context.Context, d Deps) (exportDocument, error) {
 		}
 		*section.target = entry
 	}
-	if err := readExportOwned(ctx, d, &out); err != nil {
-		return out, err
-	}
-	dropDuplicateIDs(&out)
-	return out, nil
+	return out, readExportOwned(ctx, d, &out)
 }
 
 // readExportOwned reads the sections whose state another service owns: the
@@ -359,9 +359,9 @@ func readExportBackups(ctx context.Context, d Deps, existing map[string]bool) ([
 	return out, nil
 }
 
-// readExportRepositories fills out's repository sections and returns the
-// keys of every repository, which backup exclusions are checked against.
-func readExportRepositories(ctx context.Context, d Deps, out *exportDocument) (map[string]bool, error) {
+// readExportRepositoryKeys returns the keys of every repository, which
+// backup exclusions are checked against.
+func readExportRepositoryKeys(ctx context.Context, d Deps) (map[string]bool, error) {
 	repos, err := d.Repositories.List(ctx, artifactsapi.RepoFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("list export repositories: %w", err)
@@ -369,20 +369,6 @@ func readExportRepositories(ctx context.Context, d Deps, out *exportDocument) (m
 	existing := make(map[string]bool, len(repos))
 	for _, c := range repos {
 		existing[c.Key] = true
-		fields, err := exportRepository(c)
-		if err != nil {
-			return nil, err
-		}
-		switch c.Class {
-		case repo.Local:
-			out.Local = append(out.Local, fields)
-		case repo.Remote:
-			out.Remote = append(out.Remote, fields)
-		case repo.Virtual:
-			out.Virtual = append(out.Virtual, fields)
-		case repo.Federated:
-			out.Federated = append(out.Federated, fields)
-		}
 	}
 	return existing, nil
 }

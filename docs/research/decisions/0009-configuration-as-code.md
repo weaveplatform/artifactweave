@@ -88,8 +88,11 @@ LDAP-01 ([#1832](https://github.com/weaveplatform/artifactweave/issues/1832)) ap
 LDAP service rather than its own copy of the rules, so the descriptor and
 `/access/api/v1/ldap/settings` read back one connection. Its entries change field by field
 and are validated with the rest of the document before any write; an entry set to null
-deletes a connection; the whole-section null is refused. The XML export
-lists the connections without their manager passwords.
+deletes a connection; the whole-section null is refused. The XML export carries
+neither the connections nor any repository entry, as 7.161.26's descriptor does not: it
+stores repositories in its repository configuration store and LDAP connections in Access
+([#1893](https://github.com/weaveplatform/artifactweave/issues/1893), research 06, "Keys
+shared across sections").
 
 CFG-02 ([#1826](https://github.com/weaveplatform/artifactweave/issues/1826)) adds the
 descriptor's `urlBase`, through PATCH, config apply, the bootstrap descriptor and

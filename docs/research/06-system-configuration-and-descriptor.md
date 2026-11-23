@@ -634,8 +634,9 @@ cannot be deleted, so the settings stay as last applied.
   (`enabled: true`, `retentionPeriodHours: 168`, `sendMailOnError: true`, the other flags
   false) fill a new entry, and `null` on the entry deletes it. `cronExp` is required and
   must be a Quartz expression. Every `excludedRepositories` entry must name a repository
-  that exists once the document is applied. An entry is a `repositoryRef`, an IDREF to
-  the repository (XSD `BackupType`), so deleting the repository by any path (the
+  that exists once the document is applied. An entry is a `repositoryRef` naming the
+  repository (`xs:string` in 7.161.26's `BackupType`; 6.20 typed it an IDREF), and 7.x
+  drops a deleted repository from every backup, so deleting the repository by any path (the
   descriptor, the REST API) removes its key from every backup in the same transaction,
   and a repository created again under that key is not excluded. `key`, when sent, must equal the entry key; `excludeBuilds`, deprecated in the
   XSD, is accepted and dropped. `dir` is refused: **[I]** a backup target on the server's
@@ -648,7 +649,8 @@ cannot be deleted, so the settings stay as last applied.
   It is not in the XML descriptor (see "Top-level elements"). The banner is rendered by
   the P39 UI, which reads it through the configuration module's `SystemMessage` read
   contract.
-- **Keys shared across sections** ([#1872](https://github.com/weaveplatform/artifactweave/issues/1872)).
+- **Keys shared across sections** ([#1872](https://github.com/weaveplatform/artifactweave/issues/1872),
+  [#1893](https://github.com/weaveplatform/artifactweave/issues/1893)).
   An XML document's IDs share one namespace. In 7.161.26's `artifactory.xsd` the
   `xs:ID` keys are `RepoType.key` (every repository class), `ProxyType.key`,
   `ReverseProxyType.key`, `BackupType.key`, `PropertySetType.name`,
@@ -656,26 +658,47 @@ cannot be deleted, so the settings stay as last applied.
   `SystemPropertyType.key`/`value`; the JAXB class `LdapSetting` marks its `key` `@XmlID`
   too, as 6.20's XSD declared it. The `IDREF`s that point at them are `proxyRef`,
   `propertySetRef`, `repoLayoutRef`, `remoteRepoLayoutRef`, `primaryKeyPairRef`,
-  `secondaryKeyPairRef`, `defaultDeploymentRepo`, `remoteRepo` and `repositoryRef`
-  (virtual members, backup exclusions). 7.x saves its descriptor only after validating it
-  against the XSD ([S] 7.161.26 `CentralConfigServiceImpl.validateDescriptor`,
+  `secondaryKeyPairRef`, `defaultDeploymentRepo`, `remoteRepo` and a virtual repository's
+  `repositoryRef`; a backup's `repositoryRef` is `xs:string`. 7.x saves its descriptor only
+  after validating it against the XSD ([S] 7.161.26 `CentralConfigServiceImpl.validateDescriptor`,
   `config.descriptor.xsd.validation.enabled` defaulting to true), so a PATCH that leaves
   two equal IDs answers 400 and writes nothing. 7.x keeps repositories and LDAP connections
-  outside that descriptor (repositories in its repository configuration store,
-  `ConfigDescriptorRepoUtils.cleanupConfigDescriptorRepositories`; LDAP in Access), and
-  its `isKeyAvailable` checks only proxies, reverse proxies, backups, property sets,
-  layouts, key pairs and retention policies; 6.20's also checked repositories and LDAP
-  connections ([S] 6.20 `CentralConfigDescriptorImpl.isKeyAvailable`). artifactweave's
-  export writes repositories and LDAP connections in the same document, so the descriptor's
-  one write path (PATCH, `config apply`, the bootstrap descriptor and `POST
-  /api/system/configuration/webServer`) treats all of them as one namespace
-  ([DV-203](../implementation/deviations.md#api-behaviour)): a patch that
-  would leave a key in two of the repository sections, `proxies`, the reverse proxy,
-  `backups`, `propertySets`, `repoLayouts` and `security.ldapSettings` answers 400
+  outside that descriptor, so neither is in the namespace it serves ([S] 7.161.26):
+  - **Repositories.** `CentralConfigServiceImpl.preSaveDescriptor` stores
+    `getFilteredDescriptor`, which calls `ConfigDescriptorRepoUtils.cleanupConfigDescriptorRepositories`
+    and sets all five repository maps (local, remote, virtual, federated, release bundles)
+    to empty maps. The descriptor cache is reloaded from that stored XML
+    (`getCentralConfigDescriptorCache`), and outside migration and import only the SaaS-migration
+    `CentralConfigDescriptorSanitizer` sets the maps again. `ConfigResource.getConfig` serves
+    the cached descriptor, or a clone of it with proxy and mail passwords cleared. Each map's
+    `XmlAdapter` marshals an empty map to a wrapper with an empty list, so JAXB writes
+    `<localRepositories/>`, `<remoteRepositories/>`, `<virtualRepositories/>`,
+    `<federatedRepositories/>` and `<releaseBundlesRepositories/>` with no entries. The
+    PATCH still takes the repository sections: `extractRepoConfigs` takes their diffs out of
+    the descriptor merge and `bulkUpsertRepoConfigs`/`bulkDeleteRepoConfigs` apply them to
+    the repository configuration store.
+  - **LDAP connections.** 7.161.26's `SecurityDescriptor` (`SecurityType`) has no
+    `ldapSettings` field or element, and the XSD has none. `ConfigResource.patchConfig` hands
+    the PATCH to `accessService.moveYamlConfigResourcesToAccess` before the merge, whose
+    `LdapSettingsMigrationHandler` creates, updates and deletes the connections in Access and
+    removes `security.ldapSettings` from the document.
+  - Its `isKeyAvailable` checks only proxies, reverse proxies, backups, property sets,
+    layouts, key pairs and retention policies; 6.20's also checked repositories and LDAP
+    connections ([S] 6.20 `CentralConfigDescriptorImpl.isKeyAvailable`). The repository REST
+    create checks a key only against other repositories (`RepositoryNameRestValidator` →
+    `isKeyAvailableInRepositoryConfigService`).
+
+  artifactweave follows 7.161.26 (#1893): the export carries the five repository sections
+  empty and no `ldapSettings`, and the descriptor's one write path (PATCH, `config apply`,
+  the bootstrap descriptor and `POST /api/system/configuration/webServer`) treats `proxies`,
+  the reverse proxy, `backups`, `propertySets` and `repoLayouts` as one namespace: a patch
+  that would leave a key in two of them answers 400
   `<section>.<key>: the ID '<key>' is already used by <section>.<key>` and writes nothing,
   dry runs included. The check reads the state the whole patch leaves, so a key the patch
-  frees may be reused in it, and repositories or LDAP connections created through their
-  REST APIs count. **[I]** 7.x's own refusal is its XSD validator's: probably `Found
+  frees may be reused in it. A repository or an LDAP connection may share any of their keys,
+  whether the descriptor or its REST API writes it. Since every section in the namespace is
+  written through that check, or is a bundled layout, the export never carries one ID twice.
+  **[I]** 7.x's own refusal is its XSD validator's: probably `Found
   config violations: cvc-id-2: There are multiple occurrences of ID value '<key>'.`, the
   JDK's message, which no capture shows; the text here extends 7.x's
   `UniqueXmlIdValidator` wording ("The ID '%s' is already used.") with the holder. Keys
@@ -683,15 +706,9 @@ cannot be deleted, so the settings stay as last applied.
   for reverse proxies applies only to its UI's add paths, not to the PATCH, and is not
   adopted. `ldapGroupSettings` names are not IDs: 6.20's XSD types `LdapGroupSettingType.name`
   `xs:string`, and 7.161.26's `LdapGroupSetting` does not mark it `@XmlID`, so a group setting
-  may repeat any other section's key.
-- **Keys the REST APIs share with the descriptor.** The repositories API and access's
-  LDAP settings API check a key only against their own kind, as 7.161.26's do
-  (`RepositoryNameRestValidator` consults only the repository store), so they can store
-  a key a descriptor section holds. Such a clash does not block an unrelated patch;
-  only a patch that adds a holder is refused. The export stays one namespace: the
-  sections 7.x's descriptor holds keep the ID, a repository sharing it is left out, and
-  an LDAP connection sharing a key with either is left out, as 7.161.26's export carries
-  neither. References to a left-out repository keep its key.
+  may repeat any other section's key. **[I]** until P19 ([#216](https://github.com/weaveplatform/artifactweave/issues/216)):
+  that a live 7.x's `GET /api/system/configuration` carries no repository entry and writes the
+  five sections as empty elements, which rests on the source alone.
 - A successful patch answers `<n> changes to config merged successfully` as `text/plain`,
   with no newline after it, `<n>` counted as "Semantics" describes ([J] RTFACT-31174,
   RTFACT-17040; [S] `MapToDiffConverter`). `artifactweave config apply` prints its own
@@ -716,7 +733,15 @@ cannot be deleted, so the settings stay as last applied.
 - `GET` returns an XML descriptor generated from current state, so that the
   `artifactory_*` configuration resources can read back what they wrote. CFG-01 serves
   the currently delivered sections as `application/xml`, with the XSD names and nesting,
-  including explicit false/zero/empty values. The `artifactory_repository_layout` resource finds its layout
+  including explicit false/zero/empty values. Repositories and LDAP connections are not
+  among them (see "Keys shared across sections"): they are read at `/api/repositories`
+  and `/access/api/v1/ldap/settings`, as on 7.161.26. No `artifactory_*` resource of
+  provider 12.11.14 reads a repository from the XML. Its `artifactory_ldap_setting` reads
+  `security/ldapSettings/ldapSetting` back after each apply and finds nothing, here as on
+  7.x: JFrog's own acceptance tests of that resource skip every step on Artifactory 7.57.1
+  or later (`onOrAfterVersion7571`, [S] provider 12.11.14
+  [`resource_artifactory_ldap_setting_test.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_ldap_setting_test.go)),
+  and `artifactory_ldap_setting_v2` is the resource that manages a connection. The `artifactory_repository_layout` resource finds its layout
   by the `name` element of `repoLayouts/repoLayout`, both to read it and before deleting it
   ([S] provider 12.11.14
   [`resource_artifactory_repository_layout.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_repository_layout.go)),
@@ -727,11 +752,7 @@ cannot be deleted, so the settings stay as last applied.
   or its default when never written **[I]**: 7.161.26's XSD keeps only the expiration
   policy, the lock and encryption policies having moved to Access, so their names, values
   and places follow the descriptor classes 7.161.26 still ships (`UserLockPolicy`,
-  `EncryptionPolicy`). Then `ldapSettings/ldapSetting` in XSD order
-  (`key, enabled, ldapUrl, userDnPattern, search{searchFilter, searchBase, searchSubTree,
-  managerDn}, autoCreateUser, emailAttribute, ldapPoisoningProtection,
-  allowUserToAccessProfile, pagingSupportEnabled`), leaving out empty strings and always
-  leaving out `managerPassword`.
+  `EncryptionPolicy`). It carries no `ldapSettings` (#1893).
 - `gcConfig.cronExp`, `trashcanConfig.enabled` and `trashcanConfig.retentionPeriodDays`
   (CFG-05, [#1829](https://github.com/weaveplatform/artifactweave/issues/1829)) go
   through the artifacts module's storage policy, which owns the trash can and the
@@ -753,8 +774,9 @@ cannot be deleted, so the settings stay as last applied.
 - `quotaConfig` (CFG-06, [#1830](https://github.com/weaveplatform/artifactweave/issues/1830))
   is the global storage quota, applied by `internal/configuration/core/quota`. See
   "Global storage quota" below.
-- CFG-01 collects repositories, proxies, property sets, layouts, anonymous access, mail
-  and download redirect configuration in one metadata transaction under the shared
+- CFG-01 collects the repository keys backup exclusions are checked against, proxies,
+  property sets, layouts, anonymous access, mail and download redirect configuration in one
+  metadata transaction under the shared
   `Projects.Guard`, before returning bytes after commit. Export refuses an existing
   transaction on that store before any read; section readers join the transaction
   export creates, while descriptor Apply keeps its nested atomic semantics.
@@ -768,18 +790,9 @@ cannot be deleted, so the settings stay as last applied.
   This version uses namespace `http://artifactory.jfrog.org/xsd/3.5.11`. JFrog's
   [online XSD page](https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd)
   currently publishes an older namespace; its claim to be the latest does not replace
-  the pinned archive evidence. Repository-only REST fields without an XML descriptor
-  representation are omitted; this export does not claim new runtime capabilities.
-  The CFG-01 review inventories all 141 JSON fields of the current repository model:
-  111 have class-specific XML projections and 30 are class identity, API-only bindings
-  or trust settings, legacy type-selection flags, credentials or JAXB-transient fields.
-  `HttpRepoDescriptor.retrieveSha256FromServer` and remote
-  `HuggingFaceMLRemoteConfiguration.mlRepoLayout` are visible even though the XSD lacks
-  them; the local `mlRepoLayout` field is transient. The JAXB enum annotations also
-  matter: XML uses `generic`, `yum` and `helmOci`, and lowercase VCS type/provider values,
-  while the shared remote JSON endpoint keeps its distinct Jackson enum spellings.
-  Checksum, snapshot, POM cleanup, Docker API and Terraform enum values already match
-  their stored representations. This audit preserves API-only and transient exclusions.
+  the pinned archive evidence. The repository sections carry no entries (#1893), so the
+  CFG-01 projection of the repository model's fields into `RepoType` elements is retired;
+  this export does not claim new runtime capabilities.
 - **Local engineering choice:** credentials are omitted from XML. Artifactory's encrypted
   password tokens are vendor-specific; returning sealed storage bytes or fabricated
   ciphertext would not be a portable credential. The pinned proxy reader copies the

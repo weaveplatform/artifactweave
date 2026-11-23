@@ -14688,7 +14688,7 @@ paths:
       x-cost: ordinary
   /api/system/configuration:
     get:
-      description: 'Admin only. Returns the currently delivered descriptor sections as application/xml from one committed metadata and current-authority snapshot: local, remote, virtual and federated repositories, proxies, property sets, repository layouts, mailServer, security.anonAccessEnabled and downloadRedirectConfig. Repository XML uses descriptor names and nesting rather than JSON API field names. Resource identities are preserved; absent optional configuration remains absent. Passwords and sensitive custom HTTP header values are omitted or empty. The pinned Terraform provider preserves mail and proxy passwords from its prior state. No public YAML read endpoint is supplied. Unsupported sections and full XML replacement remain owned by their future phases.'
+      description: 'Admin only. Returns the currently delivered descriptor sections as application/xml from one committed metadata and current-authority snapshot: proxies, property sets, repository layouts, mailServer, security.anonAccessEnabled and downloadRedirectConfig. As on 7.161.26, the five repository sections are empty and security carries no ldapSettings: repositories are read at /api/repositories and LDAP connections at /access/api/v1/ldap/settings. Resource identities are preserved; absent optional configuration remains absent. Passwords and sensitive custom HTTP header values are omitted or empty. The pinned Terraform provider preserves mail and proxy passwords from its prior state. No public YAML read endpoint is supplied. Unsupported sections and full XML replacement remain owned by their future phases.'
       operationId: getSystemConfiguration
       responses:
         '200':

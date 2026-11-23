@@ -70,7 +70,8 @@ func (w *repoWorld) ldapDocument(key string) configdoc.ConfigDocument {
 // TestAccLDAPDescriptorSharesAccessConnections writes one connection
 // through the descriptor and the Access API in turn: each reads back what
 // the other wrote, field by field changes keep what they omit, the password
-// included, and the XML export shows the connection without it.
+// included, and the XML export carries no ldapSettings, as 7.161.26's
+// SecurityDescriptor has none.
 func TestAccLDAPDescriptorSharesAccessConnections(t *testing.T) {
 	w := newRepoWorld(t)
 	if code, body := w.patch("admin", ldapYAML); code != http.StatusOK || body != "6 changes to config merged successfully" {
@@ -131,13 +132,7 @@ func TestAccLDAPDescriptorSharesAccessConnections(t *testing.T) {
 			"<userLockPolicy><enabled>false</enabled><loginAttempts>5</loginAttempts></userLockPolicy>"+
 			"<passwordSettings><encryptionPolicy>supported</encryptionPolicy><expirationPolicy><enabled>false</enabled>"+
 			"<passwordMaxAge>60</passwordMaxAge><notifyByEmail>true</notifyByEmail></expirationPolicy></passwordSettings>"+
-			"<ldapSettings><ldapSetting>"+
-			"<key>corp</key><enabled>false</enabled><ldapUrl>ldaps://ldap.example.com:636/dc=example,dc=com</ldapUrl>"+
-			"<search><searchFilter>(uid={0})</searchFilter><searchBase>ou=people</searchBase><searchSubTree>true</searchSubTree>"+
-			"<managerDn>cn=manager,dc=example,dc=com</managerDn></search><autoCreateUser>true</autoCreateUser>"+
-			"<emailAttribute>email</emailAttribute><ldapPoisoningProtection>true</ldapPoisoningProtection>"+
-			"<allowUserToAccessProfile>false</allowUserToAccessProfile><pagingSupportEnabled>true</pagingSupportEnabled>"+
-			"</ldapSetting></ldapSettings><ldapGroupSettings></ldapGroupSettings></security>") {
+			"<ldapGroupSettings></ldapGroupSettings></security>") || strings.Contains(xml, "ldapSetting>") {
 		t.Fatalf("export %d %s", rec.Code, xml)
 	}
 	// managerPassword null clears it; the entry null deletes the connection.

@@ -137,7 +137,7 @@ func securityBaseline(t *testing.T, backend string) {
 		"<userLockPolicy><enabled>true</enabled><loginAttempts>2</loginAttempts></userLockPolicy>" +
 		"<passwordSettings><encryptionPolicy>supported</encryptionPolicy><expirationPolicy><enabled>true</enabled>" +
 		"<passwordMaxAge>30</passwordMaxAge><notifyByEmail>false</notifyByEmail></expirationPolicy></passwordSettings>" +
-		"<ldapSettings></ldapSettings><ldapGroupSettings></ldapGroupSettings></security>"
+		"<ldapGroupSettings></ldapGroupSettings></security>"
 	if got := w.exported(); got != want {
 		t.Fatalf("export %s", got)
 	}

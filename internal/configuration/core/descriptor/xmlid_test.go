@@ -45,14 +45,12 @@ func applyWith(t *testing.T, d Deps, doc string, dryRun bool) (Patch, error) {
 	return *p, err
 }
 
-// TestUnitXMLIDSharedAcrossSections: every pair of sections the export writes
-// with an xs:ID key refuses a key the other holds, whether it was stored
-// before (by the descriptor, the repositories API or access's LDAP API) or
+// TestUnitXMLIDSharedAcrossSections: a section the export writes with an
+// xs:ID key refuses a key another holds, whether it was stored before or
 // arrives in the same patch, and the refusal names both entries.
 func TestUnitXMLIDSharedAcrossSections(t *testing.T) {
 	for _, tc := range []struct {
 		name, stored, patch, want string
-		rest                      func(*testing.T, *inmem.Store, Deps)
 	}{
 		{
 			name: "backup beside a stored proxy", stored: idEntry(idProxy, "nightly"), patch: idEntry(idBackup, "nightly"),
@@ -63,31 +61,12 @@ func TestUnitXMLIDSharedAcrossSections(t *testing.T) {
 			want: "proxies.nightly: the ID 'nightly' is already used by backups.nightly",
 		},
 		{
-			name: "layout beside a REST repository",
-			rest: func(t *testing.T, db *inmem.Store, _ Deps) {
-				t.Helper()
-				seedRepo(t, db, repo.Config{Key: "shared", Class: repo.Local, PackageType: repo.Generic})
-			},
-			patch: idEntry(idLayout, "shared"),
-			want:  "repoLayouts.shared: the ID 'shared' is already used by localRepositories.shared",
+			name: "layout beside a stored property set", stored: idEntry(idPropSt, "shared"), patch: idEntry(idLayout, "shared"),
+			want: "repoLayouts.shared: the ID 'shared' is already used by propertySets.shared",
 		},
 		{
-			name: "repository beside a stored property set", stored: idEntry(idPropSt, "shared"),
-			patch: "remoteRepositories:\n  shared:\n    type: generic\n    url: https://upstream.invalid\n",
-			want:  "remoteRepositories.shared: the ID 'shared' is already used by propertySets.shared",
-		},
-		{
-			name: "proxy beside an Access LDAP connection",
-			rest: func(t *testing.T, _ *inmem.Store, d Deps) {
-				t.Helper()
-				ldapConnection(t, d, "corp")
-			},
-			patch: idEntry(idProxy, "corp"),
-			want:  "proxies.corp: the ID 'corp' is already used by security.ldapSettings.corp",
-		},
-		{
-			name: "LDAP connection beside a stored repository", stored: idEntry(idLocal, "corp"), patch: idEntry(idLDAP, "corp"),
-			want: "security.ldapSettings.corp: the ID 'corp' is already used by localRepositories.corp",
+			name: "property set beside a stored layout", stored: idEntry(idLayout, "shared"), patch: idEntry(idPropSt, "shared"),
+			want: "propertySets.shared: the ID 'shared' is already used by repoLayouts.shared",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -97,9 +76,6 @@ func TestUnitXMLIDSharedAcrossSections(t *testing.T) {
 				if _, err := applyWith(t, d, tc.stored, false); err != nil {
 					t.Fatal(err)
 				}
-			}
-			if tc.rest != nil {
-				tc.rest(t, db, d)
 			}
 			_, before := exportXML(t, d)
 			for _, dryRun := range []bool{true, false} {
@@ -160,12 +136,11 @@ func TestUnitXMLIDReverseProxy(t *testing.T) {
 func TestUnitXMLIDKeysThatLeave(t *testing.T) {
 	db := inmem.New()
 	d := ldapDeps(t, db)
-	if _, err := applyWith(t, d, idEntry(idProxy, "x")+idEntry(idLocal, "y")+idEntry(idLDAP, "z"), false); err != nil {
+	if _, err := applyWith(t, d, idEntry(idProxy, "x")+idEntry(idLayout, "y"), false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := applyWith(t, d, "proxies:\n  x: null\n"+idEntry(idBackup, "x")+
-		"localRepositories:\n  y: null\n"+idEntry(idLayout, "y")+
-		"security:\n  ldapSettings:\n    z: null\n"+idEntry(idPropSt, "z"), false); err != nil {
+		"repoLayouts:\n  y: null\n"+idEntry(idPropSt, "y"), false); err != nil {
 		t.Fatal("keys freed in the same patch", err)
 	}
 	if _, err := applyWith(t, d, "backups:\n  x:\n    enabled: false\n", false); err != nil {
@@ -177,26 +152,41 @@ func TestUnitXMLIDKeysThatLeave(t *testing.T) {
 	}
 }
 
-// TestUnitXMLIDStoredClash: a clash only a REST surface can store does not
-// block an unrelated patch, and the export leaves out the repository or LDAP
-// connection, which 7.161.26 keeps outside its descriptor.
-func TestUnitXMLIDStoredClash(t *testing.T) {
+// TestUnitXMLIDRepositoriesAndLDAPOutsideNamespace: 7.161.26 keeps
+// repositories and LDAP connections outside its descriptor, so its
+// isKeyAvailable checks neither and its export carries neither. A key one of
+// them holds may name any descriptor section, and the reverse, whichever
+// surface wrote it and in either order, and the export still carries each ID
+// once.
+func TestUnitXMLIDRepositoriesAndLDAPOutsideNamespace(t *testing.T) {
 	db := inmem.New()
 	d := ldapDeps(t, db)
-	if _, err := applyWith(t, d, idEntry(idProxy, "dup")+idEntry(idLocal, "both"), false); err != nil {
-		t.Fatal(err)
+	steps := []func() error{
+		func() error {
+			_, err := applyWith(t, d, idEntry(idProxy, "dup")+idEntry(idLocal, "both"), false)
+			return err
+		},
+		func() error {
+			seedRepo(t, db, repo.Config{Key: "dup-rest", Class: repo.Local, PackageType: repo.Generic})
+			ldapConnection(t, d, "dup")
+			ldapConnection(t, d, "both")
+			return nil
+		},
+		// A descriptor section over a REST repository, and a repository and an
+		// LDAP connection over descriptor sections, in one patch.
+		func() error {
+			_, err := applyWith(t, d, idEntry(idLayout, "dup-rest")+idEntry(idBackup, "both")+
+				"remoteRepositories:\n  dup:\n    type: generic\n    url: https://upstream.invalid\n"+
+				idEntry(idLDAP, "dup-rest"), false)
+			return err
+		},
 	}
-	seedRepo(t, db, repo.Config{Key: "dup", Class: repo.Local, PackageType: repo.Generic})
-	ldapConnection(t, d, "dup")
-	ldapConnection(t, d, "both")
-	ldapConnection(t, d, "alone")
-	if _, err := applyWith(t, d, idEntry(idLayout, "other")+"proxies:\n  dup:\n    port: 8081\n", false); err != nil {
-		t.Fatal("an unrelated patch was blocked", err)
+	for i, step := range steps {
+		if err := step(); err != nil {
+			t.Fatal("step", i, err)
+		}
 	}
 	node, body := exportXML(t, d)
-	if xmlText(t, node, "proxies/proxy[key=dup]/port") != "8081" {
-		t.Fatal(body)
-	}
 	var ids []string
 	for _, section := range node.Children {
 		for _, entry := range section.Children {
@@ -210,17 +200,10 @@ func TestUnitXMLIDStoredClash(t *testing.T) {
 		}
 	}
 	slices.Sort(ids)
-	if len(slices.Compact(slices.Clone(ids))) != len(ids) {
-		t.Fatalf("duplicate IDs %v in\n%s", ids, body)
+	if want := []string{"both", "dup", "dup-rest"}; !slices.Equal(ids, want) {
+		t.Fatalf("IDs %v, want %v in\n%s", ids, want, body)
 	}
-	for _, want := range []string{"alone", "both", "dup", "other"} {
-		if !slices.Contains(ids, want) {
-			t.Fatalf("%s missing from %v", want, ids)
-		}
-	}
-	if strings.Contains(body, "<localRepository><key>dup</key>") || strings.Count(body, "<key>both</key>") != 1 {
-		t.Fatal(body)
-	}
+	assertEmptyRepositorySections(t, node)
 }
 
 func TestUnitXMLIDReadFailures(t *testing.T) {
@@ -240,22 +223,6 @@ func TestUnitXMLIDReadFailures(t *testing.T) {
 			t.Fatal(fail, err)
 		}
 	}
-	p, err := Parse([]byte(idEntry(idBackup, "b")), noEnv)
-	if err != nil {
-		t.Fatal(err)
-	}
-	d := depsOf(t, db)
-	d.LDAP = unreadableLDAP{}
-	if _, err := Apply(ctx, d, p, now, false); !errors.Is(err, errBoom) {
-		t.Fatal(err)
-	}
-}
-
-// unreadableLDAP fails to list the connections.
-type unreadableLDAP struct{ accessapi.LDAPSettings }
-
-func (unreadableLDAP) Connections(context.Context) ([]accessapi.LDAPConnection, error) {
-	return nil, errBoom
 }
 
 // TestUnitXMLIDLDAPGroupNamesAreNotIDs: an ldapGroupSetting's name is

@@ -165,7 +165,8 @@ func testExportSnapshot(t *testing.T, db applyStore, writer string) {
 	d := depsOf(t, db)
 	d.Projects = accesstest.Over(t, db).API().Projects
 	plan, err := Parse(
-		[]byte("localRepositories:\n  snapshot-local:\n    type: generic\n    description: before\nproxies:\n  snapshot-proxy:\n    host: before.invalid\n    port: 3128\n"),
+		[]byte("localRepositories:\n  snapshot-local:\n    type: generic\nproxies:\n  snapshot-proxy:\n    host: before.invalid\n    port: 3128\n"+
+			"backups:\n  snapshot-backup:\n    cronExp: 0 0 2 * * ?\n    excludedRepositories: [snapshot-local]\n"),
 		noEnv,
 	)
 	if err != nil {
@@ -197,7 +198,7 @@ func testExportSnapshot(t *testing.T, db applyStore, writer string) {
 	writeResult := make(chan error, 1)
 	go func() {
 		if writer == "descriptor" {
-			patch, err := Parse([]byte("localRepositories:\n  snapshot-local:\n    description: after\nproxies:\n  snapshot-proxy:\n    host: after.invalid\n"), noEnv)
+			patch, err := Parse([]byte("proxies:\n  snapshot-proxy:\n    host: after.invalid\n"), noEnv)
 			if err == nil {
 				writeDeps := d
 				writeDeps.Tx = writeTx
@@ -207,16 +208,14 @@ func testExportSnapshot(t *testing.T, db applyStore, writer string) {
 		} else {
 			// This is the owning repository API's publication: its transaction and
 			// Projects.Guard are used by HTTP repository create/update/delete too.
+			// The export reads repository keys for the backup's exclusions, so a
+			// deletion it must not tear is the repository writer's visible change.
 			writeResult <- writeTx.Tx(ctx, func(ctx context.Context) error {
 				if err := d.Projects.Guard(ctx); err != nil {
 					return err
 				}
-				c, err := d.Repositories.Get(ctx, "snapshot-local")
-				if err != nil {
-					return err
-				}
-				c.Description = "after"
-				return d.Repositories.Update(ctx, c)
+				_, _, err := d.Repositories.Remove(ctx, "snapshot-local", "")
+				return err
 			})
 		}
 	}()
@@ -248,7 +247,7 @@ func testExportSnapshot(t *testing.T, db applyStore, writer string) {
 	if err := xml.Unmarshal(got.body, &node); err != nil {
 		t.Fatal(err)
 	}
-	if xmlText(t, node, "localRepositories/localRepository/description") != "before" || xmlText(t, node, "proxies/proxy/host") != "before.invalid" {
+	if xmlText(t, node, "backups/backup/excludedRepositories/repositoryRef") != "snapshot-local" || xmlText(t, node, "proxies/proxy/host") != "before.invalid" {
 		t.Fatal("torn export", string(got.body))
 	}
 	select {
@@ -259,8 +258,9 @@ func testExportSnapshot(t *testing.T, db applyStore, writer string) {
 	case <-ctx.Done():
 		t.Fatal(ctx.Err())
 	}
-	node, _ = exportXML(t, d)
-	if xmlText(t, node, "localRepositories/localRepository/description") != "after" {
-		t.Fatal("writer never became visible")
+	node, body := exportXML(t, d)
+	if writer == "descriptor" && xmlText(t, node, "proxies/proxy/host") != "after.invalid" ||
+		writer == "repository" && strings.Contains(body, "<repositoryRef>") {
+		t.Fatal("writer never became visible", body)
 	}
 }

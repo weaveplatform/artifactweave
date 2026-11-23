@@ -2,7 +2,6 @@ package descriptor
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"slices"
@@ -158,24 +157,17 @@ downloadRedirectConfig:
 		t.Fatal("wrong descriptor root", node.Name)
 	}
 	for path, want := range map[string]string{
-		"localRepositories/localRepository/key":                                                      "export-local",
-		"localRepositories/localRepository/type":                                                     "generic",
-		"localRepositories/localRepository/description":                                              "data <>&\"",
-		"remoteRepositories/remoteRepository/key":                                                    "export-remote",
-		"remoteRepositories/remoteRepository/username":                                               "remote-user",
-		"remoteRepositories/remoteRepository/url":                                                    "https://upstream.invalid/repo",
-		"federatedRepositories/federatedRepository/federatedMembers/federatedMember/enabled":         "false",
-		"proxies/proxy/key":                                                                          "proxy <>&",
-		"proxies/proxy/services":                                                                     "jfrt,jfxr",
-		"proxies/proxy/redirectedToHosts":                                                            "one.invalid,two.invalid",
-		"propertySets/propertySet/name":                                                              "set <>&",
-		"propertySets/propertySet/visible":                                                           "false",
-		"propertySets/propertySet/properties/property/name":                                          "property <>&",
+		"proxies/proxy/key":                                 "proxy <>&",
+		"proxies/proxy/services":                            "jfrt,jfxr",
+		"proxies/proxy/redirectedToHosts":                   "one.invalid,two.invalid",
+		"propertySets/propertySet/name":                     "set <>&",
+		"propertySets/propertySet/visible":                  "false",
+		"propertySets/propertySet/properties/property/name": "property <>&",
 		"propertySets/propertySet/properties/property/predefinedValues/predefinedValue/value":        "value <>&",
 		"propertySets/propertySet/properties/property/predefinedValues/predefinedValue/defaultValue": "true",
-		"repoLayouts/repoLayout/name":                                                                "layout <>&",
-		"repoLayouts/repoLayout/descriptorPathPattern":                                               "",
-		"repoLayouts/repoLayout/distinctiveDescriptorPathPattern":                                    "false",
+		"repoLayouts/repoLayout/name":                             "layout <>&",
+		"repoLayouts/repoLayout/descriptorPathPattern":            "",
+		"repoLayouts/repoLayout/distinctiveDescriptorPathPattern": "false",
 		"mailServer/from":                        "sender <sender@example.invalid>",
 		"mailServer/enabled":                     "false",
 		"security/anonAccessEnabled":             "true",
@@ -190,19 +182,36 @@ downloadRedirectConfig:
 			t.Error("protected data reached XML", secret)
 		}
 	}
-	// The public API is the authority too: an update is visible without applying
-	// another descriptor, and deleting its repository removes its XML entry.
-	c, err := d.Repositories.Get(t.Context(), "export-local")
-	if err != nil {
-		t.Fatal(err)
+	// 7.161.26 serves its repository sections empty, the repositories living in
+	// its repository configuration store: the patch still created all four,
+	// and the export names none of them.
+	for _, key := range []string{"export-local", "export-remote", "export-virtual", "export-federated"} {
+		if _, err := d.Repositories.Get(t.Context(), key); err != nil {
+			t.Fatal("descriptor repository not created", key, err)
+		}
+		if strings.Contains(body, key) {
+			t.Error("repository reached the XML", key)
+		}
 	}
-	c.Description = "changed through owning API"
-	if err := d.Repositories.Update(t.Context(), c); err != nil {
-		t.Fatal(err)
+	assertEmptyRepositorySections(t, node)
+}
+
+// assertEmptyRepositorySections checks that the export carries each of
+// 7.161.26's repository sections, in XSD order and with no entry.
+func assertEmptyRepositorySections(t *testing.T, node exportNode) {
+	t.Helper()
+	var got []string
+	for _, section := range node.Children {
+		if strings.HasSuffix(section.Name.Local, "Repositories") {
+			got = append(got, section.Name.Local)
+			if len(section.Children) != 0 {
+				t.Errorf("%s carries %d entries", section.Name.Local, len(section.Children))
+			}
+		}
 	}
-	node, _ = exportXML(t, d)
-	if got := xmlText(t, node, "localRepositories/localRepository/description"); got != c.Description {
-		t.Fatal("stale export", got)
+	want := []string{"localRepositories", "remoteRepositories", "virtualRepositories", "federatedRepositories", "releaseBundlesRepositories"}
+	if !slices.Equal(got, want) {
+		t.Errorf("repository sections = %v, want %v", got, want)
 	}
 }
 
@@ -213,11 +222,12 @@ func TestUnitExportEmptyAndOptionalState(t *testing.T) {
 	if xmlText(t, node, "security/anonAccessEnabled") != "false" {
 		t.Fatal("unset anonymous access was not off")
 	}
-	for _, absent := range []string{"<mailServer>", "<downloadRedirectConfig>", "<backup>", "<localRepository>"} {
+	for _, absent := range []string{"<mailServer>", "<downloadRedirectConfig>", "<backup>", "<ldapSettings>"} {
 		if strings.Contains(body, absent) {
 			t.Error("invented configuration", absent)
 		}
 	}
+	assertEmptyRepositorySections(t, node)
 	// Explicit empty and false retain their presence; missing fields stay absent.
 	if err := db.Configs().
 		Put(t.Context(), configdoc.ConfigDocument{Kind: configdoc.ConfigMailServer, Key: "mailserver", Document: []byte(`{"enabled":false,"host":"","username":""}`)}); err != nil {
@@ -373,92 +383,6 @@ func TestUnitExportRechecksCurrentAdministratorAndTokenCeiling(t *testing.T) {
 	}
 }
 
-func TestUnitExportRepositoryXMLNamesAndCollections(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		body string
-		want map[string]string
-	}{
-		{
-			name: "local",
-			body: `{"key":"local","rclass":"local","packageType":"generic","checksumPolicyType":"client-checksums","downloadRedirect":false,"xrayIndex":false,"xrayDataTtl":0,"propertySets":["release"],"cargoAnonymousAccess":false}`,
-			want: map[string]string{
-				"localRepoChecksumPolicyType":      "client-checksums",
-				"downloadRedirect/enabled":         "false",
-				"xray/enabled":                     "false",
-				"xray/dataTtl":                     "0",
-				"propertySets/propertySetRef":      "release",
-				"cargoConfig/cargoAnonymousAccess": "false",
-			},
-		},
-		{
-			name: "remote",
-			body: `{"key":"remote","rclass":"remote","packageType":"generic","proxy":"corp","vcsType":"GIT","vcsGitProvider":"GITHUB","vcsGitDownloadUrl":"https://git.invalid","feedContextPath":"v2","pyPIRepositorySuffix":"simple","externalDependenciesEnabled":false,"externalDependenciesPatterns":["**"],"contentSynchronisation":{"enabled":true,"statistics":{"enabled":false},"properties":{"enabled":true},"source":{"originAbsenceDetection":true}},"customHttpHeaders":[{"name":"X-Public","value":"value <>&","sensitive":false},{"name":"X-Private","value":"private-fixture","sensitive":true}]}`,
-			want: map[string]string{
-				"proxyRef":                                             "corp",
-				"vcs/type":                                             "git",
-				"vcs/git/provider":                                     "github",
-				"vcs/git/downloadUrl":                                  "https://git.invalid",
-				"nuget/feedContextPath":                                "v2",
-				"pypi/repositorySuffix":                                "simple",
-				"externalDependencies/enabled":                         "false",
-				"externalDependencies/patterns/pattern":                "**",
-				"contentSynchronisation/statistics/enabled":            "false",
-				"contentSynchronisation/properties/enabled":            "true",
-				"contentSynchronisation/source/originAbsenceDetection": "true",
-			},
-		},
-		{
-			name: "virtual",
-			body: `{"key":"virtual","rclass":"virtual","packageType":"generic","repositories":["local"],"p2Urls":["https://p2.invalid"],"virtualRetrievalCachePeriodSecs":0,"optionalIndexCompressionFormats":["bz2"],"projectKey":"private-project","environments":["DEV"]}`,
-			want: map[string]string{
-				"repositories/repositoryRef": "local",
-				"p2/urls/url":                "https://p2.invalid",
-				"virtualCacheConfig/virtualRetrievalCachePeriodSecs": "0",
-				"debianOptionalIndexCompressionFormats/debianFormat": "bz2",
-			},
-		},
-		{
-			name: "federated",
-			body: `{"key":"federated","rclass":"federated","packageType":"generic","members":[{"url":"https://peer.invalid/repo","enabled":false}],"disableProxy":false}`,
-			want: map[string]string{
-				"federatedMembers/federatedMember/url":     "https://peer.invalid/repo",
-				"federatedMembers/federatedMember/enabled": "false",
-				"disableProxy": "false",
-			},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var cfg repo.Config
-			if err := json.Unmarshal([]byte(tc.body), &cfg); err != nil {
-				t.Fatal(err)
-			}
-			fields, err := exportRepository(cfg)
-			if err != nil {
-				t.Fatal(err)
-			}
-			body, err := xml.Marshal(fields)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var node exportNode
-			if err := xml.Unmarshal(body, &node); err != nil {
-				t.Fatal(err)
-			}
-			for path, want := range tc.want {
-				if got := xmlText(t, node, path); got != want {
-					t.Errorf("%s = %q, want %q", path, got, want)
-				}
-			}
-			for _, private := range []string{"private-fixture", "private-project", "<environments>"} {
-				if strings.Contains(string(body), private) {
-					t.Error("non-descriptor data reached XML", private)
-				}
-			}
-		})
-	}
-}
-
 func TestUnitExportLegacyProxyServiceList(t *testing.T) {
 	db := inmem.New()
 	// Older writes accepted lists here. The XML projection still reads them
@@ -515,20 +439,6 @@ func TestUnitExportPropertySetProviderMapValues(t *testing.T) {
 	}
 }
 
-func TestUnitExportRepositoryPreservesAbsentDebianFlags(t *testing.T) {
-	fields, err := exportRepository(repo.Config{Key: "debian", Class: repo.Local, PackageType: repo.Debian})
-	if err != nil {
-		t.Fatal(err)
-	}
-	body, err := xml.Marshal(fields)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(body), "<ddebSupported>") || strings.Contains(string(body), "<debianTrivialLayout>") {
-		t.Fatal("REST defaults replaced absent XML configuration", string(body))
-	}
-}
-
 func TestUnitExportDoesNotPromoteStoredValueKeysToXMLNames(t *testing.T) {
 	db := inmem.New()
 	// An unexpected structured value can exist in an older configuration
@@ -567,64 +477,6 @@ func TestUnitExportRejectsPartialAuthorityBindings(t *testing.T) {
 	}
 }
 
-func TestUnitExportJavaOnlyRemoteFields(t *testing.T) {
-	d := depsOf(t, inmem.New())
-	flag := false
-	if err := d.Repositories.Create(t.Context(), repo.Config{
-		Key: "java-remote", Class: repo.Remote, PackageType: repo.HuggingFaceML, URL: "https://upstream.invalid/repo",
-		RetrieveSha256FromServer: &flag, MLRepoLayout: &flag,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	node, _ := exportXML(t, d)
-	for _, path := range []string{"retrieveSha256FromServer", "huggingFace/mlRepoLayout"} {
-		if got := xmlText(t, node, "remoteRepositories/remoteRepository/"+path); got != "false" {
-			t.Fatalf("%s = %q, want explicit false", path, got)
-		}
-	}
-	patch, err := Parse([]byte("remoteRepositories:\n  java-remote:\n    retrieveSha256FromServer: true\n"), noEnv)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Apply(t.Context(), d, patch, now, false); err != nil {
-		t.Fatal(err)
-	}
-	node, _ = exportXML(t, d)
-	if got := xmlText(t, node, "remoteRepositories/remoteRepository/retrieveSha256FromServer"); got != "true" {
-		t.Fatal("PATCH-owned Java-only field did not round-trip", got)
-	}
-}
-
-func TestUnitExportUsesXMLPackageTypeEnumValues(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		kind repo.PackageType
-		want string
-	}{
-		{"generic", repo.Generic, "generic"},
-		{"rpm", repo.RPM, "yum"},
-		{"helm oci", repo.HelmOCI, "helmOci"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			fields, err := exportRepository(repo.Config{Key: "enum", Class: repo.Local, PackageType: tc.kind})
-			if err != nil {
-				t.Fatal(err)
-			}
-			body, err := xml.Marshal(fields)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var node exportNode
-			if err := xml.Unmarshal(body, &node); err != nil {
-				t.Fatal(err)
-			}
-			if got := xmlText(t, node, "type"); got != tc.want {
-				t.Fatalf("XML type = %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestUnitExportTrustedEmbeddingAndCompleteAuthority(t *testing.T) {
 	for _, name := range []string{"trusted embedding", "complete HTTP authority"} {
 		t.Run(name, func(t *testing.T) {
@@ -644,73 +496,6 @@ func TestUnitExportTrustedEmbeddingAndCompleteAuthority(t *testing.T) {
 			body, err := NewAPI(d).Export.XML(ctx)
 			if err != nil || len(body) == 0 {
 				t.Fatalf("valid authority binding failed: %q %v", body, err)
-			}
-		})
-	}
-}
-
-func TestUnitExportJAXBTransientAndClassSpecificValues(t *testing.T) {
-	flag := true
-	for _, class := range []repo.Class{repo.Local, repo.Remote} {
-		t.Run(string(class), func(t *testing.T) {
-			cfg := repo.Config{
-				Key: "audit", Class: class, PackageType: repo.HuggingFaceML, MLRepoLayout: &flag,
-				ProjectKey: "api-only-project", Environments: []string{"api-only-environment"},
-				P2ChildOrigins: []string{"https://api-only.invalid"}, DockerProjectID: "api-only-docker-project",
-				ForceP2Authentication: &flag, EnableNormalizedVersion: &flag, EncryptStates: &flag,
-				ForceMetadataNameVersion: &flag, ForceNonDuplicateChart: &flag,
-				SendContext: &flag, PassThrough: &flag, Curated: &flag, EnableConanSupport: &flag,
-				PodsCdnURL: "https://api-only-cdn.invalid",
-			}
-			fields, err := exportRepository(cfg)
-			if err != nil {
-				t.Fatal(err)
-			}
-			body, err := xml.Marshal(fields)
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, name := range []string{"projectKey", "environments", "p2ChildOrigins", "dockerProjectId", "forceP2Authentication", "enableNormalizedVersion", "encryptStates", "forceMetadataNameVersion", "forceNonDuplicateChart", "sendContext", "passThrough", "curated", "enableConanSupport", "podsCdnUrl"} {
-				if strings.Contains(string(body), "<"+name+">") {
-					t.Error("API-only or XmlTransient field exported", name)
-				}
-			}
-			if got := strings.Contains(string(body), "<mlRepoLayout>true</mlRepoLayout>"); got != (class == repo.Remote) {
-				t.Fatal("mlRepoLayout did not follow its class-specific JAXB visibility", string(body))
-			}
-		})
-	}
-}
-
-func TestUnitExportVCSUsesXMLEnumValues(t *testing.T) {
-	for _, tc := range []struct {
-		provider repo.VCSGitProvider
-		want     string
-	}{
-		{repo.GitHub, "github"},
-		{repo.GitHubEnterprise, "githubenterprise"},
-		{repo.GitLab, "gitlab"},
-		{repo.Bitbucket, "bitbucket"},
-		{repo.OldStash, "oldstash"},
-		{repo.Stash, "stash"},
-		{repo.ArtifactoryVCS, "artifactory"},
-		{repo.CustomVCS, "custom"},
-	} {
-		t.Run(string(tc.provider), func(t *testing.T) {
-			fields, err := exportRepository(repo.Config{Key: "vcs", Class: repo.Remote, PackageType: repo.VCS, VCSType: "GIT", VCSGitProvider: tc.provider})
-			if err != nil {
-				t.Fatal(err)
-			}
-			body, err := xml.Marshal(fields)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var node exportNode
-			if err := xml.Unmarshal(body, &node); err != nil {
-				t.Fatal(err)
-			}
-			if xmlText(t, node, "vcs/type") != "git" || xmlText(t, node, "vcs/git/provider") != tc.want {
-				t.Fatal("Jackson enum spelling reached XML", string(body))
 			}
 		})
 	}

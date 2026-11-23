@@ -180,16 +180,16 @@ func setFlag(where string, value any, dst **bool) error {
 // planLDAP checks the patch's connections against the stored ones and
 // records their outcomes. It runs with every other entry's checks, before
 // anything is written.
-func planLDAP(ctx context.Context, d Deps, p *Patch, res *configapi.Result) ([]accessapi.LDAPResult, error) {
+func planLDAP(ctx context.Context, d Deps, p *Patch, res *configapi.Result) error {
 	if len(p.LDAP) == 0 {
-		return nil, nil
+		return nil
 	}
 	if d.LDAP == nil {
-		return nil, fmt.Errorf("security.ldapSettings: no LDAP binding: %w", kernel.ErrStore)
+		return fmt.Errorf("security.ldapSettings: no LDAP binding: %w", kernel.ErrStore)
 	}
 	results, err := d.LDAP.Plan(ctx, p.LDAP)
 	if err != nil {
-		return nil, ldapError(err)
+		return ldapError(err)
 	}
 	for _, r := range results {
 		name := "security.ldapSettings." + r.Key
@@ -204,7 +204,7 @@ func planLDAP(ctx context.Context, d Deps, p *Patch, res *configapi.Result) ([]a
 			res.Unchanged = append(res.Unchanged, name)
 		}
 	}
-	return results, nil
+	return nil
 }
 
 // applyLDAP writes the patch's connections inside the patch's transaction.
@@ -228,49 +228,12 @@ func ldapError(err error) error {
 	return err
 }
 
-// exportLDAP renders the connections in 7.x's LdapSetting and SearchType
-// element order. The manager password is never exported: the provider of
-// the descriptor resource ignores it on read, and the export must not carry
-// a sealed secret (decision 0017). Empty strings are left out, as JAXB
-// leaves out an unset element.
-func exportLDAP(ctx context.Context, d Deps) ([]exportFields, error) {
-	if d.LDAP == nil {
-		return nil, nil
-	}
-	all, err := d.LDAP.Connections(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("read export LDAP connections: %w", err)
-	}
-	out := make([]exportFields, 0, len(all))
-	for _, c := range all {
-		text := func(fields []exportField, name, value string) []exportField {
-			if value == "" {
-				return fields
-			}
-			return append(fields, exportValue(name, value))
-		}
-		search := exportField{Name: "search"}
-		search.Children = text(search.Children, "searchFilter", c.SearchFilter)
-		search.Children = text(search.Children, "searchBase", c.SearchBase)
-		search.Children = append(search.Children, exportValue("searchSubTree", c.SearchSubTree))
-		search.Children = text(search.Children, "managerDn", c.ManagerDN)
-		fields := []exportField{exportValue("key", c.Key), exportValue("enabled", c.Enabled)}
-		fields = text(fields, "ldapUrl", c.URL)
-		fields = text(fields, "userDnPattern", c.UserDNPattern)
-		fields = append(fields, search, exportValue("autoCreateUser", c.AutoCreateUser))
-		fields = text(fields, "emailAttribute", c.EmailAttribute)
-		fields = append(fields,
-			exportValue("ldapPoisoningProtection", c.PoisoningProtection),
-			exportValue("allowUserToAccessProfile", c.AllowUserToAccessProfile),
-			exportValue("pagingSupportEnabled", c.PagingSupportEnabled),
-		)
-		out = append(out, exportFields{Fields: fields})
-	}
-	return out, nil
-}
-
 // readExportSecurity reads the security element: the anonymous access switch,
-// unset until first written, and the LDAP connections.
+// unset until first written, the policies and the LDAP group settings. The
+// LDAP connections are not in it: 7.161.26's SecurityDescriptor has no
+// ldapSettings, which its PATCH moves to Access
+// (LdapSettingsMigrationHandler), so they are read at
+// /access/api/v1/ldap/settings.
 func readExportSecurity(ctx context.Context, d Deps) (exportSecurity, error) {
 	var out exportSecurity
 	var err error
@@ -282,9 +245,6 @@ func readExportSecurity(ctx context.Context, d Deps) (exportSecurity, error) {
 		return out, fmt.Errorf("read export anonymous access: %w", err)
 	}
 	if err := exportPolicies(ctx, d, &out); err != nil {
-		return out, err
-	}
-	if out.LDAP, err = exportLDAP(ctx, d); err != nil {
 		return out, err
 	}
 	if out.LDAPGroups, err = exportLDAPGroups(ctx, d); err != nil {

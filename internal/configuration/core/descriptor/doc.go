@@ -36,6 +36,8 @@
 //   - NewAPI: configapi.API, with Descriptor, Export, System and Mail bound over Deps.
 //   - Export.XML: one committed, protected XML descriptor of delivered sections;
 //     its typed section document is the extension seam for future sections.
+//     Repositories are read at /api/repositories and LDAP connections at
+//     /access/api/v1/ldap/settings, as on 7.161.26.
 //   - SystemMessage (configapi.System): the systemMessageConfig singleton,
 //     the default when none is stored; it is not in the XML, as in the XSD.
 //   - The section names (SectionLocal and the rest) and Lookup.
@@ -57,8 +59,8 @@
 //     access's LDAPChange and are planned and written through access's
 //     LDAPSettings, the service behind /access/api/v1/ldap/settings, so the
 //     two surfaces share one connection; access's refusals are reported with
-//     the descriptor's field names, and the export never carries a manager
-//     password.
+//     the descriptor's field names. The export carries no ldapSettings, as
+//     7.161.26's SecurityDescriptor has none (issue 1893).
 //   - security.ldapGroupSettings entries are written the same way through
 //     access's LDAPGroupSettings, the service behind
 //     /access/api/v1/ldap/groups; the whole section set to null deletes
@@ -90,13 +92,13 @@
 //     for backups, drops a repository's key from every backup when the
 //     repository is created or deleted outside the descriptor too.
 //   - Keys are one namespace of XML IDs (issue 1872): Apply refuses a patch
-//     that leaves a key in two of the repository sections, proxies, the
-//     reverse proxy, backups, propertySets, repoLayouts and
-//     security.ldapSettings when it was not there before, reading the state
-//     the whole patch leaves, including repositories and LDAP connections
-//     their REST APIs created. A clash those APIs stored does not block an
-//     unrelated patch; the export leaves out the repository or LDAP
-//     connection that shares the key, so it never carries one ID twice.
+//     that leaves a key in two of proxies, the reverse proxy, backups,
+//     propertySets and repoLayouts when it was not there before, reading the
+//     state the whole patch leaves. Repositories and LDAP connections are
+//     outside it (issue 1893): 7.161.26 keeps them out of its descriptor, in
+//     its repository configuration store and in Access, so the export
+//     carries its five repository sections empty and no ldapSettings, and a
+//     repository or connection may share any descriptor section's key.
 //   - Error texts reach clients and logs, so they stay byte-identical.
 //
 // # References
@@ -129,8 +131,7 @@
 // export with current authority rechecks and a guarded transaction snapshot.
 // PRJ-04 adds the documented singleton mailServer settings for quota delivery,
 // with its password separated before persistence and guarded configuration reads.
-// LDAP-01 adds security.ldapSettings through access's LDAPSettings, with the
-// connections in the XML export's security element. CFG-02 adds urlBase and
+// LDAP-01 adds security.ldapSettings through access's LDAPSettings. CFG-02 adds urlBase and
 // the reverse proxy behind configuration/api.WebServer: its writes build a
 // Patch and Apply it under the guard after a current administrator recheck,
 // and the export writes both in artifactory.xsd's order. CFG-04 adds
@@ -147,7 +148,9 @@
 // artifactory_mail_server resource sends. CFG-06
 // (https://github.com/weaveplatform/artifactweave/issues/1830) adds
 // quotaConfig. Issue 1872 makes the keyed sections' xs:ID keys one
-// namespace across the patch and the export.
+// namespace across the patch and the export. Issue 1893 follows 7.161.26's
+// descriptor: the export no longer carries repositories or LDAP connections,
+// and neither is in the xs:ID namespace.
 //
 // # Testing
 //
@@ -163,8 +166,9 @@
 //   - layout_name_test.go: the bodies of the artifactory_repository_layout
 //     Terraform resource, whose layouts repeat their own name.
 //   - export_test.go and export_consistency_test.go: protected XML, provider
-//     names/list and map shapes, optional values, failures, current authority
-//     and snapshot consistency against SQLite and PostgreSQL.
+//     names/list and map shapes, optional values, the empty repository
+//     sections, failures, current authority and snapshot consistency against
+//     SQLite and PostgreSQL.
 //   - redirect_test.go: downloadRedirectConfig and DownloadRedirectMinSize.
 //   - mail_test.go: singleton mail settings, secret retention/clearing, no-op
 //     enablement, validation, dry-run and enclosing transaction rollback.
@@ -173,17 +177,18 @@
 //     reapply and delete, defaults, repository references that follow the
 //     patch, refusals that write nothing, and a final-write fault that rolls
 //     back repositories, backups, mail and the system message together.
-//   - xmlid_test.go: keys shared between every kind of section, stored before,
-//     made through the repositories and LDAP APIs or arriving in one patch,
-//     refused with both entries named and nothing written; the reverse proxy
-//     through POST webServer; keys a patch frees; a clash stored outside the
-//     descriptor left out of the export; LDAP group names, which are not
-//     IDs, repeating another section's key; and read failures.
+//   - xmlid_test.go: keys shared between the descriptor's keyed sections,
+//     stored before or arriving in one patch, refused with both entries named
+//     and nothing written; the reverse proxy through POST webServer; keys a
+//     patch frees; repositories and LDAP connections, from the descriptor or
+//     their REST APIs, sharing any section's key; LDAP group names, which are
+//     not IDs, repeating another section's key; and read failures.
 //   - sysmessage_test.go: field merges, clearing, refusals, absence from the
 //     XML, and mailServer deletion with its sealed password.
 //   - ldap_test.go: every ldapSettings field mapped, outcomes through
 //     access's binding with a dry run and a second apply, a missing binding,
-//     planning and write failures, and the export's element order.
+//     planning and write failures, and the connections left out of the
+//     export.
 //   - security_test.go: every policy field mapped, the refusals and their
 //     reasons, outcomes through access's binding with a dry run and a second
 //     apply, locks cleared by turning locking off, refused policies and
