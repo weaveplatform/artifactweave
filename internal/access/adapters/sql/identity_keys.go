@@ -351,6 +351,37 @@ func (ks keys) DeleteKeypair(ctx context.Context, name string) error {
 	)
 }
 
+func (ks keys) SetKeypairField(ctx context.Context, name string, field port.KeypairField, value string) error {
+	var (
+		col string
+		arg any = value
+		err error
+	)
+	switch field {
+	case port.KeypairPublicKey:
+		col = "public_key"
+	case port.KeypairPrivateKey:
+		col = "private_key"
+		arg, err = ks.s.Seal(purposeKeypairPrivate, name, value)
+	case port.KeypairPassphrase:
+		col = "passphrase"
+		arg, err = ks.s.Seal(purposeKeypairPassphrase, name, value)
+	default:
+		return fmt.Errorf("set keypair %q: %w %d", name, port.ErrUnknownKeypairField, field)
+	}
+	if err != nil {
+		return err
+	}
+	// One upsert, not a read and an update: at read committed (PostgreSQL)
+	// two writers of different fields would each write back the other's
+	// field as it was before, and one half would be lost.
+	_, err = ks.s.Exec(ctx, fmt.Sprintf("set keypair %q %s", name, col),
+		"INSERT INTO keypairs (name, type, alias, "+col+") VALUES (?, ?, ?, ?) "+
+			"ON CONFLICT (name) DO UPDATE SET "+col+" = excluded."+col,
+		name, string(api.KeypairGPG), name, arg)
+	return err
+}
+
 const certificateCols = "alias, pem, private_key, issued_to, issued_by, issued_on, valid_until, fingerprint"
 
 func (ks keys) scanCertificate(row interface{ Scan(...any) error }) (api.Certificate, error) {

@@ -2,6 +2,7 @@ package port
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
@@ -159,6 +160,21 @@ type TokenStore interface {
 	DeleteExpired(ctx context.Context, before time.Time) (int64, error)
 }
 
+// KeypairField is one field of a key pair that SetKeypairField writes on
+// its own.
+type KeypairField int
+
+// ErrUnknownKeypairField is SetKeypairField's error for a field it does not
+// know.
+var ErrUnknownKeypairField = errors.New("unknown key pair field")
+
+// The fields SetKeypairField writes.
+const (
+	KeypairPublicKey KeypairField = iota + 1
+	KeypairPrivateKey
+	KeypairPassphrase
+)
+
 // KeyStore persists key material: repository key pairs, trusted CA
 // certificates, trusted release-bundle keys and Distribution signing keys.
 // Private keys and passphrases are sealed.
@@ -174,6 +190,12 @@ type KeyStore interface {
 	// DeleteKeypair removes a key pair. Refusing to remove one a repository
 	// still uses (RepoStore.UsingKeypair) is the caller's decision.
 	DeleteKeypair(ctx context.Context, name string) error
+	// SetKeypairField sets one field of the key pair called name to value
+	// and keeps the others, creating a GPG pair aliased name that holds that
+	// field alone when there is none. It is one statement: the instance GPG
+	// key's halves and passphrase are written independently, and two
+	// writers of different fields must both keep theirs.
+	SetKeypairField(ctx context.Context, name string, field KeypairField, value string) error
 
 	// PutCertificate creates or replaces the certificate with c.Alias.
 	PutCertificate(ctx context.Context, c api.Certificate) error

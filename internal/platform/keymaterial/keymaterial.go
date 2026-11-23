@@ -53,6 +53,23 @@ func CheckPair(pairType, privateKey, publicKey, passphrase string) error {
 	return CheckPublic(pairType, publicKey)
 }
 
+// CheckGPGPrivate checks that value is one ASCII-armored OpenPGP key
+// holding its private key. The instance GPG key's private half is uploaded
+// on its own (setGpgPrivateKey), possibly before its passphrase or public
+// half, so it is not unlocked here; CheckPair does that when the pair signs.
+func CheckGPGPrivate(value string) error {
+	list, err := openpgp.ReadArmoredKeyRing(strings.NewReader(value))
+	switch {
+	case err != nil:
+		return invalidf("the private key is not an ASCII-armored OpenPGP key")
+	case len(list) != 1:
+		return invalidf("the private key block must hold exactly one key")
+	case list[0].PrivateKey == nil:
+		return invalidf("the private key block holds no private key")
+	}
+	return nil
+}
+
 func checkRSA(privateKey, publicKey, passphrase string) error {
 	priv, err := parsePrivateKey([]byte(privateKey), passphrase)
 	if err != nil {

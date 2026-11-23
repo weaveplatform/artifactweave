@@ -679,8 +679,11 @@ components:
 paths:
   /api/gpg/key/private:
     put:
-      description: Stores the instance-wide GPG private key used to sign Debian and Alpine metadata. Admin only.
-        The key is sealed at rest and never returned.
+      description: Stores the private half of the instance-wide GPG key pair, default-gpg-key, which signs the
+        metadata of Debian, RPM and Opkg repositories that name no key pair of their own. Admin only. The body
+        must be one ASCII-armored OpenPGP private key; it is not unlocked until it signs, so the passphrase and
+        public half may follow in later requests. The public half and passphrase are kept. The key is sealed at
+        rest and never returned.
       operationId: setGpgPrivateKey
       requestBody:
         content:
@@ -716,8 +719,9 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/setgpgprivatekey.md
   /api/gpg/key/public:
     get:
-      description: Returns the instance-wide GPG public key so package clients can verify signed metadata. Readable
-        by any authenticated user; 404 until a key is set.
+      description: Returns the public half of the instance-wide GPG key pair so Debian, RPM and Opkg clients can
+        verify metadata it signs. Readable by any authenticated user, or anonymously while anonymous access is
+        on; 404 until a public key is set.
       operationId: getGpgPublicKey
       responses:
         '200':
@@ -742,7 +746,11 @@ paths:
       x-idempotency: safe
       x-oracle-source: https://docs.jfrog.com/administration/reference/getgpgpublickey.md
     put:
-      description: Stores the instance-wide GPG public key that matches the private key. Admin only.
+      description: Stores the public half of the instance-wide GPG key pair, which getGpgPublicKey and the
+        public key download of every repository signing with it publish. Admin only. The body must be public
+        OpenPGP armor only, with no private packets or further blocks. The private half and passphrase are
+        kept. The instance key signs only once both halves are set, belong together and the passphrase unlocks
+        the private one.
       operationId: setGpgPublicKey
       requestBody:
         content:
@@ -778,8 +786,9 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/setgpgpublickey.md
   /api/gpg/passphrase:
     put:
-      description: Stores the passphrase protecting the GPG private key. Admin only. The value travels in a header
-        rather than the body and is sealed at rest.
+      description: Stores the passphrase protecting the private half of the instance-wide GPG key pair. Admin
+        only. The value travels in a header rather than the body and is sealed at rest. Set before either half,
+        it is kept for them.
       operationId: setGpgPassPhrase
       parameters:
       - description: Required header parameter. The passphrase for the stored private key.

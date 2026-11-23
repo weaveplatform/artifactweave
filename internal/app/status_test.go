@@ -47,8 +47,8 @@ type statusCase struct {
 	// or the name of a statusSecrets token "<name>-access" as Bearer.
 	// A body names the fixture's other token values as {name}
 	// (statusSecrets). A body of checksum:<sha1> is a checksum deploy, and
-	// one of declared:<content> an upload declaring its SHA-1
-	// (checksumDeploy).
+	// one of declared:<content> an upload declaring its SHA-1, and one of
+	// passphrase:<value> the GPG passphrase header (checksumDeploy).
 	as       string
 	body     string
 	expected int
@@ -58,10 +58,18 @@ func (c statusCase) method() string { m, _, _ := strings.Cut(c.route, " "); retu
 
 // checksumDeploy turns a row body of "checksum:<sha1>" into the request of
 // a checksum deploy of that SHA-1: the headers that ask for one, which a row
-// has no field for, and no body. A body of "declared:<content>" is an upload
+// has no field for, and no body. A body of "passphrase:<value>" sends value
+// as the X-GPG-PASSPHRASE header with no body (setGpgPassPhrase). A body of "declared:<content>" is an upload
 // of content with its SHA-1 declared, as the JFrog CLI sends one. A body of
 // "explode:<name>" is an archive deploy of a zip holding <name>.
 func checksumDeploy(headers map[string]string, body string) (map[string]string, string) {
+	if value, ok := strings.CutPrefix(body, "passphrase:"); ok {
+		if headers == nil {
+			headers = map[string]string{}
+		}
+		headers["X-GPG-PASSPHRASE"] = value
+		return headers, ""
+	}
 	sum, byChecksum := strings.CutPrefix(body, "checksum:")
 	content, declared := strings.CutPrefix(body, "declared:")
 	entry, explode := strings.CutPrefix(body, "explode:")
@@ -108,6 +116,7 @@ func statusTable() []statusCase {
 		cleanupPolicyStatusRows(),
 		projectRepositoryStatusRows(),
 		keypairStatusRows(),
+		gpgStatusRows(),
 		securityStatusRows(),
 		tokenStatusRows(),
 		permissionStatusRows(),

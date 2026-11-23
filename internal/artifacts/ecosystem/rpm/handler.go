@@ -388,12 +388,12 @@ func signMetadata(
 	c repo.Config,
 	files map[string][]byte,
 ) error {
-	if c.PrimaryKeyPairRef == "" {
-		return nil
-	}
-	pair, err := keys.Keypair(ctx, c.PrimaryKeyPairRef)
+	pair, signs, err := accessapi.MetadataSigningPair(ctx, keys, c.PrimaryKeyPairRef)
 	if err != nil {
 		return fmt.Errorf("rpm: metadata signing key: %w", err)
+	}
+	if !signs {
+		return nil
 	}
 	if pair.Type != accessapi.KeypairGPG {
 		return fmt.Errorf("%w: rpm metadata signing requires gpg", errInvalidPackage)

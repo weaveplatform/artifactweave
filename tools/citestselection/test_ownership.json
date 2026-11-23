@@ -91,6 +91,7 @@
       "access_identity_internal_test.go",
       "authn_middleware_test.go",
       "fixture_test.go",
+      "gpg_internal_test.go",
       "keypairs_internal_test.go",
       "ldap_groups_internal_test.go",
       "ldap_internal_test.go",
@@ -270,6 +271,7 @@
       "auth_test.go",
       "builtin_user_delete_test.go",
       "fixture_test.go",
+      "gpg_instance_key_test.go",
       "ignored_basic_test.go",
       "keypairs_privacy_test.go",
       "keypairs_test.go",
@@ -484,6 +486,7 @@
       "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "debian": [
+      "test/server/access/gpg_instance_key_test.go",
       "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "docker": [
@@ -542,6 +545,7 @@
       "test/server/artifacts/repositories_test.go"
     ],
     "opkg": [
+      "test/server/access/gpg_instance_key_test.go",
       "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "pub": [
@@ -558,6 +562,7 @@
       "test/server/artifacts/reindex_test.go"
     ],
     "rpm": [
+      "test/server/access/gpg_instance_key_test.go",
       "test/server/artifacts/protocol_download_policy_test.go"
     ],
     "skills": [

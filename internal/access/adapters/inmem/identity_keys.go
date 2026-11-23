@@ -277,6 +277,27 @@ func (ks keys) DeleteKeypair(ctx context.Context, name string) error {
 	return deleteKeyed(ks.s, ctx, ks.keypairs, "keypair", name)
 }
 
+func (ks keys) SetKeypairField(ctx context.Context, name string, field port.KeypairField, value string) error {
+	return ks.s.Do(ctx, func() error {
+		k, ok := ks.keypairs().Get(name)
+		if !ok {
+			k = api.Keypair{Name: name, Type: api.KeypairGPG, Alias: name}
+		}
+		switch field {
+		case port.KeypairPublicKey:
+			k.PublicKey = value
+		case port.KeypairPrivateKey:
+			k.PrivateKey = value
+		case port.KeypairPassphrase:
+			k.Passphrase = value
+		default:
+			return fmt.Errorf("set keypair %q: %w %d", name, port.ErrUnknownKeypairField, field)
+		}
+		ks.keypairs().Put(name, k)
+		return nil
+	})
+}
+
 func (ks keys) PutCertificate(ctx context.Context, c api.Certificate) error {
 	return ks.s.Do(ctx, func() error {
 		ks.certificates().Put(c.Alias, c)
