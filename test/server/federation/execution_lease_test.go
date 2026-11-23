@@ -10,11 +10,13 @@ import (
 	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
+	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/schedule"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
+	"github.com/weaveplatform/artifactweave/test/server/support"
 )
 
 // Use the real Quartz dispatcher, SQL queue generations and direction drivers.
@@ -41,6 +43,16 @@ func TestAccSingleReplicationQuartzManualAndExpiredSQLLease(t *testing.T) {
 				}
 				position, err := w.runtime.Store.Schedules().Get(t.Context(), schedule.Reference{Kind: replication.ScheduleKind, Key: targets[0].Key})
 				if err != nil {
+					t.Fatal(err)
+				}
+				// The runtime also holds the garbage collector's schedule, due
+				// every four hours. This test counts and leases fires of one
+				// schedule on a clock that may cross a collection fire, so
+				// move collection beyond the window; otherwise its fire is
+				// the "second" occurrence, depending on the time of day.
+				farGC := "0 0 0 1 1 ? 2099" // Quartz's last year
+				if _, err := support.StoragePolicies(w.runtime.Store).Apply(t.Context(),
+					artifactsapi.StoragePolicyChange{GCCron: &farGC}, time.Now()); err != nil {
 					t.Fatal(err)
 				}
 				var clock atomic.Int64
