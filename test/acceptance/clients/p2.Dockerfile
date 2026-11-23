@@ -1,6 +1,6 @@
 # Client pins: Eclipse Platform / Equinox P2 4.41, Java 21.
 # The archive is pinned to Eclipse's published SHA-512 for each architecture.
-FROM ubuntu:26.10@sha256:c4ca31b6e93261c5dd773826f789738a49e414ca04fc094b1ccd0f91e07329a2
+FROM ubuntu:26.10@sha256:1c2a84ae3f2a24aeb97cded5b41f0211b441662f1a188cbd2e139e7625f6f1d6
 
 COPY ubuntu-mirrors.sh /usr/local/bin/ubuntu-mirrors
 RUN ubuntu-mirrors
