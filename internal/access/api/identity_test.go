@@ -1,9 +1,11 @@
 package api_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/access/api"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
 
 func TestUnitUserInfoEnabled(t *testing.T) {
@@ -27,5 +29,12 @@ func TestUnitUserInfoEnabled(t *testing.T) {
 		if got := c.user.Enabled(); got != c.want {
 			t.Errorf("%s: Enabled() = %v, want %v", c.name, got, c.want)
 		}
+	}
+}
+
+func TestUnitSecurityPolicyInvalid(t *testing.T) {
+	err := error(&api.SecurityPolicyInvalid{Section: "userLockPolicy", Reason: "loginAttempts must be at least 1"})
+	if err.Error() != "security.userLockPolicy: loginAttempts must be at least 1" || !errors.Is(err, kernel.ErrInvalid) {
+		t.Fatal(err)
 	}
 }

@@ -23,8 +23,9 @@
 // # Inputs
 //
 //   - NewAuthenticator: the user store, the settings store (the anonymous
-//     access switch, basic authentication, the lock and expiry policies and
-//     the Access lock settings that suspension follows) and Options: the
+//     access switch, internal password login, the lock, expiry and password
+//     encryption policies and the Access lock settings that suspension
+//     follows) and Options: the
 //     verified-password cache, the hash cost and concurrency, the
 //     TokenVerifier, the group store that a transient user's automatic
 //     groups come from, the API restriction store, and the external
@@ -82,6 +83,16 @@
 //   - A directory outage is no failed login: it counts toward neither the
 //     lock policy nor the suspension. A refusal counts as a wrong internal
 //     password does.
+//   - Internal password login off (basic_authentication_enabled false)
+//     turns off internal passwords and the encrypted passwords standing for
+//     them, never a directory's: with a directory enabled every Basic
+//     password goes to it, a local user's included; with none, every
+//     password answers ErrBasicAuthDisabled, as before LDAP existed. No user
+//     is exempt, the local administrator included (decision 0019).
+//   - The password encryption policy: required refuses a clear-text
+//     password outside a UI request (WithUIRequest) with
+//     ErrClearTextPassword before the user is read, unsupported refuses the
+//     encrypted password, and Current rechecks both.
 //   - A directory login's principal carries the login's proof as its
 //     PasswordRevision, so Current, CurrentRegistry and RestoreDownload end
 //     it as soon as the connection is disabled, changed or deleted.
@@ -122,7 +133,9 @@
 // API restrictions came with retry safety and bounded API execution (pull
 // request 905). Moved here in P9d, where the seed creates the build-info
 // repository through the artifacts module's Repositories. P12 added
-// directory logins (LDAP-02, #1833).
+// directory logins (LDAP-02, #1833), then internal password login as 7.x's
+// "Disable Internal Password Login" beside directories and the password
+// encryption policy (CFG-04, #1828).
 //
 // # Testing
 //

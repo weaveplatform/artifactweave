@@ -98,6 +98,9 @@
 //     LDAPOutcome, and the refusal LDAPInvalid: the LDAP connections the
 //     configuration descriptor plans, applies and exports, never their
 //     manager passwords.
+//   - SecurityPolicies, with SecurityPolicy, PasswordEncryption and the
+//     refusal SecurityPolicyInvalid: the lock, expiration and password
+//     encryption policies the configuration descriptor applies and exports.
 //   - Settings: the access options other modules read.
 //   - API: one implementation of each contract, as the module publishes
 //     them, with the Settings.
@@ -178,7 +181,7 @@
 // RepoVisibility and Decider.VisibleRepos. P11 events.go publishes the typed
 // user.locked transition with public identity and sanitized actor facts. The
 // target layout's hooks.go token gate remains P17. P12 LDAP-01 adds
-// LDAPSettings and its values.
+// LDAPSettings and its values; CFG-04 SecurityPolicies and its values.
 //
 // # Testing
 //

@@ -476,7 +476,7 @@ padding (`cliSafe`, `internal/auth/token/jwt.go`; decision 0005, "As implemented
 | GET / POST | `/access/api/v1/saml` | 200 | plus `/saml/{name}` and `/saml/general_settings` `{enable,certificateIsPresent}`; currently 501, P21 |
 | GET / POST / PUT | `/access/api/v1/ldap/settings` | 200 / **201** | plus `GET` and `DELETE /settings/{key}` (204); see [LDAP connections](#ldap-connections). `POST /settings/test` (LDAP-02) 204 or 400, see [LDAP login](#ldap-login); `/ldap/groups[/{name}]`, `.../refresh` (LDAP-03) currently 501, P12 |
 | GET / PUT | `/access/api/v1/httpsso`, `/access/api/v1/crowd` | 200 | currently 501, P21 |
-| GET / PUT | `/access/api/v1/config/security/authentication/basic_authentication_enabled` | 200 | `{"enabled":true}` |
+| GET / PUT | `/access/api/v1/config/security/authentication/basic_authentication_enabled` | 200 | `{"enabled":true}`; internal passwords only, see [internal password login](#internal-password-login) |
 | PUT / PATCH | `/access/api/v1/config/security/password_policy` | **204** | `{uppercase,lowercase,digit,special_char,length,not_match_old}`; PUT overwrites all, PATCH is partial; no body |
 | GET | `/access/api/v1/cert/root`, `/access/api/v1/cert/ca` | 200 | `text/plain`; currently 501, P38 |
 | GET / PUT / DELETE | `/access/api/v1/vault/configs[/{key}]` | 200 | currently 501, P38 |
@@ -605,11 +605,63 @@ Local rules, each **[I]** and listed on [#216](https://github.com/weaveplatform/
   without `manager_password` uses the stored connection's only when its key, URL and
   manager DN match, so a test cannot send a stored password to another server.
 
-Not followed yet: from 7.104.0, "when using all external authentication methods, for
+### Internal password login
+
+Sources: [supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations)
+(`security.authentication.basic-authentication-enabled`, "enable basic authentication
+using internal passwords, for users whose accounts are managed directly in the JFrog
+Platform", and `password-encryption`), [LDAP](https://docs.jfrog.com/administration/docs/ldap)
+("Enabling LDAP disables internal password authentication by default"), the 7.104.0 and
+7.104.5 self-managed release notes ("when using all external authentication methods, for
 example, SAML or LDAP, basic authentication using internal passwords will be disabled by
-default". artifactweave keeps internal passwords working beside LDAP, and the local
-administrator's fallback that decision 0019 requires; the setting is reported as a
-follow-up to #1833.
+default"; "Enabling single sign-on authentication now disables internal password
+authentication by default"), and **[J]**
+[JA-20120](https://jfrog.atlassian.net/rest/api/2/issue/JA-20120) on 7.161 for the UI's
+exclusion list. Implemented by CFG-04
+([#1828](https://github.com/weaveplatform/artifactweave/issues/1828)).
+
+- **Surface.** The UI checkbox "Disable Internal Password Login" is the Access setting
+  above; its REST surface is
+  `GET/PUT /access/api/v1/config/security/authentication/basic_authentication_enabled`.
+  Neither the YAML descriptor page nor the 7.161.26 `artifactory.xsd` carries it, so the
+  descriptor does not either.
+- **What it turns off.** Internal passwords on every Basic login, and the encrypted
+  passwords standing for them **[I]**: the encrypted password is the internal password in
+  another form, so a switch that turns internal passwords off is read as turning it off
+  too; before CFG-04 artifactweave accepted it with the switch off. A directory's password goes on logging in through an
+  enabled LDAP connection, a local user's included, as do access tokens. With no
+  connection enabled no password can verify, and the answer is the 401 the switch gave
+  before LDAP existed: "Basic authentication with a password is disabled; use an access
+  token".
+- **The default.** Unset means on. Writing the first enabled connection, through the
+  Access API or the descriptor, writes it off in the same transaction while it was never
+  written; a value an administrator wrote is never overwritten, and disabling or deleting
+  connections never writes it back on **[I]**: JFrog documents the default, not when it
+  is applied, nor what an install upgraded with LDAP already enabled sees.
+- **No exemption.** 7.x exempts only the users of the UI's "Internal users allowed to use
+  basic authentication" list, which has no documented REST or configuration surface;
+  artifactweave has no UI and exempts no one, the local administrator included. This
+  conflicts with decision [0019](decisions/0019-human-authentication-tiers.md)'s local
+  administrator fallback, which that decision now records: the fallback is an
+  administrator access token, or the switch written on before or after the connection is
+  enabled.
+
+### Password encryption policy
+
+The Access `password-encryption` setting (`supported`, `required`, `unsupported`), the
+descriptor's `security.passwordSettings.encryptionPolicy`
+(`REQUIRED|SUPPORTED|UNSUPPORTED` in the YAML page and `artifactory_general_security`,
+lower case in the descriptor classes 7.161.26 still ships). Implemented by CFG-04.
+
+- `supported`, the default, accepts the clear-text and the encrypted password.
+- `required` refuses a clear-text password with 401 "Only encrypted passwords are
+  accepted; send the encrypted password instead of the clear-text password" **[I]**
+  (JFrog documents only that clear-text authentication fails), before the user is read,
+  so nothing is counted. A UI request (`/ui/` or `Request-Agent: artifactoryUI`) is
+  exempt **[I]**: the encrypted password can only be fetched with the clear-text one.
+  Access tokens are unaffected.
+- `unsupported` refuses the encrypted password, as a Basic password, in
+  `X-JFrog-Art-Api` and in the rechecks of work that outlives the request.
 
 ## Authentication accepted on every endpoint
 
@@ -659,8 +711,9 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    them: since 7.35.1 it refuses callers without credentials
    (**[J]** [RTFACT-26414](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26414);
    [research 01](01-jfrog-api-landscape.md#authentication-schemes)).
-5. Basic auth can be disabled platform-wide through
-   `/access/api/v1/config/security/authentication/basic_authentication_enabled`.
+5. Internal password login can be turned off platform-wide through
+   `/access/api/v1/config/security/authentication/basic_authentication_enabled`
+   ([internal password login](#internal-password-login)).
    Failed Basic logins also suspend the user name for a moment: "the system will temporarily
    suspend (with a 403 HTTP status code) that user's account for a brief period of time during
    which additional login attempts will be ignored", the suspension growing with each failure

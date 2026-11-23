@@ -288,6 +288,7 @@
       "projects_test.go",
       "roles_status_test.go",
       "roles_test.go",
+      "security_baseline_test.go",
       "security_test.go",
       "streamed_lists_test.go",
       "streamed_memory_test.go",

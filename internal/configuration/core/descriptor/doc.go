@@ -18,8 +18,8 @@
 //   - Parse: a YAML document and a lookup for its ${NAME} references.
 //   - Deps, which Apply and NewAPI take: the unit of work (platform/tx), the
 //     artifacts module's Repositories and Layouts, the configuration
-//     document port (platform/configdoc) and access's AnonymousAccess and
-//     LDAPSettings, all over one store.
+//     document port (platform/configdoc) and access's AnonymousAccess,
+//     SecurityPolicies and LDAPSettings, all over one store.
 //   - DownloadRedirectMinSize: the configuration document port.
 //
 // # Outputs
@@ -99,7 +99,10 @@
 // connections in the XML export's security element. CFG-02 adds urlBase and
 // the reverse proxy behind configuration/api.WebServer: its writes build a
 // Patch and Apply it under the guard after a current administrator recheck,
-// and the export writes both in artifactory.xsd's order.
+// and the export writes both in artifactory.xsd's order. CFG-04 adds
+// security.userLockPolicy and security.passwordSettings through access's
+// SecurityPolicies, with the REST APIs' rules and both blocks in the export,
+// and refuses the other documented security fields with their reasons.
 //
 // # Testing
 //
@@ -123,6 +126,11 @@
 //   - ldap_test.go: every ldapSettings field mapped, outcomes through
 //     access's binding with a dry run and a second apply, a missing binding,
 //     planning and write failures, and the export's element order.
+//   - security_test.go: every policy field mapped, the refusals and their
+//     reasons, outcomes through access's binding with a dry run and a second
+//     apply, locks cleared by turning locking off, refused policies and
+//     failed writes that write nothing of their document, the export with
+//     the defaults, and the authenticator's cache dropped after a commit.
 //   - webserver_test.go: urlBase through Parse, PUT and PATCH with the CDN
 //     rule and the cached effective value; reverse proxy writes, reads with
 //     current authority, the snippet, refusals that store nothing, rollback,

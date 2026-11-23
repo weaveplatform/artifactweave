@@ -231,6 +231,11 @@ func credentials(
 		p, err = apiKeyCredentials(ctx, a, key)
 		return p, true, refusedAPIKey(r, err)
 	}
+	if uiRequest(r) {
+		// The required password encryption policy still takes a clear-text
+		// password from the UI, where 7.x's users obtain the encrypted one.
+		ctx = authn.WithUIRequest(ctx)
+	}
 	h := r.Header.Get("Authorization")
 	switch {
 	case accessapi.IgnoredAuthorization(h):

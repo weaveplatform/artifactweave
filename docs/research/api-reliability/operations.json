@@ -2704,7 +2704,7 @@
     "spec": "access.openapi.yaml",
     "operation_id": "getBasicAuthenticationStatus",
     "state": "implemented",
-    "contract": "Returns whether usernames and passwords are accepted over HTTP Basic. When the switch is off, only access tokens and reference tokens authenticate (decision 0005). Requires a platform admin.",
+    "contract": "Returns whether internal passwords are accepted over HTTP Basic (the UI's \"Disable Internal Password Login\" unchecked). When the switch is off, internal passwords and their encrypted passwords are refused, while an enabled LDAP connection's passwords and access and reference tokens go on authenticating. Unset reads true; enabling the first LDAP connection writes it false unless it was ever written. Requires a platform admin.",
     "handler": "internal/access/adapters/http/access_identity.go: AccessService.GetBasicAuthenticationStatus",
     "direct_calls": [
       "authn.BasicAuthEnabled",
@@ -20820,7 +20820,7 @@
     "spec": "access.openapi.yaml",
     "operation_id": "setBasicAuthenticationStatus",
     "state": "implemented",
-    "contract": "Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance, from the next request on. Returns 200 with no body. Requires a platform admin.",
+    "contract": "Turns acceptance of internal passwords over HTTP Basic on or off for the whole instance, from the next request on. A value written here is never overwritten by enabling an LDAP connection. Returns 200 with no body. Requires a platform admin.",
     "handler": "internal/access/adapters/http/access_identity.go: AccessService.SetBasicAuthenticationStatus",
     "direct_calls": [
       "fmt.Errorf",

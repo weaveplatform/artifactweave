@@ -29,9 +29,10 @@
 //
 //   - Module, whose API returns one binding of each access/api contract:
 //     Authenticator, Authorizer, Tokens, Keys, Identity, Restrictions,
-//     Projects, Grants, AnonymousAccess and LDAP, with the Settings.
-//   - KeysOf, ProjectsOf, AnonymousAccessOf, LDAPSettingsOf, RestrictionsOf
-//     and TokensOf:
+//     Projects, Grants, AnonymousAccess, LDAP and Security, with the
+//     Settings.
+//   - KeysOf, ProjectsOf, AnonymousAccessOf, LDAPSettingsOf,
+//     SecurityPoliciesOf, RestrictionsOf and TokensOf:
 //     the store-only bindings, for code that holds a store before any
 //     module exists, such as bootstrap, and the multipart upload service
 //     and the garbage collector, which app builds before the work queue.
@@ -104,7 +105,9 @@
 // service and the store. The module's routes and background work (target
 // layout, line 533) stay in the server and app for now. P12 (LDAP-01): the
 // LDAP binding over access/core/ldap, through which the descriptor writes
-// the connections the Access LDAP API serves.
+// the connections the Access LDAP API serves. CFG-04: the security policy
+// binding, through which the descriptor writes the lock, expiration and
+// password encryption policies the REST APIs write, with their rules.
 //
 // # Testing
 //
@@ -122,6 +125,10 @@
 //     store's answers and its errors as it gave them.
 //   - TestUnitLDAPBinding: API().LDAP and LDAPSettingsOf plan, apply and
 //     list through access/core/ldap, inside the caller's transaction.
+//   - TestUnitSecurityPolicyBinding, TestUnitSecurityPolicyForget: API().Security
+//     and SecurityPoliciesOf read the defaults, refuse with the REST rules,
+//     write inside the caller's transaction, unlock when locking is turned
+//     off, and drop the authenticator's cached policies.
 //   - TestUnitItemGrants, TestUnitAccessChange: the scans' target order and
 //     paging, their error texts, and AccessChange at exactly its limit and
 //     one past it.

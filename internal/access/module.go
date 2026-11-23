@@ -88,6 +88,7 @@ func New(d Deps) (*Module, error) {
 			Grants:          grants{st: d.Store},
 			AnonymousAccess: AnonymousAccessOf(d.Store),
 			LDAP:            LDAPSettingsOf(d.Store),
+			Security:        securityPolicies{st: d.Store, a: d.Authenticator},
 			Settings:        d.Settings,
 		},
 	}
@@ -143,3 +144,9 @@ func AnonymousAccessOf(st Store) accessapi.AnonymousAccess {
 // a store before any module exists, such as config apply and the bootstrap
 // descriptor. The errors are the core service's.
 func LDAPSettingsOf(st Store) accessapi.LDAPSettings { return ldapSettings{st: st} }
+
+// SecurityPoliciesOf returns the baseline security policy binding over st
+// alone, for code that holds a store before any module exists, such as config
+// apply and the bootstrap descriptor. Its Forget drops nothing: no
+// authenticator exists yet to cache the policies.
+func SecurityPoliciesOf(st Store) accessapi.SecurityPolicies { return securityPolicies{st: st} }

@@ -316,8 +316,28 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
   in the document is written. **[I]** A whole-section `ldapSettings: null` is refused, as
   for `mailServer`; the deprecated `artifactory_ldap_setting` resource deletes with it,
   and `artifactory_ldap_setting_v2` deletes through the Access API instead. Reapplying a
-  document changes nothing and keeps each connection's revision. `ldapGroupSettings`
-  arrives with LDAP-03.
+  document changes nothing and keeps each connection's revision. The first enabled
+  connection turns internal password login off while that switch was never written, in
+  the same transaction ([research 05](05-platform-identity-and-security-apis.md#internal-password-login)).
+- `security.userLockPolicy` and `security.passwordSettings` (CFG-04,
+  [#1828](https://github.com/weaveplatform/artifactweave/issues/1828)) write the state of
+  `PUT /api/security/userLockPolicy`, `PUT /api/security/configuration/passwordExpirationPolicy`
+  and the Access `password-encryption` setting through the access module, checked by the
+  REST APIs' rules, so each surface reads back what the other wrote. An omitted field keeps
+  its stored value; `loginAttempts: 0` is the default 5, below that, a `passwordMaxAge`
+  below 1 or another `encryptionPolicy` answers 400 naming the field, and the whole document
+  is refused. `encryptionPolicy` takes `REQUIRED`, `SUPPORTED` or `UNSUPPORTED` in any
+  case. A `null` anywhere in the two blocks is refused **[I]**: no field there is a free
+  string, and 7.x documents no `null` that resets a policy. Each block the document names
+  is reported as updated or unchanged. `passwordSettings.resetPolicy`, which 7.161.26's
+  XSD keeps, is not in the YAML page and answers 400 as an unknown field. Turning the lock
+  policy off clears every lock, as the REST API does.
+- The other documented security fields answer 400 with their own reason, before anything
+  is written: `anonAccessToBuildInfosDisabled` is deprecated since 6.6 and not applied,
+  `ldapGroupSettings` arrives with LDAP-03, and `crowdSettings`, `samlSettings`,
+  `oauthSettings` and `httpSsoSettings` with P21 (decision
+  [0019](decisions/0019-human-authentication-tiers.md)). The internal password switch is
+  in neither the YAML page nor the XSD, so it is not a descriptor field.
 - A successful patch answers `<n> changes to config merged successfully` ([J]
   [RTFACT-31174](https://jfrog.atlassian.net/browse/RTFACT-31174) quotes "14 changes to
   config merged successfully" from 7.84; [RTFACT-17040](https://jfrog.atlassian.net/browse/RTFACT-17040)).
@@ -516,8 +536,9 @@ closed source, so its use of the shared builder is inferred [I].
 
 - `PATCH` applies `localRepositories`, `remoteRepositories`, `virtualRepositories`,
   `federatedRepositories`, `proxies`, `propertySets`, `repoLayouts`,
-  `downloadRedirectConfig`, `mailServer`, `urlBase`, the `security.anonAccessEnabled` setting and
-  the `security.ldapSettings` connections (`internal/configuration/core/descriptor`). Download redirect configuration applies
+  `downloadRedirectConfig`, `mailServer`, `urlBase`, the `security.anonAccessEnabled` setting,
+  the `security.userLockPolicy` and `security.passwordSettings` policies and the
+  `security.ldapSettings` connections (`internal/configuration/core/descriptor`). Download redirect configuration applies
   the whole-MB `fileMinimumSize` setting used by CDN/storage redirects
   ([research 19](19-cdn-and-download-redirect.md#5-artifactweave-today)). Artifactory
   applies every section its YAML pages document ([D]
@@ -525,8 +546,8 @@ closed source, so its use of the shared builder is inferred [I].
   with any other top-level section answers 400 naming each such section and listing the
   supported sections, and changes nothing. The check runs before `${NAME}` references are resolved, so the
   error names the section rather than a variable inside it. The other sections arrive with
-  their features: `backups`, `gcConfig`, `trashcanConfig`, `quotaConfig`,
-  `systemMessageConfig` and the remaining baseline security settings in P12
+  their features: `backups`, `gcConfig`, `trashcanConfig`, `quotaConfig` and
+  `systemMessageConfig` in P12
   ([plan](../implementation/plan.md)). Stored federated repository configuration does
   not establish P13 peer synchronization. P36 completes scheduled backup and migration workflows;
   human identity settings follow P21/P22, and product settings follow their owners in the
@@ -569,7 +590,13 @@ closed source, so its use of the shared builder is inferred [I].
   ([S] provider 12.11.14
   [`resource_artifactory_repository_layout.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_repository_layout.go)),
   so the XML gives each layout its key as `name`.
-- The export's `security` element carries `ldapSettings/ldapSetting` in XSD order
+- The export's `security` element carries `anonAccessEnabled`, then `userLockPolicy`
+  (`enabled, loginAttempts`) and `passwordSettings` (`encryptionPolicy` in lower case,
+  then `expirationPolicy{enabled, passwordMaxAge, notifyByEmail}`), each with its value
+  or its default when never written **[I]**: 7.161.26's XSD keeps only the expiration
+  policy, the lock and encryption policies having moved to Access, so their names, values
+  and places follow the descriptor classes 7.161.26 still ships (`UserLockPolicy`,
+  `EncryptionPolicy`). Then `ldapSettings/ldapSetting` in XSD order
   (`key, enabled, ldapUrl, userDnPattern, search{searchFilter, searchBase, searchSubTree,
   managerDn}, autoCreateUser, emailAttribute, ldapPoisoningProtection,
   allowUserToAccessProfile, pagingSupportEnabled`), leaving out empty strings and always

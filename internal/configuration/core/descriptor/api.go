@@ -51,6 +51,10 @@ type Deps struct {
 	// reads them for the export. A descriptor that names connections is
 	// refused without it; an export without it has no ldapSettings.
 	LDAP accessapi.LDAPSettings
+	// Security checks and writes the security section's userLockPolicy and
+	// passwordSettings and reads them for the export. A descriptor that names
+	// them is refused without it; an export without it leaves them out.
+	Security accessapi.SecurityPolicies
 	// Projects serializes planning and publication before repository locks,
 	// including a descriptor that also changes anonymous credential policy.
 	Projects accessapi.Projects
@@ -124,6 +128,11 @@ func (a descriptorAPI) Apply(
 		// Inside an enclosing transaction this runs before that commits; the
 		// next read may then cache the old value until PublicURLRefresh.
 		a.public.Invalidate()
+	}
+	if err == nil && !dryRun && (p.Security != nil || len(p.LDAP) > 0) && a.d.Security != nil {
+		// An enabled LDAP connection may have turned internal password
+		// login off, which the authenticator caches with the policies.
+		a.d.Security.Forget()
 	}
 	return res, err
 }

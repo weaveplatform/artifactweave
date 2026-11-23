@@ -87,6 +87,9 @@ type Patch struct {
 	// LDAP are the security.ldapSettings connections, written through
 	// access's LDAPSettings.
 	LDAP []accessapi.LDAPChange
+	// Security is the userLockPolicy and passwordSettings blocks, written
+	// through access's SecurityPolicies.
+	Security *SecurityChange
 	// Changes is the number Artifactory reports as "<n> changes to config
 	// merged successfully": every value in the document, whether or not it
 	// differs from what is stored (see values).

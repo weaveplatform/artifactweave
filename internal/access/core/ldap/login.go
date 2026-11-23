@@ -180,6 +180,20 @@ func (l *Logins) Current(ctx context.Context, name string, proof [32]byte) (auth
 	return authn.DirectoryLogin{}, kernel.ErrBadCredentials
 }
 
+// Enabled implements authn.Directory: whether any connection is enabled.
+func (l *Logins) Enabled(ctx context.Context) (bool, error) {
+	all, err := l.settings.all(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, st := range all {
+		if st.conn.Enabled {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // cachedLogin is a remembered login: the connection that accepted it, its
 // proof under the revision of the time, and the email read then.
 type cachedLogin struct {

@@ -153,6 +153,11 @@ func ldapLogin(t *testing.T, ep containertest.LDAPEndpoint, backend string) {
 		t.Fatalf("a test stored a connection: %s", body)
 	}
 
+	// 7.x turns internal password login off when the first connection is
+	// enabled, unless it was ever set; setting it on first keeps the local
+	// administrator's password, the fallback this test exercises
+	// (TestAccInternalPasswordLogin covers the switch).
+	ldapCall(t, h, http.MethodPut, internalSwitch, admin, `{"enabled":true}`, http.StatusOK)
 	// Before any connection, a directory password is refused.
 	ldapCall(t, h, http.MethodGet, "/artifactory/libs-local/", basic("alice", accesstest.Alice.Password), "",
 		http.StatusUnauthorized)

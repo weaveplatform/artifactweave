@@ -17,5 +17,6 @@ type API struct {
 	Grants          Grants
 	AnonymousAccess AnonymousAccess
 	LDAP            LDAPSettings
+	Security        SecurityPolicies
 	Settings        Settings
 }

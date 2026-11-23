@@ -8,6 +8,7 @@ import (
 	"maps"
 	"slices"
 
+	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	"github.com/weaveplatform/artifactweave/internal/access/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 )
@@ -201,7 +202,8 @@ func (a *Authenticator) TransientGroups(ctx context.Context) ([]string, error) {
 }
 
 // passwordUsable applies to an encrypted password what Basic applies to the
-// password it stands for. Setting or expiring the password revokes it
+// password it stands for, and the encryption policy's unsupported, which
+// refuses encrypted passwords. Setting or expiring the password revokes it
 // (internal/access/core/identity), but the age policy expires a password
 // with no write to revoke on, so expiry is checked here as well.
 func (a *Authenticator) passwordUsable(ctx context.Context, u model.User) error {
@@ -211,6 +213,12 @@ func (a *Authenticator) passwordUsable(ctx context.Context, u model.User) error 
 	_, expiry, err := a.policies(ctx)
 	if err != nil {
 		return err
+	}
+	a.policy.mu.Lock()
+	internal, encryption := a.policy.allowBasicAuth, a.policy.encryption
+	a.policy.mu.Unlock()
+	if !internal || encryption == accessapi.EncryptionUnsupported {
+		return kernel.ErrBadCredentials
 	}
 	if PasswordExpired(u, expiry, a.now()) {
 		return kernel.ErrPasswordExpired

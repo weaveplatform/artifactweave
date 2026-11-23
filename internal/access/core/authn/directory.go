@@ -56,6 +56,20 @@ type Directory interface {
 	// answers kernel.ErrBadCredentials when it does not. It reads local
 	// state only and joins the transaction ctx carries.
 	Current(ctx context.Context, name string, proof [32]byte) (DirectoryLogin, error)
+	// Enabled reports whether any directory is enabled. It reads local
+	// state only.
+	Enabled(ctx context.Context) (bool, error)
+}
+
+// directoryEnabled reports whether a directory could accept a password. A
+// failed read answers false: the login then gets the internal password
+// switch's refusal rather than an attempt nothing could answer.
+func (a *Authenticator) directoryEnabled(ctx context.Context) bool {
+	if a.directory == nil {
+		return false
+	}
+	on, err := a.directory.Enabled(ctx)
+	return err == nil && on
 }
 
 // directoryOutcome is what asking the directories decided.
@@ -225,6 +239,15 @@ func (a *Authenticator) currentPasswordProof(
 	revision [32]byte,
 ) (directory bool, err error) {
 	if found && sha256.Sum256(u.PasswordHash) == revision {
+		// The internal password proved it, which the switch governs; a
+		// directory's proof below does not depend on it.
+		on, err := BasicAuthEnabled(ctx, a.settings)
+		if err != nil {
+			return false, err
+		}
+		if !on {
+			return false, kernel.ErrBadCredentials
+		}
 		return false, nil
 	}
 	if a.directory == nil {
