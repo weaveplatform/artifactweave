@@ -197,6 +197,31 @@ func (o outboxStore) Applied(
 	return m, o.s.Wrap("get applied marker", err)
 }
 
+func (o outboxStore) LockApplied(
+	ctx context.Context,
+	origin, stream string,
+) (outbox.AppliedMarker, error) {
+	m := outbox.AppliedMarker{Origin: origin, Stream: stream}
+	err := o.s.Tx(ctx, func(ctx context.Context) error {
+		// A position not yet recorded has no row to lock, so one is inserted
+		// at zero first: a second inserter of the same key waits for the
+		// first one's transaction, and the locking read then serialises
+		// every later applier on the row.
+		if _, err := o.s.Exec(ctx, "lock applied marker", dialect.InsertIgnore("applied_markers",
+			[]string{"origin", "stream", "last_seq"}, []string{"origin", "stream"}),
+			origin, stream, 0); err != nil {
+			return err
+		}
+		return o.s.Wrap("lock applied marker", o.s.Q(ctx).QueryRowContext(ctx, o.s.Dialect().Rebind(
+			"SELECT last_seq FROM applied_markers WHERE origin = ? AND stream = ?"+o.s.LockClause(ctx)),
+			origin, stream).Scan(&m.LastSeq))
+	})
+	if err != nil {
+		return outbox.AppliedMarker{}, err
+	}
+	return m, nil
+}
+
 func (o outboxStore) SetApplied(ctx context.Context, m outbox.AppliedMarker) error {
 	_, err := o.s.Exec(
 		ctx,

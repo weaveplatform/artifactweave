@@ -25,6 +25,8 @@ func runPeers(t *testing.T, newStore Factory) {
 	t.Run("PairingNonces", func(t *testing.T) { testPairingNonces(t, newStore(t)) })
 	t.Run("PairingNonceRace", func(t *testing.T) { testPairingNonceRace(t, newStore(t)) })
 	t.Run("PeerProtocolVersion", func(t *testing.T) { testPeerProtocolVersion(t, newStore(t)) })
+	t.Run("PeerDelivery", func(t *testing.T) { testPeerDelivery(t, newStore(t)) })
+	t.Run("StreamResyncs", func(t *testing.T) { testStreamResyncs(t, newStore(t)) })
 	t.Run("RequestNonces", func(t *testing.T) { testRequestNonces(t, newStore(t)) })
 	t.Run("RequestNoncesConcurrent", func(t *testing.T) { testRequestNoncesConcurrent(t, newStore(t)) })
 	t.Run("FederationMembers", func(t *testing.T) { testFederationMembers(t, newStore(t)) })
@@ -82,7 +84,75 @@ func peer(i int, uses ...model.UseCase) model.Peer {
 		CityName:        "Cardiff",
 		CountryCode:     "GB",
 		EdgeRole:        i%2 == 0,
+		Delivery:        []model.Delivery{model.DeliveryPush, model.DeliveryPull, model.DeliveryPulled}[i%3],
 	}
+}
+
+// testPeerDelivery: a peer recorded without a delivery is pushed to, and
+// each delivery survives a round trip and a replacement.
+func testPeerDelivery(t *testing.T, s port.Store) {
+	ctx := context.Background()
+	ps := s.Peers()
+	p := peer(4)
+	p.Delivery = ""
+	storekit.Must(t, ps.Put(ctx, p))
+	if got := storekit.Get[model.Peer](t)(ps.Get(ctx, p.InstanceID)); got.Delivery != model.DeliveryPush {
+		t.Fatalf("a peer put without a delivery reads %q, want push", got.Delivery)
+	}
+	for _, d := range []model.Delivery{model.DeliveryPull, model.DeliveryPulled, model.DeliveryPush} {
+		p.Delivery = d
+		storekit.Must(t, ps.Put(ctx, p))
+		if got := storekit.Get[model.Peer](t)(ps.Get(ctx, p.InstanceID)); got.Delivery != d {
+			t.Fatalf("delivery %q reads back %q", d, got.Delivery)
+		}
+		all := storekit.Get[[]model.Peer](t)(ps.List(ctx, port.PeerFilter{}))
+		if len(all) != 1 || all[0].Delivery != d {
+			t.Fatalf("List after delivery %q: %+v", d, all)
+		}
+	}
+}
+
+// testStreamResyncs: flags are keyed by origin, receiver and stream, listed
+// for either side, replaced, cleared one at a time and dropped with a peer.
+func testStreamResyncs(t *testing.T, s port.Store) {
+	ctx := context.Background()
+	rs := s.Resyncs()
+	self, a, b := peerID(1), peerID(2), peerID(3)
+	storekit.Same(t, "Resyncs of none", []model.StreamResync(nil),
+		storekit.Get[[]model.StreamResync](t)(rs.Resyncs(ctx, "")))
+	flags := []model.StreamResync{
+		{Origin: self, Receiver: a, Stream: "repo:x", Position: 3, Flagged: storekit.At(1)},
+		{Origin: self, Receiver: b, Stream: "repo:x", Position: 0, Flagged: storekit.At(2)},
+		{Origin: a, Receiver: self, Stream: "repo:x", Position: 9, Flagged: storekit.At(3)},
+		{Origin: a, Receiver: self, Stream: "repo:y", Position: 1, Flagged: storekit.At(4)},
+	}
+	for _, f := range flags {
+		storekit.Must(t, rs.Flag(ctx, f))
+	}
+	storekit.Same(t, "Resyncs of every instance", flags,
+		storekit.Get[[]model.StreamResync](t)(rs.Resyncs(ctx, "")))
+	storekit.Same(t, "Resyncs naming a", []model.StreamResync{flags[0], flags[2], flags[3]},
+		storekit.Get[[]model.StreamResync](t)(rs.Resyncs(ctx, a)))
+	again := flags[0]
+	again.Position, again.Flagged = 5, storekit.At(9)
+	storekit.Must(t, rs.Flag(ctx, again))
+	storekit.Same(t, "Resyncs naming b after a replacement", []model.StreamResync{flags[1]},
+		storekit.Get[[]model.StreamResync](t)(rs.Resyncs(ctx, b)))
+	storekit.Same(t, "the replaced flag", []model.StreamResync{again, flags[2], flags[3]},
+		storekit.Get[[]model.StreamResync](t)(rs.Resyncs(ctx, a)))
+	storekit.Must(t, rs.Clear(ctx, self, b, "repo:x"))
+	storekit.Must(t, rs.Clear(ctx, self, b, "repo:x"))
+	storekit.Same(t, "Resyncs naming b after Clear", []model.StreamResync(nil),
+		storekit.Get[[]model.StreamResync](t)(rs.Resyncs(ctx, b)))
+	storekit.Must(t, rs.DeletePeer(ctx, a))
+	storekit.Same(t, "Resyncs after DeletePeer", []model.StreamResync(nil),
+		storekit.Get[[]model.StreamResync](t)(rs.Resyncs(ctx, "")))
+	failsCancelled(t, map[string]func(context.Context) error{
+		"Flag":       func(ctx context.Context) error { return rs.Flag(ctx, flags[0]) },
+		"Resyncs":    func(ctx context.Context) error { _, err := rs.Resyncs(ctx, ""); return err }, //nolint:wrapcheck // the error is the subject
+		"Clear":      func(ctx context.Context) error { return rs.Clear(ctx, self, a, "repo:x") },
+		"DeletePeer": func(ctx context.Context) error { return rs.DeletePeer(ctx, a) },
+	})
 }
 
 func testPeers(t *testing.T, s port.Store) {

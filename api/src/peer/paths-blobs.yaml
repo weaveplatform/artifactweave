@@ -3,8 +3,7 @@ paths:
     get:
       description: >-
         Returns content this instance holds, for a peer applying an event or a snapshot entry that refers to it.
-        Only content that a stream the caller holds a use case for refers to is served. Not implemented; answers
-        501.
+        Only content that a stream the caller holds a use case for refers to is served.
       operationId: getBlob
       parameters:
         - name: sha256

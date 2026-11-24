@@ -34,7 +34,7 @@
 //
 //   - OutboxStore: Append, Read, LastSeq, Streams and Prune for the entries;
 //     PutCursor, Cursor, Cursors and DeleteCursors for peers' positions;
-//     Applied and SetApplied for the receiver's; and RecordFailedFetch,
+//     Applied, LockApplied and SetApplied for the receiver's; and RecordFailedFetch,
 //     FailedFetches and ClearFailedFetch for failed blob fetches.
 //   - HLC, with Compare, Next, Merge and String, and ParseHLC with its
 //     sentinel ErrInvalidHLC.
@@ -57,7 +57,10 @@
 //     one.
 //   - SetApplied runs in the transaction that applies the entry, which makes
 //     applying idempotent: a retried batch starts at the next expected
-//     sequence, AppliedMarker.Expect.
+//     sequence, AppliedMarker.Expect. That transaction reads the position
+//     with LockApplied, which holds it until commit, so two appliers of one
+//     origin's stream never both apply the same entry; Applied alone does
+//     not on PostgreSQL.
 //   - Module events share one reserved stream per origin and the existing
 //     sequence allocator. Peer cursors and applied markers remain independent.
 //   - Consumer effects and Ack share one metadata transaction. Acquire domain

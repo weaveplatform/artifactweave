@@ -16,7 +16,8 @@ type PeerFilter struct {
 // PeerStore persists paired peers and outstanding pairing nonces.
 type PeerStore interface {
 	// Put creates or replaces the peer with p.InstanceID. UseCases are a
-	// set: duplicates are dropped and Get and List return them sorted.
+	// set: duplicates are dropped and Get and List return them sorted. An
+	// empty Delivery is stored, and returned, as model.DeliveryPush.
 	Put(ctx context.Context, p model.Peer) error
 	// Get returns the peer.
 	Get(ctx context.Context, instanceID string) (model.Peer, error)
@@ -50,6 +51,24 @@ type PeerStore interface {
 	DeleteNonce(ctx context.Context, hash []byte) error
 	// PruneNonces removes nonces that expired before t and returns how many.
 	PruneNonces(ctx context.Context, before time.Time) (int64, error)
+}
+
+// StreamResyncStore records the receivers that fell behind an origin's
+// pruned floor on a stream and need a full sync (decision 0021, Ordered
+// outbox; PEER-05 starts it).
+type StreamResyncStore interface {
+	// Flag records r, replacing the record of the same origin, receiver
+	// and stream.
+	Flag(ctx context.Context, r model.StreamResync) error
+	// Resyncs returns the records whose origin or receiver is instanceID
+	// ("" for every record), ordered by origin, receiver and stream.
+	Resyncs(ctx context.Context, instanceID string) ([]model.StreamResync, error)
+	// Clear removes one record; clearing one that does not exist is not an
+	// error, since a caught-up receiver clears whatever is there.
+	Clear(ctx context.Context, origin, receiver, stream string) error
+	// DeletePeer removes every record naming instanceID as origin or
+	// receiver, when the peer is removed.
+	DeletePeer(ctx context.Context, instanceID string) error
 }
 
 // RequestNonceStore is the replay cache of signed peer requests (decision

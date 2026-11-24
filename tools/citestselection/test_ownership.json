@@ -421,7 +421,8 @@
       "push_recovery_test.go",
       "push_scope_edges_test.go",
       "push_test.go",
-      "replication_test.go"
+      "replication_test.go",
+      "streams_test.go"
     ],
     "test/server/notifications": [
       "subscriptions_test.go"

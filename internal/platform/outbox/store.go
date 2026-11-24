@@ -45,6 +45,15 @@ type OutboxStore interface {
 	// Applied returns the receiver's position in a peer's stream; a zero
 	// LastSeq and no error when nothing was applied yet.
 	Applied(ctx context.Context, origin, stream string) (AppliedMarker, error)
+	// LockApplied returns the receiver's position in a peer's stream, as
+	// Applied does, and inside a transaction holds it until the transaction
+	// ends. An applier reads its position with it, so that of two
+	// transactions applying one origin's stream, which a retried batch and
+	// the batch it retries can be, the second waits for the first and then
+	// reads the position the first committed. Applied alone does not
+	// serialise them on PostgreSQL, where both would read the same position
+	// and apply the entry twice.
+	LockApplied(ctx context.Context, origin, stream string) (AppliedMarker, error)
 	// SetApplied records the position, in the transaction that applies the
 	// entry, which is what makes applying idempotent.
 	SetApplied(ctx context.Context, m AppliedMarker) error

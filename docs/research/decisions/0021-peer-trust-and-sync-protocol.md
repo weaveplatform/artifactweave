@@ -12,8 +12,14 @@ implemented ([PEER-03](https://github.com/weaveplatform/artifactweave/issues/192
 **Transport** below): no request under the peer prefix reaches a handler without a paired
 peer's valid signature, except `POST /pair`, verified with the key its body presents.
 **Pairing** is implemented ([PEER-02](https://github.com/weaveplatform/artifactweave/issues/1926)):
-the service_trust endpoints and the peer API's `POST` and `DELETE /pair`. The other peer
-operations answer 501 until PEER-04, PEER-05 and FED-01 serve them.
+the service_trust endpoints and the peer API's `POST` and `DELETE /pair`. **Ordered
+outbox** delivery is implemented
+([PEER-04](https://github.com/weaveplatform/artifactweave/issues/1928),
+`internal/federation/core/sync`): push and pull of `streams/{stream}/events`,
+acknowledged cursors, `GET /blobs/{sha256}`, failed binaries with back-off retry, and
+pruning that flags a peer left behind for a full sync. No stream kind is registered yet,
+so every stream answers 404 until FED-02 registers `repo:<key>`. The other peer
+operations answer 501 until PEER-05, FED-01 and #1949 serve them.
 P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
 Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
@@ -215,6 +221,16 @@ payload and, for content events, the blob sha256 and size.
 - Outbox entries are pruned once every subscribed peer has acknowledged them or once they
   are older than the retention window (seven days by default). A peer whose cursor falls
   behind the pruned range needs a full sync.
+
+As implemented (PEER-04): each received entry applies in its own transaction, which reads
+the applied position with a lock (`OutboxStore.LockApplied`, `FOR UPDATE` on PostgreSQL),
+so concurrent or retried batches apply an entry once; a blob is fetched before that
+transaction, never inside it. A peer record's `delivery` is `push` (the default), `pull`
+(this instance pulls the peer's stream because the peer cannot reach it, and still pushes
+its own) or `pulled` (the peer pulls; nothing is pushed to it). A pull's `after`
+acknowledges, and never moves the cursor back. Retention is
+`federation.outbox_retention`; a peer whose position falls below what was pruned is
+recorded in `stream_resyncs` and its pull answers 410, for PEER-05 to resync.
 
 **Full sync.** A receiver that is behind the window, or that an operator asks to resync,
 requests a snapshot of the stream: `GET /artifactweave/peer/v1/streams/{stream}/snapshot`

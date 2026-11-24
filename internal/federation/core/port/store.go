@@ -21,6 +21,7 @@ type Store interface {
 	ExecutionStore
 	Peers() PeerStore
 	RequestNonces() RequestNonceStore
+	Resyncs() StreamResyncStore
 	Federation() FederationStore
 	Platform() PlatformStore
 }
