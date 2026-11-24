@@ -20,10 +20,8 @@ import (
 // Each transaction must still flush work in sorted order, even though it
 // visits destination then source, and both moves must finish after release.
 func TestAccSymbolsOppositeMovesOnPostgres(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-	defer cancel()
 	db, err := appstoretest.OpenPostgres(
-		ctx,
+		t.Context(),
 		platsqltest.PostgresDSN(t),
 		appstoretest.PostgresOptions{},
 	)
@@ -43,6 +41,12 @@ func TestAccSymbolsOppositeMovesOnPostgres(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
+	// The deadline bounds only the barrier, the moves and the checks.
+	// PostgresDSN starts the shared container on first use, and under heavy
+	// host load that alone took 22 s, so a deadline taken before it failed a
+	// correct run with "context deadline exceeded" (#1910).
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
 	entered := make(chan struct{}, 2)
 	resume := make(chan struct{})
 	var workers sync.WaitGroup

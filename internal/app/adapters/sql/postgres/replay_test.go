@@ -78,14 +78,16 @@ func TestAccKeyedReplayCrashHelper(t *testing.T) {
 }
 
 func TestAccReplayPruneDoesNotDeleteRenewal(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	s, err := postgres.Open(ctx, platsqltest.PostgresDSN(t), postgres.Options{MaxOpenConns: 8})
+	s, err := postgres.Open(t.Context(), platsqltest.PostgresDSN(t), postgres.Options{MaxOpenConns: 8})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = s.Close() })
 	appstoretest.Reset(t, s.DB(), pgdrv.Dialect)
+	// Taken after PostgresDSN, which may start the shared container, so the
+	// deadline bounds only the prune and renewal race (#1910).
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
 	now := time.Now().UTC()
 	digest := fmt.Sprintf("%x", sha256.Sum256([]byte("prune-race")))
 	r := idempotency.ReplayRequest{
