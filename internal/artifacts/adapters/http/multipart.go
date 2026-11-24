@@ -112,10 +112,11 @@ const deployForbidden = "The user is not allowed to deploy to this location"
 // message in the error envelope, or, through
 // ArtifactoryRestExceptionMapperBase.interceptForbiddenStatus, 401
 // "Unauthorized" with the Basic challenge to an anonymous caller, who can
-// only get here with anonymous access on.
+// only get here with anonymous access on, or MapperHidden while
+// hideUnauthorizedResources is on.
 func createRefused(p kernel.Principal) error {
 	if p.Anonymous {
-		return apierror.New(http.StatusUnauthorized, "Unauthorized")
+		return apierror.Hide(apierror.New(http.StatusUnauthorized, "Unauthorized"), httpkit.MapperHidden)
 	}
 	return apierror.New(http.StatusForbidden, deployForbidden)
 }

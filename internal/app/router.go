@@ -722,6 +722,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		// Every handler's refusal is written through httpkit, which asks the
 		// stored setting only for an answer it can hide (#1903).
 		httpkit.HideUnauthorized(hidesUnauthorized(cfg.Access)),
+		// Marks the REST routes whose anonymous refusal 7.x's exception
+		// mappers answer, which the setting hides as they do (#1908).
+		httpkit.MapsForbidden(mapperRoutes),
 	)
 	limits := newLimitOptions(cfg.RequestLimits)
 	limiter := requestLimiter{cfg: cfg}

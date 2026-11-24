@@ -229,9 +229,22 @@ func NormalizeContentType(keep func(*http.Request) bool) func(http.Handler) http
 
 // BindingError renders request binding and response rendering failures from
 // the generated strict handlers in the right envelope. A MaxBytesError from
-// BodyLimit becomes 413 rather than the generic 400.
+// BodyLimit becomes 413 rather than the generic 400. A handler's refusal
+// passes httpkit.Hidden first, as httpkit.WriteErr's does, so a strict
+// operation answers as hideUnauthorizedResources asks.
 func BindingError(status int) func(w http.ResponseWriter, r *http.Request, err error) {
 	return func(w http.ResponseWriter, r *http.Request, err error) {
+		// Hidden changes only a typed refusal, so an untyped result is the
+		// setting's failed read, which gets the generic 500 rather than its
+		// text, as WriteErr gives it.
+		var typed *apierror.Error
+		hidden := httpkit.Hidden(r.Context(), err)
+		if errors.As(err, &typed) && !errors.As(hidden, &typed) {
+			httpkit.NoteCause(r.Context(), hidden)
+			apierror.Write(w, httpkit.ErrorProfile(r), hidden)
+			return
+		}
+		err = hidden
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
 			apierror.Write(
@@ -243,7 +256,6 @@ func BindingError(status int) func(w http.ResponseWriter, r *http.Request, err e
 		}
 		// A typed error carries its own status (501 from the generated stubs,
 		// 4xx from validation); only untyped errors take the binder's default.
-		var typed *apierror.Error
 		if errors.As(err, &typed) {
 			apierror.Write(w, httpkit.ErrorProfile(r), typed)
 			return

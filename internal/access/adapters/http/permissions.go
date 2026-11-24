@@ -158,6 +158,20 @@ func (c permCaller) lookup(
 	return p, nil
 }
 
+// v2Refused is a permission targets v2 refusal of the target it names, or
+// of an anonymous caller, with the answer that hides it:
+// throwForbiddenPermissionErrorMessage throws NotFoundException("") while
+// hideUnauthorizedResources is on, which NotFoundExceptionMapper answers 404
+// with an empty message in the error envelope, to an anonymous caller too
+// (RestSecurityRequestHandlerV2Impl 1011-1018, 7.161.26). Any other error
+// is returned as it is.
+func v2Refused(err error) error {
+	if errors.Is(err, kernel.ErrForbidden) || errors.Is(err, kernel.ErrUnauthenticated) {
+		return apierror.Hide(err, apierror.New(http.StatusNotFound, ""))
+	}
+	return err
+}
+
 // after is the message following sentinel, whatever wraps it.
 func after(err, sentinel error) string {
 	msg := err.Error()
@@ -422,11 +436,11 @@ func (s SecurityAPI) GetPermissionTargetDetailsV2(
 ) (artgen.GetPermissionTargetDetailsV2ResponseObject, error) {
 	c, err := permissionCaller(ctx, s.accessState)
 	if err != nil {
-		return nil, err
+		return nil, v2Refused(err)
 	}
 	p, err := c.lookup(ctx, req.PermissionTargetName, c.manages)
 	if err != nil {
-		return nil, s.permissionError(ctx, "get permission", err)
+		return nil, s.permissionError(ctx, "get permission", v2Refused(err))
 	}
 	w, err := model.PermissionToV2(p)
 	if err != nil {
@@ -446,10 +460,10 @@ func (s SecurityAPI) PermissionTargetExistenceCheckV2(
 ) (artgen.PermissionTargetExistenceCheckV2ResponseObject, error) {
 	c, err := permissionCaller(ctx, s.accessState)
 	if err != nil {
-		return nil, err
+		return nil, v2Refused(err)
 	}
 	if _, err := c.lookup(ctx, req.PermissionTargetName, c.manages); err != nil {
-		return nil, s.permissionError(ctx, "check permission", err)
+		return nil, s.permissionError(ctx, "check permission", v2Refused(err))
 	}
 	return artgen.PermissionTargetExistenceCheckV2200Response{}, nil
 }
@@ -563,7 +577,9 @@ func (s SecurityAPI) CreateOrReplacePermissionTargetV2(
 			case !exists:
 				return p, c.admin()
 			case !c.manages(old):
-				return model.Permission{}, kernel.ErrForbidden
+				// validateUpdateActionPermissions' refusal (705-709), which
+				// the setting hides as a read's.
+				return model.Permission{}, v2Refused(kernel.ErrForbidden)
 			case !c.managesAll():
 				if err := permission.CheckManagerEdit(old, p, v2Sections, c.dec); err != nil {
 					return model.Permission{}, fmt.Errorf("permissions: %w", err)

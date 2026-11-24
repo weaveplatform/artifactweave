@@ -65,3 +65,51 @@ func TestUnitHidden(t *testing.T) {
 		t.Fatal("a bare context hides", on, err)
 	}
 }
+
+// TestUnitMapperHidden: on a route MapsForbidden marks, an anonymous
+// caller's kernel.ErrUnauthenticated, however wrapped, answers 404 "Not
+// Found" while the setting is on, as 7.x's REST exception mappers answer it;
+// a named caller's, a request without a caller, an unmarked route and
+// another refusal keep the 401 or their own answer, and the setting is
+// read only for an answer it can hide.
+func TestUnitMapperHidden(t *testing.T) {
+	anonymous := kernel.Principal{Name: kernel.AnonymousUser, Anonymous: true}
+	wrapped := fmt.Errorf("repositories: %w", kernel.ErrUnauthenticated)
+	for _, tc := range []struct {
+		name   string
+		path   string
+		caller *kernel.Principal
+		err    error
+		on     bool
+		status int
+		asks   int
+	}{
+		{"hidden", "/api/x", &anonymous, wrapped, true, http.StatusNotFound, 1},
+		{"off", "/api/x", &anonymous, wrapped, false, http.StatusUnauthorized, 1},
+		{"unmarked", "/native/x", &anonymous, wrapped, true, http.StatusUnauthorized, 0},
+		{"named", "/api/x", &kernel.Principal{Name: "user"}, wrapped, true, http.StatusUnauthorized, 0},
+		{"no caller", "/api/x", nil, wrapped, true, http.StatusUnauthorized, 0},
+		{"other refusal", "/api/x", &anonymous, kernel.ErrForbidden, true, http.StatusForbidden, 0},
+	} {
+		asked := 0
+		hides := func(context.Context) (bool, error) { asked++; return tc.on, nil }
+		handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			httpkit.WriteErr(w, r, tc.err)
+		}))
+		handler = httpkit.MapsForbidden(func(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, "/api/") })(handler)
+		handler = httpkit.HideUnauthorized(hides)(handler)
+		ctx := t.Context()
+		if tc.caller != nil {
+			ctx = kernel.WithPrincipal(ctx, *tc.caller)
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequestWithContext(ctx, http.MethodGet, tc.path, nil))
+		if rec.Code != tc.status || asked != tc.asks {
+			t.Errorf("%s: %d %q after %d reads, want %d after %d", tc.name, rec.Code, rec.Body, asked, tc.status, tc.asks)
+		}
+		if tc.status == http.StatusNotFound && (!strings.Contains(rec.Body.String(), `"message":"Not Found"`) ||
+			rec.Header().Get("WWW-Authenticate") != "") {
+			t.Errorf("%s: %v %s", tc.name, rec.Header(), rec.Body)
+		}
+	}
+}

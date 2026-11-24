@@ -75,20 +75,26 @@ const (
 // mappers give its other refusals (#1573). The text is the
 // RestResponseFilter's error envelope; one 7.59.16 capture shows it raw
 // (jfrog/jfrog-client-go#851), which reads as Jersey fixing the media
-// type before the filter runs, not as the intended answer.
+// type before the filter runs, not as the intended answer. While
+// hideUnauthorizedResources is on, prepareUnAuthorizedResponse throws
+// NotFoundException("Resource not found") instead, which
+// NotFoundExceptionMapper answers 404 in the error envelope, to an
+// anonymous caller too (ArtifactResource 300-308, 7.161.26).
 func storageRefused(key, path string, p kernel.Principal) error {
-	return apierror.New(http.StatusForbidden, fmt.Sprintf(
-		"Request for '%s:%s' is forbidden for user: '%s'.", key, path, p.Name))
+	return apierror.Hide(apierror.New(http.StatusForbidden, fmt.Sprintf(
+		"Request for '%s:%s' is forbidden for user: '%s'.", key, path, p.Name)),
+		apierror.New(http.StatusNotFound, "Resource not found"))
 }
 
 // addonRefused is the refusal of the views the closed REST add-on serves
 // (the file list, last modified and permissions): an exception without a
 // response, which ArtifactoryRestExceptionMapperBase answers 403 to a user
 // and 401 "Unauthorized" with its challenge to an anonymous caller
-// (createUnauthorizedResponseWithChallenge).
+// (createUnauthorizedResponseWithChallenge), or MapperHidden while
+// hideUnauthorizedResources is on (interceptForbiddenStatus).
 func addonRefused(p kernel.Principal) error {
 	if p.Anonymous {
-		return apierror.New(http.StatusUnauthorized, "Unauthorized")
+		return apierror.Hide(apierror.New(http.StatusUnauthorized, "Unauthorized"), httpkit.MapperHidden)
 	}
 	return kernel.ErrForbidden
 }
@@ -321,10 +327,12 @@ func (s ArtifactoryAPI) getVirtualStorage(
 		// alone (RTFACT-12026, "Make stats API available for virtual
 		// repositories", is deferred).
 		if !canRead(v.acc, v.repo, v.path) {
-			err = storageRefused(v.key, v.path, p)
-		} else {
-			err = apierror.New(http.StatusNotFound, textNoItemPath)
+			// Written here, as ItemError would unwrap the refusal from the
+			// answer that hides it.
+			httpkit.WriteErr(w, r, storageRefused(v.key, v.path, p))
+			return
 		}
+		err = apierror.New(http.StatusNotFound, textNoItemPath)
 	case "properties":
 		media, body, err = v.virtualProperties(ctx, q.Get("properties"))
 	default:
@@ -517,8 +525,11 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if v.repo, v.isCached, err = itemkit.ResolveRepo(ctx, v.st, v.key); err != nil {
+		// The answers for a missing repository are apierror values already,
+		// and a refusal among them must reach WriteErr whole to be hidden.
 		if mode, merr := storageMode(q); merr == nil && isMissingRepo(err) {
-			err = missingRepoAnswer(mode, v, p)
+			httpkit.WriteErr(w, r, missingRepoAnswer(mode, v, p))
+			return
 		}
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "resolve repository", err))
 		return
@@ -548,7 +559,10 @@ func (s ArtifactoryAPI) getStorage(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := v.target(ctx)
 	if errors.Is(err, kernel.ErrNotFound) {
-		err = v.miss(mode, p)
+		// Not through ItemError, which would unwrap a refusal from the
+		// answer that hides it.
+		httpkit.WriteErr(w, r, v.miss(mode, p))
+		return
 	}
 	if err != nil {
 		httpkit.WriteErr(w, r, s.ItemError(ctx, "storage item", err))

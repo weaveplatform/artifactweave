@@ -614,16 +614,49 @@ cache fill the remote's deploy check rejects keeps its answer, since
 keeps its answer, the deploy handlers being closed code **[I]**. The Git LFS and Hugging
 Face virtual handlers, whose 7.x code is closed, hide their anonymous challenge under
 either setting, as `PackageSecurityServiceImpl.shouldHideUnauthorizedResources` gives the
-global one to package handlers **[I]**. The REST surfaces 7.x also hides
-(`ArtifactoryRestExceptionMapperBase`, the storage and statistics resources, the
-versions search, permission targets v2, WebDAV `PROPFIND`, path deletion and
-`GET /api/system/configuration/platform/security`) keep their answers until their own
-issue applies the setting there.
+global one to package handlers **[I]**.
+
+[#1908](https://github.com/weaveplatform/artifactweave/issues/1908) applies it to the
+REST surfaces 7.161.26 also hides, each with its own answer:
+
+- The storage API's item info and statistics: `prepareUnAuthorizedResponse`
+  (`ArtifactResource` 300-308) throws `NotFoundException("Resource not found")`, so the
+  403 `Request for '<repo>:<path>' is forbidden for user: '<user>'.` becomes 404
+  `Resource not found`, to an anonymous caller too. The trash can's views answer as a
+  local repository's.
+- The latest version search: `VersionsResources.getLatestVersionInternal` (98-108)
+  answers a caller without a named user with a bare 404, which `RestResponseFilter`
+  fills in as 404 `Not Found` in the error envelope.
+- Permission targets v2: `throwForbiddenPermissionErrorMessage` (1011-1018) throws
+  `NotFoundException("")`, so a read, an existence check or a replace of a target the
+  caller does not manage answers 404 with an empty message.
+- Path deletion: `assertNonRootPathDelete` (3428-3444) records `ARTIFACT_NOT_FOUND`, so
+  a `DELETE` without Delete answers 404 `Artifact deletion error: Could not locate
+  artifact. Path: '<repo>/<path>'`, under a remote's cache key. The root's refusal
+  (`isForbiddenRootPathDelete`) is never hidden.
+- The REST exception mappers: `interceptForbiddenStatus` (84-93) answers an anonymous
+  caller's forbidden with a bare 404 instead of the 401 challenge, which
+  `RestResponseFilter` fills in as 404 `Not Found`. Jersey applies the
+  mappers to every resource, but artifactweave applies this only on the REST roots whose
+  7.161.26 resources are open source (`mapperRoots` in `internal/app`), minus the
+  operations that build their own 401: `POST /api/security/token`, `system/metrics` and
+  the replication channel calls. The archive download and the versions search build
+  their own answers too. The package formats' endpoints and the roots served by closed
+  resources keep their challenge, since nothing shows that they raise a forbidden
+  **[I]**.
+
+Two surfaces have no route in artifactweave, so they wait for their own work. WebDAV
+`PROPFIND` (`PropfindMethod.shouldHideUnauthorizedResources` 294-303) is not served, and
+neither the plan nor the capability roadmap gives WebDAV a phase **[I]**.
+`GET /api/system/configuration/platform/security` (`ConfigResource.getPlatformSecurity`
+215-221, `{"anonymous_access_enabled":bool,"hide_unauthorized_resources":bool}`) falls
+under the capability roadmap's P12 row for the full descriptor and system configuration,
+and no operation serves it yet.
 
 artifactweave stores it in the access module beside the baseline policies, applies it
 through PATCH, `config apply` and the bootstrap descriptor, exports it first in the
 `security` element, reports it in `GET /api/securityconfig`, and reads it at each
-refusal, so a PATCH applies to the next download on every instance.
+refusal, so a PATCH applies to the next refusal on every instance.
 
 ### What artifactweave serves
 
