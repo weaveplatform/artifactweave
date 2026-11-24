@@ -38,6 +38,11 @@
 //     administrator and a read-only reader with their passwords, and the CA
 //     pool its fresh, per-container certificate chains to. Anonymous binds
 //     read nothing.
+//   - Postgres and RunPostgres: a PostgreSQL 17 server of the caller's own
+//     (postgres:17-alpine pinned by digest, mirror.gcr.io's copy as its
+//     second source), for a caller that must remove its container, such as
+//     the multi-instance harness in test/peers; and Removed, which proves the
+//     engine no longer has a container.
 //   - Mailpit and RunMailpit: a real SMTP server with AUTH and STARTTLS over
 //     a certificate from a CA made per run (MailpitEndpoint.CA), with
 //     Messages and Clear over its message API, so mail tests check what an
@@ -63,11 +68,14 @@
 //     directory.
 //   - https://github.com/weaveplatform/artifactweave/issues/1831: Mailpit,
 //     for mail test and quota warning delivery.
+//   - https://github.com/weaveplatform/artifactweave/issues/1924: the
+//     PostgreSQL server the multi-instance harness owns.
 //
 // # Status
 //
 // Implemented P2 (the Linux engine gate), P2b (the emulators) and P7 (the
 // answer timeout). MinIO's readiness wait added by issue 1307; the checked
 // image pull and the second sources by issue 1448; Azurite's copy by issue
-// 1463; OpenLDAP by issue 1833 (P12); Mailpit by issue 1831.
+// 1463; OpenLDAP by issue 1833 (P12); Mailpit by issue 1831; PostgreSQL by
+// issue 1924 (P13).
 package containertest

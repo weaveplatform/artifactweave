@@ -99,9 +99,12 @@ func scanKinds(root string, p plan) (kindSelection, error) {
 					return err
 				}
 				dir = filepath.ToSlash(dir)
-				// Native features own test/acceptance and real-cloud scenarios own
-				// test/platform. They have independent selected jobs.
-				if dir == "test/acceptance" || dir == "test/platform" {
+				// Native features own test/acceptance, real-cloud scenarios own
+				// test/platform and multi-instance scenarios own test/peers. They
+				// have independent selected jobs; package acceptance would
+				// otherwise start every peer cluster a second time.
+				if dir == "test/acceptance" || dir == "test/platform" ||
+					dir == "test/peers" || strings.HasPrefix(dir, "test/peers/") {
 					return nil
 				}
 				pkg := "./" + dir

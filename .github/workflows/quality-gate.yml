@@ -50,6 +50,7 @@ jobs:
       has_acceptance: ${{ steps.plan.outputs.has_acceptance }}
       terraform_provider: ${{ steps.plan.outputs.terraform_provider }}
       terraform_deployment: ${{ steps.plan.outputs.terraform_deployment }}
+      peers: ${{ steps.plan.outputs.peers }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
@@ -337,6 +338,70 @@ jobs:
         with:
           name: cover-accept-go
           path: cover/accept-go
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+
+  # P13's multi-instance scenarios. test/peers starts two or three
+  # artifactweave instances per scenario, each a separate process of the
+  # test binary itself running serve's runtime on its own loopback port,
+  # data directory and database (SQLite, or a PostgreSQL container of the
+  # scenario's own with a database per instance), with a forwarder per pair
+  # that partitions and heals. The binary passes its -test.gocoverdir to
+  # every instance, so their counters land here beside its own. Plain go
+  # test, with no make target or wrapper, so the lane runs the same on any
+  # host with Docker. Selected on full runs and for test/peers and the
+  # federation module (tools/citestselection, peers.go).
+  acceptance-peers:
+    name: 'Go acceptance (Linux, multi-instance peers)'
+    needs: [impact]
+    if: needs.impact.outputs.peers == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
+      - name: Multi-instance scenarios (race, shuffle, coverage)
+        env:
+          ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR: ${{ runner.temp }}/peer-logs
+        run: |
+          mkdir -p cover/accept-peers
+          go test -race -shuffle=on -count=1 -timeout=20m -v \
+            -cover -covermode=atomic -coverpkg=github.com/weaveplatform/artifactweave/... \
+            ./test/peers/... -args -test.gocoverdir="$PWD/cover/accept-peers"
+
+      # A failing scenario prints each instance's log in the job output;
+      # these are the complete files.
+      - name: Upload instance server logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: peer-logs
+          path: ${{ runner.temp }}/peer-logs
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload multi-instance coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cover-accept-peers
+          path: cover/accept-peers
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 7
@@ -1389,8 +1454,9 @@ jobs:
     name: 'Coverage gate (≥95% total, ≥90% per package)'
     # The download pattern cover-* picks up the unit directories from every OS,
     # package TestAcc, all four required native partitions, optional Gradle,
-    # the Terraform run and OCI conformance, all from this workflow revision.
-    needs: [impact, unit-linux, unit-macos, unit-windows, acceptance-go, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, acceptance-gradle, terraform, oci-conformance]
+    # the Terraform run, OCI conformance and the multi-instance scenarios,
+    # all from this workflow revision.
+    needs: [impact, unit-linux, unit-macos, unit-windows, acceptance-go, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, acceptance-gradle, terraform, oci-conformance, acceptance-peers]
     # Gradle is informational, so a failure there must not prevent the
     # required sources from being checked or the merged gate from running.
     if: always() && needs.impact.result == 'success' && needs.impact.outputs.profile == 'full'
@@ -1413,9 +1479,11 @@ jobs:
           JVM_RESULT: ${{ needs['acceptance-jvm'].result }}
           TERRAFORM_RESULT: ${{ needs.terraform.result }}
           OCI_RESULT: ${{ needs['oci-conformance'].result }}
+          PEERS_RESULT: ${{ needs['acceptance-peers'].result }}
         run: |
           for result in "$UNIT_LINUX_RESULT" "$UNIT_MACOS_RESULT" "$UNIT_WINDOWS_RESULT" "$GO_ACCEPTANCE_RESULT" \
-            "$ACCEPTANCE_RESULT" "$CONAN_RESULT" "$NUGET_RESULT" "$JVM_RESULT" "$TERRAFORM_RESULT" "$OCI_RESULT"; do
+            "$ACCEPTANCE_RESULT" "$CONAN_RESULT" "$NUGET_RESULT" "$JVM_RESULT" "$TERRAFORM_RESULT" "$OCI_RESULT" \
+            "$PEERS_RESULT"; do
             [ "$result" = success ] || { echo "required coverage source: $result"; exit 1; }
           done
 
@@ -1527,7 +1595,7 @@ jobs:
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [impact, docs, unit-linux, unit-macos, unit-windows, sqlite-windows, acceptance-go, lint, vuln, build, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform]
+    needs: [impact, docs, unit-linux, unit-macos, unit-windows, sqlite-windows, acceptance-go, lint, vuln, build, acceptance, acceptance-conan, acceptance-nuget, acceptance-jvm, coverage, affected-coverage, parity, terraform, oci-conformance, deploy-terraform, acceptance-peers]
     runs-on: ubuntu-latest
     steps:
       - name: Required jobs match the selected profile
@@ -1558,15 +1626,23 @@ jobs:
           OCI: ${{ needs['oci-conformance'].result }}
           DEPLOY: ${{ needs['deploy-terraform'].result }}
           DEPLOY_SELECTED: ${{ needs.impact.outputs.terraform_deployment }}
+          PEERS: ${{ needs['acceptance-peers'].result }}
+          PEERS_SELECTED: ${{ needs.impact.outputs.peers }}
         run: |
           [ "$IMPACT" = success ] || { echo "impact planner did not succeed"; exit 1; }
           require() { [ "$2" = "$3" ] || { echo "$1: expected $3, got $2"; exit 1; }; }
+          # The planner selects the multi-instance lane on every full run and
+          # for peer and federation changes; whatever it chose must have run.
+          peers=skipped
+          if [ "$PEERS_SELECTED" = true ]; then peers=success; fi
+          require acceptance-peers "$PEERS" "$peers"
           case "$PROFILE" in
             docs)
               require docs "$DOCS" success
               ;;
             full)
               require docs "$DOCS" skipped
+              require peers-selected "$PEERS_SELECTED" true
               require affected-coverage "$AFFECTED_COVERAGE" skipped
               for result in "$UNIT_LINUX" "$UNIT_MACOS" "$UNIT_WINDOWS" "$SQLITE_WINDOWS" "$GO_ACCEPTANCE" "$LINT" "$VULN" "$BUILD" \
                 "$ACCEPTANCE" "$CONAN" "$NUGET" "$JVM" "$COVERAGE" "$PARITY" "$TERRAFORM" "$OCI" "$DEPLOY"; do

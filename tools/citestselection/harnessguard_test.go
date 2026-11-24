@@ -130,6 +130,7 @@ func TestUnitWorkflowSchedulesHarnessGuardsForDeploymentChanges(t *testing.T) {
 		"terraform": true, "deploy-terraform": true,
 		"docs": false, "acceptance-go": false, "acceptance": false, "sqlite-windows": false,
 		"coverage": false, "affected-coverage": false, "vuln": false, "build": false,
+		"acceptance-peers": false,
 	}
 	for job, want := range scheduled {
 		got, err := evalCondition(workflow.Jobs[job].If, outputs)

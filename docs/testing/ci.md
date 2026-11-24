@@ -282,10 +282,12 @@ tests run as part of `make deploy-check`.
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestAccSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes. When a family's own `llms.txt` fails, the fetch takes the family's pages from the section of its parent index that lists the pages `api/oracle-inventory.json` records for it. A family that still has no page in the cache fails `TestAccSpecParity`, which names the family and its index URL, and `make parity-baseline` and `make oracle-inventory` refuse that cache; `actions/cache` saves only after a passing job, so such a crawl is not kept for the week ([#1308](https://github.com/weaveplatform/artifactweave/issues/1308)) |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc, cdn-repositories, remote-repositories, virtual-repositories, webhooks and single-replication. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
+| `acceptance-peers` (`Go acceptance (Linux, multi-instance peers)`) | `ubuntu-latest` | P13 | Runs `go test -race -shuffle=on` with whole-module `-cover` on `./test/peers/...` directly, with no make target or wrapper. Each scenario starts two or three instances of serve's runtime as separate processes on their own ports, data directories and databases, with a forwarder per pair that partitions and heals; see [Multi-instance scenarios](#multi-instance-scenarios-acceptance-peers). Selected on full runs and for changes under `test/peers/`, `internal/federation/` or `test/server/federation/`. Uploads `cover-accept-peers`, and the instances' complete server logs as `peer-logs` when it fails |
 | `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
 
-The required native acceptance partitions, `oci-conformance` and `terraform` are listed in
-the coverage job's `needs` and in the `gate` job's `needs`. The coverage job waits
+The required native acceptance partitions, `oci-conformance`, `terraform` and
+`acceptance-peers` are listed in the coverage job's `needs` and in the `gate` job's
+`needs`. The coverage job waits
 for informational Gradle too, then checks each required source succeeded and merges
 any Gradle coverage artifact alongside the required same-run artifacts. A failure
 in a required partition blocks merge; a Gradle failure cannot suppress the
@@ -332,14 +334,67 @@ lifecycle cases also run in the `test/server/artifacts/agentpackages` suite.
 
 ### Planned jobs
 
-These jobs are not in the current workflows and contribute no coverage yet. P20 also adds
-an operation/client/format inventory check to reject unmapped capability gaps; the current
-schema parity test does not provide that guarantee. The [capability roadmap](../implementation/capability-roadmap.md)
-assigns the missing behaviors to phases through P41.
+No new job is planned. `acceptance-peers`, planned here until P13, is now a
+current job: P13 adds its federated repository scenarios to it, P14 Access
+Federation and topology, and P15 release bundle distribution to an edge. P20
+adds an operation/client/format inventory check to reject unmapped capability
+gaps; the current schema parity test does not provide that guarantee. The
+[capability roadmap](../implementation/capability-roadmap.md) assigns the
+missing behaviors to phases through P41.
 
-| Planned job | Phase | Intended checks |
-|---|---|---|
-| `acceptance-peers` | P13 to P15 | Two or three `-cover` instances on separate ports and data directories for federated repository convergence, partitions and full sync (P13), Access Federation and topology (P14), and release bundle distribution to an edge (P15). Separate from `acceptance` to preserve the per-PR budget; its `cover-accept-peers` artifact and coverage/gate dependencies are added with the job |
+## Multi-instance scenarios (acceptance-peers)
+
+`test/peers` (QUA-01, [#1924](https://github.com/weaveplatform/artifactweave/issues/1924))
+holds the scenarios that need more than one artifactweave instance, and the
+harness they share. `peers.Start(t, peers.Options{Instances: n, Driver: d})`
+starts a cluster and these conventions hold for every scenario, and for the
+Terraform federated scenario that reuses them (QUA-02):
+
+- **Processes.** Each instance is the test binary itself, re-executed into
+  `TestAccPeerInstance` as P11's two-process push suites do. It loads a strict
+  YAML configuration with `config.Load`, without the host's environment, and
+  runs `app.Run`, so it has serve's runtime, router, API limits and production
+  hash and key costs. Closing its standard input stops it as a signal stops
+  serve. It inherits the binary's `-test.gocoverdir`, so under `-cover` its
+  counters join the job's coverage.
+- **Ports and base URLs.** Each instance listens on its own loopback port,
+  `127.0.0.1:<port>`, and its `base_url` is `http://127.0.0.1:<port>`. A port
+  another process takes before the instance binds it is retried with a new one.
+- **Data and databases.** Each instance has its own data directory. With
+  SQLite the database lies there; with PostgreSQL the cluster starts a
+  container of its own (`containertest.RunPostgres`, pinned by digest with
+  mirror.gcr.io as its second source) and gives each instance a database of its
+  own on it.
+- **Identity.** Each instance creates its own instance identity on its first
+  start, so `GET /api/system/service_id` differs between them; each seeds
+  `admin` with a password of its own.
+- **Links and partitions.** For every ordered pair the cluster runs a TCP
+  forwarder, `c.Link(from, to)`, and each instance's
+  `remote.allowed_private_origins` lists only its outgoing links, so an
+  instance reaches another only through a link. `c.Partition(a, b)` resets the
+  connections both links carry and refuses new ones until `c.Heal(a, b)`; a
+  reset rather than dropped traffic makes a call fail at once.
+- **Logs and teardown.** Each instance's output goes to a log file, under
+  `ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR` when it is set. When a scenario fails,
+  its output carries the tail of each instance's log. `c.Close()` stops the
+  instances, closes the links and removes the container, and `c.Leftovers`
+  names any process, listening address or container that survived it.
+
+The first scenario, `TestAccPeersHarnessSQLite` and `TestAccPeersHarnessPostgres`,
+uses no peer feature. Three instances report distinct service ids, answer
+through every link with their own identity and their configured base URL, and
+fetch each other's files through a generic remote repository whose upstream is
+the link. Partitioning the first two makes those fetches fail (502) while their
+links to the third still carry traffic, and healing restores them. The closed
+cluster leaves no process, port or container behind.
+`TestAccPeersFailurePrintsEachServerLog` runs a deliberately failing scenario in
+a process of its own and requires its output to carry each instance's log.
+
+The package acceptance lane leaves `test/peers` out (`tools/citestselection`
+scans it as it does `test/acceptance` and `test/platform`), so each cluster
+starts once per run. The harness itself is excluded from the per-package
+coverage floor like the server harness; the instances' production coverage is
+gated.
 
 ## Public upstream conformance (P9)
 
