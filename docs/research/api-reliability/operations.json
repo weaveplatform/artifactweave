@@ -2131,33 +2131,84 @@
   },
   {
     "route": "DELETE /artifactory/api/v1/service_trust/pairing/*",
-    "state": "stub: 501",
-    "handler": "internal/app/router.go: handwrittenStub",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/app/router.go: internal/federation/adapters/http.ServiceTrustAPI.unpair-fm",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "DELETE /artifactory/api/v1/service_trust/pairing/{usecase}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "unregisterPairingToken",
-    "state": "stub: 501",
-    "contract": "Not implemented; answers 501. It would remove the trust relationship with one peer for the use case and delete its stored keys, so federations that use the peer stop syncing with it. With `force=true` the local trust would be removed even when the peer cannot be told. Administrators only.",
-    "handler": "internal/app/router.go: handwrittenStub",
+    "state": "partial: native dispatch; supported modes follow the contract",
+    "contract": "Ends the trust with one paired instance for the use case. Run it on either instance of the pair, naming the other by base_url as GET pairings lists it. This instance tells the peer, in a signed call, to drop the use case, then drops it here; with `force=true` it drops it here even when the peer cannot be told. A peer left with no use case is removed together with its stream positions, so federations that use it stop syncing with it. Answers {\"message\": \"Trust with service federated-repo was canceled successfully\"}. A missing base_url, a base URL with no trust for the use case, or a peer that cannot be told without force answers 400 with \"Error while cancelling token pairing.\" and the reason. Administrators only.",
+    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended none (external-effect)",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "none (external-effect): no retry protection; the effect reaches another service, peer, upstream or the file system and cannot roll back; reconcile before repeating",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "DELETE /artifactory/api/v1/service_trust/revoke/*",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/app/router.go: internal/federation/adapters/http.ServiceTrustAPI.revoke-fm",
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "DELETE /artifactory/api/v1/service_trust/revoke/{usecase}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "revokeServiceTrustToken",
+    "state": "partial: native dispatch; supported modes follow the contract",
+    "contract": "Answers {\"message\": \"Token was successfully revoked\"} and changes nothing. A paired instance that holds a trust token would call it to revoke that token; instances of this server hold none, since they sign their requests instead (decision 0021), so there is nothing to revoke. To end a trust, use DELETE pairing on either instance. Administrators only.",
+    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "review_family": "content-and-configuration",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:usecase: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -2343,17 +2394,22 @@
     "route": "DELETE /artifactweave/peer/v1/pair",
     "spec": "peer.openapi.yaml",
     "operation_id": "cancelPairing",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Tells this instance that the calling peer cancelled their trust for use_case. This instance drops the use case from its record of the caller; a peer left with no use case is removed with its stream cursors. Not implemented; answers 501.",
-    "handler": "internal/platform/gen/peer/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; user authentication skips the peer API, admission still limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on query:use_case, header:Signature-Input",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on query:use_case, header:Signature-Input: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/peer/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -10244,6 +10300,50 @@
     ]
   },
   {
+    "route": "GET /artifactory/api/v1/service_trust/pairings/*",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/app/router.go: internal/federation/adapters/http.ServiceTrustAPI.pairings-fm",
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "GET /artifactory/api/v1/service_trust/pairings/{usecase}",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "listPairings",
+    "state": "partial: native dispatch; supported modes follow the contract",
+    "contract": "Lists the instances this one is paired with for the use case, one {\"base_url\"} each, in no particular order; an empty array when there are none. Each base URL is the one the peer is reached at, without /artifactory. Administrators only.",
+    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
+    "review_family": "content-and-configuration",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "response_collections": [
+      "200 application/json[]"
+    ],
+    "pagination_execution": "complete: the whole collection in one answer, collected before it is written: the instances paired for one use case, each paired by an administrator by hand, which the peer store reads whole; content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
     "route": "GET /artifactory/api/v1/system/liveness",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "getSystemLiveness",
@@ -15516,20 +15616,46 @@
     ]
   },
   {
+    "route": "POST /access/api/v1/service_trust/pairing/*",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/federation/adapters/http/servicetrust.go: internal/federation/adapters/http.ServiceTrustAPI.issue.func1",
+    "review_family": "identity",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "no key support; reconcile ambiguous completion before retrying",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "legacy full lists keep their complete contracts; users, groups, locked users, permissions and tokens are written from store pages; configuration lists collect; source contract declares paged variants",
+    "evidence": [
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
     "route": "POST /access/api/v1/service_trust/pairing/{useCase}",
     "spec": "access.openapi.yaml",
     "operation_id": "createPairingToken",
-    "state": "stub: 501",
-    "contract": "Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable). Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be another instance of this server. Administrators only.",
-    "handler": "internal/platform/gen/access/unimplemented.gen.go",
+    "state": "partial: native dispatch; supported modes follow the contract",
+    "contract": "Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021), the same token that POST /artifactory/api/v1/service_trust/pairing/{usecase} issues. Run it on the instance that is to be trusted and hand the token to the administrator of the other instance, who redeems it there with PUT /artifactory/api/v1/service_trust/pairing/{usecase}. Only a hash of the token's nonce is kept; the token stops working once redeemed or 300 seconds after issue. The federated-repo/* and federated-repo/r use cases are served. platform-federation, access-federation, distribution, mission-control and bridge answer 501; any other use case answers 404 {\"message\": \"Unknown use case\"}. The peer must be another instance of this server. Administrators only.",
+    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
     "review_family": "identity",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended none (secret-response)",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "none (secret-response): no retry protection; the answer carries a credential no replay stores; never blindly repeat; list credentials and revoke any not received",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/access/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/access/adapters/http/access_identity.go",
+      "internal/access/adapters/http/tokens.go",
+      "internal/access/core/identity/identity.go",
+      "internal/access/core/token/token.go",
+      "internal/access/adapters/sql/identity.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -19999,34 +20125,66 @@
     ]
   },
   {
-    "route": "POST /artifactory/api/v1/service_trust/pairing/*",
-    "state": "stub: 501",
-    "handler": "internal/app/router.go: handwrittenStub",
+    "route": "POST /artifactory/api/v1/service_trust/exchange",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "exchangeServiceTrustToken",
+    "state": "partial: native dispatch; supported modes follow the contract",
+    "contract": "Always answers 400 with the message \"Error while token exchange.\" and the reason. An instance that holds a pairing token or a long-lived trust token would exchange it here for a token of a narrower scope. Instances of this server hold no such token, since they sign their requests to each other instead (decision 0021), so there is nothing to exchange; a redeeming instance calls the issuing instance's peer API instead. It changes nothing. Open to any caller the server admits.",
+    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes",
-    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "none (secret-response): no retry protection; the answer carries a credential no replay stores; never blindly repeat; list credentials and revoke any not received",
+    "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/v1/service_trust/pairing/*",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/federation/adapters/http/servicetrust.go: internal/federation/adapters/http.ServiceTrustAPI.issue.func1",
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "no key support; reconcile ambiguous completion before retrying",
+    "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /artifactory/api/v1/service_trust/pairing/{usecase}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "generatePairingToken",
-    "state": "stub: 501",
-    "contract": "Not implemented; answers 501. It would create a one-time pairing token for establishing trust with another instance of this server (decision 0021). The token would be a signed JWT whose subject is the administrator who requested it; it could be redeemed once and would expire 300 seconds after creation. An administrator would hand it to the peer, which redeems it with the exchange operation; the two instances would then hold each other's keys and authenticate every sync call in both directions. The peer must be another instance of this server. Administrators only.",
-    "handler": "internal/app/router.go: handwrittenStub",
+    "state": "partial: native dispatch; supported modes follow the contract",
+    "contract": "Creates a single-use pairing token for establishing trust with another instance of this server for the use case (decision 0021). The token is a signed JWT naming this instance, its base URL, the fingerprint of its public key, the use case and a random nonce; it can be redeemed once and expires 300 seconds after it is created. An unredeemed token is never cancelled; it expires. Only a hash of the nonce is kept, never the token. An administrator hands it to the administrator of the other instance, who redeems it there with PUT on the same use case; the two instances then hold each other's keys and verify every sync call in both directions. The token's base URL is the configured base URL without /artifactory, or the address the request reached when none is configured. The peer must be another instance of this server. Administrators only.",
+    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended none (secret-response)",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "none (secret-response): no retry protection; the answer carries a credential no replay stores; never blindly repeat; list credentials and revoke any not received",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -20356,17 +20514,22 @@
     "route": "POST /artifactweave/peer/v1/pair",
     "spec": "peer.openapi.yaml",
     "operation_id": "redeemPairing",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Redeems a pairing token's nonce. The request is signed with the key in public_key, which the receiver has not seen before, so the signature proves the caller holds that key. The receiver records the caller as a peer holding the token's use case and answers with its own identity. A repeat of a redeem that succeeded, from the same instance with the same key, answers 200 with the same body until the token expires. Not implemented; answers 501.",
-    "handler": "internal/platform/gen/peer/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; user authentication skips the peer API, admission still limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on body:/nonce",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on body:/nonce: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/peer/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -23416,33 +23579,43 @@
   },
   {
     "route": "PUT /artifactory/api/v1/service_trust/pairing/*",
-    "state": "stub: 501",
-    "handler": "internal/app/router.go: handwrittenStub",
+    "state": "partial: mounted handwritten dispatch; may refuse unsupported paths or modes",
+    "handler": "internal/app/router.go: internal/federation/adapters/http.ServiceTrustAPI.redeem-fm",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "reconcile the addressed resource; verb alone is not proof of safe retry for every mode",
     "admission": "shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "PUT /artifactory/api/v1/service_trust/pairing/{usecase}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "exchangePairingToken",
-    "state": "stub: 501",
-    "contract": "Not implemented; answers 501. It would redeem a pairing token generated on the peer, completing trust between the two instances for the use case. It would run on the instance that did not generate the token, with the same use case. Administrators only.",
-    "handler": "internal/app/router.go: handwrittenStub",
+    "state": "partial: native dispatch; supported modes follow the contract",
+    "contract": "Redeems a pairing token created on another instance of this server, completing trust between the two for the use case. Run it on the instance that did not create the token, with the same use case. This instance calls the issuing instance named in the token, in a call signed with its own key, and checks that the issuer's answer is signed with the key whose fingerprint the token carries; both instances then record each other as peers for the use case. Answers {\"message\": \"Trust with service federated-repo was established successfully\"}. A malformed, expired, already used or altered token, one issued by this instance, one issued for another use case, or an issuer that cannot be reached or refuses answers 400 with \"Error while token pairing.\" and the reason; an expired token's reason is \"Attempt to pair instances with an expired token\". A refused token leaves no peer record on either instance. Administrators only.",
+    "handler": "internal/app/router.go: NewRouter -\u003e protocol/handwritten route",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended none (external-effect)",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "none (external-effect): no retry protection; the effect reaches another service, peer, upstream or the file system and cannot roll back; reconcile before repeating",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/app/router.go: handwrittenStub",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

@@ -673,6 +673,7 @@ column pairing_nonces.nonce_hash bytea NOT NULL
 column pairing_nonces.use_case text NOT NULL
 column pairing_nonces.expires_at bigint
 column pairing_nonces.redeemed_at bigint
+column pairing_nonces.redeemed_by text NOT NULL DEFAULT ''::text
 constraint pairing_nonces.pairing_nonces_pkey PRIMARY KEY (nonce_hash)
 index pairing_nonces.pairing_nonces_expires CREATE INDEX pairing_nonces_expires ON pairing_nonces USING btree (expires_at)
 index pairing_nonces.pairing_nonces_pkey CREATE UNIQUE INDEX pairing_nonces_pkey ON pairing_nonces USING btree (nonce_hash)

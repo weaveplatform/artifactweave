@@ -111,6 +111,7 @@ func serve(
 			Configuration: rt.modules.configuration.API(),
 			Retention:     rt.modules.retention,
 			Federation:    rt.modules.federation,
+			PeerRemote:    rt.PeerRemote,
 			Redirect: itemkit.Redirect{
 				MinSize: artifactsSettings.RedirectMinSize, TTL: artifactsSettings.RedirectTTL,
 				CDNMaxSize: cdnMaxSize(cfg.Blob),

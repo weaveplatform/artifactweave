@@ -34,10 +34,20 @@ type PeerStore interface {
 	// AddNonce stores an issued pairing nonce; kernel.ErrConflict when its
 	// hash exists.
 	AddNonce(ctx context.Context, n model.PairingNonce) error
-	// RedeemNonce marks the nonce redeemed at now and returns it. A nonce is
-	// single-use: kernel.ErrNotFound when unknown or expired at now,
-	// kernel.ErrConflict when already redeemed.
-	RedeemNonce(ctx context.Context, hash []byte, now time.Time) (model.PairingNonce, error)
+	// RedeemNonce marks the nonce redeemed at now by redeemer and returns
+	// it. A nonce is single-use: kernel.ErrNotFound when unknown or expired
+	// at now, kernel.ErrConflict when another redeemer holds it. A repeat by
+	// the redeemer that holds it, before it expires, returns it unchanged,
+	// so a redeem whose answer was lost can be retried. Of concurrent
+	// redeemers exactly one succeeds.
+	RedeemNonce(
+		ctx context.Context,
+		hash []byte,
+		redeemer string,
+		now time.Time,
+	) (model.PairingNonce, error)
+	// DeleteNonce removes a nonce; kernel.ErrNotFound when there is none.
+	DeleteNonce(ctx context.Context, hash []byte) error
 	// PruneNonces removes nonces that expired before t and returns how many.
 	PruneNonces(ctx context.Context, before time.Time) (int64, error)
 }

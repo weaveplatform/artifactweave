@@ -5334,18 +5334,15 @@ paths:
       x-cost: expensive
   /api/v1/service_trust/pairing/{useCase}:
     post:
-      description: Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable). Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be another instance of this server. Administrators only.
+      description: 'Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021), the same token that POST /artifactory/api/v1/service_trust/pairing/{usecase} issues. Run it on the instance that is to be trusted and hand the token to the administrator of the other instance, who redeems it there with PUT /artifactory/api/v1/service_trust/pairing/{usecase}. Only a hash of the token''s nonce is kept; the token stops working once redeemed or 300 seconds after issue. The federated-repo/* and federated-repo/r use cases are served. platform-federation, access-federation, distribution, mission-control and bridge answer 501; any other use case answers 404 {"message": "Unknown use case"}. The peer must be another instance of this server. Administrators only.'
       operationId: createPairingToken
       parameters:
-        - description: Required path parameter. What the trust is for. platform-federation pairs two instances of this server for platform federation, Access federation and topology membership. mission-control and bridge are accepted and answer 501.
+        - description: 'Required path parameter. What the trust is for: `federated-repo/*` for two-way federated repository trust or `federated-repo/r` for receiving-only trust. The value contains a slash, sent as is or percent-encoded. `platform-federation`, `access-federation`, `distribution`, `mission-control` and `bridge` are accepted and answer 501.'
           in: path
           name: useCase
           required: true
           schema:
-            enum:
-              - mission-control
-              - bridge
-              - platform-federation
+            description: Use case path.
             type: string
       responses:
         '200':
@@ -5377,21 +5374,29 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Unknown use case.
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: 'Unknown use case: {"message": "Unknown use case"}.'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: 'The server failed while creating the token: "Error creating pairing token." and a reason.'
         '501':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The use case is mission-control or bridge, which are not implemented.
+          description: The use case is one a later release implements.
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
       summary: Create a pairing token
       tags:
         - tokens
+        - handwritten
+      x-handwritten: true
       x-idempotency: none
       x-idempotency-reason: secret-response
       x-cost: expensive
@@ -9795,6 +9800,16 @@ components:
           description: Optional within this object. Number of users that match the filter.
           type: integer
       type: object
+    ServiceTrustMessage:
+      type: object
+      description: >-
+        The body of a service trust error answer: a single message, as every service trust endpoint answers, not the Access error envelope.
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: >-
+            Required within this object. What went wrong, naming the operation first, for example "Error creating pairing token." followed by the reason, or "Unknown use case".
     TokenCreateRequest:
       description: An access token request. Accepted as JSON or form-encoded. Every field is optional; the defaults mint an identity token for the caller that expires after the configured default expiry (31536000 seconds, one year, until an admin changes it).
       properties:

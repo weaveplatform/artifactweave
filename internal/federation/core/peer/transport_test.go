@@ -63,7 +63,7 @@ func newWorld(t *testing.T) *world {
 	w := &world{store: fedinmem.New(memtx.New()), clock: newClock()}
 	w.caller = model.Peer{
 		InstanceID: callerID, BaseURL: "https://b.example.com", PublicKey: pub,
-		ProtocolVersion: instance.ProtocolVersion, UseCases: []model.UseCase{model.UseFederation},
+		ProtocolVersion: instance.ProtocolVersion, UseCases: []model.UseCase{model.UseFederatedRepo},
 	}
 	if err := w.store.Peers().Put(t.Context(), w.caller); err != nil {
 		t.Fatal(err)

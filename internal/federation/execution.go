@@ -88,8 +88,10 @@ func (m *Module) Worker() (replication.Worker, error) {
 	}, nil
 }
 
-// RegisterWork binds the existing queue before its application loop starts.
-func (m *Module) RegisterWork(queue *work.Queue) error {
+// RegisterWork binds the existing queue before its application loop starts:
+// replication execution, and the periodic pruning of expired pairing nonces,
+// whose item it queues once.
+func (m *Module) RegisterWork(ctx context.Context, queue *work.Queue) error {
 	if queue == nil {
 		return fmt.Errorf("replication work queue unavailable: %w", kernel.ErrStore)
 	}
@@ -100,7 +102,7 @@ func (m *Module) RegisterWork(queue *work.Queue) error {
 	if err := queue.Handle(replication.ExecutionWorkKind, worker.Execute); err != nil {
 		return fmt.Errorf("register replication execution: %w", err)
 	}
-	return nil
+	return m.registerPairingWork(ctx, queue)
 }
 
 // ScheduleHandlers resolves the initialized coordinator when an occurrence

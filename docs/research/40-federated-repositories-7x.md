@@ -161,8 +161,8 @@ master token to get scoped one-hour tokens for each federation call
 (`exchangeMasterToken`, `ServiceTrustServiceImpl.java:240-247`). In P13 artifactweave answers
 it 400 `{"message":"Error while token exchange. <reason>"}`: peers sign their requests
 instead of holding tokens, and the redeemer's call goes to `/artifactweave/peer/v1/pair`
-([0021](decisions/0021-peer-trust-and-sync-protocol.md#decision)). This is a deviation
-PEER-02 registers.
+([0021](decisions/0021-peer-trust-and-sync-protocol.md#decision)), registered as
+[DV-205](../implementation/deviations.md#api-behaviour).
 
 Errors are `{"message"}` with 400 for a trust or state error and 500 otherwise
 (`ServiceTrustResource.java:92-110`); an unknown use case is 404 `{"message":"Unknown use case"}`.

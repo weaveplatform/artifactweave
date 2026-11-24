@@ -32,3 +32,15 @@ components:
               message:
                 type: string
                 description: Required within this object. Human readable explanation.
+    ServiceTrustMessage:
+      type: object
+      description: >-
+        The body of a service trust error answer: a single message, as every service trust endpoint answers, not
+        the Access error envelope.
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: >-
+            Required within this object. What went wrong, naming the operation first, for example "Error creating
+            pairing token." followed by the reason, or "Unknown use case".

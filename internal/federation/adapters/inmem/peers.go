@@ -119,6 +119,7 @@ func (p peerStore) AddNonce(ctx context.Context, n model.PairingNonce) error {
 func (p peerStore) RedeemNonce(
 	ctx context.Context,
 	hash []byte,
+	redeemer string,
 	now time.Time,
 ) (model.PairingNonce, error) {
 	var out model.PairingNonce
@@ -127,17 +128,29 @@ func (p peerStore) RedeemNonce(
 		switch {
 		case !ok:
 			return memtx.NotFound("pairing nonce", fmt.Sprintf("%x", hash))
-		case !n.RedeemedAt.IsZero():
-			return memtx.Conflict("pairing nonce already redeemed", fmt.Sprintf("%x", hash))
 		case !kernel.Normalise(now).Before(n.ExpiresAt):
 			return memtx.NotFound("pairing nonce expired", fmt.Sprintf("%x", hash))
+		case !n.RedeemedAt.IsZero() && n.RedeemedBy == redeemer:
+			out = n
+			return nil
+		case !n.RedeemedAt.IsZero():
+			return memtx.Conflict("pairing nonce already redeemed", fmt.Sprintf("%x", hash))
 		}
-		n.RedeemedAt = now
+		n.RedeemedAt, n.RedeemedBy = now, redeemer
 		p.nonces().Put(string(hash), n)
 		out, _ = p.nonces().Get(string(hash))
 		return nil
 	})
 	return out, err
+}
+
+func (p peerStore) DeleteNonce(ctx context.Context, hash []byte) error {
+	return p.s.Do(ctx, func() error {
+		if !p.nonces().Del(string(hash)) {
+			return memtx.NotFound("pairing nonce", fmt.Sprintf("%x", hash))
+		}
+		return nil
+	})
 }
 
 func (p peerStore) PruneNonces(ctx context.Context, before time.Time) (int64, error) {
