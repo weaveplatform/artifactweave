@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -22,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/devtools/specoracle"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	corepeer "github.com/weaveplatform/artifactweave/internal/federation/core/peer"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
@@ -459,4 +461,41 @@ func refusedLive(t *testing.T, a, b *peerSite) []string {
 		t.Errorf("A's record of B after a compatible request: %+v", recorded)
 	}
 	return secrets
+}
+
+// TestUnitPeerGuardWithoutStore: a router with no store has no peers, so
+// it refuses a peer request as one with an empty peer table would, and
+// passes every other request through.
+func TestUnitPeerGuardWithoutStore(t *testing.T) {
+	served := 0
+	h := peerGuard(nil, time.Now)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { served++ }))
+	key := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
+	signer := corepeer.Signer{KeyID: "jfrt@x", Key: key}
+	r := httptest.NewRequest(http.MethodGet, peerPrefix+"/status", nil)
+	if err := signer.SignRequest(r.Method, "http://"+r.Host+peerPrefix+"/status", r.Header, nil); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, r)
+	if rec.Code != http.StatusUnauthorized || served != 0 ||
+		!strings.Contains(rec.Body.String(), "no paired peer") {
+		t.Errorf("a signed peer request without a store: %d %s, served %d", rec.Code, rec.Body, served)
+	}
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/artifactweave/nothing", nil))
+	if served != 1 {
+		t.Error("a request outside the peer prefix was not passed through")
+	}
+	var none noPeers
+	if err := none.SetProtocolVersion(t.Context(), "jfrt@x", 2); !errors.Is(err, kernel.ErrNotFound) {
+		t.Errorf("SetProtocolVersion: %v", err)
+	}
+	if err := none.Remember(t.Context(), []byte{1}, time.Now(), time.Now()); !errors.Is(err, kernel.ErrStore) {
+		t.Errorf("Remember: %v", err)
+	}
+	if n, err := none.Prune(t.Context(), time.Now()); n != 0 || err != nil {
+		t.Errorf("Prune: %d, %v", n, err)
+	}
+	if _, err := newPeerClients(nil, []string{"::"}, time.Now); err == nil {
+		t.Error("peer clients with a malformed private origin")
+	}
 }
