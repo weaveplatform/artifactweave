@@ -134,7 +134,17 @@ in [the CI guide](docs/testing/ci.md).
 ## Releases
 
 Merging the release pull request that release-please keeps open tags the version and
-creates the GitHub release. The `release` workflow then builds `artifactweave` for Linux,
+creates the GitHub release. Before 1.0, a `feat:` raises the minor version and a `fix:` the
+patch.
+
+To release another version than the one proposed, push a commit to `main` whose message
+ends with a `Release-As: x.y.z` footer; release-please rewrites its pull request to that
+version. Do not edit the pull request's title: release-please tags the version in the
+title while the commit carries the version it computed, so `🔖 Check the release version`
+fails when they differ, and the `release` workflow refuses a tag that the manifest does
+not name.
+
+Once the release exists, the `release` workflow builds `artifactweave` for Linux,
 macOS and Windows on amd64 and arm64 with [GoReleaser](.goreleaser.yaml) and attaches:
 
 - an archive per platform, holding the static binary, this README and the licence;

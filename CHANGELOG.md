@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.3.1](https://github.com/weaveplatform/artifactweave/compare/v0.3.0...v0.3.1) (2026-11-24)
+## [0.4.0](https://github.com/weaveplatform/artifactweave/compare/v0.3.0...v0.4.0) (2026-11-24)
 
 
 ### Features
