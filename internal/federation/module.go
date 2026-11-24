@@ -46,6 +46,27 @@ type Deps struct {
 	// for the descriptor's urlBase as this instance's own federated member
 	// base when neither urlBase nor federatedRepoUrlBase is set.
 	BaseURL string
+
+	// streams is the stream delivery engine once OpenStreams has built it.
+	// Deps is copied into every service the module hands out, which all
+	// share this one pointer, so membership built before OpenStreams still
+	// wakes the engine built after it.
+	streams *streamRef
+}
+
+// streamRef holds the module's stream delivery engine.
+type streamRef struct {
+	mu sync.Mutex
+	e  *streamsync.Engine
+}
+
+func (r *streamRef) get() *streamsync.Engine {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.e
 }
 
 var errNoStore = errors.New("federation: Deps.Store is required")
@@ -58,7 +79,9 @@ type Module struct {
 	push            *replication.Push
 	pull            *replication.Pull
 	pushConnections *pushhttp.Factory
-	streams         *streamsync.Engine
+	// repoStream is the repository stream kind OpenStreams registered,
+	// whose tombstones RegisterWork prunes; deps.streams.mu guards it.
+	repoStream *federated.Stream
 	// configRemote and configLog are configSync's transport and log
 	// (OpenConfigSync); pushMu guards them.
 	configRemote federated.Remote
@@ -75,6 +98,7 @@ func New(d Deps) (*Module, error) {
 	if d.Store == nil {
 		return nil, errNoStore
 	}
+	d.streams = &streamRef{}
 	return &Module{deps: d}, nil
 }
 

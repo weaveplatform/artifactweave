@@ -61,6 +61,14 @@
 //   - ItemRemoval: current credential/native Delete and exact file facts fence
 //     normal item/trash/index/event mutations. The owner's selection check and
 //     durable acknowledgement join the deletion transaction; failures roll it back.
+//   - ItemFeed and ItemChange: each change a client makes to an item,
+//     reported with the item's whole state inside the change's transaction,
+//     which the federation module's repository stream appends to its outbox
+//     (decision 0022). The composite stores hold it (SetItemFeed), so every
+//     item service the module builds reports to it.
+//   - FederatedItems: another member's change applied to a federated
+//     repository in the caller's transaction, with the format's hooks and
+//     without being reported back to the ItemFeed.
 //   - StoragePolicies, with StoragePolicy, StoragePolicyChange,
 //     StoragePolicyResult and StoragePolicyInvalid: the garbage collection
 //     schedule and trash can policy that the configuration descriptor's
@@ -121,7 +129,8 @@
 // publishes typed artifact/property, Docker and build topics and immutable
 // fact values, independently of vendor webhook envelopes.
 // P11 ItemRemoval supplies retention's guarded deletion boundary; retention
-// retains policy interpretation, run state and reporting.
+// retains policy interpretation, run state and reporting. ItemFeed and
+// FederatedItems implemented P13 (FED-02, issue #1931).
 //
 // # Testing
 //

@@ -92,7 +92,7 @@ func (s MavenAPI) mavenTargetOf(
 		return mavenTarget{}, s.ItemError(ctx, "resolve repository", err)
 	case !acc.File(c, p, want):
 		return mavenTarget{}, httpkit.Denied(who)
-	case c.Class != repo.Local: // a cache alias resolves to its remote repository
+	case !maven.Hosted(c): // a cache alias resolves to its remote repository
 		return mavenTarget{}, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Unable to find local repository '%s'.", key))
 	case !maven.Serves(c.PackageType):

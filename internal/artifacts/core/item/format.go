@@ -305,7 +305,10 @@ func (s *Service) annotate(
 				return err
 			}
 		}
-		return s.emitPropertyChanges(ctx, it, before, "", now)
+		if err := s.emitPropertyChanges(ctx, it, before, "", now); err != nil {
+			return err
+		}
+		return s.feed(ctx, it)
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // the transaction returns ours

@@ -9,7 +9,9 @@
 // federation module, core layer. It shares its name with the standard
 // library's sync, so a file that needs both imports that one as gosync.
 // It is generic over stream kinds: a Kind says who exchanges its streams
-// and applies their entries, and FED-02 registers repo:<key>.
+// and applies their entries; core/federated registers repo:<key> (FED-02).
+// A kind that pauses a subscribed peer (Pauser) is sent nothing while it
+// pauses, and the peer resumes from its acknowledged position.
 //
 // # Inputs
 //
@@ -96,8 +98,9 @@
 //
 // # Status
 //
-// Implemented P13 (PEER-04, PEER-05). Repository payloads, their apply
-// rules and their snapshot items are FED-02's.
+// Implemented P13 (PEER-04, PEER-05); Pauser, Observe and Wake for the
+// repository stream (FED-02). The repository stream's snapshot items are
+// FED-04's.
 //
 // # Testing
 //

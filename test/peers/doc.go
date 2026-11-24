@@ -25,15 +25,19 @@
 //     base URL, the one address every other instance and the scenario
 //     reach it at; an egress per instance, the forward proxy its server
 //     reaches the others through; Cut and Restore, Partition and Heal,
-//     which refuse destinations at the egress; DoFrom; Stop, which stops
-//     one instance; Close and Leftovers; on each Instance, Identity, Peer
-//     and SetPeerKey over its database.
+//     which refuse destinations at the egress; DoFrom; DoHeader, for a
+//     request that needs its own headers; Stop, which stops one instance;
+//     Close and Leftovers; on each Instance, Identity, Peer and SetPeerKey
+//     over its database.
 //   - Each instance's coverage in the binary's -test.gocoverdir.
 //   - Each instance's server log in a failing scenario's output.
-//   - The scenarios: the harness's own (harness_test.go), pairing
-//     through service_trust (pairing_test.go), federated members
-//     (federated_test.go) and peer liveness (liveness_test.go); the P13
-//     peer and federation tickets add theirs.
+//   - The scenarios: the harness's own (harness_test.go) and pairing
+//     through service_trust (pairing_test.go), federated members and
+//     configuration sync (federated_test.go), change propagation
+//     (federated_sync_test.go): convergence of every kind of change, the
+//     conflict rule, catch-up after a partition, a disabled member, and
+//     Maven, npm and Docker metadata recomputed on each member; and peer
+//     liveness (liveness_test.go); the other P13 tickets add theirs.
 //
 // # References
 //
@@ -58,6 +62,6 @@
 //
 // Implemented P13 (QUA-01, issue 1924): the harness and the acceptance-peers
 // job; issue 1946 gave each instance one ingress address and moved PEER-02's
-// pairing scenarios here. The other peer and federation scenarios come with
-// their tickets.
+// pairing scenarios here; FED-01 (issue 1930) and FED-02 (issue 1931) added
+// theirs. The other peer and federation scenarios come with their tickets.
 package peers

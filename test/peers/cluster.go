@@ -515,31 +515,53 @@ func (in *Instance) openStore(t testing.TB) *appsql.Store {
 // error.
 func (in *Instance) LogPath() string { return in.logPath }
 
+// DoHeader is Do with request headers, such as a manifest's Content-Type
+// or a registry client's Accept, returning the answer's headers too.
+func (in *Instance) DoHeader(t testing.TB, method, path, body string, header http.Header) (int, http.Header, string) {
+	t.Helper()
+	status, got, data, err := in.cluster.sendHeader(in.cluster.client, in.URL, AdminUser, in.AdminPassword, header, method, path, body)
+	if err != nil {
+		t.Fatalf("%s %s on %s: %v", method, path, in.Name, err)
+	}
+	return status, got, data
+}
+
 // send sends a request through client to base, as user unless user is
 // empty. A body without contentType is JSON under the REST APIs' prefixes
 // and has no type elsewhere, where it is an artifact's content.
 func (c *Cluster) send(client *http.Client, base, user, password, contentType, method, path, body string) (int, string, error) {
+	header := http.Header{}
+	if contentType != "" {
+		header.Set("Content-Type", contentType)
+	}
+	status, _, data, err := c.sendHeader(client, base, user, password, header, method, path, body)
+	return status, data, err
+}
+
+func (c *Cluster) sendHeader(
+	client *http.Client, base, user, password string, header http.Header, method, path, body string,
+) (int, http.Header, string, error) {
 	req, err := http.NewRequestWithContext(c.t.Context(), method, base+path, strings.NewReader(body))
 	if err != nil {
-		return 0, "", err
+		return 0, nil, "", err
 	}
 	if user != "" {
 		req.SetBasicAuth(user, password)
 	}
-	if contentType == "" && body != "" &&
-		(strings.HasPrefix(path, "/artifactory/api/") || strings.HasPrefix(path, "/access/api/")) {
-		contentType = "application/json"
+	for k, v := range header {
+		req.Header[k] = v
 	}
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
+	if req.Header.Get("Content-Type") == "" && body != "" &&
+		(strings.HasPrefix(path, "/artifactory/api/") || strings.HasPrefix(path, "/access/api/")) {
+		req.Header.Set("Content-Type", "application/json")
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, "", err
+		return 0, nil, "", err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	data, err := io.ReadAll(resp.Body)
-	return resp.StatusCode, string(data), err
+	return resp.StatusCode, resp.Header, string(data), err
 }
 
 // instanceConfig is the strict YAML the instance process loads with

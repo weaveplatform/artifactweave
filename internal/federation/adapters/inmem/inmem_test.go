@@ -11,4 +11,5 @@ import (
 
 func TestUnitContract(t *testing.T) {
 	fedstoretest.Run(t, func(*testing.T) port.Store { return fedinmem.New(memtx.New()) })
+	fedstoretest.RunStamps(t, func(*testing.T) fedstoretest.StampsStore { return fedinmem.New(memtx.New()) })
 }

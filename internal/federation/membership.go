@@ -10,6 +10,7 @@ import (
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/federated"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit/apierror"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
@@ -27,7 +28,13 @@ func (d Deps) membership() (federated.Membership, error) {
 	if !ok {
 		return federated.Membership{}, fmt.Errorf("federated repository membership store unavailable: %w", kernel.ErrStore)
 	}
-	return federated.Membership{Store: st, BaseURL: d.BaseURL}, nil
+	ms := federated.Membership{Store: st, BaseURL: d.BaseURL}
+	if e := d.streams.get(); e != nil {
+		ms.Changed = func(ctx context.Context, key string) error {
+			return e.Wake(ctx, model.RepositoryStream(key)) //nolint:wrapcheck // the engine names the stream
+		}
+	}
+	return ms, nil
 }
 
 // Operations returns the federation API's configSync, migrate,

@@ -100,9 +100,13 @@ func (e *Engine) Dispatch(ctx context.Context, peerID, stream string) error {
 	if err != nil || !ok || !p.Pushes() {
 		return err
 	}
-	if _, err := e.authorize(ctx, p, stream, Send); errors.Is(err, ErrNoStream) || errors.Is(err, ErrRefused) {
+	k, err := e.authorize(ctx, p, stream, Send)
+	if errors.Is(err, ErrNoStream) || errors.Is(err, ErrRefused) {
 		return nil
 	} else if err != nil {
+		return err
+	}
+	if stop, err := paused(ctx, k, stream, peerID); err != nil || stop {
 		return err
 	}
 	self, err := e.self(ctx)

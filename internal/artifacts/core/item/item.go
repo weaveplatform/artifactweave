@@ -74,6 +74,13 @@ type Store interface {
 	Leases() work.LeaseStore
 	Instance() instance.InstanceStore
 	Events() outbox.EventStore
+	// ItemFeed is told of each change a client or a policy makes to an
+	// item (artapi.ItemFeed); nil when nothing listens. It is the store's,
+	// not a Service field, because every service the server builds over
+	// one store must report to it: a service built without the field
+	// would leave its writes out of every federated repository's stream,
+	// with nothing to show for it.
+	ItemFeed() artapi.ItemFeed
 }
 
 // Service writes items into a store and its blob store.
@@ -514,6 +521,9 @@ func (s *Service) putFile(
 	if err := s.emitPropertyChanges(ctx, stored, written.Before, d.By, now); err != nil {
 		return model.Item{}, err
 	}
+	if err := s.feed(ctx, stored); err != nil {
+		return model.Item{}, err
+	}
 	return stored, nil
 }
 
@@ -756,15 +766,26 @@ func (s *Service) MakeFolder(
 				return err //nolint:wrapcheck // the format's own error
 			}
 		}
+		_, err := s.Store.Items().Get(ctx, t.Repo.Key, t.Cached, full)
+		created := errors.Is(err, kernel.ErrNotFound)
+		if err != nil && !created {
+			return fmt.Errorf("item: get %s: %w", full, err)
+		}
 		if err := s.ensureFolders(ctx, t, full, by, now); err != nil {
 			return err
 		}
-		var err error
 		if folder, err = s.Store.Items().Get(ctx, t.Repo.Key, t.Cached, full); err != nil {
 			return fmt.Errorf("item: get %s: %w", full, err)
 		}
 		if len(props) > 0 {
+			// Annotate reports the folder with its properties.
 			return s.Annotate(ctx, t.Repo, folder, props, nil)
+		}
+		if created {
+			// An empty folder a client made is a change of its own; the
+			// folders a deploy makes above a file are not, as every member
+			// makes them when it applies the file.
+			return s.feed(ctx, folder)
 		}
 		return nil
 	})
@@ -992,7 +1013,7 @@ func (s *Service) RecordSidecar(
 		if stored, err = s.Store.Items().Put(ctx, it); err != nil {
 			return fmt.Errorf("item: put %s: %w", w.Path, err)
 		}
-		return nil
+		return s.feed(ctx, stored)
 	})
 	if err != nil {
 		return model.Item{}, err //nolint:wrapcheck // the transaction returns ours
@@ -1140,6 +1161,9 @@ func (s *Service) remove(
 			if err := s.emitArtifact(ctx, artapi.ArtifactDeleted, it, nil, by, now); err != nil {
 				return err
 			}
+		}
+		if err := s.feedRemoved(ctx, res.Removed); err != nil {
+			return err
 		}
 		if trash {
 			return nil

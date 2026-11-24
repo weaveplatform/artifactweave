@@ -39,7 +39,7 @@ func snapshotWrite(
 	r reader,
 	w format.Write,
 ) (format.Write, error) {
-	if c.Class != repo.Local || w.Cached || !IsMavenLayout(r.l) || IsMetadata(w.Path) {
+	if !Hosted(c) || w.Cached || !IsMavenLayout(r.l) || IsMetadata(w.Path) {
 		return w, nil
 	}
 	co, ok := Read(r.l, w.Path)

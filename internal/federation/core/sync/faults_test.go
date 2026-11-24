@@ -29,6 +29,8 @@ type faultSet struct {
 	name string
 	skip int
 	hits int
+	// paused is the peers the kind pauses sending to (streamsync.Pauser).
+	paused map[string]bool
 }
 
 func (f *faultSet) arm(name string, skip int) {
