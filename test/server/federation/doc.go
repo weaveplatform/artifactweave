@@ -1,7 +1,8 @@
 // Package federation qualifies single-repository replication configuration and
 // bounded push through assembled application processes and current authority,
-// and pairing between two instances through the service_trust endpoints,
-// and stream delivery between them through the peer API.
+// and stream delivery between two instances through the peer API. Pairing
+// between instances through the service_trust endpoints runs in test/peers,
+// where each instance is reached at its base URL (#1946).
 //
 // # Role
 //
@@ -21,9 +22,6 @@
 // rollback; current project flags, membership and token-ceiling enforcement.
 // Source bytes, computed digests, exact properties and scoped deletion through
 // native target admission/metadata APIs, including an empty selected source.
-// Pairing: both use cases paired, listed and unpaired on both instances, with
-// 7.x's messages; refused tokens leaving no peer record; one of two concurrent
-// redemptions pairing; a forced unpair of an unreachable peer.
 // Streams (test stream kind): entries applied once and in order through
 // dropped answers, duplicated, gapped and resumed batches and a stopped
 // receiver; a rolled-back change never delivered; pull mode reaching push
@@ -39,15 +37,16 @@
 //   - docs/research/decisions/0013-projects-and-environments.md.
 //   - https://github.com/weaveplatform/artifactweave/issues/1760.
 //   - https://github.com/weaveplatform/artifactweave/issues/1761.
-//   - https://github.com/weaveplatform/artifactweave/issues/1926 (pairing).
 //   - https://github.com/weaveplatform/artifactweave/issues/1928 (streams).
 //
 // # Status
 //
 // P11 REP-01 configuration and REP-02 bounded push. Execution/status and
 // scheduling retain REP-04 ownership; advanced replication remains deferred.
-// P13 PEER-02 pairing and PEER-04 stream delivery. The stream scenarios move
-// to test/peers once it can host paired instances (#1946).
+// P13 PEER-04 stream delivery. The stream scenarios stay here rather than in
+// test/peers: they register the test stream kind on each runtime's engine
+// and read its state in-process, which test/peers' instance processes do not
+// offer; the federated-repository kinds' scenarios go to test/peers.
 //
 // # Testing
 //
@@ -65,12 +64,11 @@
 // metadata and checksum companions; native-client consumption belongs to REP-05.
 // NTLM tests push through the fakeupstream NTLMv2 verifier configured by the
 // public descriptor, then refuse a wrong proxy password and its stale run (#1848).
-// Pairing tests open two runtimes on loopback listeners bound first, so each
-// may call the other, over SQLite and PostgreSQL scratch schemas; closing one
-// listener makes its instance unreachable. Stream tests do the same, and
-// put a hook in front of each router that drops, refuses or corrupts an
-// answer; they register the test stream kind on each runtime's engine and
-// seed peer records through PeerStore.
+// Stream tests open two runtimes on loopback listeners bound first, so each
+// may call the other, over SQLite and PostgreSQL scratch schemas, and put a
+// hook in front of each router that drops, refuses or corrupts an answer;
+// they register the test stream kind on each runtime's engine and seed peer
+// records through PeerStore.
 //
 // Every top-level test runs in parallel (#1882). Each builds its own runtimes,
 // target processes, httptest servers, temporary directories and PostgreSQL

@@ -20,6 +20,10 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/weaveplatform/artifactweave/internal/app"
+	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
+	"github.com/weaveplatform/artifactweave/internal/app/config"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/postgres"
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
@@ -35,6 +39,10 @@ const (
 
 // AdminUser is the administrator every instance seeds on its first start.
 const AdminUser = "admin"
+
+// EgressProxy is the key of the proxy configuration that makes each
+// instance's egress its platform default proxy.
+const EgressProxy = "peers-egress"
 
 // ProcessLogDirEnv names a directory that keeps each instance's server log
 // after the run, as P11's two-process suites use it; CI uploads it when the
@@ -66,15 +74,17 @@ type Options struct {
 }
 
 // Cluster is a set of artifactweave instances, each in its own OS process
-// with its own loopback port, data directory, database, instance identity
-// and base URL, and a forwarder for every ordered pair of them.
+// with its own loopback port, data directory, database, instance identity,
+// ingress address and egress proxy.
 type Cluster struct {
-	// Instances are in start order; Link, Partition and Heal take their
-	// indexes.
+	// Instances are in start order; Cut, Partition, DoFrom and their kin
+	// take their indexes.
 	Instances []*Instance
 
-	t         *testing.T
-	links     map[[2]int]*Link
+	t *testing.T
+	// ingresses maps each instance's ingress address to its index: the
+	// only destinations the egress proxies carry connections to.
+	ingresses map[string]int
 	client    *http.Client
 	postgres  containertest.PostgresEndpoint
 	stopPG    func()
@@ -102,9 +112,9 @@ func Start(t *testing.T, opts Options) *Cluster {
 	work := t.TempDir()
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	c := &Cluster{
-		t:      t,
-		links:  map[[2]int]*Link{},
-		client: &http.Client{Transport: transport, Timeout: time.Minute},
+		t:         t,
+		ingresses: map[string]int{},
+		client:    &http.Client{Transport: transport, Timeout: time.Minute},
 	}
 	t.Cleanup(c.dumpLogsOnFailure)
 	t.Cleanup(c.Close)
@@ -126,7 +136,21 @@ func Start(t *testing.T, opts Options) *Cluster {
 			cluster:       c,
 			work:          filepath.Join(work, name),
 			done:          make(chan struct{}),
+			// Both relays listen before any instance starts: the ingress
+			// is the base URL the instance's configuration names, and the
+			// egress and the other ingresses are the origins it may reach.
+			// They serve once the instances have their final addresses.
+			ingress: listenRelay(t),
+			egress:  listenRelay(t),
 		}
+		in.URL = "http://" + in.ingress.addr
+		c.ingresses[in.ingress.addr] = i
+		proxied := transport.Clone()
+		proxied.Proxy = http.ProxyURL(&url.URL{Scheme: "http", Host: in.egress.addr})
+		// A fresh connection per request, as the egress serves a plain
+		// HTTP request, so a cut never meets a pooled connection.
+		proxied.DisableKeepAlives = true
+		in.via = &http.Client{Transport: proxied, Timeout: time.Minute}
 		if err := os.MkdirAll(in.DataDir, 0o700); err != nil {
 			t.Fatal(err)
 		}
@@ -134,16 +158,6 @@ func Start(t *testing.T, opts Options) *Cluster {
 			in.dsn = c.createDatabase(t, name)
 		}
 		c.Instances = append(c.Instances, in)
-	}
-	// The forwarders listen before any instance starts, because each
-	// instance's configuration lists the origins it may reach as a remote;
-	// they serve once the instances have their final addresses.
-	for i, from := range c.Instances {
-		for j, to := range c.Instances {
-			if i != j {
-				c.links[[2]int{i, j}] = newLink(t, from, to)
-			}
-		}
 	}
 	var wg sync.WaitGroup
 	errs := make([]error, len(c.Instances))
@@ -154,37 +168,73 @@ func Start(t *testing.T, opts Options) *Cluster {
 	if err := errors.Join(errs...); err != nil {
 		t.Fatal(err)
 	}
-	for _, l := range c.links {
-		l.serve()
+	for _, in := range c.Instances {
+		in.ingress.serveIngress(in.addr)
+		in.egress.serveEgress(func(addr string) (int, bool) {
+			i, ok := c.ingresses[addr]
+			return i, ok
+		})
+	}
+	for _, in := range c.Instances {
+		in.proxyThroughEgress(t)
 	}
 	return c
 }
 
-// Link returns the forwarder through which instance from reaches instance
-// to. Its URL is the only address from's configuration allows for to.
-func (c *Cluster) Link(from, to int) *Link {
+// Cut stops instance from's server reaching instance to: its egress resets
+// every connection it carries to to's ingress and refuses new ones until
+// Restore. The cut is by source, so nothing else reaches to any less: the
+// other instances, the scenario, and to's own calls to from all still pass.
+func (c *Cluster) Cut(from, to int) {
 	c.t.Helper()
-	l, ok := c.links[[2]int{from, to}]
-	if !ok {
-		c.t.Fatalf("peers: no link from %d to %d", from, to)
-	}
-	return l
+	c.instance(from).egress.setCut(c.index(to), true)
 }
 
-// Partition cuts both links between instances a and b; Heal restores them.
+// Restore lets instance from's server reach instance to again.
+func (c *Cluster) Restore(from, to int) {
+	c.t.Helper()
+	c.instance(from).egress.setCut(c.index(to), false)
+}
+
+// Partition cuts instances a and b from each other, both ways; every other
+// pair still reaches each other.
 func (c *Cluster) Partition(a, b int) {
-	c.Link(a, b).Partition()
-	c.Link(b, a).Partition()
+	c.t.Helper()
+	c.Cut(a, b)
+	c.Cut(b, a)
 }
 
-// Heal restores both links between instances a and b.
+// Heal restores both ways between instances a and b.
 func (c *Cluster) Heal(a, b int) {
-	c.Link(a, b).Heal()
-	c.Link(b, a).Heal()
+	c.t.Helper()
+	c.Restore(a, b)
+	c.Restore(b, a)
+}
+
+// DoFrom sends a request to instance to's base URL as to's administrator,
+// the way from's server reaches it: through from's egress. It returns a
+// transport error, not a failed t, so a scenario can see a cut.
+func (c *Cluster) DoFrom(from, to int, method, path, body string) (int, string, error) {
+	c.t.Helper()
+	target := c.instance(to)
+	return c.send(c.instance(from).via, target.URL, AdminUser, target.AdminPassword, "", method, path, body)
+}
+
+func (c *Cluster) instance(i int) *Instance {
+	c.t.Helper()
+	return c.Instances[c.index(i)]
+}
+
+func (c *Cluster) index(i int) int {
+	c.t.Helper()
+	if i < 0 || i >= len(c.Instances) {
+		c.t.Fatalf("peers: no instance %d in a cluster of %d", i, len(c.Instances))
+	}
+	return i
 }
 
 // Close stops every instance as serve stops on a signal, closes the
-// forwarders and removes the PostgreSQL container. An instance that does not
+// ingresses and egresses and removes the PostgreSQL container. An instance that does not
 // stop in time is killed, and an instance that exits unsuccessfully fails t.
 // It runs once; Start registers it as a cleanup, and a scenario that checks
 // Leftovers calls it first.
@@ -195,8 +245,10 @@ func (c *Cluster) Close() {
 			wg.Go(in.stop)
 		}
 		wg.Wait()
-		for _, l := range c.links {
-			l.close()
+		for _, in := range c.Instances {
+			in.ingress.close()
+			in.egress.close()
+			in.via.CloseIdleConnections()
 		}
 		c.client.CloseIdleConnections()
 		if c.stopPG != nil {
@@ -211,7 +263,7 @@ func (c *Cluster) Close() {
 }
 
 // Leftovers names what a closed cluster still holds: a running instance
-// process, an instance or forwarder address that accepts connections, or a
+// process, an instance, ingress or egress address that accepts connections, or a
 // PostgreSQL container the engine still has. It is empty after Close.
 func (c *Cluster) Leftovers(ctx context.Context) []string {
 	var left []string
@@ -225,9 +277,7 @@ func (c *Cluster) Leftovers(ctx context.Context) []string {
 		if in.addr != "" {
 			addrs = append(addrs, in.addr)
 		}
-	}
-	for _, l := range c.links {
-		addrs = append(addrs, l.addr)
+		addrs = append(addrs, in.ingress.addr, in.egress.addr)
 	}
 	if c.postgres.ContainerID != "" {
 		if err := containertest.Removed(ctx, c.postgres.ContainerID); err != nil {
@@ -245,14 +295,17 @@ func (c *Cluster) Leftovers(ctx context.Context) []string {
 	return left
 }
 
-// originsFrom lists the forwarders instance i may reach, the
-// remote.allowed_private_origins of its configuration: every other address
-// on the loopback interface is refused as an upstream.
+// originsFrom lists what instance i's server may reach on the loopback
+// interface, the remote.allowed_private_origins of its configuration: the
+// other instances' base URLs, and its own egress, which the peer client
+// checks as it checks a destination. The egress carries connections only
+// to the ingresses, so with it as the platform default proxy an instance
+// reaches no other at its listening address, around a cut.
 func (c *Cluster) originsFrom(i int) []string {
-	var origins []string
-	for key, l := range c.links {
-		if key[0] == i {
-			origins = append(origins, l.URL)
+	origins := []string{"http://" + c.Instances[i].egress.addr}
+	for j, in := range c.Instances {
+		if j != i {
+			origins = append(origins, in.URL)
 		}
 	}
 	slices.Sort(origins)
@@ -324,9 +377,10 @@ var logName = regexp.MustCompile(`[^A-Za-z0-9_.-]+`)
 type Instance struct {
 	// Name is peer1, peer2 and so on, in start order.
 	Name string
-	// URL is the instance's own address, http://127.0.0.1:<port>, which is
-	// also its configured base_url. Scenarios address it directly; other
-	// instances reach it only through a Link.
+	// URL is the instance's ingress, http://127.0.0.1:<port>, a forwarder to
+	// the port the instance listens on, and its configured base_url: the
+	// one address every other instance and the scenario reach it at, and so
+	// the one that pairing records for it.
 	URL string
 	// DataDir is the instance's data directory; with SQLite it holds the
 	// database too.
@@ -337,6 +391,13 @@ type Instance struct {
 	cluster *Cluster
 	work    string
 	dsn     string
+	// config is the configuration file the instance process loads.
+	config string
+	// ingress forwards URL to addr; egress is the instance's platform
+	// default proxy, which Cut refuses destinations at; via is a client
+	// that sends through egress, as the instance's own server does.
+	ingress, egress *relay
+	via             *http.Client
 	// masterKey survives a retried start, which reopens the same database.
 	masterKey string
 	addr      string
@@ -351,27 +412,68 @@ type Instance struct {
 // status and body; a transport error fails t.
 func (in *Instance) Do(t testing.TB, method, path, body string) (int, string) {
 	t.Helper()
-	status, data, err := in.cluster.request(in.URL, in, method, path, body)
+	return in.DoAs(t, AdminUser, in.AdminPassword, method, path, body)
+}
+
+// DoAs is Do as user with password, or anonymously when user is empty.
+func (in *Instance) DoAs(t testing.TB, user, password, method, path, body string) (int, string) {
+	t.Helper()
+	status, data, err := in.cluster.send(in.cluster.client, in.URL, user, password, "", method, path, body)
 	if err != nil {
 		t.Fatalf("%s %s on %s: %v", method, path, in.Name, err)
 	}
 	return status, data
 }
 
+// Identity reads the instance's identity, its private key included, from
+// its database, as its own server does: a scenario can then require that no
+// answer disclosed the key. The instance must be running; a PostgreSQL
+// cluster's database goes with its container.
+func (in *Instance) Identity(t testing.TB) instance.InstanceIdentity {
+	t.Helper()
+	cfg, err := config.Load(config.LoadOptions{File: in.config})
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys, err := app.Keyring(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st, err := app.OpenStore(t.Context(), cfg, appsql.Options{SkipMigrate: true, Keyring: keys})
+	if err != nil {
+		t.Fatalf("peers: open %s's store: %v", in.Name, err)
+	}
+	defer func() { _ = st.Close() }()
+	id, err := st.Instance().Get(t.Context())
+	if err != nil {
+		t.Fatalf("peers: read %s's identity: %v", in.Name, err)
+	}
+	return id
+}
+
 // LogPath is the file that receives the instance's standard output and
 // error.
 func (in *Instance) LogPath() string { return in.logPath }
 
-func (c *Cluster) request(base string, as *Instance, method, path, body string) (int, string, error) {
+// send sends a request through client to base, as user unless user is
+// empty. A body without contentType is JSON under the REST APIs' prefixes
+// and has no type elsewhere, where it is an artifact's content.
+func (c *Cluster) send(client *http.Client, base, user, password, contentType, method, path, body string) (int, string, error) {
 	req, err := http.NewRequestWithContext(c.t.Context(), method, base+path, strings.NewReader(body))
 	if err != nil {
 		return 0, "", err
 	}
-	req.SetBasicAuth(AdminUser, as.AdminPassword)
-	if strings.HasPrefix(path, "/artifactory/api/") && body != "" {
-		req.Header.Set("Content-Type", "application/json")
+	if user != "" {
+		req.SetBasicAuth(user, password)
 	}
-	resp, err := c.client.Do(req)
+	if contentType == "" && body != "" &&
+		(strings.HasPrefix(path, "/artifactory/api/") || strings.HasPrefix(path, "/access/api/")) {
+		contentType = "application/json"
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return 0, "", err
 	}
@@ -410,7 +512,7 @@ func (in *Instance) startOnce(origins []string) error {
 	if err != nil {
 		return err
 	}
-	in.addr, in.URL = addr, "http://"+addr
+	in.addr = addr
 	database := map[string]string{"driver": string(SQLite)}
 	if in.dsn != "" {
 		database = map[string]string{"driver": string(Postgres), "dsn": in.dsn}
@@ -430,6 +532,7 @@ func (in *Instance) startOnce(origins []string) error {
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		return err
 	}
+	in.config = path
 	log, err := in.openLog()
 	if err != nil {
 		return err
@@ -473,6 +576,25 @@ func readLog(path string) string {
 	return string(data)
 }
 
+// proxyThroughEgress makes the instance's egress its platform default
+// proxy, which its remote, push and peer clients all take. Cut relies on
+// it: an instance that reached the others directly would cross every cut.
+// A scenario that adds a proxy must not make it a platform default too, nor
+// set a remote's disableProxy, or that traffic would bypass the egress.
+func (in *Instance) proxyThroughEgress(t *testing.T) {
+	t.Helper()
+	host, port, err := net.SplitHostPort(in.egress.addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	descriptor := fmt.Sprintf("proxies:\n  %s:\n    host: %s\n    port: %s\n    platformDefault: true\n", EgressProxy, host, port)
+	status, body, err := in.cluster.send(in.cluster.client, in.URL, AdminUser, in.AdminPassword, "application/yaml",
+		http.MethodPatch, "/artifactory/api/system/configuration", descriptor)
+	if err != nil || status != http.StatusOK {
+		t.Fatalf("peers: make %s's egress its platform default proxy: %d %s (%v)", in.Name, status, body, err)
+	}
+}
+
 func (in *Instance) awaitReady() error {
 	deadline := time.Now().Add(readyTimeout)
 	for time.Now().Before(deadline) {
@@ -481,7 +603,10 @@ func (in *Instance) awaitReady() error {
 			return fmt.Errorf("exited before it was ready: %v", in.exit)
 		default:
 		}
-		status, body, err := in.cluster.request(in.URL, in, http.MethodGet, "/artifactory/api/system/ping", "")
+		// The instance's own address: its ingress serves only once every
+		// instance is ready.
+		status, body, err := in.cluster.send(in.cluster.client, "http://"+in.addr, AdminUser, in.AdminPassword, "",
+			http.MethodGet, "/artifactory/api/system/ping", "")
 		if err == nil && status == http.StatusOK && body == "OK" {
 			return nil
 		}

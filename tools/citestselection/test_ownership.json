@@ -408,7 +408,6 @@
       "execution_options_test.go",
       "execution_restart_test.go",
       "execution_runtime_test.go",
-      "pairing_test.go",
       "pull_catalog_test.go",
       "pull_failures_test.go",
       "pull_registry_test.go",
