@@ -89,6 +89,25 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # The tag must name the version its commit carries, and release-please
+      # must already have made its release. When #1624's release was retagged
+      # by hand (#1947), the new v0.4.0 tag built over a 0.3.1 commit, and the
+      # v0.3.1 build, finding its release gone, had goreleaser's append mode
+      # create a second one, which became Latest. The manifest check stops the
+      # first; the release check stops the second when the release is gone
+      # before the build starts.
+      - name: Check the tag against the manifest and its release
+        env:
+          GOWORK: 'off'
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          go run ./tools/releaseversion -tag "$GITHUB_REF_NAME"
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json tagName >/dev/null; then
+            echo "::error::no GitHub release for $GITHUB_REF_NAME: release-please creates it when its pull request merges; a tag without one was not made by release-please"
+            exit 1
+          fi
+
       - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
 
       # goreleaser's sboms step shells out to syft, which the runner lacks;
