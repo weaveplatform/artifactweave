@@ -464,6 +464,21 @@ column failed_blob_fetches.failures integer NOT NULL DEFAULT 0
 column failed_blob_fetches.last_error text NOT NULL DEFAULT ''::text
 constraint failed_blob_fetches.failed_blob_fetches_pkey PRIMARY KEY (stream, sha256)
 index failed_blob_fetches.failed_blob_fetches_pkey CREATE UNIQUE INDEX failed_blob_fetches_pkey ON failed_blob_fetches USING btree (stream, sha256)
+table federation_item_stamps
+column federation_item_stamps.repo_key text COLLATE "C" NOT NULL
+column federation_item_stamps.path text COLLATE "C" NOT NULL
+column federation_item_stamps.hlc_wall bigint NOT NULL
+column federation_item_stamps.hlc_logical bigint NOT NULL
+column federation_item_stamps.origin text NOT NULL
+column federation_item_stamps.deleted boolean NOT NULL DEFAULT false
+column federation_item_stamps.folder boolean NOT NULL DEFAULT false
+column federation_item_stamps.sha256 text NOT NULL DEFAULT ''::text
+column federation_item_stamps.size bigint NOT NULL DEFAULT 0
+column federation_item_stamps.pending text
+constraint federation_item_stamps.federation_item_stamps_pkey PRIMARY KEY (repo_key, path)
+index federation_item_stamps.federation_item_stamps_pkey CREATE UNIQUE INDEX federation_item_stamps_pkey ON federation_item_stamps USING btree (repo_key, path)
+index federation_item_stamps.federation_item_stamps_sha256 CREATE INDEX federation_item_stamps_sha256 ON federation_item_stamps USING btree (repo_key, sha256)
+index federation_item_stamps.federation_item_stamps_tombstones CREATE INDEX federation_item_stamps_tombstones ON federation_item_stamps USING btree (deleted, hlc_wall)
 table federation_members
 column federation_members.repo_key text COLLATE "C" NOT NULL
 column federation_members.peer text COLLATE "C" NOT NULL

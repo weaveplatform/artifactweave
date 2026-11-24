@@ -19,8 +19,10 @@ outbox** delivery is implemented
 acknowledged cursors, `GET /blobs/{sha256}`, failed binaries with back-off retry, and
 pruning that flags a peer left behind for a full sync. **Full sync** is implemented
 ([PEER-05](https://github.com/weaveplatform/artifactweave/issues/1929)): `GET
-streams/{stream}/snapshot`, the receiver's fallback and `full_sync_runs`. No stream kind
-is registered yet, so every stream answers 404 until FED-02 registers `repo:<key>`. The
+streams/{stream}/snapshot`, the receiver's fallback and `full_sync_runs`. FED-02
+([#1931](https://github.com/weaveplatform/artifactweave/issues/1931)) registers
+`repo:<key>`, so a stream answers 404 unless it is a federated repository's and the
+caller one of its members. The
 other peer operations answer 501 until FED-01 and #1949 serve them.
 P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
 Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)

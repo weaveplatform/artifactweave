@@ -30,10 +30,14 @@
 // transport, admitting a caller who is an administrator now; RegisterWork
 // also runs the periodic pruning of expired pairing nonces
 // (PruneNoncesKind, every PruneNoncesInterval). OpenStreams builds the
-// stream delivery engine (core/sync) over the signed peer client, with no
-// stream kind registered until FED-02 adds repo:<key>; Streams returns it
-// for the peer API's stream and blob operations, and RegisterWork then
-// runs its dispatchers, pulls, blob retries, sweep and pruning.
+// stream delivery engine (core/sync) over the signed peer client and,
+// given the artifacts module's FederatedItems, registers the repo:<key>
+// stream kind (core/federated.Stream) and makes it the store's item feed;
+// Streams returns the engine for the peer API's stream and blob
+// operations, and RegisterWork then runs its dispatchers, pulls, blob
+// retries, sweep and pruning, and the pruning of expired tombstones
+// (TombstonePruneKind). Membership changes wake the repository's stream,
+// so a member added or enabled again receives at once.
 //
 // # References
 //
@@ -69,5 +73,5 @@
 // qualification is open. Advanced
 // federation remains P13/P14/P37. Both drivers open before the queue starts.
 // Pairing is implemented P13 (PEER-02, #1926); stream delivery P13 (PEER-04,
-// #1928).
+// #1928); federated repository change propagation P13 (FED-02, #1931).
 package federation

@@ -13,4 +13,7 @@ type API struct {
 	// StoragePolicies is the garbage collection schedule and trash can
 	// policy, which the configuration descriptor applies and exports.
 	StoragePolicies StoragePolicies
+	// FederatedItems applies other members' changes to federated
+	// repositories, which the federation module's repo:<key> streams carry.
+	FederatedItems FederatedItems
 }

@@ -317,6 +317,7 @@ func OpenRuntime(
 	}
 	if err := rt.openFederation(ctx, st, queue, federationOptions{
 		allowedPrivate: cfg.Remote.AllowedPrivateOrigins, blobs: hot.store, retention: cfg.Federation.OutboxRetention,
+		items: art.API().FederatedItems, feed: st,
 	}); err != nil {
 		stop()
 		mods.federation.Close()
