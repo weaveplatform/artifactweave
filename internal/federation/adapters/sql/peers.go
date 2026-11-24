@@ -287,7 +287,7 @@ func (s *Store) Federation() port.FederationStore { return federationStore{s} }
 
 type federationStore struct{ s *Store }
 
-const fedMemberCols = "repo_key, peer, base_url, remote_repo_key, enabled"
+const fedMemberCols = "repo_key, peer, base_url, remote_repo_key, enabled, mode"
 
 func (f federationStore) SetMembers(
 	ctx context.Context,
@@ -319,6 +319,7 @@ func (f federationStore) SetMembers(
 				m.BaseURL,
 				m.RemoteRepoKey,
 				m.Enabled,
+				string(m.Mode),
 			); err != nil {
 				return err
 			}
@@ -340,7 +341,7 @@ func (f federationStore) members(
 		[]any{arg},
 		func(r *sql.Rows) error {
 			var m model.FederationMember
-			err := r.Scan(&m.RepoKey, &m.PeerInstanceID, &m.BaseURL, &m.RemoteRepoKey, &m.Enabled)
+			err := r.Scan(&m.RepoKey, &m.PeerInstanceID, &m.BaseURL, &m.RemoteRepoKey, &m.Enabled, &m.Mode)
 			out = append(out, m)
 			return err //nolint:wrapcheck // wrapped by Rows
 		},

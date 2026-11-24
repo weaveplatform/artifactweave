@@ -230,6 +230,9 @@ func validate(c *Config, keyRules bool) error {
 	// by repos.CheckMembers, which needs the stored configuration and the
 	// other repositories: 7.x refuses a deployment repository outside the
 	// members only on a create or when the deployment repository changes.
+	if class == Federated {
+		validateMembers(c, add)
+	}
 	validateNumbers(c, add)
 	switch {
 	case errs == nil:

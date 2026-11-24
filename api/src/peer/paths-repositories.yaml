@@ -26,7 +26,8 @@ paths:
       description: >-
         Creates or updates this instance's copy of a federated repository the caller is a member of. The
         configuration is validated against this instance's own peers before it is stored, and nothing is stored
-        when it is refused. Not implemented; answers 501.
+        when it is refused. Its members must name this instance, at its own federated base URL with the key in the
+        path, and the caller; this instance does not send the configuration on.
       operationId: putRepositoryConfiguration
       parameters:
         - name: repoKey

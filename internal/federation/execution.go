@@ -89,8 +89,8 @@ func (m *Module) Worker() (replication.Worker, error) {
 }
 
 // RegisterWork binds the existing queue before its application loop starts:
-// replication execution, and the periodic pruning of expired pairing nonces,
-// whose item it queues once.
+// replication execution, the periodic pruning of expired pairing nonces,
+// whose item it queues once, and configSync once OpenConfigSync has run.
 func (m *Module) RegisterWork(ctx context.Context, queue *work.Queue) error {
 	if queue == nil {
 		return fmt.Errorf("replication work queue unavailable: %w", kernel.ErrStore)
@@ -102,7 +102,10 @@ func (m *Module) RegisterWork(ctx context.Context, queue *work.Queue) error {
 	if err := queue.Handle(replication.ExecutionWorkKind, worker.Execute); err != nil {
 		return fmt.Errorf("register replication execution: %w", err)
 	}
-	return m.registerPairingWork(ctx, queue)
+	if err := m.registerPairingWork(ctx, queue); err != nil {
+		return err
+	}
+	return m.registerConfigSyncWork(queue)
 }
 
 // ScheduleHandlers resolves the initialized coordinator when an occurrence

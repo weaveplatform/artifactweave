@@ -1,5 +1,6 @@
-// Package federated will manage federated repositories: members, the conflict
-// rule, lag and replay.
+// Package federated manages federated repositories: their members and the
+// configuration sync between them (FED-01), and, as P13 continues, the
+// conflict rule, lag and replay.
 //
 // # Role
 //
@@ -7,12 +8,16 @@
 //
 // # Inputs
 //
-// None yet. Planned: federated repository configurations, whose members are
-// peers paired for the federated-repo use case (decision 0022).
+// Federated repository configurations, whose members are peers paired for
+// the federated-repo use case (decision 0022), this instance's base URLs
+// (federatedRepoUrlBase, urlBase) and configurations members send.
 //
 // # Outputs
 //
-// None yet. Planned: converged members, with deploys, deletes, moves, copies
+// Members checked and stored in the federation_members table, configSync
+// work that sends each member the configuration and retries an unreachable
+// one, and the migrate, convertToLocal and member URL operations. Planned:
+// converged members, with deploys, deletes, moves, copies
 // and property changes synced, conflicts settled by hybrid logical clock time
 // with the origin instance as tie-break, full and forced sync, status, lag
 // and failed-binary replay (decision 0022; plan P13, task 2).
@@ -36,5 +41,6 @@
 //
 // # Status
 //
-// Placeholder: implemented by P13.
+// Members and configuration sync implemented (FED-01, issue #1930); event
+// sync and the rest of P13 to follow.
 package federated

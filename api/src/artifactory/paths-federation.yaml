@@ -1,3 +1,18 @@
+components:
+  schemas:
+    FederatedReplaceUrl:
+      description: A member base URL and its replacement (7.161.26's ReplaceUrlConfig).
+      properties:
+        oldBaseUrl:
+          description: Required within this object. The base URL members name now, with or without /artifactory.
+          type: string
+        newBaseUrl:
+          description: Required within this object. The base URL they should name, with or without /artifactory.
+          type: string
+      required:
+      - oldBaseUrl
+      - newBaseUrl
+      type: object
 paths:
   /api/federation/binaries/failures/delete:
     delete:
@@ -219,9 +234,10 @@ paths:
       x-cost: expensive
   /api/federation/configSync/{repoKey}:
     post:
-      description: Sends this member's shared configuration of a federated repository to every other member, repairing
-        drift left by a network failure. Only shared settings travel; each member keeps its own repository key and
-        local-only settings (decision 0022).
+      description: Sends this member's configuration of a federated repository to every other member, repairing
+        drift left by a network failure, and answers "Configuration sync executed successfully" once the sends are
+        queued (7.x's FederatedRepoResource). Each member keeps its own repository key. A member that cannot be
+        reached is logged as unavailable and retried until it receives the configuration. Administrators only.
       operationId: synchronizeFederatedMemberConfiguration
       parameters:
       - description: Required path parameter. Key of the federated repository.
@@ -238,13 +254,17 @@ paths:
               schema:
                 description: Result; its fields are not specified.
                 type: object
-          description: The configuration was sent to every reachable member.
+            text/plain:
+              schema:
+                description: '"Configuration sync executed successfully".'
+                type: string
+          description: The configuration sends to every member are queued; artifactweave answers text/plain.
         '400':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The request was malformed or a value is invalid.
+          description: The repository is not a federated repository.
         '401':
           content:
             application/json:
@@ -256,7 +276,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission this operation needs.
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No repository has the key.
         '500':
           content:
             application/json:
@@ -272,8 +298,9 @@ paths:
       x-cost: expensive
   /api/federation/convertToLocal:
     post:
-      description: Converts federated repositories back to local repositories, keeping their content and metadata.
-        Allowed only for a repository whose federation has no other active members; remove the other members first.
+      description: Converts federated repositories back to local repositories, keeping their content and metadata
+        and dropping their members. Allowed only for a repository whose federation has no other enabled member;
+        remove or disable the other members first. Each repository converts on its own; administrators only.
       operationId: convertFederatedRepositoryToLocal
       requestBody:
         content:
@@ -547,7 +574,9 @@ paths:
     post:
       description: Converts a local repository into a federated repository with this instance as its only member,
         keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project,
-        every member of a federation must carry the same project key.
+        every member of a federation must carry the same project key. A package type that cannot be federated
+        (terraformbackend), a repository that is not local and one with push replication configured answer 400.
+        Administrators only.
       operationId: convertLocalRepositoryToFederated
       parameters:
       - description: Required path parameter. Key of the local repository to convert.
@@ -879,6 +908,59 @@ paths:
       tags:
       - federation
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/removefederationmember.md
+      x-idempotency: natural
+      x-idempotency-natural:
+      - 'body:'
+      x-cost: expensive
+  /api/federation/replaceUrl:
+    post:
+      description: Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl,
+        keeping its repository key, and sends each changed configuration to its members. The new base URL must
+        belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it
+        (FederatedReplaceUrlResource). Administrators only.
+      operationId: replaceFederatedMemberBaseUrl
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FederatedReplaceUrl'
+        description: The base URL to replace and its replacement.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: '"Binding URL from URL <oldBaseUrl> to new <newBaseUrl> finished."'
+                type: string
+          description: Every member at the old base URL now names the new one.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A base URL is missing, or a rewritten member is not a paired peer; nothing is changed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Replace a federated member's base URL
+      tags:
+      - federation
       x-idempotency: natural
       x-idempotency-natural:
       - 'body:'
@@ -1545,6 +1627,59 @@ paths:
       x-cost: ordinary
       x-pagination: complete
       x-pagination-next: none
+  /api/federation/updateMemberUrl:
+    post:
+      description: Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl,
+        keeping its repository key, and sends each changed configuration to its members. The new base URL must
+        belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it
+        (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+      operationId: updateFederatedMemberUrl
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FederatedReplaceUrl'
+        description: The base URL to replace and its replacement.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: '"Binding URL from URL <oldBaseUrl> to new <newBaseUrl> finished."'
+                type: string
+          description: Every member at the old base URL now names the new one.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A base URL is missing, or a rewritten member is not a paired peer; nothing is changed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Update a federated member's URL
+      tags:
+      - federation
+      x-idempotency: natural
+      x-idempotency-natural:
+      - 'body:'
+      x-cost: expensive
   /api/v2/federation/status/repo/{repoKey}:
     get:
       deprecated: true

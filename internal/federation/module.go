@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/adapters/pushhttp"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/federated"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -37,6 +39,10 @@ type Deps struct {
 	Repositories   artifactsapi.Repositories
 	Zone           string
 	UserQueryLimit int
+	// BaseURL is the installation's configured base URL, which stands in
+	// for the descriptor's urlBase as this instance's own federated member
+	// base when neither urlBase nor federatedRepoUrlBase is set.
+	BaseURL string
 }
 
 var errNoStore = errors.New("federation: Deps.Store is required")
@@ -49,7 +55,11 @@ type Module struct {
 	push            *replication.Push
 	pull            *replication.Pull
 	pushConnections *pushhttp.Factory
-	closed          bool
+	// configRemote and configLog are configSync's transport and log
+	// (OpenConfigSync); pushMu guards them.
+	configRemote federated.Remote
+	configLog    *slog.Logger
+	closed       bool
 }
 
 // New constructs the module without reading or writing its dependencies.
@@ -95,15 +105,30 @@ func (m *Module) RepositoryLifecycle() artifactsapi.RepositoryLifecycle {
 
 type repositoryLifecycle struct{ deps Deps }
 
+// RefreshRepository refreshes replication and then a federated repository's
+// members, queueing configSync when they changed; a repository no longer
+// federated loses its members.
 func (l repositoryLifecycle) RefreshRepository(ctx context.Context, key string) error {
-	return l.deps.configurations().RefreshRepository(ctx, key) //nolint:wrapcheck // the service supplies repository refresh context
+	if err := l.deps.configurations().RefreshRepository(ctx, key); err != nil {
+		return err //nolint:wrapcheck // the service supplies repository refresh context
+	}
+	return l.reconcile(ctx, key)
 }
 
+// ResetRepository resets replication and drops the key's federated members,
+// on a fresh create (CreatedRepository then stores the new ones) and before
+// a delete.
 func (l repositoryLifecycle) ResetRepository(ctx context.Context, key string) error {
 	if l.deps.Access.Projects == nil {
 		return fmt.Errorf("replication repository guard is unavailable: %w", kernel.ErrStore)
 	}
-	return l.deps.configurations().ResetRepository(ctx, key) //nolint:wrapcheck // service supplies lifetime context
+	if err := l.deps.configurations().ResetRepository(ctx, key); err != nil {
+		return err //nolint:wrapcheck // service supplies lifetime context
+	}
+	if ms, err := l.deps.membership(); err == nil {
+		return ms.Clear(ctx, key) //nolint:wrapcheck // Clear names what failed
+	}
+	return nil
 }
 
 type policy struct{ decider accessapi.Decider }

@@ -470,6 +470,7 @@ column federation_members.peer text COLLATE "C" NOT NULL
 column federation_members.base_url text NOT NULL DEFAULT ''::text
 column federation_members.remote_repo_key text NOT NULL DEFAULT ''::text
 column federation_members.enabled boolean NOT NULL DEFAULT true
+column federation_members.mode text NOT NULL DEFAULT ''::text
 constraint federation_members.federation_members_pkey PRIMARY KEY (repo_key, peer)
 index federation_members.federation_members_peer CREATE INDEX federation_members_peer ON federation_members USING btree (peer, repo_key)
 index federation_members.federation_members_pkey CREATE UNIQUE INDEX federation_members_pkey ON federation_members USING btree (repo_key, peer)

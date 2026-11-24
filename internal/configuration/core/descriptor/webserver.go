@@ -2,7 +2,6 @@ package descriptor
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -24,60 +23,87 @@ import (
 const (
 	SectionURLBase        = "urlBase"
 	SectionReverseProxies = "reverseProxies"
+	// SectionFederatedRepoURLBase is 7.x's federatedRepoUrlBase, a
+	// top-level scalar beside urlBase ("A hard-coded URL prefix used by
+	// federated repository as the local member URL base",
+	// artifactory.xsd:211). It overrides urlBase for this instance's own
+	// federated repository members and for the base URL a federated pairing
+	// token carries (decision 0022).
+	SectionFederatedRepoURLBase = "federatedRepoUrlBase"
 )
 
-// Each is stored as one configuration document. urlBase's kind is this
-// package's own, as downloadRedirectConfig's is; the reverse proxy uses the
-// shared reverse_proxy kind under one key, because Artifactory keeps a
-// single current reverse proxy and replaces it whole
+// Each is stored as one configuration document. The two base URL kinds are
+// configdoc's, as the artifacts and federation modules read
+// federatedRepoUrlBase and urlBase through configdoc.FederatedBase; the
+// reverse proxy uses the shared reverse_proxy kind under one key, because
+// Artifactory keeps a single current reverse proxy and replaces it whole
 // (CentralConfigDescriptorImpl.updateReverseProxy).
 const (
-	urlBaseKind     configdoc.ConfigKind = "url_base"
-	urlBaseKey      string               = "default"
-	urlBaseField    string               = "urlBase"
-	reverseProxyKey string               = "current"
+	urlBaseKind     = configdoc.ConfigURLBase
+	urlBaseKey      = configdoc.BaseURLKey
+	urlBaseField    = configdoc.URLBaseField
+	reverseProxyKey = "current"
+)
+
+// baseScalar is one of the two base URL scalars of the descriptor.
+type baseScalar struct {
+	section string
+	kind    configdoc.ConfigKind
+	field   string
+}
+
+var (
+	urlBaseScalar              = baseScalar{SectionURLBase, urlBaseKind, urlBaseField}
+	federatedRepoURLBaseScalar = baseScalar{
+		SectionFederatedRepoURLBase, configdoc.ConfigFederatedRepoURLBase, configdoc.FederatedRepoURLBaseField,
+	}
 )
 
 var _ configapi.WebServer = webServerAPI{}
 
 // singleton reports the sections whose results name the section alone.
 func singleton(c ConfigChange) bool {
-	return c.Kind == configdoc.ConfigMailServer || c.Section == SectionURLBase || c.Section == SectionReverseProxies ||
+	return c.Kind == configdoc.ConfigMailServer || c.Section == SectionURLBase ||
+		c.Section == SectionFederatedRepoURLBase || c.Section == SectionReverseProxies ||
 		c.Section == SectionSystemMessage || c.Section == SectionQuota
 }
 
-// parseURLBase adds the urlBase scalar of top, when present, to p. A null or
-// blank value clears it, as 6.20's ConfigResource allows "removing custom
-// urlBase"; anything else must be a URL, checked here without the CDN hosts,
-// which Apply adds.
+// parseURLBase adds the urlBase and federatedRepoUrlBase scalars of top,
+// when present, to p. A null or blank value clears one, as 6.20's
+// ConfigResource allows "removing custom urlBase"; anything else must be a
+// URL, checked here without the CDN hosts, which Apply adds.
 func parseURLBase(top map[string]any, p *Patch) error {
-	v, present := top[SectionURLBase]
-	if !present {
-		return nil
-	}
-	if v != nil {
-		if _, ok := v.(string); !ok {
-			return fmt.Errorf("%w: urlBase must be a string or null", ErrInvalid)
+	for _, b := range []baseScalar{urlBaseScalar, federatedRepoURLBaseScalar} {
+		v, present := top[b.section]
+		if !present {
+			continue
 		}
-	}
-	c := urlBaseChange(v)
-	if !c.Delete {
-		if err := system.CheckURLBase(c.Fields[urlBaseField].(string), nil); err != nil {
-			return err //nolint:wrapcheck // the validator names the field and ErrInvalid
+		if v != nil {
+			if _, ok := v.(string); !ok {
+				return fmt.Errorf("%w: %s must be a string or null", ErrInvalid, b.section)
+			}
 		}
+		c := b.change(v)
+		if !c.Delete {
+			if err := system.CheckBaseURL(b.section, c.Fields[b.field].(string), nil); err != nil {
+				return err //nolint:wrapcheck // the validator names the field and ErrInvalid
+			}
+		}
+		p.Configs = append(p.Configs, c)
 	}
-	p.Configs = append(p.Configs, c)
 	return nil
 }
 
-func urlBaseChange(v any) ConfigChange {
-	c := ConfigChange{Section: SectionURLBase, Kind: urlBaseKind, Key: urlBaseKey}
+func urlBaseChange(v any) ConfigChange { return urlBaseScalar.change(v) }
+
+func (b baseScalar) change(v any) ConfigChange {
+	c := ConfigChange{Section: b.section, Kind: b.kind, Key: urlBaseKey}
 	s, _ := v.(string)
 	if s = strings.TrimSpace(s); s == "" {
 		c.Delete = true
 		return c
 	}
-	c.Fields = map[string]any{urlBaseField: s}
+	c.Fields = map[string]any{b.field: s}
 	return c
 }
 
@@ -89,6 +115,10 @@ func validateWebServer(d Deps, kind configdoc.ConfigKind, doc map[string]any) er
 	case urlBaseKind:
 		s, _ := doc[urlBaseField].(string)
 		return system.CheckURLBase(s, d.Settings.CDNHosts) //nolint:wrapcheck // names the field and ErrInvalid
+	case federatedRepoURLBaseScalar.kind:
+		s, _ := doc[federatedRepoURLBaseScalar.field].(string)
+		//nolint:wrapcheck // names the field and ErrInvalid
+		return system.CheckBaseURL(federatedRepoURLBaseScalar.section, s, d.Settings.CDNHosts)
 	case configdoc.ConfigReverseProxy:
 		rp, err := system.ReverseProxyFromDocument(doc)
 		if err != nil {
@@ -128,22 +158,11 @@ func newPublicURL(d Deps) *system.PublicURL {
 }
 
 func storedURLBase(ctx context.Context, configs configdoc.ConfigStore) (string, bool, error) {
-	doc, err := configs.Get(ctx, urlBaseKind, urlBaseKey)
-	if errors.Is(err, kernel.ErrNotFound) {
-		return "", false, nil
-	}
+	s, ok, err := configdoc.StoredScalar(ctx, configs, urlBaseKind, urlBaseField)
 	if err != nil {
-		return "", false, fmt.Errorf("descriptor: %s: %w", SectionURLBase, err)
+		return "", false, fmt.Errorf("descriptor: %w", err)
 	}
-	var fields map[string]any
-	if err := json.Unmarshal(doc.Document, &fields); err != nil {
-		return "", false, fmt.Errorf("descriptor: stored %s: %w", SectionURLBase, err)
-	}
-	s, ok := fields[urlBaseField].(string)
-	if !ok || s == "" {
-		return "", false, fmt.Errorf("descriptor: stored %s: %w", SectionURLBase, kernel.ErrStore)
-	}
-	return s, true, nil
+	return s, ok, nil
 }
 
 func (a webServerAPI) BaseURL(ctx context.Context) string { return a.public.Get(ctx) }
@@ -323,6 +342,14 @@ func readWebServerExport(ctx context.Context, d Deps, out *exportDocument) error
 	}
 	if ok {
 		out.URLBase = &urlBase
+	}
+	federated, ok, err := configdoc.StoredScalar(ctx, d.Configs,
+		federatedRepoURLBaseScalar.kind, federatedRepoURLBaseScalar.field)
+	if err != nil {
+		return fmt.Errorf("read export: descriptor: %w", err)
+	}
+	if ok {
+		out.FederatedRepoURLBase = &federated
 	}
 	return nil
 }

@@ -518,7 +518,7 @@ type ClientInterface interface {
 
 	// PutRepositoryConfigurationWithBody Send a federated repository's configuration
 	//
-	// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Not implemented; answers 501.
+	// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -527,7 +527,7 @@ type ClientInterface interface {
 
 	// PutRepositoryConfiguration Send a federated repository's configuration
 	//
-	// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Not implemented; answers 501.
+	// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -648,7 +648,7 @@ func (c *Client) RedeemPairing(ctx context.Context, params *RedeemPairingParams,
 
 // PutRepositoryConfigurationWithBody Send a federated repository's configuration
 //
-// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Not implemented; answers 501.
+// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.
 //
 // Takes any type of body and a specified content type.
 //
@@ -667,7 +667,7 @@ func (c *Client) PutRepositoryConfigurationWithBody(ctx context.Context, repoKey
 
 // PutRepositoryConfiguration Send a federated repository's configuration
 //
-// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Not implemented; answers 501.
+// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1593,7 +1593,7 @@ type ClientWithResponsesInterface interface {
 
 	// PutRepositoryConfigurationWithBodyWithResponse Send a federated repository's configuration
 	//
-	// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Not implemented; answers 501.
+	// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1602,7 +1602,7 @@ type ClientWithResponsesInterface interface {
 
 	// PutRepositoryConfigurationWithResponse Send a federated repository's configuration
 	//
-	// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Not implemented; answers 501.
+	// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2539,7 +2539,7 @@ func (c *ClientWithResponses) RedeemPairingWithResponse(ctx context.Context, par
 
 // PutRepositoryConfigurationWithBodyWithResponse Send a federated repository's configuration
 //
-// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Not implemented; answers 501.
+// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2554,7 +2554,7 @@ func (c *ClientWithResponses) PutRepositoryConfigurationWithBodyWithResponse(ctx
 
 // PutRepositoryConfigurationWithResponse Send a federated repository's configuration
 //
-// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Not implemented; answers 501.
+// Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

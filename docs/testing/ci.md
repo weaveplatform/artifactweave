@@ -416,6 +416,12 @@ refused tokens, one of two concurrent redemptions, receiving-only trust through
 Access, unpairing on both sides, and no answer carrying a private key. A redeem
 across a partition answers the network failure and pairs nothing, and the same
 token pairs once healed; an unpair across a partition fails unless forced.
+`TestAccFederatedMembersSQLite` and `TestAccFederatedMembersPostgres` pair three
+instances and federate one repository across them (FED-01, [#1930](https://github.com/weaveplatform/artifactweave/issues/1930)):
+an unpaired or receiver member is refused, a create on one instance reaches the
+other two as their own copies listing every member, an update reaches a member
+cut off from the sender once the cut is restored, a member's own change reaches
+the others, and configSync answers as 7.x does.
 `TestAccPeersFailurePrintsEachServerLog` runs a deliberately failing scenario in
 a process of its own and requires its output to carry each instance's log.
 

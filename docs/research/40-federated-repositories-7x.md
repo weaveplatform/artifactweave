@@ -476,3 +476,12 @@ Posted on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for 
    `updateMemberUrl` notify the other members.
 6. The JSON names of the status DTOs, which carry no `@JsonProperty` (section 7).
 7. The 400 or other answer 7.x gives for a member URL it does not trust (section 10).
+8. The success bodies of `migrate` and `convertToLocal`, which jfrog-client-go does not
+   read. artifactweave answers `Repository '<key>' was converted to a federated repository`
+   and `Converted to local repositories: <keys>` (FED-01).
+9. Whether 7.x refuses two members on one instance. artifactweave does, since its
+   membership table holds one member per peer.
+10. The message 7.x gives a federated repository naming a proxy that does not exist.
+    artifactweave answers `Proxy '<key>' does not exist`.
+11. Whether 7.x refuses `migrate` for a repository with push replication. artifactweave
+    does, as decision 0022 forbids a repository being both federated and a push target.
