@@ -143,10 +143,15 @@ type Peer struct {
 	UseCases        []UseCase
 	Status          PeerStatus
 	LastSeen        time.Time
-	DisplayName     string
-	CityName        string
-	CountryCode     string
-	EdgeRole        bool
+	// ClockSkew is the peer's clock minus this instance's, as the last
+	// verified status read measured it (pairing.Service.Probe); positive
+	// when the peer's clock is ahead. Past corepeer.Skew, five minutes,
+	// the two refuse each other's signatures.
+	ClockSkew   time.Duration
+	DisplayName string
+	CityName    string
+	CountryCode string
+	EdgeRole    bool
 	// Delivery is how stream entries travel to and from the peer; the
 	// stores return DeliveryPush for a peer recorded without one.
 	Delivery Delivery
@@ -187,6 +192,20 @@ func (p Peer) DeriveStatus(
 	default:
 		return PeerOnline
 	}
+}
+
+// Liveness is what a status read records on a peer: the status it
+// derived, when the peer last answered verified and the clock skew that
+// answer showed (PeerStore.SetLiveness).
+type Liveness struct {
+	Status    PeerStatus
+	LastSeen  time.Time
+	ClockSkew time.Duration
+}
+
+// Liveness is the peer's recorded liveness.
+func (p Peer) Liveness() Liveness {
+	return Liveness{Status: p.Status, LastSeen: p.LastSeen, ClockSkew: p.ClockSkew}
 }
 
 // PairingNonce backs a single-use pairing token. Only the nonce hash is

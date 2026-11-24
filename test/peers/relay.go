@@ -203,6 +203,13 @@ func (r *relay) untrack(conn net.Conn) {
 
 // close stops accepting, resets what the relay carries and waits for its
 // goroutines, so a closed relay holds no port and no connection.
+// listening reports whether close has yet to release the relay's listener.
+func (r *relay) listening() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return !r.closed
+}
+
 func (r *relay) close() {
 	r.mu.Lock()
 	if r.closed {

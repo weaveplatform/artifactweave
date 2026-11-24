@@ -17,7 +17,27 @@ import (
 const (
 	PruneNoncesKind     = "federation.pairing-nonce-prune"
 	PruneNoncesInterval = 10 * time.Minute
+	// PeerProbeKind is the periodic read of every paired peer's status
+	// (pairing.Service.Probe), one item keyed "probe" that runs every probe
+	// interval (OpenLiveness). The queue leases it, so one node of a
+	// cluster reads each peer per interval.
+	PeerProbeKind = "federation.peer-probe"
 )
+
+// OpenLiveness gives the module the transport its periodic peer status
+// reads go through, the signed peer client, and their interval
+// (federation.peer_probe_interval; zero is
+// pairing.DefaultProbeInterval). A peer then reads OFFLINE once unseen for
+// two intervals. RegisterWork registers the reads; without OpenLiveness
+// none run.
+func (m *Module) OpenLiveness(remote pairing.StatusRemote, interval time.Duration) {
+	if interval <= 0 {
+		interval = pairing.DefaultProbeInterval
+	}
+	m.pushMu.Lock()
+	defer m.pushMu.Unlock()
+	m.probeRemote, m.probeInterval = remote, interval
+}
 
 // Pairing returns the pairing service (decision 0021) over the module's
 // store, calling other instances through remote: the signed peer client.
@@ -28,7 +48,14 @@ func (m *Module) Pairing(remote pairing.Remote) (*pairing.Service, error) {
 	if !ok {
 		return nil, fmt.Errorf("pairing store unavailable: %w", kernel.ErrStore)
 	}
-	return &pairing.Service{Store: store, Remote: remote, Authorize: m.deps.pairingAdministrator}, nil
+	m.pushMu.Lock()
+	prober, interval := m.probeRemote, m.probeInterval
+	m.pushMu.Unlock()
+	svc := &pairing.Service{Store: store, Remote: remote, Authorize: m.deps.pairingAdministrator, Prober: prober}
+	if interval > 0 {
+		svc.StaleAfter = pairing.StaleAfterProbes(interval)
+	}
+	return svc, nil
 }
 
 // pairingAdministrator refuses a caller who is not an administrator now:
@@ -90,9 +117,43 @@ func (m *Module) registerPairingWork(ctx context.Context, queue *work.Queue) err
 		return fmt.Errorf("register pairing nonce pruning: %w", err)
 	}
 	if _, err := store.WorkQueue().Get(ctx, PruneNoncesKind, "prune"); errors.Is(err, kernel.ErrNotFound) {
-		return enqueue(ctx)
+		if err := enqueue(ctx); err != nil {
+			return err
+		}
 	} else if err != nil {
 		return fmt.Errorf("read pairing nonce pruning: %w", err)
+	}
+	return m.registerProbeWork(ctx, queue, store.WorkQueue(), svc)
+}
+
+// registerProbeWork registers the periodic peer status reads once
+// OpenLiveness has given the module their transport, and queues their item
+// when it is not queued yet, so a restart adds none.
+func (m *Module) registerProbeWork(ctx context.Context, queue *work.Queue, items work.WorkQueue, svc *pairing.Service) error {
+	m.pushMu.Lock()
+	interval := m.probeInterval
+	m.pushMu.Unlock()
+	if svc.Prober == nil {
+		return nil
+	}
+	enqueue := func(ctx context.Context) error {
+		if err := items.Enqueue(ctx, PeerProbeKind, "probe", nil, time.Now()); err != nil {
+			return fmt.Errorf("queue peer status reads: %w", err)
+		}
+		return nil
+	}
+	if err := queue.HandleEvery(PeerProbeKind, interval, func(ctx context.Context, _ work.WorkItem) error {
+		if err := svc.Probe(ctx); err != nil {
+			return err //nolint:wrapcheck // Probe names the peer it failed on
+		}
+		return enqueue(ctx)
+	}); err != nil {
+		return fmt.Errorf("register peer status reads: %w", err)
+	}
+	if _, err := items.Get(ctx, PeerProbeKind, "probe"); errors.Is(err, kernel.ErrNotFound) {
+		return enqueue(ctx)
+	} else if err != nil {
+		return fmt.Errorf("read peer status reads: %w", err)
 	}
 	return nil
 }

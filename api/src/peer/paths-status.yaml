@@ -33,7 +33,9 @@ paths:
     get:
       description: >-
         Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a
-        peer whose answer does not verify is unauthorized. Not implemented; answers 501.
+        peer whose answer does not verify, or that refuses the caller's signature, is unauthorized. The caller
+        measures the clock skew between the two instances from `time`. Each instance reads every paired peer's
+        status periodically.
       operationId: getPeerStatus
       parameters:
         - $ref: '#/components/parameters/PeerProtocol'

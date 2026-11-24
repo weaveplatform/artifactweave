@@ -82,6 +82,10 @@ func TestUnitPeer(t *testing.T) {
 	if got := other.DeriveStatus(t0, stale, true, 0); got != model.PeerUnauthorized {
 		t.Errorf("a rejected peer of another major version is %s, want UNAUTHORIZED", got)
 	}
+	live := model.Peer{Status: model.PeerOnline, LastSeen: t0, ClockSkew: time.Second, DisplayName: "x"}
+	if got := live.Liveness(); got != (model.Liveness{Status: model.PeerOnline, LastSeen: t0, ClockSkew: time.Second}) {
+		t.Errorf("Peer.Liveness = %+v", got)
+	}
 	n := model.PairingNonce{ExpiresAt: t0.Add(model.PairingTokenTTL)}
 	if !n.Usable(t0) || n.Usable(t0.Add(model.PairingTokenTTL)) {
 		t.Error("expiry")

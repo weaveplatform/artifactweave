@@ -60,6 +60,7 @@ func (p peerStore) Put(ctx context.Context, peer model.Peer) error {
 		if peer.Delivery == "" {
 			peer.Delivery = model.DeliveryPush
 		}
+		peer.ClockSkew = peer.ClockSkew.Truncate(time.Millisecond)
 		p.t().Put(peer.InstanceID, peer)
 		return nil
 	})
@@ -104,6 +105,19 @@ func (p peerStore) SetProtocolVersion(ctx context.Context, instanceID string, ma
 			return memtx.NotFound("peer", instanceID)
 		}
 		peer.ProtocolVersion = major
+		p.t().Put(instanceID, peer)
+		return nil
+	})
+}
+
+func (p peerStore) SetLiveness(ctx context.Context, instanceID string, l model.Liveness) error {
+	return p.s.Do(ctx, func() error {
+		peer, ok := p.t().Get(instanceID)
+		if !ok {
+			return memtx.NotFound("peer", instanceID)
+		}
+		// The SQL store keeps the skew in whole milliseconds.
+		peer.Status, peer.LastSeen, peer.ClockSkew = l.Status, l.LastSeen, l.ClockSkew.Truncate(time.Millisecond)
 		p.t().Put(instanceID, peer)
 		return nil
 	})

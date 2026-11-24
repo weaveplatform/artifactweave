@@ -301,9 +301,10 @@ func peerBody(from *peerSite, method, path string, op *openapi3.Operation) ([]by
 // TestAccPeerOperationsSignedBetweenInstances runs two instances over
 // SQLite and over PostgreSQL, pairs them through their peer stores, and
 // sends every peer operation from B to A through B's peer client: A
-// verifies each request and answers it signed, 501 or /pair's own answer,
-// and B verifies each answer. Then a replayed, a tampered and a misdirected request, and one of
-// another major protocol version, are refused live; the mismatch is
+// verifies each request and answers it signed, with the operation's own
+// answer or 501, and B verifies each answer. Then a replayed, a tampered
+// and a misdirected request, and one of another major protocol version,
+// are refused live; the mismatch is
 // recorded on A's record of B. Neither instance logs a signature, nonce or
 // key.
 func TestAccPeerOperationsSignedBetweenInstances(t *testing.T) {
@@ -354,9 +355,12 @@ func TestAccPeerOperationsSignedBetweenInstances(t *testing.T) {
 					// PEER-02 serves /pair: the nonce "n" is malformed, and B
 					// holds no use case on A to drop. FED-01 serves
 					// /repositories/{repoKey}, whose plausible body carries
-					// no configuration.
+					// no configuration. #1949 serves /status, which names
+					// A and the use cases B holds there: none.
 					status, code := http.StatusNotImplemented, `"NOT_IMPLEMENTED"`
 					switch {
+					case method == http.MethodGet && path == "/status":
+						status, code = http.StatusOK, `"instance_id":"`+a.self.InstanceID+`"`
 					case method == http.MethodPost && path == "/pair",
 						method == http.MethodPut && path == "/repositories/{repoKey}":
 						status, code = http.StatusBadRequest, `"BAD_REQUEST"`

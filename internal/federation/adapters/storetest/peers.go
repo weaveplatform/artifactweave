@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
@@ -26,6 +27,7 @@ func runPeers(t *testing.T, newStore Factory) {
 	t.Run("PairingNonces", func(t *testing.T) { testPairingNonces(t, newStore(t)) })
 	t.Run("PairingNonceRace", func(t *testing.T) { testPairingNonceRace(t, newStore(t)) })
 	t.Run("PeerProtocolVersion", func(t *testing.T) { testPeerProtocolVersion(t, newStore(t)) })
+	t.Run("PeerLiveness", func(t *testing.T) { testPeerLiveness(t, newStore(t)) })
 	t.Run("PeerDelivery", func(t *testing.T) { testPeerDelivery(t, newStore(t)) })
 	t.Run("StreamResyncs", func(t *testing.T) { testStreamResyncs(t, newStore(t)) })
 	t.Run("RequestNonces", func(t *testing.T) { testRequestNonces(t, newStore(t)) })
@@ -81,6 +83,7 @@ func peer(i int, uses ...model.UseCase) model.Peer {
 		UseCases:        uses,
 		Status:          model.PeerOnline,
 		LastSeen:        storekit.At(i),
+		ClockSkew:       time.Duration(i-2) * 1500 * time.Millisecond,
 		DisplayName:     fmt.Sprintf("Edge %d", i),
 		CityName:        "Cardiff",
 		CountryCode:     "GB",
@@ -261,6 +264,31 @@ func testPeerProtocolVersion(t *testing.T, s port.Store) {
 	storekit.Same(t, "Get after SetProtocolVersion", want, storekit.Get[model.Peer](t)(ps.Get(ctx, p.InstanceID)))
 	failsCancelled(t, map[string]func(context.Context) error{
 		"SetProtocolVersion": func(ctx context.Context) error { return ps.SetProtocolVersion(ctx, p.InstanceID, 1) },
+	})
+}
+
+// testPeerLiveness records a status read's outcome on a peer and nothing
+// else: the key, use cases and what the administrator set stay. The skew
+// keeps whole milliseconds, its sign included.
+func testPeerLiveness(t *testing.T, s port.Store) {
+	ctx := context.Background()
+	ps := s.Peers()
+	l := model.Liveness{Status: model.PeerUnauthorized, LastSeen: storekit.At(7), ClockSkew: -2500 * time.Millisecond}
+	storekit.WantErr(t, ps.SetLiveness(ctx, peerID(1), l), kernel.ErrNotFound)
+	p := peer(1, model.UseFederatedRepo, model.UseFederatedRepoRead)
+	storekit.Must(t, ps.Put(ctx, p))
+	storekit.Must(t, ps.SetLiveness(ctx, p.InstanceID, model.Liveness{
+		Status: l.Status, LastSeen: l.LastSeen, ClockSkew: l.ClockSkew - 400*time.Microsecond,
+	}))
+	want := p
+	want.Status, want.LastSeen, want.ClockSkew = l.Status, l.LastSeen, l.ClockSkew
+	storekit.Same(t, "Get after SetLiveness", want, storekit.Get[model.Peer](t)(ps.Get(ctx, p.InstanceID)))
+	// A peer never seen keeps no time.
+	storekit.Must(t, ps.SetLiveness(ctx, p.InstanceID, model.Liveness{Status: model.PeerOffline}))
+	want.Status, want.LastSeen, want.ClockSkew = model.PeerOffline, time.Time{}, 0
+	storekit.Same(t, "Get after SetLiveness unseen", want, storekit.Get[model.Peer](t)(ps.Get(ctx, p.InstanceID)))
+	failsCancelled(t, map[string]func(context.Context) error{
+		"SetLiveness": func(ctx context.Context) error { return ps.SetLiveness(ctx, p.InstanceID, l) },
 	})
 }
 

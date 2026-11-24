@@ -37,10 +37,18 @@ type store struct {
 func (s store) Outbox() outbox.OutboxStore       { return s.platform.Outbox() }
 func (s store) Instance() instance.InstanceStore { return s.platform.Instance() }
 
-// server is the peer API with /pair served, as the application mounts it.
+// server is the peer API with /pair and /status served, as the
+// application mounts them.
 type server struct {
 	peergen.UnimplementedStrict
-	pair peeradapter.PairServer
+	pair   peeradapter.PairServer
+	status peeradapter.StatusServer
+}
+
+func (s server) GetPeerStatus(
+	ctx context.Context, req peergen.GetPeerStatusRequestObject,
+) (peergen.GetPeerStatusResponseObject, error) {
+	return s.status.GetPeerStatus(ctx, req)
 }
 
 func (s server) RedeemPairing(
@@ -107,7 +115,10 @@ func newNode(t *testing.T) *instanceNode {
 		ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 	}
 	peergen.HandlerWithOptions(
-		peergen.NewStrictHandlerWithOptions(server{pair: peeradapter.PairServer{Pairing: n.svc}}, nil, opts),
+		peergen.NewStrictHandlerWithOptions(server{
+			pair:   peeradapter.PairServer{Pairing: n.svc},
+			status: peeradapter.StatusServer{Status: n.svc, Version: "1.2.3"},
+		}, nil, opts),
 		peergen.ChiServerOptions{
 			BaseURL: peeradapter.Prefix, BaseRouter: r,
 			ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),

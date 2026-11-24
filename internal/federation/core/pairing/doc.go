@@ -18,7 +18,9 @@
 //   - For Accept, a redeeming instance's nonce, instance id, base URL,
 //     Ed25519 public key and protocol version, whose signature the peer
 //     middleware has checked against that key; for Drop, a verified peer's
-//     instance id and a use case.
+//     instance id and a use case; for Describe, a verified peer's record
+//     and this instance's release version.
+//   - For Probe, the peer records and the StatusRemote transport (Prober).
 //   - The store (peers, pairing nonces, outbox cursors, instance identity),
 //     the Remote transport, the administrator check, a clock and a random
 //     source.
@@ -31,6 +33,9 @@
 //   - Peer records on both instances, with base URL, public key, protocol
 //     version, use cases, status and last-seen time; their removal, with
 //     their outbox cursors, when the last use case goes.
+//   - Describe's PeerStatus, the peer API's GET /status answer; Probe's
+//     liveness on each peer record: status, last-seen time and clock skew
+//     (#1949).
 //   - Refusal, 7.x's trust or state error, which the endpoints answer with
 //     400 after 7.x's message pattern; ErrInvalidRequest and
 //     ErrNonceRefused for the peer API's 400 and 403.
@@ -50,6 +55,11 @@
 //     the expired nonces.
 //   - P13 issues and accepts federated-repo/* and federated-repo/r only
 //     (model.PairingFor); the handlers answer the other use cases.
+//   - A peer is seen only when its signed status answer verifies, or, for
+//     a peer this instance cannot reach (model.DeliveryPulled), when its
+//     own status read does; UNAUTHORIZED, once recorded, lasts until an
+//     answer verifies. Liveness writes touch only the liveness columns
+//     (PeerStore.SetLiveness).
 //
 // # References
 //
@@ -67,10 +77,11 @@
 //   - Plan:
 //     docs/implementation/plan.md#p13-peer-trust-and-federated-repositories.
 //   - https://github.com/weaveplatform/artifactweave/issues/1926
+//   - https://github.com/weaveplatform/artifactweave/issues/1949 (liveness).
 //
 // # Status
 //
-// Implemented P13 (PEER-02).
+// Implemented P13 (PEER-02); liveness P13 (#1949).
 //
 // # Testing
 //
@@ -87,4 +98,9 @@
 //     TestUnitStoreFaults, TestUnitDefaults, TestUnitVersions and
 //     TestUnitTokenParse cover status derivation, pruning, refused callers,
 //     store faults, defaults and the token encoding.
+//   - liveness_test.go: TestUnitProbe records verified, unverified,
+//     unreachable and refused reads, the clock skew and the stale window;
+//     TestUnitProbePulledPeer, TestUnitDescribe, TestUnitProbeIntervals and
+//     TestUnitProbeStoreFaults cover peers that pull, the status answer, the
+//     intervals and store faults.
 package pairing

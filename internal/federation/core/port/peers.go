@@ -31,6 +31,11 @@ type PeerStore interface {
 	// than this build's marks the peer unavailable (decision 0021,
 	// Versioning).
 	SetProtocolVersion(ctx context.Context, instanceID string, major int) error
+	// SetLiveness records l, a status read's outcome, on the peer, leaving
+	// the rest of its record as it is; kernel.ErrNotFound when there is no
+	// such peer. A status read never rewrites what pairing or an
+	// administrator set on the record, the key among them.
+	SetLiveness(ctx context.Context, instanceID string, l model.Liveness) error
 
 	// AddNonce stores an issued pairing nonce; kernel.ErrConflict when its
 	// hash exists.
