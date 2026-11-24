@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	accessapi "github.com/weaveplatform/artifactweave/internal/access/api"
 	artifactsapi "github.com/weaveplatform/artifactweave/internal/artifacts/api"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/adapters/pushhttp"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/federated"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/pairing"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/replication"
 	streamsync "github.com/weaveplatform/artifactweave/internal/federation/core/sync"
@@ -61,7 +63,11 @@ type Module struct {
 	// (OpenConfigSync); pushMu guards them.
 	configRemote federated.Remote
 	configLog    *slog.Logger
-	closed       bool
+	// probeRemote and probeInterval are the peer status reads' transport
+	// and interval (OpenLiveness); pushMu guards them.
+	probeRemote   pairing.StatusRemote
+	probeInterval time.Duration
+	closed        bool
 }
 
 // New constructs the module without reading or writing its dependencies.

@@ -165,6 +165,7 @@
       "status_huggingface_xet_test.go",
       "status_machinelearning_test.go",
       "status_nix_test.go",
+      "status_peerstatus_test.go",
       "status_peerstreams_test.go",
       "status_pkgtest_test.go",
       "status_puppet_test.go",

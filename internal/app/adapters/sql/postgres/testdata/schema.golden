@@ -716,6 +716,7 @@ column peers.city_name text NOT NULL DEFAULT ''::text
 column peers.country_code text NOT NULL DEFAULT ''::text
 column peers.edge_role boolean NOT NULL DEFAULT false
 column peers.delivery text NOT NULL DEFAULT 'push'::text
+column peers.clock_skew_ms bigint NOT NULL DEFAULT 0
 constraint peers.peers_pkey PRIMARY KEY (instance_id)
 index peers.peers_pkey CREATE UNIQUE INDEX peers_pkey ON peers USING btree (instance_id)
 table permission_grants

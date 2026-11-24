@@ -18,12 +18,13 @@ type federationOptions struct {
 	allowedPrivate []string
 	blobs          blob.Store
 	retention      time.Duration
+	probeInterval  time.Duration
 }
 
 // openFederation gives the runtime its pairing transport, opens stream
-// delivery and configSync over the same signed peer client (decision 0021)
-// and registers the federation module's work, the last federation steps
-// OpenRuntime takes.
+// delivery, configSync and the peer status reads over the same signed peer
+// client (decision 0021) and registers the federation module's work, the
+// last federation steps OpenRuntime takes.
 func (rt *Runtime) openFederation(ctx context.Context, st PeerClientStore, queue *work.Queue, o federationOptions) error {
 	f, err := newPeerClients(st, o.allowedPrivate, time.Now)
 	if err != nil {
@@ -35,6 +36,7 @@ func (rt *Runtime) openFederation(ctx context.Context, st PeerClientStore, queue
 		log = rt.Logging.Logger("artifactweave.federation")
 	}
 	rt.Federation.OpenConfigSync(peeradapter.ConfigRemote{Factory: f}, log)
+	rt.Federation.OpenLiveness(peeradapter.StatusRemote{Factory: f}, o.probeInterval)
 	if _, err := rt.Federation.OpenStreams(federation.StreamOptions{
 		Blobs: o.blobs, Remote: peeradapter.StreamRemote{Factory: f}, Queue: queue, Retention: o.retention,
 	}); err != nil {

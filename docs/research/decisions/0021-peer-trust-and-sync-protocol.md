@@ -20,8 +20,11 @@ acknowledged cursors, `GET /blobs/{sha256}`, failed binaries with back-off retry
 pruning that flags a peer left behind for a full sync. **Full sync** is implemented
 ([PEER-05](https://github.com/weaveplatform/artifactweave/issues/1929)): `GET
 streams/{stream}/snapshot`, the receiver's fallback and `full_sync_runs`. No stream kind
-is registered yet, so every stream answers 404 until FED-02 registers `repo:<key>`. The
-other peer operations answer 501 until FED-01 and #1949 serve them.
+is registered yet, so every stream answers 404 until FED-02 registers `repo:<key>`.
+FED-01 serves `PUT /repositories/{repoKey}`, and
+[#1949](https://github.com/weaveplatform/artifactweave/issues/1949) serves `GET /status`
+and reads every paired peer's status periodically (**Wire contract** below), so every
+peer operation is served.
 P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
 Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
@@ -197,6 +200,25 @@ carries no user credential, and the signature is its authentication. Errors use
 `/pfed`'s integer code only repeats the status. Event, snapshot entry and error
 schemas are versioned with the protocol and only gain fields in a minor version.
 Collections page by cursor, default 100 and at most 1000.
+
+As implemented ([#1949](https://github.com/weaveplatform/artifactweave/issues/1949),
+`pairing.Service.Describe` and `Probe`):
+
+- `GET /status` answers the instance's `instance_id`, `protocol_version`, release
+  `version`, `time` and the use cases the verified caller holds with it.
+- Every `federation.peer_probe_interval` (five minutes by default), one node reads every
+  paired peer's `/status` through the signing client, as the work queue's periodic
+  `federation.peer-probe` item. A verified answer records the peer's `last_seen_at` and
+  its clock skew (`clock_skew_ms`, its `time` minus the midpoint of the call on this
+  clock). An answer carrying a signature the recorded key does not verify, or the
+  peer's 401 refusing this instance's signature, records the peer `UNAUTHORIZED`: the
+  trust no longer holds in one direction or the other. It stays so until an answer
+  verifies again. No answer, or any other answer, leaves `last_seen_at` as it was, so
+  the peer reads `OFFLINE` once unseen for two intervals (`model.Peer.DeriveStatus`).
+- A peer recorded as `pulled` cannot be reached from this instance and is not read.
+  Its own verified read of this instance's `/status` records it as seen instead.
+- A read writes only the peer's status, last-seen time and skew. It never writes back a
+  key or use case that pairing or an administrator changed meanwhile.
 
 **Ordered outbox.** Each instance appends every change a use case must propagate to an
 outbox, per stream: one stream per federated repository (`repo:<key>`), one for Access
