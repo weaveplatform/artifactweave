@@ -72,6 +72,9 @@ func (s faultStore) Peers() port.PeerStore            { return faultPeers{s.st.P
 func (s faultStore) Outbox() outbox.OutboxStore       { return faultOutbox{s.st.Outbox(), s.f} }
 func (s faultStore) Resyncs() port.StreamResyncStore  { return faultResyncs{s.st.Resyncs(), s.f} }
 func (s faultStore) Instance() instance.InstanceStore { return faultInstance{s.st.Instance(), s.f} }
+func (s faultStore) Snapshots() port.SnapshotStore    { return faultSnapshots{s.st.Snapshots(), s.f} }
+
+func (s faultStore) Federation() port.FederationStore { return faultFederation{s.st.Federation(), s.f} }
 
 type faultPeers struct {
 	port.PeerStore

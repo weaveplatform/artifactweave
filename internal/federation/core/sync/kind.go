@@ -69,6 +69,36 @@ type Kind interface {
 	References(ctx context.Context, stream, sha256 string) (bool, error)
 }
 
+// SnapshotProvider is the part of a kind that lists a stream's current
+// state for a snapshot on the sending instance (decision 0021, Full sync).
+// A kind without one takes no snapshots, and a receiver cannot resync its
+// streams. FED-04 supplies the repository's.
+type SnapshotProvider interface {
+	// SnapshotItems lists up to limit of stream's items as this instance,
+	// self, holds them, tombstones included, with keys after after in
+	// byte order of key, each key once. The engine calls it inside the
+	// transaction that reads the stream's sequence, page after page.
+	SnapshotItems(ctx context.Context, self, stream, after string, limit int) ([]model.SnapshotEntry, error)
+}
+
+// Reconciler is the part of a kind that a full sync applies a snapshot
+// through on the receiving instance. Reconcile and Discard run inside the
+// engine's transaction, which also records how far the run has got.
+type Reconciler interface {
+	// LocalItems lists up to limit of this instance's items of origin's
+	// stream, tombstones included, with keys after after in byte order of
+	// key, each with the clock time and origin of its last change.
+	LocalItems(ctx context.Context, origin, stream, after string, limit int) ([]model.SnapshotEntry, error)
+	// Reconcile makes item en.Key of origin's stream what en says: its
+	// state, or a tombstone that keeps an older change from restoring it.
+	// held is Apply's: false when the content's fetch failed, and the kind
+	// keeps the item pending until Publish.
+	Reconcile(ctx context.Context, origin, stream string, en model.SnapshotEntry, held bool) error
+	// Discard removes item key of origin's stream, tombstone included,
+	// which a forced full sync finds in no snapshot entry.
+	Discard(ctx context.Context, origin, stream, key string) error
+}
+
 // KindOf is the name of the kind stream belongs to.
 func KindOf(stream string) string {
 	name, _, _ := strings.Cut(stream, ":")

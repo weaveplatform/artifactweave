@@ -243,6 +243,41 @@ type StreamResync struct {
 	// highest sequence it had applied, or the origin had seen acknowledged.
 	Position int64
 	Flagged  time.Time
+	// Run is, on the receiver's record, the full-sync run resynchronising
+	// the stream (FullSyncRun.ID), 0 before one starts. While a record
+	// names this instance as receiver, the origin's entries on the stream
+	// apply only through that run.
+	Run int64
+}
+
+// SnapshotEntry is one item's state in a stream snapshot (decision 0021,
+// Full sync): its key on the stream, the clock time and origin of the
+// change that produced it, and the state in the stream kind's form. A
+// tombstone is Deleted and has no payload or blob.
+type SnapshotEntry struct {
+	Key        string
+	Time       outbox.HLC
+	Origin     string
+	Deleted    bool
+	Payload    []byte
+	BlobSHA256 string
+	BlobSize   int64
+}
+
+// Stamp is the entry's position for the conflict rule.
+func (e SnapshotEntry) Stamp() Stamp { return Stamp{Time: e.Time, Origin: e.Origin} }
+
+// StreamSnapshot is a snapshot of this instance's stream taken for one
+// receiver: the entries are kept as they were at Sequence, so its pages
+// stay consistent while the stream moves on. Read is when a page was last
+// served; a snapshot unread for long is pruned, and its cursor answers 410.
+type StreamSnapshot struct {
+	ID       int64
+	Stream   string
+	Receiver string
+	Sequence int64
+	Taken    time.Time
+	Read     time.Time
 }
 
 // StreamKind is the family of an outbox stream.

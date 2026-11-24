@@ -23,6 +23,10 @@ func (noRemote) Pull(context.Context, model.Peer, string, int64, int) (streamsyn
 	return streamsync.Page{}, nil
 }
 
+func (noRemote) Snapshot(context.Context, model.Peer, string, string, int) (streamsync.SnapshotPage, error) {
+	return streamsync.SnapshotPage{}, nil
+}
+
 func (noRemote) FetchBlob(context.Context, model.Peer, string, func(io.Reader) error) error {
 	return nil
 }

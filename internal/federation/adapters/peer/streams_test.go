@@ -35,6 +35,13 @@ type fakeStreams struct {
 	receive func(streamsync.Batch) (int64, error)
 	events  func(after int64, limit int) (streamsync.Page, error)
 	blob    func(sha string) (io.ReadSeekCloser, blob.Info, error)
+	// snapshot answers GET snapshot; stream is the stream asked for.
+	snapshot func(stream, cursor string, limit int) (streamsync.SnapshotPage, error)
+}
+
+func (f *fakeStreams) Snapshot(_ context.Context, caller model.Peer, stream, cursor string, limit int) (streamsync.SnapshotPage, error) {
+	f.caller = caller
+	return f.snapshot(stream, cursor, limit)
 }
 
 func (f *fakeStreams) Receive(_ context.Context, caller model.Peer, b streamsync.Batch) (int64, error) {
@@ -65,6 +72,10 @@ func (a streamAPI) PushEvents(ctx context.Context, r peergen.PushEventsRequestOb
 
 func (a streamAPI) PullEvents(ctx context.Context, r peergen.PullEventsRequestObject) (peergen.PullEventsResponseObject, error) {
 	return a.s.PullEvents(ctx, r)
+}
+
+func (a streamAPI) GetSnapshot(ctx context.Context, r peergen.GetSnapshotRequestObject) (peergen.GetSnapshotResponseObject, error) {
+	return a.s.GetSnapshot(ctx, r)
 }
 
 func (a streamAPI) GetBlob(ctx context.Context, r peergen.GetBlobRequestObject) (peergen.GetBlobResponseObject, error) {

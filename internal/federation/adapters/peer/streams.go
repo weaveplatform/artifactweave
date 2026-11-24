@@ -24,12 +24,13 @@ import (
 type StreamService interface {
 	Receive(ctx context.Context, caller model.Peer, b streamsync.Batch) (int64, error)
 	Events(ctx context.Context, caller model.Peer, stream string, after int64, limit int) (streamsync.Page, error)
+	Snapshot(ctx context.Context, caller model.Peer, stream, cursor string, limit int) (streamsync.SnapshotPage, error)
 	Blob(ctx context.Context, caller model.Peer, sha256 string) (io.ReadSeekCloser, blob.Info, error)
 }
 
-// StreamServer serves POST and GET /streams/{stream}/events and GET
-// /blobs/{sha256} (decision 0021, "Wire contract") for the caller
-// Server.Middleware verified.
+// StreamServer serves POST and GET /streams/{stream}/events, GET
+// /streams/{stream}/snapshot and GET /blobs/{sha256} (decision 0021, "Wire
+// contract") for the caller Server.Middleware verified.
 type StreamServer struct {
 	Streams StreamService
 }
@@ -57,6 +58,17 @@ func (s StreamServer) PushEvents(
 	}
 	applied, err := s.Streams.Receive(ctx, caller, b)
 	var conflict *streamsync.ConflictError
+	if errors.Is(err, streamsync.ErrBusy) {
+		// The caller's dispatcher backs off and pushes again; the full
+		// sync takes about as long as its snapshot has pages.
+		return peergen.PushEvents503JSONResponse{ServiceUnavailableJSONResponse: peergen.ServiceUnavailableJSONResponse{
+			Body: peergen.ErrorResponse{
+				Code:    "SERVICE_UNAVAILABLE",
+				Message: "This instance is resynchronising the stream from the caller; push again later",
+			},
+			Headers: peergen.ServiceUnavailableResponseHeaders{RetryAfter: busyRetryAfter},
+		}}, nil
+	}
 	if errors.As(err, &conflict) {
 		return peergen.PushEvents409JSONResponse{
 			Code: "CONFLICT", Message: "The batch must start at sequence " + strconv.FormatInt(conflict.Expected, 10),
@@ -99,6 +111,79 @@ func (s StreamServer) PullEvents(
 		out.NextAfter = &page.NextAfter
 	}
 	return out, nil
+}
+
+// busyRetryAfter is the Retry-After, in seconds, of a push refused while a
+// full sync of its stream runs: the sweep that pushes again runs every 30.
+const busyRetryAfter = 30
+
+// GetSnapshot serves a page of a snapshot of the stream.
+func (s StreamServer) GetSnapshot(
+	ctx context.Context,
+	req peergen.GetSnapshotRequestObject,
+) (peergen.GetSnapshotResponseObject, error) {
+	caller, ok := corepeer.Caller(ctx)
+	if !ok {
+		return nil, apierror.New(http.StatusUnauthorized, notSigned)
+	}
+	cursor := ""
+	if req.Params.Cursor != nil {
+		cursor = *req.Params.Cursor
+	}
+	limit := streamsync.DefaultBatch
+	if req.Params.Limit != nil {
+		limit = *req.Params.Limit
+	}
+	page, err := s.Streams.Snapshot(ctx, caller, req.Stream, cursor, limit)
+	switch {
+	case errors.Is(err, streamsync.ErrGone):
+		return nil, apierror.New(http.StatusGone, "The snapshot is no longer available; take a new one without a cursor")
+	case errors.Is(err, streamsync.ErrNoSnapshot):
+		return nil, apierror.New(http.StatusNotFound, "This instance takes no snapshots of the stream")
+	case err != nil:
+		return nil, streamError(err)
+	}
+	entries := make([]peergen.SnapshotEntry, 0, len(page.Entries))
+	for _, en := range page.Entries {
+		entries = append(entries, snapshotEntryOf(en))
+	}
+	out := peergen.GetSnapshot200JSONResponse{
+		Origin: page.Origin, Stream: req.Stream, Sequence: page.Sequence, Entries: entries,
+	}
+	if page.NextCursor != "" {
+		out.NextCursor = &page.NextCursor
+	}
+	return out, nil
+}
+
+// snapshotEntryOf writes a snapshot entry as the wire's.
+func snapshotEntryOf(en model.SnapshotEntry) peergen.SnapshotEntry {
+	out := peergen.SnapshotEntry{Key: en.Key, Hlc: en.Time.String(), Origin: en.Origin, Deleted: en.Deleted}
+	if len(en.Payload) > 0 {
+		p := json.RawMessage(en.Payload)
+		out.Payload = &p
+	}
+	if en.BlobSHA256 != "" {
+		out.Blob = &peergen.BlobReference{Sha256: en.BlobSHA256, Size: en.BlobSize}
+	}
+	return out
+}
+
+// snapshotEntryFrom reads a wire snapshot entry; false when its clock time
+// does not parse.
+func snapshotEntryFrom(w peergen.SnapshotEntry) (model.SnapshotEntry, bool) {
+	t, err := outbox.ParseHLC(w.Hlc)
+	if err != nil {
+		return model.SnapshotEntry{}, false
+	}
+	en := model.SnapshotEntry{Key: w.Key, Time: t, Origin: w.Origin, Deleted: w.Deleted}
+	if w.Payload != nil && string(*w.Payload) != "null" {
+		en.Payload = []byte(*w.Payload)
+	}
+	if w.Blob != nil {
+		en.BlobSHA256, en.BlobSize = w.Blob.Sha256, w.Blob.Size
+	}
+	return en, true
 }
 
 // GetBlob serves content a stream the caller receives refers to. The

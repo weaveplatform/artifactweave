@@ -11399,12 +11399,12 @@
     "route": "GET /artifactweave/peer/v1/streams/{stream}/snapshot",
     "spec": "peer.openapi.yaml",
     "operation_id": "getSnapshot",
-    "state": "stub: 501",
-    "contract": "Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot; the following pages continue it. Not implemented; answers 501.",
-    "handler": "internal/platform/gen/peer/unimplemented.gen.go",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot, replacing the caller's earlier one of the stream; the following pages continue it and stay as they were at its sequence while the stream moves on. Taking a snapshot also stops this instance pushing the stream to the caller until the caller reads the events after the snapshot's sequence with GET /streams/{stream}/events, which acknowledges them. A snapshot not read for an hour is dropped.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; user authentication skips the peer API, admission still limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "declared_page_controls": [
       "query cursor: Optional query parameter. The opaque next_cursor of the previous page; absent to take a new snapshot. A cursor continues only the snapshot, stream and caller it was issued for.",
@@ -11413,10 +11413,15 @@
     "response_collections": [
       "200 application/json.entries[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes; declared cursor",
+    "pagination_execution": "cursor (position cursor, size limit, next body:/next_cursor); content-and-configuration: singular resources, streams or legacy complete collections; declared pagination is retained; no universal keyset/constant-cost claim",
     "evidence": [
-      "internal/platform/gen/peer/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -20608,7 +20613,7 @@
     "spec": "peer.openapi.yaml",
     "operation_id": "pushEvents",
     "state": "partial: handwritten override of generated operation",
-    "contract": "Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.",
+    "contract": "Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it. While this instance resynchronises the stream from the caller from a snapshot, it applies the caller's events on it only through that full sync and answers a batch 503 with Retry-After; a batch that starts past the expected sequence answers 409 and makes this instance ask the caller whether the events in between are pruned, starting a full sync when they are.",
     "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
     "effects": "resource mutation/action; see served contract and handler calls",

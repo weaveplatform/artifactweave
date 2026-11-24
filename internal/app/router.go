@@ -1557,8 +1557,8 @@ type (
 	gridService   struct{ gridgen.UnimplementedStrict }
 	// peerService is the peer API's server (decision 0021); its P13
 	// tickets replace the stubs. pair serves /pair (PEER-02); streams the
-	// stream events and blobs (PEER-04); repos /repositories/{repoKey}
-	// (FED-01).
+	// stream events and blobs (PEER-04) and snapshots (PEER-05); repos
+	// /repositories/{repoKey} (FED-01).
 	peerService struct {
 		peergen.UnimplementedStrict
 		pair    federationpeer.PairServer
@@ -1661,6 +1661,18 @@ func (s peerService) PullEvents(
 		return s.UnimplementedStrict.PullEvents(ctx, req) //nolint:wrapcheck // the generated 501
 	}
 	return s.streams.PullEvents(ctx, req) //nolint:wrapcheck // as RedeemPairing
+}
+
+// GetSnapshot serves a page of a stream snapshot (PEER-05); without a
+// delivery engine it keeps the 501 stub.
+func (s peerService) GetSnapshot(
+	ctx context.Context,
+	req peergen.GetSnapshotRequestObject,
+) (peergen.GetSnapshotResponseObject, error) {
+	if s.streams.Streams == nil {
+		return s.UnimplementedStrict.GetSnapshot(ctx, req) //nolint:wrapcheck // the generated 501
+	}
+	return s.streams.GetSnapshot(ctx, req) //nolint:wrapcheck // as RedeemPairing
 }
 
 // GetBlob serves content a peer's stream refers to (PEER-04); without a
