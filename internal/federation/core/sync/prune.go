@@ -14,12 +14,26 @@ import (
 // Sweep starts what a committed entry did not (SweepKind): the dispatcher
 // of every peer this instance pushes to whose cursor is behind the stream's
 // last entry, a peer added after the entry for one, and a pull of every
-// stream this instance pulls. Streams go in the order of Priority, highest
-// first, so FED-04's prioritization dispatches them first.
+// stream this instance pulls, and the run of every stream this instance
+// is resynchronising, so a run whose work was given up on goes on. Streams
+// go in the order of Priority, highest first, so FED-04's prioritization
+// dispatches them first.
 func (e *Engine) Sweep(ctx context.Context) error {
 	self, err := e.self(ctx)
 	if err != nil {
 		return err
+	}
+	flags, err := e.Store.Resyncs().Resyncs(ctx, self)
+	if err != nil {
+		return fmt.Errorf("full-sync flags: %w", err)
+	}
+	for _, f := range flags {
+		if f.Receiver != self {
+			continue
+		}
+		if err := e.enqueue(ctx, FullSyncKind, item{Peer: f.Origin, Stream: f.Stream}); err != nil {
+			return err
+		}
 	}
 	for _, k := range e.Kinds.Kinds() {
 		streams, err := e.ordered(ctx, k)
@@ -98,10 +112,14 @@ func (e *Engine) sweepStream(ctx context.Context, self string, k Kind, stream st
 // (PruneKind). A peer whose position the window has passed is flagged for
 // a full sync (PEER-05); the numbering is never reset, so the peer's next
 // push or pull finds the gap rather than other entries under its numbers.
+// Snapshots no receiver has read for SnapshotIdle go too.
 func (e *Engine) Prune(ctx context.Context) error {
 	self, err := e.self(ctx)
 	if err != nil {
 		return err
+	}
+	if _, err := e.Store.Snapshots().PruneSnapshots(ctx, e.now().Add(-SnapshotIdle)); err != nil {
+		return fmt.Errorf("prune snapshots: %w", err)
 	}
 	cutoff := e.now().Add(-e.retention())
 	for _, k := range e.Kinds.Kinds() {

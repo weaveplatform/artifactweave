@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -629,9 +630,11 @@ func TestAccMigrateCommand(t *testing.T) {
 	}
 
 	// --module limits each action to one stream. Each stream's latest
-	// version is the number of its embedded SQLite migrations, so a new
-	// migration changes the expected answers without editing this test
-	// (a hard-coded count broke main when federation gained 0009).
+	// version is the number of its newest embedded SQLite migration, so a
+	// new migration changes the expected answers without editing this test
+	// (a hard-coded count broke main when federation gained 0009). It is
+	// read from the name, not counted: lanes reserve numbers, so a module
+	// can hold 0014 before another lane's 0013 lands.
 	latest := map[string]int{}
 	var order []string
 	for _, m := range appsql.Modules() {
@@ -639,7 +642,11 @@ func TestAccMigrateCommand(t *testing.T) {
 		if err != nil || len(files) == 0 {
 			t.Fatalf("module %s has no SQLite migrations: %v", m.Name, err)
 		}
-		latest[m.Name] = len(files)
+		newest, err := strconv.Atoi(strings.SplitN(filepath.Base(files[len(files)-1]), "_", 2)[0])
+		if err != nil {
+			t.Fatalf("module %s's newest migration %s has no number: %v", m.Name, files[len(files)-1], err)
+		}
+		latest[m.Name] = newest
 		order = append(order, m.Name)
 	}
 	n := latest["artifacts"]

@@ -31,6 +31,10 @@ const (
 	// it hands the rest to its next run, so one busy stream cannot hold a
 	// worker while others wait.
 	runBatches = 10
+	// SnapshotIdle is how long a snapshot is kept after its last page was
+	// served. A receiver that comes back later is answered 410 and takes a
+	// new one, which is cheaper than holding every abandoned copy.
+	SnapshotIdle = time.Hour
 )
 
 var (
@@ -41,8 +45,16 @@ var (
 	// or a batch whose origin is not the caller: 403.
 	ErrRefused = errors.New("the caller may not exchange the stream with this instance")
 	// ErrGone reports entries after a position that the origin has pruned;
-	// the receiver needs a full sync: 410.
+	// the receiver needs a full sync: 410. A snapshot cursor whose
+	// snapshot is no longer kept answers it too.
 	ErrGone = errors.New("the entries after the position have been pruned")
+	// ErrBusy refuses a batch on a stream this instance is resynchronising
+	// from the caller: its entries apply through the full sync until it
+	// completes, so the caller retries later: 503.
+	ErrBusy = errors.New("a full sync of the stream from the caller is in progress")
+	// ErrNoSnapshot refuses a snapshot, or a full sync, of a stream whose
+	// kind takes none: 404.
+	ErrNoSnapshot = errors.New("this instance takes no snapshots of the stream")
 	// errApplied reports an entry another transaction applied first.
 	errApplied = errors.New("entry already applied")
 	// errSize reports fetched content of another size than its entry gives.
@@ -75,6 +87,17 @@ type Page struct {
 	NextAfter int64
 }
 
+// SnapshotPage is one page of a peer's snapshot of a stream: entries in
+// order of key, taken at Sequence, and the cursor of the next page, ""
+// after the last.
+type SnapshotPage struct {
+	Origin     string
+	Stream     string
+	Sequence   int64
+	Entries    []model.SnapshotEntry
+	NextCursor string
+}
+
 // Remote calls a peer's stream and blob operations through the signed peer
 // client (adapters/peer).
 type Remote interface {
@@ -84,6 +107,10 @@ type Remote interface {
 	Push(ctx context.Context, peer model.Peer, b Batch) (int64, error)
 	// Pull reads the peer's entries on stream after after; ErrGone on 410.
 	Pull(ctx context.Context, peer model.Peer, stream string, after int64, limit int) (Page, error)
+	// Snapshot reads a page of the peer's snapshot of stream: a new
+	// snapshot when cursor is "", otherwise the page cursor continues;
+	// ErrGone on 410.
+	Snapshot(ctx context.Context, peer model.Peer, stream, cursor string, limit int) (SnapshotPage, error)
 	// FetchBlob streams the peer's blob sha256 to into once the answer's
 	// signature verifies. into's error is returned as it is.
 	FetchBlob(ctx context.Context, peer model.Peer, sha256 string, into func(io.Reader) error) error
@@ -91,12 +118,15 @@ type Remote interface {
 
 // Store is what the engine reads and writes, in one unit of work: the peer
 // records, the outbox with its cursors, applied markers and failed fetches,
-// the full-sync flags, this instance's identity and the work queue.
+// the full-sync flags, the snapshots taken for receivers and the full-sync
+// runs, and this instance's identity.
 type Store interface {
 	tx.Runner
 	Peers() port.PeerStore
 	Outbox() outbox.OutboxStore
 	Resyncs() port.StreamResyncStore
+	Snapshots() port.SnapshotStore
+	Federation() port.FederationStore
 	Instance() instance.InstanceStore
 }
 
@@ -232,8 +262,24 @@ func (e *Engine) cursor(ctx context.Context, peer, stream string) (outbox.PeerCu
 	return c, nil
 }
 
+// flagged reports whether origin's stream is flagged for a full sync of
+// receiver: on the origin, that it sends receiver nothing but the
+// resynchronisation; on the receiver, that the origin's entries apply only
+// through its run.
+func (e *Engine) flagged(ctx context.Context, origin, receiver, stream string) (model.StreamResync, bool, error) {
+	f, err := e.Store.Resyncs().Get(ctx, origin, receiver, stream)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.StreamResync{}, false, nil
+	}
+	if err != nil {
+		return model.StreamResync{}, false, fmt.Errorf("full-sync flag of %s on %s: %w", receiver, stream, err)
+	}
+	return f, true, nil
+}
+
 // flag records that receiver's position on origin's stream is below the
-// origin's pruned floor (PEER-05 resynchronises it).
+// origin's pruned floor, or that a snapshot was taken for it, so the origin
+// sends it nothing more until it has caught up (PEER-05).
 func (e *Engine) flag(ctx context.Context, origin, receiver, stream string, position int64) error {
 	if err := e.Store.Resyncs().Flag(ctx, model.StreamResync{
 		Origin: origin, Receiver: receiver, Stream: stream, Position: position, Flagged: e.now(),

@@ -22,7 +22,8 @@
 //   - Factory and Run.
 //   - The subtests, one per concern, each on a store of its own:
 //     Replications, Peers, PairingNonces, FederationMembers, FullSyncs,
-//     AccessTargets, PlatformFederations and Topologies.
+//     AccessTargets, PlatformFederations, Topologies, and the full sync's
+//     StreamResyncRun, FullSyncProgress, Snapshots and SnapshotPrune.
 //
 // # Invariants
 //

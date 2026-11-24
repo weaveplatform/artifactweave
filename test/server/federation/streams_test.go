@@ -511,20 +511,25 @@ func testStreams(t *testing.T, driver string, dsn func() string) {
 		if err != nil || len(flags) != 1 || flags[0].Origin != a.id || flags[0].Position != 0 {
 			t.Fatalf("A's flags %+v, %v; want B flagged at 0", flags, err)
 		}
-		// B now pulls, from below the floor: A answers 410 and B flags
-		// itself, applying nothing.
+		// B now pulls, from below the floor: A answers 410, and B, applying
+		// nothing across the gap, recovers from a snapshot (PEER-05) and
+		// goes on pulling from its sequence.
 		b.record(a, []model.UseCase{model.UseFederatedRepo}, model.DeliveryPull)
 		if _, err := b.engine.Remote.Pull(t.Context(), b.peer(a.id), testStream, 0, 10); !errors.Is(err, streamsync.ErrGone) {
 			t.Fatalf("pull below the floor: %v, want 410", err)
 		}
 		b.sweep()
-		eventually(t, func() string { return "B never flagged itself" }, func() bool {
-			got, err := b.runtime.Store.Resyncs().Resyncs(t.Context(), b.id)
-			return err == nil && len(got) == 1 && got[0].Origin == a.id && got[0].Receiver == b.id
-		})
+		if run := b.waitResynced(a); run.SnapshotSeq != 3 {
+			t.Fatalf("run %+v, want one from sequence 3", run)
+		}
 		if n := len(b.state(a).Applied); n != 0 {
 			t.Fatalf("B applied %d entries across the gap", n)
 		}
+		a.put("k", "pulled")
+		b.sweep()
+		eventually(t, func() string { return fmt.Sprint(b.state(a).Items) }, func() bool {
+			return b.state(a).Items["k"].Value == "pulled"
+		})
 	})
 }
 

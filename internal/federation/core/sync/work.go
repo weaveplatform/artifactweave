@@ -30,6 +30,9 @@ const (
 	// expired entries and flags the peers left behind.
 	PruneKind     = "federation.stream-prune"
 	PruneInterval = 10 * time.Minute
+	// FullSyncKind is one per peer and stream: it resynchronises the
+	// stream from the peer's snapshot (Resync), or probes whether it must.
+	FullSyncKind = "federation.stream-full-sync"
 	// periodicKey is the one item of each periodic kind.
 	periodicKey = "streams"
 )
@@ -74,8 +77,11 @@ func (e *Engine) Register(ctx context.Context, q *work.Queue, items work.WorkQue
 		SendKind:  func(ctx context.Context, i item) error { return e.Dispatch(ctx, i.Peer, i.Stream) },
 		PullKind:  func(ctx context.Context, i item) error { return e.PullFrom(ctx, i.Peer, i.Stream) },
 		FetchKind: func(ctx context.Context, i item) error { return e.RetryFetch(ctx, i.Stream, i.SHA256) },
+		FullSyncKind: func(ctx context.Context, i item) error {
+			return e.Resync(ctx, i.Peer, i.Stream)
+		},
 	}
-	for _, kind := range []string{SendKind, PullKind, FetchKind} {
+	for _, kind := range []string{SendKind, PullKind, FetchKind, FullSyncKind} {
 		h := handlers[kind]
 		if err := q.Handle(kind, func(ctx context.Context, it work.WorkItem) error {
 			i, err := decode(it)

@@ -51,6 +51,10 @@ func (r StreamRemote) Push(ctx context.Context, peer model.Peer, b streamsync.Ba
 		return resp.JSON200.AppliedSeq, nil
 	case resp.StatusCode() == http.StatusConflict && resp.JSON409 != nil && resp.JSON409.ExpectedSeq != nil:
 		return 0, &streamsync.ConflictError{Expected: *resp.JSON409.ExpectedSeq}
+	case resp.StatusCode() == http.StatusServiceUnavailable:
+		// Resynchronising the stream from this instance, or briefly unable
+		// to admit the batch: either way the dispatcher backs off.
+		return 0, fmt.Errorf("%w: %w", streamsync.ErrBusy, answerError("push "+b.Stream, peer, resp.StatusCode(), resp.Body))
 	default:
 		return 0, answerError("push "+b.Stream, peer, resp.StatusCode(), resp.Body)
 	}
@@ -92,6 +96,58 @@ func (r StreamRemote) Pull(ctx context.Context, peer model.Peer, stream string, 
 		page.NextAfter = *resp.JSON200.NextAfter
 	}
 	return page, nil
+}
+
+// Snapshot reads a page of the peer's snapshot of stream; a 410 is
+// streamsync.ErrGone.
+func (r StreamRemote) Snapshot(
+	ctx context.Context, peer model.Peer, stream, cursor string, limit int,
+) (streamsync.SnapshotPage, error) {
+	api, done, err := r.api(ctx, peer)
+	if err != nil {
+		return streamsync.SnapshotPage{}, err
+	}
+	defer done()
+	params := &peerclient.GetSnapshotParams{Limit: &limit}
+	if cursor != "" {
+		params.Cursor = &cursor
+	}
+	resp, err := api.GetSnapshotWithResponse(ctx, stream, params)
+	if err != nil {
+		return streamsync.SnapshotPage{}, fmt.Errorf("snapshot %s from %s: %w", stream, peer.InstanceID, err)
+	}
+	switch {
+	case resp.StatusCode() == http.StatusOK && resp.JSON200 != nil:
+	case resp.StatusCode() == http.StatusGone:
+		return streamsync.SnapshotPage{}, streamsync.ErrGone
+	default:
+		return streamsync.SnapshotPage{}, answerError("snapshot "+stream, peer, resp.StatusCode(), resp.Body)
+	}
+	if resp.JSON200.Origin != peer.InstanceID || resp.JSON200.Stream != stream {
+		return streamsync.SnapshotPage{}, fmt.Errorf("%w: snapshot %s from %s: the page names origin %s and stream %s",
+			errAnswer, stream, peer.InstanceID, resp.JSON200.Origin, resp.JSON200.Stream)
+	}
+	page := streamsync.SnapshotPage{Origin: peer.InstanceID, Stream: stream, Sequence: resp.JSON200.Sequence}
+	for _, w := range resp.JSON200.Entries {
+		en, ok := snapshotEntryFrom(peergenSnapshotEntry(w))
+		if !ok {
+			return streamsync.SnapshotPage{}, fmt.Errorf("%w: snapshot %s from %s: entry %q has hlc %q",
+				errAnswer, stream, peer.InstanceID, w.Key, w.Hlc)
+		}
+		page.Entries = append(page.Entries, en)
+	}
+	if resp.JSON200.NextCursor != nil {
+		page.NextCursor = *resp.JSON200.NextCursor
+	}
+	return page, nil
+}
+
+func peergenSnapshotEntry(w peerclient.SnapshotEntry) peergen.SnapshotEntry {
+	out := peergen.SnapshotEntry{Key: w.Key, Hlc: w.Hlc, Origin: w.Origin, Deleted: w.Deleted, Payload: w.Payload}
+	if w.Blob != nil {
+		out.Blob = &peergen.BlobReference{Sha256: w.Blob.Sha256, Size: w.Blob.Size}
+	}
+	return out
 }
 
 // FetchBlob streams the peer's blob to into. The answer's signature covers

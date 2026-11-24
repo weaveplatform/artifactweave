@@ -17,9 +17,11 @@ outbox** delivery is implemented
 ([PEER-04](https://github.com/weaveplatform/artifactweave/issues/1928),
 `internal/federation/core/sync`): push and pull of `streams/{stream}/events`,
 acknowledged cursors, `GET /blobs/{sha256}`, failed binaries with back-off retry, and
-pruning that flags a peer left behind for a full sync. No stream kind is registered yet,
-so every stream answers 404 until FED-02 registers `repo:<key>`. The other peer
-operations answer 501 until PEER-05, FED-01 and #1949 serve them.
+pruning that flags a peer left behind for a full sync. **Full sync** is implemented
+([PEER-05](https://github.com/weaveplatform/artifactweave/issues/1929)): `GET
+streams/{stream}/snapshot`, the receiver's fallback and `full_sync_runs`. No stream kind
+is registered yet, so every stream answers 404 until FED-02 registers `repo:<key>`. The
+other peer operations answer 501 until FED-01 and #1949 serve them.
 P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
 Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
@@ -239,6 +241,40 @@ properties, timestamps and tombstones) taken at a stated sequence. The receiver 
 fetches missing blobs, applies the differences and then resumes the event stream from the
 snapshot's sequence.
 
+As implemented (PEER-05): the sender copies the snapshot into `stream_snapshots` and
+`stream_snapshot_entries` when the first page is asked for, a page at a time, so later
+pages stay at its sequence while the stream moves on and memory holds one page. A
+receiver has one snapshot of a stream: a new one replaces its earlier one, and one not
+read for an hour is dropped, after which its cursor answers 410. A cursor issued for
+another stream or caller answers 400, and a kind that takes no snapshots answers 404.
+Taking a snapshot flags the receiver in `stream_resyncs` first, in a transaction of its
+own, and a dispatcher reads that flag after its entries, so nothing pushed while the
+receiver resynchronises is newer than the snapshot; the flag clears when the receiver
+reads the events after the snapshot's sequence, which acknowledges them.
+
+A receiver finds it is behind in two ways. A pull answered 410 starts its full sync. A
+pushing sender cannot send a batch with a gap, so it pushes the first entry it still
+holds; the receiver refuses it with 409 and asks, with a pull of one entry from its own
+position, whether the entries in between are pruned, starting the full sync on a 410.
+While it runs, the receiver's own `stream_resyncs` record names the run, the origin's
+pushes on the stream answer 503 with `Retry-After`, and its pulls stop: the origin's
+entries apply only through the run.
+
+Each run is a `full_sync_runs` row with the stream, the peer, `forced`, the snapshot's
+sequence, its phase and position, and a status: `IN_PROGRESS`, `COMPLETED`,
+`COMPLETED_WITH_ERRORS` when content could not be fetched (a failed binary, retried as
+any other), or `FAILED` when the peer stopped granting the stream. Each page is diffed
+against the receiver's items in key order; its content is fetched outside any
+transaction; and the page applies in one transaction with the run's position, so a run
+stopped by a restart resumes at the next page and a page applied twice changes nothing.
+In normal mode the conflict rule decides each item, so the receiver keeps what is newer
+on its side; a forced run takes the snapshot's item and discards items the snapshot does
+not hold. After the last page the receiver's applied position becomes the snapshot's
+sequence and it pulls the entries after it until it has caught up; a 410 on the way
+takes a new snapshot. An operator starts a run through FED-04's `fullSync` and
+`forceFullSync` (`Engine.FullSync`); a forced request restarts a normal run that is
+under way, since the pages it applied kept what a forced run discards.
+
 **Conflict rule.** Where a stream accepts writes on more than one instance (federated
 repositories), each event carries its hybrid logical clock timestamp and origin. For the
 same item, the event with the later timestamp wins and the higher `instance_id` breaks a
@@ -311,6 +347,12 @@ Alternatives considered:
   idempotent apply, cursor advance, pruning.
 - Multi-instance acceptance scenarios in the `acceptance-peers` CI job: pair two and three
   instances, partition one, resume from cursor, force a full sync after pruning.
+- Full sync (PEER-05): `core/sync`'s unit tests with the `streamtest` kind (push and pull
+  receivers past the window, pages that keep their sequence while the sender writes, a
+  restart mid-run, forced and normal modes, failed content, refusals), the snapshot store
+  contract on SQLite and PostgreSQL, and `test/server/federation`'s two-instance
+  scenarios on both: a receiver stopped past retention recovers and continues, paging
+  stays consistent while writes continue, and a 410 on pull starts the fallback.
 
 ## References
 

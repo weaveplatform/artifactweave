@@ -247,6 +247,10 @@ func (s *Store) RequestNonces() fedport.RequestNonceStore { return s.federation.
 // origin's pruned floor.
 func (s *Store) Resyncs() fedport.StreamResyncStore { return s.federation.Resyncs() }
 
+// Snapshots is the federation module's store of the stream snapshots this
+// instance has taken for its receivers.
+func (s *Store) Snapshots() fedport.SnapshotStore { return s.federation.Snapshots() }
+
 // Federation is the federation module's federated repository store.
 func (s *Store) Federation() fedport.FederationStore { return s.federation.Federation() }
 

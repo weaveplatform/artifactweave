@@ -22,18 +22,24 @@
 //     stream and its items in the settings store, in the apply
 //     transaction; Publish makes items pending a blob visible; References
 //     says which content a visible item holds.
+//   - streamsync.SnapshotProvider and streamsync.Reconciler: its items, with
+//     each one's clock time, origin and tombstone (State.Stamps), listed for
+//     a snapshot and reconciled from one by the conflict rule.
 //   - State, which a test reads to see what an instance applied, and in
-//     which order.
+//     which order; Diverge, which writes an item only this instance holds,
+//     as a forced full sync discards.
 //
 // # References
 //
 //   - Decision 0021: docs/research/decisions/0021-peer-trust-and-sync-protocol.md
 //     ("Ordered outbox").
-//   - https://github.com/weaveplatform/artifactweave/issues/1928 (PEER-04).
+//   - https://github.com/weaveplatform/artifactweave/issues/1928 (PEER-04)
+//     and https://github.com/weaveplatform/artifactweave/issues/1929
+//     (PEER-05).
 //
 // # Status
 //
-// Implemented P13 (PEER-04).
+// Implemented P13 (PEER-04, PEER-05).
 //
 // # Testing
 //
