@@ -18,15 +18,18 @@
 //
 // # Outputs
 //
-//   - A Cluster: Instances, each on its own loopback port, which is also
-//     its base URL, with its own data directory, database, instance
-//     identity and administrator password; a Link per ordered pair, the
-//     only address an instance's configuration lets it reach the other at;
-//     Partition and Heal; Close and Leftovers.
+//   - A Cluster: Instances, each on its own loopback port, with its own
+//     data directory, database, instance identity and administrator
+//     password; an ingress per instance, a forwarder whose address is its
+//     base URL, the one address every other instance and the scenario
+//     reach it at; an egress per instance, the forward proxy its server
+//     reaches the others through; Cut and Restore, Partition and Heal,
+//     which refuse destinations at the egress; DoFrom; Close and Leftovers.
 //   - Each instance's coverage in the binary's -test.gocoverdir.
 //   - Each instance's server log in a failing scenario's output.
-//   - The scenarios: the harness's own (harness_test.go) so far; the P13
-//     peer and federation tickets add theirs.
+//   - The scenarios: the harness's own (harness_test.go) and pairing
+//     through service_trust (pairing_test.go); the P13 peer and federation
+//     tickets add theirs.
 //
 // # References
 //
@@ -44,9 +47,13 @@
 //   - Decision 0022: docs/research/decisions/0022-federated-repositories.md.
 //   - Decision 0015: docs/research/decisions/0015-testing-and-acceptance.md.
 //   - https://github.com/weaveplatform/artifactweave/issues/1924
+//   - https://github.com/weaveplatform/artifactweave/issues/1946: one
+//     ingress address per instance, partitions by source.
 //
 // # Status
 //
 // Implemented P13 (QUA-01, issue 1924): the harness and the acceptance-peers
-// job. The peer and federation scenarios come with their tickets.
+// job; issue 1946 gave each instance one ingress address and moved PEER-02's
+// pairing scenarios here. The other peer and federation scenarios come with
+// their tickets.
 package peers

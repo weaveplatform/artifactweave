@@ -282,7 +282,7 @@ tests run as part of `make deploy-check`.
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestAccSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline records unimplemented product contracts and explicitly assigned gaps, including the project-scoped remote fields and admin endpoints in [#487](https://github.com/weaveplatform/artifactweave/issues/487). Passing parity means no unrecorded drift, not that every operation is implemented. docs.jfrog.com is contacted only on a cache miss. The cache key carries the ISO week as well as the hash of `tools/specoracle/main.go`, so the first run of each week crawls afresh and a page JFrog changed reaches the check within a week ([#419](https://github.com/weaveplatform/artifactweave/issues/419)); a new family in the index list is crawled at once. A local `.specoracle` is never refreshed by itself: run `make oracle-fetch` again after the index list changes. When a family's own `llms.txt` fails, the fetch takes the family's pages from the section of its parent index that lists the pages `api/oracle-inventory.json` records for it. A family that still has no page in the cache fails `TestAccSpecParity`, which names the family and its index URL, and `make parity-baseline` and `make oracle-inventory` refuse that cache; `actions/cache` saves only after a passing job, so such a crawl is not kept for the week ([#1308](https://github.com/weaveplatform/artifactweave/issues/1308)) |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity, oidc, cdn-repositories, remote-repositories, virtual-repositories, webhooks and single-replication. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
-| `acceptance-peers` (`Go acceptance (Linux, multi-instance peers)`) | `ubuntu-latest` | P13 | Runs `go test -race -shuffle=on` with whole-module `-cover` on `./test/peers/...` directly, with no make target or wrapper. Each scenario starts two or three instances of serve's runtime as separate processes on their own ports, data directories and databases, with a forwarder per pair that partitions and heals; see [Multi-instance scenarios](#multi-instance-scenarios-acceptance-peers). Selected on full runs and for changes under `test/peers/`, `internal/federation/` or `test/server/federation/`. Uploads `cover-accept-peers`, and the instances' complete server logs as `peer-logs` when it fails |
+| `acceptance-peers` (`Go acceptance (Linux, multi-instance peers)`) | `ubuntu-latest` | P13 | Runs `go test -race -shuffle=on` with whole-module `-cover` on `./test/peers/...` directly, with no make target or wrapper. Each scenario starts two or three instances of serve's runtime as separate processes on their own ports, data directories and databases, each reached at one ingress address that is its base URL and reaching the others through an egress proxy of its own that partitions and heals; see [Multi-instance scenarios](#multi-instance-scenarios-acceptance-peers). Selected on full runs and for changes under `test/peers/`, `internal/federation/` or `test/server/federation/`. Uploads `cover-accept-peers`, and the instances' complete server logs as `peer-logs` when it fails |
 | `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
 
 The required native acceptance partitions, `oci-conformance`, `terraform` and
@@ -358,8 +358,15 @@ Terraform federated scenario that reuses them (QUA-02):
   serve. It inherits the binary's `-test.gocoverdir`, so under `-cover` its
   counters join the job's coverage.
 - **Ports and base URLs.** Each instance listens on its own loopback port,
-  `127.0.0.1:<port>`, and its `base_url` is `http://127.0.0.1:<port>`. A port
-  another process takes before the instance binds it is retried with a new one.
+  `127.0.0.1:<port>`. A port another process takes before the instance binds
+  it is retried with a new one. In front of it the cluster runs its
+  **ingress**, a TCP forwarder on a loopback port of its own, and the
+  instance's `base_url` is the ingress's address, `in.URL`. It is the one
+  address every other instance and the scenario reach the instance at, as a
+  real deployment gives each instance one address its peers use. Pairing
+  therefore records each instance at the address the others reach it at: a
+  pairing token carries the issuer's base URL and a redeem the redeemer's
+  ([#1946](https://github.com/weaveplatform/artifactweave/issues/1946)).
 - **Data and databases.** Each instance has its own data directory. With
   SQLite the database lies there; with PostgreSQL the cluster starts a
   container of its own (`containertest.RunPostgres`, pinned by digest with
@@ -368,25 +375,47 @@ Terraform federated scenario that reuses them (QUA-02):
 - **Identity.** Each instance creates its own instance identity on its first
   start, so `GET /api/system/service_id` differs between them; each seeds
   `admin` with a password of its own.
-- **Links and partitions.** For every ordered pair the cluster runs a TCP
-  forwarder, `c.Link(from, to)`, and each instance's
-  `remote.allowed_private_origins` lists only its outgoing links, so an
-  instance reaches another only through a link. `c.Partition(a, b)` resets the
-  connections both links carry and refuses new ones until `c.Heal(a, b)`; a
-  reset rather than dropped traffic makes a call fail at once.
+- **Egress and partitions.** Each instance also has an **egress**, an HTTP
+  forward proxy on a loopback port of its own that the harness makes the
+  instance's platform default proxy (`proxies.peers-egress`,
+  `platformDefault: true`), so its remote, push and peer clients all go
+  through it. It serves CONNECT, which the peer client sends for every
+  destination, and absolute-form requests, which the remote client sends for
+  a plain HTTP destination named by IP address, one request per connection.
+  It carries connections only to the instances' ingresses. Each instance's
+  `remote.allowed_private_origins` lists the other instances' base URLs and
+  its own egress. A partition is by source: `c.Cut(from, to)` makes `from`'s
+  egress reset the connections it carries to `to` and refuse new ones until
+  `c.Restore(from, to)`; `c.Partition(a, b)` cuts both ways and `c.Heal(a, b)`
+  restores both. Every other pair, and the scenario's own requests, still
+  pass. A reset rather than dropped traffic makes a call fail at once.
+  `c.DoFrom(from, to, …)` sends a request the way `from`'s server reaches
+  `to`. A scenario must not add another platform default proxy, nor set a
+  remote's `disableProxy`: that traffic would bypass the egress and cross
+  every partition.
 - **Logs and teardown.** Each instance's output goes to a log file, under
   `ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR` when it is set. When a scenario fails,
   its output carries the tail of each instance's log. `c.Close()` stops the
-  instances, closes the links and removes the container, and `c.Leftovers`
-  names any process, listening address or container that survived it.
+  instances, closes the ingresses and egresses and removes the container, and
+  `c.Leftovers` names any process, listening address or container that
+  survived it. `in.Identity(t)` reads a running instance's identity, its
+  private key included, from its database, so a scenario can require that no
+  answer disclosed it.
 
 The first scenario, `TestAccPeersHarnessSQLite` and `TestAccPeersHarnessPostgres`,
 uses no peer feature. Three instances report distinct service ids, answer
-through every link with their own identity and their configured base URL, and
+every other instance's egress with their own identity and their base URL, and
 fetch each other's files through a generic remote repository whose upstream is
-the link. Partitioning the first two makes those fetches fail (502) while their
-links to the third still carry traffic, and healing restores them. The closed
-cluster leaves no process, port or container behind.
+the other's base URL. Partitioning the first two makes those fetches fail (502)
+while both still reach the third and are reached by it, and healing restores
+them; a cut stops one direction only. The closed cluster leaves no process,
+port or container behind.
+`TestAccPairingSQLite` and `TestAccPairingPostgres` pair two instances through
+the `service_trust` endpoints (PEER-02, [#1926](https://github.com/weaveplatform/artifactweave/issues/1926)):
+refused tokens, one of two concurrent redemptions, receiving-only trust through
+Access, unpairing on both sides, and no answer carrying a private key. A redeem
+across a partition answers the network failure and pairs nothing, and the same
+token pairs once healed; an unpair across a partition fails unless forced.
 `TestAccPeersFailurePrintsEachServerLog` runs a deliberately failing scenario in
 a process of its own and requires its output to carry each instance's log.
 

@@ -28,9 +28,11 @@ func TestAccPeersHarnessPostgres(t *testing.T) {
 }
 
 // qualifyHarness needs no peer feature: three instances with their own
-// identities and base URLs reach each other through the links, a partition
-// stops one pair's traffic while the third instance's links still carry
-// theirs, healing restores it, and the closed cluster leaves nothing behind.
+// identities and base URLs reach each other at those base URLs through
+// their egresses, a partition stops one pair's traffic while the third
+// instance still reaches and is reached by both, a cut is one way only,
+// healing restores the traffic, and the closed cluster leaves nothing
+// behind.
 func qualifyHarness(t *testing.T, driver peers.Driver) {
 	c := peers.Start(t, peers.Options{Instances: 3, Driver: driver})
 	owner := map[string]string{}
@@ -48,32 +50,38 @@ func qualifyHarness(t *testing.T, driver peers.Driver) {
 			`{"key":"peer-local","rclass":"local","packageType":"generic"}`, http.StatusOK)
 		expect(t, in, http.MethodPut, "/artifactory/peer-local/whoami.txt", in.Name, http.StatusCreated)
 	}
+	reaches := func(i, j int) error {
+		status, id, err := c.DoFrom(i, j, http.MethodGet, "/artifactory/api/system/service_id", "")
+		if err != nil {
+			return err
+		}
+		if status != http.StatusOK || id != ids[j] {
+			return fmt.Errorf("answered %d %q, want %s", status, id, ids[j])
+		}
+		return nil
+	}
 	for i, from := range c.Instances {
 		for j, to := range c.Instances {
 			if i == j {
 				continue
 			}
-			link := c.Link(i, j)
-			status, id, err := link.Do(http.MethodGet, "/artifactory/api/system/service_id", "")
-			if err != nil || status != http.StatusOK || id != ids[j] {
-				t.Fatalf("link %s->%s reached %d %q (%v), want %s", from.Name, to.Name, status, id, err, ids[j])
+			if err := reaches(i, j); err != nil {
+				t.Fatalf("%s->%s: %v", from.Name, to.Name, err)
 			}
-			// A request through the link carries the link's Host, so only
-			// the instance's configured base URL can put its own address in
-			// the answer.
-			status, body, err := link.Do(http.MethodGet, "/artifactory/api/storage/peer-local/whoami.txt", "")
+			status, body, err := c.DoFrom(i, j, http.MethodGet, "/artifactory/api/storage/peer-local/whoami.txt", "")
 			var info struct {
 				URI string `json:"uri"`
 			}
 			if err != nil || status != http.StatusOK || json.Unmarshal([]byte(body), &info) != nil ||
 				info.URI != to.URL+"/artifactory/api/storage/peer-local/whoami.txt" {
-				t.Fatalf("link %s->%s storage info: %d %s (%v), want uri under %s", from.Name, to.Name, status, body, err, to.URL)
+				t.Fatalf("%s->%s storage info: %d %s (%v), want uri under %s", from.Name, to.Name, status, body, err, to.URL)
 			}
 			// The instance's own server makes the next call: a generic remote
-			// whose upstream is the link.
+			// whose upstream is the other's base URL, reached through the
+			// egress that is its platform default proxy.
 			remote := fmt.Sprintf(`{"key":%q,"rclass":"remote","packageType":"generic","url":%q,`+
 				`"username":%q,"password":%q,"assumedOfflinePeriodSecs":0,"missedRetrievalCachePeriodSecs":0}`,
-				"from-"+to.Name, link.URL+"/artifactory/peer-local", peers.AdminUser, to.AdminPassword)
+				"from-"+to.Name, to.URL+"/artifactory/peer-local", peers.AdminUser, to.AdminPassword)
 			expect(t, from, http.MethodPut, "/artifactory/api/repositories/from-"+to.Name, remote, http.StatusOK)
 			if body := expect(t, from, http.MethodGet, "/artifactory/from-"+to.Name+"/whoami.txt", "", http.StatusOK); body != to.Name {
 				t.Fatalf("%s fetched %q from %s, want %q", from.Name, body, to.Name, to.Name)
@@ -86,11 +94,13 @@ func qualifyHarness(t *testing.T, driver peers.Driver) {
 		expect(t, in, http.MethodPut, "/artifactory/peer-local/later.txt", "later on "+in.Name, http.StatusCreated)
 	}
 	c.Partition(0, 1)
-	for _, link := range []*peers.Link{c.Link(0, 1), c.Link(1, 0)} {
-		if status, _, err := link.Do(http.MethodGet, "/artifactory/api/system/ping", ""); err == nil {
-			t.Fatalf("partitioned link %s->%s answered %d", link.From.Name, link.To.Name, status)
+	for _, pair := range [][2]int{{0, 1}, {1, 0}} {
+		if err := reaches(pair[0], pair[1]); err == nil {
+			t.Fatalf("%s reached %s across the partition", c.Instances[pair[0]].Name, c.Instances[pair[1]].Name)
 		}
 	}
+	// The instance's own server is cut too: its egress is its platform
+	// default proxy.
 	for _, pair := range [][2]*peers.Instance{{a, b}, {b, a}} {
 		status, body := pair[0].Do(t, http.MethodGet, "/artifactory/from-"+pair[1].Name+"/later.txt", "")
 		if status == http.StatusOK {
@@ -98,15 +108,35 @@ func qualifyHarness(t *testing.T, driver peers.Driver) {
 		}
 		t.Logf("%s's fetch from %s across the partition: %d %s", pair[0].Name, pair[1].Name, status, body)
 	}
-	// The partition is between a and b only.
+	// The partition is between a and b only: the third instance reaches both
+	// and both reach it, and the scenario still reaches a and b at their
+	// base URLs.
+	for _, pair := range [][2]int{{0, 2}, {2, 0}, {1, 2}, {2, 1}} {
+		if err := reaches(pair[0], pair[1]); err != nil {
+			t.Fatalf("%s->%s during the partition: %v", c.Instances[pair[0]].Name, c.Instances[pair[1]].Name, err)
+		}
+	}
 	if body := expect(t, a, http.MethodGet, "/artifactory/from-"+other.Name+"/later.txt", "", http.StatusOK); body != "later on "+other.Name {
 		t.Fatalf("%s fetched %q from %s during the partition", a.Name, body, other.Name)
 	}
+	expect(t, b, http.MethodGet, "/artifactory/peer-local/later.txt", "", http.StatusOK)
 	c.Heal(0, 1)
 	for _, pair := range [][2]*peers.Instance{{a, b}, {b, a}} {
 		if body := expect(t, pair[0], http.MethodGet, "/artifactory/from-"+pair[1].Name+"/later.txt", "", http.StatusOK); body != "later on "+pair[1].Name {
 			t.Fatalf("%s fetched %q from %s after healing", pair[0].Name, body, pair[1].Name)
 		}
+	}
+	// A cut is one way: a stops reaching b while b still reaches a.
+	c.Cut(0, 1)
+	if err := reaches(0, 1); err == nil {
+		t.Fatalf("%s reached %s across a cut", a.Name, b.Name)
+	}
+	if err := reaches(1, 0); err != nil {
+		t.Fatalf("%s->%s while %s is cut from %s: %v", b.Name, a.Name, a.Name, b.Name, err)
+	}
+	c.Restore(0, 1)
+	if err := reaches(0, 1); err != nil {
+		t.Fatalf("%s->%s after the cut was lifted: %v", a.Name, b.Name, err)
 	}
 
 	c.Close()
