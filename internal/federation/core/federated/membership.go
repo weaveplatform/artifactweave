@@ -37,6 +37,7 @@ type Store interface {
 	tx.Runner
 	Peers() port.PeerStore
 	Federation() port.FederationStore
+	Stamps() port.ItemStampStore
 	Replications() port.ReplicationStore
 	Configs() configdoc.ConfigStore
 	WorkQueue() work.WorkQueue
@@ -67,6 +68,11 @@ type Membership struct {
 	BaseURL string
 	// Now defaults to time.Now.
 	Now func() time.Time
+	// Changed, when set, runs in the transaction of every Reconcile, so
+	// stream delivery starts at once for a member added or enabled, or for
+	// this instance's own member enabled again, rather than at its next
+	// sweep.
+	Changed func(ctx context.Context, key string) error
 }
 
 // SelfBase is this instance's own member base URL: federatedRepoUrlBase,
@@ -223,6 +229,19 @@ func (m Membership) Reconcile(ctx context.Context, c repo.Config, sync bool) err
 			return fmt.Errorf("store federated repository members: %w", err)
 		}
 	}
+	if c.Class != repo.Federated {
+		// The stamps settle a federated repository's changes; a local one
+		// has none to settle, and should it be federated again, its
+		// changes start from what it holds then.
+		if err := m.Store.Stamps().Clear(ctx, c.Key); err != nil {
+			return fmt.Errorf("clear federated repository stamps: %w", err)
+		}
+	}
+	if m.Changed != nil {
+		if err := m.Changed(ctx, c.Key); err != nil {
+			return err
+		}
+	}
 	if !sync {
 		return nil
 	}
@@ -236,10 +255,14 @@ func sameMembers(a, b []model.FederationMember) bool {
 	})
 }
 
-// Clear drops a repository's members, when it is deleted or created anew.
+// Clear drops a repository's members and its conflict-rule stamps, when
+// it is deleted, created anew or converted to a local repository.
 func (m Membership) Clear(ctx context.Context, key string) error {
 	if err := m.Store.Federation().SetMembers(ctx, key, nil); err != nil {
 		return fmt.Errorf("clear federated repository members: %w", err)
+	}
+	if err := m.Store.Stamps().Clear(ctx, key); err != nil {
+		return fmt.Errorf("clear federated repository stamps: %w", err)
 	}
 	return nil
 }

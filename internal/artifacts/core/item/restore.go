@@ -114,6 +114,9 @@ func (s *Service) restoreRecord(
 	if err := s.emitPropertyChanges(ctx, stored, before, by, now); err != nil {
 		return model.Item{}, err
 	}
+	if err := s.feed(ctx, stored); err != nil {
+		return model.Item{}, err
+	}
 	return stored, nil
 }
 

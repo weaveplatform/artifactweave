@@ -607,6 +607,9 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step, res *Tran
 		if err := s.emitPropertyChanges(ctx, landed, before, t.By, now); err != nil {
 			return err
 		}
+		if err := s.feed(ctx, landed); err != nil {
+			return err
+		}
 		if st.src.Folder {
 			res.Folders++
 		} else {
@@ -766,7 +769,7 @@ func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) e
 	items := s.Store.Items()
 	hooks, env := s.format(t.From.Repo.PackageType), s.env()
 	var versions []model.PackageVersion
-	var folders, files []model.Item
+	var folders, files, removed []model.Item
 	for _, st := range steps {
 		if st.src.Folder {
 			folders = append(folders, st.src)
@@ -787,6 +790,7 @@ func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) e
 		if err != nil {
 			return fmt.Errorf("item: delete %s: %w", st.src.FullPath(), err)
 		}
+		removed = append(removed, res.Removed...)
 		for sha, n := range res.BlobRefs {
 			if _, err := s.Store.Blobs().Unref(ctx, sha, n); err != nil {
 				return fmt.Errorf("item: release blob %s: %w", sha, err)
@@ -802,9 +806,11 @@ func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) e
 		if len(children) > 0 {
 			continue
 		}
-		if _, err := items.Delete(ctx, t.From.Repo.Key, false, f.FullPath()); err != nil {
+		res, err := items.Delete(ctx, t.From.Repo.Key, false, f.FullPath())
+		if err != nil {
 			return fmt.Errorf("item: delete %s: %w", f.FullPath(), err)
 		}
+		removed = append(removed, res.Removed...)
 	}
 	if err := pkgindex.Prune(ctx, s.Store, versions); err != nil {
 		return err //nolint:wrapcheck // pkgindex wraps its own
@@ -812,7 +818,9 @@ func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) e
 	if err := hooks.Deleted(ctx, env, t.From.Repo, files); err != nil {
 		return err //nolint:wrapcheck // the format's own error
 	}
-	return nil
+	// A move reaches a federated source's members as the deletes it made
+	// there (decision 0022); the landing was reported as it happened.
+	return s.feedRemoved(ctx, removed)
 }
 
 // moveFile is Env.Move: a move of the file at from to to within c, as

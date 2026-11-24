@@ -54,6 +54,7 @@ type Store struct {
 	releases      *relinmem.Store
 	workers       *wrkinmem.Store
 	capacity      configapi.StorageCapacity
+	feed          itemFeed
 }
 
 // New returns an empty store. It registers the artifacts module's layout
@@ -253,6 +254,9 @@ func (s *Store) Snapshots() fedport.SnapshotStore { return s.federation.Snapshot
 
 // Federation is the federation module's federated repository store.
 func (s *Store) Federation() fedport.FederationStore { return s.federation.Federation() }
+
+// Stamps is the federation module's conflict-rule item records.
+func (s *Store) Stamps() fedport.ItemStampStore { return s.federation.Stamps() }
 
 // Platform is the federation module's platform federation store.
 func (s *Store) Platform() fedport.PlatformStore { return s.federation.Platform() }

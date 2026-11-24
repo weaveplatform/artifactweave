@@ -19,7 +19,8 @@ import (
 // with the caller flagged for a full sync, when the entries after it have
 // been pruned.
 func (e *Engine) Events(ctx context.Context, caller model.Peer, stream string, after int64, limit int) (Page, error) {
-	if _, err := e.authorize(ctx, caller, stream, Send); err != nil {
+	k, err := e.authorize(ctx, caller, stream, Send)
+	if err != nil {
 		return Page{}, err
 	}
 	if limit < 1 || limit > MaxBatch {
@@ -35,6 +36,14 @@ func (e *Engine) Events(ctx context.Context, caller model.Peer, stream string, a
 	}
 	if after < 0 || after > head {
 		return Page{}, fmt.Errorf("after must be 0 to %d, the stream's last sequence: %w", head, kernel.ErrInvalid)
+	}
+	stop, err := paused(ctx, k, stream, caller.InstanceID)
+	if err != nil {
+		return Page{}, err
+	}
+	if stop {
+		// What the caller has applied still counts; nothing more is sent.
+		return Page{Origin: self}, e.acknowledge(ctx, caller.InstanceID, stream, after)
 	}
 	entries, err := e.Store.Outbox().Read(ctx, self, stream, after, limit)
 	if err != nil {

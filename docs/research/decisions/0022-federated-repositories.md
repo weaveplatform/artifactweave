@@ -7,7 +7,10 @@ Status: Accepted
 Implementation status (2026-11-24): **in progress, P13**. Members and
 configuration sync are implemented (FED-01, [#1930](https://github.com/weaveplatform/artifactweave/issues/1930)):
 member checks against paired peers, `federatedRepoUrlBase`, configSync over the
-peer API, `migrate`, `convertToLocal`, `replaceUrl` and `updateMemberUrl`. The
+peer API, `migrate`, `convertToLocal`, `replaceUrl` and `updateMemberUrl`. Change
+propagation is implemented (FED-02, [#1931](https://github.com/weaveplatform/artifactweave/issues/1931)):
+the `repo:<key>` stream kind (`internal/federation/core/federated`, `Stream`), its
+producer in the item service's transaction and its applier under the conflict rule. The
 rest of the decision below describes intended behavior that later P13 tasks
 implement; their generated API stubs and storage models do not implement it yet.
 A `receiver` member is refused until FED-03.
@@ -101,6 +104,33 @@ applied items rather than shipped, so every member's metadata reflects its own c
 
 **Conflicts** follow 0021: last writer by hybrid logical clock time per item path, origin
 `instance_id` as the tie-break, tombstones for deletes.
+
+How FED-02 carries this out, where no 7.x source fixes the detail [I] (#216 compares
+them against a live 7.x in P19):
+
+- Every entry is an item's whole state after the change: a put carries the content's
+  checksums, the creation and modification times and users, and the item's whole
+  property set; a delete carries the path. Whichever change wins therefore leaves the
+  same item on every member, whatever order the entries arrive in. A move is a put at
+  the destination and a delete at the source; a removed folder's files go first, then
+  its folders deepest first, and a member deletes a folder only once it is empty.
+- Each member keeps a stamp per item (`federation_item_stamps`): the clock time and
+  origin of the change that left it so, a tombstone for a delete, kept for the outbox
+  retention window. A local change first merges the stamp it replaces into the clock,
+  so it orders after everything the instance knew of the item.
+- A member applies a winning change without asking the format to admit it again (the
+  member that made it did), then runs the format's deploy and property hooks, so its
+  own metadata and package index follow; a delete goes to the trash can when it is on,
+  as a client's would. A file where the change needs a folder, or the reverse, or a
+  repository no longer federated here, is logged and skipped rather than stopping the
+  stream.
+- `enabled: false` pauses sending: no member sends to a disabled member, and a member
+  whose own entry is disabled sends to none. The paused member stays subscribed, so
+  its cursor holds within the retention window and it catches up from there once
+  enabled again; receiving is not paused.
+- Maven treats a federated repository as a local one for metadata, snapshot names and
+  cleanup, since 7.x's `FederatedRepoDescriptor` extends `LocalRepoDescriptor`
+  ([research 40](../40-federated-repositories-7x.md)).
 
 **Operations.**
 

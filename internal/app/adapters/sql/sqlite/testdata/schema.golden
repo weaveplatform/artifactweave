@@ -37,6 +37,8 @@ index cold_blobs_unreferenced cold_blobs CREATE INDEX cold_blobs_unreferenced ON
 index distribution_jobs_peer distribution_jobs CREATE INDEX distribution_jobs_peer ON distribution_jobs(peer,tracker_id)
 index distribution_trackers_bundle distribution_trackers CREATE INDEX distribution_trackers_bundle ON distribution_trackers(bundle_name,bundle_version,id)
 index environments_project environments CREATE INDEX environments_project ON environments(project_key,name)
+index federation_item_stamps_sha256 federation_item_stamps CREATE INDEX federation_item_stamps_sha256 ON federation_item_stamps(repo_key,sha256)
+index federation_item_stamps_tombstones federation_item_stamps CREATE INDEX federation_item_stamps_tombstones ON federation_item_stamps(deleted,hlc_wall)
 index federation_members_peer federation_members CREATE INDEX federation_members_peer ON federation_members(peer,repo_key)
 index full_sync_runs_repo full_sync_runs CREATE INDEX full_sync_runs_repo ON full_sync_runs(repo_key,id)
 index gitlfs_locks_repo_path gitlfs_locks CREATE INDEX gitlfs_locks_repo_path ON gitlfs_locks(repo_key,path)
@@ -113,6 +115,7 @@ index sqlite_autoindex_config_secrets_1 config_secrets
 index sqlite_autoindex_distribution_jobs_1 distribution_jobs
 index sqlite_autoindex_environments_1 environments
 index sqlite_autoindex_failed_blob_fetches_1 failed_blob_fetches
+index sqlite_autoindex_federation_item_stamps_1 federation_item_stamps
 index sqlite_autoindex_federation_members_1 federation_members
 index sqlite_autoindex_gitlfs_locks_1 gitlfs_locks
 index sqlite_autoindex_gitlfs_locks_2 gitlfs_locks
@@ -248,6 +251,7 @@ table distribution_jobs distribution_jobs CREATE TABLE distribution_jobs(tracker
 table distribution_trackers distribution_trackers CREATE TABLE distribution_trackers(id INTEGER PRIMARY KEY AUTOINCREMENT,bundle_name TEXT NOT NULL,bundle_version TEXT NOT NULL,kind TEXT NOT NULL,dry_run BOOLEAN NOT NULL DEFAULT FALSE,auto_create_repos BOOLEAN NOT NULL DEFAULT FALSE,status TEXT NOT NULL DEFAULT '',created_at BIGINT,created_by TEXT NOT NULL DEFAULT '',rules TEXT)
 table environments environments CREATE TABLE environments(name TEXT PRIMARY KEY,project_key TEXT NOT NULL DEFAULT '')
 table failed_blob_fetches failed_blob_fetches CREATE TABLE failed_blob_fetches(stream TEXT NOT NULL,sha256 TEXT NOT NULL,sha1 TEXT NOT NULL DEFAULT '',repo_key TEXT NOT NULL DEFAULT '',first_failed_at BIGINT,failures INTEGER NOT NULL DEFAULT 0,last_error TEXT NOT NULL DEFAULT '',PRIMARY KEY(stream,sha256))
+table federation_item_stamps federation_item_stamps CREATE TABLE federation_item_stamps(repo_key TEXT NOT NULL,path TEXT NOT NULL,hlc_wall BIGINT NOT NULL,hlc_logical BIGINT NOT NULL,origin TEXT NOT NULL,deleted BOOLEAN NOT NULL DEFAULT FALSE,folder BOOLEAN NOT NULL DEFAULT FALSE,sha256 TEXT NOT NULL DEFAULT '',size BIGINT NOT NULL DEFAULT 0,pending TEXT,PRIMARY KEY(repo_key,path))
 table federation_members federation_members CREATE TABLE federation_members(repo_key TEXT NOT NULL,peer TEXT NOT NULL,base_url TEXT NOT NULL DEFAULT '',remote_repo_key TEXT NOT NULL DEFAULT '',enabled BOOLEAN NOT NULL DEFAULT TRUE,mode TEXT NOT NULL DEFAULT '',PRIMARY KEY(repo_key,peer))
 table full_sync_runs full_sync_runs CREATE TABLE full_sync_runs(id INTEGER PRIMARY KEY AUTOINCREMENT,repo_key TEXT NOT NULL,peer TEXT NOT NULL,forced BOOLEAN NOT NULL DEFAULT FALSE,snapshot_seq BIGINT NOT NULL DEFAULT 0,started_at BIGINT,finished_at BIGINT,status TEXT NOT NULL DEFAULT '',result_paths TEXT,stream TEXT NOT NULL DEFAULT '',phase TEXT NOT NULL DEFAULT '',page_cursor TEXT NOT NULL DEFAULT '',last_key TEXT NOT NULL DEFAULT '',message TEXT NOT NULL DEFAULT '')
 table gitlfs_locks gitlfs_locks CREATE TABLE gitlfs_locks(id TEXT PRIMARY KEY,repo_key TEXT NOT NULL REFERENCES repositories(key)ON DELETE CASCADE,path TEXT NOT NULL,owner TEXT NOT NULL,locked_at BIGINT NOT NULL,UNIQUE(repo_key,path))

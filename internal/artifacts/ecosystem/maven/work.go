@@ -114,9 +114,18 @@ func groupOf(pom string) (string, bool) {
 }
 
 // derived reports whether c's files have derived Maven metadata at all:
-// local repositories' own files do, remote caches' do not.
+// local and federated repositories' own files do, remote caches' do not.
 func derived(c repo.Config, cached bool) bool {
-	return !cached && c.Class == repo.Local
+	return !cached && Hosted(c)
+}
+
+// Hosted reports whether c holds its own deployed files, as a local
+// repository does: a federated repository is one too, since 7.x's
+// FederatedRepoDescriptor extends LocalRepoDescriptor (research 40), so
+// each member computes Maven metadata, snapshot names and cleanup for the
+// files it holds as a local repository does.
+func Hosted(c repo.Config) bool {
+	return c.Class == repo.Local || c.Class == repo.Federated
 }
 
 // queued reports whether a write in c queues Maven metadata: one where
