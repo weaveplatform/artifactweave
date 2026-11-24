@@ -768,6 +768,9 @@ func (s *Service) MakeFolder(
 		}
 		_, err := s.Store.Items().Get(ctx, t.Repo.Key, t.Cached, full)
 		created := errors.Is(err, kernel.ErrNotFound)
+		if err != nil && !created {
+			return fmt.Errorf("item: get %s: %w", full, err)
+		}
 		if err := s.ensureFolders(ctx, t, full, by, now); err != nil {
 			return err
 		}
