@@ -19,7 +19,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.21.3
 	github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign v1.12.12
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.116.0
-	github.com/aws/smithy-go v1.28.9
+	github.com/aws/smithy-go v1.28.10
 	github.com/containerd/errdefs v1.0.0
 	github.com/cucumber/gherkin/go/v42 v42.0.1
 	github.com/cucumber/godog v0.16.0
@@ -154,7 +154,7 @@ require (
 	github.com/moby/moby/api v1.57.0 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/sequential v0.7.0 // indirect
-	github.com/moby/sys/user v0.5.0 // indirect
+	github.com/moby/sys/user v0.5.1 // indirect
 	github.com/moby/sys/userns v0.2.1 // indirect
 	github.com/moby/term v0.5.2 // indirect
 	github.com/narqo/go-badge v0.0.0-20230821190521-c9a75c019a59 // indirect
@@ -188,7 +188,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.yaml.in/yaml/v4 v4.0.0 // indirect
-	golang.org/x/exp v0.0.0-20261121134650-e1094eeca1b5 // indirect
+	golang.org/x/exp v0.0.0-20261124000051-d6646c509b6d // indirect
 	golang.org/x/image v0.48.0 // indirect
 	golang.org/x/oauth2 v0.38.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
@@ -196,9 +196,9 @@ require (
 	golang.org/x/time v0.16.0 // indirect
 	golang.org/x/tools v0.53.0 // indirect
 	golang.org/x/vuln v1.10.0 // indirect
-	google.golang.org/genproto v0.0.0-20261118221215-c8830f628b3f // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20261118221215-c8830f628b3f // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20261118221215-c8830f628b3f // indirect
+	google.golang.org/genproto v0.0.0-20261123191846-1e707ab9fbc2 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20261123191846-1e707ab9fbc2 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261123191846-1e707ab9fbc2 // indirect
 	google.golang.org/grpc v1.85.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	modernc.org/libc v1.82.13 // indirect
