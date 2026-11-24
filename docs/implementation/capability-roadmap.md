@@ -60,7 +60,7 @@ inventory across products, APIs and clients.
 | Virtual resolution and metadata merging | Implemented P10 mechanisms and retained client/server evidence are mapped in the [virtual guide](../operations/virtual-repositories.md) and [type matrix](package-format-matrix.md); [EPIC-QUA #1528](https://github.com/weaveplatform/artifactweave/issues/1528) owns final phase qualification |
 | Projects, durable events, webhook subscription administration, package cleanup, single push/pull replication | P11 implements documented project administration, durable event consumers, subscription management, package cleanup and single replication, qualified on merged main `425ce4de9a68` by #1765 ([full workflow 45191301585](https://github.com/weaveplatform/artifactweave/actions/runs/45191301585) and literal `make gate`). P19a separately owns project-scoped remotes #487, observed webhook delivery/test/troubleshooting and unconfirmed cleanup additions after P19 |
 | Full descriptor, system configuration, LDAP, anonymous access and configured mail notifications | P12; #1832 manages LDAP connections through the Access API and `security.ldapSettings` and authenticates users against them (#1833); #1834 synchronises LDAP group settings through the Access API and `security.ldapGroupSettings` and makes the directory's groups each fresh login's and refresh's memberships; #1827 implements process-local temporary logger controls over real handlers (P35 cross-node propagation; P38 streaming/support bundles); #303 includes native anonymous reads with an explicit permission grant; mail settings must result in delivery. Proxy #1835 implements artifact-source NTLMv2/domain/ntHost and #1836 scoped redirected Basic credentials for artifact downloads with independent credential/destination rules and required native evidence; #1848 applies NTLMv2 proxies and valid redirected-host settings to single-replication push. #618 supplies HTTP(S) Basic proxies and checked-IP CONNECT for DNS-named HTTP sources. #1903 adds the global `security.hideUnauthorizedResources`. P12 is qualified on merged main `b910ea869b65` by #1838 ([full workflow 45277781762](https://github.com/weaveplatform/artifactweave/actions/runs/45277781762) and literal `make gate`); #1912 (#1905) then aligned the XML `security` element with 7.161.26, and #1908 (global hiding on REST surfaces) remains open |
-| Repository and Access Federation, topology | P13/P14 for artifactweave peers; external interoperability is additionally owned by P37/P40 |
+| Repository and Access Federation, topology | P13/P14 for artifactweave peers; external interoperability is additionally owned by P37/P40. P13 federates every implemented local type except `terraformbackend`, which 7.x cannot federate, includes receiver (unidirectional) members, and answers the endpoints only RTFS serves as [research 40](../research/40-federated-repositories-7x.md#7-federation-endpoints-and-how-artifactweave-answers-them) records; its Terraform exit is the [35 resources of research 40 §9](../research/40-federated-repositories-7x.md#9-terraform-exit-set) |
 | Release bundles v1 and Distribution | P15, including the bundle-delete `archive` flag contract; accepting and ignoring it is not completion. Coordinate archive effects with P16; v2 compatibility and distribution remain explicitly in P24 |
 | Cold storage and archive/restore policies | P16; accepting `cold_blob` settings alone does not satisfy it |
 | Workers | P17; scheduled/event execution, language/runtime contract and sandbox behavior, not configuration CRUD alone; security/runtime event producers integrate in P27 |
@@ -124,14 +124,14 @@ itself rejects is a compatibility rule, not a missing product feature.
 | Public type(s) | Accepted classes | Native behavior owner |
 |---|---|---|
 | `docker`, `oci`, `helmoci`, `go`, `helm`, `maven`, `gradle`, `ivy`, `sbt`, `npm`, `nuget`, `pypi`, `terraform` | L/R/V/F | Local protocols P6–P8 and remote P9; P10 virtual metadata/item resolution and family DDR flows implemented ([evidence](../operations/virtual-repositories.md#family-evidence)); peer federation P13, remaining protocol gaps P28 |
-| `terraformbackend` | L | P8 state service; remaining applicable APIs P28 |
+| `terraformbackend` | L | P8 state service; remaining applicable APIs P28. Not federated: 7.x excludes it ([research 40](../research/40-federated-repositories-7x.md#4-package-types)) |
 | `generic` | L/R/V/F | P3 storage, P9 HTTP remote retrieval and P10 ordered virtual fetch/DDR/browse implemented; peer federation P13 |
-| `releasebundles` | L/F | P15; v2 workflows P24 |
+| `releasebundles` | L/F | P15; v2 workflows P24; outside P13's federation exit until P15 implements the local type |
 | `alpine` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `debian` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `rpm` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `opkg` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
-| `cargo` | L/R/F | P9c; verify the documented federation workaround separately |
+| `cargo` | L/R/F | P9c; verify the documented federation workaround separately; peer federation P13 |
 | `composer` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `gems` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `pub` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
@@ -151,7 +151,7 @@ itself rejects is a compatibility rule, not a missing product feature.
 | `ansible` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `chef` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `puppet` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
-| `vagrant` | L/F | P9c #785: native metadata, verified boxes and Vagrant client proof; [guide](../testing/vagrant.md) |
+| `vagrant` | L/F | P9c #785: native metadata, verified boxes and Vagrant client proof; [guide](../testing/vagrant.md); peer federation P13 |
 | `vcs` | R | P9c |
 | `gitlfs` | L/R/V/F | P9c protocol; P10 shared virtual walk ([current mechanism/evidence](package-format-matrix.md)); peer federation P13 where accepted |
 | `nix` | L/R/V/F; signed binary cache native proof | P9c #788 |
