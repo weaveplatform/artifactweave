@@ -230,8 +230,10 @@ func dropAnswer(method, prefix string, n *atomic.Int32) func(http.ResponseWriter
 	}
 }
 
-const eventsPath = "/artifactweave/peer/v1/streams/"
-const blobsPath = "/artifactweave/peer/v1/blobs/"
+const (
+	eventsPath = "/artifactweave/peer/v1/streams/"
+	blobsPath  = "/artifactweave/peer/v1/blobs/"
+)
 
 func testStreams(t *testing.T, driver string, dsn func() string) {
 	t.Run("push", func(t *testing.T) {

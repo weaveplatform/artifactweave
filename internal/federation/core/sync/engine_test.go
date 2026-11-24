@@ -338,12 +338,19 @@ func TestUnitFailedFetchAdvancesAndRetryPublishes(t *testing.T) {
 			if len(failed) != 1 || failed[0].SHA256 != sum || failed[0].LastError == "" {
 				t.Fatalf("failed fetches %+v", failed)
 			}
+			w.faults = faults{down: map[string]bool{}}
 			if fault == "size" {
-				// The entry's size is wrong for good; the retry cannot
-				// publish what does not match, which FED-06 lists.
+				// The entry's size is wrong for good: the retry holds the
+				// content to it too, so the item never publishes and its
+				// failed binary stays for FED-06.
+				if err := b.engine.RetryFetch(t.Context(), stream, sum); err == nil {
+					t.Fatal("content of another size than its entry published")
+				}
+				if !b.state(a).Items["f"].Pending || len(b.failed()) != 1 {
+					t.Fatalf("item %+v, failed %+v", b.state(a).Items["f"], b.failed())
+				}
 				return
 			}
-			w.faults = faults{down: map[string]bool{}}
 			b.run(streamsync.FetchKind)
 			if it := b.state(a).Items["f"]; it.Pending {
 				t.Fatalf("item %+v, want published", it)

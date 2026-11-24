@@ -83,7 +83,7 @@ func (e *Engine) RetryFetch(ctx context.Context, stream, sha256 string) error {
 	if !hasFailure(failed, sha256) {
 		return nil
 	}
-	waiting, err := k.Pending(ctx, stream, sha256)
+	size, waiting, err := k.Pending(ctx, stream, sha256)
 	if err != nil {
 		return fmt.Errorf("items of %s pending %s: %w", stream, sha256, err)
 	}
@@ -106,9 +106,9 @@ func (e *Engine) RetryFetch(ctx context.Context, stream, sha256 string) error {
 			from = append(from, p)
 		}
 	}
-	// The failed binary keeps no size: the SHA-256 the store's commit
-	// checks is what identifies the content.
-	held, reason, err := e.ensureBlob(ctx, from, sha256, -1)
+	// The item's entry gave the size: a retry holds the content to it as
+	// the first fetch did, so content of another size never publishes.
+	held, reason, err := e.ensureBlob(ctx, from, sha256, size)
 	if err != nil {
 		return err
 	}

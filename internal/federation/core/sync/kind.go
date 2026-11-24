@@ -41,9 +41,10 @@ type Applier interface {
 	// deleted or replaced meanwhile, which stay as that entry left them.
 	Publish(ctx context.Context, stream, sha256 string) error
 	// Pending reports whether an item of stream still waits for the blob
-	// sha256. None does once later entries have deleted or replaced every
-	// item that did, and the failed binary is then cleared unfetched.
-	Pending(ctx context.Context, stream, sha256 string) (bool, error)
+	// sha256, and the size its entry gave, which the fetch holds the
+	// content to. None waits once later entries have deleted or replaced
+	// every item that did, and the failed binary is then cleared unfetched.
+	Pending(ctx context.Context, stream, sha256 string) (size int64, ok bool, err error)
 }
 
 // Kind is a family of streams: repo:<key> for a federated repository

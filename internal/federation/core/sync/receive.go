@@ -155,21 +155,18 @@ func (e *Engine) ensureBlob(ctx context.Context, from []model.Peer, sha256 strin
 }
 
 // fetch streams one peer's blob into the blob store. The store's commit
-// checks the SHA-256, and fetch the size when it is not negative, before
-// committing, so content that is corrupt, truncated or another size than
-// the entry says is never stored.
+// checks the SHA-256 and fetch the size before committing, so content
+// that is corrupt, truncated or another size than the entry says is never
+// stored.
 func (e *Engine) fetch(ctx context.Context, p model.Peer, sha256 string, size int64) error {
 	return e.Remote.FetchBlob(ctx, p, sha256, func(r io.Reader) error { //nolint:wrapcheck // the remote names the peer and the blob
 		up, err := e.Blobs.BeginUpload(ctx)
 		if err != nil {
 			return fmt.Errorf("begin blob %s: %w", sha256, err)
 		}
-		if size >= 0 {
-			// One byte past the size is enough to tell that it is longer.
-			r = io.LimitReader(r, size+1)
-		}
-		n, err := up.Append(ctx, r)
-		if err == nil && size >= 0 && n != size {
+		// One byte past the size is enough to tell that it is longer.
+		n, err := up.Append(ctx, io.LimitReader(r, size+1))
+		if err == nil && n != size {
 			err = fmt.Errorf("%w: blob %s has %d bytes, not the %d its entry gives", errSize, sha256, n, size)
 		}
 		if err == nil {

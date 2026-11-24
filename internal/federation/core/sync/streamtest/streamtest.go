@@ -46,6 +46,7 @@ type Store interface {
 type Item struct {
 	Value   string `json:"value,omitempty"`
 	SHA256  string `json:"sha256,omitempty"`
+	Size    int64  `json:"size,omitempty"`
 	Pending bool   `json:"pending,omitempty"`
 }
 
@@ -158,7 +159,7 @@ func (k *Kind) Apply(ctx context.Context, e outbox.OutboxEntry, held bool) error
 		s.Applied = append(s.Applied, strconv.FormatInt(e.Seq, 10))
 		switch e.EventType {
 		case Put:
-			s.Items[p.Key] = Item{Value: p.Value, SHA256: e.BlobSHA256, Pending: !held}
+			s.Items[p.Key] = Item{Value: p.Value, SHA256: e.BlobSHA256, Size: e.BlobSize, Pending: !held}
 		case Delete:
 			delete(s.Items, p.Key)
 		}
@@ -192,22 +193,24 @@ func (k *Kind) Publish(ctx context.Context, stream, sha256 string) error {
 }
 
 // Pending reports whether an item of stream, of any origin, still waits
-// for the content.
-func (k *Kind) Pending(ctx context.Context, stream, sha256 string) (bool, error) {
-	return k.find(ctx, stream, func(it Item) bool { return it.Pending && it.SHA256 == sha256 })
+// for the content, and the size its entry gave.
+func (k *Kind) Pending(ctx context.Context, stream, sha256 string) (int64, bool, error) {
+	it, ok, err := k.find(ctx, stream, func(it Item) bool { return it.Pending && it.SHA256 == sha256 })
+	return it.Size, ok, err
 }
 
 // References reports whether a visible item of stream, of any origin, has
 // the content.
 func (k *Kind) References(ctx context.Context, stream, sha256 string) (bool, error) {
-	return k.find(ctx, stream, func(it Item) bool { return !it.Pending && it.SHA256 == sha256 })
+	_, ok, err := k.find(ctx, stream, func(it Item) bool { return !it.Pending && it.SHA256 == sha256 })
+	return ok, err
 }
 
-// find reports whether an item of stream, of any origin, matches.
-func (k *Kind) find(ctx context.Context, stream string, match func(Item) bool) (bool, error) {
+// find returns an item of stream, of any origin, that matches.
+func (k *Kind) find(ctx context.Context, stream string, match func(Item) bool) (Item, bool, error) {
 	keys, err := k.Store.Settings().Keys(ctx)
 	if err != nil {
-		return false, fmt.Errorf("streamtest keys: %w", err)
+		return Item{}, false, fmt.Errorf("streamtest keys: %w", err)
 	}
 	for _, sk := range keys {
 		origin, ok := strings.CutPrefix(sk, key(stream, ""))
@@ -216,15 +219,15 @@ func (k *Kind) find(ctx context.Context, stream string, match func(Item) bool) (
 		}
 		s, err := k.State(ctx, stream, origin)
 		if err != nil {
-			return false, err
+			return Item{}, false, err
 		}
 		for _, it := range s.Items {
 			if match(it) {
-				return true, nil
+				return it, true, nil
 			}
 		}
 	}
-	return false, nil
+	return Item{}, false, nil
 }
 
 // Change is one change a test makes on the origin.

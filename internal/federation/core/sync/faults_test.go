@@ -259,9 +259,9 @@ func (k faultKind) References(ctx context.Context, s, sha256 string) (bool, erro
 	return k.Kind.References(ctx, s, sha256) //nolint:wrapcheck // passed through
 }
 
-func (k faultKind) Pending(ctx context.Context, s, sha256 string) (bool, error) {
+func (k faultKind) Pending(ctx context.Context, s, sha256 string) (int64, bool, error) {
 	if err := k.f.check("Kind.Pending"); err != nil {
-		return false, err
+		return 0, false, err
 	}
 	return k.Kind.Pending(ctx, s, sha256) //nolint:wrapcheck // passed through
 }
