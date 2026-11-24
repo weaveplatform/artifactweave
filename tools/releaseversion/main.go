@@ -185,7 +185,9 @@ func markerProblems(root, version string) ([]string, error) {
 		}
 		content, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			problems = append(problems, err.Error())
+			// Name the file as the config does: the OS error carries a native
+			// path, which on Windows has no forward slashes to match.
+			problems = append(problems, fmt.Sprintf("%s, listed in extra-files: %v", path, err))
 			continue
 		}
 		for i, line := range strings.Split(string(content), "\n") {
