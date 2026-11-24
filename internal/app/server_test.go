@@ -420,23 +420,25 @@ func TestAccStubsAndEnvelopes(t *testing.T) {
 			`{"code":501,"message":"not implemented by artifactweave yet"}`,
 		},
 		// The peer API takes /grid's flat envelope, under its own prefix
-		// only: the rest of /artifactweave/ keeps the default.
-		// Without its signed headers a peer operation is refused by the
-		// generated binder; TestAccPeerOperationsAnswer501AtStartUp sends
-		// them and gets the 501.
+		// only: the rest of /artifactweave/ keeps the default. Every
+		// request under the prefix meets the signature check before
+		// routing (decision 0021, Transport), so an unsigned one learns
+		// neither which operations exist nor how they bind; one without a
+		// protocol version is refused first.
+		// TestAccPeerOperationsSignedBetweenInstances signs them.
 		{
 			"peer operation without its headers",
 			"GET",
 			"/artifactweave/peer/v1/status",
 			400,
-			`{"code":"BAD_REQUEST","message":"Header parameter Artifactweave-Peer-Protocol is required, but not found"}`,
+			`{"code":"BAD_REQUEST","message":"Artifactweave-Peer-Protocol must be <major>.<minor>"}`,
 		},
 		{
 			"peer unknown path",
 			"GET",
 			"/artifactweave/peer/v1/nothing",
-			404,
-			`{"code":"NOT_FOUND","message":"not found: GET /artifactweave/peer/v1/nothing"}`,
+			400,
+			`{"code":"BAD_REQUEST","message":"Artifactweave-Peer-Protocol must be <major>.<minor>"}`,
 		},
 		{
 			"artifactweave outside peer",

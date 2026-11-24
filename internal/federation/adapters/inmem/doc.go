@@ -28,6 +28,7 @@
 //
 //   - The rows live in tables of the shared memtx.Store under the SQL
 //     tables' names (replications, replication_runs, peers, pairing_nonces,
+//     peer_request_nonces,
 //     federation_members, full_sync_runs, access_federation_targets,
 //     platform_federations and topologies), so every call joins the
 //     transaction that the caller's context carries, whichever module's

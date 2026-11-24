@@ -701,6 +701,7 @@ timestamps are UTC; identifiers are the wire identities above.
 | `instance` | `id PK (singleton), instance_id, public_key, private_key (sealed), namespace_id, protocol_version` | | the peer identity ([0021](decisions/0021-peer-trust-and-sync-protocol.md)) and the cold-storage namespace |
 | `peers` | `id PK, instance_id UNIQUE, base_url, public_key, protocol_version, status, last_seen_at, edge_role, display_name, city_name, country_code` | `use_cases[]` | every federation member, edge, Access Federation target, follower JPD and topology site |
 | `pairing_nonces` | `nonce_hash PK, use_case, expires_at, redeemed_at` | | single-use pairing tokens |
+| `peer_request_nonces` | `nonce_hash PK, expires_at` (indexed) | | the peer transport's replay cache ([0021](decisions/0021-peer-trust-and-sync-protocol.md)): SHA-256 of the signer's `keyid` and signature `nonce`, kept until the signature's `created` plus the 5-minute skew. A table, not memory, so a replay is refused after a restart and across nodes sharing the database. Added with PEER-03 (#1927) |
 | `outbox` | `origin, stream, seq, hlc_time, event_type, blob_sha256, blob_size, created_at`; PK `(origin, stream, seq)` | payload | written in the same transaction as the change it records |
 | `peer_cursors` | `peer_id, stream, acked_seq, last_sent_at, last_error`; PK `(peer_id, stream)` | | lag, status and pruning |
 | `applied_markers` | `origin, stream, last_seq`; PK `(origin, stream)` | | idempotent apply on the receiver |

@@ -3,8 +3,11 @@ package storetest
 import (
 	"context"
 	"crypto/ed25519"
+	"errors"
 	"fmt"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
@@ -20,6 +23,9 @@ import (
 func runPeers(t *testing.T, newStore Factory) {
 	t.Run("Peers", func(t *testing.T) { testPeers(t, newStore(t)) })
 	t.Run("PairingNonces", func(t *testing.T) { testPairingNonces(t, newStore(t)) })
+	t.Run("PeerProtocolVersion", func(t *testing.T) { testPeerProtocolVersion(t, newStore(t)) })
+	t.Run("RequestNonces", func(t *testing.T) { testRequestNonces(t, newStore(t)) })
+	t.Run("RequestNoncesConcurrent", func(t *testing.T) { testRequestNoncesConcurrent(t, newStore(t)) })
 	t.Run("FederationMembers", func(t *testing.T) { testFederationMembers(t, newStore(t)) })
 	t.Run("FullSyncs", func(t *testing.T) { testFullSyncs(t, newStore(t)) })
 	t.Run("AccessTargets", func(t *testing.T) { testAccessTargets(t, newStore(t)) })
@@ -167,6 +173,82 @@ func testPeers(t *testing.T, s port.Store) {
 		"List":   func(ctx context.Context) error { _, err := ps.List(ctx, port.PeerFilter{}); return err },
 		"Delete": func(ctx context.Context) error { return ps.Delete(ctx, again.InstanceID) },
 	})
+}
+
+// testPeerProtocolVersion records the major version a peer last sent and
+// leaves the rest of its record as it was (decision 0021, Versioning).
+func testPeerProtocolVersion(t *testing.T, s port.Store) {
+	ctx := context.Background()
+	ps := s.Peers()
+	storekit.WantErr(t, ps.SetProtocolVersion(ctx, peerID(1), 2), kernel.ErrNotFound)
+	p := peer(1, model.UseFederation)
+	storekit.Must(t, ps.Put(ctx, p))
+	storekit.Must(t, ps.SetProtocolVersion(ctx, p.InstanceID, 2))
+	want := p
+	want.ProtocolVersion = 2
+	storekit.Same(t, "Get after SetProtocolVersion", want, storekit.Get[model.Peer](t)(ps.Get(ctx, p.InstanceID)))
+	failsCancelled(t, map[string]func(context.Context) error{
+		"SetProtocolVersion": func(ctx context.Context) error { return ps.SetProtocolVersion(ctx, p.InstanceID, 1) },
+	})
+}
+
+// testRequestNonces covers the replay cache of signed peer requests: a live
+// entry refuses its hash, an expired one is replaced, and pruning removes
+// only expired entries.
+func testRequestNonces(t *testing.T, s port.Store) {
+	ctx := context.Background()
+	rn := s.RequestNonces()
+	a, b := []byte{0x01, 0xaa}, []byte{0x02, 0xbb}
+	storekit.Must(t, rn.Remember(ctx, a, storekit.At(5), storekit.At(0)))
+	storekit.Must(t, rn.Remember(ctx, b, storekit.At(20), storekit.At(0)))
+	storekit.WantErr(t, rn.Remember(ctx, a, storekit.At(9), storekit.At(4)), kernel.ErrConflict)
+	// At its expiry the entry no longer refuses, and the new one replaces it.
+	storekit.Must(t, rn.Remember(ctx, a, storekit.At(10), storekit.At(5)))
+	storekit.WantErr(t, rn.Remember(ctx, a, storekit.At(12), storekit.At(9)), kernel.ErrConflict)
+
+	n := storekit.Get[int64](t)(rn.Prune(ctx, storekit.At(10)))
+	if n != 0 {
+		t.Errorf("Prune before every expiry removed %d", n)
+	}
+	if n = storekit.Get[int64](t)(rn.Prune(ctx, storekit.At(11))); n != 1 {
+		t.Errorf("Prune removed %d, want the one expired entry", n)
+	}
+	storekit.Must(t, rn.Remember(ctx, a, storekit.At(15), storekit.At(11)))
+	storekit.WantErr(t, rn.Remember(ctx, b, storekit.At(25), storekit.At(11)), kernel.ErrConflict)
+	failsCancelled(t, map[string]func(context.Context) error{
+		"Remember": func(ctx context.Context) error { return rn.Remember(ctx, []byte{9}, storekit.At(1), storekit.At(0)) },
+		"Prune": func(ctx context.Context) error {
+			_, err := rn.Prune(ctx, storekit.At(0))
+			return err //nolint:wrapcheck // failsCancelled checks the store's own error
+		},
+	})
+}
+
+// testRequestNoncesConcurrent remembers one hash from many goroutines at
+// once: exactly one succeeds, so one signed request is accepted once.
+func testRequestNoncesConcurrent(t *testing.T, s port.Store) {
+	const n = 16
+	var (
+		wg        sync.WaitGroup
+		ok, taken atomic.Int32
+	)
+	for range n {
+		wg.Go(func() {
+			err := s.RequestNonces().Remember(context.Background(), []byte{0x42}, storekit.At(5), storekit.At(0))
+			switch {
+			case err == nil:
+				ok.Add(1)
+			case errors.Is(err, kernel.ErrConflict):
+				taken.Add(1)
+			default:
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	if ok.Load() != 1 || taken.Load() != n-1 {
+		t.Errorf("%d remembered and %d refused, want 1 and %d", ok.Load(), taken.Load(), n-1)
+	}
 }
 
 // nonce builds a pairing nonce with hash byte i expiring at minute exp.

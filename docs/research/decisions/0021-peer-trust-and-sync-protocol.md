@@ -8,7 +8,11 @@ Implementation status (2026-11-24): **planned P13**. The decision below describe
 intended behavior; generated API stubs and storage models do not implement it. The peer
 API's wire contract is specified ([PEER-01](https://github.com/weaveplatform/artifactweave/issues/1925),
 **Wire contract** below): `api/src/peer/` generates its server and client, and every
-operation answers 501 until PEER-02 to PEER-05 and FED-01 serve it.
+operation answers 501 until PEER-02 to PEER-05 and FED-01 serve it. The signed transport
+is implemented ([PEER-03](https://github.com/weaveplatform/artifactweave/issues/1927),
+**Transport** below): no request under the peer prefix reaches a handler without a
+paired peer's valid signature, except `POST /pair`, verified with the key its body
+presents.
 P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
 Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
@@ -118,6 +122,36 @@ receiver rejects unknown keys, a clock skew above five minutes and replayed nonc
 (cached for the skew window). TLS certificates are verified normally; peer signatures are
 an additional layer, not a substitute for TLS.
 
+As implemented (PEER-03, `internal/federation/core/peer` and
+`internal/federation/adapters/peer`):
+
+- A request carries one signature, labelled `peer`, with `created`, `keyid` (the
+  sender's `instance_id`), `alg="ed25519"` and a `nonce` of 24 random bytes. It covers
+  `@method`, `@target-uri`, `date` and, with a body, `content-digest` (RFC 9530,
+  `sha-256` required, `sha-512` checked when present). Both `created` and `Date` must
+  be within five minutes of the receiver's clock.
+- The answer is signed with the same parameters over `@status`, `date`,
+  `content-digest` and the request's `@method`, `@target-uri` and `signature-input`
+  (each with `;req`), so an answer cannot be replayed onto another request. The client
+  refuses an answer that does not verify, whatever its status, and refusals the
+  middleware makes before it knows the caller are unsigned.
+- The replay cache is the `peer_request_nonces` table: the SHA-256 of `keyid` and
+  nonce, kept until `created` plus the skew. It survives a restart and is shared by
+  nodes on one database, so a captured request cannot be replayed after a restart or to
+  another node. The nonce is remembered only after every other check passes, so refused
+  requests cannot fill it.
+- The receiver rebuilds `@target-uri` from `X-Forwarded-Proto`, `X-Forwarded-Host` and
+  `X-Forwarded-Port` when a proxy sets them, otherwise from the connection, and the
+  request's path and query as received. A reverse proxy in front of an instance must
+  therefore keep the path and query unchanged and either keep the `Host` or forward
+  those headers; one that rewrites the path breaks verification. The peer's recorded
+  base URL is what the sender signs, so it must be the URL the proxy serves.
+- Every refusal is 401 in the flat envelope with a fixed message per cause (unknown key,
+  bad signature, missing or wrong coverage, digest mismatch, skew, replay); none echoes
+  a signature, nonce or key, and the transport logs none.
+- The client retries only operations whose `x-idempotency` is safe or natural, after a
+  connection failure, a timeout or 429, 502, 503 or 504, signing each attempt afresh.
+
 **Wire contract.** `api/src/peer/` specifies the peer API in its own OpenAPI document,
 version 1.0, served under `/artifactweave/peer/v1` and generated like the JFrog-facing
 services into `internal/platform/gen/peer` and `pkg/client/peer`. It has no JFrog
@@ -190,7 +224,9 @@ window so a late event cannot resurrect a deleted item.
 `Artifactweave-Peer-Protocol: <major>.<minor>`. Minor versions are additive and both sides
 ignore unknown fields and event types they do not subscribe to. A major mismatch is
 refused with 400 and recorded on the peer record, which surfaces as an unavailable member
-or an offline JPD in the status APIs.
+or an offline JPD in the status APIs. The 400 is answered whether or not the request
+verifies, but only a verified caller's version is recorded, so nobody can mark a peer
+offline by sending its `keyid`; a later compatible request clears it.
 
 ## Rationale
 
@@ -229,6 +265,8 @@ Alternatives considered:
   cannot be pushed to. A pull mode (the receiver polls `.../events?after=`) is part of the
   protocol for that case.
 - Clock skew above five minutes breaks request verification; operators run NTP.
+- A reverse proxy in front of a peer must preserve the request path and query and either
+  the `Host` or the `X-Forwarded-*` headers, or signatures stop verifying (**Transport**).
 - The outbox retention window bounds how long a peer can be offline before it needs a
   full sync; the window is configurable.
 - The protocol is not interoperable with Artifactory and is not meant to be. A 7.x
@@ -237,7 +275,10 @@ Alternatives considered:
 ## Verification
 
 - Unit tests for token issue, single use, expiry and signature checks, and for request
-  signing with replay and skew rejection.
+  signing with replay and skew rejection: RFC 9421's Ed25519 test vector, a replay race,
+  middleware refusals with no handler effect, a tampered answer refused by the client,
+  and two instances exchanging every peer operation signed
+  (`TestAccPeerOperationsSignedBetweenInstances`).
 - Handler tests for `pairings`, `pairing` (all three methods, with and without `force`),
   `revoke` and `exchange` answers and messages, and for both use cases, including a
   receiving-only peer's event batch refused with 403.
