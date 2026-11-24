@@ -371,7 +371,8 @@ func (f federationStore) MembersWithPeer(
 	return f.members(ctx, "peer", "repo_key", peer)
 }
 
-const fullSyncCols = "repo_key, peer, forced, snapshot_seq, started_at, finished_at, status, result_paths"
+const fullSyncCols = "repo_key, peer, forced, snapshot_seq, started_at, finished_at, status, result_paths, " +
+	"stream, phase, page_cursor, last_key, message"
 
 func scanFullSync(r dialect.PeersScanner) (model.FullSyncRun, error) {
 	var (
@@ -381,7 +382,8 @@ func scanFullSync(r dialect.PeersScanner) (model.FullSyncRun, error) {
 		paths             sql.NullString
 	)
 	if err := r.Scan(&run.ID, &run.RepoKey, &run.PeerInstanceID, &run.Forced, &run.SnapshotSeq,
-		&started, &finished, &status, &paths); err != nil {
+		&started, &finished, &status, &paths, &run.Stream, &run.Phase, &run.Cursor, &run.LastKey,
+		&run.Message); err != nil {
 		return run, err //nolint:wrapcheck // wrapped by the caller
 	}
 	run.Started, run.Finished, run.Status = dialect.FromMicros(
@@ -399,7 +401,7 @@ func fullSyncArgs(r model.FullSyncRun) []any {
 	return []any{
 		r.RepoKey, r.PeerInstanceID, r.Forced, r.SnapshotSeq,
 		dialect.Micros(r.Started), dialect.Micros(r.Finished), string(r.Status),
-		peersDoc(r.ResultPaths),
+		peersDoc(r.ResultPaths), r.Stream, string(r.Phase), r.Cursor, r.LastKey, r.Message,
 	}
 }
 
@@ -442,7 +444,8 @@ func (f federationStore) FullSync(ctx context.Context, id int64) (model.FullSync
 func (f federationStore) UpdateFullSync(ctx context.Context, r model.FullSyncRun) error {
 	return f.s.ExecOne(ctx, fmt.Sprintf("update full sync %d", r.ID), "UPDATE full_sync_runs SET "+
 		"repo_key = ?, peer = ?, forced = ?, snapshot_seq = ?, started_at = ?, finished_at = ?, "+
-		"status = ?, result_paths = ? WHERE id = ?", append(fullSyncArgs(r), r.ID)...)
+		"status = ?, result_paths = ?, stream = ?, phase = ?, page_cursor = ?, last_key = ?, message = ? WHERE id = ?",
+		append(fullSyncArgs(r), r.ID)...)
 }
 
 func (f federationStore) FullSyncs(

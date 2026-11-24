@@ -51,10 +51,21 @@ type Item struct {
 }
 
 // State is what an instance holds of one origin's stream: every entry it
-// applied, in the order applied as "<seq>", and the items.
+// applied, in the order applied as "<seq>", and the items. Stamps holds,
+// for every key ever changed, the clock time and origin of its last
+// change, and whether that change deleted it: the tombstones a snapshot
+// carries.
 type State struct {
-	Applied []string        `json:"applied,omitempty"`
-	Items   map[string]Item `json:"items,omitempty"`
+	Applied []string         `json:"applied,omitempty"`
+	Items   map[string]Item  `json:"items,omitempty"`
+	Stamps  map[string]Stamp `json:"stamps,omitempty"`
+}
+
+// Stamp is a key's last change.
+type Stamp struct {
+	HLC     string `json:"hlc"`
+	Origin  string `json:"origin"`
+	Deleted bool   `json:"deleted,omitempty"`
 }
 
 // Kind is the test stream kind. UseCases defaults to federated-repo/* for
@@ -68,7 +79,11 @@ type Kind struct {
 	subs map[string][]string
 }
 
-var _ streamsync.Kind = (*Kind)(nil)
+var (
+	_ streamsync.Kind             = (*Kind)(nil)
+	_ streamsync.SnapshotProvider = (*Kind)(nil)
+	_ streamsync.Reconciler       = (*Kind)(nil)
+)
 
 // Name is the kind's stream prefix.
 func (*Kind) Name() string { return Name }
@@ -117,13 +132,16 @@ func (k *Kind) State(ctx context.Context, stream, origin string) (State, error) 
 	var s State
 	err := k.Store.Settings().Get(ctx, key(stream, origin), &s)
 	if errors.Is(err, kernel.ErrNotFound) {
-		return State{Items: map[string]Item{}}, nil
+		return State{Items: map[string]Item{}, Stamps: map[string]Stamp{}}, nil
 	}
 	if err != nil {
 		return State{}, fmt.Errorf("streamtest state: %w", err)
 	}
 	if s.Items == nil {
 		s.Items = map[string]Item{}
+	}
+	if s.Stamps == nil {
+		s.Stamps = map[string]Stamp{}
 	}
 	return s, nil
 }
@@ -160,8 +178,10 @@ func (k *Kind) Apply(ctx context.Context, e outbox.OutboxEntry, held bool) error
 		switch e.EventType {
 		case Put:
 			s.Items[p.Key] = Item{Value: p.Value, SHA256: e.BlobSHA256, Size: e.BlobSize, Pending: !held}
+			s.Stamps[p.Key] = Stamp{HLC: e.Time.String(), Origin: e.Origin}
 		case Delete:
 			delete(s.Items, p.Key)
+			s.Stamps[p.Key] = Stamp{HLC: e.Time.String(), Origin: e.Origin, Deleted: true}
 		}
 	})
 }
@@ -286,4 +306,88 @@ func store(ctx context.Context, blobs blob.Store, content []byte, sum string) er
 		return fmt.Errorf("streamtest blob: %w", err)
 	}
 	return nil
+}
+
+// value is a snapshot entry's payload: the item's value.
+type value struct {
+	Value string `json:"value,omitempty"`
+}
+
+// items lists the keys of origin's stream after after, in byte order, up to
+// limit, as snapshot entries; each comes from the key's stamp.
+func (k *Kind) items(ctx context.Context, origin, stream, after string, limit int) ([]model.SnapshotEntry, error) {
+	s, err := k.State(ctx, stream, origin)
+	if err != nil {
+		return nil, err
+	}
+	keys := slices.Sorted(maps.Keys(s.Stamps))
+	var out []model.SnapshotEntry
+	for _, key := range keys {
+		if key <= after {
+			continue
+		}
+		if len(out) == limit {
+			break
+		}
+		st := s.Stamps[key]
+		t, err := outbox.ParseHLC(st.HLC)
+		if err != nil {
+			return nil, fmt.Errorf("streamtest stamp of %s: %w", key, err)
+		}
+		en := model.SnapshotEntry{Key: key, Time: t, Origin: st.Origin, Deleted: st.Deleted}
+		if it, ok := s.Items[key]; ok && !st.Deleted {
+			en.Payload, _ = json.Marshal(value{Value: it.Value}) //nolint:errchkjson // a string
+			en.BlobSHA256, en.BlobSize = it.SHA256, it.Size
+		}
+		out = append(out, en)
+	}
+	return out, nil
+}
+
+// SnapshotItems lists what this instance, self, holds of its own stream:
+// the state its own changes left, which is what it sends.
+func (k *Kind) SnapshotItems(ctx context.Context, self, stream, after string, limit int) ([]model.SnapshotEntry, error) {
+	return k.items(ctx, self, stream, after, limit)
+}
+
+// LocalItems lists what this instance holds of origin's stream.
+func (k *Kind) LocalItems(ctx context.Context, origin, stream, after string, limit int) ([]model.SnapshotEntry, error) {
+	return k.items(ctx, origin, stream, after, limit)
+}
+
+// Reconcile sets the item to the snapshot entry, a tombstone deleting it.
+// It records no applied sequence: a snapshot is not an entry.
+func (k *Kind) Reconcile(ctx context.Context, origin, stream string, en model.SnapshotEntry, held bool) error {
+	var v value
+	if len(en.Payload) > 0 {
+		if err := json.Unmarshal(en.Payload, &v); err != nil {
+			return fmt.Errorf("streamtest snapshot payload: %w", err)
+		}
+	}
+	return k.update(ctx, stream, origin, func(s *State) {
+		s.Stamps[en.Key] = Stamp{HLC: en.Time.String(), Origin: en.Origin, Deleted: en.Deleted}
+		if en.Deleted {
+			delete(s.Items, en.Key)
+			return
+		}
+		s.Items[en.Key] = Item{Value: v.Value, SHA256: en.BlobSHA256, Size: en.BlobSize, Pending: !held}
+	})
+}
+
+// Discard removes the key, tombstone included.
+func (k *Kind) Discard(ctx context.Context, origin, stream, key string) error {
+	return k.update(ctx, stream, origin, func(s *State) {
+		delete(s.Items, key)
+		delete(s.Stamps, key)
+	})
+}
+
+// Diverge sets key on origin's stream on this instance directly, as no
+// entry would: a test's stand-in for what a receiver holds that its
+// origin does not, such as an item whose tombstone the origin has pruned.
+func (k *Kind) Diverge(ctx context.Context, origin, stream, key, val string, t outbox.HLC) error {
+	return k.update(ctx, stream, origin, func(s *State) {
+		s.Items[key] = Item{Value: val}
+		s.Stamps[key] = Stamp{HLC: t.String(), Origin: origin}
+	})
 }

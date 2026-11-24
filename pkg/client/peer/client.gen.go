@@ -197,7 +197,7 @@ type SnapshotEntry struct {
 	Origin string `json:"origin"`
 
 	// Payload Optional within this object. The item's state in the stream kind's form; on a repository stream, its properties and its created and modified times. Absent on a tombstone.
-	Payload *map[string]interface{} `json:"payload,omitempty"`
+	Payload *json.RawMessage `json:"payload,omitempty"`
 }
 
 // SnapshotPage One page of a snapshot of a stream's current state. Version 1.0; a later minor version may add fields, which the caller ignores.
@@ -550,7 +550,7 @@ type ClientInterface interface {
 
 	// PushEventsWithBody Push events
 	//
-	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
+	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it. While this instance resynchronises the stream from the caller from a snapshot, it applies the caller's events on it only through that full sync and answers a batch 503 with Retry-After; a batch that starts past the expected sequence answers 409 and makes this instance ask the caller whether the events in between are pruned, starting a full sync when they are.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -559,7 +559,7 @@ type ClientInterface interface {
 
 	// PushEvents Push events
 	//
-	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
+	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it. While this instance resynchronises the stream from the caller from a snapshot, it applies the caller's events on it only through that full sync and answers a batch 503 with Retry-After; a batch that starts past the expected sequence answers 409 and makes this instance ask the caller whether the events in between are pruned, starting a full sync when they are.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -568,7 +568,7 @@ type ClientInterface interface {
 
 	// GetSnapshot Read a stream snapshot
 	//
-	// Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot; the following pages continue it. Not implemented; answers 501.
+	// Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot, replacing the caller's earlier one of the stream; the following pages continue it and stay as they were at its sequence while the stream moves on. Taking a snapshot also stops this instance pushing the stream to the caller until the caller reads the events after the snapshot's sequence with GET /streams/{stream}/events, which acknowledges them. A snapshot not read for an hour is dropped.
 	//
 	// Corresponds with GET /streams/{stream}/snapshot (the `GetSnapshot` operationId).
 	GetSnapshot(ctx context.Context, stream Stream, params *GetSnapshotParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -720,7 +720,7 @@ func (c *Client) PullEvents(ctx context.Context, stream Stream, params *PullEven
 
 // PushEventsWithBody Push events
 //
-// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
+// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it. While this instance resynchronises the stream from the caller from a snapshot, it applies the caller's events on it only through that full sync and answers a batch 503 with Retry-After; a batch that starts past the expected sequence answers 409 and makes this instance ask the caller whether the events in between are pruned, starting a full sync when they are.
 //
 // Takes any type of body and a specified content type.
 //
@@ -739,7 +739,7 @@ func (c *Client) PushEventsWithBody(ctx context.Context, stream Stream, params *
 
 // PushEvents Push events
 //
-// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
+// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it. While this instance resynchronises the stream from the caller from a snapshot, it applies the caller's events on it only through that full sync and answers a batch 503 with Retry-After; a batch that starts past the expected sequence answers 409 and makes this instance ask the caller whether the events in between are pruned, starting a full sync when they are.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -758,7 +758,7 @@ func (c *Client) PushEvents(ctx context.Context, stream Stream, params *PushEven
 
 // GetSnapshot Read a stream snapshot
 //
-// Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot; the following pages continue it. Not implemented; answers 501.
+// Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot, replacing the caller's earlier one of the stream; the following pages continue it and stay as they were at its sequence while the stream moves on. Taking a snapshot also stops this instance pushing the stream to the caller until the caller reads the events after the snapshot's sequence with GET /streams/{stream}/events, which acknowledges them. A snapshot not read for an hour is dropped.
 //
 // Corresponds with GET /streams/{stream}/snapshot (the `GetSnapshot` operationId).
 func (c *Client) GetSnapshot(ctx context.Context, stream Stream, params *GetSnapshotParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1629,7 +1629,7 @@ type ClientWithResponsesInterface interface {
 
 	// PushEventsWithBodyWithResponse Push events
 	//
-	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
+	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it. While this instance resynchronises the stream from the caller from a snapshot, it applies the caller's events on it only through that full sync and answers a batch 503 with Retry-After; a batch that starts past the expected sequence answers 409 and makes this instance ask the caller whether the events in between are pruned, starting a full sync when they are.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1638,7 +1638,7 @@ type ClientWithResponsesInterface interface {
 
 	// PushEventsWithResponse Push events
 	//
-	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
+	// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it. While this instance resynchronises the stream from the caller from a snapshot, it applies the caller's events on it only through that full sync and answers a batch 503 with Retry-After; a batch that starts past the expected sequence answers 409 and makes this instance ask the caller whether the events in between are pruned, starting a full sync when they are.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1647,7 +1647,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetSnapshotWithResponse Read a stream snapshot
 	//
-	// Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot; the following pages continue it. Not implemented; answers 501.
+	// Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot, replacing the caller's earlier one of the stream; the following pages continue it and stay as they were at its sequence while the stream moves on. Taking a snapshot also stops this instance pushing the stream to the caller until the caller reads the events after the snapshot's sequence with GET /streams/{stream}/events, which acknowledges them. A snapshot not read for an hour is dropped.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2599,7 +2599,7 @@ func (c *ClientWithResponses) PullEventsWithResponse(ctx context.Context, stream
 
 // PushEventsWithBodyWithResponse Push events
 //
-// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
+// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it. While this instance resynchronises the stream from the caller from a snapshot, it applies the caller's events on it only through that full sync and answers a batch 503 with Retry-After; a batch that starts past the expected sequence answers 409 and makes this instance ask the caller whether the events in between are pruned, starting a full sync when they are.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2614,7 +2614,7 @@ func (c *ClientWithResponses) PushEventsWithBodyWithResponse(ctx context.Context
 
 // PushEventsWithResponse Push events
 //
-// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
+// Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it. While this instance resynchronises the stream from the caller from a snapshot, it applies the caller's events on it only through that full sync and answers a batch 503 with Retry-After; a batch that starts past the expected sequence answers 409 and makes this instance ask the caller whether the events in between are pruned, starting a full sync when they are.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2629,7 +2629,7 @@ func (c *ClientWithResponses) PushEventsWithResponse(ctx context.Context, stream
 
 // GetSnapshotWithResponse Read a stream snapshot
 //
-// Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot; the following pages continue it. Not implemented; answers 501.
+// Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot, replacing the caller's earlier one of the stream; the following pages continue it and stay as they were at its sequence while the stream moves on. Taking a snapshot also stops this instance pushing the stream to the caller until the caller reads the events after the snapshot's sequence with GET /streams/{stream}/events, which acknowledges them. A snapshot not read for an hour is dropped.
 //
 // Returns a wrapper object for the known response body format(s).
 //

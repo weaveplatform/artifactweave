@@ -276,7 +276,7 @@ paths:
   /streams/{stream}/events:
     post:
       description: >-
-        Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it.
+        Pushes a batch of the sender's events. This instance applies them strictly in sequence and records the highest applied sequence from the origin in the same transaction as each applied change, so a batch that is retried after it was applied changes nothing. A content event whose blob this instance does not hold is applied after the blob is fetched from the origin; when the fetch fails, the event is still applied, the content is recorded as a failed binary and fetched again with back-off, and the item appears once it arrives, unless a later event has deleted or replaced it. While this instance resynchronises the stream from the caller from a snapshot, it applies the caller's events on it only through that full sync and answers a batch 503 with Retry-After; a batch that starts past the expected sequence answers 409 and makes this instance ask the caller whether the events in between are pruned, starting a full sync when they are.
       operationId: pushEvents
       parameters:
         - $ref: '#/components/parameters/Stream'
@@ -421,7 +421,7 @@ paths:
   /streams/{stream}/snapshot:
     get:
       description: >-
-        Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot; the following pages continue it. Not implemented; answers 501.
+        Lists the current state of every item on this instance's stream, tombstones included, as of one stated sequence, for a peer that has fallen behind the outbox retention window or was asked to resync. The first request, without a cursor, takes the snapshot, replacing the caller's earlier one of the stream; the following pages continue it and stay as they were at its sequence while the stream moves on. Taking a snapshot also stops this instance pushing the stream to the caller until the caller reads the events after the snapshot's sequence with GET /streams/{stream}/events, which acknowledges them. A snapshot not read for an hour is dropped.
       operationId: getSnapshot
       parameters:
         - $ref: '#/components/parameters/Stream'
@@ -461,7 +461,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: This instance does not exchange the stream with the caller.
+          description: >-
+            This instance does not exchange the stream with the caller, or takes no snapshots of the stream's kind.
           content:
             application/json:
               schema:
@@ -890,6 +891,8 @@ components:
           additionalProperties: true
           description: >-
             Optional within this object. The item's state in the stream kind's form; on a repository stream, its properties and its created and modified times. Absent on a tombstone.
+          # Carried as the origin wrote it, as Event.payload is.
+          x-go-type: json.RawMessage
         blob:
           allOf:
             - $ref: '#/components/schemas/BlobReference'

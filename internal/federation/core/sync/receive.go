@@ -18,7 +18,11 @@ import (
 // send the stream here or b.Origin is not caller; kernel.ErrInvalid for a
 // batch whose entries are not consecutive from FromSeq; a *ConflictError
 // when FromSeq is not the sequence expected next, a batch already applied
-// included, so a retried batch changes nothing.
+// included, so a retried batch changes nothing; ErrBusy while this
+// instance resynchronises the stream from caller. A batch that starts past
+// the expected sequence also queues a probe (Resync): the caller pushes
+// from past this instance's position when the entries in between are
+// pruned, and only a full sync can bring those back.
 func (e *Engine) Receive(ctx context.Context, caller model.Peer, b Batch) (int64, error) {
 	k, err := e.authorize(ctx, caller, b.Stream, Receive)
 	if err != nil {
@@ -30,14 +34,28 @@ func (e *Engine) Receive(ctx context.Context, caller model.Peer, b Batch) (int64
 	if err := consecutive(b.FromSeq, b.Entries); err != nil {
 		return 0, err
 	}
+	self, err := e.self(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if _, busy, err := e.flagged(ctx, b.Origin, self, b.Stream); err != nil {
+		return 0, err
+	} else if busy {
+		return 0, ErrBusy
+	}
 	m, err := e.Store.Outbox().Applied(ctx, b.Origin, b.Stream)
 	if err != nil {
 		return 0, fmt.Errorf("applied position on %s: %w", b.Stream, err)
 	}
 	if b.FromSeq != m.Expect() {
+		if b.FromSeq > m.Expect() {
+			if err := e.enqueue(ctx, FullSyncKind, item{Peer: b.Origin, Stream: b.Stream}); err != nil {
+				return 0, err
+			}
+		}
 		return 0, &ConflictError{Expected: m.Expect()}
 	}
-	if err := e.apply(ctx, caller, k, b.Stream, b.Entries); err != nil {
+	if err := e.applyFrom(ctx, caller, k, b.Stream, b.Entries, false); err != nil {
 		return 0, err
 	}
 	m, err = e.Store.Outbox().Applied(ctx, b.Origin, b.Stream)
@@ -65,12 +83,19 @@ func consecutive(first int64, entries []outbox.OutboxEntry) error {
 	return nil
 }
 
-// apply applies from's entries of stream in sequence, each in its own
+// applyFrom applies from's entries of stream in sequence, each in its own
 // transaction with its applied position. A content entry's blob is fetched
 // first, outside any transaction, since no metadata transaction spans
 // network I/O; a failed fetch still applies the entry, recording a failed
-// binary and queueing its retry, so the stream moves on.
-func (e *Engine) apply(ctx context.Context, from model.Peer, k Kind, stream string, entries []outbox.OutboxEntry) error {
+// binary and queueing its retry, so the stream moves on. Unless resync, the
+// full sync's own catch-up, an entry of a stream flagged for a full sync
+// from from is refused with ErrBusy: applied after the snapshot, an entry
+// older than it would undo what the snapshot set.
+func (e *Engine) applyFrom(ctx context.Context, from model.Peer, k Kind, stream string, entries []outbox.OutboxEntry, resync bool) error {
+	self, err := e.self(ctx)
+	if err != nil {
+		return err
+	}
 	for _, en := range entries {
 		en.Origin, en.Stream = from.InstanceID, stream
 		held, reason, err := e.ensureBlob(ctx, []model.Peer{from}, en.BlobSHA256, en.BlobSize)
@@ -89,6 +114,13 @@ func (e *Engine) apply(ctx context.Context, from model.Peer, k Kind, stream stri
 			}
 			if _, err := e.regrant(ctx, from.InstanceID, stream, Receive); err != nil {
 				return err
+			}
+			if !resync {
+				if _, busy, err := e.flagged(ctx, from.InstanceID, self, stream); err != nil {
+					return err
+				} else if busy {
+					return ErrBusy
+				}
 			}
 			e.observe(en.Time)
 			if err := k.Apply(ctx, en, held); err != nil {

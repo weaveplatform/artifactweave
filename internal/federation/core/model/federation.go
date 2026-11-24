@@ -122,7 +122,10 @@ func DeriveSyncStatus(
 	return SyncSyncing
 }
 
-// FullSyncRun is one snapshot resynchronisation of a repository with a peer.
+// FullSyncRun is one snapshot resynchronisation of a stream from a peer
+// (decision 0021, Full sync): RepoKey is set for a repository's stream.
+// Phase, Cursor and LastKey are how far it has got, stored with each
+// applied page, so a run a restart interrupts resumes where it stopped.
 type FullSyncRun struct {
 	ID             int64
 	RepoKey        string
@@ -133,4 +136,25 @@ type FullSyncRun struct {
 	Finished       time.Time
 	Status         retentionapi.RunStatus
 	ResultPaths    []string
+	Stream         string
+	Phase          FullSyncPhase
+	// Cursor is the peer's next_cursor for the page after the last applied
+	// one, "" before the first page and after the last.
+	Cursor string
+	// LastKey is the key of the last applied page's last entry.
+	LastKey string
+	// Message is why the run last failed, or stopped.
+	Message string
 }
+
+// FullSyncPhase is the part of a full sync a run is in.
+type FullSyncPhase string
+
+// Full-sync phases.
+const (
+	// FullSyncSnapshot reads and applies the peer's snapshot.
+	FullSyncSnapshot FullSyncPhase = "snapshot"
+	// FullSyncStream applies the peer's entries after the snapshot's
+	// sequence, until it has caught up.
+	FullSyncStream FullSyncPhase = "stream"
+)

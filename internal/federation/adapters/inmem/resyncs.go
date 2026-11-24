@@ -29,6 +29,18 @@ func (r resyncStore) Flag(ctx context.Context, f model.StreamResync) error {
 	})
 }
 
+func (r resyncStore) Get(ctx context.Context, origin, receiver, stream string) (model.StreamResync, error) {
+	var out model.StreamResync
+	err := r.s.Do(ctx, func() error {
+		var ok bool
+		if out, ok = r.t().Get(resyncKey{origin, receiver, stream}); !ok {
+			return memtx.NotFound("stream resync", origin+" "+receiver+" "+stream)
+		}
+		return nil
+	})
+	return out, err
+}
+
 func (r resyncStore) Resyncs(ctx context.Context, instanceID string) ([]model.StreamResync, error) {
 	var out []model.StreamResync
 	err := r.s.Do(ctx, func() error {

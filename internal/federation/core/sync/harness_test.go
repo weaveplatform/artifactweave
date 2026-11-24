@@ -64,6 +64,13 @@ type world struct {
 	faults  faults
 	pushes  int
 	fetches int
+	// snapshots counts snapshot pages asked for; onSnapshot, when set, is
+	// called with each page's cursor before it is served.
+	snapshots  int
+	onSnapshot func(cursor string)
+	// onPull, when set, is called with each pull's position before it is
+	// served.
+	onPull func(after int64)
 }
 
 // faults are what the remote does wrong. Each is consumed by the call it
@@ -320,7 +327,32 @@ func (r remote) Pull(ctx context.Context, peer model.Peer, s string, after int64
 	if err != nil {
 		return streamsync.Page{}, err
 	}
+	r.w.mu.Lock()
+	hook := r.w.onPull
+	r.w.mu.Unlock()
+	if hook != nil {
+		hook(after)
+	}
 	return to.engine.Events(ctx, c, s, after, limit)
+}
+
+func (r remote) Snapshot(ctx context.Context, peer model.Peer, s, cursor string, limit int) (streamsync.SnapshotPage, error) {
+	to, err := r.target(peer)
+	if err != nil {
+		return streamsync.SnapshotPage{}, err
+	}
+	c, err := caller(to, r.from.id)
+	if err != nil {
+		return streamsync.SnapshotPage{}, err
+	}
+	r.w.mu.Lock()
+	r.w.snapshots++
+	hook := r.w.onSnapshot
+	r.w.mu.Unlock()
+	if hook != nil {
+		hook(cursor)
+	}
+	return to.engine.Snapshot(ctx, c, s, cursor, limit)
 }
 
 func (r remote) FetchBlob(ctx context.Context, peer model.Peer, sha256 string, into func(io.Reader) error) error {

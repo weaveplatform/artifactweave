@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
 )
@@ -87,9 +88,13 @@ func jsonObject(b []byte) bool {
 // batch at a time, and stores each answered position as the cursor
 // (SendKind). On 409 it resumes from the sequence the peer expects. A
 // failure is recorded on the cursor and returned, and the queue retries it
-// with back-off. A peer that pulls, has no record, is not granted the
-// stream or is behind the pruned floor is not pushed to; the last is
-// flagged for a full sync.
+// with back-off. A peer that pulls, has no record or is not granted the
+// stream is not pushed to. Nor is one flagged for a full sync: a snapshot
+// was taken for it, or it is behind the pruned floor, which flags it. Such
+// a peer is pushed only the first entry still held, which it refuses with
+// 409 and which makes it probe this instance, find the gap and resync
+// (Resync); a peer that accepts it was lined up after all, and is sent to
+// again.
 func (e *Engine) Dispatch(ctx context.Context, peerID, stream string) error {
 	p, ok, err := e.peer(ctx, peerID)
 	if err != nil || !ok || !p.Pushes() {
@@ -104,7 +109,7 @@ func (e *Engine) Dispatch(ctx context.Context, peerID, stream string) error {
 	if err != nil {
 		return err
 	}
-	for i := range runBatches {
+	for range runBatches {
 		c, err := e.cursor(ctx, peerID, stream)
 		if err != nil {
 			return err
@@ -121,14 +126,14 @@ func (e *Engine) Dispatch(ctx context.Context, peerID, stream string) error {
 			return fmt.Errorf("read %s after %d: %w", stream, c.AckedSeq, err)
 		}
 		if len(entries) == 0 || entries[0].Seq != c.AckedSeq+1 {
-			return e.flag(ctx, self, peerID, stream, c.AckedSeq)
-		}
-		if i == 0 {
-			// Lined up with the outbox again, as a full sync (PEER-05)
-			// leaves a flagged peer.
-			if err := e.Store.Resyncs().Clear(ctx, self, peerID, stream); err != nil {
-				return fmt.Errorf("clear %s's full-sync flag on %s: %w", peerID, stream, err)
+			if err := e.flag(ctx, self, peerID, stream, c.AckedSeq); err != nil {
+				return err
 			}
+			return e.notify(ctx, p, c, self, entries)
+		}
+		// The flag is read after the entries: see take.
+		if _, held, err := e.flagged(ctx, self, peerID, stream); err != nil || held {
+			return err
 		}
 		applied, err := e.Remote.Push(ctx, p, Batch{Origin: self, Stream: stream, FromSeq: c.AckedSeq + 1, Entries: entries})
 		var conflict *ConflictError
@@ -151,6 +156,36 @@ func (e *Engine) Dispatch(ctx context.Context, peerID, stream string) error {
 	}
 	// More remain: the next run continues, after any other due work.
 	return e.enqueue(ctx, SendKind, item{Peer: peerID, Stream: stream})
+}
+
+// notify pushes a peer behind the pruned floor the first entry this
+// instance still holds of c's stream. The peer refuses it with 409, since
+// it expects an earlier one, and that refusal makes it probe and resync. A
+// peer that applies it was at the floor: its cursor and flag are brought
+// up to date, and the stream is dispatched to it again. No entry is held
+// when the peer is behind only an empty stream's floor, and then there is
+// nothing to tell.
+func (e *Engine) notify(ctx context.Context, p model.Peer, c outbox.PeerCursor, self string, entries []outbox.OutboxEntry) error {
+	if len(entries) == 0 {
+		return nil
+	}
+	first := entries[:1]
+	applied, err := e.Remote.Push(ctx, p, Batch{Origin: self, Stream: c.Stream, FromSeq: first[0].Seq, Entries: first})
+	var conflict *ConflictError
+	switch {
+	case errors.As(err, &conflict), errors.Is(err, ErrBusy):
+		return nil
+	case err != nil:
+		return e.fail(ctx, c, err)
+	}
+	c.AckedSeq, c.LastSent, c.LastError = applied, e.now(), ""
+	if err := e.Store.Outbox().PutCursor(ctx, c); err != nil {
+		return fmt.Errorf("store peer %s cursor on %s: %w", c.PeerInstanceID, c.Stream, err)
+	}
+	if err := e.Store.Resyncs().Clear(ctx, self, c.PeerInstanceID, c.Stream); err != nil {
+		return fmt.Errorf("clear %s's full-sync flag on %s: %w", c.PeerInstanceID, c.Stream, err)
+	}
+	return e.enqueue(ctx, SendKind, item{Peer: c.PeerInstanceID, Stream: c.Stream})
 }
 
 // fail records err on the cursor, keeping its position, and returns it.

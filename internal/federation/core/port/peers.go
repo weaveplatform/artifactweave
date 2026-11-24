@@ -60,6 +60,9 @@ type StreamResyncStore interface {
 	// Flag records r, replacing the record of the same origin, receiver
 	// and stream.
 	Flag(ctx context.Context, r model.StreamResync) error
+	// Get returns the record of origin, receiver and stream;
+	// kernel.ErrNotFound when there is none.
+	Get(ctx context.Context, origin, receiver, stream string) (model.StreamResync, error)
 	// Resyncs returns the records whose origin or receiver is instanceID
 	// ("" for every record), ordered by origin, receiver and stream.
 	Resyncs(ctx context.Context, instanceID string) ([]model.StreamResync, error)
@@ -69,6 +72,29 @@ type StreamResyncStore interface {
 	// DeletePeer removes every record naming instanceID as origin or
 	// receiver, when the peer is removed.
 	DeletePeer(ctx context.Context, instanceID string) error
+}
+
+// SnapshotStore keeps the stream snapshots this instance has taken for its
+// receivers (decision 0021, Full sync): each a copy of a stream's items at
+// one sequence, which the receiver reads a page at a time.
+type SnapshotStore interface {
+	// CreateSnapshot stores s with its ID assigned and no entries, and
+	// removes s.Receiver's earlier snapshots of s.Stream with theirs.
+	CreateSnapshot(ctx context.Context, s model.StreamSnapshot) (model.StreamSnapshot, error)
+	// Snapshot returns one snapshot; kernel.ErrNotFound when there is none.
+	Snapshot(ctx context.Context, id int64) (model.StreamSnapshot, error)
+	// AddSnapshotEntries adds entries to snapshot id; kernel.ErrConflict
+	// when it holds an entry of the same key.
+	AddSnapshotEntries(ctx context.Context, id int64, entries []model.SnapshotEntry) error
+	// SnapshotEntries returns up to limit of snapshot id's entries whose
+	// key is after after, in byte order of key.
+	SnapshotEntries(ctx context.Context, id int64, after string, limit int) ([]model.SnapshotEntry, error)
+	// ReadSnapshot records that a page of snapshot id was served at;
+	// kernel.ErrNotFound when there is no such snapshot.
+	ReadSnapshot(ctx context.Context, id int64, at time.Time) error
+	// PruneSnapshots removes the snapshots last read, or taken and never
+	// read, before before, with their entries, and returns how many.
+	PruneSnapshots(ctx context.Context, before time.Time) (int64, error)
 }
 
 // RequestNonceStore is the replay cache of signed peer requests (decision

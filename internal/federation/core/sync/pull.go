@@ -83,9 +83,10 @@ func (e *Engine) acknowledge(ctx context.Context, peer, stream string, after int
 
 // PullFrom reads peer's entries on stream after this instance's applied
 // position and applies them, a page at a time (PullKind), for a peer this
-// instance pulls from because the peer cannot push to it. A 410 flags this
-// instance for a full sync of the stream. A peer this instance does not
-// pull from, or may not receive the stream from, is not asked.
+// instance pulls from because the peer cannot push to it. A 410 starts a
+// full sync of the stream, and a stream being resynchronised is left to
+// it. A peer this instance does not pull from, or may not receive the
+// stream from, is not asked.
 func (e *Engine) PullFrom(ctx context.Context, peerID, stream string) error {
 	p, ok, err := e.peer(ctx, peerID)
 	if err != nil || !ok || !p.Pulls() {
@@ -101,6 +102,9 @@ func (e *Engine) PullFrom(ctx context.Context, peerID, stream string) error {
 	if err != nil {
 		return err
 	}
+	if _, busy, err := e.flagged(ctx, peerID, self, stream); err != nil || busy {
+		return err
+	}
 	for range runBatches {
 		m, err := e.Store.Outbox().Applied(ctx, peerID, stream)
 		if err != nil {
@@ -108,7 +112,8 @@ func (e *Engine) PullFrom(ctx context.Context, peerID, stream string) error {
 		}
 		page, err := e.Remote.Pull(ctx, p, stream, m.LastSeq, e.batch())
 		if errors.Is(err, ErrGone) {
-			return e.flag(ctx, peerID, self, stream, m.LastSeq)
+			_, err := e.startResync(ctx, peerID, stream, false)
+			return err
 		}
 		if err != nil {
 			return fmt.Errorf("pull %s from %s: %w", stream, peerID, err)
@@ -119,7 +124,7 @@ func (e *Engine) PullFrom(ctx context.Context, peerID, stream string) error {
 		if err := consecutive(m.Expect(), page.Entries); err != nil {
 			return fmt.Errorf("pull %s from %s: %w", stream, peerID, err)
 		}
-		if err := e.apply(ctx, p, k, stream, page.Entries); err != nil {
+		if err := e.applyFrom(ctx, p, k, stream, page.Entries, false); err != nil {
 			return err
 		}
 		if page.NextAfter == 0 {
