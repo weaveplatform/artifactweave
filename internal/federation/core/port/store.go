@@ -20,6 +20,7 @@ type Store interface {
 	PullStore
 	ExecutionStore
 	Peers() PeerStore
+	RequestNonces() RequestNonceStore
 	Federation() FederationStore
 	Platform() PlatformStore
 }

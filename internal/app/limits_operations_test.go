@@ -1,7 +1,11 @@
 package app
 
 import (
+	"bytes"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"mime"
@@ -18,7 +22,11 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/inmem"
 	"github.com/weaveplatform/artifactweave/internal/app/adapters/sql/sqlite"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
+	corepeer "github.com/weaveplatform/artifactweave/internal/federation/core/peer"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/apilimit"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 )
 
 // limitedOperation is one operation of a bundled spec as the admission
@@ -164,21 +172,22 @@ func TestAccAPILimitEveryOperation(t *testing.T) {
 				admitted[want.policy]++
 				now = now.Add(time.Minute)
 				w := newItemWorld(t, false, func(c *RouterConfig) { c.RequestLimits = limits })
+				send := func(method, target string) *httptest.ResponseRecorder {
+					if strings.HasPrefix(target, peerPrefix+"/") {
+						return w.peerDo(method, target)
+					}
+					return w.do(method, target, "admin", "")
+				}
 				for range want.quota {
 					method, target := l.method, l.target
 					if spendsCredentials[l.op.OperationID] {
 						method, target = http.MethodGet, "/artifactory/api/search/spent"
 					}
-					if rec := w.do(
-						method,
-						target,
-						"admin",
-						"",
-					); rec.Code == http.StatusTooManyRequests {
+					if rec := send(method, target); rec.Code == http.StatusTooManyRequests {
 						t.Errorf("%s: refused within its quota: %s", l, rec.Body)
 					}
 				}
-				rec := w.do(l.method, l.target, "admin", "")
+				rec := send(l.method, l.target)
 				policy := fmt.Sprintf("%q;q=%d;w=60", want.policy, want.quota)
 				problems := declaredAnswer(l.op, rec)
 				switch {
@@ -312,4 +321,39 @@ func TestAccAPILimitExemptProbes(t *testing.T) {
 	if len(probes) != 9 {
 		t.Fatalf("probes %v", probes)
 	}
+}
+
+// peerDo sends a peer operation signed by a peer paired with w's store:
+// only a paired peer's request gets past peerGuard to the limiter, which
+// charges it to that peer's own budget. POST /pair presents the peer's
+// identity, as a redeem does.
+func (w *itemWorld) peerDo(method, target string) *httptest.ResponseRecorder {
+	w.t.Helper()
+	key := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{7}, ed25519.SeedSize))
+	pub, _ := key.Public().(ed25519.PublicKey)
+	const id = "jfrt@7e7e7e7e-0000-4000-8000-000000000007"
+	if _, err := w.db.Peers().Get(w.t.Context(), id); errors.Is(err, kernel.ErrNotFound) {
+		if err := w.db.Peers().Put(w.t.Context(), model.Peer{
+			InstanceID: id, BaseURL: "https://peer.example.com", PublicKey: pub,
+			ProtocolVersion: instance.ProtocolVersion,
+		}); err != nil {
+			w.t.Fatal(err)
+		}
+	}
+	var body []byte
+	if method == http.MethodPost && target == peerPrefix+"/pair" {
+		body, _ = json.Marshal(map[string]string{
+			"nonce": "n", "instance_id": id, "base_url": "https://peer.example.com",
+			"public_key": base64.StdEncoding.EncodeToString(pub), "protocol_version": "1.0",
+		})
+	}
+	r := httptest.NewRequest(method, target, bytes.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	signer := corepeer.Signer{KeyID: id, Key: key}
+	if err := signer.SignRequest(method, "http://"+r.Host+target, r.Header, body); err != nil {
+		w.t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	w.h.ServeHTTP(rec, r)
+	return rec
 }

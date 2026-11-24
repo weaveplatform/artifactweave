@@ -364,6 +364,12 @@ func TestAccUnimplementedOperationsAnswer501(t *testing.T) {
 	for _, name := range specFiles {
 		doc := loadSpec(t, name)
 		prefix := doc.Servers[0].URL
+		if prefix == peerPrefix {
+			// Only a paired peer's signed request reaches a peer operation;
+			// TestAccPeerOperationsSignedBetweenInstances sends each one
+			// signed between two running instances and gets its 501.
+			continue
+		}
 		for path, item := range doc.Paths.Map() {
 			for method, op := range item.Operations() {
 				key := method + " " + prefix + path

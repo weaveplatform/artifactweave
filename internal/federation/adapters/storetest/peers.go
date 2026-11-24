@@ -3,8 +3,11 @@ package storetest
 import (
 	"context"
 	"crypto/ed25519"
+	"errors"
 	"fmt"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
@@ -20,6 +23,10 @@ import (
 func runPeers(t *testing.T, newStore Factory) {
 	t.Run("Peers", func(t *testing.T) { testPeers(t, newStore(t)) })
 	t.Run("PairingNonces", func(t *testing.T) { testPairingNonces(t, newStore(t)) })
+	t.Run("PairingNonceRace", func(t *testing.T) { testPairingNonceRace(t, newStore(t)) })
+	t.Run("PeerProtocolVersion", func(t *testing.T) { testPeerProtocolVersion(t, newStore(t)) })
+	t.Run("RequestNonces", func(t *testing.T) { testRequestNonces(t, newStore(t)) })
+	t.Run("RequestNoncesConcurrent", func(t *testing.T) { testRequestNoncesConcurrent(t, newStore(t)) })
 	t.Run("FederationMembers", func(t *testing.T) { testFederationMembers(t, newStore(t)) })
 	t.Run("FullSyncs", func(t *testing.T) { testFullSyncs(t, newStore(t)) })
 	t.Run("AccessTargets", func(t *testing.T) { testAccessTargets(t, newStore(t)) })
@@ -85,7 +92,7 @@ func testPeers(t *testing.T, s port.Store) {
 	storekit.WantErr(t, err, kernel.ErrNotFound)
 	storekit.WantErr(t, ps.Delete(ctx, peerID(1)), kernel.ErrNotFound)
 
-	p1 := peer(1, model.UseFederation, model.UseDistribution, model.UseFederation)
+	p1 := peer(1, model.UseFederatedRepo, model.UseDistribution, model.UseFederatedRepo)
 	p2 := peer(2, model.UseDistribution)
 	p3 := peer(3)
 	for _, p := range []model.Peer{p3, p1, p2} {
@@ -93,7 +100,7 @@ func testPeers(t *testing.T, s port.Store) {
 	}
 	// Use cases are a set, returned sorted.
 	wantP1 := p1
-	wantP1.UseCases = []model.UseCase{model.UseDistribution, model.UseFederation}
+	wantP1.UseCases = []model.UseCase{model.UseDistribution, model.UseFederatedRepo}
 	got := storekit.Get[model.Peer](t)(ps.Get(ctx, p1.InstanceID))
 	storekit.Same(t, "Get", wantP1, got)
 
@@ -152,7 +159,7 @@ func testPeers(t *testing.T, s port.Store) {
 	)
 	storekit.Same(t, "List distribution after delete", []model.Peer(nil), dist)
 	// A peer put again after deletion starts with only its new use cases.
-	again := peer(2, model.UseFederation)
+	again := peer(2, model.UseFederatedRepo)
 	storekit.Must(t, ps.Put(ctx, again))
 	storekit.Same(
 		t,
@@ -169,12 +176,88 @@ func testPeers(t *testing.T, s port.Store) {
 	})
 }
 
+// testPeerProtocolVersion records the major version a peer last sent and
+// leaves the rest of its record as it was (decision 0021, Versioning).
+func testPeerProtocolVersion(t *testing.T, s port.Store) {
+	ctx := context.Background()
+	ps := s.Peers()
+	storekit.WantErr(t, ps.SetProtocolVersion(ctx, peerID(1), 2), kernel.ErrNotFound)
+	p := peer(1, model.UseFederatedRepo)
+	storekit.Must(t, ps.Put(ctx, p))
+	storekit.Must(t, ps.SetProtocolVersion(ctx, p.InstanceID, 2))
+	want := p
+	want.ProtocolVersion = 2
+	storekit.Same(t, "Get after SetProtocolVersion", want, storekit.Get[model.Peer](t)(ps.Get(ctx, p.InstanceID)))
+	failsCancelled(t, map[string]func(context.Context) error{
+		"SetProtocolVersion": func(ctx context.Context) error { return ps.SetProtocolVersion(ctx, p.InstanceID, 1) },
+	})
+}
+
+// testRequestNonces covers the replay cache of signed peer requests: a live
+// entry refuses its hash, an expired one is replaced, and pruning removes
+// only expired entries.
+func testRequestNonces(t *testing.T, s port.Store) {
+	ctx := context.Background()
+	rn := s.RequestNonces()
+	a, b := []byte{0x01, 0xaa}, []byte{0x02, 0xbb}
+	storekit.Must(t, rn.Remember(ctx, a, storekit.At(5), storekit.At(0)))
+	storekit.Must(t, rn.Remember(ctx, b, storekit.At(20), storekit.At(0)))
+	storekit.WantErr(t, rn.Remember(ctx, a, storekit.At(9), storekit.At(4)), kernel.ErrConflict)
+	// At its expiry the entry no longer refuses, and the new one replaces it.
+	storekit.Must(t, rn.Remember(ctx, a, storekit.At(10), storekit.At(5)))
+	storekit.WantErr(t, rn.Remember(ctx, a, storekit.At(12), storekit.At(9)), kernel.ErrConflict)
+
+	n := storekit.Get[int64](t)(rn.Prune(ctx, storekit.At(10)))
+	if n != 0 {
+		t.Errorf("Prune before every expiry removed %d", n)
+	}
+	if n = storekit.Get[int64](t)(rn.Prune(ctx, storekit.At(11))); n != 1 {
+		t.Errorf("Prune removed %d, want the one expired entry", n)
+	}
+	storekit.Must(t, rn.Remember(ctx, a, storekit.At(15), storekit.At(11)))
+	storekit.WantErr(t, rn.Remember(ctx, b, storekit.At(25), storekit.At(11)), kernel.ErrConflict)
+	failsCancelled(t, map[string]func(context.Context) error{
+		"Remember": func(ctx context.Context) error { return rn.Remember(ctx, []byte{9}, storekit.At(1), storekit.At(0)) },
+		"Prune": func(ctx context.Context) error {
+			_, err := rn.Prune(ctx, storekit.At(0))
+			return err //nolint:wrapcheck // failsCancelled checks the store's own error
+		},
+	})
+}
+
+// testRequestNoncesConcurrent remembers one hash from many goroutines at
+// once: exactly one succeeds, so one signed request is accepted once.
+func testRequestNoncesConcurrent(t *testing.T, s port.Store) {
+	const n = 16
+	var (
+		wg        sync.WaitGroup
+		ok, taken atomic.Int32
+	)
+	for range n {
+		wg.Go(func() {
+			err := s.RequestNonces().Remember(context.Background(), []byte{0x42}, storekit.At(5), storekit.At(0))
+			switch {
+			case err == nil:
+				ok.Add(1)
+			case errors.Is(err, kernel.ErrConflict):
+				taken.Add(1)
+			default:
+				t.Error(err)
+			}
+		})
+	}
+	wg.Wait()
+	if ok.Load() != 1 || taken.Load() != n-1 {
+		t.Errorf("%d remembered and %d refused, want 1 and %d", ok.Load(), taken.Load(), n-1)
+	}
+}
+
 // nonce builds a pairing nonce with hash byte i expiring at minute exp.
 func nonce(i, exp int) model.PairingNonce {
 	return model.PairingNonce{
 		//nolint:gosec // G115: fixture numbers are small, so the byte is the number
 		NonceHash: []byte{0xaa, byte(i), 0x00, 0xff},
-		UseCase:   model.UseFederation,
+		UseCase:   model.UseFederatedRepo,
 		ExpiresAt: storekit.At(exp),
 	}
 }
@@ -188,32 +271,109 @@ func testPairingNonces(t *testing.T, s port.Store) {
 	}
 	storekit.WantErr(t, ps.AddNonce(ctx, n1), kernel.ErrConflict)
 
-	_, err := ps.RedeemNonce(ctx, []byte{0x01}, storekit.At(0))
+	const (
+		redeemer = "jfrt@00000001-0000-4000-8000-000000000001 key-a"
+		other    = "jfrt@00000002-0000-4000-8000-000000000002 key-b"
+	)
+	_, err := ps.RedeemNonce(ctx, []byte{0x01}, redeemer, storekit.At(0))
 	storekit.WantErr(t, err, kernel.ErrNotFound)
 	// Expired: after the expiry, and at the very instant of it.
-	_, err = ps.RedeemNonce(ctx, n1.NonceHash, storekit.At(11))
+	_, err = ps.RedeemNonce(ctx, n1.NonceHash, redeemer, storekit.At(11))
 	storekit.WantErr(t, err, kernel.ErrNotFound)
-	_, err = ps.RedeemNonce(ctx, n1.NonceHash, storekit.At(10))
+	_, err = ps.RedeemNonce(ctx, n1.NonceHash, redeemer, storekit.At(10))
 	storekit.WantErr(t, err, kernel.ErrNotFound)
 
-	got := storekit.Get[model.PairingNonce](t)(ps.RedeemNonce(ctx, n2.NonceHash, storekit.At(5)))
+	got := storekit.Get[model.PairingNonce](t)(ps.RedeemNonce(ctx, n2.NonceHash, redeemer, storekit.At(5)))
 	redeemed := n2
-	redeemed.RedeemedAt = storekit.At(5)
+	redeemed.RedeemedAt, redeemed.RedeemedBy = storekit.At(5), redeemer
 	storekit.Same(t, "RedeemNonce", redeemed, got)
-	// Single use.
-	_, err = ps.RedeemNonce(ctx, n2.NonceHash, storekit.At(6))
+	// Single use: another redeemer is refused, while the one that holds it
+	// gets the same nonce back, unchanged, until it expires.
+	_, err = ps.RedeemNonce(ctx, n2.NonceHash, other, storekit.At(6))
 	storekit.WantErr(t, err, kernel.ErrConflict)
+	again := storekit.Get[model.PairingNonce](t)(ps.RedeemNonce(ctx, n2.NonceHash, redeemer, storekit.At(7)))
+	storekit.Same(t, "RedeemNonce repeated by its redeemer", redeemed, again)
+	_, err = ps.RedeemNonce(ctx, n2.NonceHash, redeemer, storekit.At(10))
+	storekit.WantErr(t, err, kernel.ErrNotFound)
+
+	// A nonce added already redeemed, the redeeming side's claim on a
+	// token, keeps its redeemer.
+	claim := nonce(4, 40)
+	claim.RedeemedAt, claim.RedeemedBy = storekit.At(1), redeemer
+	storekit.Must(t, ps.AddNonce(ctx, claim))
+	storekit.WantErr(t, ps.AddNonce(ctx, claim), kernel.ErrConflict)
+	_, err = ps.RedeemNonce(ctx, claim.NonceHash, other, storekit.At(2))
+	storekit.WantErr(t, err, kernel.ErrConflict)
+	storekit.Must(t, ps.DeleteNonce(ctx, claim.NonceHash))
+	storekit.WantErr(t, ps.DeleteNonce(ctx, claim.NonceHash), kernel.ErrNotFound)
+	storekit.Must(t, ps.AddNonce(ctx, claim))
 
 	pruned, err := ps.PruneNonces(ctx, storekit.At(20))
 	storekit.Must(t, err)
 	if pruned != 2 {
 		t.Fatalf("PruneNonces = %d, want 2", pruned)
 	}
-	_, err = ps.RedeemNonce(ctx, n2.NonceHash, storekit.At(6))
+	_, err = ps.RedeemNonce(ctx, n2.NonceHash, redeemer, storekit.At(6))
 	storekit.WantErr(t, err, kernel.ErrNotFound)
-	got = storekit.Get[model.PairingNonce](t)(ps.RedeemNonce(ctx, n3.NonceHash, storekit.At(25)))
+	got = storekit.Get[model.PairingNonce](t)(ps.RedeemNonce(ctx, n3.NonceHash, redeemer, storekit.At(25)))
 	if !got.RedeemedAt.Equal(storekit.Want(storekit.At(25))) {
 		t.Fatalf("RedeemedAt = %v", got.RedeemedAt)
+	}
+	//nolint:wrapcheck // each case checks only that the call fails
+	failsCancelled(t, map[string]func(context.Context) error{
+		"AddNonce": func(ctx context.Context) error { return ps.AddNonce(ctx, nonce(9, 90)) },
+		"RedeemNonce": func(ctx context.Context) error {
+			_, err := ps.RedeemNonce(ctx, n3.NonceHash, redeemer, storekit.At(26))
+			return err
+		},
+		"DeleteNonce": func(ctx context.Context) error { return ps.DeleteNonce(ctx, n3.NonceHash) },
+		"PruneNonces": func(ctx context.Context) error { _, err := ps.PruneNonces(ctx, storekit.At(99)); return err },
+	})
+}
+
+// testPairingNonceRace redeems one nonce from many redeemers at once, and
+// claims one token's nonce many times at once: of each, exactly one
+// succeeds and every other is refused as a conflict, the single use that a
+// pairing token's two concurrent redemptions rely on (decision 0021).
+func testPairingNonceRace(t *testing.T, s port.Store) {
+	ctx := context.Background()
+	ps := s.Peers()
+	n := nonce(5, 50)
+	storekit.Must(t, ps.AddNonce(ctx, n))
+	const racers = 8
+	redeem := make(chan error, racers)
+	claim := make(chan error, racers)
+	var wg sync.WaitGroup
+	for i := range racers {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			_, err := ps.RedeemNonce(ctx, n.NonceHash, fmt.Sprintf("redeemer-%d", i), storekit.At(1))
+			redeem <- err
+		}()
+		go func() {
+			defer wg.Done()
+			c := nonce(6, 50)
+			c.RedeemedAt, c.RedeemedBy = storekit.At(1), fmt.Sprintf("claim-%d", i)
+			claim <- ps.AddNonce(ctx, c)
+		}()
+	}
+	wg.Wait()
+	close(redeem)
+	close(claim)
+	for name, results := range map[string]chan error{"RedeemNonce": redeem, "AddNonce": claim} {
+		won := 0
+		for err := range results {
+			switch {
+			case err == nil:
+				won++
+			case !errors.Is(err, kernel.ErrConflict):
+				t.Errorf("%s: a losing racer got %v, want a conflict", name, err)
+			}
+		}
+		if won != 1 {
+			t.Errorf("%s: %d racers succeeded, want exactly 1", name, won)
+		}
 	}
 }
 

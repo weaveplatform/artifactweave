@@ -1,5 +1,6 @@
 // Package federationhttp serves single-target replication configuration,
-// enablement/global controls, durable execution and scoped status.
+// enablement/global controls, durable execution and scoped status, and the
+// service_trust pairing endpoints.
 //
 // # Role
 //
@@ -9,7 +10,9 @@
 // # Inputs
 //
 // Generated request/status DTOs, guarded configuration, the durable dispatch
-// coordinator and the current-authority status reader. Wire conversion remains
+// coordinator and the current-authority status reader; for ServiceTrustAPI,
+// the pairing service, its administrator check and the 501 stub of each
+// service_trust operation. Wire conversion remains
 // here; core services have no generated API types.
 //
 // # Outputs
@@ -22,6 +25,14 @@
 // return read-authorized durable status with 200. Admission makes no peer call;
 // per-run options are immutable and credentials are separately sealed. Explicit
 // push destinations are independent of saved configuration and never inherit credentials.
+//
+// ServiceTrustAPI serves /artifactory/api/v1/service_trust/ (pairing,
+// pairings, revoke, exchange) and POST
+// /access/api/v1/service_trust/pairing/{useCase} in 7.x's {"message"}
+// bodies: 400 with the operation's message pattern for a refusal, 500 for
+// anything else, 404 "Unknown use case" after the administrator check, and
+// 501 before it for a use case a later phase serves (model.PairingFor).
+// revoke changes nothing and exchange always answers 400 (DV-205).
 //
 // # References
 //
@@ -37,6 +48,8 @@
 //   - Context map: the federation row, restated in the module root's doc.go;
 //     https://github.com/weaveplatform/artifactweave/issues/958 holds the
 //     map.
+//   - Decision 0021: docs/research/decisions/0021-peer-trust-and-sync-protocol.md;
+//     research 40, section 5: docs/research/40-federated-repositories-7x.md.
 //   - Decision 0022: docs/research/decisions/0022-federated-repositories.md.
 //   - Decision 0025:
 //     docs/research/decisions/0025-platform-federation-and-topology.md.
@@ -49,4 +62,5 @@
 // REP-01 configuration, durable single-target status and stored-config execute
 // are implemented. One-shot overrides and advanced, event-driven
 // and checksum replication retain their separate generated/deferred owners.
+// The service_trust endpoints are implemented P13 (PEER-02, #1926).
 package federationhttp

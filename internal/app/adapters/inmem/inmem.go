@@ -239,6 +239,10 @@ func (s *Store) Executions() fedport.ExecutionProgressStore { return s.federatio
 // Peers is the federation module's peer store.
 func (s *Store) Peers() fedport.PeerStore { return s.federation.Peers() }
 
+// RequestNonces is the federation module's replay cache of signed peer
+// requests.
+func (s *Store) RequestNonces() fedport.RequestNonceStore { return s.federation.RequestNonces() }
+
 // Federation is the federation module's federated repository store.
 func (s *Store) Federation() fedport.FederationStore { return s.federation.Federation() }
 

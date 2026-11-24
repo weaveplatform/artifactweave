@@ -814,6 +814,7 @@ var apiReviewCollected = map[string]string{
 	"GET /artifactory/api/security/keypair":                                            "administrator key pairs, which the store reads whole",
 	"GET /artifactory/api/system/security/certificates":                                "administrator certificates, which the store reads whole",
 	"GET /artifactory/api/v2/repositories/batch":                                       "bounded by the repository names the request lists",
+	"GET /artifactory/api/v1/service_trust/pairings/{usecase}":                         "the instances paired for one use case, each paired by an administrator by hand, which the peer store reads whole",
 	"GET /artifactory/api/v2/security/permissions/groups/{groupName}":                  "the permissions naming one principal, which authorization reads whole for every request that principal makes",
 	"GET /artifactory/api/v2/security/permissions/users/{userName}":                    "the permissions naming one principal, which authorization reads whole for every request that principal makes",
 	"GET /artifactory/api/vcs/branches/{repoKey}/{userOrg}/{repo}":                     "the Git host's reference listing, read whole within the configured reference caps",

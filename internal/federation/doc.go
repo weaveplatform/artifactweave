@@ -1,6 +1,6 @@
-// Package federation owns guarded single-target replication configuration and
-// the bounded single-push transfer driver.
-// Peer trust, outbox delivery, federation and topology retain their later owners.
+// Package federation owns guarded single-target replication configuration,
+// the bounded single-push transfer driver and pairing between instances.
+// Outbox delivery, federation and topology retain their later owners.
 //
 // # Role
 //
@@ -26,6 +26,10 @@
 // retain admission/lease ownership. Close releases the owned target HTTP pool.
 // Caller restoration refreshes the original verified credential and current
 // permissions under the project guard, and never returns a transaction context.
+// Pairing returns the pairing service (core/pairing) over a given signed
+// transport, admitting a caller who is an administrator now; RegisterWork
+// also runs the periodic pruning of expired pairing nonces
+// (PruneNoncesKind, every PruneNoncesInterval).
 //
 // # References
 //
@@ -60,4 +64,5 @@
 // scoped evidence. Manual selection/transport overrides are sealed per run; explicit destinations need no saved row and retain independent history. Remaining
 // qualification is open. Advanced
 // federation remains P13/P14/P37. Both drivers open before the queue starts.
+// Pairing is implemented P13 (PEER-02, #1926).
 package federation

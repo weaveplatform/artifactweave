@@ -31,6 +31,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraformbackend"
 	"github.com/weaveplatform/artifactweave/internal/configuration/core/quota"
 	"github.com/weaveplatform/artifactweave/internal/federation"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/pairing"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/mirror"
@@ -81,6 +82,9 @@ type Runtime struct {
 	Artifacts *artifacts.Module
 	// Federation owns configuration and the initialized bounded single-push driver.
 	Federation *federation.Module
+	// PeerRemote is the signed peer client pairing calls other instances
+	// through; the router takes it as RouterConfig.PeerRemote.
+	PeerRemote pairing.Remote
 	// modules are the access, artifacts and configuration modules over
 	// Store, Auth and Tokens; the server is given their APIs and the
 	// artifacts module's remote sources beside them.
@@ -311,7 +315,7 @@ func OpenRuntime(
 		art.Close()
 		return nil, errors.Join(err, st.Close())
 	}
-	if err := mods.federation.RegisterWork(queue); err != nil {
+	if err := rt.openFederation(ctx, st, queue, cfg.Remote.AllowedPrivateOrigins); err != nil {
 		stop()
 		mods.federation.Close()
 		art.Close()

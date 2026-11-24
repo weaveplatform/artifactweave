@@ -69,6 +69,8 @@ import (
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/federation"
 	federationhttp "github.com/weaveplatform/artifactweave/internal/federation/adapters/http"
+	federationpeer "github.com/weaveplatform/artifactweave/internal/federation/adapters/peer"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/pairing"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/notifications"
 	notificationshttp "github.com/weaveplatform/artifactweave/internal/notifications/adapters/http"
@@ -124,6 +126,8 @@ type RouterStore interface {
 	instance.Store
 	// The receipts of the keyed operations' replay (keyed.go).
 	Replays() idempotency.ReplayStore
+	// The peer records and replay cache the peer transport verifies with.
+	PeerStore
 	// Subscription administration and its sealed handler secrets.
 	notifications.Store
 }
@@ -226,6 +230,9 @@ type RouterConfig struct {
 	// Federation owns single-replication configuration. Direct router assembly
 	// binds it over Store and Access when nil, matching runtime assembly.
 	Federation *federation.Module
+	// PeerRemote is the signed peer client pairing calls other instances
+	// through (decision 0021); nil refuses a redeem or an unpair with 500.
+	PeerRemote pairing.Remote
 	// AllowBasicAuthTokens lets a password sent with Basic create tokens
 	// through POST /access/api/v1/tokens (token.allow_basic_auth); the zero
 	// value refuses it, as Artifactory 7.x does by default.
@@ -645,6 +652,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			replicationOps.Executions = &coordinator
 		}
 	}
+	serviceTrust, pairServer := pairingAPIs(cfg)
 	logger := cfg.Logger
 	if logger == nil {
 		logger = slog.Default()
@@ -746,6 +754,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			),
 		)
 	}
+	// Ahead of routing, so nothing under the peer prefix is served without
+	// a paired peer's signature; user authentication above skips it.
+	r.Use(peerGuard(cfg.Store, time.Now))
 	// After authentication, which it needs, and ahead of routing, which
 	// cannot match it (HelmPartialReindex).
 	if cfg.Store != nil {
@@ -791,6 +802,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	cranOps.RegisterCranRoutes(r)
 	artAPI.RegisterTransferRoutes(r)
 	replicationOps.RegisterExecutionRoutes(r)
+	r.With(middleware.BodyLimit(middleware.ManagementBodyLimit)).Group(serviceTrust.RegisterRoutes)
 	debianOps.RegisterDebianSnapshotRoutes(r)
 	artAPI.RegisterStorageRoutes(r)
 	artAPI.RegisterTrashRoutes(r)
@@ -951,14 +963,16 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			},
 		)
 		// artifactweave's own peer protocol (decision 0021), beside the
-		// JFrog prefixes and outside the parity oracle; every operation
-		// answers 501 until PEER-02 to PEER-05 and FED-01 serve it.
+		// JFrog prefixes and outside the parity oracle; peerGuard verifies
+		// every request first. /pair is served (PEER-02); the other
+		// operations answer 501 until PEER-04, PEER-05 and FED-01 serve
+		// them.
 		peerOpts := peergen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		peergen.HandlerWithOptions(
-			peergen.NewStrictHandlerWithOptions(peerService{}, keyed.peer(), peerOpts),
+			peergen.NewStrictHandlerWithOptions(peerService{pair: pairServer}, keyed.peer(), peerOpts),
 			peergen.ChiServerOptions{
 				BaseURL:          peerBase,
 				BaseRouter:       g,
@@ -1334,17 +1348,6 @@ func skipsAuthentication(mounted []pkgroute.Protocol) func(*http.Request) bool {
 	}
 }
 
-// peerBase is the prefix of the peer API (decision 0021), its spec's
-// servers[0].url.
-const peerBase = "/artifactweave/peer/v1"
-
-// peerRequest reports a request to the peer API, which user authentication
-// skips. A peer proves who it is with an HTTP message signature, which the
-// peer middleware verifies (PEER-03), and carries no user credential: user
-// authentication would answer every peer 401 while anonymous access is off,
-// and run it as the anonymous user while it is on.
-func peerRequest(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, peerBase+"/") }
-
 // errorProfileFor is the profile errorProfileRules give path. Unclaimed
 // routes keep the same profile as handled requests so clients can read
 // their 404 responses.
@@ -1492,9 +1495,54 @@ type (
 	pfedService   struct{ pfedgen.UnimplementedStrict }
 	gridService   struct{ gridgen.UnimplementedStrict }
 	// peerService is the peer API's server (decision 0021); its P13
-	// tickets replace the stubs.
-	peerService struct{ peergen.UnimplementedStrict }
+	// tickets replace the stubs. pair serves /pair (PEER-02).
+	peerService struct {
+		peergen.UnimplementedStrict
+		pair federationpeer.PairServer
+	}
 )
+
+// pairingAPIs are the service_trust endpoints and the peer API's /pair
+// over one pairing service (decision 0021). Without a store the served use
+// cases answer 500, as other handlers without theirs do, and /pair keeps
+// its 501 stub.
+func pairingAPIs(cfg RouterConfig) (federationhttp.ServiceTrustAPI, federationpeer.PairServer) {
+	serviceTrust := federationhttp.ServiceTrustAPI{
+		Unimplemented: func(method, template string) http.Handler { return handwrittenStub(method, template) },
+	}
+	var pairServer federationpeer.PairServer
+	if cfg.Federation != nil {
+		if svc, err := cfg.Federation.Pairing(cfg.PeerRemote); err == nil {
+			serviceTrust.Pairing, serviceTrust.Authorize = svc, svc.Authorize
+			pairServer.Pairing = svc
+		}
+	}
+	return serviceTrust, pairServer
+}
+
+// RedeemPairing redeems a pairing nonce (PEER-02); without a pairing
+// service it keeps the 501 stub.
+func (s peerService) RedeemPairing(
+	ctx context.Context,
+	req peergen.RedeemPairingRequestObject,
+) (peergen.RedeemPairingResponseObject, error) {
+	if s.pair.Pairing == nil {
+		return s.UnimplementedStrict.RedeemPairing(ctx, req) //nolint:wrapcheck // the generated 501
+	}
+	return s.pair.RedeemPairing(ctx, req) //nolint:wrapcheck // the strict error handler renders the adapter's errors
+}
+
+// CancelPairing drops a calling peer's use case (PEER-02); without a
+// pairing service it keeps the 501 stub.
+func (s peerService) CancelPairing(
+	ctx context.Context,
+	req peergen.CancelPairingRequestObject,
+) (peergen.CancelPairingResponseObject, error) {
+	if s.pair.Pairing == nil {
+		return s.UnimplementedStrict.CancelPairing(ctx, req) //nolint:wrapcheck // the generated 501
+	}
+	return s.pair.CancelPairing(ctx, req) //nolint:wrapcheck // as RedeemPairing
+}
 
 var (
 	_ artgen.StrictServerInterface          = artifactoryServer{}

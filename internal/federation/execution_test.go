@@ -43,17 +43,17 @@ func TestUnitReplicationExecutionLifecycleRequiresBothIdleDrivers(t *testing.T) 
 	if err != nil || len(worker.Drivers) != 2 {
 		t.Fatal("both checkpoint projections were not bound", err)
 	}
-	if err := m.RegisterWork(nil); !errors.Is(err, kernel.ErrStore) {
+	if err := m.RegisterWork(t.Context(), nil); !errors.Is(err, kernel.ErrStore) {
 		t.Fatal("nil queue accepted", err)
 	}
 	queue, err := work.New(store, work.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := m.RegisterWork(queue); err != nil {
+	if err := m.RegisterWork(t.Context(), queue); err != nil {
 		t.Fatal(err)
 	}
-	if err := m.RegisterWork(queue); !errors.Is(err, work.ErrDuplicateHandler) {
+	if err := m.RegisterWork(t.Context(), queue); !errors.Is(err, work.ErrDuplicateHandler) {
 		t.Fatal("duplicate execution registration accepted", err)
 	}
 	m.Close()

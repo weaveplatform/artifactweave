@@ -24,16 +24,46 @@ type PeerStore interface {
 	List(ctx context.Context, f PeerFilter) ([]model.Peer, error)
 	// Delete removes the peer.
 	Delete(ctx context.Context, instanceID string) error
+	// SetProtocolVersion records the major protocol version the peer last
+	// sent on a verified request, leaving the rest of its record as it is;
+	// kernel.ErrNotFound when there is no such peer. A major version other
+	// than this build's marks the peer unavailable (decision 0021,
+	// Versioning).
+	SetProtocolVersion(ctx context.Context, instanceID string, major int) error
 
 	// AddNonce stores an issued pairing nonce; kernel.ErrConflict when its
 	// hash exists.
 	AddNonce(ctx context.Context, n model.PairingNonce) error
-	// RedeemNonce marks the nonce redeemed at now and returns it. A nonce is
-	// single-use: kernel.ErrNotFound when unknown or expired at now,
-	// kernel.ErrConflict when already redeemed.
-	RedeemNonce(ctx context.Context, hash []byte, now time.Time) (model.PairingNonce, error)
+	// RedeemNonce marks the nonce redeemed at now by redeemer and returns
+	// it. A nonce is single-use: kernel.ErrNotFound when unknown or expired
+	// at now, kernel.ErrConflict when another redeemer holds it. A repeat by
+	// the redeemer that holds it, before it expires, returns it unchanged,
+	// so a redeem whose answer was lost can be retried. Of concurrent
+	// redeemers exactly one succeeds.
+	RedeemNonce(
+		ctx context.Context,
+		hash []byte,
+		redeemer string,
+		now time.Time,
+	) (model.PairingNonce, error)
+	// DeleteNonce removes a nonce; kernel.ErrNotFound when there is none.
+	DeleteNonce(ctx context.Context, hash []byte) error
 	// PruneNonces removes nonces that expired before t and returns how many.
 	PruneNonces(ctx context.Context, before time.Time) (int64, error)
+}
+
+// RequestNonceStore is the replay cache of signed peer requests (decision
+// 0021, Transport). It holds a hash of each accepted request's key id and
+// nonce until the request could no longer pass the clock skew check, and
+// it is persistent, so a request accepted before a restart, or by another
+// node on the same database, is refused when replayed.
+type RequestNonceStore interface {
+	// Remember records hash until expires. kernel.ErrConflict when hash is
+	// recorded and has not expired at now; an expired entry is replaced.
+	// Of concurrent calls with one hash, exactly one succeeds.
+	Remember(ctx context.Context, hash []byte, expires, now time.Time) error
+	// Prune removes entries that expired before t and returns how many.
+	Prune(ctx context.Context, before time.Time) (int64, error)
 }
 
 // FederationStore persists federated repository membership (decision 0022)

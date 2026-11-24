@@ -166,6 +166,7 @@
       "status_pkgtest_test.go",
       "status_puppet_test.go",
       "status_reindex_test.go",
+      "status_servicetrust_test.go",
       "status_test.go",
       "stub_test.go",
       "tokens_fixture_test.go",
@@ -254,6 +255,7 @@
     "internal/federation/adapters/http": [
       "execute_boundaries_test.go",
       "replication_test.go",
+      "servicetrust_test.go",
       "status_test.go"
     ],
     "internal/notifications/adapters/http": [
@@ -406,6 +408,7 @@
       "execution_options_test.go",
       "execution_restart_test.go",
       "execution_runtime_test.go",
+      "pairing_test.go",
       "pull_catalog_test.go",
       "pull_failures_test.go",
       "pull_registry_test.go",

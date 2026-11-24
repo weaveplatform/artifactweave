@@ -168,15 +168,22 @@ func (p peerStore) Delete(ctx context.Context, instanceID string) error {
 	})
 }
 
+func (p peerStore) SetProtocolVersion(ctx context.Context, instanceID string, major int) error {
+	return p.s.ExecOne(ctx, "set peer protocol version "+instanceID,
+		"UPDATE peers SET protocol_version = ? WHERE instance_id = ?", major, instanceID)
+}
+
 func (p peerStore) AddNonce(ctx context.Context, n model.PairingNonce) error {
 	_, err := p.s.Exec(
 		ctx,
 		"add pairing nonce",
-		"INSERT INTO pairing_nonces (nonce_hash, use_case, expires_at, redeemed_at) VALUES (?, ?, ?, ?)",
+		"INSERT INTO pairing_nonces (nonce_hash, use_case, expires_at, redeemed_at, redeemed_by) "+
+			"VALUES (?, ?, ?, ?, ?)",
 		n.NonceHash,
 		string(n.UseCase),
 		dialect.Micros(n.ExpiresAt),
 		dialect.Micros(n.RedeemedAt),
+		n.RedeemedBy,
 	)
 	return err
 }
@@ -184,18 +191,21 @@ func (p peerStore) AddNonce(ctx context.Context, n model.PairingNonce) error {
 func (p peerStore) RedeemNonce(
 	ctx context.Context,
 	hash []byte,
+	redeemer string,
 	now time.Time,
 ) (model.PairingNonce, error) {
 	var out model.PairingNonce
 	err := p.s.Tx(ctx, func(ctx context.Context) error {
 		// The conditional update is the redemption: of two concurrent
-		// redeemers exactly one changes the row.
+		// redeemers exactly one changes the row, and the other then reads
+		// the winner's redeemed_by.
 		n, err := p.s.Exec(
 			ctx,
 			"redeem pairing nonce",
-			"UPDATE pairing_nonces SET redeemed_at = ? "+
+			"UPDATE pairing_nonces SET redeemed_at = ?, redeemed_by = ? "+
 				"WHERE nonce_hash = ? AND redeemed_at IS NULL AND expires_at > ?",
 			now.UnixMicro(),
+			redeemer,
 			hash,
 			now.UnixMicro(),
 		)
@@ -203,25 +213,27 @@ func (p peerStore) RedeemNonce(
 			return err
 		}
 		var exp, red sql.NullInt64
-		var use string
+		var use, by string
 		err = p.s.Q(ctx).QueryRowContext(ctx, p.s.Dialect().Rebind(
-			"SELECT use_case, expires_at, redeemed_at FROM pairing_nonces WHERE nonce_hash = ?",
+			"SELECT use_case, expires_at, redeemed_at, redeemed_by FROM pairing_nonces WHERE nonce_hash = ?",
 		), hash).
-			Scan(&use, &exp, &red)
+			Scan(&use, &exp, &red, &by)
 		if err != nil {
 			return p.s.Wrap(fmt.Sprintf("redeem pairing nonce %x", hash), err)
 		}
 		out = model.PairingNonce{
 			NonceHash: hash, UseCase: model.UseCase(use),
-			ExpiresAt: dialect.FromMicros(exp), RedeemedAt: dialect.FromMicros(red),
+			ExpiresAt: dialect.FromMicros(exp), RedeemedAt: dialect.FromMicros(red), RedeemedBy: by,
 		}
 		switch {
 		case n == 1:
 			return nil
-		case red.Valid:
-			return fmt.Errorf("pairing nonce %x already redeemed: %w", hash, kernel.ErrConflict)
-		default:
+		case !exp.Valid || exp.Int64 <= now.UnixMicro():
 			return fmt.Errorf("pairing nonce %x expired: %w", hash, kernel.ErrNotFound)
+		case red.Valid && by == redeemer:
+			return nil
+		default:
+			return fmt.Errorf("pairing nonce %x already redeemed: %w", hash, kernel.ErrConflict)
 		}
 	})
 	if err != nil {
@@ -230,9 +242,43 @@ func (p peerStore) RedeemNonce(
 	return out, nil
 }
 
+func (p peerStore) DeleteNonce(ctx context.Context, hash []byte) error {
+	return p.s.ExecOne(ctx, fmt.Sprintf("delete pairing nonce %x", hash),
+		"DELETE FROM pairing_nonces WHERE nonce_hash = ?", hash)
+}
+
 func (p peerStore) PruneNonces(ctx context.Context, before time.Time) (int64, error) {
 	return p.s.Exec(ctx, "prune pairing nonces",
 		"DELETE FROM pairing_nonces WHERE expires_at IS NULL OR expires_at < ?", before.UnixMicro())
+}
+
+// RequestNonces returns the replay cache of signed peer requests (decision
+// 0021, Transport).
+func (s *Store) RequestNonces() port.RequestNonceStore { return requestNonceStore{s} }
+
+type requestNonceStore struct{ s *Store }
+
+func (n requestNonceStore) Remember(ctx context.Context, hash []byte, expires, now time.Time) error {
+	// One statement, so two concurrent requests with one nonce cannot both
+	// insert: the second meets the first's row and updates it only when it
+	// has expired, which leaves no row changed while it is live.
+	changed, err := n.s.Exec(ctx, "remember peer request nonce",
+		"INSERT INTO peer_request_nonces (nonce_hash, expires_at) VALUES (?, ?) "+
+			"ON CONFLICT (nonce_hash) DO UPDATE SET expires_at = excluded.expires_at "+
+			"WHERE peer_request_nonces.expires_at <= ?",
+		hash, expires.UnixMicro(), now.UnixMicro())
+	if err != nil {
+		return err
+	}
+	if changed == 0 {
+		return fmt.Errorf("remember peer request nonce: %w", kernel.ErrConflict)
+	}
+	return nil
+}
+
+func (n requestNonceStore) Prune(ctx context.Context, before time.Time) (int64, error) {
+	return n.s.Exec(ctx, "prune peer request nonces",
+		"DELETE FROM peer_request_nonces WHERE expires_at < ?", before.UnixMicro())
 }
 
 // Federation returns the federated repository store: members and full

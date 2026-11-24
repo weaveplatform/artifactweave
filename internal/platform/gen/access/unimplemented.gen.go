@@ -434,10 +434,6 @@ func (UnimplementedStrict) UpdateScimUser(context.Context, UpdateScimUserRequest
 	return nil, apierror.ErrNotImplemented
 }
 
-func (UnimplementedStrict) CreatePairingToken(context.Context, CreatePairingTokenRequestObject) (CreatePairingTokenResponseObject, error) {
-	return nil, apierror.ErrNotImplemented
-}
-
 func (UnimplementedStrict) ExportAccessConfiguration(context.Context, ExportAccessConfigurationRequestObject) (ExportAccessConfigurationResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }

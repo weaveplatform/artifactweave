@@ -199,34 +199,47 @@ func (f *Factory) proxy(ctx context.Context, target model.Replication) (proxySel
 	if target.DisableProxy {
 		return proxySelection{}, nil
 	}
-	var selected configdoc.ConfigDocument
 	if target.Proxy != "" {
 		doc, err := f.store.Configs().Get(ctx, configdoc.ConfigProxy, target.Proxy)
 		if err != nil {
 			return proxySelection{}, proxyError(err)
 		}
-		selected = doc
-	} else {
-		docs, err := f.store.Configs().List(ctx, configdoc.ConfigProxy)
-		if err != nil {
-			return proxySelection{}, proxyError(err)
+		return proxyURL(doc)
+	}
+	return platformProxy(ctx, f.store.Configs())
+}
+
+// PlatformProxy is the proxy an Artifactory-service call names no proxy of
+// its own goes through: the one enabled platform default proxy serving
+// jfrt, with its NTLM identity when it has one, or nil for a direct
+// connection. The peer client uses it as single push does. Two such
+// defaults, or one that does not parse, are outbound.ErrConfiguration.
+func PlatformProxy(ctx context.Context, configs configdoc.ConfigStore) (*url.URL, *outbound.NTLMProxy, error) {
+	selected, err := platformProxy(ctx, configs)
+	return selected.url, selected.ntlm, err
+}
+
+func platformProxy(ctx context.Context, configs configdoc.ConfigStore) (proxySelection, error) {
+	docs, err := configs.List(ctx, configdoc.ConfigProxy)
+	if err != nil {
+		return proxySelection{}, proxyError(err)
+	}
+	var selected configdoc.ConfigDocument
+	for _, doc := range docs {
+		var proxy wire.ProxyConfiguration
+		if json.Unmarshal(doc.Document, &proxy) != nil {
+			return proxySelection{}, outbound.ErrConfiguration
 		}
-		for _, doc := range docs {
-			var proxy wire.ProxyConfiguration
-			if json.Unmarshal(doc.Document, &proxy) != nil {
+		if doc.Enabled && proxy.PlatformDefault && proxyService(proxy.Services) {
+			if selected.Key != "" {
 				return proxySelection{}, outbound.ErrConfiguration
 			}
-			if doc.Enabled && proxy.PlatformDefault && proxyService(proxy.Services) {
-				if selected.Key != "" {
-					return proxySelection{}, outbound.ErrConfiguration
-				}
-				selected = doc
-			}
+			selected = doc
 		}
-		if selected.Key == "" {
-			// No default selects the direct connection.
-			return proxySelection{}, nil
-		}
+	}
+	if selected.Key == "" {
+		// No default selects the direct connection.
+		return proxySelection{}, nil
 	}
 	return proxyURL(selected)
 }

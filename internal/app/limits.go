@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/adapters/http/itemkit"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/build"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/model"
+	corepeer "github.com/weaveplatform/artifactweave/internal/federation/core/peer"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/internal/platform/gen/operations"
@@ -95,6 +96,11 @@ func (s requestLimiter) limitIngress(o limitOptions) func(http.Handler) http.Han
 	}
 }
 
+// peerPrincipal prefixes a peer's instance id to name its request budget.
+// The slash keeps it apart from every user name, which identity's
+// validName refuses one in.
+const peerPrincipal = "peer/"
+
 // limitPrincipal admits an authenticated request to its principal's
 // budget and, for an expensive one, to the expensive lane.
 func (s requestLimiter) limitPrincipal(o limitOptions) func(http.Handler) http.Handler {
@@ -109,6 +115,12 @@ func (s requestLimiter) limitPrincipal(o limitOptions) func(http.Handler) http.H
 			name := "anonymous"
 			if authenticated && !p.Anonymous {
 				name = p.Name
+			}
+			// A peer carries no user credential: peerGuard has verified its
+			// signature, so its budget is its own instance's, not the
+			// anonymous user's, which every peer would otherwise share.
+			if peer, ok := corepeer.Caller(r.Context()); ok {
+				name = peerPrincipal + peer.InstanceID
 			}
 			scope := apilimit.Scope{Principal: name, Expensive: cost == costExpensive}
 			if err := s.budgetResources(r, p, &scope); err != nil {

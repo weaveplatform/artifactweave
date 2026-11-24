@@ -380,6 +380,17 @@ components:
       - status
       - locks
       type: object
+    ServiceTrustMessage:
+      description: The body of every service trust answer other than a pairing token or a pairing list, success
+        or error.
+      properties:
+        message:
+          description: Required within this object. What happened. An error names the operation first, for example
+            "Error while token pairing." followed by the reason.
+          type: string
+      required:
+      - message
+      type: object
 paths:
   /api/artifactexport/repository:
     post:
@@ -1007,16 +1018,54 @@ paths:
       x-tier: stub
       x-idempotency: safe
       x-cost: ordinary
+  /api/v1/service_trust/exchange:
+    post:
+      description: Always answers 400 with the message "Error while token exchange." and the reason. An
+        instance that holds a pairing token or a long-lived trust token would exchange it here for a token of a
+        narrower scope. Instances of this server hold no such token, since they sign their requests to each other instead (decision
+        0021), so there is nothing to exchange; a redeeming instance calls the issuing instance's peer API instead.
+        It changes nothing. Open to any caller the server admits.
+      operationId: exchangeServiceTrustToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: The exchange request. Its content is not read.
+              type: object
+        description: The exchange request. Its content is not read.
+        required: false
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: Nothing can be exchanged; the message gives the reason.
+      summary: Exchange a service trust token (not supported)
+      tags:
+      - federation
+      - handwritten
+      x-handwritten: true
+      x-idempotency: none
+      x-idempotency-reason: secret-response
+      x-cost: ordinary
   /api/v1/service_trust/pairing/{usecase}:
     delete:
-      description: Not implemented; answers 501. It would remove the trust relationship with one peer for the use
-        case and delete its stored keys, so federations that use the peer stop syncing with it. With `force=true`
-        the local trust would be removed even when the peer cannot be told. Administrators only.
+      description: 'Ends the trust with one paired instance for the use case. Run it on either instance of the pair,
+        naming the other by base_url as GET pairings lists it. This instance tells the peer, in a signed call, to drop
+        the use case, then drops it here; with `force=true` it drops it here even when the peer cannot be told. A
+        peer left with no use case is removed together with its stream positions, so federations that use it stop
+        syncing with it. Answers {"message": "Trust with service federated-repo was canceled successfully"}. A
+        missing base_url, a base URL with no trust for the use case, or a peer that cannot be told without force
+        answers 400 with "Error while cancelling token pairing." and the reason. Administrators only.'
       operationId: unregisterPairingToken
       parameters:
       - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository
-          trust or `federated-repo/r` for receive-only trust. The value contains a slash. Any other value, including
-          the `artifactory-cold` use cases, answers 404.'
+          trust or `federated-repo/r` for receiving-only trust, in which the instance that issued the token sends
+          events to the one that redeemed it and accepts none from it. The value contains a slash, sent as is or
+          percent-encoded. `platform-federation`, `access-federation`, `distribution`, `mission-control` and
+          `bridge` answer 501; any other value, including `artifactory-cold` and `artifactory-cold/<namespace>`,
+          answers 404.'
         in: path
         name: usecase
         required: true
@@ -1024,7 +1073,7 @@ paths:
           description: Use case path.
           type: string
       - description: Optional query parameter. When true, remove the local trust even if the peer is unreachable.
-          Defaults to false.
+          Defaults to false; any value other than true is false.
         in: query
         name: force
         schema:
@@ -1038,7 +1087,8 @@ paths:
               description: Which peer to unpair.
               properties:
                 base_url:
-                  description: Required within this object. Base URL of the peer to unpair.
+                  description: Required within this object. Base URL of the peer to unpair, as GET pairings lists
+                    it; a trailing slash or /artifactory is ignored.
                   type: string
               required:
               - base_url
@@ -1050,15 +1100,14 @@ paths:
           content:
             application/json:
               schema:
-                description: Trust was removed.
-                properties:
-                  message:
-                    description: Optional within this object. Confirmation.
-                    type: string
-                type: object
+                $ref: '#/components/schemas/ServiceTrustMessage'
           description: Trust was removed.
         '400':
-          $ref: '#/components/responses/AdminBadRequest'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: No base URL, no trust with that base URL for the use case, or the peer could not be told and force was not set.
         '401':
           $ref: '#/components/responses/AdminUnauthorized'
         '403':
@@ -1067,32 +1116,43 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: The use case is not supported or no trust with that peer exists.
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: 'The use case is unknown: {"message": "Unknown use case"}.'
         '500':
-          $ref: '#/components/responses/AdminInternalServerError'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: The server failed while removing the trust.
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
       summary: Remove trust with a peer
       tags:
       - federation
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/unregisterpairingtoken.md
-      x-tier: stub
       x-idempotency: none
       x-idempotency-reason: external-effect
       x-cost: expensive
     post:
-      description: 'Not implemented; answers 501. It would create a one-time pairing token for establishing trust
-        with another instance of this server (decision 0021). The token would be a signed JWT whose subject is the
-        administrator who requested it; it could be redeemed once and would expire 300 seconds after creation. An
-        administrator would hand it to the peer, which redeems it with the exchange operation; the two instances
-        would then hold each other''s keys and authenticate every sync call in both directions. The peer must be
-        another instance of this server. Administrators only.'
+      description: 'Creates a single-use pairing token for establishing trust with another instance of this server
+        for the use case (decision 0021). The token is a signed JWT naming this instance, its base URL, the
+        fingerprint of its public key, the use case and a random nonce; it can be redeemed once and expires 300
+        seconds after it is created. An unredeemed token is never cancelled; it expires. Only a hash of the nonce
+        is kept, never the token. An administrator hands it to the administrator of the other instance, who redeems
+        it there with PUT on the same use case; the two instances then hold each other''s keys and verify every sync
+        call in both directions. The token''s base URL is the configured base URL without /artifactory, or the
+        address the request reached when none is configured. The peer must be another instance of this server.
+        Administrators only.'
       operationId: generatePairingToken
       parameters:
       - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository
-          trust or `federated-repo/r` for receive-only trust. The value contains a slash. Any other value, including
-          the `artifactory-cold` use cases, answers 404.'
+          trust or `federated-repo/r` for receiving-only trust, in which the instance that issued the token sends
+          events to the one that redeemed it and accepts none from it. The value contains a slash, sent as is or
+          percent-encoded. `platform-federation`, `access-federation`, `distribution`, `mission-control` and
+          `bridge` answer 501; any other value, including `artifactory-cold` and `artifactory-cold/<namespace>`,
+          answers 404.'
         in: path
         name: usecase
         required: true
@@ -1107,8 +1167,9 @@ paths:
                 description: The pairing token.
                 properties:
                   pairing_token:
-                    description: Required within this object. The signed one-time token. It becomes invalid once
-                      exchanged or 300 seconds after creation, whichever comes first.
+                    description: Required within this object. The signed single-use token. It becomes invalid once
+                      redeemed or 300 seconds after creation, whichever comes first. Treat it as a secret until it
+                      is redeemed.
                     type: string
                 required:
                 - pairing_token
@@ -1122,29 +1183,43 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: The use case is not supported.
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: 'The use case is unknown: {"message": "Unknown use case"}.'
         '500':
-          $ref: '#/components/responses/AdminInternalServerError'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: 'The server failed while creating the token: "Error creating pairing token." and a reason.'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
       summary: Generate a pairing token
       tags:
       - federation
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md
-      x-tier: stub
       x-idempotency: none
       x-idempotency-reason: secret-response
       x-cost: expensive
     put:
-      description: Not implemented; answers 501. It would redeem a pairing token generated on the peer, completing
-        trust between the two instances for the use case. It would run on the instance that did not generate the
-        token, with the same use case. Administrators only.
+      description: 'Redeems a pairing token created on another instance of this server, completing trust between the
+        two for the use case. Run it on the instance that did not create the token, with the same use case. This
+        instance calls the issuing instance named in the token, in a call signed with its own key, and checks that
+        the issuer''s answer is signed with the key whose fingerprint the token carries; both instances then record
+        each other as peers for the use case. Answers {"message": "Trust with service federated-repo was established
+        successfully"}. A malformed, expired, already used or altered token, one issued by this instance, one
+        issued for another use case, or an issuer that cannot be reached or refuses answers 400 with "Error while
+        token pairing." and the reason; an expired token''s reason is "Attempt to pair instances with an expired
+        token". A refused token leaves no peer record on either instance. Administrators only.'
       operationId: exchangePairingToken
       parameters:
       - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository
-          trust or `federated-repo/r` for receive-only trust. The value contains a slash. Any other value, including
-          the `artifactory-cold` use cases, answers 404.'
+          trust or `federated-repo/r` for receiving-only trust, in which the instance that issued the token sends
+          events to the one that redeemed it and accepts none from it. The value contains a slash, sent as is or
+          percent-encoded. `platform-federation`, `access-federation`, `distribution`, `mission-control` and
+          `bridge` answer 501; any other value, including `artifactory-cold` and `artifactory-cold/<namespace>`,
+          answers 404.'
         in: path
         name: usecase
         required: true
@@ -1170,19 +1245,14 @@ paths:
           content:
             application/json:
               schema:
-                description: Trust was established.
-                properties:
-                  message:
-                    description: Optional within this object. Confirmation.
-                    type: string
-                type: object
+                $ref: '#/components/schemas/ServiceTrustMessage'
           description: Trust was established.
         '400':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: The token is malformed, expired, already used or was issued for another use case.
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: The token was refused or the issuer could not complete the pairing; the message gives the reason.
         '401':
           $ref: '#/components/responses/AdminUnauthorized'
         '403':
@@ -1191,17 +1261,133 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: The use case is not supported.
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: 'The use case is unknown: {"message": "Unknown use case"}.'
         '500':
-          $ref: '#/components/responses/AdminInternalServerError'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: The server failed while recording the trust.
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
       summary: Exchange a pairing token
       tags:
       - federation
       - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/exchangepairingtoken.md
-      x-tier: stub
       x-idempotency: none
       x-idempotency-reason: external-effect
+      x-cost: expensive
+  /api/v1/service_trust/pairings/{usecase}:
+    get:
+      description: Lists the instances this one is paired with for the use case, one {"base_url"} each, in no
+        particular order; an empty array when there are none. Each base URL is the one the peer is reached at,
+        without /artifactory. Administrators only.
+      operationId: listPairings
+      parameters:
+      - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository
+          trust or `federated-repo/r` for receiving-only trust, in which the instance that issued the token sends
+          events to the one that redeemed it and accepts none from it. The value contains a slash, sent as is or
+          percent-encoded. `platform-federation`, `access-federation`, `distribution`, `mission-control` and
+          `bridge` answer 501; any other value, including `artifactory-cold` and `artifactory-cold/<namespace>`,
+          answers 404.'
+        in: path
+        name: usecase
+        required: true
+        schema:
+          description: Use case path.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The paired instances.
+                items:
+                  description: One paired instance.
+                  properties:
+                    base_url:
+                      description: Required within this object. Base URL of the paired instance.
+                      type: string
+                  required:
+                  - base_url
+                  type: object
+                type: array
+          description: The paired instances.
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: 'The use case is unknown: {"message": "Unknown use case"}.'
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: 'The server failed while listing: "Error getting list of pairing tokens." and a reason.'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: List paired instances
+      tags:
+      - federation
+      - handwritten
+      x-handwritten: true
+      x-idempotency: safe
+      x-cost: ordinary
+      x-pagination: complete
+      x-pagination-next: none
+  /api/v1/service_trust/revoke/{usecase}:
+    delete:
+      description: 'Answers {"message": "Token was successfully revoked"} and changes nothing. A paired
+        instance that holds a trust token would call it to revoke that token; instances of this server hold none, since they
+        sign their requests instead (decision 0021), so there is nothing to revoke. To end a trust, use DELETE
+        pairing on either instance. Administrators only.'
+      operationId: revokeServiceTrustToken
+      parameters:
+      - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository
+          trust or `federated-repo/r` for receiving-only trust, in which the instance that issued the token sends
+          events to the one that redeemed it and accepts none from it. The value contains a slash, sent as is or
+          percent-encoded. `platform-federation`, `access-federation`, `distribution`, `mission-control` and
+          `bridge` answer 501; any other value, including `artifactory-cold` and `artifactory-cold/<namespace>`,
+          answers 404.'
+        in: path
+        name: usecase
+        required: true
+        schema:
+          description: Use case path.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: Nothing was held, so nothing was revoked.
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTrustMessage'
+          description: 'The use case is unknown: {"message": "Unknown use case"}.'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: Revoke a service trust token
+      tags:
+      - federation
+      - handwritten
+      x-handwritten: true
+      x-idempotency: natural
+      x-idempotency-natural:
+      - path:usecase
       x-cost: expensive

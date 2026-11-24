@@ -673,6 +673,7 @@ column pairing_nonces.nonce_hash bytea NOT NULL
 column pairing_nonces.use_case text NOT NULL
 column pairing_nonces.expires_at bigint
 column pairing_nonces.redeemed_at bigint
+column pairing_nonces.redeemed_by text NOT NULL DEFAULT ''::text
 constraint pairing_nonces.pairing_nonces_pkey PRIMARY KEY (nonce_hash)
 index pairing_nonces.pairing_nonces_expires CREATE INDEX pairing_nonces_expires ON pairing_nonces USING btree (expires_at)
 index pairing_nonces.pairing_nonces_pkey CREATE UNIQUE INDEX pairing_nonces_pkey ON pairing_nonces USING btree (nonce_hash)
@@ -684,6 +685,12 @@ column peer_cursors.last_sent_at bigint
 column peer_cursors.last_error text NOT NULL DEFAULT ''::text
 constraint peer_cursors.peer_cursors_pkey PRIMARY KEY (peer, stream)
 index peer_cursors.peer_cursors_pkey CREATE UNIQUE INDEX peer_cursors_pkey ON peer_cursors USING btree (peer, stream)
+table peer_request_nonces
+column peer_request_nonces.nonce_hash bytea NOT NULL
+column peer_request_nonces.expires_at bigint NOT NULL
+constraint peer_request_nonces.peer_request_nonces_pkey PRIMARY KEY (nonce_hash)
+index peer_request_nonces.peer_request_nonces_expires CREATE INDEX peer_request_nonces_expires ON peer_request_nonces USING btree (expires_at)
+index peer_request_nonces.peer_request_nonces_pkey CREATE UNIQUE INDEX peer_request_nonces_pkey ON peer_request_nonces USING btree (nonce_hash)
 table peer_use_cases
 column peer_use_cases.peer text COLLATE "C" NOT NULL
 column peer_use_cases.use_case text COLLATE "C" NOT NULL

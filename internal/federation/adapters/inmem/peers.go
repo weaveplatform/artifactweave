@@ -18,6 +18,7 @@ import (
 const (
 	tPeers         = "peers"
 	tPairingNonces = "pairing_nonces"
+	tRequestNonces = "peer_request_nonces"
 	tFedMembers    = "federation_members"
 	tFullSyncs     = "full_sync_runs"
 	tAccessTargets = "access_federation_targets"
@@ -92,6 +93,18 @@ func (p peerStore) Delete(ctx context.Context, instanceID string) error {
 	})
 }
 
+func (p peerStore) SetProtocolVersion(ctx context.Context, instanceID string, major int) error {
+	return p.s.Do(ctx, func() error {
+		peer, ok := p.t().Get(instanceID)
+		if !ok {
+			return memtx.NotFound("peer", instanceID)
+		}
+		peer.ProtocolVersion = major
+		p.t().Put(instanceID, peer)
+		return nil
+	})
+}
+
 func (p peerStore) AddNonce(ctx context.Context, n model.PairingNonce) error {
 	return p.s.Do(ctx, func() error {
 		k := string(n.NonceHash)
@@ -106,6 +119,7 @@ func (p peerStore) AddNonce(ctx context.Context, n model.PairingNonce) error {
 func (p peerStore) RedeemNonce(
 	ctx context.Context,
 	hash []byte,
+	redeemer string,
 	now time.Time,
 ) (model.PairingNonce, error) {
 	var out model.PairingNonce
@@ -114,17 +128,29 @@ func (p peerStore) RedeemNonce(
 		switch {
 		case !ok:
 			return memtx.NotFound("pairing nonce", fmt.Sprintf("%x", hash))
-		case !n.RedeemedAt.IsZero():
-			return memtx.Conflict("pairing nonce already redeemed", fmt.Sprintf("%x", hash))
 		case !kernel.Normalise(now).Before(n.ExpiresAt):
 			return memtx.NotFound("pairing nonce expired", fmt.Sprintf("%x", hash))
+		case !n.RedeemedAt.IsZero() && n.RedeemedBy == redeemer:
+			out = n
+			return nil
+		case !n.RedeemedAt.IsZero():
+			return memtx.Conflict("pairing nonce already redeemed", fmt.Sprintf("%x", hash))
 		}
-		n.RedeemedAt = now
+		n.RedeemedAt, n.RedeemedBy = now, redeemer
 		p.nonces().Put(string(hash), n)
 		out, _ = p.nonces().Get(string(hash))
 		return nil
 	})
 	return out, err
+}
+
+func (p peerStore) DeleteNonce(ctx context.Context, hash []byte) error {
+	return p.s.Do(ctx, func() error {
+		if !p.nonces().Del(string(hash)) {
+			return memtx.NotFound("pairing nonce", fmt.Sprintf("%x", hash))
+		}
+		return nil
+	})
 }
 
 func (p peerStore) PruneNonces(ctx context.Context, before time.Time) (int64, error) {
@@ -137,6 +163,36 @@ func (p peerStore) PruneNonces(ctx context.Context, before time.Time) (int64, er
 		return nil
 	})
 	return n, err
+}
+
+// RequestNonces returns the replay cache of signed peer requests (decision
+// 0021, Transport).
+func (s *Store) RequestNonces() port.RequestNonceStore { return requestNonceStore{s} }
+
+type requestNonceStore struct{ s *Store }
+
+func (n requestNonceStore) t() *memtx.Table[string, time.Time] {
+	return memtx.TableOf[string, time.Time](n.s.Store, tRequestNonces)
+}
+
+func (n requestNonceStore) Remember(ctx context.Context, hash []byte, expires, now time.Time) error {
+	return n.s.Do(ctx, func() error {
+		if live, ok := n.t().Get(string(hash)); ok && live.After(kernel.Normalise(now)) {
+			return fmt.Errorf("remember peer request nonce: %w", kernel.ErrConflict)
+		}
+		n.t().Put(string(hash), expires)
+		return nil
+	})
+}
+
+func (n requestNonceStore) Prune(ctx context.Context, before time.Time) (int64, error) {
+	var out int64
+	err := n.s.Do(ctx, func() error {
+		before = kernel.Normalise(before)
+		out = n.t().DeleteWhere(func(_ string, expires time.Time) bool { return expires.Before(before) })
+		return nil
+	})
+	return out, err
 }
 
 // Federation returns the federated repository store: members and full

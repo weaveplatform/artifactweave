@@ -10,6 +10,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/outbox"
 )
 
@@ -27,12 +28,12 @@ func TestUnitDirectionFor(t *testing.T) {
 }
 
 func TestUnitPeer(t *testing.T) {
-	for _, u := range []model.UseCase{model.UseFederation, model.UseDistribution, model.UseAccessFederation, model.UsePlatformFederation} {
+	for _, u := range []model.UseCase{model.UseFederatedRepo, model.UseFederatedRepoRead, model.UseDistribution, model.UseAccessFederation, model.UsePlatformFederation} {
 		if !model.KnownUseCase(u) {
 			t.Errorf("%s should be known", u)
 		}
 	}
-	for _, u := range []model.UseCase{"mission-control", "bridge", "artifactory-cold"} {
+	for _, u := range []model.UseCase{"mission-control", "bridge", "artifactory-cold", "federation"} {
 		if model.KnownUseCase(u) {
 			t.Errorf("%s should answer 404", u)
 		}
@@ -41,8 +42,11 @@ func TestUnitPeer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := model.Peer{PublicKey: pub, UseCases: []model.UseCase{model.UseFederation}, LastSeen: t0}
-	if !p.Has(model.UseFederation) || p.Has(model.UseDistribution) {
+	p := model.Peer{
+		PublicKey: pub, UseCases: []model.UseCase{model.UseFederatedRepo}, LastSeen: t0,
+		ProtocolVersion: instance.ProtocolVersion,
+	}
+	if !p.Has(model.UseFederatedRepo) || p.Has(model.UseDistribution) {
 		t.Error("Peer.Has")
 	}
 	stale := 5 * time.Minute
@@ -65,6 +69,19 @@ func TestUnitPeer(t *testing.T) {
 	if (model.Peer{}).DeriveStatus(t0, stale, false, 0) != model.PeerOffline {
 		t.Error("a never-seen peer is offline")
 	}
+	// A recorded major version mismatch makes a peer seen a minute ago
+	// unavailable (decision 0021, Versioning), and unauthorized still wins.
+	other := p
+	other.ProtocolVersion = instance.ProtocolVersion + 1
+	if other.Compatible() || !p.Compatible() {
+		t.Error("Peer.Compatible")
+	}
+	if got := other.DeriveStatus(t0.Add(time.Minute), stale, false, 0); got != model.PeerOffline {
+		t.Errorf("a peer speaking another major version is %s, want OFFLINE", got)
+	}
+	if got := other.DeriveStatus(t0, stale, true, 0); got != model.PeerUnauthorized {
+		t.Errorf("a rejected peer of another major version is %s, want UNAUTHORIZED", got)
+	}
 	n := model.PairingNonce{ExpiresAt: t0.Add(model.PairingTokenTTL)}
 	if !n.Usable(t0) || n.Usable(t0.Add(model.PairingTokenTTL)) {
 		t.Error("expiry")
@@ -72,6 +89,39 @@ func TestUnitPeer(t *testing.T) {
 	n.RedeemedAt = t0
 	if n.Usable(t0) {
 		t.Error("a redeemed nonce is single-use")
+	}
+}
+
+func TestUnitUseCasePairing(t *testing.T) {
+	for path, want := range map[string]model.Pairing{
+		"federated-repo/*":            model.PairingServed,
+		"federated-repo/r":            model.PairingServed,
+		"platform-federation":         model.PairingPlanned,
+		"access-federation":           model.PairingPlanned,
+		"distribution":                model.PairingPlanned,
+		"mission-control":             model.PairingPlanned,
+		"bridge":                      model.PairingPlanned,
+		"artifactory-cold":            model.PairingUnknown,
+		"artifactory-cold/ns1":        model.PairingUnknown,
+		"federated-repo":              model.PairingUnknown,
+		"federated-repo/libs-local:w": model.PairingUnknown,
+		"federation":                  model.PairingUnknown,
+		"":                            model.PairingUnknown,
+		"federated-repo/*/":           model.PairingUnknown,
+		"FEDERATED-REPO/*":            model.PairingUnknown,
+	} {
+		if got := model.PairingFor(path); got != want {
+			t.Errorf("PairingFor(%q) = %d, want %d", path, got, want)
+		}
+	}
+	for u, want := range map[model.UseCase]string{
+		model.UseFederatedRepo:      "federated-repo",
+		model.UseFederatedRepoRead:  "federated-repo",
+		model.UsePlatformFederation: "platform-federation",
+	} {
+		if got := u.Name(); got != want {
+			t.Errorf("%s.Name() = %q, want %q", u, got, want)
+		}
 	}
 }
 
