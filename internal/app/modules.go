@@ -97,6 +97,7 @@ func buildModules(cfg config.Config, d moduleDeps) (modules, error) {
 		Lifetimes:      repos.NewRepositoryLifetimes(d.store),
 		Store:          d.store, Access: accessAPI, Ownership: repos.NewProjectRepositoryLookup(d.store),
 		Repositories: repos.NewRepositories(d.store, accessAPI.Keys, accessAPI.Projects),
+		BaseURL:      cfg.BaseURL,
 	})
 	if err != nil {
 		return modules{}, fmt.Errorf("federation: %w", err)

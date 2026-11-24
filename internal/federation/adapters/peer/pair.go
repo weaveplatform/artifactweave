@@ -29,6 +29,10 @@ type PairService interface {
 // in the context (corepeer.Caller).
 type PairServer struct {
 	Pairing PairService
+	// FederatedBase returns federatedRepoUrlBase, "" when it is not set;
+	// when set, the issuer answers with it as its base URL rather than the
+	// request's, as the token it issued carries it. Nil uses the request's.
+	FederatedBase func(ctx context.Context) (string, error)
 }
 
 const notSigned = "The request is not signed by the instance it names"
@@ -52,10 +56,20 @@ func (s PairServer) RedeemPairing(
 	if !ok || caller.InstanceID != req.Body.InstanceId || !ed25519.PublicKey(key).Equal(caller.PublicKey) {
 		return nil, apierror.New(http.StatusUnauthorized, notSigned)
 	}
+	self := baseurl.From(ctx)
+	if s.FederatedBase != nil {
+		base, err := s.FederatedBase(ctx)
+		if err != nil {
+			return nil, err //nolint:wrapcheck // the strict error handler answers 500 and logs the cause
+		}
+		if base != "" {
+			self = base
+		}
+	}
 	ans, err := s.Pairing.Accept(ctx, pairing.Request{
 		Nonce: req.Body.Nonce, InstanceID: req.Body.InstanceId, BaseURL: req.Body.BaseUrl,
 		PublicKey: key, ProtocolVersion: req.Body.ProtocolVersion,
-	}, baseurl.From(ctx))
+	}, self)
 	switch {
 	case errors.Is(err, pairing.ErrInvalidRequest):
 		return nil, apierror.New(http.StatusBadRequest,

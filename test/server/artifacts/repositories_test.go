@@ -1569,7 +1569,8 @@ var localModelFields = []string{
 // An administrator's v1 read of a generic local, an RPM remote, a Maven
 // virtual and a Docker federated repository created through the API with
 // every default has its class's 7.161.26 read model whole, with the
-// model's values for the fields main left out (#1493).
+// model's values for the fields main left out (#1493); a federated
+// repository's members list the instance itself (#1930).
 func TestAccV1ReadIsTheClassReadModel(t *testing.T) {
 	w := newRepoWorld(t)
 	remote := []string{
@@ -1635,10 +1636,13 @@ func TestAccV1ReadIsTheClassReadModel(t *testing.T) {
 		},
 		{
 			"docker-federated", `{"rclass":"federated","packageType":"docker"}`,
-			slices.Concat(withoutProject, localModelFields, []string{"disableProxy"}),
+			slices.Concat(withoutProject, localModelFields, []string{"disableProxy", "members"}),
 			map[string]any{
 				"blockPushingSchema1": true, "encryptStates": true, "disableProxy": false,
 				"enableDockerSupport": true,
+				// 7.x lists the instance itself as a member, at its base URL
+				// (#1930).
+				"members": []any{map[string]any{"url": "https://reg.example/artifactory/docker-federated", "enabled": true}},
 			},
 		},
 	} {

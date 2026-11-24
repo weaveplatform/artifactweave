@@ -4454,6 +4454,15 @@ type ExportSettings struct {
 	Verbose *bool `json:"verbose,omitempty"`
 }
 
+// FederatedReplaceUrl A member base URL and its replacement (7.161.26's ReplaceUrlConfig).
+type FederatedReplaceUrl struct {
+	// NewBaseUrl Required within this object. The base URL they should name, with or without /artifactory.
+	NewBaseUrl string `json:"newBaseUrl"`
+
+	// OldBaseUrl Required within this object. The base URL members name now, with or without /artifactory.
+	OldBaseUrl string `json:"oldBaseUrl"`
+}
+
 // FederatedRepositoryConfiguration Configuration of a federated repository: a local repository whose content and metadata are kept in sync with copies on other instances of this server (decision 0022). Members are instances of this server that trust each other through pairing (decision 0021). Deploys, deletes, moves, copies and property changes on any member are sent to the others as ordered events; where two members change the same item, the change with the later event time wins and the originating instance id breaks ties. A full sync repairs members that missed events.
 type FederatedRepositoryConfiguration = repo.Config
 
@@ -8388,6 +8397,12 @@ type ConvertFederatedRepositoryToLocalJSONRequestBody = ConvertFederatedReposito
 // RemoveFederationMemberTextRequestBody defines body for RemoveFederationMember for text/plain ContentType.
 type RemoveFederationMemberTextRequestBody = RemoveFederationMemberTextBody
 
+// ReplaceFederatedMemberBaseUrlJSONRequestBody defines body for ReplaceFederatedMemberBaseUrl for application/json ContentType.
+type ReplaceFederatedMemberBaseUrlJSONRequestBody = FederatedReplaceUrl
+
+// UpdateFederatedMemberUrlJSONRequestBody defines body for UpdateFederatedMemberUrl for application/json ContentType.
+type UpdateFederatedMemberUrlJSONRequestBody = FederatedReplaceUrl
+
 // SetGpgPrivateKeyTextRequestBody defines body for SetGpgPrivateKey for text/plain ContentType.
 type SetGpgPrivateKeyTextRequestBody = SetGpgPrivateKeyTextBody
 
@@ -10527,14 +10542,14 @@ type ClientInterface interface {
 
 	// SynchronizeFederatedMemberConfiguration Push federated repository configuration to members
 	//
-	// Sends this member's shared configuration of a federated repository to every other member, repairing drift left by a network failure. Only shared settings travel; each member keeps its own repository key and local-only settings (decision 0022).
+	// Sends this member's configuration of a federated repository to every other member, repairing drift left by a network failure, and answers "Configuration sync executed successfully" once the sends are queued (7.x's FederatedRepoResource). Each member keeps its own repository key. A member that cannot be reached is logged as unavailable and retried until it receives the configuration. Administrators only.
 	//
 	// Corresponds with POST /api/federation/configSync/{repoKey} (the `SynchronizeFederatedMemberConfiguration` operationId).
 	SynchronizeFederatedMemberConfiguration(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ConvertFederatedRepositoryToLocalWithBody Convert federated repositories to local
 	//
-	// Converts federated repositories back to local repositories, keeping their content and metadata. Allowed only for a repository whose federation has no other active members; remove the other members first.
+	// Converts federated repositories back to local repositories, keeping their content and metadata and dropping their members. Allowed only for a repository whose federation has no other enabled member; remove or disable the other members first. Each repository converts on its own; administrators only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10543,7 +10558,7 @@ type ClientInterface interface {
 
 	// ConvertFederatedRepositoryToLocal Convert federated repositories to local
 	//
-	// Converts federated repositories back to local repositories, keeping their content and metadata. Allowed only for a repository whose federation has no other active members; remove the other members first.
+	// Converts federated repositories back to local repositories, keeping their content and metadata and dropping their members. Allowed only for a repository whose federation has no other enabled member; remove or disable the other members first. Each repository converts on its own; administrators only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10573,7 +10588,7 @@ type ClientInterface interface {
 
 	// ConvertLocalRepositoryToFederated Convert a local repository to federated
 	//
-	// Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key.
+	// Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key. A package type that cannot be federated (terraformbackend), a repository that is not local and one with push replication configured answer 400. Administrators only.
 	//
 	// Corresponds with POST /api/federation/migrate/{repoKey} (the `ConvertLocalRepositoryToFederated` operationId).
 	ConvertLocalRepositoryToFederated(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10623,6 +10638,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/federation/removeMember (the `RemoveFederationMember` operationId).
 	RemoveFederationMemberWithTextBody(ctx context.Context, body RemoveFederationMemberTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReplaceFederatedMemberBaseUrlWithBody Replace a federated member's base URL
+	//
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/federation/replaceUrl (the `ReplaceFederatedMemberBaseUrl` operationId).
+	ReplaceFederatedMemberBaseUrlWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReplaceFederatedMemberBaseUrl Replace a federated member's base URL
+	//
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/federation/replaceUrl (the `ReplaceFederatedMemberBaseUrl` operationId).
+	ReplaceFederatedMemberBaseUrl(ctx context.Context, body ReplaceFederatedMemberBaseUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetFederationSyncState List federated repository sync state
 	//
@@ -10680,6 +10713,24 @@ type ClientInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetUnavailableMirrors(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateFederatedMemberUrlWithBody Update a federated member's URL
+	//
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/federation/updateMemberUrl (the `UpdateFederatedMemberUrl` operationId).
+	UpdateFederatedMemberUrlWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateFederatedMemberUrl Update a federated member's URL
+	//
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/federation/updateMemberUrl (the `UpdateFederatedMemberUrl` operationId).
+	UpdateFederatedMemberUrl(ctx context.Context, body UpdateFederatedMemberUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateRubyGemsIndex performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 	//
@@ -15153,7 +15204,7 @@ func (c *Client) ReplayFailedBinaryTasks(ctx context.Context, params *ReplayFail
 
 // SynchronizeFederatedMemberConfiguration Push federated repository configuration to members
 //
-// Sends this member's shared configuration of a federated repository to every other member, repairing drift left by a network failure. Only shared settings travel; each member keeps its own repository key and local-only settings (decision 0022).
+// Sends this member's configuration of a federated repository to every other member, repairing drift left by a network failure, and answers "Configuration sync executed successfully" once the sends are queued (7.x's FederatedRepoResource). Each member keeps its own repository key. A member that cannot be reached is logged as unavailable and retried until it receives the configuration. Administrators only.
 //
 // Corresponds with POST /api/federation/configSync/{repoKey} (the `SynchronizeFederatedMemberConfiguration` operationId).
 func (c *Client) SynchronizeFederatedMemberConfiguration(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15170,7 +15221,7 @@ func (c *Client) SynchronizeFederatedMemberConfiguration(ctx context.Context, re
 
 // ConvertFederatedRepositoryToLocalWithBody Convert federated repositories to local
 //
-// Converts federated repositories back to local repositories, keeping their content and metadata. Allowed only for a repository whose federation has no other active members; remove the other members first.
+// Converts federated repositories back to local repositories, keeping their content and metadata and dropping their members. Allowed only for a repository whose federation has no other enabled member; remove or disable the other members first. Each repository converts on its own; administrators only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15189,7 +15240,7 @@ func (c *Client) ConvertFederatedRepositoryToLocalWithBody(ctx context.Context, 
 
 // ConvertFederatedRepositoryToLocal Convert federated repositories to local
 //
-// Converts federated repositories back to local repositories, keeping their content and metadata. Allowed only for a repository whose federation has no other active members; remove the other members first.
+// Converts federated repositories back to local repositories, keeping their content and metadata and dropping their members. Allowed only for a repository whose federation has no other enabled member; remove or disable the other members first. Each repository converts on its own; administrators only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15259,7 +15310,7 @@ func (c *Client) GetListOfInconsistentFederatedRepositories(ctx context.Context,
 
 // ConvertLocalRepositoryToFederated Convert a local repository to federated
 //
-// Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key.
+// Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key. A package type that cannot be federated (terraformbackend), a repository that is not local and one with push replication configured answer 400. Administrators only.
 //
 // Corresponds with POST /api/federation/migrate/{repoKey} (the `ConvertLocalRepositoryToFederated` operationId).
 func (c *Client) ConvertLocalRepositoryToFederated(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15370,6 +15421,44 @@ func (c *Client) RemoveFederationMemberWithBody(ctx context.Context, contentType
 // Corresponds with POST /api/federation/removeMember (the `RemoveFederationMember` operationId).
 func (c *Client) RemoveFederationMemberWithTextBody(ctx context.Context, body RemoveFederationMemberTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRemoveFederationMemberRequestWithTextBody(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReplaceFederatedMemberBaseUrlWithBody Replace a federated member's base URL
+//
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/federation/replaceUrl (the `ReplaceFederatedMemberBaseUrl` operationId).
+func (c *Client) ReplaceFederatedMemberBaseUrlWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceFederatedMemberBaseUrlRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReplaceFederatedMemberBaseUrl Replace a federated member's base URL
+//
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/federation/replaceUrl (the `ReplaceFederatedMemberBaseUrl` operationId).
+func (c *Client) ReplaceFederatedMemberBaseUrl(ctx context.Context, body ReplaceFederatedMemberBaseUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReplaceFederatedMemberBaseUrlRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -15493,6 +15582,44 @@ func (c *Client) GetFederationStateSummaries(ctx context.Context, reqEditors ...
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) GetUnavailableMirrors(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetUnavailableMirrorsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateFederatedMemberUrlWithBody Update a federated member's URL
+//
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/federation/updateMemberUrl (the `UpdateFederatedMemberUrl` operationId).
+func (c *Client) UpdateFederatedMemberUrlWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateFederatedMemberUrlRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateFederatedMemberUrl Update a federated member's URL
+//
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/federation/updateMemberUrl (the `UpdateFederatedMemberUrl` operationId).
+func (c *Client) UpdateFederatedMemberUrl(ctx context.Context, body UpdateFederatedMemberUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateFederatedMemberUrlRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -25983,6 +26110,46 @@ func NewRemoveFederationMemberRequestWithBody(server string, contentType string,
 	return req, nil
 }
 
+// NewReplaceFederatedMemberBaseUrlRequest calls the generic ReplaceFederatedMemberBaseUrl builder with application/json body
+func NewReplaceFederatedMemberBaseUrlRequest(server string, body ReplaceFederatedMemberBaseUrlJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewReplaceFederatedMemberBaseUrlRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewReplaceFederatedMemberBaseUrlRequestWithBody constructs an http.Request for the ReplaceFederatedMemberBaseUrl method, with any body, and a specified content type
+func NewReplaceFederatedMemberBaseUrlRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/replaceUrl")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetFederationSyncStateRequest constructs an http.Request for the GetFederationSyncState method
 func NewGetFederationSyncStateRequest(server string) (*http.Request, error) {
 	var err error
@@ -26236,6 +26403,46 @@ func NewGetUnavailableMirrorsRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateFederatedMemberUrlRequest calls the generic UpdateFederatedMemberUrl builder with application/json body
+func NewUpdateFederatedMemberUrlRequest(server string, body UpdateFederatedMemberUrlJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateFederatedMemberUrlRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpdateFederatedMemberUrlRequestWithBody constructs an http.Request for the UpdateFederatedMemberUrl method, with any body, and a specified content type
+func NewUpdateFederatedMemberUrlRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/federation/updateMemberUrl")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -38082,7 +38289,7 @@ type ClientWithResponsesInterface interface {
 
 	// SynchronizeFederatedMemberConfigurationWithResponse Push federated repository configuration to members
 	//
-	// Sends this member's shared configuration of a federated repository to every other member, repairing drift left by a network failure. Only shared settings travel; each member keeps its own repository key and local-only settings (decision 0022).
+	// Sends this member's configuration of a federated repository to every other member, repairing drift left by a network failure, and answers "Configuration sync executed successfully" once the sends are queued (7.x's FederatedRepoResource). Each member keeps its own repository key. A member that cannot be reached is logged as unavailable and retried until it receives the configuration. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38091,7 +38298,7 @@ type ClientWithResponsesInterface interface {
 
 	// ConvertFederatedRepositoryToLocalWithBodyWithResponse Convert federated repositories to local
 	//
-	// Converts federated repositories back to local repositories, keeping their content and metadata. Allowed only for a repository whose federation has no other active members; remove the other members first.
+	// Converts federated repositories back to local repositories, keeping their content and metadata and dropping their members. Allowed only for a repository whose federation has no other enabled member; remove or disable the other members first. Each repository converts on its own; administrators only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38100,7 +38307,7 @@ type ClientWithResponsesInterface interface {
 
 	// ConvertFederatedRepositoryToLocalWithResponse Convert federated repositories to local
 	//
-	// Converts federated repositories back to local repositories, keeping their content and metadata. Allowed only for a repository whose federation has no other active members; remove the other members first.
+	// Converts federated repositories back to local repositories, keeping their content and metadata and dropping their members. Allowed only for a repository whose federation has no other enabled member; remove or disable the other members first. Each repository converts on its own; administrators only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38136,7 +38343,7 @@ type ClientWithResponsesInterface interface {
 
 	// ConvertLocalRepositoryToFederatedWithResponse Convert a local repository to federated
 	//
-	// Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key.
+	// Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key. A package type that cannot be federated (terraformbackend), a repository that is not local and one with push replication configured answer 400. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38196,6 +38403,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/federation/removeMember (the `RemoveFederationMember` operationId).
 	RemoveFederationMemberWithTextBodyWithResponse(ctx context.Context, body RemoveFederationMemberTextRequestBody, reqEditors ...RequestEditorFn) (*RemoveFederationMemberResponse, error)
+
+	// ReplaceFederatedMemberBaseUrlWithBodyWithResponse Replace a federated member's base URL
+	//
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/replaceUrl (the `ReplaceFederatedMemberBaseUrl` operationId).
+	ReplaceFederatedMemberBaseUrlWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceFederatedMemberBaseUrlResponse, error)
+
+	// ReplaceFederatedMemberBaseUrlWithResponse Replace a federated member's base URL
+	//
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/replaceUrl (the `ReplaceFederatedMemberBaseUrl` operationId).
+	ReplaceFederatedMemberBaseUrlWithResponse(ctx context.Context, body ReplaceFederatedMemberBaseUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceFederatedMemberBaseUrlResponse, error)
 
 	// GetFederationSyncStateWithResponse List federated repository sync state
 	//
@@ -38267,6 +38492,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetUnavailableMirrorsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetUnavailableMirrorsResponse, error)
+
+	// UpdateFederatedMemberUrlWithBodyWithResponse Update a federated member's URL
+	//
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/updateMemberUrl (the `UpdateFederatedMemberUrl` operationId).
+	UpdateFederatedMemberUrlWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateFederatedMemberUrlResponse, error)
+
+	// UpdateFederatedMemberUrlWithResponse Update a federated member's URL
+	//
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/federation/updateMemberUrl (the `UpdateFederatedMemberUrl` operationId).
+	UpdateFederatedMemberUrlWithResponse(ctx context.Context, body UpdateFederatedMemberUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateFederatedMemberUrlResponse, error)
 
 	// CalculateRubyGemsIndexWithResponse performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 	//
@@ -49475,6 +49718,8 @@ type SynchronizeFederatedMemberConfigurationResponse struct {
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
 	// JSON429 the response for an HTTP 429 `application/json` response
 	JSON429 *TooManyRequests
 	// JSON500 the response for an HTTP 500 `application/json` response
@@ -49505,6 +49750,11 @@ func (r SynchronizeFederatedMemberConfigurationResponse) GetJSON401() *ErrorResp
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r SynchronizeFederatedMemberConfigurationResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r SynchronizeFederatedMemberConfigurationResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
 }
 
 // GetJSON429 returns the response for an HTTP 429 `application/json` response
@@ -50571,6 +50821,100 @@ func (r RemoveFederationMemberResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RemoveFederationMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ReplaceFederatedMemberBaseUrlResponse429Headers the declared response headers of an HTTP 429 response for ReplaceFederatedMemberBaseUrl
+type ReplaceFederatedMemberBaseUrlResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// ReplaceFederatedMemberBaseUrlResponse503Headers the declared response headers of an HTTP 503 response for ReplaceFederatedMemberBaseUrl
+type ReplaceFederatedMemberBaseUrlResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type ReplaceFederatedMemberBaseUrlResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ReplaceFederatedMemberBaseUrlResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *ReplaceFederatedMemberBaseUrlResponse503Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ReplaceFederatedMemberBaseUrlResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ReplaceFederatedMemberBaseUrlResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ReplaceFederatedMemberBaseUrlResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r ReplaceFederatedMemberBaseUrlResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ReplaceFederatedMemberBaseUrlResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ReplaceFederatedMemberBaseUrlResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ReplaceFederatedMemberBaseUrlResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReplaceFederatedMemberBaseUrlResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReplaceFederatedMemberBaseUrlResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReplaceFederatedMemberBaseUrlResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -51666,6 +52010,100 @@ func (r GetUnavailableMirrorsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetUnavailableMirrorsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateFederatedMemberUrlResponse429Headers the declared response headers of an HTTP 429 response for UpdateFederatedMemberUrl
+type UpdateFederatedMemberUrlResponse429Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+// UpdateFederatedMemberUrlResponse503Headers the declared response headers of an HTTP 503 response for UpdateFederatedMemberUrl
+type UpdateFederatedMemberUrlResponse503Headers struct {
+	RateLimit       *string
+	RateLimitPolicy *string
+	RetryAfter      int
+}
+
+type UpdateFederatedMemberUrlResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *TooManyRequests
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *ServiceUnavailable
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *UpdateFederatedMemberUrlResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *UpdateFederatedMemberUrlResponse503Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r UpdateFederatedMemberUrlResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UpdateFederatedMemberUrlResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r UpdateFederatedMemberUrlResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r UpdateFederatedMemberUrlResponse) GetJSON429() *TooManyRequests {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r UpdateFederatedMemberUrlResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r UpdateFederatedMemberUrlResponse) GetJSON503() *ServiceUnavailable {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateFederatedMemberUrlResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateFederatedMemberUrlResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateFederatedMemberUrlResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateFederatedMemberUrlResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -75930,7 +76368,7 @@ func (c *ClientWithResponses) ReplayFailedBinaryTasksWithResponse(ctx context.Co
 
 // SynchronizeFederatedMemberConfigurationWithResponse Push federated repository configuration to members
 //
-// Sends this member's shared configuration of a federated repository to every other member, repairing drift left by a network failure. Only shared settings travel; each member keeps its own repository key and local-only settings (decision 0022).
+// Sends this member's configuration of a federated repository to every other member, repairing drift left by a network failure, and answers "Configuration sync executed successfully" once the sends are queued (7.x's FederatedRepoResource). Each member keeps its own repository key. A member that cannot be reached is logged as unavailable and retried until it receives the configuration. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -75945,7 +76383,7 @@ func (c *ClientWithResponses) SynchronizeFederatedMemberConfigurationWithRespons
 
 // ConvertFederatedRepositoryToLocalWithBodyWithResponse Convert federated repositories to local
 //
-// Converts federated repositories back to local repositories, keeping their content and metadata. Allowed only for a repository whose federation has no other active members; remove the other members first.
+// Converts federated repositories back to local repositories, keeping their content and metadata and dropping their members. Allowed only for a repository whose federation has no other enabled member; remove or disable the other members first. Each repository converts on its own; administrators only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -75960,7 +76398,7 @@ func (c *ClientWithResponses) ConvertFederatedRepositoryToLocalWithBodyWithRespo
 
 // ConvertFederatedRepositoryToLocalWithResponse Convert federated repositories to local
 //
-// Converts federated repositories back to local repositories, keeping their content and metadata. Allowed only for a repository whose federation has no other active members; remove the other members first.
+// Converts federated repositories back to local repositories, keeping their content and metadata and dropping their members. Allowed only for a repository whose federation has no other enabled member; remove or disable the other members first. Each repository converts on its own; administrators only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76020,7 +76458,7 @@ func (c *ClientWithResponses) GetListOfInconsistentFederatedRepositoriesWithResp
 
 // ConvertLocalRepositoryToFederatedWithResponse Convert a local repository to federated
 //
-// Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key.
+// Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key. A package type that cannot be federated (terraformbackend), a repository that is not local and one with push replication configured answer 400. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -76121,6 +76559,36 @@ func (c *ClientWithResponses) RemoveFederationMemberWithTextBodyWithResponse(ctx
 		return nil, err
 	}
 	return ParseRemoveFederationMemberResponse(rsp)
+}
+
+// ReplaceFederatedMemberBaseUrlWithBodyWithResponse Replace a federated member's base URL
+//
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/replaceUrl (the `ReplaceFederatedMemberBaseUrl` operationId).
+func (c *ClientWithResponses) ReplaceFederatedMemberBaseUrlWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceFederatedMemberBaseUrlResponse, error) {
+	rsp, err := c.ReplaceFederatedMemberBaseUrlWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaceFederatedMemberBaseUrlResponse(rsp)
+}
+
+// ReplaceFederatedMemberBaseUrlWithResponse Replace a federated member's base URL
+//
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/replaceUrl (the `ReplaceFederatedMemberBaseUrl` operationId).
+func (c *ClientWithResponses) ReplaceFederatedMemberBaseUrlWithResponse(ctx context.Context, body ReplaceFederatedMemberBaseUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceFederatedMemberBaseUrlResponse, error) {
+	rsp, err := c.ReplaceFederatedMemberBaseUrl(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReplaceFederatedMemberBaseUrlResponse(rsp)
 }
 
 // GetFederationSyncStateWithResponse List federated repository sync state
@@ -76234,6 +76702,36 @@ func (c *ClientWithResponses) GetUnavailableMirrorsWithResponse(ctx context.Cont
 		return nil, err
 	}
 	return ParseGetUnavailableMirrorsResponse(rsp)
+}
+
+// UpdateFederatedMemberUrlWithBodyWithResponse Update a federated member's URL
+//
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/updateMemberUrl (the `UpdateFederatedMemberUrl` operationId).
+func (c *ClientWithResponses) UpdateFederatedMemberUrlWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateFederatedMemberUrlResponse, error) {
+	rsp, err := c.UpdateFederatedMemberUrlWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateFederatedMemberUrlResponse(rsp)
+}
+
+// UpdateFederatedMemberUrlWithResponse Update a federated member's URL
+//
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/federation/updateMemberUrl (the `UpdateFederatedMemberUrl` operationId).
+func (c *ClientWithResponses) UpdateFederatedMemberUrlWithResponse(ctx context.Context, body UpdateFederatedMemberUrlJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateFederatedMemberUrlResponse, error) {
+	rsp, err := c.UpdateFederatedMemberUrl(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateFederatedMemberUrlResponse(rsp)
 }
 
 // CalculateRubyGemsIndexWithResponse performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
@@ -90918,6 +91416,13 @@ func ParseSynchronizeFederatedMemberConfigurationResponse(rsp *http.Response) (*
 		}
 		response.JSON403 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest TooManyRequests
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -90938,6 +91443,9 @@ func ParseSynchronizeFederatedMemberConfigurationResponse(rsp *http.Response) (*
 			return nil, err
 		}
 		response.JSON503 = &dest
+
+	case rsp.StatusCode == 200:
+		// Content-type (text/plain) unsupported
 
 	}
 
@@ -92186,6 +92694,118 @@ func ParseRemoveFederationMemberResponse(rsp *http.Response) (*RemoveFederationM
 	return response, nil
 }
 
+// ParseReplaceFederatedMemberBaseUrlResponse parses an HTTP response from a ReplaceFederatedMemberBaseUrlWithResponse call
+func ParseReplaceFederatedMemberBaseUrlResponse(rsp *http.Response) (*ReplaceFederatedMemberBaseUrlResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReplaceFederatedMemberBaseUrlResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers ReplaceFederatedMemberBaseUrlResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers ReplaceFederatedMemberBaseUrlResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetFederationSyncStateResponse parses an HTTP response from a GetFederationSyncStateWithResponse call
 func ParseGetFederationSyncStateResponse(rsp *http.Response) (*GetFederationSyncStateResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -93200,6 +93820,118 @@ func ParseGetUnavailableMirrorsResponse(rsp *http.Response) (*GetUnavailableMirr
 		response.Headers429 = &headers
 	case rsp.StatusCode == 503:
 		var headers GetUnavailableMirrorsResponse503Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateFederatedMemberUrlResponse parses an HTTP response from a UpdateFederatedMemberUrlWithResponse call
+func ParseUpdateFederatedMemberUrlResponse(rsp *http.Response) (*UpdateFederatedMemberUrlResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateFederatedMemberUrlResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyRequests
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 429:
+		var headers UpdateFederatedMemberUrlResponse429Headers
+		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimit = &value
+		}
+		if values := rsp.Header.Values("RateLimit-Policy"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit-Policy", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RateLimitPolicy = &value
+		}
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers UpdateFederatedMemberUrlResponse503Headers
 		if values := rsp.Header.Values("RateLimit"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "RateLimit", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {

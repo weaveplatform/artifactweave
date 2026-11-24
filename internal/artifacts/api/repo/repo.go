@@ -201,10 +201,13 @@ type ContentSyncSource struct {
 
 // Member is one federated repository member. enabled is a FlexBool because
 // JFrog documents it as a string; nil means the caller did not say, and
-// Defaults turns that into true.
+// Defaults turns that into true. mode is left out when the caller did not
+// send it, which means bidirectional, as 7.161.26's
+// FederatedMemberConfiguration leaves it null.
 type Member struct {
-	URL     string    `json:"url"`
-	Enabled *FlexBool `json:"enabled,omitempty"`
+	URL     string     `json:"url"`
+	Mode    MemberMode `json:"mode,omitempty"`
+	Enabled *FlexBool  `json:"enabled,omitempty"`
 }
 
 // Config is the repository configuration document. Optional scalars are

@@ -113,6 +113,7 @@ func statusTable() []statusCase {
 		projectStatusRows(),
 		webhookStatusRows(),
 		replicationStatusRows(),
+		federatedStatusRows(),
 		cleanupPolicyStatusRows(),
 		projectRepositoryStatusRows(),
 		keypairStatusRows(),
