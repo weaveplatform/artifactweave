@@ -190,12 +190,12 @@ func (s DebianAPI) buildVirtualDebian(
 	if err != nil {
 		return nil, err //nolint:wrapcheck // the merge's not-found and limit are the answers
 	}
-	if c.KeyPair == "" {
-		return files, nil
-	}
-	pair, err := s.Access.Keys.Keypair(r.Context(), c.KeyPair)
+	pair, signs, err := accessapi.MetadataSigningPair(r.Context(), s.Access.Keys, c.KeyPair)
 	if err != nil {
 		return nil, fmt.Errorf("debian virtual signing key: %w", err)
+	}
+	if !signs {
+		return files, nil
 	}
 	if pair.Type != accessapi.KeypairGPG {
 		return nil, errDebianVirtualKey

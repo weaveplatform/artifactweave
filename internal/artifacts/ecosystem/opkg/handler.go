@@ -342,12 +342,12 @@ func signingKey(
 	if c.Class == repo.Virtual {
 		ref = c.KeyPair
 	}
-	if ref == "" {
-		return accessapi.Keypair{}, nil
-	}
-	pair, err := keys.Keypair(ctx, ref)
+	pair, signs, err := accessapi.MetadataSigningPair(ctx, keys, ref)
 	if err != nil {
 		return pair, fmt.Errorf("opkg: signing key: %w", err)
+	}
+	if !signs {
+		return accessapi.Keypair{}, nil
 	}
 	if pair.Type != accessapi.KeypairGPG {
 		return pair, fmt.Errorf("%w: index signing requires gpg", errInvalidIndex)

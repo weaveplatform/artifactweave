@@ -52,6 +52,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/remote/source"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/core/repos"
 	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem"
+	"github.com/weaveplatform/artifactweave/internal/artifacts/ecosystem/terraform/terraformtest"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob/fs"
@@ -417,11 +418,12 @@ func mustStatus(t *testing.T, rec *httptest.ResponseRecorder, want int, what str
 func ptr[T any](v T) *T { return &v }
 
 // keyMaterial is generated once per test binary: an RSA pair, another RSA
-// pair, and a self-signed client certificate bundle. Keys are never
+// pair, a GPG pair, and a self-signed client certificate bundle. Keys are never
 // committed, which would also trip secret scanning.
 type keyMaterial struct {
 	private, public           string
 	otherPrivate, otherPublic string
+	gpgPrivate, gpgPublic     string
 	bundle                    string
 }
 
@@ -457,6 +459,10 @@ var testKeys = sync.OnceValue(func() keyMaterial {
 	if err != nil {
 		panic(err)
 	}
+	gpg, err := terraformtest.NewKey()
+	if err != nil {
+		panic(err)
+	}
 	priv := func(k *rsa.PrivateKey) string {
 		return string(pem.EncodeToMemory(&pem.Block{
 			Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(k),
@@ -467,6 +473,8 @@ var testKeys = sync.OnceValue(func() keyMaterial {
 		public:       pub(k),
 		otherPrivate: priv(other),
 		otherPublic:  pub(other),
+		gpgPrivate:   gpg.Private,
+		gpgPublic:    gpg.Public,
 		bundle: string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert})) +
 			string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: ecDER})),
 	}
@@ -606,6 +614,51 @@ func keypairStatusRows() []statusCase {
 		{delCert, cert + "/cert-new", "user", "", 403},
 		{delCert, cert + "/cert-new", "admin", "", 200},
 		{delCert, cert + "/cert-new", "admin", "", 404},
+	}
+}
+
+// gpgStatusRows covers the instance GPG key (#1654). Rows run in order
+// against one fixture: the public read answers 404 until a public half is
+// set, setting the private half alone included, and a body of
+// passphrase:<value> sends the X-GPG-PASSPHRASE header (checksumDeploy).
+func gpgStatusRows() []statusCase {
+	const (
+		private    = "PUT /artifactory/api/gpg/key/private"
+		getPublic  = "GET /artifactory/api/gpg/key/public"
+		setPublic  = "PUT /artifactory/api/gpg/key/public"
+		passphrase = "PUT /artifactory/api/gpg/passphrase"
+		priv       = "/artifactory/api/gpg/key/private"
+		pub        = "/artifactory/api/gpg/key/public"
+		pass       = "/artifactory/api/gpg/passphrase"
+	)
+	k := testKeys()
+	return []statusCase{
+		{private, priv, "admin", k.gpgPrivate, 200},
+		{private, priv, "admin", k.gpgPublic, 400},
+		{private, priv, "user", k.gpgPrivate, 403},
+		{private, priv, "", k.gpgPrivate, 401},
+
+		{getPublic, pub, "admin", "", 404},
+		{getPublic, pub, "user", "", 404},
+		{getPublic, pub, "", "", 401},
+
+		{setPublic, pub, "admin", k.gpgPrivate, 400},
+		{setPublic, pub, "admin", k.gpgPublic, 200},
+		{setPublic, pub, "user", k.gpgPublic, 403},
+		{setPublic, pub, "", k.gpgPublic, 401},
+
+		// Any authenticated caller reads it, and anonymous while anonymous
+		// access is on (getgpgpublickey). Anonymous rows run against the
+		// anonymous-on fixture, which holds no instance key, so admission
+		// shows as its 404 rather than 401.
+		{getPublic, pub, "admin", "", 200},
+		{getPublic, pub, "user", "", 200},
+		{getPublic, pub, "anonymous", "", 404},
+
+		{passphrase, pass, "admin", "passphrase:secret", 200},
+		{passphrase, pass, "admin", "", 400},
+		{passphrase, pass, "user", "passphrase:secret", 403},
+		{passphrase, pass, "", "passphrase:secret", 401},
 	}
 }
 

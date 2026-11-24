@@ -221,6 +221,52 @@ func TestUnitCheckGPG(t *testing.T) {
 	}
 }
 
+// TestUnitCheckGPGPrivate: the instance key's private half is accepted
+// alone, encrypted or not, before any passphrase; anything but one armored
+// private key is refused.
+func TestUnitCheckGPGPrivate(t *testing.T) {
+	priv, pub := gpgPair(t, "")
+	encPriv, _ := gpgPair(t, "s3cret")
+	otherPriv, _ := gpgPair(t, "")
+	for _, ok := range []string{priv, encPriv} {
+		if err := keymaterial.CheckGPGPrivate(ok); err != nil {
+			t.Errorf("a private key: %v", err)
+		}
+	}
+	for name, c := range map[string]struct{ value, expected string }{
+		"public":    {pub, "no private key"},
+		"not armor": {"not armor", "not an ASCII-armored"},
+		"empty":     {armored(t, openpgp.PrivateKeyType, func(*bytes.Buffer) error { return nil }), "private key"},
+		"two keys":  {twoEntities(t, priv, otherPriv), "exactly one key"},
+	} {
+		err := keymaterial.CheckGPGPrivate(c.value)
+		if !errors.Is(err, keymaterial.ErrInvalid) || !strings.Contains(err.Error(), c.expected) {
+			t.Errorf("%s: %v, want an invalid error mentioning %q", name, err, c.expected)
+		}
+	}
+}
+
+// twoEntities is one private armor block holding both keys a and b.
+func twoEntities(t *testing.T, a, b string) string {
+	t.Helper()
+	var ring openpgp.EntityList
+	for _, k := range []string{a, b} {
+		list, err := openpgp.ReadArmoredKeyRing(strings.NewReader(k))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ring = append(ring, list...)
+	}
+	return armored(t, openpgp.PrivateKeyType, func(w *bytes.Buffer) error {
+		for _, e := range ring {
+			if err := e.SerializePrivate(w, nil); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func TestUnitParseBundle(t *testing.T) {
 	ec, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {

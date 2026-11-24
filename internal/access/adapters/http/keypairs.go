@@ -34,11 +34,23 @@ func repoNotFound(key string) error {
 	return apierror.New(http.StatusNotFound, fmt.Sprintf("Repository '%s' does not exist", key))
 }
 
+// noKeypairAssigned answers the public key download of a repository that
+// signs with no pair.
+func noKeypairAssigned(key string) error {
+	return apierror.New(http.StatusNotFound, fmt.Sprintf("Repository '%s' has no key pair assigned", key))
+}
+
 func certificateNotFound(alias string) error {
 	return apierror.New(http.StatusNotFound, fmt.Sprintf("Certificate '%s' does not exist", alias))
 }
 
 func (s SecurityAPI) keypairSummary(ctx context.Context, k api.Keypair) (artgen.KeyPairSummary, error) {
+	// The instance GPG pair is written one half at a time (setGpgPrivateKey),
+	// so it may have no public half yet; an empty field exports nothing.
+	if k.PublicKey == "" {
+		typ := string(k.Type)
+		return artgen.KeyPairSummary{PairName: &k.Name, PairType: &typ, Alias: &k.Alias, PublicKey: &k.PublicKey}, nil
+	}
 	if err := keymaterial.CheckPublic(string(k.Type), k.PublicKey); err != nil {
 		return artgen.KeyPairSummary{}, s.internalError(ctx, "read key pair public material", err)
 	}
@@ -287,8 +299,9 @@ func publicKeyFile(k api.Keypair) string {
 }
 
 // GetKeyPairPublicKeyPerRepository returns the public half of the repository's
-// signing pair, including Alpine, Debian and RPM virtual repositories' keyPair, which
-// clients fetch to verify signed metadata. 7.x asks only for an authenticated
+// signing pair, including Alpine, Debian, RPM and Opkg virtual repositories'
+// keyPair, or the instance GPG pair a Debian, RPM or Opkg repository naming
+// none signs with, which clients fetch to verify signed metadata. 7.x asks only for an authenticated
 // user, or anonymous while anonymous access is on
 // (getkeypairpublickeyperrepository), and no read
 // permission on the repository, so a caller that may not read a repository
@@ -311,18 +324,24 @@ func (s SecurityAPI) GetKeyPairPublicKeyPerRepository(
 	ref := cfg.PrimaryKeyPairRef
 	if cfg.Class == repo.Virtual &&
 		(cfg.PackageType == repo.Alpine || cfg.PackageType == repo.Debian ||
-			cfg.PackageType == repo.RPM) {
+			cfg.PackageType == repo.RPM || cfg.PackageType == repo.Opkg) {
 		ref = cfg.KeyPair
 	}
-	if ref == "" {
-		return nil, apierror.New(http.StatusNotFound,
-			fmt.Sprintf("Repository '%s' has no key pair assigned", req.RepoKey))
+	// A Debian, RPM or Opkg repository that names no pair signs with the
+	// instance GPG key once it is set (#1654), so its clients fetch that
+	// key here; Alpine signs with RSA and a remote repository signs nothing.
+	gpgSigned := cfg.Class != repo.Remote &&
+		(cfg.PackageType == repo.Debian || cfg.PackageType == repo.RPM || cfg.PackageType == repo.Opkg)
+	if ref == "" && !gpgSigned {
+		return nil, noKeypairAssigned(req.RepoKey)
 	}
-	switch k, err := st.Keys().Keypair(ctx, ref); {
+	switch k, ok, err := api.MetadataSigningPair(ctx, st.Keys(), ref); {
 	case errors.Is(err, kernel.ErrNotFound):
 		return nil, keypairNotFound(ref)
 	case err != nil:
 		return nil, s.internalError(ctx, "get key pair", err)
+	case !ok:
+		return nil, noKeypairAssigned(req.RepoKey)
 	default:
 		if err := keymaterial.CheckPublic(string(k.Type), k.PublicKey); err != nil {
 			return nil, s.internalError(ctx, "download key pair public material", err)

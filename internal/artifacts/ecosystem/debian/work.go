@@ -140,11 +140,11 @@ func buildIndex(ctx context.Context, env format.Env, c repo.Config, validate boo
 		}
 		base := "dists/" + distribution + "/"
 		generated[base+"Release"] = body
-		if c.PrimaryKeyPairRef != "" {
-			pair, err := env.Keys.Keypair(ctx, c.PrimaryKeyPairRef)
-			if err != nil {
-				return fmt.Errorf("debian: signing key: %w", err)
-			}
+		pair, signs, err := api.MetadataSigningPair(ctx, env.Keys, c.PrimaryKeyPairRef)
+		if err != nil {
+			return fmt.Errorf("debian: signing key: %w", err)
+		}
+		if signs {
 			if pair.Type != api.KeypairGPG {
 				return fmt.Errorf(
 					"%w: repository %s needs a gpg signing pair",

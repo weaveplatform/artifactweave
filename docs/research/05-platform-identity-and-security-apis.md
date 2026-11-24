@@ -101,7 +101,7 @@ and https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.
 | GET | `/api/system/security/certificates` | 200 | remote-repository client certificates: `[{certificateAlias,issuedTo,issuedBy,issuedOn,validUntil,fingerPrint}]` |
 | POST | `/api/system/security/certificates/{alias}` | 200 | PEM body, `text/plain`; response `{status,message[]}` |
 | DELETE | `/api/system/security/certificates/{alias}` | 200 | |
-| PUT / GET | `/api/gpg/key/public`, `/api/gpg/key/private`, `/api/gpg/passphrase` | 200 | `text/plain`; passphrase via header `X-GPG-PASSPHRASE` |
+| PUT / GET | `/api/gpg/key/public`, `/api/gpg/key/private`, `/api/gpg/passphrase` | 200 | `text/plain`; passphrase via header `X-GPG-PASSPHRASE`. Each write is admin only and sets one field of the `default-gpg-key` pair, which signs Debian, RPM and Opkg metadata for repositories naming no pair; the read answers 404 until a public key is set ([instance-gpg-key.md](instance-gpg-key.md), #1654) |
 | POST | `/api/security/keypair` | **201** | `{pairName,pairType:"RSA"\|"GPG",alias,privateKey,publicKey,passphrase,vaultKey,vaultPublicKey{path,key}}`; admin only; creates the pair, or replaces a pair of the same name ([createkeypair](https://docs.jfrog.com/administration/reference/createkeypair)). Repositories refer to a pair by name, so those using a replaced pair sign with its new material **[I]** |
 | GET | `/api/security/keypair` | 200 | list; admin only |
 | PUT | `/api/security/keypair` | 200 | admin only; replaces the pair named in the body |

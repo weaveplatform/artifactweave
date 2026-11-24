@@ -133,12 +133,12 @@ func signVirtualRPM(
 	c repo.Config,
 	files map[string][]byte,
 ) error {
-	if c.KeyPair == "" {
-		return nil
-	}
-	pair, err := keys.Keypair(ctx, c.KeyPair)
+	pair, signs, err := accessapi.MetadataSigningPair(ctx, keys, c.KeyPair)
 	if err != nil {
 		return fmt.Errorf("rpm: virtual signing key: %w", err)
+	}
+	if !signs {
+		return nil
 	}
 	if pair.Type != accessapi.KeypairGPG {
 		return errRPMVirtualKey

@@ -685,6 +685,26 @@ func testKeypairs(t *testing.T, s port.Store) {
 	_, err = ks.Keypair(ctx, "rsa")
 	storekit.WantErr(t, err, kernel.ErrNotFound)
 	storekit.WantErr(t, ks.DeleteKeypair(ctx, "rsa"), kernel.ErrNotFound)
+
+	// SetKeypairField creates a GPG pair aliased by its name holding the one
+	// field, then sets each further field and keeps the others; sealed
+	// fields come back unsealed.
+	const staged = "staged"
+	storekit.Must(t, ks.SetKeypairField(ctx, staged, port.KeypairPrivateKey, "private"))
+	want := api.Keypair{Name: staged, Type: api.KeypairGPG, Alias: staged, PrivateKey: "private"}
+	storekit.Same(t, "SetKeypairField create", want, storekit.Get[api.Keypair](t)(ks.Keypair(ctx, staged)))
+	storekit.Must(t, ks.SetKeypairField(ctx, staged, port.KeypairPassphrase, "pass"))
+	storekit.Must(t, ks.SetKeypairField(ctx, staged, port.KeypairPublicKey, "public"))
+	want.Passphrase, want.PublicKey = "pass", "public"
+	storekit.Same(t, "SetKeypairField fields", want, storekit.Get[api.Keypair](t)(ks.Keypair(ctx, staged)))
+	storekit.Must(t, ks.SetKeypairField(ctx, staged, port.KeypairPrivateKey, "rotated"))
+	want.PrivateKey = "rotated"
+	storekit.Same(t, "SetKeypairField replace", want, storekit.Get[api.Keypair](t)(ks.Keypair(ctx, staged)))
+	// An existing pair keeps its type and alias.
+	storekit.Must(t, ks.SetKeypairField(ctx, "plain", port.KeypairPublicKey, "new-public"))
+	plain.PublicKey = "new-public"
+	storekit.Same(t, "SetKeypairField existing", plain, storekit.Get[api.Keypair](t)(ks.Keypair(ctx, "plain")))
+	storekit.WantErr(t, ks.SetKeypairField(ctx, staged, port.KeypairField(0), "x"), port.ErrUnknownKeypairField)
 }
 
 func certificate(i int, alias string) api.Certificate {

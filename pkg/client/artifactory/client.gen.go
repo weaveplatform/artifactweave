@@ -10682,7 +10682,7 @@ type ClientInterface interface {
 
 	// SetGpgPrivateKeyWithBody Set the GPG private key
 	//
-	// Stores the instance-wide GPG private key used to sign Debian and Alpine metadata. Admin only. The key is sealed at rest and never returned.
+	// Stores the private half of the instance-wide GPG key pair, default-gpg-key, which signs the metadata of Debian, RPM and Opkg repositories that name no key pair of their own. Admin only. The body must be one ASCII-armored OpenPGP private key; it is not unlocked until it signs, so the passphrase and public half may follow in later requests. The public half and passphrase are kept. The key is sealed at rest and never returned.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10691,7 +10691,7 @@ type ClientInterface interface {
 
 	// SetGpgPrivateKeyWithTextBody Set the GPG private key
 	//
-	// Stores the instance-wide GPG private key used to sign Debian and Alpine metadata. Admin only. The key is sealed at rest and never returned.
+	// Stores the private half of the instance-wide GPG key pair, default-gpg-key, which signs the metadata of Debian, RPM and Opkg repositories that name no key pair of their own. Admin only. The body must be one ASCII-armored OpenPGP private key; it is not unlocked until it signs, so the passphrase and public half may follow in later requests. The public half and passphrase are kept. The key is sealed at rest and never returned.
 	//
 	// Takes a body of the `text/plain` content type.
 	//
@@ -10700,14 +10700,14 @@ type ClientInterface interface {
 
 	// GetGpgPublicKey Get the GPG public key
 	//
-	// Returns the instance-wide GPG public key so package clients can verify signed metadata. Readable by any authenticated user; 404 until a key is set.
+	// Returns the public half of the instance-wide GPG key pair so Debian, RPM and Opkg clients can verify metadata it signs. Readable by any authenticated user, or anonymously while anonymous access is on; 404 until a public key is set.
 	//
 	// Corresponds with GET /api/gpg/key/public (the `GetGpgPublicKey` operationId).
 	GetGpgPublicKey(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetGpgPublicKeyWithBody Set the GPG public key
 	//
-	// Stores the instance-wide GPG public key that matches the private key. Admin only.
+	// Stores the public half of the instance-wide GPG key pair, which getGpgPublicKey and the public key download of every repository signing with it publish. Admin only. The body must be public OpenPGP armor only, with no private packets or further blocks. The private half and passphrase are kept. The instance key signs only once both halves are set, belong together and the passphrase unlocks the private one.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10716,7 +10716,7 @@ type ClientInterface interface {
 
 	// SetGpgPublicKeyWithTextBody Set the GPG public key
 	//
-	// Stores the instance-wide GPG public key that matches the private key. Admin only.
+	// Stores the public half of the instance-wide GPG key pair, which getGpgPublicKey and the public key download of every repository signing with it publish. Admin only. The body must be public OpenPGP armor only, with no private packets or further blocks. The private half and passphrase are kept. The instance key signs only once both halves are set, belong together and the passphrase unlocks the private one.
 	//
 	// Takes a body of the `text/plain` content type.
 	//
@@ -10725,7 +10725,7 @@ type ClientInterface interface {
 
 	// SetGpgPassPhrase Set the GPG passphrase
 	//
-	// Stores the passphrase protecting the GPG private key. Admin only. The value travels in a header rather than the body and is sealed at rest.
+	// Stores the passphrase protecting the private half of the instance-wide GPG key pair. Admin only. The value travels in a header rather than the body and is sealed at rest. Set before either half, it is kept for them.
 	//
 	// Corresponds with PUT /api/gpg/passphrase (the `SetGpgPassPhrase` operationId).
 	SetGpgPassPhrase(ctx context.Context, params *SetGpgPassPhraseParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11619,7 +11619,7 @@ type ClientInterface interface {
 
 	// GetKeyPairPublicKeyPerRepository Get the public key assigned to a repository
 	//
-	// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+	// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine, Debian, RPM and Opkg virtual repositories use their keyPair; other repositories use the primary key pair. A Debian, RPM or Opkg repository that names no pair answers the instance-wide GPG key (default-gpg-key) once it signs with it. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or signs with no pair.
 	//
 	// Corresponds with GET /api/security/keypair/public/repositories/{repoKey} (the `GetKeyPairPublicKeyPerRepository` operationId).
 	GetKeyPairPublicKeyPerRepository(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -15514,7 +15514,7 @@ func (c *Client) CalculateRubyGemsIndex(ctx context.Context, repoKey string, req
 
 // SetGpgPrivateKeyWithBody Set the GPG private key
 //
-// Stores the instance-wide GPG private key used to sign Debian and Alpine metadata. Admin only. The key is sealed at rest and never returned.
+// Stores the private half of the instance-wide GPG key pair, default-gpg-key, which signs the metadata of Debian, RPM and Opkg repositories that name no key pair of their own. Admin only. The body must be one ASCII-armored OpenPGP private key; it is not unlocked until it signs, so the passphrase and public half may follow in later requests. The public half and passphrase are kept. The key is sealed at rest and never returned.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15533,7 +15533,7 @@ func (c *Client) SetGpgPrivateKeyWithBody(ctx context.Context, contentType strin
 
 // SetGpgPrivateKeyWithTextBody Set the GPG private key
 //
-// Stores the instance-wide GPG private key used to sign Debian and Alpine metadata. Admin only. The key is sealed at rest and never returned.
+// Stores the private half of the instance-wide GPG key pair, default-gpg-key, which signs the metadata of Debian, RPM and Opkg repositories that name no key pair of their own. Admin only. The body must be one ASCII-armored OpenPGP private key; it is not unlocked until it signs, so the passphrase and public half may follow in later requests. The public half and passphrase are kept. The key is sealed at rest and never returned.
 //
 // Takes a body of the `text/plain` content type.
 //
@@ -15552,7 +15552,7 @@ func (c *Client) SetGpgPrivateKeyWithTextBody(ctx context.Context, body SetGpgPr
 
 // GetGpgPublicKey Get the GPG public key
 //
-// Returns the instance-wide GPG public key so package clients can verify signed metadata. Readable by any authenticated user; 404 until a key is set.
+// Returns the public half of the instance-wide GPG key pair so Debian, RPM and Opkg clients can verify metadata it signs. Readable by any authenticated user, or anonymously while anonymous access is on; 404 until a public key is set.
 //
 // Corresponds with GET /api/gpg/key/public (the `GetGpgPublicKey` operationId).
 func (c *Client) GetGpgPublicKey(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15569,7 +15569,7 @@ func (c *Client) GetGpgPublicKey(ctx context.Context, reqEditors ...RequestEdito
 
 // SetGpgPublicKeyWithBody Set the GPG public key
 //
-// Stores the instance-wide GPG public key that matches the private key. Admin only.
+// Stores the public half of the instance-wide GPG key pair, which getGpgPublicKey and the public key download of every repository signing with it publish. Admin only. The body must be public OpenPGP armor only, with no private packets or further blocks. The private half and passphrase are kept. The instance key signs only once both halves are set, belong together and the passphrase unlocks the private one.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15588,7 +15588,7 @@ func (c *Client) SetGpgPublicKeyWithBody(ctx context.Context, contentType string
 
 // SetGpgPublicKeyWithTextBody Set the GPG public key
 //
-// Stores the instance-wide GPG public key that matches the private key. Admin only.
+// Stores the public half of the instance-wide GPG key pair, which getGpgPublicKey and the public key download of every repository signing with it publish. Admin only. The body must be public OpenPGP armor only, with no private packets or further blocks. The private half and passphrase are kept. The instance key signs only once both halves are set, belong together and the passphrase unlocks the private one.
 //
 // Takes a body of the `text/plain` content type.
 //
@@ -15607,7 +15607,7 @@ func (c *Client) SetGpgPublicKeyWithTextBody(ctx context.Context, body SetGpgPub
 
 // SetGpgPassPhrase Set the GPG passphrase
 //
-// Stores the passphrase protecting the GPG private key. Admin only. The value travels in a header rather than the body and is sealed at rest.
+// Stores the passphrase protecting the private half of the instance-wide GPG key pair. Admin only. The value travels in a header rather than the body and is sealed at rest. Set before either half, it is kept for them.
 //
 // Corresponds with PUT /api/gpg/passphrase (the `SetGpgPassPhrase` operationId).
 func (c *Client) SetGpgPassPhrase(ctx context.Context, params *SetGpgPassPhraseParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17692,7 +17692,7 @@ func (c *Client) UpdateKeyPair(ctx context.Context, body UpdateKeyPairJSONReques
 
 // GetKeyPairPublicKeyPerRepository Get the public key assigned to a repository
 //
-// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine, Debian, RPM and Opkg virtual repositories use their keyPair; other repositories use the primary key pair. A Debian, RPM or Opkg repository that names no pair answers the instance-wide GPG key (default-gpg-key) once it signs with it. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or signs with no pair.
 //
 // Corresponds with GET /api/security/keypair/public/repositories/{repoKey} (the `GetKeyPairPublicKeyPerRepository` operationId).
 func (c *Client) GetKeyPairPublicKeyPerRepository(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -38271,7 +38271,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetGpgPrivateKeyWithBodyWithResponse Set the GPG private key
 	//
-	// Stores the instance-wide GPG private key used to sign Debian and Alpine metadata. Admin only. The key is sealed at rest and never returned.
+	// Stores the private half of the instance-wide GPG key pair, default-gpg-key, which signs the metadata of Debian, RPM and Opkg repositories that name no key pair of their own. Admin only. The body must be one ASCII-armored OpenPGP private key; it is not unlocked until it signs, so the passphrase and public half may follow in later requests. The public half and passphrase are kept. The key is sealed at rest and never returned.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38280,7 +38280,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetGpgPrivateKeyWithTextBodyWithResponse Set the GPG private key
 	//
-	// Stores the instance-wide GPG private key used to sign Debian and Alpine metadata. Admin only. The key is sealed at rest and never returned.
+	// Stores the private half of the instance-wide GPG key pair, default-gpg-key, which signs the metadata of Debian, RPM and Opkg repositories that name no key pair of their own. Admin only. The body must be one ASCII-armored OpenPGP private key; it is not unlocked until it signs, so the passphrase and public half may follow in later requests. The public half and passphrase are kept. The key is sealed at rest and never returned.
 	//
 	// Takes a body of the `text/plain` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38289,7 +38289,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetGpgPublicKeyWithResponse Get the GPG public key
 	//
-	// Returns the instance-wide GPG public key so package clients can verify signed metadata. Readable by any authenticated user; 404 until a key is set.
+	// Returns the public half of the instance-wide GPG key pair so Debian, RPM and Opkg clients can verify metadata it signs. Readable by any authenticated user, or anonymously while anonymous access is on; 404 until a public key is set.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38298,7 +38298,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetGpgPublicKeyWithBodyWithResponse Set the GPG public key
 	//
-	// Stores the instance-wide GPG public key that matches the private key. Admin only.
+	// Stores the public half of the instance-wide GPG key pair, which getGpgPublicKey and the public key download of every repository signing with it publish. Admin only. The body must be public OpenPGP armor only, with no private packets or further blocks. The private half and passphrase are kept. The instance key signs only once both halves are set, belong together and the passphrase unlocks the private one.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38307,7 +38307,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetGpgPublicKeyWithTextBodyWithResponse Set the GPG public key
 	//
-	// Stores the instance-wide GPG public key that matches the private key. Admin only.
+	// Stores the public half of the instance-wide GPG key pair, which getGpgPublicKey and the public key download of every repository signing with it publish. Admin only. The body must be public OpenPGP armor only, with no private packets or further blocks. The private half and passphrase are kept. The instance key signs only once both halves are set, belong together and the passphrase unlocks the private one.
 	//
 	// Takes a body of the `text/plain` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38316,7 +38316,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetGpgPassPhraseWithResponse Set the GPG passphrase
 	//
-	// Stores the passphrase protecting the GPG private key. Admin only. The value travels in a header rather than the body and is sealed at rest.
+	// Stores the passphrase protecting the private half of the instance-wide GPG key pair. Admin only. The value travels in a header rather than the body and is sealed at rest. Set before either half, it is kept for them.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -39354,7 +39354,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetKeyPairPublicKeyPerRepositoryWithResponse Get the public key assigned to a repository
 	//
-	// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+	// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine, Debian, RPM and Opkg virtual repositories use their keyPair; other repositories use the primary key pair. A Debian, RPM or Opkg repository that names no pair answers the instance-wide GPG key (default-gpg-key) once it signs with it. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or signs with no pair.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -76245,7 +76245,7 @@ func (c *ClientWithResponses) CalculateRubyGemsIndexWithResponse(ctx context.Con
 
 // SetGpgPrivateKeyWithBodyWithResponse Set the GPG private key
 //
-// Stores the instance-wide GPG private key used to sign Debian and Alpine metadata. Admin only. The key is sealed at rest and never returned.
+// Stores the private half of the instance-wide GPG key pair, default-gpg-key, which signs the metadata of Debian, RPM and Opkg repositories that name no key pair of their own. Admin only. The body must be one ASCII-armored OpenPGP private key; it is not unlocked until it signs, so the passphrase and public half may follow in later requests. The public half and passphrase are kept. The key is sealed at rest and never returned.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76260,7 +76260,7 @@ func (c *ClientWithResponses) SetGpgPrivateKeyWithBodyWithResponse(ctx context.C
 
 // SetGpgPrivateKeyWithTextBodyWithResponse Set the GPG private key
 //
-// Stores the instance-wide GPG private key used to sign Debian and Alpine metadata. Admin only. The key is sealed at rest and never returned.
+// Stores the private half of the instance-wide GPG key pair, default-gpg-key, which signs the metadata of Debian, RPM and Opkg repositories that name no key pair of their own. Admin only. The body must be one ASCII-armored OpenPGP private key; it is not unlocked until it signs, so the passphrase and public half may follow in later requests. The public half and passphrase are kept. The key is sealed at rest and never returned.
 //
 // Takes a body of the `text/plain` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76275,7 +76275,7 @@ func (c *ClientWithResponses) SetGpgPrivateKeyWithTextBodyWithResponse(ctx conte
 
 // GetGpgPublicKeyWithResponse Get the GPG public key
 //
-// Returns the instance-wide GPG public key so package clients can verify signed metadata. Readable by any authenticated user; 404 until a key is set.
+// Returns the public half of the instance-wide GPG key pair so Debian, RPM and Opkg clients can verify metadata it signs. Readable by any authenticated user, or anonymously while anonymous access is on; 404 until a public key is set.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -76290,7 +76290,7 @@ func (c *ClientWithResponses) GetGpgPublicKeyWithResponse(ctx context.Context, r
 
 // SetGpgPublicKeyWithBodyWithResponse Set the GPG public key
 //
-// Stores the instance-wide GPG public key that matches the private key. Admin only.
+// Stores the public half of the instance-wide GPG key pair, which getGpgPublicKey and the public key download of every repository signing with it publish. Admin only. The body must be public OpenPGP armor only, with no private packets or further blocks. The private half and passphrase are kept. The instance key signs only once both halves are set, belong together and the passphrase unlocks the private one.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76305,7 +76305,7 @@ func (c *ClientWithResponses) SetGpgPublicKeyWithBodyWithResponse(ctx context.Co
 
 // SetGpgPublicKeyWithTextBodyWithResponse Set the GPG public key
 //
-// Stores the instance-wide GPG public key that matches the private key. Admin only.
+// Stores the public half of the instance-wide GPG key pair, which getGpgPublicKey and the public key download of every repository signing with it publish. Admin only. The body must be public OpenPGP armor only, with no private packets or further blocks. The private half and passphrase are kept. The instance key signs only once both halves are set, belong together and the passphrase unlocks the private one.
 //
 // Takes a body of the `text/plain` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76320,7 +76320,7 @@ func (c *ClientWithResponses) SetGpgPublicKeyWithTextBodyWithResponse(ctx contex
 
 // SetGpgPassPhraseWithResponse Set the GPG passphrase
 //
-// Stores the passphrase protecting the GPG private key. Admin only. The value travels in a header rather than the body and is sealed at rest.
+// Stores the passphrase protecting the private half of the instance-wide GPG key pair. Admin only. The value travels in a header rather than the body and is sealed at rest. Set before either half, it is kept for them.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -78079,7 +78079,7 @@ func (c *ClientWithResponses) UpdateKeyPairWithResponse(ctx context.Context, bod
 
 // GetKeyPairPublicKeyPerRepositoryWithResponse Get the public key assigned to a repository
 //
-// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine virtual repositories use their keyPair; other repositories use the primary key pair. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
+// Returns the public half of the repository's signing key pair, which package clients fetch to verify signed metadata. Alpine, Debian, RPM and Opkg virtual repositories use their keyPair; other repositories use the primary key pair. A Debian, RPM or Opkg repository that names no pair answers the instance-wide GPG key (default-gpg-key) once it signs with it. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or signs with no pair.
 //
 // Returns a wrapper object for the known response body format(s).
 //
