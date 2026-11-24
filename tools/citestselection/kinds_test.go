@@ -39,6 +39,9 @@ func TestAccFeatures() {}
 		"test/platform/cloud_test.go": `package platform
 func TestAccCloud() {}
 `,
+		"test/peers/harness_test.go": `package peers
+func TestAccPeersHarness() {}
+`,
 	} {
 		file := filepath.Join(root, path)
 		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {

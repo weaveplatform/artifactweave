@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -137,7 +138,14 @@ func startPushTarget(t *testing.T, cfg config.Config) string {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.WithoutCancel(t.Context()))
-	command := exec.CommandContext(ctx, executable, "-test.run=^TestAccSinglePushTargetProcess$")
+	args := []string{"-test.run=^TestAccSinglePushTargetProcess$"}
+	// Without the owner's -test.gocoverdir a -cover target process writes
+	// its counters to a temporary directory it deletes on exit, so none of
+	// the target's coverage reached make accept-go's merge.
+	if f := flag.Lookup("test.gocoverdir"); f != nil && f.Value.String() != "" {
+		args = append(args, "-test.gocoverdir="+f.Value.String())
+	}
+	command := exec.CommandContext(ctx, executable, args...)
 	command.WaitDelay = 10 * time.Second
 	command.Env = append(os.Environ(), pushProcessConfig+"="+path)
 	logDir := os.Getenv("ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR")

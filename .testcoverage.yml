@@ -44,6 +44,11 @@ exclude:
     # Server-assembly harness: remaining branches abort on fixture setup
     # failures; production server coverage remains gated.
     - ^test/server/support/harness/
+    # Multi-instance harness (acceptance-peers): its remaining branches abort
+    # on an instance that fails to start or stop, a forwarder that cannot
+    # listen, or a container that will not start; the instances' production
+    # coverage, which its processes write, remains gated.
+    - ^test/peers/
     # Shared Agent Packages/Plugins route fixture. Its uncovered branches
     # abort on fixture setup failures or malformed test responses; the
     # production handlers remain in the per-package gate.
