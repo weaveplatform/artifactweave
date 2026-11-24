@@ -355,13 +355,16 @@ func testAppliedMarkersLocked(t *testing.T, s Store) {
 			err := s.Tx(ctx, func(ctx context.Context) error {
 				m, err := s.Outbox().LockApplied(ctx, origin, stream)
 				if err != nil {
-					return err
+					return fmt.Errorf("lock applied: %w", err)
 				}
 				mu.Lock()
 				read = append(read, m.LastSeq)
 				mu.Unlock()
 				m.LastSeq++
-				return s.Outbox().SetApplied(ctx, m)
+				if err := s.Outbox().SetApplied(ctx, m); err != nil {
+					return fmt.Errorf("set applied: %w", err)
+				}
+				return nil
 			})
 			if err != nil {
 				t.Error(err)
@@ -381,19 +384,19 @@ func testAppliedMarkersLocked(t *testing.T, s Store) {
 		outbox.AppliedMarker{Origin: origin, Stream: stream, LastSeq: workers},
 		storekit.Get[outbox.AppliedMarker](t)(s.Outbox().Applied(ctx, origin, stream)),
 	)
-	rollback := errors.New("roll back")
+	// errBoom rolls the transaction back after the position moved.
 	err := s.Tx(ctx, func(ctx context.Context) error {
 		m, err := s.Outbox().LockApplied(ctx, origin, stream)
 		if err != nil {
-			return err
+			return fmt.Errorf("lock applied: %w", err)
 		}
 		m.LastSeq = 99
 		if err := s.Outbox().SetApplied(ctx, m); err != nil {
-			return err
+			return fmt.Errorf("set applied: %w", err)
 		}
-		return rollback
+		return errBoom
 	})
-	if !errors.Is(err, rollback) {
+	if !errors.Is(err, errBoom) {
 		t.Fatalf("rolled-back apply: %v", err)
 	}
 	storekit.Same(
@@ -403,6 +406,7 @@ func testAppliedMarkersLocked(t *testing.T, s Store) {
 		storekit.Get[outbox.AppliedMarker](t)(s.Outbox().Applied(ctx, origin, stream)),
 	)
 	failsCancelled(t, map[string]func(context.Context) error{
+		//nolint:wrapcheck // the case checks only that the call fails
 		"LockApplied": func(ctx context.Context) error { _, err := s.Outbox().LockApplied(ctx, origin, stream); return err },
 	})
 }
