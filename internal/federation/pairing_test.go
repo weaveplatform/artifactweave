@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/pairing"
+	fedport "github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/work"
@@ -207,5 +208,104 @@ func TestUnitPeerProbe(t *testing.T) {
 	}
 	if p, err := store.Peers().Get(t.Context(), peer.InstanceID); err != nil || p.Status != model.PeerOnline || p.LastSeen.IsZero() {
 		t.Fatalf("the read peer: %+v, %v", p, err)
+	}
+}
+
+// probeFaults fails the peer status reads' own store calls, by kind, and
+// leaves the rest of the store working.
+type probeFaults struct {
+	*inmem.Store
+	get, enqueue, list bool
+}
+
+func (s *probeFaults) WorkQueue() work.WorkQueue { return probeQueue{s.Store.WorkQueue(), s} }
+
+func (s *probeFaults) Peers() fedport.PeerStore { return probePeers{s.Store.Peers(), s} }
+
+type probeQueue struct {
+	work.WorkQueue
+	f *probeFaults
+}
+
+func (q probeQueue) Get(ctx context.Context, kind, key string) (work.WorkItem, error) {
+	if q.f.get && kind == federation.PeerProbeKind {
+		return work.WorkItem{}, kernel.ErrStore
+	}
+	return q.WorkQueue.Get(ctx, kind, key) //nolint:wrapcheck // a test double passes the store's error on
+}
+
+func (q probeQueue) Enqueue(ctx context.Context, kind, key string, payload []byte, now time.Time) error {
+	if q.f.enqueue && kind == federation.PeerProbeKind {
+		return kernel.ErrStore
+	}
+	return q.WorkQueue.Enqueue(ctx, kind, key, payload, now) //nolint:wrapcheck // a test double passes the store's error on
+}
+
+type probePeers struct {
+	fedport.PeerStore
+	f *probeFaults
+}
+
+func (p probePeers) List(ctx context.Context, f fedport.PeerFilter) ([]model.Peer, error) {
+	if p.f.list {
+		return nil, kernel.ErrStore
+	}
+	return p.PeerStore.List(ctx, f) //nolint:wrapcheck // a test double passes the store's error on
+}
+
+// TestUnitPeerProbeFaults surfaces a store fault in registering the reads
+// or in a run, and a run that fails is not followed by a queued next run
+// of its own making: the queue retries the item.
+func TestUnitPeerProbeFaults(t *testing.T) {
+	for name, tc := range map[string]struct {
+		faults  probeFaults
+		atStart bool
+	}{
+		"read the queued item": {faults: probeFaults{get: true}, atStart: true},
+		"list the peers":       {faults: probeFaults{list: true}},
+		"queue the next read":  {faults: probeFaults{enqueue: true}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			store := &probeFaults{Store: inmem.New()}
+			if err := instance.EnsureInstance(t.Context(), store.Store); err != nil {
+				t.Fatal(err)
+			}
+			m, err := federation.New(federation.Deps{Store: store, Access: pushAccess()})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(m.Close)
+			if err := m.OpenPush(t.Context(), struct{ artifactsapi.TransferSource }{}, federation.PushOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			if err := m.OpenPull(t.Context(), struct{ artifactsapi.PullSource }{}); err != nil {
+				t.Fatal(err)
+			}
+			m.OpenLiveness(&probeRemote{}, time.Second)
+			queue, err := work.New(store, work.Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			// The item is queued before the fault that a run meets.
+			*store = probeFaults{Store: store.Store, get: tc.faults.get}
+			err = m.RegisterWork(t.Context(), queue)
+			if tc.atStart {
+				if !errors.Is(err, kernel.ErrStore) {
+					t.Fatalf("RegisterWork = %v, want the store fault", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			*store = probeFaults{Store: store.Store, list: tc.faults.list, enqueue: tc.faults.enqueue}
+			if _, err := queue.RunDue(t.Context(), federation.PeerProbeKind); err != nil {
+				t.Fatal(err)
+			}
+			item, err := store.Store.WorkQueue().Get(t.Context(), federation.PeerProbeKind, "probe")
+			if err != nil || item.Attempts != 1 || item.LastError == "" {
+				t.Fatalf("the failed run's item: %+v, %v", item, err)
+			}
+		})
 	}
 }
