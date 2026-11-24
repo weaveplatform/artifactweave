@@ -346,9 +346,11 @@ jobs:
   # artifactweave instances per scenario, each a separate process of the
   # test binary itself running serve's runtime on its own loopback port,
   # data directory and database (SQLite, or a PostgreSQL container of the
-  # scenario's own with a database per instance), with a forwarder per pair
-  # that partitions and heals. The binary passes its -test.gocoverdir to
-  # every instance, so their counters land here beside its own. Plain go
+  # scenario's own with a database per instance), each reached at one
+  # ingress address that is its base URL and reaching the others through an
+  # egress proxy of its own that partitions and heals. The binary passes its
+  # -test.gocoverdir to every instance, so their counters land here beside
+  # its own. Plain go
   # test, with no make target or wrapper, so the lane runs the same on any
   # host with Docker. Selected on full runs and for test/peers and the
   # federation module (tools/citestselection, peers.go).
