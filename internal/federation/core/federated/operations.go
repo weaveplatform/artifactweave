@@ -124,6 +124,9 @@ func (o Operations) ConvertToLocal(ctx context.Context, keys []string) ([]string
 	if err := o.Authorize(ctx); err != nil {
 		return nil, nil, err
 	}
+	if len(keys) == 0 {
+		return nil, nil, refuse("A list of federated repository keys is required")
+	}
 	var converted []string
 	failed := map[string]string{}
 	for _, key := range keys {
@@ -175,11 +178,13 @@ const MsgReplaceURL = "Binding URL from URL %s to new %s finished."
 // is, so newBase must belong to a paired peer, and every rewritten
 // repository's configuration is sent to its members.
 func (o Operations) ReplaceURL(ctx context.Context, oldBase, newBase string) error {
-	if strings.TrimSpace(oldBase) == "" || strings.TrimSpace(newBase) == "" {
-		return refuse("oldBaseUrl and newBaseUrl are required")
-	}
 	from, to := repo.NormalizeMemberBase(oldBase), repo.NormalizeMemberBase(newBase)
 	return o.tx(ctx, func(ctx context.Context) error {
+		// Checked after the caller is, so only an administrator learns
+		// what the body lacks.
+		if strings.TrimSpace(oldBase) == "" || strings.TrimSpace(newBase) == "" {
+			return refuse("oldBaseUrl and newBaseUrl are required")
+		}
 		all, err := o.Repositories.List(ctx, artifactsapi.RepoFilter{})
 		if err != nil {
 			return fmt.Errorf("list repositories: %w", err)

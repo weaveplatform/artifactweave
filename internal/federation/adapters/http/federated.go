@@ -115,10 +115,11 @@ func (a FederatedAPI) ConvertFederatedRepositoryToLocal(
 	if err != nil {
 		return nil, err
 	}
-	if req.Body == nil || len(*req.Body) == 0 {
-		return nil, apierror.New(http.StatusBadRequest, "A list of federated repository keys is required")
+	var keys []string
+	if req.Body != nil {
+		keys = *req.Body
 	}
-	converted, failed, err := ops.ConvertToLocal(ctx, *req.Body)
+	converted, failed, err := ops.ConvertToLocal(ctx, keys)
 	if err != nil {
 		return nil, federatedError(ctx, "", err)
 	}
@@ -171,7 +172,7 @@ func (a FederatedAPI) replace(ctx context.Context, body *artgen.FederatedReplace
 		return "", err
 	}
 	if body == nil {
-		return "", apierror.New(http.StatusBadRequest, "oldBaseUrl and newBaseUrl are required")
+		body = &artgen.FederatedReplaceUrl{}
 	}
 	if err := ops.ReplaceURL(ctx, body.OldBaseUrl, body.NewBaseUrl); err != nil {
 		return "", federatedError(ctx, "", err)
