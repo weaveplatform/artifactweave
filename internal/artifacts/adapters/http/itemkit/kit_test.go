@@ -236,6 +236,31 @@ func TestUnitItemErrorStatuses(t *testing.T) {
 	}
 }
 
+// TestUnitDeployRefusalHides: the item deploy route's overwrite refusal is
+// OverwriteRefusal's, with ARTIFACT_NOT_FOUND's 404 as the answer that hides
+// it, to a named and an anonymous caller alike (#1916).
+func TestUnitDeployRefusalHides(t *testing.T) {
+	denied := &item.OverwriteDeniedError{Repo: kittest.LocalKey, Path: "a.txt", User: "ann"}
+	user := accessapi.WithCaller(t.Context(), kernel.Principal{Name: "ann"}, &accessapitest.Decider{})
+	for _, ctx := range []context.Context{user, t.Context()} {
+		err := itemkit.DeployRefusal(ctx, denied)
+		var hideable *apierror.Hideable
+		if !errors.As(err, &hideable) {
+			t.Fatalf("%v is not hideable", err)
+		}
+		refusal, want := hideable.Refusal, itemkit.OverwriteRefusal(ctx, denied)
+		var got, wantErr *apierror.Error
+		if !errors.As(refusal, &got) || !errors.As(want, &wantErr) ||
+			got.Status != wantErr.Status || got.Message != wantErr.Message {
+			t.Errorf("refusal %v, want %v", refusal, want)
+		}
+		if h := hideable.Hidden; h.Status != http.StatusNotFound ||
+			h.Message != "Artifact deletion error: Could not locate artifact. Path: '"+kittest.LocalKey+"/a.txt'" {
+			t.Errorf("hidden %d %q", h.Status, h.Message)
+		}
+	}
+}
+
 var errRepos = errors.New("repositories unavailable")
 
 // failingRepos is a store whose repository reads fail.

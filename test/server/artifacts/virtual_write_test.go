@@ -88,8 +88,7 @@ func TestAccDeployThroughVirtual(t *testing.T) {
 	wantError(t, "overwrite through virt",
 		w.do(http.MethodPut, "/artifactory/virt/d/v.txt", "deployer", "changed"),
 		http.StatusForbidden,
-		"Not enough permissions to delete/overwrite artifact 'libs-local:d/v.txt' "+
-			"(user: 'deployer' needs DELETE permission).", "")
+		refusedOverwrite("libs-local", "d/v.txt", "deployer"), "")
 	// user may write nowhere.
 	wantStatus(
 		t,

@@ -90,7 +90,7 @@ func (s ArtifactoryAPI) ProtocolOptions() pkgroute.Options {
 			return itemkit.StreamNames(c, path.Base(p), form)
 		},
 		DeployItem: func(w http.ResponseWriter, r *http.Request, c repo.Config, rest string) {
-			s.deployEscapedItem(w, r, url.PathEscape(c.Key)+"/"+rest)
+			s.deployEscapedItem(w, r, url.PathEscape(c.Key)+"/"+rest, itemkit.OverwriteRefusal)
 		},
 		ItemError: s.ItemError,
 		Created: func(w http.ResponseWriter, r *http.Request, it model.Item) {

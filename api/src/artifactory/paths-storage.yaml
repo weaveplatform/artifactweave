@@ -3328,10 +3328,15 @@ paths:
         the repository forbids overwrites; replacing needs delete permission at the stored path, except with the
         file''s own content: a deploy that declares the stored file''s SHA-1 or SHA-256 and stores those same bytes
         needs deploy permission only, and so does such a checksum deploy unless the server is set to require delete
-        permission for it. A replacement refused for want of delete permission answers 403, or 401 to an anonymous
-        caller, with the message `Not enough permissions to delete/overwrite artifact ''<repoKey>:<path>'' (user:
-        ''<user>'' needs DELETE permission).`, naming the repository the file is in, its stored path (for an archive,
-        the entry in the way) and the caller, `anonymous` for an anonymous one. A `.md5`, `.sha1`,
+        permission for it. A `.md5`, `.sha1` or `.sha256` stored as a file of its own, a `maven-metadata.xml`
+        and a Maven non-unique snapshot (a `-SNAPSHOT` file in a `-SNAPSHOT` folder) are replaced with deploy
+        permission alone. A
+        replacement refused for want of delete permission answers 403, or 401 to an anonymous caller, with the
+        message `Artifact deletion error: Not enough permissions to delete/overwrite all artifacts under
+        ''<repoKey>/<path>'' (user: ''<user>'' needs DELETE permission).`, naming the repository the file is in,
+        its stored path (for an archive, the entry in the way) and the caller, `anonymous` for an anonymous one.
+        While the security configuration''s `hideUnauthorizedResources` is on, it answers 404 `Artifact deletion
+        error: Could not locate artifact. Path: ''<repoKey>/<path>''` instead, to an anonymous caller too. A `.md5`, `.sha1`,
         `.sha256` or `.sha512` body for an existing file, or for any file in a Maven-family repository, records that
         checksum on the file and answers 201 with no body and the file''s URL in `Location`. The same route carries
         two variants selected by headers. With `X-Explode-Archive: true` the body is a zip, tar, tar.gz or tgz archive whose

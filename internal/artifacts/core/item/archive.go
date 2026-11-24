@@ -49,10 +49,11 @@ var ErrBadArchive = archive.ErrUnusable
 var ErrOverwriteDenied = errors.New("item: no permission to overwrite")
 
 // OverwriteDeniedError is a write refused because it would replace a file
-// the caller may not delete. Its text is Artifactory 7.x's, which clients
-// match rather than read: Poetry's publish --skip-existing takes a 403
-// whose text holds "overwrite artifact" for a file that is already there,
-// and fails on any other wording.
+// the caller may not delete. Its text is 7.161.26's REQUIRES_DELETE_PERMISSION
+// (ArtifactDeleteFailStatus 12-14), which assertNonRootPathDelete records for
+// a deploy over a file since 7.111 (#1916). Earlier 7.x wrote "delete/overwrite
+// artifact '<repo>:<path>'", which twine up to 6.1 and Poetry 2.5.1 match for
+// --skip-existing; 7.x's own text no longer matches it (pypa/twine#1251).
 type OverwriteDeniedError struct {
 	// Repo is the key of the repository that holds the file.
 	Repo string
@@ -63,16 +64,32 @@ type OverwriteDeniedError struct {
 	User string
 }
 
-// Error returns Artifactory 7.x's text for the refusal, naming the
-// repository, the path and the user. Clients match it, so it stays
-// byte-identical.
+// Error returns 7.161.26's text for the refusal, which names the file as
+// RepoPath.toPrettyPath does, '<repo>/<path>', and the user. Clients show
+// and match it, so it stays byte-identical.
 func (e *OverwriteDeniedError) Error() string {
 	return fmt.Sprintf(
-		"Not enough permissions to delete/overwrite artifact '%s:%s' (user: '%s' needs DELETE permission).",
+		"Artifact deletion error: Not enough permissions to delete/overwrite all artifacts under "+
+			"'%s/%s' (user: '%s' needs DELETE permission).",
 		e.Repo,
 		e.Path,
 		e.User,
 	)
+}
+
+// NotFound is the text 7.161.26 answers in place of Error while the global
+// hideUnauthorizedResources is on: ARTIFACT_NOT_FOUND, naming the same
+// file (assertNonRootPathDelete 3428-3444).
+func (e *OverwriteDeniedError) NotFound() string {
+	return ArtifactNotFound(e.Repo, e.Path)
+}
+
+// ArtifactNotFound is 7.161.26's ARTIFACT_NOT_FOUND text for path in the
+// repository whose key is storing, a remote's cache for a remote's file.
+// assertNonRootPathDelete gives it for a deletion and for an overwrite the
+// global hideUnauthorizedResources hides.
+func ArtifactNotFound(storing, path string) string {
+	return fmt.Sprintf("Artifact deletion error: Could not locate artifact. Path: '%s/%s'", storing, path)
 }
 
 // Unwrap returns ErrOverwriteDenied, so errors.Is matches every overwrite

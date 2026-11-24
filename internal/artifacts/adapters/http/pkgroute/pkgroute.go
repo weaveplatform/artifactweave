@@ -1094,7 +1094,8 @@ func (k *Kit) Store(
 	p, _ := kernel.FromContext(ctx)
 	existing, err := k.o.Store.Items().Get(ctx, c.Key, false, path)
 	switch {
-	case err == nil && !existing.Folder && !can(r, c, path, accessapi.ActionDelete):
+	case err == nil && !existing.Folder && item.OverwriteNeedsDelete(path) &&
+		!can(r, c, path, accessapi.ActionDelete):
 		// Overwriting replaces content, which needs the right to delete it.
 		// The item routes word the refusal, as clients match its text.
 		return model.Item{}, k.o.ItemError(ctx, "deploy", &item.OverwriteDeniedError{

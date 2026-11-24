@@ -47,7 +47,8 @@
 //     cleanup (KindCacheCleanupSchedule, KindCacheCleanup).
 //   - Errors the HTTP layer maps onto statuses: ErrChecksumMismatch,
 //     ErrBadChecksum, ErrNoBlob, ErrConflict, ErrCollected, ErrBadArchive,
-//     ErrOverwriteDenied with OverwriteDeniedError, and SidecarError.
+//     ErrOverwriteDenied with OverwriteDeniedError (and ArtifactNotFound,
+//     the text that hides it), and SidecarError.
 //   - StorageFault, with MarkStorageFault: a failure of the server's own
 //     storage while the cache keeps a remote file: a failed open or read
 //     of its copy by the format's Validate hook, its inspection or a
