@@ -588,6 +588,7 @@ func matrixTable() []matrixRow {
 		projectMatrix(),
 		webhookMatrix(),
 		replicationMatrix(),
+		federatedMatrix(),
 		cleanupPolicyMatrix(),
 		projectRepositoryMatrix(),
 		permissionMatrix(),

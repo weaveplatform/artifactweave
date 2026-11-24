@@ -4,8 +4,13 @@ Checked against: Artifactory 7.161.32 and the 7.161.26 source ([research 40](../
 
 Status: Accepted
 
-Implementation status (2026-11-24): **planned P13**. The decision below describes
-intended behavior; generated API stubs and storage models do not implement it.
+Implementation status (2026-11-24): **in progress, P13**. Members and
+configuration sync are implemented (FED-01, [#1930](https://github.com/weaveplatform/artifactweave/issues/1930)):
+member checks against paired peers, `federatedRepoUrlBase`, configSync over the
+peer API, `migrate`, `convertToLocal`, `replaceUrl` and `updateMemberUrl`. The
+rest of the decision below describes intended behavior that later P13 tasks
+implement; their generated API stubs and storage models do not implement it yet.
+A `receiver` member is refused until FED-03.
 P37 owns vendor federation/RTFS interoperability and migration contracts. [0042](0042-capability-scope-and-supersession.md)
 replaces permanent scope cuts; [research 10](../10-scope-and-tiers.md) records current
 availability.

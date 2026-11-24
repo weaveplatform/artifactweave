@@ -163,21 +163,26 @@ func TestUnitStamp(t *testing.T) {
 
 func TestUnitFederation(t *testing.T) {
 	base, key, err := model.ParseMemberURL("https://a.example.com/artifactory/generic-fed/")
-	if err != nil || base != "https://a.example.com" || key != "generic-fed" {
+	if err != nil || base != "https://a.example.com/artifactory" || key != "generic-fed" {
 		t.Errorf("%q %q %v", base, key, err)
 	}
-	base, _, err = model.ParseMemberURL("https://a.example.com/prefix/artifactory/libs?x=1")
-	if err != nil || base != "https://a.example.com/prefix" {
-		t.Errorf("prefixed base: %q %v", base, err)
+	// 7.x appends /artifactory to a base without it, after trimming slashes.
+	base, key, err = model.ParseMemberURL("https://a.example.com/prefix//libs")
+	if err != nil || base != "https://a.example.com/prefix/artifactory" || key != "libs" {
+		t.Errorf("normalized base: %q %q %v", base, key, err)
 	}
-	for _, bad := range []string{"not a url", "/artifactory/x", "https://h/repo/x", "https://h/artifactory/", "https://h/artifactory/a/b", "%zz"} {
+	for _, bad := range []string{
+		"not a url", "/artifactory/x", "https://h/", "https://h", "https://h/a?x=1",
+		"https://h/a#f", "https://u:p@h/a", "ftp://h/a", "%zz",
+	} {
 		if _, _, err := model.ParseMemberURL(bad); !errors.Is(err, model.ErrInvalidMemberURL) {
 			t.Errorf("%q: %v", bad, err)
 		}
 	}
 	cfg := &repo.Config{Key: "generic-fed", Class: repo.Federated, Members: []repo.Member{
 		{URL: "https://self.example.com/artifactory/generic-fed", Enabled: repo.Flex(true)},
-		{URL: "https://a.example.com/artifactory/generic-fed"},
+		{URL: repo.SelfMemberURL("generic-fed")},
+		{URL: "https://a.example.com/generic-fed", Mode: repo.ModeBidirectional},
 		{URL: "https://b.example.com/artifactory/other", Enabled: repo.Flex(false)},
 	}}
 	members, err := model.MembersOf(cfg, "https://self.example.com/")
@@ -187,19 +192,29 @@ func TestUnitFederation(t *testing.T) {
 	want := []model.FederationMember{
 		{
 			RepoKey:       "generic-fed",
-			BaseURL:       "https://a.example.com",
+			BaseURL:       "https://a.example.com/artifactory",
 			RemoteRepoKey: "generic-fed",
+			Mode:          repo.ModeBidirectional,
 			Enabled:       true,
 		},
 		{
 			RepoKey:       "generic-fed",
-			BaseURL:       "https://b.example.com",
+			BaseURL:       "https://b.example.com/artifactory",
 			RemoteRepoKey: "other",
 			Enabled:       false,
 		},
 	}
 	if diff := cmp.Diff(want, members); diff != "" {
 		t.Error(diff)
+	}
+	if members[0].Receiver() || !(model.FederationMember{Mode: repo.ModeReceiver}).Receiver() {
+		t.Error("Receiver")
+	}
+	// The self base with another key is another repository, not this one.
+	if model.IsSelfMember("https://self.example.com/artifactory/other", "generic-fed", "https://self.example.com") ||
+		model.IsSelfMember("https://self.example.com/artifactory/generic-fed", "generic-fed", "") ||
+		model.IsSelfMember("nonsense", "generic-fed", "https://self.example.com") {
+		t.Error("IsSelfMember")
 	}
 	cfg.Members = append(cfg.Members, repo.Member{URL: "nonsense"})
 	if _, err := model.MembersOf(cfg, ""); !errors.Is(err, model.ErrInvalidMemberURL) {

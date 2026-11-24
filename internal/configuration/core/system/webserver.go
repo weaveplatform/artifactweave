@@ -201,8 +201,15 @@ func wholeNumber(v any) (int, bool) {
 // UrlValidator, without user information, a query or a fragment, which no
 // link built on it could carry, and whose host is not one cdnHosts sit under.
 func CheckURLBase(raw string, cdnHosts []string) error {
+	return CheckBaseURL("urlBase", raw, cdnHosts)
+}
+
+// CheckBaseURL is CheckURLBase for a base URL setting named field: urlBase,
+// or federatedRepoUrlBase, which members and pairing tokens carry to other
+// instances and which the same rules therefore apply to.
+func CheckBaseURL(field, raw string, cdnHosts []string) error {
 	invalid := func(why string) error {
-		return fmt.Errorf("%w: urlBase %s", configapi.ErrInvalid, why)
+		return fmt.Errorf("%w: %s %s", configapi.ErrInvalid, field, why)
 	}
 	if strings.ContainsFunc(raw, func(r rune) bool { return r <= ' ' || r == 0x7f }) {
 		return invalid("must not contain spaces or control characters")

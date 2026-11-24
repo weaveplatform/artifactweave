@@ -303,6 +303,7 @@ var applied = []string{
 	SectionMailServer,
 	SectionSecurity,
 	SectionURLBase,
+	SectionFederatedRepoURLBase,
 	SectionBackups,
 	SectionSystemMessage,
 }

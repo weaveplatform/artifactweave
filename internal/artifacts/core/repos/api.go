@@ -82,6 +82,9 @@ func (r repositories) Create(ctx context.Context, c repo.Config) error {
 		if err := checkProjectPrefix(c); err != nil {
 			return err
 		}
+		if err := r.admit(ctx, &c); err != nil {
+			return err
+		}
 		if err := r.st.Repos().Create(ctx, c); err != nil {
 			return err //nolint:wrapcheck // preserves upstream error identity
 		}
@@ -89,7 +92,16 @@ func (r repositories) Create(ctx context.Context, c repo.Config) error {
 			return err
 		}
 		if r.projects != nil {
-			return r.projects.BindRepository(ctx, c.Key, c.ProjectKey, c.Environments, true) //nolint:wrapcheck // access owns binding context
+			if err := r.projects.BindRepository(ctx, c.Key, c.ProjectKey, c.Environments, true); err != nil {
+				return err //nolint:wrapcheck // access owns binding context
+			}
+		}
+		for _, lifecycle := range r.lifecycles {
+			if a, ok := lifecycle.(artifactsapi.RepositoryAdmission); ok {
+				if err := a.CreatedRepository(ctx, c.Key); err != nil {
+					return fmt.Errorf("created repository consumers: %w", err)
+				}
+			}
 		}
 		return nil
 	})
@@ -97,6 +109,9 @@ func (r repositories) Create(ctx context.Context, c repo.Config) error {
 
 func (r repositories) Update(ctx context.Context, c repo.Config) error {
 	return r.tx(ctx, func(ctx context.Context) error {
+		if err := r.admit(ctx, &c); err != nil {
+			return err
+		}
 		if err := r.st.Repos().Update(ctx, c); err != nil {
 			return err //nolint:wrapcheck // preserves upstream error identity
 		}
@@ -131,6 +146,20 @@ func (r repositories) Remove(ctx context.Context, key, by string) (int64, bool, 
 		return err //nolint:wrapcheck // preserves removal/binding error identity for the caller
 	})
 	return removed, trashed, err
+}
+
+// admit lets each lifecycle that takes part in writes check c and rewrite it
+// to its stored form. Its refusal is returned unwrapped, as the answer the
+// caller gives.
+func (r repositories) admit(ctx context.Context, c *repo.Config) error {
+	for _, lifecycle := range r.lifecycles {
+		if a, ok := lifecycle.(artifactsapi.RepositoryAdmission); ok {
+			if err := a.AdmitRepository(ctx, c); err != nil {
+				return err //nolint:wrapcheck // the consumer's refusal is the answer
+			}
+		}
+	}
+	return nil
 }
 
 func (r repositories) resetRepository(ctx context.Context, key string) error {

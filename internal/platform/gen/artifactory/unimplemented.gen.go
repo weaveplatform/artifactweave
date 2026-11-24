@@ -402,6 +402,10 @@ func (UnimplementedStrict) RemoveFederationMember(context.Context, RemoveFederat
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) ReplaceFederatedMemberBaseUrl(context.Context, ReplaceFederatedMemberBaseUrlRequestObject) (ReplaceFederatedMemberBaseUrlResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) GetFederationSyncState(context.Context, GetFederationSyncStateRequestObject) (GetFederationSyncStateResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
@@ -427,6 +431,10 @@ func (UnimplementedStrict) GetFederationStateSummaries(context.Context, GetFeder
 }
 
 func (UnimplementedStrict) GetUnavailableMirrors(context.Context, GetUnavailableMirrorsRequestObject) (GetUnavailableMirrorsResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) UpdateFederatedMemberUrl(context.Context, UpdateFederatedMemberUrlRequestObject) (UpdateFederatedMemberUrlResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 

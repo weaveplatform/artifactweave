@@ -76,6 +76,7 @@ import (
 	notificationshttp "github.com/weaveplatform/artifactweave/internal/notifications/adapters/http"
 	"github.com/weaveplatform/artifactweave/internal/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	accessgen "github.com/weaveplatform/artifactweave/internal/platform/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/internal/platform/gen/artifactory"
@@ -448,6 +449,36 @@ func configuredBaseURL(cfg RouterConfig) func(context.Context) string {
 	return func(context.Context) string { return cfg.BaseURL }
 }
 
+// federatedAPIs are the federated repository operations under
+// /api/federation and the peer API's configuration receiver (FED-01); each
+// keeps its 501 without a federation module over a store that serves them.
+func federatedAPIs(cfg RouterConfig) (federationhttp.FederatedAPI, federationpeer.RepositoryServer) {
+	var ops federationhttp.FederatedAPI
+	var receiver federationpeer.RepositoryServer
+	if cfg.Federation == nil {
+		return ops, receiver
+	}
+	if o, err := cfg.Federation.Operations(); err == nil {
+		ops.Operations = o
+	}
+	if r, err := cfg.Federation.Receiver(); err == nil {
+		receiver.Receiver = r
+	}
+	return ops, receiver
+}
+
+// memberBase is the base URL a federated repository's own member is read
+// back with: federatedRepoUrlBase, urlBase or the configured base URL
+// (configdoc.FederatedBase). Without a store there is none.
+func memberBase(cfg RouterConfig) func(context.Context) (string, error) {
+	if cfg.Store == nil {
+		return nil
+	}
+	return func(ctx context.Context) (string, error) {
+		return configdoc.FederatedBase(ctx, cfg.Store.Configs(), cfg.BaseURL) //nolint:wrapcheck // names the setting
+	}
+}
+
 // withFederation runs after Access and before Configuration: descriptor
 // repository deletion must share the same replication lifetime cleanup.
 func withFederation(cfg RouterConfig) RouterConfig {
@@ -459,6 +490,7 @@ func withFederation(cfg RouterConfig) RouterConfig {
 		Lifetimes:      repos.NewRepositoryLifetimes(cfg.Store),
 		Store:          cfg.Store, Access: cfg.Access, Ownership: repos.NewProjectRepositoryLookup(cfg.Store),
 		Repositories: repos.NewRepositories(cfg.Store, cfg.Access.Keys, cfg.Access.Projects),
+		BaseURL:      cfg.BaseURL,
 	}); err == nil {
 		// New refuses only a nil store, excluded above, and performs no I/O.
 		cfg.Federation = m
@@ -498,6 +530,31 @@ func (l repositoryLifecycles) RefreshRepository(ctx context.Context, key string)
 	for _, lifecycle := range l {
 		if err := lifecycle.RefreshRepository(ctx, key); err != nil {
 			return err //nolint:wrapcheck // the consumer names what failed
+		}
+	}
+	return nil
+}
+
+// AdmitRepository and CreatedRepository forward to the consumers that take
+// part in repository writes (artifactsapi.RepositoryAdmission), so wrapping
+// them in the composite does not hide that they do.
+func (l repositoryLifecycles) AdmitRepository(ctx context.Context, c *repo.Config) error {
+	for _, lifecycle := range l {
+		if a, ok := lifecycle.(artifactsapi.RepositoryAdmission); ok {
+			if err := a.AdmitRepository(ctx, c); err != nil {
+				return err //nolint:wrapcheck // the consumer's refusal is the answer
+			}
+		}
+	}
+	return nil
+}
+
+func (l repositoryLifecycles) CreatedRepository(ctx context.Context, key string) error {
+	for _, lifecycle := range l {
+		if a, ok := lifecycle.(artifactsapi.RepositoryAdmission); ok {
+			if err := a.CreatedRepository(ctx, key); err != nil {
+				return err //nolint:wrapcheck // the consumer names what failed
+			}
 		}
 	}
 	return nil
@@ -557,6 +614,7 @@ func artifactsDeps(cfg RouterConfig) artifactshttp.Deps {
 		Deps:                        kitDeps(cfg),
 		Store:                       cfg.Store,
 		RepositoryLifecycle:         repositoryLifecycle(cfg),
+		MemberBase:                  memberBase(cfg),
 		RemoteHTTP:                  cfg.RemoteHTTP,
 		RemoteStatus:                cfg.RemoteStatus,
 		GC:                          cfg.GC,
@@ -652,6 +710,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			replicationOps.Executions = &coordinator
 		}
 	}
+	federatedOps, repoServer := federatedAPIs(cfg)
 	serviceTrust, pairServer := pairingAPIs(cfg)
 	logger := cfg.Logger
 	if logger == nil {
@@ -875,6 +934,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 				RPMAPI:             &rpmOps,
 				PackagePoliciesAPI: &cleanupOps,
 				ReplicationAPI:     &replicationOps,
+				FederatedAPI:       &federatedOps,
 			}, append(keyed.artifactory(), vcshttp.KeepRequest), strictOpts),
 			artgen.ChiServerOptions{
 				BaseURL:          "/artifactory",
@@ -972,7 +1032,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		peergen.HandlerWithOptions(
-			peergen.NewStrictHandlerWithOptions(peerService{pair: pairServer, streams: streamServer(cfg)}, keyed.peer(), peerOpts),
+			peergen.NewStrictHandlerWithOptions(peerService{pair: pairServer, streams: streamServer(cfg), repos: repoServer}, keyed.peer(), peerOpts),
 			peergen.ChiServerOptions{
 				BaseURL:          peerBase,
 				BaseRouter:       g,
@@ -1463,6 +1523,7 @@ type artifactoryServer struct {
 	*rpmhttp.RPMAPI
 	*retentionhttp.PackagePoliciesAPI
 	*federationhttp.ReplicationAPI
+	*federationhttp.FederatedAPI
 	artifactoryStubs
 }
 
@@ -1496,11 +1557,13 @@ type (
 	gridService   struct{ gridgen.UnimplementedStrict }
 	// peerService is the peer API's server (decision 0021); its P13
 	// tickets replace the stubs. pair serves /pair (PEER-02); streams the
-	// stream events and blobs (PEER-04) and snapshots (PEER-05).
+	// stream events and blobs (PEER-04) and snapshots (PEER-05); repos
+	// /repositories/{repoKey} (FED-01).
 	peerService struct {
 		peergen.UnimplementedStrict
 		pair    federationpeer.PairServer
 		streams federationpeer.StreamServer
+		repos   federationpeer.RepositoryServer
 	}
 )
 
@@ -1518,6 +1581,14 @@ func pairingAPIs(cfg RouterConfig) (federationhttp.ServiceTrustAPI, federationpe
 			serviceTrust.Pairing, serviceTrust.Authorize = svc, svc.Authorize
 			pairServer.Pairing = svc
 		}
+	}
+	if cfg.Store != nil {
+		federatedBase := func(ctx context.Context) (string, error) {
+			base, _, err := configdoc.StoredScalar(ctx, cfg.Store.Configs(),
+				configdoc.ConfigFederatedRepoURLBase, configdoc.FederatedRepoURLBaseField)
+			return base, err //nolint:wrapcheck // names the setting
+		}
+		serviceTrust.FederatedBase, pairServer.FederatedBase = federatedBase, federatedBase
 	}
 	return serviceTrust, pairServer
 }
@@ -1544,6 +1615,18 @@ func (s peerService) CancelPairing(
 		return s.UnimplementedStrict.CancelPairing(ctx, req) //nolint:wrapcheck // the generated 501
 	}
 	return s.pair.CancelPairing(ctx, req) //nolint:wrapcheck // as RedeemPairing
+}
+
+// PutRepositoryConfiguration applies a member's federated repository
+// configuration (FED-01); without a receiver it keeps the 501 stub.
+func (s peerService) PutRepositoryConfiguration(
+	ctx context.Context,
+	req peergen.PutRepositoryConfigurationRequestObject,
+) (peergen.PutRepositoryConfigurationResponseObject, error) {
+	if s.repos.Receiver == nil {
+		return s.UnimplementedStrict.PutRepositoryConfiguration(ctx, req) //nolint:wrapcheck // the generated 501
+	}
+	return s.repos.PutRepositoryConfiguration(ctx, req) //nolint:wrapcheck // as RedeemPairing
 }
 
 // streamServer serves the peer API's stream events and blobs over the

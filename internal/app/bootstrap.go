@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/configuration"
 	configapi "github.com/weaveplatform/artifactweave/internal/configuration/api"
 	"github.com/weaveplatform/artifactweave/internal/configuration/core/descriptor"
+	"github.com/weaveplatform/artifactweave/internal/federation"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/settings"
 )
@@ -84,8 +85,9 @@ func ApplyDescriptor(
 // administration recheck, and no loggers.
 func configurationOver(st *appsql.Store, installation configapi.Settings) configapi.API {
 	return descriptor.NewAPI(descriptor.Deps{
-		Tx:              st,
-		Repositories:    repos.NewRepositories(st, access.KeysOf(st), access.ProjectsOf(st), configuration.RepositoryLifecycle(st)),
+		Tx: st,
+		Repositories: repos.NewRepositories(st, access.KeysOf(st), access.ProjectsOf(st),
+			configuration.RepositoryLifecycle(st), federation.MembershipLifecycle(st, installation.BaseURL, st.Repos().Get)),
 		Layouts:         layout.Checker{},
 		Configs:         st.Configs(),
 		AnonymousAccess: access.AnonymousAccessOf(st),

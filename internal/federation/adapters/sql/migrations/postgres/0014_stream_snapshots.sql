@@ -4,8 +4,7 @@
 -- sequence while the stream moves on; entries are read in byte order of
 -- key, hence COLLATE "C", ordering as SQLite does. A receiver records how
 -- far a run has got in full_sync_runs, with each applied page, and the
--- run resynchronising a flagged stream in stream_resyncs.run. 0013 belongs
--- to FED-01's federated members.
+-- run resynchronising a flagged stream in stream_resyncs.run.
 -- +up
 ALTER TABLE full_sync_runs ADD COLUMN stream TEXT NOT NULL DEFAULT '';
 ALTER TABLE full_sync_runs ADD COLUMN phase TEXT NOT NULL DEFAULT '';

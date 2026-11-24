@@ -334,3 +334,54 @@ func TestUnitWebServerExportOrder(t *testing.T) {
 		last = i
 	}
 }
+
+// federatedRepoUrlBase (#1930) takes urlBase's rules, round-trips through
+// the YAML patch and the XML export, after urlBase as in artifactory.xsd,
+// and is the base the federation reads for this instance's own members.
+func TestUnitFederatedRepoURLBase(t *testing.T) {
+	for doc, deleted := range map[string]bool{
+		"federatedRepoUrlBase: https://fed.example.com": false,
+		"federatedRepoUrlBase: null":                    true,
+	} {
+		p, err := Parse([]byte(doc), noEnv)
+		if err != nil || len(p.Configs) != 1 || p.Configs[0].Delete != deleted || p.Configs[0].Section != SectionFederatedRepoURLBase {
+			t.Errorf("%s: %+v %v", doc, p, err)
+		}
+	}
+	for _, doc := range []string{"federatedRepoUrlBase: 1", "federatedRepoUrlBase: ftp://x"} {
+		if _, err := Parse([]byte(doc), noEnv); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "federatedRepoUrlBase") {
+			t.Errorf("%s: %v", doc, err)
+		}
+	}
+	db := inmem.New()
+	d := webServerDeps(t, db)
+	api, ctx := NewAPI(d), adminCtx(t)
+	if got, err := configdoc.FederatedBase(ctx, db.Configs(), "https://install.example/"); err != nil || got != "https://install.example" {
+		t.Fatalf("fallback %q %v", got, err)
+	}
+	plan, err := api.Descriptor.Parse([]byte("federatedRepoUrlBase: https://cdn.example.com"), noEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := api.Descriptor.Apply(ctx, plan, now, false); !errors.Is(err, ErrInvalid) {
+		t.Errorf("CDN host: %v", err)
+	}
+	mustApply(t, db, "urlBase: https://reg.example.com\nfederatedRepoUrlBase: https://fed.example.com/\n")
+	if got, err := configdoc.FederatedBase(ctx, db.Configs(), "https://install.example"); err != nil || got != "https://fed.example.com" {
+		t.Fatalf("federated base %q %v", got, err)
+	}
+	node, body := exportXML(t, d)
+	if got := xmlText(t, node, "federatedRepoUrlBase"); got != "https://fed.example.com/" {
+		t.Errorf("federatedRepoUrlBase %q", got)
+	}
+	if u, f := strings.Index(body, "<urlBase>"), strings.Index(body, "<federatedRepoUrlBase>"); u < 0 || f < u {
+		t.Errorf("federatedRepoUrlBase out of artifactory.xsd order in %s", body)
+	}
+	mustApply(t, db, "federatedRepoUrlBase: null\n")
+	if got, err := configdoc.FederatedBase(ctx, db.Configs(), ""); err != nil || got != "https://reg.example.com" {
+		t.Fatalf("after clearing, urlBase %q %v", got, err)
+	}
+	if _, body := exportXML(t, d); strings.Contains(body, "federatedRepoUrlBase") {
+		t.Errorf("cleared federatedRepoUrlBase exported: %s", body)
+	}
+}

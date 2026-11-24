@@ -73,6 +73,23 @@ type ServiceTrustAPI struct {
 	// phase implements, as the spec's 501 stub for that method and path
 	// template does today.
 	Unimplemented func(method, template string) http.Handler
+	// FederatedBase returns federatedRepoUrlBase, "" when it is not set.
+	// When set it is the base URL a federated pairing token carries and a
+	// redeem names this instance by, as 7.161.26's ServiceTrustResource
+	// gives federatedRepoUrlBase (:200-202, :218-227); otherwise the
+	// request's base URL is. Nil is never set.
+	FederatedBase func(ctx context.Context) (string, error)
+}
+
+// self is the base URL this instance pairs as (FederatedBase).
+func (a ServiceTrustAPI) self(r *http.Request) (string, error) {
+	if a.FederatedBase != nil {
+		base, err := a.FederatedBase(r.Context())
+		if err != nil || base != "" {
+			return base, err
+		}
+	}
+	return baseurl.From(r.Context()), nil
 }
 
 // RegisterRoutes claims the service_trust operations' patterns, ahead of
@@ -185,7 +202,11 @@ func (a ServiceTrustAPI) issue(template string) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		token, err := a.Pairing.Issue(r.Context(), use, baseurl.From(r.Context()))
+		var token string
+		self, err := a.self(r)
+		if err == nil {
+			token, err = a.Pairing.Issue(r.Context(), use, self)
+		}
 		if err != nil {
 			fail(w, r, msgCreate, err)
 			return
@@ -208,7 +229,11 @@ func (a ServiceTrustAPI) redeem(w http.ResponseWriter, r *http.Request) {
 	// An unreadable body carries no token, which Redeem refuses as
 	// malformed.
 	_ = json.NewDecoder(r.Body).Decode(&body)
-	if err := a.Pairing.Redeem(r.Context(), use, body.PairingToken, baseurl.From(r.Context())); err != nil {
+	self, err := a.self(r)
+	if err == nil {
+		err = a.Pairing.Redeem(r.Context(), use, body.PairingToken, self)
+	}
+	if err != nil {
 		fail(w, r, msgPair, err)
 		return
 	}
