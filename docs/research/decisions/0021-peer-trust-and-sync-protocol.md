@@ -1,10 +1,10 @@
 # 0021: Peer trust and sync protocol
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32 and the 7.161.26 source ([research 40](../40-federated-repositories-7x.md))
 
-Status: Proposed
+Status: Accepted
 
-Implementation status (2026-10-21): **planned P13**. The decision below describes
+Implementation status (2026-11-24): **planned P13**. The decision below describes
 intended behavior; generated API stubs and storage models do not implement it.
 P37 owns cross-vendor synchronization and separate cold-instance contracts; P40 owns
 Mission Control/bridge/estate integration. [0042](0042-capability-scope-and-supersession.md)
@@ -24,6 +24,11 @@ APIs that create the relationships (`service_trust/pairing`, federated repositor
 paths and shapes. What travels between instances is ours to define, and it must be
 concrete enough that the stores can model it before any of it is built.
 
+The 7.161.26 source shows the whole service-trust surface: `pairings`, `pairing`, `revoke`
+and `exchange`, the use-case patterns, and the bearer master token the redeeming instance
+keeps for a year ([research 40 §5](../40-federated-repositories-7x.md#5-service-trust-pairing)).
+The federation engine and RTFS stay closed source.
+
 ## Decision
 
 **Identity.** Every instance has a stable `instance_id` (the `jfrt@<uuid>` value already
@@ -33,33 +38,73 @@ the public key is published to paired peers only. A peer record holds the peer's
 `instance_id`, base URL, public key, protocol version, granted use cases, status and
 last-seen time.
 
-**Pairing.** Pairing reuses the documented endpoints:
+**Pairing.** Pairing keeps 7.x's endpoints, bodies and messages
+([research 40 §5](../40-federated-repositories-7x.md#endpoints)). Only the call between the
+two instances is artifactweave's own:
 
 1. An administrator on instance A calls `POST /artifactory/api/v1/service_trust/pairing/{usecase}`
-   (or the Access equivalent). A returns `{pairing_token}`: a single-use token that expires after 300 seconds (JFrog's pairing-token default)
-   that encodes A's base URL, `instance_id`, public-key fingerprint, the use case and a
-   random nonce, signed by A.
-2. An administrator on instance B calls `PUT .../pairing/{usecase}` with that token. B
-   verifies the token's signature against the embedded fingerprint once it has fetched
-   A's key, then calls A's peer endpoint `POST /artifactweave/peer/v1/pair` with the
-   nonce, B's identity and B's public key, signed with B's key.
+   (or the Access equivalent). A returns `{pairing_token}`: a single-use token that expires
+   after 300 seconds, 7.x's five minutes. It encodes A's base URL, `instance_id`,
+   public-key fingerprint, the use case and a random nonce, and A signs it. For the
+   federated-repository use cases the base URL is `federatedRepoUrlBase` without
+   `/artifactory`, or `urlBase` when that is empty, as 7.x does.
+2. An administrator on instance B calls `PUT .../pairing/{usecase}` with `{pairing_token}`.
+   B refuses an expired token with 400 "Error while token pairing. Attempt to pair instances
+   with an expired token", and otherwise calls A's peer endpoint
+   `POST /artifactweave/peer/v1/pair` with the nonce, B's identity and B's public key,
+   signed with B's key. This call takes the place of the 7.x redeemer's call to the issuer's
+   `exchange`.
 3. A checks the nonce is unused and unexpired, records B, and answers with its own public
    key and protocol version, signed. B checks the key matches the fingerprint in the token
-   and records A. Both now hold each other as peers for that use case.
-4. `DELETE .../pairing/{usecase}` removes the use case; a peer with no use cases left is
-   removed and its outbox cursors are dropped.
+   and records A. Both now hold each other as peers for that use case. B answers
+   `{"message":"Trust with service federated-repo was established successfully"}`, 7.x's
+   message, which names the use case.
+4. `GET .../pairings/{usecase}` lists the peers holding the use case as `[{"base_url"}]`.
+5. `DELETE .../pairing/{usecase}` with `{"base_url"}` tells that peer, in a signed
+   `DELETE /artifactweave/peer/v1/pair`, to drop the use case, then drops it locally. With
+   `?force=true` the local record goes even when the peer cannot be reached. It answers
+   `{"message":"Trust with service federated-repo was canceled successfully"}`. A peer with no
+   use cases left is removed and its outbox cursors are dropped.
+6. `DELETE .../revoke/{usecase}` revokes the caller's own credential in 7.x when its scope
+   names the use case. artifactweave gives peers no bearer credential, so no caller's token
+   carries the scope, and it answers 200 `{"message":"Token was successfully revoked"}`
+   without a change, as 7.161.26 does for such a caller.
+7. `POST .../exchange` is where a 7.x redeemer presents a pairing token, and later its
+   master token, to get a token. artifactweave peers sign requests instead
+   (**Transport**), so no artifactweave token can be exchanged: it answers 400
+   `{"message":"Error while token exchange. <reason>"}`, 7.x's pattern for a refused
+   exchange. This is a deviation that PEER-02 registers.
 
-Use cases are JFrog's names where they mean the same thing (`platform-federation` on the
-Access endpoint; `federated-repo/*` for two-way and `federated-repo/r` for receive-only
-federated repository trust on the Artifactory endpoint, as 7.x documents them and
-`api/src/artifactory/paths-admin.yaml` specifies) plus artifactweave's own:
-`distribution` and `access-federation`. One peer relationship can carry several use cases.
-The initial design leaves `mission-control` and `bridge` as 501 use cases and
-`artifactory-cold`/`artifactory-cold/<namespace>` as unknown (404), because P16 first uses
-an internal tier ([0024](0024-cold-storage-tier.md)). These are planned transitional
-responses; current pairing operations themselves remain stubs. P40 must implement the
-Mission Control/bridge pairing contracts, and P37 the separate cold-instance contract
+**Use cases.** On the Artifactory endpoint they are 7.x's, as `ServiceTrustUseCase` matches
+them:
+
+- `federated-repo/*`: two-way federated-repository trust.
+- `federated-repo/r`: receiving-only trust. The issuer (A) sends events on federated
+  repository streams to the redeemer (B) and accepts none from it: A refuses B's event
+  batches on those streams with 403, and B never sends on them. B still fetches blobs from
+  A. This is 7.x's receiving-only master token, which keeps B's administrator from building
+  federations that send back to A ([research 40 §6](../40-federated-repositories-7x.md#6-receiving-only-unidirectional-members)).
+  When a pair holds both use cases, `federated-repo/*` applies.
+
+`internal/federation/core/model` names the two-way use case `UseFederation = "federation"`;
+PEER-02 renames it to `federated-repo/*` and adds `federated-repo/r`. The Access endpoint
+keeps `platform-federation` (P14). artifactweave adds its own `distribution` (P15) and
+`access-federation` (P14); 7.161.26's `ServiceTrustUseCase` also matches `distribution` on the
+Artifactory endpoint, which its documentation does not list. One peer relationship can
+carry several use cases.
+
+P13 issues and accepts only `federated-repo/*` and `federated-repo/r`, on both the
+Artifactory and the Access pairing endpoints. `platform-federation`, `access-federation`
+and `distribution` keep today's answers (501) until P14 and P15 implement them. `mission-control` and `bridge` answer 501 and
+`artifactory-cold`/`artifactory-cold/<namespace>` answer 404 `{"message":"Unknown use case"}`,
+because P16 first uses an internal tier ([0024](0024-cold-storage-tier.md)). These are planned
+transitional responses: P40 implements the Mission Control/bridge pairing contracts, and
+P37 the separate cold-instance contract
 ([pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md)).
+
+7.x's master token (365 days, refreshed hourly within a 7-day grace) has no counterpart:
+trust lasts until either side unpairs, and a peer whose signatures stop verifying shows as
+`UNAUTHORIZED`.
 
 **Transport.** Peer traffic is HTTPS on the normal listener under the
 `/artifactweave/peer/v1/` prefix, which is artifactweave's own API, specified in its own
@@ -87,8 +132,11 @@ payload and, for content events, the blob sha256 and size.
   stores it as the peer's acknowledged cursor.
 - Content is pulled, not pushed: when an event references a blob the receiver does not
   hold, it fetches `GET /artifactweave/peer/v1/blobs/{sha256}` (signed) before applying
-  the event. A fetch that fails is recorded as a failed binary task and retried with
-  back-off; the event's metadata is applied once the blob arrives.
+  the event. A failed fetch does not stop the stream: the item is recorded as a failed
+  binary task, the cursor advances past the event and later events still apply. The item
+  appears on that member only when a back-off retry or a replay (`binaries/failures/replay`)
+  fetches the blob, and not at all if a later event has deleted or replaced it in the
+  meantime.
 - Outbox entries are pruned once every subscribed peer has acknowledged them or once they
   are older than the retention window (seven days by default). A peer whose cursor falls
   behind the pruned range needs a full sync.
@@ -117,16 +165,25 @@ or an offline JPD in the status APIs.
 Pairing through the existing endpoints keeps the operator workflow and the Terraform
 shapes JFrog users already know, while the token carrying a key fingerprint means no
 certificate authority is needed between instances. Signed requests on top of TLS give
-mutual authentication without asking operators to provision client certificates. A
-per-stream outbox written in the same transaction as the change is the simplest ordering
-guarantee that survives crashes: nothing is propagated that did not commit, and nothing
-that committed is lost. Pulling blobs separately keeps event batches small and lets
-checksum deduplication skip content the receiver already holds.
+mutual authentication without asking operators to provision client certificates, and
+remove 7.x's long-lived bearer master token, its refresh job and the scoped-token
+exchange; that is why `exchange` and `revoke` have nothing to act on. A per-stream outbox
+written in the same transaction as the change is the simplest ordering guarantee that
+survives crashes: nothing is propagated that did not commit, and nothing that committed is
+lost. Pulling blobs separately keeps event batches small and lets checksum deduplication
+skip content the receiver already holds.
+
+Enforcing receiving-only trust at the peer record, not only on the repository's member
+`mode`, gives the guarantee 7.x documents for `federated-repo/r`: the receiving site cannot
+send back even if its administrator configures a two-way member.
 
 Alternatives considered:
 
 - *Reverse-engineering JFrog's protocols.* Rejected by the owner: undocumented, licence
   gated to obtain, and liable to change without notice.
+- *Serving `exchange` as the redeem call.* It would keep 7.x's call between instances, but
+  its body carries no public key and its answer is a bearer token artifactweave would then
+  have to store, refresh and revoke.
 - *mTLS with a private CA.* Strong, but every deployment would need a CA and certificate
   rotation; Ed25519 keys exchanged at pairing are enough for a set of peers that an
   administrator pairs by hand.
@@ -142,12 +199,16 @@ Alternatives considered:
 - Clock skew above five minutes breaks request verification; operators run NTP.
 - The outbox retention window bounds how long a peer can be offline before it needs a
   full sync; the window is configurable.
-- The protocol is not interoperable with Artifactory and is not meant to be.
+- The protocol is not interoperable with Artifactory and is not meant to be. A 7.x
+  instance cannot redeem an artifactweave pairing token, and the reverse; P37 owns that.
 
 ## Verification
 
 - Unit tests for token issue, single use, expiry and signature checks, and for request
   signing with replay and skew rejection.
+- Handler tests for `pairings`, `pairing` (all three methods, with and without `force`),
+  `revoke` and `exchange` answers and messages, and for both use cases, including a
+  receiving-only peer's event batch refused with 403.
 - Store contract tests for the outbox: sequence assignment in the change transaction,
   idempotent apply, cursor advance, pruning.
 - Multi-instance acceptance scenarios in the `acceptance-peers` CI job: pair two and three
@@ -155,10 +216,12 @@ Alternatives considered:
 
 ## References
 
-- [Research 16](../16-enterprise-products.md), sections 3 and 4
+- [Research 40](../40-federated-repositories-7x.md), sections 5 to 7; [research 16](../16-enterprise-products.md), sections 3 and 4
 - [0017](0017-sealed-columns-and-master-key.md), [0020](0020-domain-model.md),
   [0022](0022-federated-repositories.md), [0023](0023-release-bundles-and-distribution.md),
   [0025](0025-platform-federation-and-topology.md)
+- 7.161.26 `web/rest/.../servicetrust/ServiceTrustResource.java`,
+  `backend/core/.../servicetrust/ServiceTrustUseCase.java`
 - RFC 9421, HTTP Message Signatures: <https://www.rfc-editor.org/rfc/rfc9421>
 - RFC 8032, Ed25519: <https://www.rfc-editor.org/rfc/rfc8032>
 - Hybrid logical clocks: Kulkarni et al., "Logical Physical Clocks", 2014

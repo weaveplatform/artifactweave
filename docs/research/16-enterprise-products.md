@@ -266,6 +266,11 @@ features such as unidirectional sync for RTFS only ([7.133.3](https://docs.jfrog
 Sources: https://docs.jfrog.com/artifactory/reference/federated-repositories-api/llms.txt,
 https://docs.jfrog.com/artifactory/docs/access-federation-vs-repo-federation.md.
 
+[Research 40](40-federated-repositories-7x.md) records what the 7.161.26 source adds: the
+member `mode` and the receiving-only contract, the member URL rules and
+`federatedRepoUrlBase`, the `terraformbackend` exclusion, the whole service-trust surface,
+every federation path with artifactweave's answer, and P13's Terraform exit set.
+
 ### Endpoint groups (22 operations, plus the pairing endpoints)
 
 | Group | Paths | Status codes |
@@ -287,12 +292,13 @@ https://docs.jfrog.com/artifactory/docs/access-federation-vs-repo-federation.md.
 | Unavailable mirror | `[{localRepoKey, remoteUrl, remoteRepoKey, status}]` | |
 | Failed binary task | `[{sha1, repoKey, creationTime, failuresCount}]` | |
 | Repository status | `{localKey, binariesTasksInfo{inProgressTasks, failingTasks}, mirrorEventsStatusInfo[], federatedArtifactStatus{}}` | the last two are untyped in the oracle |
-| Pairing token | `{pairing_token}`; exchange body `{pairing_token}` → `{message}` | On the Artifactory endpoint 7.x documents `federated-repo/*` (two-way federated repository trust), `federated-repo/r` (receive-only, for unidirectional federation), `artifactory-cold` and `artifactory-cold/<namespace>`, and answers 404 to anything else ([pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md)); the Access endpoint's use cases include `mission-control`, `bridge` and `platform-federation`; artifactweave adds its own (see [0021](decisions/0021-peer-trust-and-sync-protocol.md)). P16 initially uses an internal tier; P37 owns separate cold-instance pairing. The 404 use-case behavior in decision 0021 is a planned transitional boundary, not current implemented pairing |
+| Pairing token | `{pairing_token}`; exchange body `{pairing_token}` → `{message}` | On the Artifactory endpoint 7.x documents `federated-repo/*` (two-way federated repository trust), `federated-repo/r` (receive-only, for unidirectional federation), `artifactory-cold` and `artifactory-cold/<namespace>`, and answers 404 to anything else ([pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md)); the Access endpoint's use cases include `mission-control`, `bridge` and `platform-federation`; artifactweave adds its own (see [0021](decisions/0021-peer-trust-and-sync-protocol.md)). The source also serves `GET pairings/{usecase}`, `DELETE revoke/{usecase}` and `POST exchange` ([research 40 §5](40-federated-repositories-7x.md#5-service-trust-pairing)). P16 initially uses an internal tier; P37 owns separate cold-instance pairing. The 404 use-case behavior in decision 0021 is a planned transitional boundary, not current implemented pairing |
 
 ### Clients
 
-Terraform `artifactory_federated_<type>_repository` (37 types, eight in artifactweave's
-scope plus `generic`), which `PUT`s the repository with `members` and reads it back. With
+Terraform `artifactory_federated_<type>_repository` (37 resources), which `PUT`s the
+repository with `members`, calls `configSync` and reads it back. P13 qualifies the 35 whose
+local type artifactweave implements ([research 40 §9](40-federated-repositories-7x.md#9-terraform-exit-set)). With
 federation real, a multi-member plan is accepted when every member URL belongs to a paired
 peer; the earlier rule that rejected multi-member lists with 400 is withdrawn. Timing: P13.
 

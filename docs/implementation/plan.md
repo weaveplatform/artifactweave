@@ -1326,30 +1326,40 @@ operational APIs P38; observation P19.
 ## P13: Peer trust and federated repositories
 
 Decisions: [0021](../research/decisions/0021-peer-trust-and-sync-protocol.md),
-[0022](../research/decisions/0022-federated-repositories.md).
+[0022](../research/decisions/0022-federated-repositories.md). Research:
+[40](../research/40-federated-repositories-7x.md).
+
+**Tracking.** Index #TBD
 
 **Tasks**
-0. Specify artifactweave's own peer API (`/artifactweave/peer/v1/`, decision 0021) as
-   `api/src/peer/`, with the same conventions and generation as the JFrog-compatible
-   services; it has no JFrog counterpart, so it is outside the parity oracle.
-1. Peer identities and keys, pairing through `service_trust/pairing`, mutually signed
-   requests, the ordered event outbox with acknowledgements, idempotent apply and
-   full-sync fallback.
-2. Federated repositories: create and convert, member management, event sync of
-   deploy, delete, move, copy and property changes, conflict rule, full and forced
-   sync, status, lag, inconsistent repositories, failed-binary replay.
-3. Extend P11's local and empty-members federated package cleanup selection to
-   federated repositories with configured members, using current membership and
-   member download evidence; local statistics alone cannot decide whether their
-   packages are unused. Preserve federated policy CRUD and qualify current-self
-   identity and multi-peer selection/publication races
-   ([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)).
-4. A Linux `acceptance-peers` CI job that runs multi-instance scenarios.
+
+Peer trust and the sync protocol (0021):
+- PEER-01: specify artifactweave's own peer API (`/artifactweave/peer/v1/`) as `api/src/peer/`, generated like the JFrog-compatible services and outside the parity oracle.
+- PEER-02: pairing through the Artifactory and Access `service_trust` `pairing`, `pairings`, `revoke` and `exchange` for `federated-repo/*` and `federated-repo/r`, with the signed single-use 300 s token, `/peer/v1/pair`, peer records and status, and the model's use-case rename from `federation`.
+- PEER-03: signed peer transport: RFC 9421 signatures, nonces and five-minute skew, the protocol-version header, the peer client and the server middleware.
+- PEER-04: stream delivery: pushed batches, 409 with the expected sequence, acknowledgements and cursors, pull mode, blob fetch, failed-fetch records and retention pruning.
+- PEER-05: the stream snapshot and the full-sync fallback.
+
+Federated repositories (0022):
+- FED-01: members and configuration: the member URL rules, the paired-peer check (400), at most ten members, `mode`, the `terraformbackend` refusal, `federatedRepoUrlBase`, `configSync`, `migrate` and `convertToLocal`.
+- FED-02: event sync of deploys, deletes, moves, copies and properties on the `repo:<key>` stream, applied with the HLC conflict rule and tombstones, with format metadata recomputed on each member.
+- FED-03: receiver (unidirectional) members: receive only, paired through `federated-repo/r`.
+- FED-04: `fullSync` and `forceFullSync` (with `?mirror`), `recovery`, `reconnect`, `removeMember`, `prioritization` and `propagateCreatedTime`.
+- FED-05: status (v1 and v2 repository status, `mirrorsLag`, `unavailableMirrors`, `stateList`, `stateSummary`, `connectionStates`, `state`, `inconsistentRepos`) and the answers to the endpoints only RTFS serves ([research 40 §7](../research/40-federated-repositories-7x.md#7-federation-endpoints-and-how-artifactweave-answers-them)).
+- FED-06: failed binaries: list, replay and delete.
+- FED-07: federated cleanup selection with current peer download evidence ([#1798](https://github.com/weaveplatform/artifactweave/issues/1798)), extending P11's local and empty-member selection while preserving federated policy CRUD.
+
+Qualification:
+- QUA-01: the multi-instance harness in `test/peers`, built from P11's two-process pattern, and the Linux `acceptance-peers` CI job.
+- QUA-02: Terraform, in the existing `terraform` CI job against three instances: every resource in the exit set applies with three members, refreshes to an empty plan, reads back and destroys, and writes `p13-provider-evidence.json`; provider faults get scenario workarounds.
+- QUA-03: phase qualification: three-instance convergence, full-sync repair of a partitioned member, the hosted full run, literal `make gate` and this plan's record.
 
 **Exit criteria**
 - Three instances converge after deploys, deletes and property changes on each; full
   sync repairs a partitioned member.
-- `artifactory_federated_*_repository` for the eight formats apply, plan clean, destroy.
+- `artifactory_federated_*_repository` for every implemented federated type except
+  `terraformbackend` ([the 35 resources in research 40](../research/40-federated-repositories-7x.md#9-terraform-exit-set))
+  apply, plan clean, destroy.
 
 ## P14: Platform federation and topology
 

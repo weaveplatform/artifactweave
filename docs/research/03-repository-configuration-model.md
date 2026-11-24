@@ -763,12 +763,15 @@ Zap expires upstream metadata only; a cache alias never triggers upstream work.
 ## Federated fields
 
 Everything a local repository has, `terraformType` included, plus `members`, an array of
-`{"url","enabled"}` where `enabled` is a boolean (default `true`; documented as a string, see
-below) and `url` may be derived from the base URL and the key, and `proxy` and `disableProxy`,
+`{"url","mode","enabled"}` where `enabled` is a boolean (default `true`; documented as a string, see
+below), `mode` is `bidirectional` (default) or `receiver` (7.x's receiving-only member, which P13 implements), and `url` may be derived from the base URL and the key, and `proxy` and `disableProxy`,
 which the v1 read gives as `false` when unset, as 7.161.26's
 `FederatedRepositoryConfigurationImpl` defaults it ([#1493](https://github.com/weaveplatform/artifactweave/issues/1493)).
 The provider's federated Terraform resource sends `terraformType` with `rclass` federated
 ([S] provider 12.11.14 [`resource_artifactory_federated_terraform_repository.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/federated/resource_artifactory_federated_terraform_repository.go)).
+[Research 40](40-federated-repositories-7x.md) holds the descriptor's federated elements
+(`maxNumberOfThreads`, `modificationDate`, `federatedRepoUrlBase`), the member URL rules,
+the receiving-only `mode` and why `terraformbackend` cannot be federated.
 
 ## Typing traps
 
