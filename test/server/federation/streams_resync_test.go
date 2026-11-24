@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/federation/core/sync/streamtest"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
+	"github.com/weaveplatform/artifactweave/internal/platform/work"
 	retentionapi "github.com/weaveplatform/artifactweave/internal/retention/api"
 )
 
@@ -51,6 +52,24 @@ func (in *streamInstance) pruneLater() {
 	if err := later.Prune(in.t.Context()); err != nil {
 		in.t.Fatal(err)
 	}
+}
+
+// waitSendIdle waits until no run of in's dispatcher to peer is under way.
+func (in *streamInstance) waitSendIdle(peer *streamInstance) {
+	in.t.Helper()
+	key := peer.id + " " + testStream
+	var state work.WorkState
+	eventually(in.t, func() string { return fmt.Sprint("A's dispatcher to B is ", state) }, func() bool {
+		it, err := in.runtime.Store.WorkQueue().Get(in.t.Context(), streamsync.SendKind, key)
+		if errors.Is(err, kernel.ErrNotFound) {
+			return true
+		}
+		if err != nil {
+			in.t.Fatal(err)
+		}
+		state = it.State
+		return it.State != work.WorkLeased
+	})
 }
 
 // waitResynced waits until in holds origin's items as origin does, with
@@ -97,6 +116,13 @@ func testStreamResync(t *testing.T, driver string, dsn func() string) {
 		if f := a.flags(); len(f) != 1 || f[0].Receiver != b.id || f[0].Position != 3 {
 			t.Fatalf("A's flags %+v, want B at 3", f)
 		}
+		// A push already under way read B's flag before the prune set it.
+		// B must not take it: B would then hold every entry and need no
+		// full sync, which is not the recovery this scenario shows (the
+		// sync package's TestUnitDispatchClearsAFlagItsPushOutran covers
+		// that one). So B stays away until A's dispatcher is idle; any run
+		// after that reads the flag.
+		a.waitSendIdle(b)
 
 		// B is back: A's next change finds B behind the floor and is
 		// pushed to it; B refuses it, asks for what it lacks, finds it

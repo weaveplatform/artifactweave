@@ -153,9 +153,13 @@ func (e *Engine) Dispatch(ctx context.Context, peerID, stream string) error {
 		case err != nil:
 			return e.fail(ctx, c, err)
 		}
+		from := c.AckedSeq
 		c.AckedSeq, c.LastSent, c.LastError = min(applied, head), e.now(), ""
 		if err := e.Store.Outbox().PutCursor(ctx, c); err != nil {
 			return fmt.Errorf("store peer %s cursor on %s: %w", peerID, stream, err)
+		}
+		if err := e.unflagCaughtUp(ctx, self, peerID, stream, from, err); err != nil {
+			return err
 		}
 	}
 	// More remain: the next run continues, after any other due work.
@@ -190,6 +194,30 @@ func (e *Engine) notify(ctx context.Context, p model.Peer, c outbox.PeerCursor, 
 		return fmt.Errorf("clear %s's full-sync flag on %s: %w", c.PeerInstanceID, c.Stream, err)
 	}
 	return e.enqueue(ctx, SendKind, item{Peer: c.PeerInstanceID, Stream: c.Stream})
+}
+
+// unflagCaughtUp clears the receiver's full-sync flag that a prune set
+// while this dispatcher's push was in flight. The dispatcher read the flag
+// before pushing, so a prune between that read and the push flags the
+// receiver at the position the push started from, with the entries it
+// lacked already on their way. When the receiver applies them, nothing
+// lies between its position and the stream: a flag at or below from no
+// longer marks a gap, and left in place it would hold every later entry
+// back with no full sync to clear it (the receiver never refuses a push,
+// so it never probes). pushErr is the push's own result: an entry refused
+// with 409 says nothing about the gap.
+func (e *Engine) unflagCaughtUp(ctx context.Context, self, peerID, stream string, from int64, pushErr error) error {
+	if pushErr != nil {
+		return nil
+	}
+	f, held, err := e.flagged(ctx, self, peerID, stream)
+	if err != nil || !held || f.Position > from {
+		return err
+	}
+	if err := e.Store.Resyncs().Clear(ctx, self, peerID, stream); err != nil {
+		return fmt.Errorf("clear %s's full-sync flag on %s: %w", peerID, stream, err)
+	}
+	return nil
 }
 
 // fail records err on the cursor, keeping its position, and returns it.

@@ -113,6 +113,43 @@ func TestUnitDispatchCatchesUpAPeerAtTheFloor(t *testing.T) {
 	}
 }
 
+// TestUnitDispatchClearsAFlagItsPushOutran prunes A's stream while A's push
+// to B is in flight: the prune flags B at the position the push started
+// from, and B then applies the push. B has no gap, so the flag goes and A
+// pushes the next change; left in place, it would hold B back for good,
+// since B never refuses a push and so never probes for a full sync.
+func TestUnitDispatchClearsAFlagItsPushOutran(t *testing.T) {
+	w := newWorld()
+	a, b := w.add(t), w.add(t)
+	pair(t, a, b, fed, model.DeliveryPush, model.DeliveryPush)
+	for i := range 3 {
+		a.put(fmt.Sprint("k", i), "first")
+	}
+	a.run(streamsync.SendKind)
+	for i := range 3 {
+		a.put(fmt.Sprint("k", i), "second")
+	}
+	w.mu.Lock()
+	w.faults.beforePush = func() {
+		*a.clock = t0.Add(streamsync.DefaultRetention + time.Hour)
+		if err := a.engine.Prune(t.Context()); err != nil {
+			t.Error(err)
+		}
+	}
+	w.mu.Unlock()
+	a.run(streamsync.SendKind)
+	wantApplied(t, b.applied(a), seqs(1, 6))
+	if a.cursor(b) != 6 || len(a.resyncs()) != 0 {
+		t.Fatalf("cursor %d, flags %+v after the push the prune raced", a.cursor(b), a.resyncs())
+	}
+	a.put("after", "the prune")
+	a.run(streamsync.SendKind)
+	wantApplied(t, b.applied(a), seqs(1, 7))
+	if len(b.runs()) != 0 {
+		t.Fatalf("runs %+v, want no full sync", b.runs())
+	}
+}
+
 // badItems is the plain kind with a snapshot side that lists items.
 type badItems struct {
 	plain

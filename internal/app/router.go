@@ -76,6 +76,7 @@ import (
 	notificationshttp "github.com/weaveplatform/artifactweave/internal/notifications/adapters/http"
 	"github.com/weaveplatform/artifactweave/internal/platform/apilimit"
 	"github.com/weaveplatform/artifactweave/internal/platform/blob"
+	"github.com/weaveplatform/artifactweave/internal/platform/buildinfo"
 	"github.com/weaveplatform/artifactweave/internal/platform/configdoc"
 	"github.com/weaveplatform/artifactweave/internal/platform/crypt"
 	accessgen "github.com/weaveplatform/artifactweave/internal/platform/gen/access"
@@ -711,7 +712,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		}
 	}
 	federatedOps, repoServer := federatedAPIs(cfg)
-	serviceTrust, pairServer := pairingAPIs(cfg)
+	serviceTrust, pairServer, statusServer := pairingAPIs(cfg)
 	logger := cfg.Logger
 	if logger == nil {
 		logger = slog.Default()
@@ -1024,15 +1025,18 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		)
 		// artifactweave's own peer protocol (decision 0021), beside the
 		// JFrog prefixes and outside the parity oracle; peerGuard verifies
-		// every request first. /pair is served (PEER-02); the other
-		// operations answer 501 until PEER-04, PEER-05 and FED-01 serve
-		// them.
+		// every request first. Every operation is served: /pair and
+		// /status by the pairing service, the streams, snapshots and blobs
+		// by the delivery engine and /repositories by configSync; each
+		// keeps its 501 stub in a router without what serves it.
 		peerOpts := peergen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		peergen.HandlerWithOptions(
-			peergen.NewStrictHandlerWithOptions(peerService{pair: pairServer, streams: streamServer(cfg), repos: repoServer}, keyed.peer(), peerOpts),
+			peergen.NewStrictHandlerWithOptions(peerService{
+				pair: pairServer, streams: streamServer(cfg), repos: repoServer, status: statusServer,
+			}, keyed.peer(), peerOpts),
 			peergen.ChiServerOptions{
 				BaseURL:          peerBase,
 				BaseRouter:       g,
@@ -1558,28 +1562,33 @@ type (
 	// peerService is the peer API's server (decision 0021); its P13
 	// tickets replace the stubs. pair serves /pair (PEER-02); streams the
 	// stream events and blobs (PEER-04) and snapshots (PEER-05); repos
-	// /repositories/{repoKey} (FED-01).
+	// /repositories/{repoKey} (FED-01); status /status (#1949).
 	peerService struct {
 		peergen.UnimplementedStrict
 		pair    federationpeer.PairServer
 		streams federationpeer.StreamServer
 		repos   federationpeer.RepositoryServer
+		status  federationpeer.StatusServer
 	}
 )
 
-// pairingAPIs are the service_trust endpoints and the peer API's /pair
-// over one pairing service (decision 0021). Without a store the served use
-// cases answer 500, as other handlers without theirs do, and /pair keeps
-// its 501 stub.
-func pairingAPIs(cfg RouterConfig) (federationhttp.ServiceTrustAPI, federationpeer.PairServer) {
+// pairingAPIs are the service_trust endpoints and the peer API's /pair and
+// /status over one pairing service (decision 0021). Without a store the
+// served use cases answer 500, as other handlers without theirs do, and
+// /pair and /status keep their 501 stubs.
+func pairingAPIs(cfg RouterConfig) (federationhttp.ServiceTrustAPI, federationpeer.PairServer, federationpeer.StatusServer) {
 	serviceTrust := federationhttp.ServiceTrustAPI{
 		Unimplemented: func(method, template string) http.Handler { return handwrittenStub(method, template) },
 	}
-	var pairServer federationpeer.PairServer
+	var (
+		pairServer   federationpeer.PairServer
+		statusServer federationpeer.StatusServer
+	)
 	if cfg.Federation != nil {
 		if svc, err := cfg.Federation.Pairing(cfg.PeerRemote); err == nil {
 			serviceTrust.Pairing, serviceTrust.Authorize = svc, svc.Authorize
 			pairServer.Pairing = svc
+			statusServer = federationpeer.StatusServer{Status: svc, Version: buildinfo.Version()}
 		}
 	}
 	if cfg.Store != nil {
@@ -1590,7 +1599,7 @@ func pairingAPIs(cfg RouterConfig) (federationhttp.ServiceTrustAPI, federationpe
 		}
 		serviceTrust.FederatedBase, pairServer.FederatedBase = federatedBase, federatedBase
 	}
-	return serviceTrust, pairServer
+	return serviceTrust, pairServer, statusServer
 }
 
 // RedeemPairing redeems a pairing nonce (PEER-02); without a pairing
@@ -1627,6 +1636,18 @@ func (s peerService) PutRepositoryConfiguration(
 		return s.UnimplementedStrict.PutRepositoryConfiguration(ctx, req) //nolint:wrapcheck // the generated 501
 	}
 	return s.repos.PutRepositoryConfiguration(ctx, req) //nolint:wrapcheck // as RedeemPairing
+}
+
+// GetPeerStatus answers a peer's signed liveness and version read (#1949);
+// without a pairing service it keeps the 501 stub.
+func (s peerService) GetPeerStatus(
+	ctx context.Context,
+	req peergen.GetPeerStatusRequestObject,
+) (peergen.GetPeerStatusResponseObject, error) {
+	if s.status.Status == nil {
+		return s.UnimplementedStrict.GetPeerStatus(ctx, req) //nolint:wrapcheck // the generated 501
+	}
+	return s.status.GetPeerStatus(ctx, req) //nolint:wrapcheck // as RedeemPairing
 }
 
 // streamServer serves the peer API's stream events and blobs over the

@@ -137,8 +137,11 @@ type Service struct {
 	Now  func() time.Time
 	Rand io.Reader
 	// StaleAfter is how long after it was last seen a peer is OFFLINE;
-	// zero means ten minutes, two of PEER-05's status reads.
+	// zero means ten minutes, two of Probe's default interval
+	// (StaleAfterProbes).
 	StaleAfter time.Duration
+	// Prober reads peers' status for Probe; nil probes nothing.
+	Prober StatusRemote
 }
 
 func (s Service) now() time.Time {
@@ -521,7 +524,9 @@ func (s Service) Observe(ctx context.Context, instanceID string, rejected bool) 
 			p.LastSeen = now
 		}
 		p.Status = p.DeriveStatus(now, s.staleAfter(), rejected, 0)
-		if err := s.Store.Peers().Put(ctx, p); err != nil {
+		// Only the liveness columns: a whole-record Put here would write
+		// back whatever pairing or an administrator changed since the read.
+		if err := s.Store.Peers().SetLiveness(ctx, instanceID, p.Liveness()); err != nil {
 			return fmt.Errorf("record peer %s: %w", instanceID, err)
 		}
 		return nil

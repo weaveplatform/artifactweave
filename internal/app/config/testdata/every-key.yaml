@@ -129,3 +129,4 @@ virtual:
     max_size: 64MiB
 federation:
   outbox_retention: 72h
+  peer_probe_interval: 90s

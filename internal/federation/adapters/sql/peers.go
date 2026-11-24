@@ -22,16 +22,18 @@ func (s *Store) Peers() port.PeerStore { return peerStore{s} }
 type peerStore struct{ s *Store }
 
 const peerCols = "instance_id, base_url, public_key, protocol_version, status, last_seen_at, " +
-	"display_name, city_name, country_code, edge_role, delivery"
+	"display_name, city_name, country_code, edge_role, delivery, clock_skew_ms"
 
 func scanPeer(r dialect.PeersScanner) (model.Peer, error) {
 	var (
 		p    model.Peer
 		pub  []byte
 		seen sql.NullInt64
+		skew int64
 	)
 	err := r.Scan(&p.InstanceID, &p.BaseURL, &pub, &p.ProtocolVersion, &p.Status, &seen,
-		&p.DisplayName, &p.CityName, &p.CountryCode, &p.EdgeRole, &p.Delivery)
+		&p.DisplayName, &p.CityName, &p.CountryCode, &p.EdgeRole, &p.Delivery, &skew)
+	p.ClockSkew = time.Duration(skew) * time.Millisecond
 	if len(pub) > 0 {
 		p.PublicKey = pub
 	}
@@ -56,6 +58,7 @@ func (p peerStore) Put(ctx context.Context, peer model.Peer) error {
 			peer.CountryCode,
 			peer.EdgeRole,
 			string(delivery(peer.Delivery)),
+			peer.ClockSkew.Milliseconds(),
 		); err != nil {
 			return err
 		}
@@ -180,6 +183,12 @@ func (p peerStore) Delete(ctx context.Context, instanceID string) error {
 func (p peerStore) SetProtocolVersion(ctx context.Context, instanceID string, major int) error {
 	return p.s.ExecOne(ctx, "set peer protocol version "+instanceID,
 		"UPDATE peers SET protocol_version = ? WHERE instance_id = ?", major, instanceID)
+}
+
+func (p peerStore) SetLiveness(ctx context.Context, instanceID string, l model.Liveness) error {
+	return p.s.ExecOne(ctx, "set peer liveness "+instanceID,
+		"UPDATE peers SET status = ?, last_seen_at = ?, clock_skew_ms = ? WHERE instance_id = ?",
+		string(l.Status), dialect.Micros(l.LastSeen), l.ClockSkew.Milliseconds(), instanceID)
 }
 
 func (p peerStore) AddNonce(ctx context.Context, n model.PairingNonce) error {

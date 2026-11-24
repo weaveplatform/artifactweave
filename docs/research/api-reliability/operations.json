@@ -11351,20 +11351,25 @@
     "route": "GET /artifactweave/peer/v1/status",
     "spec": "peer.openapi.yaml",
     "operation_id": "getPeerStatus",
-    "state": "stub: 501",
-    "contract": "Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a peer whose answer does not verify is unauthorized. Not implemented; answers 501.",
-    "handler": "internal/platform/gen/peer/unimplemented.gen.go",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a peer whose answer does not verify, or that refuses the caller's signature, is unauthorized. The caller measures the clock skew between the two instances from `time`. Each instance reads every paired peer's status periodically.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; user authentication skips the peer API, admission still limits",
-    "retry": "501 is not transient; do not retry until support changes; intended safe",
+    "effects": "read; downloads may update cache, usage statistics or remote-fetch state",
+    "retry": "safe: bounded read retry with deadline/backoff and Retry-After; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
     "response_collections": [
       "200 application/json.use_cases[]"
     ],
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/peer/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -23933,17 +23938,22 @@
     "route": "PUT /artifactweave/peer/v1/repositories/{repoKey}",
     "spec": "peer.openapi.yaml",
     "operation_id": "putRepositoryConfiguration",
-    "state": "stub: 501",
+    "state": "partial: handwritten override of generated operation",
     "contract": "Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.",
-    "handler": "internal/platform/gen/peer/unimplemented.gen.go",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; user authentication skips the peer API, admission still limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoKey",
+    "effects": "resource-addressed write/delete; additional index, retention, audit or lifecycle effects are possible",
+    "retry": "natural on path:repoKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "ordinary: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/peer/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {

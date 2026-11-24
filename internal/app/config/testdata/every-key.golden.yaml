@@ -185,6 +185,7 @@ remote:
     allowed_private_origins: []
 federation:
     outbox_retention: 72h0m0s
+    peer_probe_interval: 1m30s
 api:
     enabled: false
     authentication_per_minute: 1000

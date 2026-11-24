@@ -45,6 +45,7 @@ var statusParts = []statusPart{
 	cranArchiveStatusPart,
 	serviceTrustStatusPart,
 	peerStreamsStatusPart,
+	peerStatusStatusPart,
 }
 
 // matrixPart is a format's share of the route × principal matrix.
@@ -68,6 +69,7 @@ var matrixParts = []matrixPart{
 	cranArchiveMatrixPart,
 	serviceTrustMatrixPart,
 	peerStreamsMatrixPart,
+	peerStatusMatrixPart,
 }
 
 // partRoutes is the routes each status part lists under pick.

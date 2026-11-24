@@ -15,6 +15,8 @@
 //     instance id, base URL and public key.
 //   - PairServer: the pairing service's issuing side (PairService); PairRemote:
 //     a Factory.
+//   - StatusServer: the pairing service's status answer (StatusService) and
+//     the release version; StatusRemote: a Factory.
 //
 // # Outputs
 //
@@ -42,6 +44,11 @@
 //     caller's record (204). PairRemote is the pairing service's transport
 //     (pairing.Remote): it calls both and sorts failures into unreachable,
 //     unverified and a status the issuer refused with.
+//   - StatusServer serves GET /status, the verified caller's view of this
+//     instance (#1949). StatusRemote is the pairing service's status read
+//     (pairing.StatusRemote): an answer whose signature does not verify,
+//     and the peer's own 401, are pairing.ErrUnverified; any other unsigned
+//     answer is only its status.
 //
 // # References
 //
@@ -54,8 +61,9 @@
 // # Status
 //
 // Implemented P13 (PEER-03): the server middleware and the signing client.
-// Implemented P13 (PEER-02): /pair and the pairing transport. The other
-// operations behind the middleware are PEER-04's, PEER-05's and FED-01's.
+// Implemented P13 (PEER-02): /pair and the pairing transport. Implemented
+// P13 (#1949): /status and the status read. The other operations behind
+// the middleware are PEER-04's, PEER-05's and FED-01's.
 //
 // # Testing
 //
@@ -65,5 +73,6 @@
 // between two running instances. pair_test.go pairs and unpairs two
 // instances through their signed peer APIs and refuses spent nonces,
 // unreachable and forged issuers and requests not signed by the instance
-// they name.
+// they name. status_test.go reads a paired instance's status over the
+// signed transport and sorts each failure.
 package peer

@@ -62,6 +62,9 @@ const (
 	DefaultWorkMaxAttempts = 10
 	// DefaultOutboxRetention is decision 0021's outbox retention window.
 	DefaultOutboxRetention = 7 * 24 * time.Hour
+	// DefaultPeerProbeInterval is pairing.DefaultProbeInterval: two of
+	// them are the ten minutes a peer may go unseen before it is OFFLINE.
+	DefaultPeerProbeInterval = 5 * time.Minute
 	// DefaultNPMMaxPublishSize is decision 0034's cap on an npm publish
 	// body. The body carries the tarball in base64, a third larger than the
 	// tarball itself.
@@ -125,6 +128,33 @@ type Federation struct {
 	// that has not acknowledged it; a peer still behind it then needs a full
 	// sync.
 	OutboxRetention time.Duration `yaml:"outbox_retention"`
+	// PeerProbeInterval is how often this instance reads every paired
+	// peer's signed status; a peer unseen for two intervals is OFFLINE.
+	PeerProbeInterval time.Duration `yaml:"peer_probe_interval"`
+}
+
+func (f *Federation) set(key, value string) error {
+	if key == "federation.peer_probe_interval" {
+		return setDuration(&f.PeerProbeInterval, key, value)
+	}
+	return setDuration(&f.OutboxRetention, key, value)
+}
+
+func (f Federation) validate() []error {
+	var errs []error
+	// A retention under a minute would prune entries a dispatcher's next
+	// run is about to send, flagging every peer for a full sync.
+	if f.OutboxRetention < time.Minute {
+		errs = append(errs, fmt.Errorf("%w: federation.outbox_retention %s must be at least 1m",
+			ErrInvalidValue, f.OutboxRetention))
+	}
+	// A read every second already costs each peer a signed request a
+	// second; below that the reads would only queue behind each other.
+	if f.PeerProbeInterval < time.Second {
+		errs = append(errs, fmt.Errorf("%w: federation.peer_probe_interval %s must be at least 1s",
+			ErrInvalidValue, f.PeerProbeInterval))
+	}
+	return errs
 }
 
 // Remote supplies exact operator-approved private outbound origins for remote
@@ -367,7 +397,7 @@ func Default() Config {
 			MaxAttempts: DefaultWorkMaxAttempts,
 		},
 		Build:      Build{BlockDuplicateEntries: true},
-		Federation: Federation{OutboxRetention: DefaultOutboxRetention},
+		Federation: Federation{OutboxRetention: DefaultOutboxRetention, PeerProbeInterval: DefaultPeerProbeInterval},
 		NPM: NPM{
 			MaxPublishSize: DefaultNPMMaxPublishSize,
 			NPMLogin:       NPMLogin{LoginTokenExpiry: DefaultNPMLoginTokenExpiry},
@@ -482,6 +512,7 @@ var keys = append(append([]string{
 	"work.lease",
 	"work.max_attempts",
 	"federation.outbox_retention",
+	"federation.peer_probe_interval",
 	"build.block_duplicate_entries",
 	"npm.max_publish_size",
 	"token.allow_basic_auth",
@@ -576,8 +607,8 @@ func set(cfg *Config, key, value string) error {
 		return setDuration(&cfg.Work.Lease, key, value)
 	case "work.max_attempts":
 		return setInt(&cfg.Work.MaxAttempts, key, value)
-	case "federation.outbox_retention":
-		return setDuration(&cfg.Federation.OutboxRetention, key, value)
+	case "federation.outbox_retention", "federation.peer_probe_interval":
+		return cfg.Federation.set(key, value)
 	case "npm.max_publish_size":
 		return setByteSize(&cfg.NPM.MaxPublishSize, key, value)
 	case "environments.global_limit":
@@ -814,12 +845,7 @@ func (c Config) Validate() error {
 		errs = append(errs, fmt.Errorf("%w: work.lease %s must be at least 1s",
 			ErrInvalidValue, c.Work.Lease))
 	}
-	// A retention under a minute would prune entries a dispatcher's next
-	// run is about to send, flagging every peer for a full sync.
-	if c.Federation.OutboxRetention < time.Minute {
-		errs = append(errs, fmt.Errorf("%w: federation.outbox_retention %s must be at least 1m",
-			ErrInvalidValue, c.Federation.OutboxRetention))
-	}
+	errs = append(errs, c.Federation.validate()...)
 	if c.NPM.MaxPublishSize <= 0 {
 		errs = append(errs, fmt.Errorf("%w: npm.max_publish_size %s must be more than zero",
 			ErrInvalidValue, c.NPM.MaxPublishSize))

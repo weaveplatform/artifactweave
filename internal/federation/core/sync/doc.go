@@ -71,7 +71,9 @@
 //     inside the retention window. A peer whose position falls below the
 //     pruned floor is flagged and sent only the first entry still held,
 //     which it refuses with 409 and answers by asking for what it lacks;
-//     the 410 it gets starts its full sync.
+//     the 410 it gets starts its full sync. A push already in flight when
+//     the prune flags the peer, and which the peer applies, closes the gap
+//     the flag records, so the dispatcher clears that flag.
 //   - A snapshot is copied when it is taken, so its pages stay at its
 //     sequence while the stream moves on; memory holds one page. Its
 //     receiver is flagged on the sender first, so nothing pushed to it

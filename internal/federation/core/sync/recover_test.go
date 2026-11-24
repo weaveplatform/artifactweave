@@ -212,3 +212,56 @@ func TestUnitRecoverAndForgetFailuresSurface(t *testing.T) {
 		}
 	}
 }
+
+// TestUnitRequestedFullSyncKeepsTheFlagARacingPushStartedBefore runs a
+// requested full sync (a sender's fullSync asking B to resync, FED-04)
+// while A's push to B is in flight: B flags itself when the request
+// arrives, then its run takes A's snapshot, which flags B on A at the
+// position the push started from. B refuses the push as busy, so the push
+// clears neither flag (unflagCaughtUp), and the run, not the push, brings
+// B to the snapshot; A's pushes then resume after it.
+func TestUnitRequestedFullSyncKeepsTheFlagARacingPushStartedBefore(t *testing.T) {
+	w := newWorld()
+	a, b := w.add(t), w.add(t)
+	pair(t, a, b, fed, model.DeliveryPush, model.DeliveryPush)
+	for i := range 3 {
+		a.put(fmt.Sprint("k", i), "first")
+	}
+	a.run(streamsync.SendKind)
+	for i := range 3 {
+		a.put(fmt.Sprint("k", i), "second")
+	}
+	from := a.cursor(b)
+	w.mu.Lock()
+	w.faults.beforePush = func() {
+		if _, err := b.engine.FullSync(t.Context(), a.id, stream, true); err != nil {
+			t.Error(err)
+			return
+		}
+		// The run's first snapshot page, as B's FullSyncKind fetches it.
+		p, err := b.store.Peers().Get(t.Context(), a.id)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if _, err := (remote{w: w, from: b}).Snapshot(t.Context(), p, stream, "", streamsync.MaxBatch); err != nil {
+			t.Error(err)
+		}
+	}
+	w.mu.Unlock()
+	a.run(streamsync.SendKind)
+	if f := a.resyncs(); len(f) != 1 || f[0].Receiver != b.id || f[0].Position != from {
+		t.Fatalf("A's flags %+v after the push, want B's at %d", f, from)
+	}
+	if len(b.resyncs()) != 1 {
+		t.Fatalf("B's flags %+v, want its run's", b.resyncs())
+	}
+	b.run(streamsync.FullSyncKind)
+	converged(t, b, a)
+	if len(a.resyncs()) != 0 || len(b.resyncs()) != 0 {
+		t.Fatalf("flags A %+v B %+v after the run", a.resyncs(), b.resyncs())
+	}
+	a.put("after", "the run")
+	a.run(streamsync.SendKind)
+	converged(t, b, a)
+}

@@ -563,7 +563,7 @@ type ClientInterface interface {
 
 	// GetPeerStatus Read a peer's liveness and version
 	//
-	// Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a peer whose answer does not verify is unauthorized. Not implemented; answers 501.
+	// Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a peer whose answer does not verify, or that refuses the caller's signature, is unauthorized. The caller measures the clock skew between the two instances from `time`. Each instance reads every paired peer's status periodically.
 	//
 	// Corresponds with GET /status (the `GetPeerStatus` operationId).
 	GetPeerStatus(ctx context.Context, params *GetPeerStatusParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -731,7 +731,7 @@ func (c *Client) PutRepositoryConfiguration(ctx context.Context, repoKey string,
 
 // GetPeerStatus Read a peer's liveness and version
 //
-// Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a peer whose answer does not verify is unauthorized. Not implemented; answers 501.
+// Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a peer whose answer does not verify, or that refuses the caller's signature, is unauthorized. The caller measures the clock skew between the two instances from `time`. Each instance reads every paired peer's status periodically.
 //
 // Corresponds with GET /status (the `GetPeerStatus` operationId).
 func (c *Client) GetPeerStatus(ctx context.Context, params *GetPeerStatusParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1790,7 +1790,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPeerStatusWithResponse Read a peer's liveness and version
 	//
-	// Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a peer whose answer does not verify is unauthorized. Not implemented; answers 501.
+	// Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a peer whose answer does not verify, or that refuses the caller's signature, is unauthorized. The caller measures the clock skew between the two instances from `time`. Each instance reads every paired peer's status periodically.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2867,7 +2867,7 @@ func (c *ClientWithResponses) PutRepositoryConfigurationWithResponse(ctx context
 
 // GetPeerStatusWithResponse Read a peer's liveness and version
 //
-// Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a peer whose answer does not verify is unauthorized. Not implemented; answers 501.
+// Answers a signed liveness and version read. A peer that answers is online for the use cases it lists; a peer whose answer does not verify, or that refuses the caller's signature, is unauthorized. The caller measures the clock skew between the two instances from `time`. Each instance reads every paired peer's status periodically.
 //
 // Returns a wrapper object for the known response body format(s).
 //

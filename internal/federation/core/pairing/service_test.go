@@ -837,6 +837,20 @@ func (f faultPeers) Put(ctx context.Context, p model.Peer) error {
 	return f.PeerStore.Put(ctx, p)
 }
 
+func (f faultPeers) List(ctx context.Context, filter port.PeerFilter) ([]model.Peer, error) {
+	if f.fail["List"] {
+		return nil, errStore
+	}
+	return f.PeerStore.List(ctx, filter)
+}
+
+func (f faultPeers) SetLiveness(ctx context.Context, id string, l model.Liveness) error {
+	if f.fail["SetLiveness"] {
+		return errStore
+	}
+	return f.PeerStore.SetLiveness(ctx, id, l)
+}
+
 func (f faultPeers) Delete(ctx context.Context, id string) error {
 	if f.fail["Delete"] {
 		return errStore
@@ -883,12 +897,12 @@ func TestUnitStoreFaults(t *testing.T) {
 			_, err := faulty(a, "AddNonce").Issue(t.Context(), model.UseFederatedRepo, a.base)
 			return err
 		}(),
-		"redeem AddNonce": faulty(b, "AddNonce").Redeem(t.Context(), model.UseFederatedRepo, must(a.svc.Issue(t.Context(), model.UseFederatedRepo, a.base)), b.base),
-		"redeem Get":      faulty(b, "Get").Redeem(t.Context(), model.UseFederatedRepo, must(a.svc.Issue(t.Context(), model.UseFederatedRepo, a.base)), b.base),
-		"redeem Put":      faulty(b, "Put").Redeem(t.Context(), model.UseFederatedRepo, must(a.svc.Issue(t.Context(), model.UseFederatedRepo, a.base)), b.base),
-		"drop Get":        faulty(b, "Get").Drop(t.Context(), aid, model.UseFederatedRepo),
-		"drop Put":        faulty(b, "Put").Drop(t.Context(), aid, model.UseFederatedRepo),
-		"observe Put":     faulty(b, "Put").Observe(t.Context(), aid, false),
+		"redeem AddNonce":     faulty(b, "AddNonce").Redeem(t.Context(), model.UseFederatedRepo, must(a.svc.Issue(t.Context(), model.UseFederatedRepo, a.base)), b.base),
+		"redeem Get":          faulty(b, "Get").Redeem(t.Context(), model.UseFederatedRepo, must(a.svc.Issue(t.Context(), model.UseFederatedRepo, a.base)), b.base),
+		"redeem Put":          faulty(b, "Put").Redeem(t.Context(), model.UseFederatedRepo, must(a.svc.Issue(t.Context(), model.UseFederatedRepo, a.base)), b.base),
+		"drop Get":            faulty(b, "Get").Drop(t.Context(), aid, model.UseFederatedRepo),
+		"drop Put":            faulty(b, "Put").Drop(t.Context(), aid, model.UseFederatedRepo),
+		"observe SetLiveness": faulty(b, "SetLiveness").Observe(t.Context(), aid, false),
 	} {
 		if !errors.Is(err, kernel.ErrStore) {
 			t.Errorf("%s: %v", name, err)

@@ -397,10 +397,15 @@ Terraform federated scenario that reuses them (QUA-02):
   `ARTIFACTWEAVE_TEST_PROCESS_LOG_DIR` when it is set. When a scenario fails,
   its output carries the tail of each instance's log. `c.Close()` stops the
   instances, closes the ingresses and egresses and removes the container, and
-  `c.Leftovers` names any process, listening address or container that
-  survived it. `in.Identity(t)` reads a running instance's identity, its
+  `c.Leftovers` names any process, ingress or egress or container that
+  survived it, asking each owner rather than dialling ports another
+  scenario may already have reused. `in.Identity(t)` reads a running instance's identity, its
   private key included, from its database, so a scenario can require that no
-  answer disclosed it.
+  answer disclosed it. `in.Peer(t, id)` reads its record of a peer, status,
+  last-seen time and clock skew included, and `in.SetPeerKey(t, id, key)`
+  replaces the key that record holds. `c.Stop(i)` stops one instance and
+  leaves the rest running; `Options.PeerProbeInterval` sets every instance's
+  `federation.peer_probe_interval`.
 
 The first scenario, `TestAccPeersHarnessSQLite` and `TestAccPeersHarnessPostgres`,
 uses no peer feature. Three instances report distinct service ids, answer
@@ -422,6 +427,13 @@ an unpaired or receiver member is refused, a create on one instance reaches the
 other two as their own copies listing every member, an update reaches a member
 cut off from the sender once the cut is restored, a member's own change reaches
 the others, and configSync answers as 7.x does.
+`TestAccPeerLivenessSQLite` and `TestAccPeerLivenessPostgres` pair two instances
+that read each other's signed `GET /artifactweave/peer/v1/status` every second
+([#1949](https://github.com/weaveplatform/artifactweave/issues/1949)): each
+records the other ONLINE from a read after pairing, with a clock skew under a
+second; a partition turns both OFFLINE and healing it both ONLINE; a record
+holding a key the peer does not sign with shows it UNAUTHORIZED on both sides
+until the key is restored; and a stopped instance turns OFFLINE on the other.
 `TestAccFederatedFullSyncSQLite` and `TestAccFederatedFullSyncPostgres` run
 FED-04's operations across three instances ([#1932](https://github.com/weaveplatform/artifactweave/issues/1932))
 with `Options.Retention` at one minute, the least the configuration accepts, so

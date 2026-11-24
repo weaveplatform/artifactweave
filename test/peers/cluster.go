@@ -2,6 +2,7 @@ package peers
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -23,6 +24,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/internal/app/config"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/postgres"
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
@@ -76,6 +79,9 @@ type Options struct {
 	// past the window sets the minimum, a minute, and the instance then
 	// prunes every ten seconds.
 	Retention time.Duration
+	// PeerProbeInterval is each instance's federation.peer_probe_interval,
+	// how often it reads its peers' status; zero keeps the default.
+	PeerProbeInterval time.Duration
 }
 
 // Cluster is a set of artifactweave instances, each in its own OS process
@@ -139,6 +145,8 @@ func Start(t *testing.T, opts Options) *Cluster {
 			AdminPassword: "peer-admin-" + strings.ToLower(rand.Text()),
 			masterKey:     "peer-master-key-" + strings.ToLower(rand.Text()),
 			cluster:       c,
+			probe:         opts.PeerProbeInterval,
+			retention:     opts.Retention,
 			work:          filepath.Join(work, name),
 			done:          make(chan struct{}),
 			// Both relays listen before any instance starts: the ingress
@@ -147,9 +155,6 @@ func Start(t *testing.T, opts Options) *Cluster {
 			// They serve once the instances have their final addresses.
 			ingress: listenRelay(t),
 			egress:  listenRelay(t),
-		}
-		if opts.Retention > 0 {
-			in.federation = map[string]string{"outbox_retention": opts.Retention.String()}
 		}
 		in.URL = "http://" + in.ingress.addr
 		c.ingresses[in.ingress.addr] = i
@@ -219,6 +224,14 @@ func (c *Cluster) Heal(a, b int) {
 	c.Restore(b, a)
 }
 
+// Stop stops instance i as serve stops on a signal, as Close does, and
+// leaves the rest of the cluster running. Its ingress stays, so the others
+// still reach its base URL and find nothing listening there.
+func (c *Cluster) Stop(i int) {
+	c.t.Helper()
+	c.instance(i).stop()
+}
+
 // DoFrom sends a request to instance to's base URL as to's administrator,
 // the way from's server reaches it: through from's egress. It returns a
 // transport error, not a failed t, so a scenario can see a cut.
@@ -254,6 +267,7 @@ func (c *Cluster) Close() {
 		}
 		wg.Wait()
 		for _, in := range c.Instances {
+			in.closeStore()
 			in.ingress.close()
 			in.egress.close()
 			in.via.CloseIdleConnections()
@@ -271,33 +285,32 @@ func (c *Cluster) Close() {
 }
 
 // Leftovers names what a closed cluster still holds: a running instance
-// process, an instance, ingress or egress address that accepts connections, or a
-// PostgreSQL container the engine still has. It is empty after Close.
+// process, an ingress or egress that still listens, or a PostgreSQL container
+// the engine still has. It is empty after Close.
+//
+// It asks each owner rather than dialling the addresses: a port is free for
+// anyone the moment its owner closes it, and on Linux the ports Docker
+// publishes and the ones parallel scenarios listen on come from the same
+// ephemeral range, so a dial that connects can reach another scenario's
+// instance or container. An exited process holds no socket, and a relay's
+// listener is closed before close returns.
 func (c *Cluster) Leftovers(ctx context.Context) []string {
 	var left []string
-	var addrs []string
 	for _, in := range c.Instances {
 		select {
 		case <-in.done:
 		default:
 			left = append(left, in.Name+" process is still running")
 		}
-		if in.addr != "" {
-			addrs = append(addrs, in.addr)
+		for _, r := range []*relay{in.ingress, in.egress} {
+			if r.listening() {
+				left = append(left, r.addr+" still accepts connections")
+			}
 		}
-		addrs = append(addrs, in.ingress.addr, in.egress.addr)
 	}
 	if c.postgres.ContainerID != "" {
 		if err := containertest.Removed(ctx, c.postgres.ContainerID); err != nil {
 			left = append(left, err.Error())
-		}
-	}
-	slices.Sort(addrs)
-	for _, addr := range addrs {
-		conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "tcp", addr)
-		if err == nil {
-			_ = conn.Close()
-			left = append(left, addr+" still accepts connections")
 		}
 	}
 	return left
@@ -397,8 +410,12 @@ type Instance struct {
 	AdminPassword string
 
 	cluster *Cluster
-	work    string
-	dsn     string
+	// probe and retention are the configuration's federation section:
+	// peer_probe_interval and outbox_retention, left out when zero.
+	probe     time.Duration
+	retention time.Duration
+	work      string
+	dsn       string
 	// config is the configuration file the instance process loads.
 	config string
 	// ingress forwards URL to addr; egress is the instance's platform
@@ -408,14 +425,22 @@ type Instance struct {
 	via             *http.Client
 	// masterKey survives a retried start, which reopens the same database.
 	masterKey string
-	// federation is the configuration's federation section, if any.
-	federation map[string]string
-	addr       string
-	logPath    string
-	stdin      io.WriteCloser
-	done       chan struct{}
-	exit       error
-	kill       func()
+	addr      string
+	logPath   string
+	stdin     io.WriteCloser
+	done      chan struct{}
+	exit      error
+	kill      func()
+	// store is the scenario's own handle on the instance's metadata store,
+	// opened at the first Identity, Peer or SetPeerKey and closed by Close. A
+	// scenario polls Peer every few hundred milliseconds; opening the store
+	// for each read loaded the configuration and keyring and opened a pool
+	// every time, taking CPU from the instances of the scenarios running
+	// beside it. On SQLite that load was enough to hold a request's
+	// admission transaction past its 500ms budget (apilimit's
+	// BudgetTimeout), and the request answered 503.
+	storeMu sync.Mutex
+	store   *appsql.Store
 }
 
 // Do sends a request to the instance as its administrator and returns the
@@ -441,6 +466,57 @@ func (in *Instance) DoAs(t testing.TB, user, password, method, path, body string
 // cluster's database goes with its container.
 func (in *Instance) Identity(t testing.TB) instance.InstanceIdentity {
 	t.Helper()
+	id, err := in.openStore(t).Instance().Get(t.Context())
+	if err != nil {
+		t.Fatalf("peers: read %s's identity: %v", in.Name, err)
+	}
+	return id
+}
+
+// Peer reads the instance's record of the peer instanceID from its
+// database, as its own server does: what its status reads last recorded
+// (status, last-seen time and clock skew) included. ok is false while it
+// has no such record. The instance must be running, as for Identity.
+func (in *Instance) Peer(t testing.TB, instanceID string) (model.Peer, bool) {
+	t.Helper()
+	p, err := in.openStore(t).Peers().Get(t.Context(), instanceID)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.Peer{}, false
+	}
+	if err != nil {
+		t.Fatalf("peers: read %s's record of %s: %v", in.Name, instanceID, err)
+	}
+	return p, true
+}
+
+// SetPeerKey replaces the public key in the instance's record of the peer
+// instanceID, as if the peer now signed with key: the instance then
+// refuses the peer's requests and its answers. Restoring the peer's own
+// key ends that. Only the key changes; status reads write the liveness
+// columns alone, so they never write an old key back.
+func (in *Instance) SetPeerKey(t testing.TB, instanceID string, key ed25519.PublicKey) {
+	t.Helper()
+	st := in.openStore(t)
+	p, err := st.Peers().Get(t.Context(), instanceID)
+	if err != nil {
+		t.Fatalf("peers: read %s's record of %s: %v", in.Name, instanceID, err)
+	}
+	p.PublicKey = key
+	if err := st.Peers().Put(t.Context(), p); err != nil {
+		t.Fatalf("peers: write %s's record of %s: %v", in.Name, instanceID, err)
+	}
+}
+
+// openStore returns the instance's metadata store, opened once with the
+// configuration it runs with, its master key included, without migrating
+// it.
+func (in *Instance) openStore(t testing.TB) *appsql.Store {
+	t.Helper()
+	in.storeMu.Lock()
+	defer in.storeMu.Unlock()
+	if in.store != nil {
+		return in.store
+	}
 	cfg, err := config.Load(config.LoadOptions{File: in.config})
 	if err != nil {
 		t.Fatal(err)
@@ -449,16 +525,23 @@ func (in *Instance) Identity(t testing.TB) instance.InstanceIdentity {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st, err := app.OpenStore(t.Context(), cfg, appsql.Options{SkipMigrate: true, Keyring: keys})
+	// Not t's context: the handle outlives the call that opens it, until
+	// Close.
+	st, err := app.OpenStore(context.Background(), cfg, appsql.Options{SkipMigrate: true, Keyring: keys})
 	if err != nil {
 		t.Fatalf("peers: open %s's store: %v", in.Name, err)
 	}
-	defer func() { _ = st.Close() }()
-	id, err := st.Instance().Get(t.Context())
-	if err != nil {
-		t.Fatalf("peers: read %s's identity: %v", in.Name, err)
+	in.store = st
+	return st
+}
+
+func (in *Instance) closeStore() {
+	in.storeMu.Lock()
+	defer in.storeMu.Unlock()
+	if in.store != nil {
+		_ = in.store.Close()
+		in.store = nil
 	}
-	return id
 }
 
 // LogPath is the file that receives the instance's standard output and
@@ -517,15 +600,14 @@ func (c *Cluster) sendHeader(
 // instanceConfig is the strict YAML the instance process loads with
 // config.Load, as serve loads --config; only the keys a cluster sets.
 type instanceConfig struct {
-	Listen    string            `yaml:"listen"`
-	BaseURL   string            `yaml:"base_url"`
-	DataDir   string            `yaml:"data_dir"`
-	MasterKey string            `yaml:"master_key"`
-	Database  map[string]string `yaml:"database"`
-	Bootstrap map[string]string `yaml:"bootstrap"`
-	Log       map[string]string `yaml:"log"`
-	Remote    map[string]any    `yaml:"remote"`
-	// Federation is set only when Options.Retention is.
+	Listen     string            `yaml:"listen"`
+	BaseURL    string            `yaml:"base_url"`
+	DataDir    string            `yaml:"data_dir"`
+	MasterKey  string            `yaml:"master_key"`
+	Database   map[string]string `yaml:"database"`
+	Bootstrap  map[string]string `yaml:"bootstrap"`
+	Log        map[string]string `yaml:"log"`
+	Remote     map[string]any    `yaml:"remote"`
 	Federation map[string]string `yaml:"federation,omitempty"`
 }
 
@@ -551,6 +633,13 @@ func (in *Instance) startOnce(origins []string) error {
 	if in.dsn != "" {
 		database = map[string]string{"driver": string(Postgres), "dsn": in.dsn}
 	}
+	federation := map[string]string{}
+	if in.probe > 0 {
+		federation["peer_probe_interval"] = in.probe.String()
+	}
+	if in.retention > 0 {
+		federation["outbox_retention"] = in.retention.String()
+	}
 	data, err := yaml.Marshal(instanceConfig{
 		Listen: addr, BaseURL: in.URL, DataDir: in.DataDir,
 		MasterKey:  in.masterKey,
@@ -558,7 +647,7 @@ func (in *Instance) startOnce(origins []string) error {
 		Bootstrap:  map[string]string{"admin_password": in.AdminPassword},
 		Log:        map[string]string{"level": "debug", "format": "text"},
 		Remote:     map[string]any{"allowed_private_origins": origins},
-		Federation: in.federation,
+		Federation: federation,
 	})
 	if err != nil {
 		return err
