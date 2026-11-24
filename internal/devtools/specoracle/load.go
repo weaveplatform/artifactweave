@@ -88,6 +88,8 @@ func Load(cacheDir string) (Oracle, error) {
 
 // LoadOurs reads the project's own YAML specs the same way, so both sides go
 // through one normaliser and the comparison cannot be skewed by a second parser.
+// A spec whose info is marked x-artifactweave-extension: true is read and
+// left out whole.
 func LoadOurs(paths ...string) (Oracle, error) {
 	o := Oracle{Ops: map[string]Operation{}}
 	if len(paths) == 0 {
@@ -105,6 +107,13 @@ func LoadOurs(paths ...string) (Oracle, error) {
 		doc, ok := toJSONish(node).(map[string]any)
 		if !ok {
 			return o, fmt.Errorf("%s: %w", p, errNotMapping)
+		}
+		// A document whose info carries the marker is a service of our own
+		// with no published counterpart, such as the peer API (decision
+		// 0021). Loading it would list every operation as extra and let a
+		// future scaffold or baseline treat it as a JFrog family.
+		if info, _ := doc["info"].(map[string]any); extension(info) {
+			continue
 		}
 		o.add(doc, "ours", filepath.Base(p))
 	}

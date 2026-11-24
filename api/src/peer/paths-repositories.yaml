@@ -1,0 +1,86 @@
+components:
+  schemas:
+    RepositoryConfiguration:
+      type: object
+      description: >-
+        A federated repository's configuration, sent to each member when the repository is created, when its
+        members change and on a configuration sync. Version 1.0; a later minor version may add fields, which the
+        receiver ignores.
+      required: [stream, configuration]
+      properties:
+        stream:
+          type: string
+          description: >-
+            Required within this object. The sender's stream for the repository, `repo:<repoKey>` with the sender's
+            key, on which the repository's events arrive.
+        configuration:
+          type: object
+          additionalProperties: true
+          description: >-
+            Required within this object. The repository in the form `GET /artifactory/api/repositories/{repoKey}`
+            answers, with `rclass` `federated` and `members` listing every member, this instance's included. Its
+            `key` is the key in the path.
+paths:
+  /repositories/{repoKey}:
+    put:
+      description: >-
+        Creates or updates this instance's copy of a federated repository the caller is a member of. The
+        configuration is validated against this instance's own peers before it is stored, and nothing is stored
+        when it is refused. Not implemented; answers 501.
+      operationId: putRepositoryConfiguration
+      parameters:
+        - name: repoKey
+          in: path
+          required: true
+          description: Required path parameter. The repository key on this instance, as this instance's member URL names it.
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PeerProtocol'
+        - $ref: '#/components/parameters/PeerDate'
+        - $ref: '#/components/parameters/PeerSignature'
+        - $ref: '#/components/parameters/PeerSignatureInput'
+        - $ref: '#/components/parameters/PeerContentDigest'
+      requestBody:
+        description: The configuration.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryConfiguration'
+      responses:
+        '204':
+          description: This instance's copy is created or updated.
+        '400':
+          description: >-
+            The body is malformed, the configuration is not valid here (including a member whose base URL is no
+            peer of this instance), or the protocol major version is not this instance's; details lists the
+            refused fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/PeerUnauthorized'
+        '403':
+          description: >-
+            The caller holds no federated repository use case with this instance, or this instance issued it only
+            `federated-repo/r`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: A repository with this key exists here and is not a federated repository of the same package type.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/PeerInternalError'
+      summary: Send a federated repository's configuration
+      tags:
+        - repositories
+      x-idempotency: natural
+      x-idempotency-natural:
+        - path:repoKey
+      x-cost: ordinary

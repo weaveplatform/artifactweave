@@ -1,5 +1,5 @@
 # Declarations every service shares (decision 0043, "Where the declarations
-# live"). make bundle merges this fragment into each of the seven bundles, and
+# live"). make bundle merges this fragment into every service's bundle, and
 # adds TooManyRequests as the 429 and ServiceUnavailable as the 503 of every
 # operation whose x-cost is not exempt and that does not declare that status
 # itself. It sits beside the service directories, not in one, because the

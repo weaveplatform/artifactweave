@@ -763,3 +763,53 @@ components:
 		t.Fatal(diff)
 	}
 }
+
+// TestUnitLoadOursSkipsOwnServices: a document whose info is marked as an
+// extension, the peer API's, contributes no operation, while an unmarked
+// document beside it still does, so the marker cannot hide a JFrog family
+// that merely lacks it.
+func TestUnitLoadOursSkipsOwnServices(t *testing.T) {
+	dir := t.TempDir()
+	own := filepath.Join(dir, "peer.openapi.yaml")
+	jfrog := filepath.Join(dir, "grid.openapi.yaml")
+	for path, spec := range map[string]string{
+		own: `openapi: 3.0.3
+info:
+  title: Peer
+  x-artifactweave-extension: true
+servers:
+  - url: /artifactweave/peer/v1
+paths:
+  /status:
+    get:
+      operationId: getPeerStatus
+      responses:
+        '200':
+          description: ok
+`,
+		jfrog: `openapi: 3.0.3
+info:
+  title: Grid
+servers:
+  - url: /grid
+paths:
+  /api/v1/topology:
+    get:
+      operationId: listGridTopologies
+      responses:
+        '200':
+          description: ok
+`,
+	} {
+		if err := os.WriteFile(path, []byte(spec), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ours, err := LoadOurs(own, jfrog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff([]string{"GET /grid/api/v1/topology"}, keys(ours.Ops)); diff != "" {
+		t.Fatal(diff)
+	}
+}

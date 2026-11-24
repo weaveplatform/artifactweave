@@ -81,6 +81,7 @@ import (
 	eventgen "github.com/weaveplatform/artifactweave/internal/platform/gen/event"
 	gridgen "github.com/weaveplatform/artifactweave/internal/platform/gen/grid"
 	"github.com/weaveplatform/artifactweave/internal/platform/gen/operations"
+	peergen "github.com/weaveplatform/artifactweave/internal/platform/gen/peer"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/platform/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/platform/gen/worker"
 	"github.com/weaveplatform/artifactweave/internal/platform/httpkit"
@@ -582,7 +583,8 @@ func routerLogger(cfg RouterConfig, name string) *slog.Logger {
 // NewRouter returns the handler for every JFrog path prefix over cfg:
 // /artifactory, /access, /event, /router, /jfconnect and /v2; /distribution,
 // /worker, /pfed and /grid, whose specified operations answer 501 until they
-// are built; and the products artifactweave does not implement, which answer
+// are built; artifactweave's own peer API under /artifactweave/peer/v1, whose
+// operations answer 501 likewise; and the products artifactweave does not implement, which answer
 // 501 naming the product (Mission Control 404). Flat CRUD families come from
 // the generated strict servers, and the item paths, protocols and other
 // hand-written routes are mounted ahead of them. When cfg sets a Store but no
@@ -740,14 +742,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			// challenged whether anonymous access is on or off.
 			kit.ForceAuthentication,
 			accesshttp.Authenticate(
-				newAuthnOptions(cfg.Auth, cfg.Store, cfg.Access.Authorizer, func(req *http.Request) bool {
-					if terraformbackendhttp.IsPath(req.URL.Path) {
-						return terraformbackendhttp.SkipsAuthentication(req)
-					}
-					return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
-						return p.SkipsAuthentication(req)
-					})
-				}),
+				newAuthnOptions(cfg.Auth, cfg.Store, cfg.Access.Authorizer, skipsAuthentication(mounted)),
 			),
 		)
 	}
@@ -951,6 +946,21 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			gridgen.NewStrictHandlerWithOptions(gridService{}, keyed.grid(), gridOpts),
 			gridgen.ChiServerOptions{
 				BaseURL:          "/grid",
+				BaseRouter:       g,
+				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
+			},
+		)
+		// artifactweave's own peer protocol (decision 0021), beside the
+		// JFrog prefixes and outside the parity oracle; every operation
+		// answers 501 until PEER-02 to PEER-05 and FED-01 serve it.
+		peerOpts := peergen.StrictHTTPServerOptions{
+			RequestErrorHandlerFunc:  middleware.BindingError(http.StatusBadRequest),
+			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
+		}
+		peergen.HandlerWithOptions(
+			peergen.NewStrictHandlerWithOptions(peerService{}, keyed.peer(), peerOpts),
+			peergen.ChiServerOptions{
+				BaseURL:          peerBase,
 				BaseRouter:       g,
 				ErrorHandlerFunc: middleware.BindingError(http.StatusBadRequest),
 			},
@@ -1301,7 +1311,39 @@ var errorProfileRules = []httpkit.ProfileRule{
 	{Match: pathPrefix("/distribution/"), Profile: apierror.ProfileJFrogDistribution},
 	{Match: pathPrefix("/pfed/"), Profile: apierror.ProfilePlatformFederation},
 	{Match: pathPrefix("/grid/"), Profile: apierror.ProfileGrid},
+	// The peer API takes the same flat envelope as /grid: a symbolic code
+	// that peers branch on, which /pfed's integer code would only repeat
+	// from the status. The spec's ErrorResponse records it.
+	{Match: pathPrefix(peerBase + "/"), Profile: apierror.ProfileGrid},
 }
+
+// skipsAuthentication reports the requests user authentication passes
+// untouched beyond newAuthnOptions' own: the peer API's, the Terraform
+// backend's that verify themselves, and those a mounted protocol skips.
+func skipsAuthentication(mounted []pkgroute.Protocol) func(*http.Request) bool {
+	return func(req *http.Request) bool {
+		if peerRequest(req) {
+			return true
+		}
+		if terraformbackendhttp.IsPath(req.URL.Path) {
+			return terraformbackendhttp.SkipsAuthentication(req)
+		}
+		return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
+			return p.SkipsAuthentication(req)
+		})
+	}
+}
+
+// peerBase is the prefix of the peer API (decision 0021), its spec's
+// servers[0].url.
+const peerBase = "/artifactweave/peer/v1"
+
+// peerRequest reports a request to the peer API, which user authentication
+// skips. A peer proves who it is with an HTTP message signature, which the
+// peer middleware verifies (PEER-03), and carries no user credential: user
+// authentication would answer every peer 401 while anonymous access is off,
+// and run it as the anonymous user while it is on.
+func peerRequest(r *http.Request) bool { return strings.HasPrefix(r.URL.Path, peerBase+"/") }
 
 // errorProfileFor is the profile errorProfileRules give path. Unclaimed
 // routes keep the same profile as handled requests so clients can read
@@ -1449,6 +1491,9 @@ type (
 	workerService struct{ workergen.UnimplementedStrict }
 	pfedService   struct{ pfedgen.UnimplementedStrict }
 	gridService   struct{ gridgen.UnimplementedStrict }
+	// peerService is the peer API's server (decision 0021); its P13
+	// tickets replace the stubs.
+	peerService struct{ peergen.UnimplementedStrict }
 )
 
 var (
@@ -1459,4 +1504,5 @@ var (
 	_ workergen.StrictServerInterface       = workerService{}
 	_ pfedgen.StrictServerInterface         = pfedService{}
 	_ gridgen.StrictServerInterface         = gridService{}
+	_ peergen.StrictServerInterface         = peerService{}
 )

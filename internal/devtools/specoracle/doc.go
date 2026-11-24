@@ -58,7 +58,9 @@
 //     x-artifactweave-extension: true is left out on both sides: an
 //     optional extension JFrog's clients never send or can ignore (#1395),
 //     such as the shared 429 and 503 every admitted operation declares, so
-//     declaring one never moves the baseline.
+//     declaring one never moves the baseline. A whole document whose info
+//     is so marked, the peer API's (decision 0021), is ours alone: LoadOurs
+//     leaves out all of it, so it is neither extra nor a family.
 //   - One bad page never hides the rest: Fetch records a page that fails or
 //     has no block in the manifest, and Load records a block that does not
 //     parse in the oracle's Errors.
@@ -112,6 +114,8 @@
 //     the report, summary and text agree.
 //   - TestUnitLoadOursSkipsExtensions: an operation, a parameter and a
 //     response marked as an extension are not compared.
+//     TestUnitLoadOursSkipsOwnServices: a document whose info is marked
+//     contributes nothing, and an unmarked one beside it still does.
 //   - TestUnitBaselineRoundTrip: a written baseline reads back, Diff splits
 //     regressions from improvements, and an absent file reads as empty.
 //   - TestUnitBuildInventory, TestUnitManifestSourcesDegrades,

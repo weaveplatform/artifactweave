@@ -25,6 +25,8 @@ api/
   event.openapi.yaml           # /event/api webhooks
   distribution.openapi.yaml grid.openapi.yaml pfed.openapi.yaml worker.openapi.yaml
                                # bundled contracts; unimplemented operations return 501
+  peer.openapi.yaml            # /artifactweave/peer/v1, the peer protocol (decision 0021);
+                               # no JFrog counterpart, outside the parity oracle
   oapi-server-*.yaml           # oapi-codegen configs, one per spec
   oapi-client-*.yaml
 internal/

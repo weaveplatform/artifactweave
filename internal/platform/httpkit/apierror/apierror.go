@@ -43,7 +43,8 @@ const (
 	// an integer code, used by the platform federation service (/pfed).
 	ProfilePlatformFederation
 	// ProfileGrid is {"code":"NOT_FOUND","message":"..."}, a symbolic code, with
-	// details when set, used by the topology service (/grid).
+	// details when set, used by the topology service (/grid) and by the peer
+	// API (/artifactweave/peer/v1, decision 0021).
 	ProfileGrid
 	// ProfileText is a plain-text body, used by the Go proxy: the go command shows
 	// an error's body only when it is plain text (decision 0035).

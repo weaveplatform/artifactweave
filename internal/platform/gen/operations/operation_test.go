@@ -18,6 +18,7 @@ import (
 	eventgen "github.com/weaveplatform/artifactweave/internal/platform/gen/event"
 	gridgen "github.com/weaveplatform/artifactweave/internal/platform/gen/grid"
 	"github.com/weaveplatform/artifactweave/internal/platform/gen/operations"
+	peergen "github.com/weaveplatform/artifactweave/internal/platform/gen/peer"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/platform/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/platform/gen/worker"
 )
@@ -48,6 +49,10 @@ var mounts = map[string]func(chi.Router){
 	"grid": func(r chi.Router) {
 		gridgen.HandlerWithOptions(gridgen.NewStrictHandler(gridgen.UnimplementedStrict{}, nil),
 			gridgen.ChiServerOptions{BaseURL: "/grid", BaseRouter: r})
+	},
+	"peer": func(r chi.Router) {
+		peergen.HandlerWithOptions(peergen.NewStrictHandler(peergen.UnimplementedStrict{}, nil),
+			peergen.ChiServerOptions{BaseURL: "/artifactweave/peer/v1", BaseRouter: r})
 	},
 	"pfed": func(r chi.Router) {
 		pfedgen.HandlerWithOptions(pfedgen.NewStrictHandler(pfedgen.UnimplementedStrict{}, nil),
