@@ -4,6 +4,9 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
 
+permissions:
+  contents: read
+
 jobs:
   validate-pr-title:
     name: '✅ Validate PR Title'
@@ -53,3 +56,37 @@ jobs:
           fi
           
           echo "✅ PR title '$PR_TITLE' follows the conventional commit format and is compatible with the release-please"
+
+  # release-please tags the version in the release pull request's title when it
+  # merges, while the branch carries the version it computed. A title edited by
+  # hand therefore tags a version the commit does not hold: #1154 was retitled
+  # 0.3.0 and tagged v0.3.0 on a 0.2.1 commit, and #1624 was retitled 0.4.0
+  # over 0.3.1 content (#1947). `edited` reruns this on every title change.
+  release-version:
+    name: '🔖 Check the release version'
+    # Branch identity, not the title: the title is what is under check.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'release-please--branches--main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Title, manifest, CHANGELOG and version markers agree
+        env:
+          GOWORK: 'off'
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: go run ./tools/releaseversion -title "$PR_TITLE"
