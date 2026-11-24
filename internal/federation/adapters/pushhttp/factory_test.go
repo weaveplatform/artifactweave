@@ -489,3 +489,24 @@ func TestAccTargetProxyServicesExchange(t *testing.T) {
 		})
 	}
 }
+
+// TestUnitPlatformProxy is the default proxy the peer client shares with
+// single push: none is a direct connection, one enabled jfrt default is
+// used with its credentials, and two are ambiguous.
+func TestUnitPlatformProxy(t *testing.T) {
+	store := platforminmem.New(memtx.New())
+	u, ntlm, err := PlatformProxy(t.Context(), store.Configs())
+	if err != nil || u != nil || ntlm != nil {
+		t.Fatalf("no proxy: %v, %v, %v", u, ntlm, err)
+	}
+	proxy := wire.ProxyConfiguration{Host: "proxy.invalid", Port: 3128, PlatformDefault: true, Username: "u"}
+	putProxy(t, store, "only", proxy, "p")
+	u, _, err = PlatformProxy(t.Context(), store.Configs())
+	if err != nil || u == nil || u.Host != "proxy.invalid:3128" || u.User.Username() != "u" {
+		t.Fatalf("one default: %v, %v", u, err)
+	}
+	putProxy(t, store, "second", proxy, "")
+	if _, _, err := PlatformProxy(t.Context(), store.Configs()); !errors.Is(err, outbound.ErrConfiguration) {
+		t.Errorf("two defaults: %v", err)
+	}
+}

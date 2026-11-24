@@ -1,11 +1,16 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -15,6 +20,9 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/weaveplatform/artifactweave/internal/devtools/specoracle"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
+	corepeer "github.com/weaveplatform/artifactweave/internal/federation/core/peer"
+	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/sqltest"
 	"github.com/weaveplatform/artifactweave/internal/platform/testkit/repopath"
 )
@@ -92,12 +100,14 @@ func TestAccPeerServiceOutsideParityOracle(t *testing.T) {
 	}
 }
 
-// TestAccPeerOperationsAnswer501AtStartUp sends every peer operation, signed
-// headers and all, to the server run starts over SQLite and over PostgreSQL,
-// with anonymous access off as it starts. User authentication skips the peer
-// API, so each answers 501 in the flat envelope until its P13 ticket serves
-// it, both without user credentials and with ones that do not verify.
-func TestAccPeerOperationsAnswer501AtStartUp(t *testing.T) {
+// TestAccPeerOperationsRefuseUnsignedAtStartUp sends every peer operation,
+// with every header it declares but a signature no peer made, to the server
+// run starts over SQLite and over PostgreSQL, with anonymous access off as
+// it starts. User authentication skips the peer API and the peer transport
+// refuses each with 401 in the flat envelope, with user credentials that do
+// not verify and without any: no handler runs. TestAccPeerOperationsSigned
+// BetweenInstances sends them signed.
+func TestAccPeerOperationsRefuseUnsignedAtStartUp(t *testing.T) {
 	doc := loadSpec(t, peerSpec)
 	for _, backend := range []string{"sqlite", "postgres"} {
 		t.Run(backend, func(t *testing.T) {
@@ -135,16 +145,17 @@ func TestAccPeerOperationsAnswer501AtStartUp(t *testing.T) {
 						status, body := sendPeerOperation(
 							t, client, "http://"+addr, method, path, op, authorization,
 						)
-						if status != http.StatusNotImplemented {
-							t.Errorf("%s %s (Authorization %q): status %d, body %s",
-								method, path, authorization, status, body)
-							continue
+						want, code := http.StatusUnauthorized, "UNAUTHORIZED"
+						if method == http.MethodPost && path == "/pair" {
+							// The redeem is verified with the key its body
+							// presents, and "{}" presents none.
+							want, code = http.StatusBadRequest, "BAD_REQUEST"
 						}
 						var got map[string]any
-						if err := json.Unmarshal(body, &got); err != nil ||
-							got["code"] != "NOT_IMPLEMENTED" ||
-							got["message"] != "not implemented by artifactweave yet" || len(got) != 2 {
-							t.Errorf("%s %s: body %s, want the flat 501 envelope", method, path, body)
+						if status != want || json.Unmarshal(body, &got) != nil ||
+							got["code"] != code || len(got) != 2 {
+							t.Errorf("%s %s (Authorization %q): status %d, body %s, want the flat %d",
+								method, path, authorization, status, body, want)
 						}
 					}
 				}
@@ -193,6 +204,12 @@ func sendPeerOperation(
 			req.Header.Set(p.Value.Name, plausibleValue(p.Value))
 		}
 	}
+	// Well-formed signed headers that no paired peer made.
+	req.Header.Set("Artifactweave-Peer-Protocol", "1.0")
+	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+	req.Header.Set("Signature-Input",
+		`peer=("@method" "@target-uri" "date");created=1;keyid="jfrt@x";alg="ed25519";nonce="n"`)
+	req.Header.Set("Signature", "peer=:AAAA:")
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -203,4 +220,243 @@ func sendPeerOperation(
 		t.Fatal(err)
 	}
 	return resp.StatusCode, b
+}
+
+// peerSite is one running instance for the peer transport scenarios: its
+// runtime, a listener over the router serve builds, and what it logs.
+type peerSite struct {
+	rt     *Runtime
+	server *httptest.Server
+	log    *syncBuffer
+	self   model.Peer
+	key    ed25519.PrivateKey
+}
+
+func openPeerSite(t *testing.T, backend string) *peerSite {
+	t.Helper()
+	cfg := testConfig(t)
+	if backend == "postgres" {
+		cfg.Database.Driver = "postgres"
+		cfg.Database.DSN = sqltest.ScratchDSN(t, sqltest.PostgresDSN(t))
+	}
+	site := &peerSite{log: &syncBuffer{}}
+	logger := slog.New(slog.NewTextHandler(site.log, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	rt, err := OpenRuntime(t.Context(), cfg, logger, RuntimeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	site.rt = rt
+	site.server = httptest.NewServer(NewRouter(RouterConfig{
+		Store: rt.Store, Blobs: rt.Blobs, Auth: rt.Auth, Tokens: rt.Tokens,
+		Access: rt.modules.access.API(), Configuration: rt.modules.configuration.API(),
+		Logging: rt.Logging,
+	}))
+	t.Cleanup(func() {
+		site.server.Close()
+		if err := rt.Close(context.Background()); err != nil {
+			t.Error(err)
+		}
+	})
+	id, err := rt.Store.Instance().Get(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	site.key = id.PrivateKey
+	site.self = model.Peer{
+		InstanceID: id.InstanceID, BaseURL: site.server.URL, PublicKey: id.PublicKey,
+		ProtocolVersion: instance.ProtocolVersion,
+	}
+	return site
+}
+
+// pair records each site as the other's peer, as PEER-02's pairing will.
+func pair(t *testing.T, a, b *peerSite) {
+	t.Helper()
+	if err := a.rt.Store.Peers().Put(t.Context(), b.self); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.rt.Store.Peers().Put(t.Context(), a.self); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// peerBody is a body each peer operation accepts: POST /pair presents the
+// caller's identity, which its signature must verify with.
+func peerBody(from *peerSite, method, path string, op *openapi3.Operation) ([]byte, string) {
+	if method == http.MethodPost && path == "/pair" {
+		b, _ := json.Marshal(map[string]string{
+			"nonce": "n", "instance_id": from.self.InstanceID, "base_url": from.self.BaseURL,
+			"public_key": base64.StdEncoding.EncodeToString(from.self.PublicKey), "protocol_version": "1.0",
+		})
+		return b, "application/json"
+	}
+	r, contentType := plausibleBody(op.RequestBody)
+	b, _ := io.ReadAll(r)
+	return b, contentType
+}
+
+// TestAccPeerOperationsSignedBetweenInstances runs two instances over
+// SQLite and over PostgreSQL, pairs them through their peer stores, and
+// sends every peer operation from B to A through B's peer client: A
+// verifies each request and answers its 501 signed, and B verifies each
+// answer. Then a replayed, a tampered and a misdirected request, and one of
+// another major protocol version, are refused live; the mismatch is
+// recorded on A's record of B. Neither instance logs a signature, nonce or
+// key.
+func TestAccPeerOperationsSignedBetweenInstances(t *testing.T) {
+	doc := loadSpec(t, peerSpec)
+	for _, backend := range []string{"sqlite", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			a, b := openPeerSite(t, backend), openPeerSite(t, backend)
+			pair(t, a, b)
+			clients, err := newPeerClients(b.rt.Store, []string{a.server.URL}, time.Now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			client, err := clients.Client(t.Context(), a.self)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+			var secrets []string
+			checked := 0
+			for path, item := range doc.Paths.Map() {
+				for method, op := range item.Operations() {
+					checked++
+					body, contentType := peerBody(b, method, path, op)
+					target := a.server.URL + peerPrefix + fillParams(path)
+					var query []string
+					for _, p := range op.Parameters {
+						if p.Value.Required && p.Value.In == openapi3.ParameterInQuery {
+							query = append(query, p.Value.Name+"="+url.QueryEscape(plausibleValue(p.Value)))
+						}
+					}
+					if len(query) > 0 {
+						target += "?" + strings.Join(query, "&")
+					}
+					req, err := http.NewRequestWithContext(t.Context(), method, target, bytes.NewReader(body))
+					if err != nil {
+						t.Fatal(err)
+					}
+					if contentType != "" {
+						req.Header.Set("Content-Type", contentType)
+					}
+					resp, err := client.Do(req)
+					if err != nil {
+						t.Errorf("%s %s: %v", method, path, err)
+						continue
+					}
+					got, _ := io.ReadAll(resp.Body)
+					_ = resp.Body.Close()
+					if resp.StatusCode != http.StatusNotImplemented || !strings.Contains(string(got), `"NOT_IMPLEMENTED"`) {
+						t.Errorf("%s %s: status %d, body %s, want the signed 501", method, path, resp.StatusCode, got)
+					}
+					secrets = append(secrets, req.Header.Get("Signature"), resp.Header.Get("Signature"))
+				}
+			}
+			if checked != 8 {
+				t.Errorf("checked %d peer operations, want 8", checked)
+			}
+			secrets = append(secrets, refusedLive(t, a, b)...)
+
+			for _, site := range []*peerSite{a, b} {
+				secrets = append(secrets,
+					base64.StdEncoding.EncodeToString(site.key),
+					base64.StdEncoding.EncodeToString(site.key.Seed()),
+					base64.StdEncoding.EncodeToString(site.self.PublicKey))
+			}
+			logs := a.log.String() + b.log.String()
+			if !strings.Contains(logs, peerPrefix) {
+				t.Fatal("the instances logged no peer request; the log check would prove nothing")
+			}
+			for _, secret := range secrets {
+				secret = strings.TrimSuffix(strings.TrimPrefix(secret, "peer=:"), ":")
+				if secret != "" && strings.Contains(logs, secret) {
+					t.Errorf("a signature, nonce or key appears in the logs")
+				}
+			}
+		})
+	}
+}
+
+// refusedLive sends B's signed requests to A by hand, replayed, tampered,
+// misdirected and of another major version, checks each refusal, and
+// returns the signatures and nonces it used.
+func refusedLive(t *testing.T, a, b *peerSite) []string {
+	t.Helper()
+	signer := corepeer.Signer{KeyID: b.self.InstanceID, Key: b.key}
+	send := func(r *http.Request) (int, string) {
+		resp, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		body, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(body)
+	}
+	signed := func(target string, body []byte) *http.Request {
+		r, err := http.NewRequestWithContext(t.Context(), http.MethodPost, target, bytes.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := signer.SignRequest(r.Method, target, r.Header, body); err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	var secrets []string
+	remember := func(r *http.Request) {
+		s, _ := corepeer.ParseSignature(r.Header)
+		secrets = append(secrets, r.Header.Get("Signature"), s.Params.Nonce)
+	}
+	events := a.server.URL + peerPrefix + "/streams/repo:libs/events"
+	body := []byte(`{"origin":"x","from_seq":1,"events":[]}`)
+
+	r := signed(events, body)
+	remember(r)
+	replay := r.Clone(t.Context())
+	replay.Body = io.NopCloser(bytes.NewReader(body))
+	if status, got := send(r); status != http.StatusNotImplemented {
+		t.Errorf("the original: %d %s", status, got)
+	}
+	if status, got := send(replay); status != http.StatusUnauthorized || !strings.Contains(got, "already used") {
+		t.Errorf("a replay: %d %s", status, got)
+	}
+
+	r = signed(events, body)
+	remember(r)
+	r.Body = io.NopCloser(strings.NewReader(`{"origin":"y","from_seq":1,"events":[]}`))
+	if status, got := send(r); status != http.StatusUnauthorized || !strings.Contains(got, "Content-Digest") {
+		t.Errorf("a tampered body: %d %s", status, got)
+	}
+
+	// Signed for B's own listener and sent to A: the target URI differs.
+	r = signed(b.server.URL+peerPrefix+"/streams/repo:libs/events", body)
+	remember(r)
+	r.URL, _ = url.Parse(events)
+	r.Host = r.URL.Host
+	if status, got := send(r); status != http.StatusUnauthorized || !strings.Contains(got, "does not verify") {
+		t.Errorf("a request signed for another instance: %d %s", status, got)
+	}
+
+	r = signed(events, body)
+	remember(r)
+	r.Header.Set(corepeer.HeaderProtocol, "2.0")
+	if status, got := send(r); status != http.StatusBadRequest || !strings.Contains(got, "not compatible") {
+		t.Errorf("another major version: %d %s", status, got)
+	}
+	recorded, err := a.rt.Store.Peers().Get(t.Context(), b.self.InstanceID)
+	if err != nil || recorded.ProtocolVersion != 2 ||
+		recorded.DeriveStatus(time.Now(), time.Hour, false, 0) != model.PeerOffline {
+		t.Errorf("A's record of B after the mismatch: %+v, %v", recorded, err)
+	}
+	r = signed(events, body)
+	remember(r)
+	if status, got := send(r); status != http.StatusNotImplemented {
+		t.Errorf("a compatible request after the mismatch: %d %s", status, got)
+	}
+	if recorded, _ = a.rt.Store.Peers().Get(t.Context(), b.self.InstanceID); !recorded.Compatible() {
+		t.Errorf("A's record of B after a compatible request: %+v", recorded)
+	}
+	return secrets
 }

@@ -61,8 +61,10 @@
 //   - The document has no published counterpart and stays outside the parity
 //     oracle: its info carries x-artifactweave-extension, and no operation
 //     carries x-oracle-source (TestAccPeerServiceOutsideParityOracle).
-//   - Response signing is the peer middleware's (PEER-03), so no response
-//     object declares the signed headers.
+//   - Request verification and response signing are the peer middleware's
+//     (internal/federation/adapters/peer), which runs before this server's
+//     mux: the operations declare the signed request headers for clients,
+//     and no response object declares the signed answer's.
 //
 // # References
 //
@@ -86,8 +88,9 @@
 //
 // Implemented P13 (PEER-01): the document and its generated server. The
 // router's peer service embeds UnimplementedStrict and implements nothing,
-// so every operation answers 501 until PEER-02 to PEER-05 and FED-01 build
-// them.
+// so every operation a paired peer signs answers 501, signed, until PEER-02
+// to PEER-05 and FED-01 build them; an unsigned request is refused before
+// it reaches this server (PEER-03).
 //
 // # Testing
 //
@@ -96,10 +99,11 @@
 //
 //   - TestAccHandwrittenRoutesNotGenerated: the generated mux holds every
 //     operation of the document.
-//   - TestAccUnimplementedOperationsAnswer501 and
-//     TestAccPeerOperationsAnswer501AtStartUp: every operation answers 501
-//     with the flat body the envelope table gives, the second through the
-//     server run starts over SQLite and PostgreSQL.
+//   - TestAccPeerOperationsSignedBetweenInstances: every operation, signed
+//     by a paired instance's peer client, answers a signed 501 in the flat
+//     envelope over SQLite and PostgreSQL.
+//   - TestAccPeerOperationsRefuseUnsignedAtStartUp: unsigned, every
+//     operation is refused 401 through the server run starts.
 //   - TestAccPeerServiceOutsideParityOracle: the document stays outside the
 //     parity oracle and inside the generated-mux check.
 //   - TestAccAPIReliabilityLedger: the API reliability ledger, which names

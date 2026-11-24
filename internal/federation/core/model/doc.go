@@ -47,7 +47,10 @@
 //   - ExecutionEffect retains the exact transfer intent/version, sanitized
 //     outcome and actual affected paths. ApplyExecutionEffect updates counters
 //     once per observation; ExecutionPathState reports only matching evidence.
-//   - Peer with Has and DeriveStatus, PeerStatus, UseCase with
+//   - Peer with Has, Compatible and DeriveStatus (a peer whose recorded
+//     major protocol version differs from this instance's is OFFLINE, as an
+//     unreachable one is, until it sends a compatible request), PeerStatus,
+//     UseCase with
 //     KnownUseCase, PairingNonce with Usable, and PairingTokenTTL.
 //   - Stamp with After; StreamKind with RepositoryStream, AccessStream,
 //     DistributionStream and ParseStream, and the sentinel ErrInvalidStream.

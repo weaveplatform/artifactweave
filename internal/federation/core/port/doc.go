@@ -38,16 +38,23 @@
 //     authenticated destination inspection, upload, properties, bounded files
 //     and exact file deletion. Network calls never join a metadata transaction.
 //     PushTargetFailure retains only closed permanent refusal reason codes.
-//   - PeerStore: Put, Get, List and Delete; AddNonce, RedeemNonce and
-//     PruneNonces.
+//   - PeerStore: Put, Get, List and Delete; SetProtocolVersion, which
+//     records the major protocol version a verified peer last sent; AddNonce,
+//     RedeemNonce and PruneNonces.
+//   - RequestNonceStore: the peer transport's replay cache. Remember keeps a
+//     signature nonce's hash until it expires and refuses one still live
+//     with kernel.ErrConflict, atomically, so of two requests racing with
+//     one nonce exactly one is admitted; Prune drops expired hashes. It is a
+//     table, so a replay is refused across a restart and across nodes that
+//     share the database.
 //   - FederationStore: SetMembers, Members and MembersWithPeer;
 //     CreateFullSync, FullSync, UpdateFullSync and FullSyncs.
 //   - PlatformStore: PutAccessTarget, AccessTarget, AccessTargets and
 //     DeleteAccessTarget; PutFederation, Federation, Federations and
 //     DeleteFederation; PutTopology, Topology, Topologies and DeleteTopology.
 //   - PeerFilter.
-//   - Store: shared transactions, Replications, PushProgress, PullProgress, Peers, Federation
-//     and Platform. ConfigurationStore remains independent of execution.
+//   - Store: shared transactions, Replications, PushProgress, PullProgress, Peers,
+//     RequestNonces, Federation and Platform. ConfigurationStore remains independent of execution.
 //
 // # Invariants
 //
