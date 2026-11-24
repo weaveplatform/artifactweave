@@ -1329,7 +1329,7 @@ Decisions: [0021](../research/decisions/0021-peer-trust-and-sync-protocol.md),
 [0022](../research/decisions/0022-federated-repositories.md). Research:
 [40](../research/40-federated-repositories-7x.md).
 
-**Tracking.** Index #TBD
+**Tracking.** [P13 implementation backlog and product baseline #1920](https://github.com/weaveplatform/artifactweave/issues/1920)
 
 **Tasks**
 
