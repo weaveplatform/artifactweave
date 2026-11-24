@@ -19,6 +19,7 @@ const (
 	tPeers         = "peers"
 	tPairingNonces = "pairing_nonces"
 	tRequestNonces = "peer_request_nonces"
+	tResyncs       = "stream_resyncs"
 	tFedMembers    = "federation_members"
 	tFullSyncs     = "full_sync_runs"
 	tAccessTargets = "access_federation_targets"
@@ -56,6 +57,9 @@ func useCaseSet(in []model.UseCase) []model.UseCase {
 func (p peerStore) Put(ctx context.Context, peer model.Peer) error {
 	return p.s.Do(ctx, func() error {
 		peer.UseCases = useCaseSet(peer.UseCases)
+		if peer.Delivery == "" {
+			peer.Delivery = model.DeliveryPush
+		}
 		p.t().Put(peer.InstanceID, peer)
 		return nil
 	})

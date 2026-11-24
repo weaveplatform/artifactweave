@@ -61,6 +61,11 @@ exclude:
     # store or blob directory that fails to seed, while the kit itself
     # (internal/artifacts/adapters/http/itemkit) stays in the per-package gate.
     - ^internal/artifacts/adapters/http/itemkit/kittest/
+    # Test stream kind (PEER-04): its remaining branches are settings and
+    # blob store failures of a test's own fixture, while the delivery
+    # engine it exercises (internal/federation/core/sync) stays in the
+    # per-package gate.
+    - ^internal/federation/core/sync/streamtest/
     # Skips container tests where Docker cannot run Linux containers; its
     # branches are the skip paths of other platforms.
     - ^pkg/containertest/

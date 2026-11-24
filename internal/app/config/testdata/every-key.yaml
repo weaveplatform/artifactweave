@@ -127,3 +127,5 @@ virtual:
   metadata_cache:
     max_entries: 2000
     max_size: 64MiB
+federation:
+  outbox_retention: 72h

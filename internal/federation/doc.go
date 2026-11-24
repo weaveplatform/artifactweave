@@ -29,7 +29,11 @@
 // Pairing returns the pairing service (core/pairing) over a given signed
 // transport, admitting a caller who is an administrator now; RegisterWork
 // also runs the periodic pruning of expired pairing nonces
-// (PruneNoncesKind, every PruneNoncesInterval).
+// (PruneNoncesKind, every PruneNoncesInterval). OpenStreams builds the
+// stream delivery engine (core/sync) over the signed peer client, with no
+// stream kind registered until FED-02 adds repo:<key>; Streams returns it
+// for the peer API's stream and blob operations, and RegisterWork then
+// runs its dispatchers, pulls, blob retries, sweep and pruning.
 //
 // # References
 //
@@ -64,5 +68,6 @@
 // scoped evidence. Manual selection/transport overrides are sealed per run; explicit destinations need no saved row and retain independent history. Remaining
 // qualification is open. Advanced
 // federation remains P13/P14/P37. Both drivers open before the queue starts.
-// Pairing is implemented P13 (PEER-02, #1926).
+// Pairing is implemented P13 (PEER-02, #1926); stream delivery P13 (PEER-04,
+// #1928).
 package federation

@@ -291,6 +291,10 @@ func (s *Store) Peers() fedport.PeerStore { return s.federation.Peers() }
 // requests.
 func (s *Store) RequestNonces() fedport.RequestNonceStore { return s.federation.RequestNonces() }
 
+// Resyncs is the federation module's record of receivers behind an
+// origin's pruned floor.
+func (s *Store) Resyncs() fedport.StreamResyncStore { return s.federation.Resyncs() }
+
 // Federation is the federation module's federated repository store.
 func (s *Store) Federation() fedport.FederationStore { return s.federation.Federation() }
 

@@ -1,6 +1,7 @@
 package peer_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
@@ -483,6 +484,22 @@ func TestUnitContentDigest(t *testing.T) {
 	} {
 		if err := corepeer.CheckContentDigest(value, body); !errors.Is(err, corepeer.ErrDigest) {
 			t.Errorf("%s: %v, want ErrDigest", name, err)
+		}
+	}
+
+	// A streamed answer's digest is read for the SHA-256 the reader then
+	// computes.
+	if got, err := corepeer.DigestSHA256(both); err != nil || !bytes.Equal(got, sum[:]) {
+		t.Errorf("DigestSHA256 = %x, %v", got, err)
+	}
+	for name, value := range map[string]string{
+		"sha-512 only": "sha-512=:AA==:",
+		"not bytes":    `sha-256="x"`,
+		"short":        "sha-256=:AA==:",
+		"malformed":    "sha-256=",
+	} {
+		if _, err := corepeer.DigestSHA256(value); !errors.Is(err, corepeer.ErrDigest) {
+			t.Errorf("DigestSHA256 %s: %v, want ErrDigest", name, err)
 		}
 	}
 }

@@ -302,6 +302,18 @@ func (v *Verifier) ObserveVersion(ctx context.Context, caller model.Peer, sent V
 // content. A caller must not act on an answer, or read its body, before
 // this succeeds.
 func VerifyResponse(resp Message, body []byte, keyID string, key ed25519.PublicKey, now time.Time) error {
+	if err := VerifyResponseFields(resp, keyID, key, now); err != nil {
+		return err
+	}
+	return CheckContentDigest(resp.Header.Get(HeaderContentDigest), body)
+}
+
+// VerifyResponseFields is VerifyResponse without the body: it
+// authenticates the answer's status and fields, Content-Digest among them,
+// so an answer too large to hold, a blob, can be streamed once its
+// Content-Digest is known to be the peer's. The caller must then check
+// the content against that digest (DigestSHA256) before using it.
+func VerifyResponseFields(resp Message, keyID string, key ed25519.PublicKey, now time.Time) error {
 	sig, err := ParseSignature(resp.Header)
 	if err != nil {
 		return err
@@ -315,10 +327,7 @@ func VerifyResponse(resp Message, body []byte, keyID string, key ed25519.PublicK
 	if sig.Params.KeyID != keyID {
 		return fmt.Errorf("%w: the answer is not signed by the peer called", ErrUnknownKey)
 	}
-	if err := sig.Verify(resp, key); err != nil {
-		return err
-	}
-	return CheckContentDigest(resp.Header.Get(HeaderContentDigest), body)
+	return sig.Verify(resp, key)
 }
 
 // requireCoverage checks that sig covers every component in want, carries a

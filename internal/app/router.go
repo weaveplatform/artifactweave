@@ -972,7 +972,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			ResponseErrorHandlerFunc: middleware.BindingError(http.StatusInternalServerError),
 		}
 		peergen.HandlerWithOptions(
-			peergen.NewStrictHandlerWithOptions(peerService{pair: pairServer}, keyed.peer(), peerOpts),
+			peergen.NewStrictHandlerWithOptions(peerService{pair: pairServer, streams: streamServer(cfg)}, keyed.peer(), peerOpts),
 			peergen.ChiServerOptions{
 				BaseURL:          peerBase,
 				BaseRouter:       g,
@@ -1495,10 +1495,12 @@ type (
 	pfedService   struct{ pfedgen.UnimplementedStrict }
 	gridService   struct{ gridgen.UnimplementedStrict }
 	// peerService is the peer API's server (decision 0021); its P13
-	// tickets replace the stubs. pair serves /pair (PEER-02).
+	// tickets replace the stubs. pair serves /pair (PEER-02); streams the
+	// stream events and blobs (PEER-04).
 	peerService struct {
 		peergen.UnimplementedStrict
-		pair federationpeer.PairServer
+		pair    federationpeer.PairServer
+		streams federationpeer.StreamServer
 	}
 )
 
@@ -1542,6 +1544,52 @@ func (s peerService) CancelPairing(
 		return s.UnimplementedStrict.CancelPairing(ctx, req) //nolint:wrapcheck // the generated 501
 	}
 	return s.pair.CancelPairing(ctx, req) //nolint:wrapcheck // as RedeemPairing
+}
+
+// streamServer serves the peer API's stream events and blobs over the
+// runtime's delivery engine. A router without one, such as a test's that
+// opens no runtime, keeps the 501 stubs.
+func streamServer(cfg RouterConfig) federationpeer.StreamServer {
+	if e := cfg.Federation.Streams(); e != nil {
+		return federationpeer.StreamServer{Streams: e}
+	}
+	return federationpeer.StreamServer{}
+}
+
+// PushEvents applies a peer's batch (PEER-04); without a delivery engine
+// it keeps the 501 stub.
+func (s peerService) PushEvents(
+	ctx context.Context,
+	req peergen.PushEventsRequestObject,
+) (peergen.PushEventsResponseObject, error) {
+	if s.streams.Streams == nil {
+		return s.UnimplementedStrict.PushEvents(ctx, req) //nolint:wrapcheck // the generated 501
+	}
+	return s.streams.PushEvents(ctx, req) //nolint:wrapcheck // as RedeemPairing
+}
+
+// PullEvents serves a peer that pulls (PEER-04); without a delivery
+// engine it keeps the 501 stub.
+func (s peerService) PullEvents(
+	ctx context.Context,
+	req peergen.PullEventsRequestObject,
+) (peergen.PullEventsResponseObject, error) {
+	if s.streams.Streams == nil {
+		return s.UnimplementedStrict.PullEvents(ctx, req) //nolint:wrapcheck // the generated 501
+	}
+	return s.streams.PullEvents(ctx, req) //nolint:wrapcheck // as RedeemPairing
+}
+
+// GetBlob serves content a peer's stream refers to (PEER-04); without a
+// delivery engine it keeps the 501 stub.
+func (s peerService) GetBlob(
+	ctx context.Context,
+	req peergen.GetBlobRequestObject,
+) (peergen.GetBlobResponseObject, error) {
+	if s.streams.Streams == nil {
+		return s.UnimplementedStrict.GetBlob(ctx, req) //nolint:wrapcheck // the generated 501
+	}
+	return s.streams.GetBlob(ctx, req) //nolint:wrapcheck // as RedeemPairing
 }
 
 var (

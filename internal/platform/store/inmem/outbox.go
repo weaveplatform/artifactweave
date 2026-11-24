@@ -177,6 +177,15 @@ func (o outboxStore) Applied(
 	return out, err
 }
 
+// LockApplied is Applied: the store's one gate already serialises every
+// transaction.
+func (o outboxStore) LockApplied(
+	ctx context.Context,
+	origin, stream string,
+) (outbox.AppliedMarker, error) {
+	return o.Applied(ctx, origin, stream)
+}
+
 func (o outboxStore) SetApplied(ctx context.Context, m outbox.AppliedMarker) error {
 	return o.s.Do(ctx, func() error {
 		o.applied().Put(peersPair{m.Origin, m.Stream}, m)

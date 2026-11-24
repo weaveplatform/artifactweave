@@ -115,12 +115,13 @@ type Remote interface {
 }
 
 // Store is what pairing reads and writes: the peer records and nonces, the
-// outbox cursors a removed peer leaves, and this instance's identity, in
-// one unit of work.
+// outbox cursors and full-sync flags a removed peer leaves, and this
+// instance's identity, in one unit of work.
 type Store interface {
 	tx.Runner
 	Peers() port.PeerStore
 	Outbox() outbox.OutboxStore
+	Resyncs() port.StreamResyncStore
 	Instance() instance.InstanceStore
 }
 
@@ -349,8 +350,10 @@ func (s Service) checkAnswer(tok Parsed, ans Answer, major int) error {
 func (s Service) grant(ctx context.Context, p model.Peer, use model.UseCase, now time.Time) error {
 	if prev, err := s.Store.Peers().Get(ctx, p.InstanceID); err == nil {
 		p.UseCases = prev.UseCases
-		p.DisplayName, p.CityName, p.CountryCode, p.EdgeRole =
-			prev.DisplayName, prev.CityName, prev.CountryCode, prev.EdgeRole
+		// Pairing another use case changes none of what the administrator
+		// set on the record, the way its entries travel included.
+		p.DisplayName, p.CityName, p.CountryCode, p.EdgeRole, p.Delivery =
+			prev.DisplayName, prev.CityName, prev.CountryCode, prev.EdgeRole, prev.Delivery
 	} else if !errors.Is(err, kernel.ErrNotFound) {
 		return fmt.Errorf("read peer %s: %w", p.InstanceID, err)
 	}
@@ -466,7 +469,7 @@ func (s Service) Unpair(ctx context.Context, use model.UseCase, base string, for
 }
 
 // Drop removes use from the peer's record; a peer left with no use case
-// is removed with its outbox cursors. A peer that does not hold use, or
+// is removed with its outbox cursors and full-sync flags. A peer that does not hold use, or
 // is not recorded, is no error: the peer API's DELETE /pair answers 204
 // either way.
 func (s Service) Drop(ctx context.Context, instanceID string, use model.UseCase) error {
@@ -495,6 +498,9 @@ func (s Service) Drop(ctx context.Context, instanceID string, use model.UseCase)
 		}
 		if err := s.Store.Outbox().DeleteCursors(ctx, instanceID); err != nil {
 			return fmt.Errorf("remove peer %s cursors: %w", instanceID, err)
+		}
+		if err := s.Store.Resyncs().DeletePeer(ctx, instanceID); err != nil {
+			return fmt.Errorf("remove peer %s full-sync flags: %w", instanceID, err)
 		}
 		return nil
 	})
