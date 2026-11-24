@@ -415,6 +415,9 @@ func (s ArtifactoryAPI) GetAllRepositoryConfigurations(
 		// local repository here lacks the Maven fields, as that read's does,
 		// and has signedUrlTtl (repo.Full).
 		c = repo.Relevant(repo.Full(c))
+		if err := s.resolveMembers(ctx, &c); err != nil {
+			return nil, err
+		}
 		switch c.Class {
 		case repo.Local:
 			out.LOCAL = append(out.LOCAL, c)
@@ -535,7 +538,34 @@ func (s ArtifactoryAPI) readOne(
 	case !can(c):
 		return p, repo.Config{}, httpkit.Denied(p)
 	}
-	return p, itemkit.View(p, c), nil
+	c = itemkit.View(p, c)
+	if err := s.resolveMembers(ctx, &c); err != nil {
+		return p, repo.Config{}, err
+	}
+	return p, c, nil
+}
+
+// resolveMembers gives a federated repository's own member, stored as
+// repo.SelfMemberURL, the base URL this instance's member has now, as 7.x
+// resolves its placeholder on every read.
+func (s ArtifactoryAPI) resolveMembers(ctx context.Context, c *repo.Config) error {
+	if len(c.Members) == 0 || s.cfg.MemberBase == nil {
+		return nil
+	}
+	base, err := s.cfg.MemberBase(ctx)
+	if err != nil {
+		return s.InternalError(ctx, "read federated member base URL", err)
+	}
+	repo.ResolveSelfMember(c, base)
+	return nil
+}
+
+// refusal passes on a 4xx answer a repository write's consumer gave, such
+// as a federated member refusal (artifactsapi.RepositoryAdmission), which
+// the write's own error handling would otherwise turn into a 500.
+func refusal(err error) (*apierror.Error, bool) {
+	var e *apierror.Error
+	return e, errors.As(err, &e) && e.Status >= 400 && e.Status < 500
 }
 
 // GetRepositoryConfiguration returns a repository's configuration as the
@@ -704,7 +734,11 @@ func (s ArtifactoryAPI) GetBatchOfRepositoriesByName(
 		case err != nil:
 			return nil, s.InternalError(ctx, "get repository", err)
 		case can(c):
-			out[key] = itemkit.View(p, c)
+			view := itemkit.View(p, c)
+			if err := s.resolveMembers(ctx, &view); err != nil {
+				return nil, err
+			}
+			out[key] = view
 		}
 	}
 	return out, nil
@@ -792,7 +826,11 @@ func (s ArtifactoryAPI) createRepository(
 	if err := createdRepositoryPermissions(ctx, created); err != nil {
 		return nil, err
 	}
-	switch err := createAll(ctx, st, created, s.cfg.Access.Projects, s.cfg.RepositoryLifecycle); {
+	err = createAll(ctx, st, created, s.cfg.Access.Projects, s.cfg.RepositoryLifecycle)
+	if e, ok := refusal(err); ok {
+		return nil, e
+	}
+	switch {
 	case errors.Is(err, kernel.ErrConflict):
 		return nil, httpkit.BadRequestf(msgKeyExists)
 	case err != nil:
@@ -891,7 +929,11 @@ func (s ArtifactoryAPI) createMultipleRepositories(
 	if err := createdRepositoryPermissions(ctx, append(created, prepared...)); err != nil {
 		return nil, err
 	}
-	switch err := createAll(ctx, st, append(created, prepared...), s.cfg.Access.Projects, s.cfg.RepositoryLifecycle); {
+	err = createAll(ctx, st, append(created, prepared...), s.cfg.Access.Projects, s.cfg.RepositoryLifecycle)
+	if e, ok := refusal(err); ok {
+		return nil, e
+	}
+	switch {
 	case errors.Is(err, kernel.ErrConflict):
 		return nil, apierror.New(http.StatusConflict, msgKeyExists)
 	case err != nil:
@@ -1013,9 +1055,11 @@ func (s ArtifactoryAPI) updateRepositoryConfiguration(
 	if err := createdRepositoryPermissions(ctx, created); err != nil {
 		return nil, err
 	}
-	switch err := s.writeUpdates(
-		ctx, st, created, []repo.Config{stored}, []repo.Config{updated},
-	); {
+	err = s.writeUpdates(ctx, st, created, []repo.Config{stored}, []repo.Config{updated})
+	if e, ok := refusal(err); ok {
+		return nil, e
+	}
+	switch {
 	case errors.Is(err, errCreatedKeyTaken):
 		return nil, httpkit.BadRequestf(msgKeyExists)
 	case err != nil:
@@ -1197,7 +1241,11 @@ func (s ArtifactoryAPI) updateMultipleRepositories(
 	if err := createdRepositoryPermissions(ctx, created); err != nil {
 		return nil, err
 	}
-	switch err := s.writeUpdates(ctx, st, created, before, updated); {
+	err = s.writeUpdates(ctx, st, created, before, updated)
+	if e, ok := refusal(err); ok {
+		return nil, e
+	}
+	switch {
 	case errors.Is(err, errCreatedKeyTaken):
 		// The batch create's answer for a taken key.
 		return nil, apierror.New(http.StatusConflict, msgKeyExists)

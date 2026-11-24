@@ -58,6 +58,10 @@ type Deps struct {
 	// RepositoryLifecycle joins guarded repository creation/removal to consumer
 	// configuration cleanup. Runtime and direct router assembly supply the same binding.
 	RepositoryLifecycle artifactsapi.RepositoryLifecycle
+	// MemberBase is the base URL a federated repository's own member is
+	// read back with (repo.ResolveSelfMember): federatedRepoUrlBase, or
+	// urlBase. Nil reads the stored form.
+	MemberBase func(context.Context) (string, error)
 	// RemoteHTTP drops the connection pool of a repository that is
 	// deleted. Assign it only a pool that exists, or leave it nil: a nil
 	// *upstream.Pool stored in it is a non-nil interface, so a delete would

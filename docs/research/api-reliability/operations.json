@@ -7831,6 +7831,7 @@
       "repo.Relevant",
       "s.InternalError",
       "s.content",
+      "s.resolveMembers",
       "st.Repos",
       "st.Repos().List"
     ],
@@ -10447,6 +10448,7 @@
       "s.InternalError",
       "s.content",
       "s.readerFor",
+      "s.resolveMembers",
       "slices.Contains",
       "st.Repos",
       "st.Repos().Get",
@@ -17233,34 +17235,44 @@
     "route": "POST /artifactory/api/federation/configSync/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "synchronizeFederatedMemberConfiguration",
-    "state": "stub: 501",
-    "contract": "Sends this member's shared configuration of a federated repository to every other member, repairing drift left by a network failure. Only shared settings travel; each member keeps its own repository key and local-only settings (decision 0022).",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Sends this member's configuration of a federated repository to every other member, repairing drift left by a network failure, and answers \"Configuration sync executed successfully\" once the sends are queued (7.x's FederatedRepoResource). Each member keeps its own repository key. A member that cannot be reached is logged as unavailable and retried until it receives the configuration. Administrators only.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended none (external-effect)",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "none (external-effect): no retry protection; the effect reaches another service, peer, upstream or the file system and cannot roll back; reconcile before repeating",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
     "route": "POST /artifactory/api/federation/convertToLocal",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "convertFederatedRepositoryToLocal",
-    "state": "stub: 501",
-    "contract": "Converts federated repositories back to local repositories, keeping their content and metadata. Allowed only for a repository whose federation has no other active members; remove the other members first.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Converts federated repositories back to local repositories, keeping their content and metadata and dropping their members. Allowed only for a repository whose federation has no other enabled member; remove or disable the other members first. Each repository converts on its own; administrators only.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on body:",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on body:: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -17307,17 +17319,22 @@
     "route": "POST /artifactory/api/federation/migrate/{repoKey}",
     "spec": "artifactory.openapi.yaml",
     "operation_id": "convertLocalRepositoryToFederated",
-    "state": "stub: 501",
-    "contract": "Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key.",
-    "handler": "internal/platform/gen/artifactory/unimplemented.gen.go",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Converts a local repository into a federated repository with this instance as its only member, keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project, every member of a federation must carry the same project key. A package type that cannot be federated (terraformbackend), a repository that is not local and one with push replication configured answer 400. Administrators only.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
     "review_family": "content-and-configuration",
-    "effects": "no operation effect; middleware still authenticates/admit-limits",
-    "retry": "501 is not transient; do not retry until support changes; intended natural on path:repoKey",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on path:repoKey: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
     "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
-    "pagination_execution": "schema-only; no collection query executes",
+    "pagination_execution": "not a collection",
     "evidence": [
-      "internal/platform/gen/artifactory/unimplemented.gen.go",
-      "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -17369,6 +17386,50 @@
     "evidence": [
       "internal/platform/gen/artifactory/unimplemented.gen.go",
       "internal/app/stub_test.go: TestAccUnimplementedOperationsAnswer501"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/replaceUrl",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "replaceFederatedMemberBaseUrl",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on body:: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
+    ]
+  },
+  {
+    "route": "POST /artifactory/api/federation/updateMemberUrl",
+    "spec": "artifactory.openapi.yaml",
+    "operation_id": "updateFederatedMemberUrl",
+    "state": "partial: handwritten override of generated operation",
+    "contract": "Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.",
+    "handler": "internal/app/router.go: handwritten routes precede generated handlers",
+    "review_family": "content-and-configuration",
+    "effects": "resource mutation/action; see served contract and handler calls",
+    "retry": "natural on body:: repeating the identical request converges on one state, though the answer may differ; reconcile the target after ambiguous completion; do not send Idempotency-Key",
+    "admission": "expensive: shared authentication/global/principal; resolved repository/project when applicable; 128 local in-flight; no queue; expensive shared/global/principal rates, 32 local/16 per-principal permits, 2m deadline",
+    "pagination_execution": "not a collection",
+    "evidence": [
+      "internal/app/router.go",
+      "internal/artifacts/adapters/http/items.go",
+      "internal/artifacts/adapters/http/storage.go",
+      "internal/artifacts/adapters/sql/content_items.go",
+      "internal/access/adapters/sql/projects.go",
+      "docs/research/decisions/0043-api-reliability.md",
+      "internal/app/limits.go"
     ]
   },
   {
@@ -23816,7 +23877,7 @@
     "spec": "peer.openapi.yaml",
     "operation_id": "putRepositoryConfiguration",
     "state": "stub: 501",
-    "contract": "Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Not implemented; answers 501.",
+    "contract": "Creates or updates this instance's copy of a federated repository the caller is a member of. The configuration is validated against this instance's own peers before it is stored, and nothing is stored when it is refused. Its members must name this instance, at its own federated base URL with the key in the path, and the caller; this instance does not send the configuration on.",
     "handler": "internal/platform/gen/peer/unimplemented.gen.go",
     "review_family": "content-and-configuration",
     "effects": "no operation effect; user authentication skips the peer API, admission still limits",

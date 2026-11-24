@@ -206,6 +206,29 @@ Feature: Repositories API
     Then the command succeeds
     And the server answered no request with 500 since the last command
 
+  @jf
+  Scenario: jf rt repo-create and repo-update with a federated template list the instance as a member
+    Given the JFrog CLI is available
+    And a file "federated.json" with content:
+      """
+      {"key": "jf-federated", "rclass": "federated", "packageType": "generic"}
+      """
+    And a file "federated-update.json" with content:
+      """
+      {"key": "jf-federated", "rclass": "federated", "packageType": "generic", "description": "federated by jf"}
+      """
+    When I run jf "rt repo-create {dir}/federated.json --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When I run jf "rt repo-update {dir}/federated-update.json --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the server answered no request with 500 since the last command
+    When I GET "/artifactory/api/repositories/jf-federated" as admin
+    Then the JSON field "description" equals "federated by jf"
+    And the JSON field "rclass" equals "federated"
+    When I run jf "rt repo-delete jf-federated --quiet --url {url} --user admin --password {password}"
+    Then the command succeeds
+
   Scenario: A virtual repository may have no members, and each member has its package type
     When I PUT "/artifactory/api/repositories/npm-local" as admin with body:
       """

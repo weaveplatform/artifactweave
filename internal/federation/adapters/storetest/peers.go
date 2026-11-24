@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/artifacts/api/repo"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
 	"github.com/weaveplatform/artifactweave/internal/federation/core/port"
 	"github.com/weaveplatform/artifactweave/internal/kernel"
@@ -465,8 +466,10 @@ func testFederationMembers(t *testing.T, s port.Store) {
 	storekit.Same(t, "Members of a repository with none", []model.FederationMember(nil),
 		storekit.Get[[]model.FederationMember](t)(fs.Members(ctx, "r1")))
 
-	// RepoKey on the input is overwritten by the repository being set.
+	// RepoKey on the input is overwritten by the repository being set; the
+	// mode is kept as given.
 	b, a := member("wrong", 2, false), member("wrong", 1, true)
+	b.Mode = repo.ModeReceiver
 	storekit.Must(t, fs.SetMembers(ctx, "r1", []model.FederationMember{b, a}))
 	a.RepoKey, b.RepoKey = "r1", "r1"
 	storekit.Same(

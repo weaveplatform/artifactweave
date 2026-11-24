@@ -352,10 +352,13 @@ func TestAccPeerOperationsSignedBetweenInstances(t *testing.T) {
 					got, _ := io.ReadAll(resp.Body)
 					_ = resp.Body.Close()
 					// PEER-02 serves /pair: the nonce "n" is malformed, and B
-					// holds no use case on A to drop.
+					// holds no use case on A to drop. FED-01 serves
+					// /repositories/{repoKey}, whose plausible body carries
+					// no configuration.
 					status, code := http.StatusNotImplemented, `"NOT_IMPLEMENTED"`
 					switch {
-					case method == http.MethodPost && path == "/pair":
+					case method == http.MethodPost && path == "/pair",
+						method == http.MethodPut && path == "/repositories/{repoKey}":
 						status, code = http.StatusBadRequest, `"BAD_REQUEST"`
 					case method == http.MethodDelete && path == "/pair":
 						status, code = http.StatusNoContent, ""

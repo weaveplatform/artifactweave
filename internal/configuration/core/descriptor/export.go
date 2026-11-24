@@ -45,20 +45,22 @@ type exportDocument struct {
 	// descriptor reloaded from that store, so JAXB writes each repository
 	// section as an empty element. Repositories are read through
 	// /api/repositories; no pinned artifactory_* resource reads them here.
-	Local            struct{}       `xml:"localRepositories"`
-	Remote           struct{}       `xml:"remoteRepositories"`
-	Virtual          struct{}       `xml:"virtualRepositories"`
-	Federated        struct{}       `xml:"federatedRepositories"`
-	ReleaseBundles   struct{}       `xml:"releaseBundlesRepositories"`
-	Proxies          []exportFields `xml:"proxies>proxy"`
-	ReverseProxies   []exportFields `xml:"reverseProxies>reverseProxy"`
-	PropertySets     []exportFields `xml:"propertySets>propertySet"`
-	URLBase          *string        `xml:"urlBase,omitempty"`
-	Layouts          []exportFields `xml:"repoLayouts>repoLayout"`
-	GC               *exportFields  `xml:"gcConfig,omitempty"`
-	Quota            *exportFields  `xml:"quotaConfig,omitempty"`
-	Trashcan         *exportFields  `xml:"trashcanConfig,omitempty"`
-	DownloadRedirect *exportFields  `xml:"downloadRedirectConfig,omitempty"`
+	Local          struct{}       `xml:"localRepositories"`
+	Remote         struct{}       `xml:"remoteRepositories"`
+	Virtual        struct{}       `xml:"virtualRepositories"`
+	Federated      struct{}       `xml:"federatedRepositories"`
+	ReleaseBundles struct{}       `xml:"releaseBundlesRepositories"`
+	Proxies        []exportFields `xml:"proxies>proxy"`
+	ReverseProxies []exportFields `xml:"reverseProxies>reverseProxy"`
+	PropertySets   []exportFields `xml:"propertySets>propertySet"`
+	URLBase        *string        `xml:"urlBase,omitempty"`
+	// After urlBase, as artifactory.xsd orders them (research 06).
+	FederatedRepoURLBase *string        `xml:"federatedRepoUrlBase,omitempty"`
+	Layouts              []exportFields `xml:"repoLayouts>repoLayout"`
+	GC                   *exportFields  `xml:"gcConfig,omitempty"`
+	Quota                *exportFields  `xml:"quotaConfig,omitempty"`
+	Trashcan             *exportFields  `xml:"trashcanConfig,omitempty"`
+	DownloadRedirect     *exportFields  `xml:"downloadRedirectConfig,omitempty"`
 }
 
 // exportSecurity is 7.161.26's SecurityType (SecurityDescriptor propOrder

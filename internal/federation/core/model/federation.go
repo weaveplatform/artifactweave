@@ -3,7 +3,6 @@ package model
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -17,54 +16,63 @@ var ErrInvalidMemberURL = errors.New("invalid federation member URL")
 
 // FederationMember is one member of a federated repository, normalised from
 // the repository's members list. Members are peers paired for federation
-// (decision 0022); RemoteRepoKey is the repository's key on that peer.
+// (decision 0022); BaseURL is the member's base URL as 7.x normalizes it,
+// ending in /artifactory, and RemoteRepoKey the repository's key on that
+// peer.
 type FederationMember struct {
 	RepoKey        string
 	PeerInstanceID string
 	BaseURL        string
 	RemoteRepoKey  string
+	Mode           repo.MemberMode
 	Enabled        bool
 }
 
-// ParseMemberURL splits "<base URL>/artifactory/<repoKey>" into the instance
-// base URL and the repository key.
+// Receiver reports whether the member only receives (decision 0022).
+func (m FederationMember) Receiver() bool { return m.Mode == repo.ModeReceiver }
+
+// ParseMemberURL splits a member URL into its base URL, normalized by 7.x's
+// rule (trailing slashes trimmed, /artifactory appended when missing), and
+// the repository key, its last path element (research 40, section 3).
 func ParseMemberURL(raw string) (baseURL, repoKey string, err error) {
-	u, err := url.Parse(raw)
-	if err != nil || u.Scheme == "" || u.Host == "" {
+	base, key, err := repo.SplitMemberURL(raw)
+	if err != nil {
 		return "", "", fmt.Errorf("%w: %q", ErrInvalidMemberURL, raw)
 	}
-	path := strings.TrimSuffix(u.Path, "/")
-	i := strings.LastIndex(path, "/artifactory/")
-	if i < 0 {
-		return "", "", fmt.Errorf("%w: %q has no /artifactory/<repoKey>", ErrInvalidMemberURL, raw)
+	return base, key, nil
+}
+
+// IsSelfMember reports whether a member URL names this instance's own
+// member of repository key: the stored placeholder, or selfBase (this
+// instance's federatedRepoUrlBase, or urlBase when that is empty) with the
+// repository's key (FederatedMemberUtils.java:126-129).
+func IsSelfMember(raw, key, selfBase string) bool {
+	base, memberKey, err := repo.SplitMemberURL(raw)
+	if err != nil || memberKey != key {
+		return false
 	}
-	repoKey = path[i+len("/artifactory/"):]
-	if repoKey == "" || strings.Contains(repoKey, "/") {
-		return "", "", fmt.Errorf("%w: %q", ErrInvalidMemberURL, raw)
-	}
-	u.Path = path[:i]
-	u.RawQuery, u.Fragment = "", ""
-	return u.String(), repoKey, nil
+	return base == repo.SelfMemberBase ||
+		strings.TrimSpace(selfBase) != "" && base == repo.NormalizeMemberBase(selfBase)
 }
 
 // MembersOf lists a federated repository's members from its configuration,
-// skipping the entry for selfBaseURL (a member may list itself). The peer
-// instance id is resolved later against the peer table.
-func MembersOf(cfg *repo.Config, selfBaseURL string) ([]FederationMember, error) {
+// skipping this instance's own (IsSelfMember). The peer instance id is
+// resolved later against the peer table.
+func MembersOf(cfg *repo.Config, selfBase string) ([]FederationMember, error) {
 	var out []FederationMember
-	self := strings.TrimSuffix(selfBaseURL, "/")
 	for _, m := range cfg.Members {
 		base, key, err := ParseMemberURL(m.URL)
 		if err != nil {
 			return nil, err
 		}
-		if base == self {
+		if IsSelfMember(m.URL, cfg.Key, selfBase) {
 			continue
 		}
 		out = append(out, FederationMember{
 			RepoKey:       cfg.Key,
 			BaseURL:       base,
 			RemoteRepoKey: key,
+			Mode:          m.Mode,
 			Enabled:       m.Enabled == nil || m.Enabled.Bool(),
 		})
 	}
