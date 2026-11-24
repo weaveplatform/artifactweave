@@ -2,6 +2,7 @@ package peers
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -23,6 +24,8 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/app"
 	appsql "github.com/weaveplatform/artifactweave/internal/app/adapters/sql"
 	"github.com/weaveplatform/artifactweave/internal/app/config"
+	"github.com/weaveplatform/artifactweave/internal/federation/core/model"
+	"github.com/weaveplatform/artifactweave/internal/kernel"
 	"github.com/weaveplatform/artifactweave/internal/platform/instance"
 	"github.com/weaveplatform/artifactweave/internal/platform/sql/postgres"
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
@@ -71,6 +74,9 @@ type Options struct {
 	Instances int
 	// Driver is SQLite (the default) or Postgres.
 	Driver Driver
+	// PeerProbeInterval is each instance's federation.peer_probe_interval,
+	// how often it reads its peers' status; zero keeps the default.
+	PeerProbeInterval time.Duration
 }
 
 // Cluster is a set of artifactweave instances, each in its own OS process
@@ -134,6 +140,7 @@ func Start(t *testing.T, opts Options) *Cluster {
 			AdminPassword: "peer-admin-" + strings.ToLower(rand.Text()),
 			masterKey:     "peer-master-key-" + strings.ToLower(rand.Text()),
 			cluster:       c,
+			probe:         opts.PeerProbeInterval,
 			work:          filepath.Join(work, name),
 			done:          make(chan struct{}),
 			// Both relays listen before any instance starts: the ingress
@@ -209,6 +216,14 @@ func (c *Cluster) Heal(a, b int) {
 	c.t.Helper()
 	c.Restore(a, b)
 	c.Restore(b, a)
+}
+
+// Stop stops instance i as serve stops on a signal, as Close does, and
+// leaves the rest of the cluster running. Its ingress stays, so the others
+// still reach its base URL and find nothing listening there.
+func (c *Cluster) Stop(i int) {
+	c.t.Helper()
+	c.instance(i).stop()
 }
 
 // DoFrom sends a request to instance to's base URL as to's administrator,
@@ -389,6 +404,7 @@ type Instance struct {
 	AdminPassword string
 
 	cluster *Cluster
+	probe   time.Duration
 	work    string
 	dsn     string
 	// config is the configuration file the instance process loads.
@@ -431,6 +447,56 @@ func (in *Instance) DoAs(t testing.TB, user, password, method, path, body string
 // cluster's database goes with its container.
 func (in *Instance) Identity(t testing.TB) instance.InstanceIdentity {
 	t.Helper()
+	st := in.openStore(t)
+	defer func() { _ = st.Close() }()
+	id, err := st.Instance().Get(t.Context())
+	if err != nil {
+		t.Fatalf("peers: read %s's identity: %v", in.Name, err)
+	}
+	return id
+}
+
+// Peer reads the instance's record of the peer instanceID from its
+// database, as its own server does: what its status reads last recorded
+// (status, last-seen time and clock skew) included. ok is false while it
+// has no such record. The instance must be running, as for Identity.
+func (in *Instance) Peer(t testing.TB, instanceID string) (model.Peer, bool) {
+	t.Helper()
+	st := in.openStore(t)
+	defer func() { _ = st.Close() }()
+	p, err := st.Peers().Get(t.Context(), instanceID)
+	if errors.Is(err, kernel.ErrNotFound) {
+		return model.Peer{}, false
+	}
+	if err != nil {
+		t.Fatalf("peers: read %s's record of %s: %v", in.Name, instanceID, err)
+	}
+	return p, true
+}
+
+// SetPeerKey replaces the public key in the instance's record of the peer
+// instanceID, as if the peer now signed with key: the instance then
+// refuses the peer's requests and its answers. Restoring the peer's own
+// key ends that. Only the key changes; status reads write the liveness
+// columns alone, so they never write an old key back.
+func (in *Instance) SetPeerKey(t testing.TB, instanceID string, key ed25519.PublicKey) {
+	t.Helper()
+	st := in.openStore(t)
+	defer func() { _ = st.Close() }()
+	p, err := st.Peers().Get(t.Context(), instanceID)
+	if err != nil {
+		t.Fatalf("peers: read %s's record of %s: %v", in.Name, instanceID, err)
+	}
+	p.PublicKey = key
+	if err := st.Peers().Put(t.Context(), p); err != nil {
+		t.Fatalf("peers: write %s's record of %s: %v", in.Name, instanceID, err)
+	}
+}
+
+// openStore opens the instance's metadata store with the configuration it
+// runs with, its master key included, without migrating it.
+func (in *Instance) openStore(t testing.TB) *appsql.Store {
+	t.Helper()
 	cfg, err := config.Load(config.LoadOptions{File: in.config})
 	if err != nil {
 		t.Fatal(err)
@@ -443,12 +509,7 @@ func (in *Instance) Identity(t testing.TB) instance.InstanceIdentity {
 	if err != nil {
 		t.Fatalf("peers: open %s's store: %v", in.Name, err)
 	}
-	defer func() { _ = st.Close() }()
-	id, err := st.Instance().Get(t.Context())
-	if err != nil {
-		t.Fatalf("peers: read %s's identity: %v", in.Name, err)
-	}
-	return id
+	return st
 }
 
 // LogPath is the file that receives the instance's standard output and
@@ -485,14 +546,15 @@ func (c *Cluster) send(client *http.Client, base, user, password, contentType, m
 // instanceConfig is the strict YAML the instance process loads with
 // config.Load, as serve loads --config; only the keys a cluster sets.
 type instanceConfig struct {
-	Listen    string            `yaml:"listen"`
-	BaseURL   string            `yaml:"base_url"`
-	DataDir   string            `yaml:"data_dir"`
-	MasterKey string            `yaml:"master_key"`
-	Database  map[string]string `yaml:"database"`
-	Bootstrap map[string]string `yaml:"bootstrap"`
-	Log       map[string]string `yaml:"log"`
-	Remote    map[string]any    `yaml:"remote"`
+	Listen     string            `yaml:"listen"`
+	BaseURL    string            `yaml:"base_url"`
+	DataDir    string            `yaml:"data_dir"`
+	MasterKey  string            `yaml:"master_key"`
+	Database   map[string]string `yaml:"database"`
+	Bootstrap  map[string]string `yaml:"bootstrap"`
+	Log        map[string]string `yaml:"log"`
+	Remote     map[string]any    `yaml:"remote"`
+	Federation map[string]string `yaml:"federation,omitempty"`
 }
 
 func (in *Instance) start(origins []string) error {
@@ -517,13 +579,18 @@ func (in *Instance) startOnce(origins []string) error {
 	if in.dsn != "" {
 		database = map[string]string{"driver": string(Postgres), "dsn": in.dsn}
 	}
+	var federation map[string]string
+	if in.probe > 0 {
+		federation = map[string]string{"peer_probe_interval": in.probe.String()}
+	}
 	data, err := yaml.Marshal(instanceConfig{
 		Listen: addr, BaseURL: in.URL, DataDir: in.DataDir,
-		MasterKey: in.masterKey,
-		Database:  database,
-		Bootstrap: map[string]string{"admin_password": in.AdminPassword},
-		Log:       map[string]string{"level": "debug", "format": "text"},
-		Remote:    map[string]any{"allowed_private_origins": origins},
+		MasterKey:  in.masterKey,
+		Database:   database,
+		Bootstrap:  map[string]string{"admin_password": in.AdminPassword},
+		Log:        map[string]string{"level": "debug", "format": "text"},
+		Remote:     map[string]any{"allowed_private_origins": origins},
+		Federation: federation,
 	})
 	if err != nil {
 		return err
