@@ -2,7 +2,7 @@
   "schema": 1,
   "type": "swift",
   "name": "Swift Package Registry",
-  "client": "Swift/SwiftPM 6.4.2 pinned Linux client",
+  "client": "Swift/SwiftPM 6.4.3 pinned Linux client",
   "version_sources": [
     "test/acceptance/clients/swift.Dockerfile"
   ],

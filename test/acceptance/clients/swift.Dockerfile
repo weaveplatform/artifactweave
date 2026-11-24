@@ -1,4 +1,4 @@
-# Client pins: Swift/SwiftPM 6.4.2 pinned Linux client.
+# Client pins: Swift/SwiftPM 6.4.3 pinned Linux client.
 # SwiftPM is pinned to the multi-platform image index. Its native
 # package-registry client publishes, resolves and downloads in acceptance.
 FROM swift:6.4.3-jammy@sha256:a76121ceda0315af40b7c15e71a8447248a318787b0d8b41b212a2812279542f
