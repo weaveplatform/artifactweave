@@ -138,13 +138,15 @@ func main() {
 				"| Go acceptance packages | %s | %d package `TestAcc` packages |\n"+
 				"| Go acceptance native clients | %s | godog tags `%s` |\n"+
 				"| Terraform provider conformance | %s | %s |\n"+
-				"| Terraform deployment checks | %s | %s |\n",
+				"| Terraform deployment checks | %s | %s |\n"+
+				"| Go acceptance multi-instance peers | %s | %s |\n",
 			laneState(kinds.hasUnit()),
 			len(kinds.Unit), len(kinds.Fuzz),
 			laneState(len(kinds.Acc) != 0), len(kinds.Acc),
 			laneState(p.profile == "full" || p.profile == "format"), p.nativeSummaryTags(),
 			laneState(provider), p.terraformReason(true),
 			laneState(deployment), p.terraformReason(false),
+			laneState(p.peersLane()), p.peersReason(),
 		)
 		body.WriteString(
 			"Exact selected Go entry points are retained in the test-selection artifact.\n",
@@ -162,7 +164,7 @@ func main() {
 func githubOutputs(p plan, kinds kindSelection) string {
 	provider, deployment := p.terraformLanes()
 	return fmt.Sprintf(
-		"profile=%s\nmerge_base=%s\nowner=%s\nunits=%s\ntags=%s\nclients=%s\ncoverpkg=%s\nchanged_packages=%s\nunit_packages=%s\nacceptance_packages=%s\nfuzz_packages=%s\nunit_run=%s\nacceptance_run=%s\nhas_unit=%t\nhas_acceptance=%t\nterraform_provider=%t\nterraform_deployment=%t\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
+		"profile=%s\nmerge_base=%s\nowner=%s\nunits=%s\ntags=%s\nclients=%s\ncoverpkg=%s\nchanged_packages=%s\nunit_packages=%s\nacceptance_packages=%s\nfuzz_packages=%s\nunit_run=%s\nacceptance_run=%s\nhas_unit=%t\nhas_acceptance=%t\nterraform_provider=%t\nterraform_deployment=%t\npeers=%t\ncandidate_profile=%s\ncandidate_owner=%s\ncandidate_units=%s\ncandidate_tags=%s\ncandidate_clients=%s\n",
 		p.profile,
 		p.mergeBase,
 		p.candidate.owner,
@@ -180,6 +182,7 @@ func githubOutputs(p plan, kinds kindSelection) string {
 		len(kinds.Acc) != 0,
 		provider,
 		deployment,
+		p.peersLane(),
 		p.candidate.profile,
 		p.candidate.owner,
 		strings.Join(p.candidate.units, " "),

@@ -432,6 +432,30 @@ func TestUnitWorkflowKeepsOneRequiredGateForSelectedProfiles(t *testing.T) {
 			t.Errorf("%s is not selected by its own Terraform impact flag", name)
 		}
 	}
+	// The multi-instance lane runs go test on test/peers itself, with the
+	// race detector, shuffled order and a coverage directory of its own that
+	// the merged gate reads, and the required gate waits for it.
+	peers := workflow.Jobs["acceptance-peers"]
+	if !contains(peers.Needs, "impact") || peers.If != "needs.impact.outputs.peers == 'true'" ||
+		!contains(workflow.Jobs["coverage"].Needs, "acceptance-peers") ||
+		!contains(workflow.Jobs["gate"].Needs, "acceptance-peers") {
+		t.Error("acceptance-peers must be selected by its impact flag and feed the coverage gate and the required gate")
+	}
+	var peersRun, peersUpload bool
+	for _, step := range peers.Steps {
+		if strings.Contains(step.Run, "go test -race -shuffle=on") &&
+			strings.Contains(step.Run, "./test/peers/...") &&
+			strings.Contains(step.Run, `-test.gocoverdir="$PWD/cover/accept-peers"`) &&
+			!strings.Contains(step.Run, "make ") {
+			peersRun = true
+		}
+		if step.Name == "Upload multi-instance coverage" {
+			peersUpload = true
+		}
+	}
+	if !peersRun || !peersUpload {
+		t.Error("acceptance-peers must run go test on ./test/peers/... directly and upload cover-accept-peers")
+	}
 	if job := workflow.Jobs["acceptance-go"]; !contains(job.Needs, "impact") ||
 		!strings.Contains(job.If, "has_acceptance == 'true'") ||
 		!strings.HasPrefix(job.Name, "Go acceptance tests") {
@@ -715,6 +739,7 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 		"AFFECTED_COVERAGE": "skipped", "PARITY": "skipped", "JVM": "skipped",
 		"TERRAFORM": "skipped", "PROVIDER_SELECTED": "false", "OCI": "skipped",
 		"DEPLOY": "skipped", "DEPLOY_SELECTED": "false",
+		"PEERS": "skipped", "PEERS_SELECTED": "false",
 	}
 	full := map[string]string{
 		"PROFILE": "full", "HAS_UNIT": "true", "GO_ACCEPTANCE": "success",
@@ -724,7 +749,7 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 		"JVM":      "success",
 		"COVERAGE": "success", "PARITY": "success", "TERRAFORM": "success",
 		"PROVIDER_SELECTED": "true", "OCI": "success", "DEPLOY": "success",
-		"DEPLOY_SELECTED": "true",
+		"DEPLOY_SELECTED": "true", "PEERS": "success", "PEERS_SELECTED": "true",
 	}
 	fullWith := func(key, value string) map[string]string {
 		values := maps.Clone(full)
@@ -782,6 +807,20 @@ func TestUnitRequiredGateExecutesTheFourLanePolicy(t *testing.T) {
 			"DEPLOY_SELECTED": "true", "DEPLOY": "success",
 		}, true},
 		{"release full gate", "success", full, true},
+		{"full rejects failed multi-instance peers", "success", fullWith("PEERS", "failure"), false},
+		{"full rejects skipped multi-instance peers", "success", fullWith("PEERS", "skipped"), false},
+		{"full rejects an unselected multi-instance lane", "success", fullWith("PEERS_SELECTED", "false"), false},
+		{"docs rejects unexpected multi-instance peers", "", map[string]string{
+			"DOCS": "success", "PEERS": "success",
+		}, false},
+		{"format rejects unexpected multi-instance peers", "success", map[string]string{
+			"PROFILE": "format", "HAS_UNIT": "true", "LINT": "success",
+			"ACCEPTANCE": "success", "AFFECTED_COVERAGE": "success", "PEERS": "success",
+		}, false},
+		{"selected multi-instance peers must run", "success", map[string]string{
+			"PROFILE": "format", "HAS_UNIT": "true", "LINT": "success",
+			"ACCEPTANCE": "success", "AFFECTED_COVERAGE": "success", "PEERS_SELECTED": "true",
+		}, false},
 		{"full rejects failed Windows SQLite acceptance", "success", fullWith("SQLITE_WINDOWS", "failure"), false},
 		{"full rejects skipped Windows SQLite acceptance", "success", fullWith("SQLITE_WINDOWS", "skipped"), false},
 		{"full rejects cancelled Windows SQLite acceptance", "success", fullWith("SQLITE_WINDOWS", "cancelled"), false},

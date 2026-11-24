@@ -26,8 +26,11 @@
 //
 //   - The profile (full, format, deployment or docs) and the reason for it,
 //     with the selected unit packages, acceptance tags and native clients,
+//     and whether the multi-instance lane (acceptance-peers) runs: on every
+//     full run and for test/peers and the federation module (peers.go),
 //     written to the GitHub Actions output and step summary files
-//     (-github-output, -summary).
+//     (-github-output, -summary). test/peers is left out of the package
+//     lanes, as test/acceptance and test/platform are.
 //   - With -selection-json, the selected Go test names and packages as JSON.
 //   - With -check-coverage, a failure when a changed production package is
 //     missing from the same run's coverage or below 90% of its statements.
@@ -44,5 +47,6 @@
 // # Status
 //
 // Implemented P9b (issue 673); P9d added the module layout's packages and
-// the split test packages (issue 951).
+// the split test packages (issue 951); P13 the multi-instance lane (issue
+// 1924).
 package main
