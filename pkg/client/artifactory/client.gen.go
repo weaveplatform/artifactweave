@@ -10641,7 +10641,7 @@ type ClientInterface interface {
 
 	// ReplaceFederatedMemberBaseUrlWithBody Replace a federated member's base URL
 	//
-	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10650,7 +10650,7 @@ type ClientInterface interface {
 
 	// ReplaceFederatedMemberBaseUrl Replace a federated member's base URL
 	//
-	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10716,7 +10716,7 @@ type ClientInterface interface {
 
 	// UpdateFederatedMemberUrlWithBody Update a federated member's URL
 	//
-	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10725,7 +10725,7 @@ type ClientInterface interface {
 
 	// UpdateFederatedMemberUrl Update a federated member's URL
 	//
-	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -15433,7 +15433,7 @@ func (c *Client) RemoveFederationMemberWithTextBody(ctx context.Context, body Re
 
 // ReplaceFederatedMemberBaseUrlWithBody Replace a federated member's base URL
 //
-// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15452,7 +15452,7 @@ func (c *Client) ReplaceFederatedMemberBaseUrlWithBody(ctx context.Context, cont
 
 // ReplaceFederatedMemberBaseUrl Replace a federated member's base URL
 //
-// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15594,7 +15594,7 @@ func (c *Client) GetUnavailableMirrors(ctx context.Context, reqEditors ...Reques
 
 // UpdateFederatedMemberUrlWithBody Update a federated member's URL
 //
-// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15613,7 +15613,7 @@ func (c *Client) UpdateFederatedMemberUrlWithBody(ctx context.Context, contentTy
 
 // UpdateFederatedMemberUrl Update a federated member's URL
 //
-// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -38406,7 +38406,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReplaceFederatedMemberBaseUrlWithBodyWithResponse Replace a federated member's base URL
 	//
-	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38415,7 +38415,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReplaceFederatedMemberBaseUrlWithResponse Replace a federated member's base URL
 	//
-	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38495,7 +38495,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateFederatedMemberUrlWithBodyWithResponse Update a federated member's URL
 	//
-	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38504,7 +38504,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateFederatedMemberUrlWithResponse Update a federated member's URL
 	//
-	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+	// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -76563,7 +76563,7 @@ func (c *ClientWithResponses) RemoveFederationMemberWithTextBodyWithResponse(ctx
 
 // ReplaceFederatedMemberBaseUrlWithBodyWithResponse Replace a federated member's base URL
 //
-// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76578,7 +76578,7 @@ func (c *ClientWithResponses) ReplaceFederatedMemberBaseUrlWithBodyWithResponse(
 
 // ReplaceFederatedMemberBaseUrlWithResponse Replace a federated member's base URL
 //
-// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource). Administrators only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76706,7 +76706,7 @@ func (c *ClientWithResponses) GetUnavailableMirrorsWithResponse(ctx context.Cont
 
 // UpdateFederatedMemberUrlWithBodyWithResponse Update a federated member's URL
 //
-// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -76721,7 +76721,7 @@ func (c *ClientWithResponses) UpdateFederatedMemberUrlWithBodyWithResponse(ctx c
 
 // UpdateFederatedMemberUrlWithResponse Update a federated member's URL
 //
-// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
+// Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl, keeping its repository key, and sends each changed configuration to its members. The new base URL must belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

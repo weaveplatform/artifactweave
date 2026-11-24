@@ -258,7 +258,7 @@ paths:
               schema:
                 description: '"Configuration sync executed successfully".'
                 type: string
-          description: The configuration sends to every member are queued; artifactweave answers text/plain.
+          description: The configuration sends to every member are queued; the answer is text/plain.
         '400':
           content:
             application/json:
@@ -916,7 +916,7 @@ paths:
     post:
       description: Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl,
         keeping its repository key, and sends each changed configuration to its members. The new base URL must
-        belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it
+        belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it
         (FederatedReplaceUrlResource). Administrators only.
       operationId: replaceFederatedMemberBaseUrl
       requestBody:
@@ -1631,7 +1631,7 @@ paths:
     post:
       description: Rewrites, on every federated repository, each member whose base URL is oldBaseUrl to newBaseUrl,
         keeping its repository key, and sends each changed configuration to its members. The new base URL must
-        belong to a paired peer, as every member's must. Not on JFrog's API index; 7.161.26 serves it
+        belong to a paired peer, as every member's must. Not on the published API index; 7.161.26 serves it
         (FederatedReplaceUrlResource) with the same body and effect as replaceUrl. Administrators only.
       operationId: updateFederatedMemberUrl
       requestBody:
