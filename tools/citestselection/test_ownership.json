@@ -119,6 +119,8 @@
       "cleanup_policies_test.go",
       "docker_list_errors_test.go",
       "error_profiles_p8_test.go",
+      "federated_matrix_test.go",
+      "federated_status_test.go",
       "fixtures_test.go",
       "format_tables_test.go",
       "hash_test.go",
